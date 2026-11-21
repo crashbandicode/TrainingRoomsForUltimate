@@ -582,7 +582,7 @@ impl Wizard {
                 Some([20.0, -28.0])
             }
             (Drill::GuardEdge, Some(perfect::sora_flight::KIND)) if perfect::is_crossing_stage(stage_key) => {
-                Some([10.0, -30.0])
+                Some([20.0, -28.0])
             }
             (Drill::GuardEdge, Some(perfect::olimar::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([26.0, -26.0])
@@ -1028,6 +1028,30 @@ mod tests {
         for key in [(3, 1), (0, 1), (311, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn sora_wizard_uses_the_widened_default_release_on_the_three_measured_stages() {
+        let stage = Stage::new(
+            [-200.0, 200.0, 180.0, -140.0],
+            [-160.0, 160.0, 120.0, -100.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        )
+        .unwrap();
+        for id in [0, 3, 311] {
+            let mut wizard = Wizard::new(
+                Drill::GuardEdge,
+                stage,
+                [0.0, 0.0],
+                100,
+                (id, 0),
+                Some(perfect::sora_flight::KIND),
+            )
+            .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0]);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0]);
         }
     }
 

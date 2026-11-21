@@ -23,12 +23,15 @@ const JUMP_CLEARANCE: f32 = 17.84;
 const MAX_WAIT: u32 = 90;
 const JUMP_THINKS: u32 = 72;
 const FALL_TO_SWEEP: [u32; 6] = [11, 10, 12, 9, 13, 14];
+const EARLY_JUMP_FALL: [u32; 8] = [16, 18, 20, 22, 24, 26, 28, 30];
+const LOCK_STEP: f32 = 2.647;
+const LOCK_THINKS: f32 = 12.0;
 
 const S_X2_RING: [u32; 44] = [
-    0x00000000, 0x00003fc0, 0x00003fc0, 0x00001fc0, 0x00000fc0, 0x00000fc0, 0x000007c0, 0x000007c0,
-    0x000003c0, 0x000001c0, 0x000000c0, 0x000000c0, 0x00000040, 0x00000000, 0x00000000, 0x00000000,
-    0x00000000, 0x0000000c, 0x00000004, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x0003ffc0, 0x0001ffc0, 0x0001ffc0, 0x0000ffc0, 0x0000ffc0, 0x00007fc0, 0x00003fc0,
+    0x00003fc0, 0x00001fc0, 0x00000fc0, 0x000007c0, 0x000007c0, 0x000003c0, 0x000003c0, 0x000001c0,
+    0x000000e0, 0x000000fc, 0x0000007c, 0x0000003c, 0x0000001c, 0x0000001c, 0x0000000c, 0x0000000c,
+    0x00000004, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000,
 ];
@@ -112,6 +115,22 @@ struct FlightTiming {
     jump: u32,
     sweep: u32,
     angle: BladeAngle,
+    finish: FlightFinish,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum FlightFinish {
+    Stage,
+    Low,
+}
+
+impl FlightFinish {
+    const fn live_margin(self) -> f32 {
+        match self {
+            Self::Stage => 1.0,
+            Self::Low => 1.5,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -172,19 +191,28 @@ impl FlightSpace<'_> {
             && (-22.5..=-8.5).contains(&(point[1] - self.near[1]))
     }
 
-    fn cast_slack(self, cast: Point, angle: BladeAngle) -> f32 {
+    fn cast_slack(self, cast: Point, angle: BladeAngle, finish: FlightFinish) -> f32 {
         let [dx, dy] = sweep_and_blade(angle);
         let q = self.ahead(cast, dx, dy);
         let out = (q[0] - self.far[0]) * self.inward;
         let depth = self.far[1] - q[1];
         let distance = out.hypot(depth);
-        let end = 31.764 * depth / distance - depth;
+        if !distance.is_finite() || distance == 0.0 {
+            return f32::NEG_INFINITY;
+        }
+        let end = LOCK_STEP * LOCK_THINKS * depth / distance - depth;
+        let (min_end, max_end, max_distance) = match finish {
+            FlightFinish::Stage => (-2.3, 4.0, 35.0),
+            // Measured low catches include the lock dash's two cliff checks and its rise.
+            // Keep 1.5 units inside the deepest measured end and longest lock.
+            FlightFinish::Low => (-24.5, 0.7, 58.0),
+        };
         (out - 5.5)
             .min(10.5 - out)
             .min(distance - 27.0)
-            .min(35.0 - distance)
-            .min(end + 2.3)
-            .min(4.0 - end)
+            .min(max_distance - distance)
+            .min(end - min_end)
+            .min(max_end - end)
     }
 
     fn sweep_clear(self, cast: Point, angle: BladeAngle) -> bool {
@@ -248,11 +276,23 @@ fn lost(vy: f32, frames: u32) -> f32 {
 }
 
 fn solve(space: FlightSpace<'_>, start: Point, vy: f32) -> Option<FlightTiming> {
+    find_flight(space, start, vy, &FALL_TO_SWEEP, FlightFinish::Stage)
+        .or_else(|| find_flight(space, start, vy, &FALL_TO_SWEEP, FlightFinish::Low))
+        .or_else(|| find_flight(space, start, vy, &EARLY_JUMP_FALL, FlightFinish::Low))
+}
+
+fn find_flight(
+    space: FlightSpace<'_>,
+    start: Point,
+    vy: f32,
+    fall_to_sweep: &[u32],
+    finish: FlightFinish,
+) -> Option<FlightTiming> {
     let span = (space.far[0] - start[0]) * space.inward;
     let mut best = None;
     for angle in BladeAngle::ALL {
         let [dx, _] = sweep_and_blade(angle);
-        for gap in FALL_TO_SWEEP {
+        for &gap in fall_to_sweep {
             let lo = ((span + 5.5 - dx + 4.32) / AIR_SPEED - (JUMP_THINKS + gap) as f32)
                 .ceil()
                 .max(11.0) as u32;
@@ -261,11 +301,12 @@ fn solve(space: FlightSpace<'_>, start: Point, vy: f32) -> Option<FlightTiming> 
                 .clamp(0.0, 300.0) as u32;
             for glide in lo..=hi {
                 let drift = AIR_SPEED * (glide + JUMP_THINKS + gap) as f32 - 4.32;
-                for wait in 0..=MAX_WAIT {
+                let max_wait = if finish == FlightFinish::Stage { MAX_WAIT } else { 0 };
+                for wait in 0..=max_wait {
                     let dy = -lost(vy, wait + glide) + JUMP_HEIGHT[JUMP_THINKS as usize] + 0.02
                         - TERMINAL * gap as f32;
                     let cast = space.ahead(start, drift, dy);
-                    let slack = space.cast_slack(cast, angle);
+                    let slack = space.cast_slack(cast, angle, finish);
                     let score = slack - 0.01 * wait as f32;
                     if slack < 1.5 || best.as_ref().is_some_and(|(old, _)| score <= *old) {
                         continue;
@@ -278,7 +319,7 @@ fn solve(space: FlightSpace<'_>, start: Point, vy: f32) -> Option<FlightTiming> 
                     let Some(cast) = space.jump_to_cast(press, press_speed, gap) else {
                         continue;
                     };
-                    if space.cast_slack(cast, angle) >= 1.5 && space.sweep_clear(cast, angle) {
+                    if space.cast_slack(cast, angle, finish) >= 1.5 && space.sweep_clear(cast, angle) {
                         best = Some((
                             score,
                             FlightTiming {
@@ -286,6 +327,7 @@ fn solve(space: FlightSpace<'_>, start: Point, vy: f32) -> Option<FlightTiming> 
                                 jump,
                                 sweep: jump + JUMP_THINKS + gap,
                                 angle,
+                                finish,
                             },
                         ));
                     }
@@ -409,7 +451,7 @@ impl SoraFlight {
                 && beat.can_rise
                 && beat.can_blade
                 && (beat.velocity[0] * self.inward - AIR_SPEED).abs() <= 0.12
-                && drop.cast_slack(cast, timing.angle) >= 1.0
+                && drop.cast_slack(cast, timing.angle, timing.finish) >= timing.finish.live_margin()
                 && drop.sweep_clear(cast, timing.angle))
             .then_some(pad(forward, JUMP));
         }
@@ -431,8 +473,9 @@ impl SoraFlight {
             let angle = BladeAngle::ALL
                 .into_iter()
                 .filter_map(|angle| {
-                    let slack = drop.cast_slack(cast, angle);
-                    (slack >= 1.0 && drop.sweep_clear(cast, angle)).then_some((slack, angle))
+                    let slack = drop.cast_slack(cast, angle, timing.finish);
+                    (slack >= timing.finish.live_margin() && drop.sweep_clear(cast, angle))
+                        .then_some((slack, angle))
                 })
                 .max_by(|a, b| a.0.total_cmp(&b.0))?
                 .1;
@@ -534,8 +577,33 @@ mod tests {
                     jump: 67,
                     sweep: 150,
                     angle: BladeAngle::A130,
+                    finish: FlightFinish::Stage,
                 }
             );
+        }
+    }
+
+    #[test]
+    fn sora_admits_the_widened_default_and_the_measured_lower_far_catch() {
+        for (outside, height, vy) in [
+            (20.0, -28.0, 0.0),
+            (20.0, -28.0, -1.44),
+            (10.0, -58.0, -1.44),
+            (30.0, -30.0, -1.44),
+            (70.0, 34.0, -1.44),
+            (14.0, -46.0, -1.44),
+        ] {
+            for stage in [(3, 0), (0, 0), (311, 0)] {
+                let position = [-79.99 - outside, height];
+                let beat = SoraBeat {
+                    velocity: [0.0, vy],
+                    ..sample(position)
+                };
+                assert!(
+                    SoraFlight::start(&facts(stage, position, [0.0; 2]), beat).is_some(),
+                    "no S-X2 at {outside} out, {height} high, vy {vy}, on {stage:?}",
+                );
+            }
         }
     }
 
@@ -620,7 +688,7 @@ mod tests {
     fn sora_region_cells_keep_a_clear_way_through_the_ring_from_either_side() {
         assert_eq!(
             S_X2_RING.iter().map(|row| row.count_ones()).sum::<u32>(),
-            60
+            142
         );
         for (row, &bits) in S_X2_RING.iter().enumerate() {
             for col in (0..30).filter(|col| bits & (1 << col) != 0) {
