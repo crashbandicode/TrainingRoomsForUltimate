@@ -118,11 +118,10 @@ pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
 
-/// Report only hook writes made by the visualizer installer. The spacing installer owns its own write.
-pub fn visualizer_written(site: &Site, guard: GuardOutcome, installed: bool) -> Written {
-    if installed && matches!(site.kind, SeamKind::Hook { .. })
-        && !GRADER_ROWS.iter().any(|&(name, _)| name == site.name)
-    {
+/// Report each hook's actual installer outcome in the shared table.
+pub fn reported_write(site: &Site, guard: GuardOutcome, visualizer: bool, spacing: bool) -> Written {
+    let installed = if site.name == "spacing_hit_handler" { spacing } else { visualizer };
+    if installed && matches!(site.kind, SeamKind::Hook { .. }) {
         Written::Far
     } else if guard.usable() {
         Written::Checked

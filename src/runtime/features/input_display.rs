@@ -184,12 +184,14 @@ unsafe fn lane_player() -> bool {
     !natives::is_operation_cpu(i32::from(crate::runtime::features::cpu::primary_entry_now()))
 }
 
-/// Boot: every optional spacing-grader row passed its guard.
-pub fn set_grader_read(on: bool) {
+/// Set up the spacing grader at boot and return whether its hook was installed.
+pub fn set_grader_read(on: bool) -> bool {
     FIGHTER_READ.store(on, Ordering::Release);
-    if on {
-        skyline::install_hook!(spacing_hit);
+    if !on {
+        return false;
     }
+    skyline::install_hook!(spacing_hit);
+    true
 }
 
 pub fn set_owner_read(on: bool) {

@@ -406,20 +406,26 @@ fn grader_rows_resolve_in_the_hitbox_table() {
 }
 
 #[test]
-fn core06_install_report_only_marks_visualizer_hook_writes() {
+fn core06_install_report_distinguishes_visualizer_and_spacing_writes() {
     use model::guard::GuardOutcome;
     use model::install_line::Written;
 
     let site = |name| SITES.iter().find(|site| site.name == name).unwrap();
-    let written = sites_hitbox::visualizer_written;
+    let written = sites_hitbox::reported_write;
     let usable = GuardOutcome::Stock;
     let phase_end = site("overlay_process_end");
     let spacing = site("spacing_hit_handler");
-    assert_eq!(written(phase_end, usable, true), Written::Far);
-    assert_eq!(written(phase_end, usable, false), Written::Checked);
-    assert_eq!(written(spacing, usable, true), Written::Checked);
-    assert_eq!(written(spacing, GuardOutcome::Foreign { first_diff: 0 }, true), Written::Skipped);
-    assert_eq!(SITES.iter().filter(|site| written(site, usable, true) == Written::Far).count(), 8);
+    assert_eq!(written(phase_end, usable, true, false), Written::Far);
+    assert_eq!(written(phase_end, usable, false, true), Written::Checked);
+    assert_eq!(written(spacing, usable, false, true), Written::Far);
+    assert_eq!(written(spacing, usable, true, false), Written::Checked);
+    assert_eq!(written(spacing, GuardOutcome::Foreign { first_diff: 0 }, true, false), Written::Skipped);
+    for (visualizer, grader, expected) in [(true, true, 9), (true, false, 8), (false, true, 1), (false, false, 0)] {
+        assert_eq!(SITES.iter().filter(|site| written(site, usable, visualizer, grader) == Written::Far).count(), expected);
+    }
+    let boot = include_str!("../src/runtime/boot.rs");
+    assert!(boot.contains("let spacing_installed = input_display::set_grader_read("));
+    assert!(boot.contains("hitbox::reports(&hb_found, hitbox_on, spacing_installed)"));
 }
 
 #[test]
@@ -1581,101 +1587,46 @@ fn core06_hurt_census_window_and_line_format() {
 
 #[test]
 fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect() {
-    // Keep the original visualizer admission and diagnostic census boundaries. The only second release caller is
-    // a live Perfect attempt sampling the current primary P1 for a recovery plan.
-    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/hitbox.rs")).unwrap();
-    let toks = callgraph::lex(&src);
+    // Fighter and article visuals sample at phase 8. Perfect recovery keeps its early gameplay measurement.
+    use callgraph::Tok;
+
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    let toks = callgraph::lex(src);
     let refs = |name: &str| -> Vec<usize> {
-        toks.iter().enumerate().filter(|(_, t)| matches!(t, callgraph::Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
+        toks.iter().enumerate().filter(|(_, t)| matches!(t, Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
     };
-    // The visualizer reads in sample_fighter. The Perfect probe and diagnostic census keep their own entry points.
-    let mut stats_span = None;
-    for i in 0..toks.len() - 2 {
-        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "mod")
-            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "stats")
-            && matches!(&toks[i + 2], callgraph::Tok::Punct('{'))
-        {
-            let mut depth = 0i32;
-            let close = (i + 2..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('{') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct('}') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .expect("the stats module closes");
-            stats_span = Some((i, close));
-            break;
-        }
-    }
-    let (stats_open, stats_close) = stats_span.expect("one diag `mod stats` block");
+    let span = |kind: &str, name: &str| {
+        let start = toks.windows(2).position(|w| {
+            matches!(&w[0], Tok::Ident(s) if s == kind) && matches!(&w[1], Tok::Ident(s) if s == name)
+        }).unwrap_or_else(|| panic!("missing {kind} {name}"));
+        let open = (start + 2..toks.len()).find(|&i| matches!(toks[i], Tok::Punct('{'))).unwrap();
+        let mut depth = 0;
+        let close = (open..toks.len()).find(|&i| match toks[i] {
+            Tok::Punct('{') => { depth += 1; false }
+            Tok::Punct('}') => { depth -= 1; depth == 0 }
+            _ => false,
+        }).expect("the body closes");
+        start..close
+    };
+    let stats = span("mod", "stats");
     assert!(
-        toks[..stats_open].iter().rev().take(10).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+        toks[..stats.start].iter().rev().take(10).any(|t| matches!(t, Tok::Ident(s) if s == "cfg")),
         "the stats module is diag-gated"
     );
-    let inside_stats = |i: usize| i > stats_open && i < stats_close;
-    let mut sample_span = None;
-    for i in 0..toks.len() - 2 {
-        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "fn")
-            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "sample_fighter")
-            && matches!(&toks[i + 2], callgraph::Tok::Punct('('))
-        {
-            let mut depth = 0i32;
-            let body_open = (i + 2..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('(') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct(')') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .and_then(|close| (close..toks.len()).find(|&k| matches!(&toks[k], callgraph::Tok::Punct('{'))))
-                .expect("the frame body opens");
-            let mut depth = 0i32;
-            let close = (body_open..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('{') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct('}') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .expect("the frame body closes");
-            sample_span = Some((body_open, close));
-            break;
-        }
+    let sample = span("fn", "sample_fighter");
+    let articles = span("fn", "draw_articles");
+    let perfect = span("fn", "perfect_player_height");
+    let perfect_visual = span("fn", "perfect_visualizer_height");
+    let constructors = refs("GameHurt");
+    for (reader, expected) in [(&sample, 1), (&articles, 2), (&perfect, 1), (&perfect_visual, 1)] {
+        assert_eq!(constructors.iter().filter(|i| reader.contains(i)).count(), expected);
     }
-    let (sample_open, sample_close) = sample_span.expect("one `fn sample_fighter`");
-    let inside_sample = |i: usize| i > sample_open && i < sample_close;
-    let perfect_start = toks.windows(3).position(|w| {
-        matches!(&w[0], callgraph::Tok::Ident(s) if s == "fn")
-            && matches!(&w[1], callgraph::Tok::Ident(s) if s == "perfect_player_height")
-            && matches!(&w[2], callgraph::Tok::Punct('('))
-    }).expect("the second release reader belongs to the live Perfect player snapshot");
-    let perfect_open = (perfect_start + 3..toks.len())
-        .find(|&i| matches!(toks[i], callgraph::Tok::Punct('{')))
-        .expect("the Perfect reader body opens");
-    let mut depth = 0;
-    let perfect_close = (perfect_open..toks.len()).find(|&i| match toks[i] {
-        callgraph::Tok::Punct('{') => { depth += 1; false }
-        callgraph::Tok::Punct('}') => { depth -= 1; depth == 0 }
-        _ => false,
-    }).expect("the Perfect reader body closes");
-    let inside_perfect = |i: usize| i > perfect_open && i < perfect_close;
-    assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_perfect(i)).count(), 1);
+    assert!(src.contains("let hurt = shown(legend::ARTICLE_HURTBOXES) && matches!(scene::current(), Some(Scene::Training));"));
+    assert!(src.contains("if hurt && !articles.tracked"));
+    assert!(src.contains("if hurt {"));
+    assert!(src.contains("if let Some(attempt) = super::edge_juggle::player_height_request(accessor)"));
+    assert!(src.contains("if SETTING.load(Ordering::Acquire) && shown(legend::HURTBOXES) {\n            perfect_visualizer_height(attempt.player())"));
+    assert_eq!(src.matches("perfect_visualizer_height(attempt.player())").count(), 1);
     let adapter = include_str!("../src/runtime/features/edge_juggle.rs");
     assert_eq!(src.matches("perfect_player_height(&attempt)").count(), 1);
     assert!(adapter.contains("wanted() == Some(run.drill)"));
@@ -1687,7 +1638,6 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     assert!(src.contains("let enabled = active && SETTING.load(Ordering::Acquire);"));
     assert!(src.contains("sample_fighter(&mut store, board, accessor, enabled);"));
     assert!(src.contains("let mut hurt = (enabled && shown(legend::HURTBOXES)).then(|| hitbox::GameHurt"));
-    assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_sample(i)).count(), 1);
     assert!(adapter.contains("&& run.plan_pending"));
     assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
     assert!(adapter.contains("run.player_height.request(frame, actionable)"));
@@ -1699,19 +1649,19 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
         for &i in &found {
             let definition = toks[..i].iter().rev().take(3).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "fn"));
-            assert!(definition || inside_sample(i) || inside_perfect(i) || inside_stats(i), "{name} at token {i} is outside the two release callers and diag census");
+            assert!(definition || [&sample, &articles, &perfect, &perfect_visual, &stats].iter().any(|span| span.contains(&i)), "{name} at token {i} is outside the admitted overlay and Perfect readers and diag census");
         }
     }
     // The census stays diag-only: its walk and its window type are named only inside the gated module.
     for name in ["hurt_parts", "HurtCensus"] {
         let found = refs(name);
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
-        assert!(found.iter().all(|&i| inside_stats(i) || name == "hurt_parts" && inside_perfect(i)), "{name} is outside its allowed readers");
+        assert!(found.iter().all(|&i| stats.contains(&i) || name == "hurt_parts" && perfect.contains(&i)), "{name} is outside its allowed readers");
     }
     // The per-frame census call: cfg-gated wherever it sits.
     for i in refs("hurt_census") {
         assert!(
-            inside_stats(i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+            stats.contains(&i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
             "the census call at token {i} is cfg-gated"
         );
     }

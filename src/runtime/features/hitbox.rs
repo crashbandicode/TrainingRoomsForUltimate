@@ -38,7 +38,7 @@ use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
-use crate::model::install_line::{SiteReport, Written};
+use crate::model::install_line::SiteReport;
 use crate::model::legend;
 use crate::model::practice_games::{self, Game};
 use crate::model::scene::Scene;
@@ -1637,8 +1637,7 @@ pub fn check(poisoned: &dyn Fn(&str) -> bool) -> [GuardOutcome; N] {
 }
 
 /// Install the overlay hooks after its full closure and the CPU frame wrapper pass their guards.
-/// Returns the installed flag and the per-site result for the boot log.
-pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N]) {
+pub fn install(closure: bool) -> bool {
     if closure {
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
@@ -1649,14 +1648,16 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         skyline::install_hook!(overlay_process_end_hook);
     }
-    let written = std::array::from_fn(|i| sites_hitbox::visualizer_written(&sites_hitbox::SITES[i], found[i], closure));
     set_installed(closure);
-    (closure, written)
+    closure
 }
 
-/// The rows of `sites_hitbox` for the install line.
-pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport; N] {
-    std::array::from_fn(|i| SiteReport { site: sites_hitbox::SITES[i].name, found: found[i], written: written[i] })
+/// Record the visualizer and the separately installed spacing hook in the same install line.
+pub fn reports(found: &[GuardOutcome; N], visualizer: bool, spacing: bool) -> [SiteReport; N] {
+    std::array::from_fn(|i| {
+        let site = &sites_hitbox::SITES[i];
+        SiteReport { site: site.name, found: found[i], written: sites_hitbox::reported_write(site, found[i], visualizer, spacing) }
+    })
 }
 
 // ---- diag: the cost of the pass and the plugin's share of the effect pool -------------------------------------------------

@@ -2277,3 +2277,11 @@ ceiling = 187797
 date = "2026-11-21"
 reason = "Keep the committed BTT layout visible while a held run waits for its first phase-8 sample. Export the anchor reader for the stacked strip without suppressing lints and check the install report against the hook owner. Exact normalized delta +19 over 187778, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
 approved_by = "Operator through tr-primary-2 at 19:07Z requested the held editor correction under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187805
+date = "2026-11-21"
+reason = "Report the visualizer and spacing hook writes from their independent boot outcomes. Exact normalized delta +8 over 187797, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
+approved_by = "Operator through tr-primary-2 on 2026-11-21 requested completion through source review under the measured LOC rule for memory-efficient changes."
