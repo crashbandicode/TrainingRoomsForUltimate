@@ -865,22 +865,23 @@ mod tests {
     }
 
     #[test]
-    fn puff_fd_wizard_releases_inside_the_measured_ring() {
+    fn puff_wizard_releases_inside_the_measured_fd_and_battlefield_ring() {
         let stage = Stage::new(
             [-240.0, 240.0, 160.0, -140.0],
             [-160.0, 160.0, 110.0, -105.0],
             [[-80.0, 0.0], [80.0, 0.0]],
         ).unwrap();
         let puff = Some(0xc);
-        let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, (3, 0), puff)
-            .unwrap();
-        assert_eq!(wizard.setup.cpu, [-100.0, -28.0]);
-        wizard.change_area(stage, 1);
-        assert_eq!(wizard.setup.cpu, [100.0, -28.0]);
-        wizard.change_area(stage, 1);
-        assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
-
-        for key in [(3, 1), (0, 0), (311, 0)] {
+        for key in [(3, 0), (0, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff)
+                .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0], "stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(3, 1), (0, 1), (311, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }

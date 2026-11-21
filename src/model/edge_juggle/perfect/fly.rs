@@ -29,7 +29,7 @@ const RING_CELLS: [u32; 44] = [
 
 /// The live shape must still match the measured profile.
 pub fn puff_stage(stage: (i32, u32)) -> bool {
-    stage == (3, 0)
+    matches!(stage, (0 | 3, 0))
 }
 
 fn falling(vy: f32) -> f32 {
