@@ -112,7 +112,7 @@ pub struct SkullBashPath {
     pub height: f32,
 }
 
-// The 199 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
+// The 195 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
 // Mirrored at runtime. The live outline and blast line must still match.
 // The frame after a press can fall another 2.48 units (edge-ref-pika-sA2d-1).
 const SKULL_BASH_RING: [u32; 44] = [
