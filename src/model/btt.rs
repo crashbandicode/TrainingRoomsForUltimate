@@ -770,11 +770,13 @@ pub const fn pointer_ok(p: usize) -> bool {
     p >= 0x1_0000 && p & 7 == 0
 }
 
-/// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
-/// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
-/// the frames left before it may ask again.
-/// Eggsercise's off-stage zone editor shares the placing camera with BTT and Tech.
+pub const BTT_PLACEMENT_OWNER: u8 = 1;
+pub const TECH_CAMERA_OWNER: u8 = 2;
 pub const EGG_ZONE_OWNER: u8 = 4;
+pub const EDGE_JUGGLE_OWNER: u8 = 8;
+pub const TECH_PLACEMENT_OWNER: u8 = 16;
+const INTERRUPTED: u8 = 32;
+const PLACEMENT_OWNERS: u8 = BTT_PLACEMENT_OWNER | EGG_ZONE_OWNER | EDGE_JUGGLE_OWNER | TECH_PLACEMENT_OWNER;
 
 /// Lock-free owner requests; the game thread alone steps the camera state.
 pub struct CameraRequests(std::sync::atomic::AtomicU8);
@@ -785,9 +787,29 @@ impl CameraRequests {
         if want { self.0.fetch_or(owner, Ordering::AcqRel); }
         else { self.0.fetch_and(!owner, Ordering::AcqRel); }
     }
-    pub fn wanted(&self) -> bool { self.0.load(std::sync::atomic::Ordering::Acquire) != 0 }
+    pub fn interrupt(&self) {
+        self.request(INTERRUPTED, true);
+    }
+
+    pub fn placement(&self, covered: bool) -> bool {
+        let owners = self.0.load(std::sync::atomic::Ordering::Acquire);
+        !covered && placement_wanted(owners)
+    }
+
+    pub fn camera_wanted(&self, covered: bool) -> bool {
+        use std::sync::atomic::Ordering;
+        let owners = self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire, |owners| {
+            (owners & INTERRUPTED != 0).then_some(owners & TECH_CAMERA_OWNER)
+        }).unwrap_or_else(|owners| owners);
+        !covered && (owners & TECH_CAMERA_OWNER != 0 || placement_wanted(owners))
+    }
 }
 
+fn placement_wanted(owners: u8) -> bool {
+    owners & INTERRUPTED == 0 && owners & PLACEMENT_OWNERS != 0
+}
+
+/// The game-thread camera state keeps the native mode seen before taking Fixed.
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     saved: Option<i32>,

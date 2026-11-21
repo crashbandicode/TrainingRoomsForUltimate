@@ -399,7 +399,10 @@ fn role_of(accessor: usize) -> Option<FighterKey> {
     let scene = role_scene();
     with(|cpu| role_adapter::role(cpu, scene, accessor))
         .flatten()
-        .filter(|&key| !super::edge_juggle::suspends_cpu_settings(key))
+        .filter(|&key| {
+            !(super::edge_juggle::suspends_cpu_settings(key)
+                || key.entry == primary_entry(scene == Some(Scene::Lobby)) && super::btt_camera::placing())
+        })
 }
 
 /// Ask the game's table for every constant, once. Returns whether the table is ready. Called from the
@@ -640,7 +643,9 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
-    let practice_owned = super::mashout::owns_cpu(accessor) || super::edge_juggle::suspends_cpu_settings(key);
+    let practice_owned = super::mashout::owns_cpu(accessor)
+        || super::edge_juggle::suspends_cpu_settings(key)
+        || key.entry == primary_entry(lobby) && super::btt_camera::placing();
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }

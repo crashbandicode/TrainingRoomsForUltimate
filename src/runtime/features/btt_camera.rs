@@ -11,7 +11,7 @@ use std::cell::Cell;
 use crate::model::btt::{self as model, Camera, CameraRequests};
 use crate::model::sites_pkg2;
 use crate::runtime::game::{self, natives};
-use crate::runtime::scene;
+use crate::runtime::{published, scene};
 
 /// The camera unit's rows passed their guards (boot sets it); nothing here asks the game before.
 static USABLE: AtomicBool = AtomicBool::new(false);
@@ -46,37 +46,39 @@ unsafe fn manager() -> usize {
     }
 }
 
-/// One pass of Player 1 (the game thread, no lock held): ask for the Fixed camera while `want`, give the game's own back when not,
-/// by state (`model::btt_camera::Camera::step`), so a reset, a state load, a stage change or the game's Training Camera option that
-/// took the camera is answered within `RETRY` frames. Nothing happens outside a practice scene or without a camera manager.
-///
-/// # Safety
-/// The game thread, in a battle scene.
-pub unsafe fn apply(want: bool) {
-    if !USABLE.load(Ordering::Acquire) { return; }
-    request(1, want);
+/// Editors publish their game-thread placement state. Tech may also own the camera during a run.
+pub(super) fn request(owner_bit: u8, want: bool) {
+    OWNERS.request(owner_bit, want);
 }
 
-/// BTT and Tech publish placement requests. The zone editor is sampled by frame().
-/// # Safety
-/// Callers release their bit on every placing exit. The game thread applies requests in frame().
-pub unsafe fn request(owner_bit: u8, want: bool) {
-    if !USABLE.load(Ordering::Acquire) {
-        return;
-    }
-    OWNERS.request(owner_bit, want);
+/// End the borrowed session even if a feature opens a fresh editor in the same P1 pass.
+pub(crate) fn interrupt_placement() {
+    OWNERS.interrupt();
+}
+
+/// Both CPU dispatch paths use the same session as the camera. This is an
+/// atomic read, independent of whether the native camera rows were admitted.
+pub(super) fn placing() -> bool {
+    OWNERS.placement(covered())
+}
+
+fn covered() -> bool {
+    published::input_owners().covers_strip() || super::states::is_loading()
+}
+
+pub(super) fn placement_pad(buttons: u32) -> Option<crate::model::edge_juggle::perfect::Correction> {
+    if placing() { crate::model::edge_juggle::Phase::Place.held_pad(buttons) } else { None }
 }
 
 /// Step once per game frame, after placing owners publish their requests.
 /// # Safety
 /// Player 1's non-Nana game-thread callback; no plugin lock is held.
 pub unsafe fn frame() {
+    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
+    let want = OWNERS.camera_wanted(covered());
     if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
-    // The editor's generation-checked lease ends on every close and reset path.
-    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
-    let want = OWNERS.wanted();
     let mut camera = CAMERA.0.get();
     let act = camera.step(want, mode);
     HOLD.store(camera.holding(), Ordering::Release);

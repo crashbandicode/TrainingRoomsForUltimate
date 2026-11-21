@@ -5,7 +5,7 @@ use super::{
     tech_adapter::{Adapter, HitlagResolver},
     tech_surfaces::{self, NativeSource, PlatformScan, ScanState},
 };
-use crate::model::btt::{Pad, LOOKS};
+use crate::model::btt::{self as model, Pad, LOOKS};
 use crate::model::chords::{field, Sample};
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::rng::Rng;
@@ -133,9 +133,12 @@ pub fn wizard_active() -> bool {
 pub fn take_menu_request() -> bool {
     BACK_MENU.swap(false, Ordering::AcqRel)
 }
+fn release_camera_requests() {
+    super::btt_camera::request(model::TECH_PLACEMENT_OWNER | model::TECH_CAMERA_OWNER, false);
+}
+
 pub fn menu_opened() {
-    // SAFETY: atomic owner-bit release; every placing exit also releases bit 2.
-    unsafe { super::btt_camera::request(2, false) };
+    release_camera_requests();
     GUARD_PRESS.store(false, Ordering::Release);
     PLACING.store(false, Ordering::Release);
     WIZARD_ACTIVE.store(false, Ordering::Release);
@@ -528,7 +531,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let facts = scene::facts();
     if facts.busy {
-        super::btt_camera::request(2, false);
+        release_camera_requests();
         return;
     }
     let Some(mut view) = VIEW.try_lock() else {
@@ -555,7 +558,7 @@ pub unsafe fn frame(fighter: usize) {
         WIZARD_ACTIVE.store(false, Ordering::Release);
         notices::clear(NOTICE);
         drop(view);
-        super::btt_camera::request(2, false);
+        release_camera_requests();
         return;
     }
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
@@ -1092,11 +1095,7 @@ pub unsafe fn frame(fighter: usize) {
         }
     });
     drop(view);
-    super::btt_camera::request(
-        2,
-        running()
-            && !open
-            && !published::input_owners().covers_strip()
-            && (placing() || camera == 1),
-    );
+    let admitted = running() && !open && !published::input_owners().covers_strip();
+    super::btt_camera::request(model::TECH_PLACEMENT_OWNER, admitted && placing());
+    super::btt_camera::request(model::TECH_CAMERA_OWNER, admitted && camera == 1);
 }

@@ -1371,7 +1371,7 @@ fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
         locks.push(camera.clone());
     }
     let camera_lock = locks.iter().position(|lock| lock == &camera).unwrap();
-    let callbacks: Vec<usize> = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"].iter().map(|entry| {
+    let callbacks: Vec<usize> = ["btt_camera::request", "btt_camera::interrupt_placement", "btt_camera::placing", "btt_camera::placement_pad", "btt_camera::frame"].iter().map(|entry| {
         let found = graph.find(entry);
         assert_eq!(found.len(), 1, "camera callback {entry}");
         found[0]
