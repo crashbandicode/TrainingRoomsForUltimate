@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 183635
+ceiling = 183646
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 58ea02c9 measures 183635, an exact 12609 normalized-line delta over 171026. Adds the measured Pyra to Mythra swap return and the reviewed Final Destination mirror of Snake Cypher."
+reason = "rc.15 niche recovery candidate on 79cc06f1. The measured Link gate at dc762e1a is 183635. R.O.B. recovery timing at 722cd5b5 adds 11 lines with the same normalized counter, for 183646 and an exact 12620 delta over 171026."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
