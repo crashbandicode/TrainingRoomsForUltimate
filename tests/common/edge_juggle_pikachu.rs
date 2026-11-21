@@ -145,12 +145,14 @@ fn skull_bash_flies_the_native_side_jump_and_two_aim_sequence() {
 }
 
 #[test]
-fn skull_bash_uses_the_rebaked_199_cell_region() {
+fn skull_bash_uses_the_rebaked_195_cell_fast_fall_region() {
     let count: u32 = super::SKULL_BASH_RING.iter().map(|row| row.count_ones()).sum();
-    assert_eq!(count, 199);
+    assert_eq!(count, 195);
     let ledges = [[0.0, 0.0], [159.975, 0.0]];
-    for (release, offered) in [([-13.0, -66.0], true), ([-17.0, -66.0], false),
-                              ([-29.0, -62.0], true), ([-33.0, -62.0], false)] {
+    for (release, offered) in [
+        ([-13.0, -66.0], false), ([-17.0, -66.0], false),
+        ([-21.0, -62.0], true), ([-25.0, -62.0], false),
+    ] {
         assert_eq!(skull_bash_start((3, 0), &RING, ledges, release, BOTTOM, 8.5).is_some(),
                    offered, "{release:?}");
     }
@@ -266,13 +268,16 @@ fn fake_out_spends_only_the_jump_near_the_lip_and_a_fresh_special_if_needed() {
         (3, 0), &RING, [[0.0, 0.0], [159.975, 0.0]], start, BOTTOM, 8.5,
     ).unwrap();
     let mut flight = FakeOutFlight::new(path, outline, BOTTOM);
+    assert_eq!(flight.start_check([-20.0, -43.7], -2.48), None);
+    assert_eq!(flight.start_check([-20.0, -46.18], -2.48), Some(super::Move::Jump));
     let sample = |frame, motion, position, velocity, jumps, can_start| FakeOutSample {
         frame, motion, position, velocity, jumps, can_start,
     };
     let frames = [
         (sample(0, Motion::Free, start, [0.0, -1.55], 1, true), [0.0, -1.0], 0),
-        (sample(14, Motion::Free, [-20.0, -51.5], [0.0, -1.55], 1, true), [1.0, 0.0], JUMP),
-        (sample(14, Motion::Free, [-20.0, -51.5], [0.0, -1.55], 1, true), [1.0, 0.0], JUMP),
+        (sample(13, Motion::Free, [-20.0, -43.7], [0.0, -2.48], 1, true), [0.0, -1.0], 0),
+        (sample(14, Motion::Free, [-20.0, -46.18], [0.0, -2.48], 1, true), [1.0, 0.0], JUMP),
+        (sample(14, Motion::Free, [-20.0, -46.18], [0.0, -2.48], 1, true), [1.0, 0.0], JUMP),
         (sample(15, Motion::Travel, [-19.1, -49.0], [0.9, 2.55], 0, false), [1.0, 0.0], 0),
         (sample(25, Motion::Travel, [-10.9, -31.0], [0.957, 1.35], 0, false), [-1.0, 0.0], 0),
         (sample(35, Motion::Travel, [-7.0, -19.0], [0.0, 0.25], 0, false), [0.0, 0.0], 0),

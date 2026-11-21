@@ -114,11 +114,12 @@ pub struct SkullBashPath {
 
 // The 199 candidate cells from reference-crossings/gen_regions.py, P-SB on the common ring.
 // Mirrored at runtime. The live outline and blast line must still match.
+// The frame after a press can fall another 2.48 units (edge-ref-pika-sA2d-1).
 const SKULL_BASH_RING: [u32; 44] = [
     0x0000, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
     0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
     0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc, 0x03fc,
-    0x01fc, 0x00fc, 0x000c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x01fc, 0x003c, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000,
 ];
@@ -360,6 +361,10 @@ pub struct FakeOutFlight {
     last: Option<(u32, Correction)>,
 }
 
+// Leave the native double jump room to apex within the 19.7-unit catch depth
+// after one more full fast-fall frame (MODEL.md §4.5).
+const FAKE_OUT_JUMP_DEPTH: f32 = 46.0;
+
 impl FakeOutFlight {
     fn new(path: SkullBashPath, outline: Outline, bottom: f32) -> Self {
         Self {
@@ -382,7 +387,9 @@ impl FakeOutFlight {
 
     pub fn start_check(&self, position: Point, vertical_speed: f32) -> Option<Move> {
         match self.phase {
-            FakeOutPhase::Approach if position[1] <= self.path.launch_y => Some(Move::Jump),
+            FakeOutPhase::Approach if position[1] <= self.near_ledge()[1] - FAKE_OUT_JUMP_DEPTH => {
+                Some(Move::Jump)
+            }
             FakeOutPhase::Drift if position[1] <= self.near_ledge()[1] - 24.0 && vertical_speed <= 0.0 => {
                 Some(Move::QuickAttack)
             }
@@ -425,7 +432,7 @@ impl FakeOutFlight {
                 {
                     return None;
                 }
-                if sample.position[1] > self.path.launch_y {
+                if sample.position[1] > ledge[1] - FAKE_OUT_JUMP_DEPTH {
                     return Some(pad([0.0, -1.0], 0));
                 }
                 if !sample.can_start {
