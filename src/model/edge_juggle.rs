@@ -564,14 +564,14 @@ pub fn recovery_away_facing(
         return None;
     }
     let [left, right] = stage.ledges;
-    let takes_bomb_route = match fighter {
+    let takes_away_facing_route = match fighter {
         Some(perfect::link::KIND) => {
             perfect::link::in_region(stage_key, stage.ledges, setup.cpu, setup.percent.into())
         }
-        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, left, setup.cpu),
+        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, stage.ledges, setup.cpu),
         _ => false,
     };
-    takes_bomb_route.then_some(if setup.cpu[0] < left[0].midpoint(right[0]) { -1.0 } else { 1.0 })
+    takes_away_facing_route.then_some(if setup.cpu[0] < left[0].midpoint(right[0]) { -1.0 } else { 1.0 })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -631,6 +631,9 @@ impl Wizard {
             None
         };
         let area_offset = match (drill, fighter) {
+            (Drill::GuardEdge, Some(perfect::snake::KIND)) if stage_key == (3, 0) => {
+                Some([20.0, -4.0])
+            }
             (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -55.0])
             }
@@ -1181,7 +1184,7 @@ mod tests {
     }
 
     #[test]
-    fn snake_wizard_offers_only_the_measured_left_cypher_start() {
+    fn snake_wizard_offers_the_mirror_cypher_start_only_on_final_destination() {
         let stage = Stage::new(
             [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
             [[-80.0, 0.0], [80.0, 0.0]],
@@ -1195,8 +1198,11 @@ mod tests {
                 perfect::is_crossing_stage(key).then_some(-1.0));
             assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x22)), None);
             wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
-            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)), None);
+            let right = if key == (3, 0) { [100.0, -4.0] }
+                else { stage.area_default(Area::LowerRight).unwrap() };
+            assert_eq!(wizard.setup.cpu, right);
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)),
+                (key == (3, 0)).then_some(1.0));
             wizard.change_area(stage, -1);
             assert_eq!(wizard.setup.cpu, left);
         }

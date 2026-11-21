@@ -266,11 +266,11 @@ fn snake_repeats_the_committed_press_on_duplicate_thinks() {
         velocity: [0.987, -1.73],
         ..first
     };
-    assert_eq!(flight.step(jump), Some(pad(FORWARD, JUMP)));
-    assert_eq!(flight.step(jump), Some(pad(FORWARD, JUMP)));
+    assert_eq!(flight.step(jump), Some(pad([1.0, 0.0], JUMP)));
+    assert_eq!(flight.step(jump), Some(pad([1.0, 0.0], JUMP)));
     assert_eq!(
         flight.step(CypherSample { frame: 77, status: JUMP_AERIAL, jumps: 0, ..jump }),
-        Some(pad(FORWARD, JUMP))
+        Some(pad([1.0, 0.0], JUMP))
     );
     let rise = CypherSample {
         frame: 102,
@@ -362,4 +362,63 @@ fn snake_live_admission_matches_the_five_point_reference_on_a_grid() {
             }
         }
     }
+}
+
+#[test]
+fn snake_mirrors_the_measured_cypher_pads_on_final_destination() {
+    let mut facts = facts();
+    let left = initial(&facts);
+    let right = facts.ledges[1][0];
+    facts.position = [right + 20.0, -4.0];
+    let first = CypherSample { position: facts.position, facing: 1.0, ..left };
+    let mut flight = CypherFlight::start(&facts, first).expect("flown right start");
+    assert_eq!(flight.exit_point(), facts.ledges[0]);
+    assert_eq!(flight.crossing_frames(), 209);
+    assert_eq!(flight.step(first), Some(pad([-1.0, 0.0], 0)));
+
+    let jump = CypherSample {
+        frame: 76,
+        position: [right - 37.29, -114.25],
+        velocity: [-0.987, -1.73],
+        ..first
+    };
+    assert_eq!(flight.step(jump), Some(pad([-1.0, 0.0], JUMP)));
+    assert_eq!(
+        flight.step(CypherSample { frame: 77, status: JUMP_AERIAL, jumps: 0, ..jump }),
+        Some(pad([-1.0, 0.0], JUMP))
+    );
+    let rise = CypherSample {
+        frame: 102,
+        status: JUMP_AERIAL,
+        position: [right - 62.87, -82.61],
+        velocity: [-0.987, 0.375],
+        jumps: 0,
+        ..first
+    };
+    assert_eq!(flight.step(rise), Some(pad(UP, SPECIAL)));
+    let ride = CypherSample {
+        frame: 109, status: CYPHER_RIDE, position: [right - 69.8, -82.2], ..rise
+    };
+    assert_eq!(flight.step(ride), Some(pad([-1.0, 0.0], 0)));
+    assert_eq!(
+        flight.step(CypherSample {
+            frame: 197, status: CYPHER_RELEASE, position: [right - 156.2, -29.5], ..ride
+        }),
+        Some(pad([1.0, 0.0], 0))
+    );
+}
+
+#[test]
+fn snake_right_region_rejects_unflown_stages_facing_and_release_points() {
+    let mut facts = facts();
+    let first = initial(&facts);
+    let right = facts.ledges[1][0];
+    facts.position = [right + 20.0, -4.0];
+    let first = CypherSample { position: facts.position, facing: 1.0, ..first };
+    for stage in [(0, 0), (311, 0), (3, 1)] {
+        assert!(CypherFlight::start(&RouteFacts { stage, ..facts }, first).is_none());
+    }
+    assert!(CypherFlight::start(&facts, CypherSample { facing: -1.0, ..first }).is_none());
+    facts.position = [right + 30.0, -30.0];
+    assert!(CypherFlight::start(&facts, CypherSample { position: facts.position, ..first }).is_none());
 }

@@ -1,4 +1,4 @@
-//! Measured left-to-right Cypher flight on the three common stage outlines.
+//! Measured Cypher flight on the three common stage outlines.
 use super::{
     niche::pad, region, Correction, Point, RouteFacts, JUMP, SPECIAL,
 };
@@ -13,16 +13,28 @@ pub const JUMP_AERIAL: i32 = 0xc;
 const CYPHER_START: i32 = 0x1de;
 const CYPHER_RIDE: i32 = 0x1f4;
 const CYPHER_RELEASE: i32 = 0x1f5;
-const FORWARD: Point = [1.0, 0.0];
-const BACK: Point = [-1.0, 0.0];
 const UP: Point = [0.0, 1.0];
-pub fn in_region(stage: (i32, u32), near: Point, position: Point) -> bool {
-    super::is_crossing_stage(stage) && flight_time(near, position, 0.0).is_some()
+// Only Final Destination has a flown right-to-left reference.
+fn crossing_side(stage: (i32, u32), ledges: [Point; 2], position: Point) -> Option<(Point, Point, f32)> {
+    let [left, right] = ledges;
+    if super::is_crossing_stage(stage) && position[0] < left[0] {
+        Some((left, right, 1.0))
+    } else if stage == (3, 0) && position[0] > right[0] {
+        Some((right, left, -1.0))
+    } else {
+        None
+    }
 }
 
-fn flight_time(near: Point, position: Point, vy: f32) -> Option<u16> {
+pub fn in_region(stage: (i32, u32), ledges: [Point; 2], position: Point) -> bool {
+    crossing_side(stage, ledges, position).is_some_and(|(near, _, inward)| {
+        flight_time(near, position, inward, 0.0).is_some()
+    })
+}
+
+fn flight_time(near: Point, position: Point, inward: f32, vy: f32) -> Option<u16> {
     envelope::guarded_time(
-        f64::from(near[0]) - f64::from(position[0]),
+        (f64::from(near[0]) - f64::from(position[0])) * f64::from(inward),
         f64::from(position[1]) - f64::from(near[1]),
         f64::from(vy),
     )
@@ -53,6 +65,7 @@ enum Phase {
 pub struct CypherFlight {
     near: Point,
     far: Point,
+    inward: f32,
     bottom: f32,
     frames: u16,
     phase: Phase,
@@ -61,14 +74,14 @@ pub struct CypherFlight {
 
 impl CypherFlight {
     pub fn start(facts: &RouteFacts<'_>, sample: CypherSample) -> Option<Self> {
-        let [near, far] = facts.ledges;
         facts.crossing_band()?;
+        let (near, far, inward) = crossing_side(facts.stage, facts.ledges, sample.position)?;
         if facts.fighter != KIND
             || facts.position != sample.position
             || !region::has_common_underside(facts.ledges, facts.blast[3], facts.outline)
             || sample.status != FALL
             || sample.velocity[0] != 0.0
-            || sample.facing != -1.0
+            || sample.facing != -inward
             || sample.jumps != 1
             || !sample.can_rise
         {
@@ -77,8 +90,9 @@ impl CypherFlight {
         Some(Self {
             near,
             far,
+            inward,
             bottom: facts.blast[3],
-            frames: flight_time(near, sample.position, sample.velocity[1])?,
+            frames: flight_time(near, sample.position, inward, sample.velocity[1])?,
             phase: Phase::Drift,
             last_pad: None,
         })
@@ -104,27 +118,30 @@ impl CypherFlight {
         if let Some((_, correction)) = self.last_pad.filter(|&(frame, _)| frame == sample.frame) {
             return Some(correction);
         }
-        let inside = f64::from(x) - f64::from(self.near[0]);
+        let inside = (f64::from(x) - f64::from(self.near[0])) * f64::from(self.inward);
+        let forward = [self.inward, 0.0];
+        let back = [-self.inward, 0.0];
+        let facing_away = sample.facing == -self.inward;
         let height = f64::from(y) - f64::from(self.near[1]);
         let (next, stick, buttons) = match self.phase {
-            Phase::Drift if sample.status == FALL && sample.jumps == 1 && sample.facing == -1.0 => {
+            Phase::Drift if sample.status == FALL && sample.jumps == 1 && facing_away => {
                 if inside >= envelope::JUMP_INSIDE || height <= envelope::JUMP_HEIGHT {
                     sample
                         .can_jump
-                        .then_some((Phase::Jump(sample.frame), FORWARD, JUMP))?
+                        .then_some((Phase::Jump(sample.frame), forward, JUMP))?
                 } else {
-                    (Phase::Drift, FORWARD, 0)
+                    (Phase::Drift, forward, 0)
                 }
             }
             Phase::Jump(press)
                 if sample.frame.wrapping_sub(press) == 1
-                    && sample.facing == -1.0
+                    && facing_away
                     && matches!(sample.status, FALL | JUMP_AERIAL) =>
             {
-                (Phase::Ascent, FORWARD, JUMP)
+                (Phase::Ascent, forward, JUMP)
             }
             Phase::Ascent
-                if sample.status == JUMP_AERIAL && sample.jumps == 0 && sample.facing == -1.0 =>
+                if sample.status == JUMP_AERIAL && sample.jumps == 0 && facing_away =>
             {
                 if inside >= envelope::CYPHER_INSIDE {
                     (sample.can_rise && envelope::CYPHER_HEIGHT.contains(&height)).then_some((
@@ -133,24 +150,24 @@ impl CypherFlight {
                         SPECIAL,
                     ))?
                 } else {
-                    (Phase::Ascent, FORWARD, 0)
+                    (Phase::Ascent, forward, 0)
                 }
             }
-            Phase::Start(press) if sample.status == CYPHER_START && sample.facing == -1.0 => {
+            Phase::Start(press) if sample.status == CYPHER_START && facing_away => {
                 let age = sample.frame.wrapping_sub(press);
                 if age <= 2 {
                     (Phase::Start(press), UP, SPECIAL)
                 } else {
-                    (Phase::Start(press), FORWARD, 0)
+                    (Phase::Start(press), forward, 0)
                 }
             }
             Phase::Start(_) | Phase::Ride
-                if sample.status == CYPHER_RIDE && sample.facing == -1.0 =>
+                if sample.status == CYPHER_RIDE && facing_away =>
             {
-                (Phase::Ride, FORWARD, 0)
+                (Phase::Ride, forward, 0)
             }
             Phase::Ride | Phase::Release if sample.status == CYPHER_RELEASE => {
-                (Phase::Release, BACK, 0)
+                (Phase::Release, back, 0)
             }
             _ => return None,
         };
