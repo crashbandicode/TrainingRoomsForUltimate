@@ -1,6 +1,6 @@
 //! Reachability bitmaps baked by the per-fighter recovery model.
 
-pub(super) fn contains(rows: &[u32; 44], outside: f32, height: f32) -> bool {
+pub(super) fn contains(rows: &[u32], outside: f32, height: f32) -> bool {
     if !(0.0 < outside && outside < 120.0 && height.is_finite() && height <= 40.0) {
         return false;
     }
@@ -30,6 +30,13 @@ mod tests {
         ] {
             assert!(!contains(&rows, x, y), "outside cell ({x}, {y})");
         }
+    }
+
+    #[test]
+    fn a_compact_map_declines_heights_after_its_last_row() {
+        let two_rows = [0, 1 << 5];
+        assert!(contains(&two_rows, 20.0, 36.0));
+        assert!(!contains(&two_rows, 20.0, 32.0));
     }
 
     #[test]
