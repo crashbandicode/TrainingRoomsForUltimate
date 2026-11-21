@@ -117,9 +117,10 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("target", &["GRADER"], "Grader::target is a lock-free model ring enqueue"),
     (
         "poll",
-        &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "t"],
+        &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "step", "t"],
         "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
-         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters",
+         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters; `step` is the model's \
+         lobby_speed::FrameStep in game_speed::frame_step_poll, a plain counter with no lock (rc.15 1 Frame)",
     ),
 ];
 const PANELS: &str = "combos::Ui and setups::Ui live only in the worker's state (`s.combos`, `s.setups`, `setups` in worker::close); \

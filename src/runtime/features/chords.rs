@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use hos_lock::Mutex;
 
 use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
+use crate::model::game_speed::HoldEvent;
 use crate::model::ini_files;
 use crate::model::input_delay::Owners;
 use crate::model::menu::chord::Chord;
@@ -115,6 +116,9 @@ pub unsafe fn on_poll(controller: usize) {
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();
+    // rc.15: the lobby's 1 Frame step, on the raw controller (the native button; never while the speed hold is open).
+    let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
+    crate::runtime::features::game_speed::frame_step_poll(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN), hold_open, block);
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
