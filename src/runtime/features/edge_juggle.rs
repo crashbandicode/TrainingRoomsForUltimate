@@ -464,9 +464,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     let Some(mut engine) = ENGINE.try_lock() else {
         return Correction::default();
     };
-    let Some(run) = engine.run.as_mut().filter(|run| {
-        wanted() == Some(run.drill) && run.wizard.is_none()
-    }) else {
+    let Some(run) = engine.run.as_mut().filter(|run| wanted() == Some(run.drill)) else {
         return Correction::default();
     };
     use crate::model::sites_pkg2 as sites;
@@ -482,10 +480,12 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     {
         return Correction::default();
     }
+    // The wizard is in Place. Its stock CPU must also stay neutral so it
+    // cannot move or hit P1 before the selected start is applied.
     if let Some(hold) = run.rounds.phase.held_pad(buttons) {
         return hold;
     }
-    if run.difficulty != Difficulty::Perfect || run.rounds.phase != Phase::Live {
+    if run.wizard.is_some() || run.difficulty != Difficulty::Perfect || run.rounds.phase != Phase::Live {
         return Correction::default();
     }
     let status = natives::status_kind(accessor);
