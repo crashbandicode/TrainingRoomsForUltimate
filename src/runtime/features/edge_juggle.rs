@@ -527,7 +527,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     let position = [natives::pos_x(accessor), natives::pos_y(accessor)];
     if run.drill == Drill::GuardEdge {
         if run.niche.as_ref().is_some_and(niche_pad::NicheGuide::using_bomb) {
-            return niche_correction(run, ai, accessor, position, status, stock);
+            return niche_correction(run, ai, accessor, p1, position, status, stock);
         }
         // Hit off-stage: survive first, otherwise bend the launch at the nearer ledge.
         // J3's counter stays the Juggler's; this edit has no trace tag until one is agreed.
@@ -541,7 +541,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
             }
         }
         if run.niche.is_some() {
-            return niche_correction(run, ai, accessor, position, status, stock);
+            return niche_correction(run, ai, accessor, p1, position, status, stock);
         }
         if run.oil_stall.active() {
             // Transition terms may be unavailable in the active stance.
@@ -1030,6 +1030,7 @@ unsafe fn niche_correction(
     run: &mut Run,
     ai: usize,
     cpu: usize,
+    p1: usize,
     position: [f32; 2],
     status: i32,
     stock: StockPad,
@@ -1047,7 +1048,7 @@ unsafe fn niche_correction(
         return Correction::default();
     }
     let id = guide.selected_niche_row().id;
-    if let Some(edit) = guide.correct_niche_pad(ai, cpu, position, status, run.rounds.frames) {
+    if let Some(edit) = guide.correct_niche_pad(ai, cpu, p1, position, status, run.rounds.frames) {
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
     }
     run.niche = None;
@@ -1166,7 +1167,7 @@ unsafe fn recovery_pad(
                 Ok((top, reach)) => {
                     run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
                     if run.niche.is_some() {
-                        return niche_correction(run, ai, cpu, pos, natives::status_kind(cpu), stock);
+                        return niche_correction(run, ai, cpu, p1, pos, natives::status_kind(cpu), stock);
                     }
                 }
                 Err(input) => planner_unavailable(input),

@@ -20,8 +20,11 @@ mod region;
 pub mod rule_counts;
 #[path = "perfect/sheik.rs"]
 pub mod sheik;
+#[cfg(test)]
 #[path = "perfect/sora.rs"]
-pub mod sora;
+mod sora;
+#[path = "perfect/sora_flight.rs"]
+pub mod sora_flight;
 
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];

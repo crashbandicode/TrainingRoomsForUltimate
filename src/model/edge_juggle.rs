@@ -581,6 +581,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(0x13)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, 28.0])
             }
+            (Drill::GuardEdge, Some(perfect::sora_flight::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([10.0, 30.0])
+            }
             (Drill::GuardEdge, Some(perfect::olimar::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([26.0, 26.0])
             }

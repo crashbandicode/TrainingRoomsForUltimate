@@ -14,6 +14,7 @@ use perfect::olimar::{self, OlimarBeat, OlimarFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::sheik::{SheikBeat, SheikFlight};
+use perfect::sora_flight::{self, SoraBeat, SoraFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
@@ -32,6 +33,7 @@ enum MeasuredFlight {
     PichuFakeOut(PichuFakeOut),
     Olimar(OlimarFlight),
     Sheik(SheikFlight),
+    Sora(SoraFlight),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -163,6 +165,32 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == sora_flight::KIND {
+            band?;
+            let fall = konst(C::StatusFall);
+            if fall == UNRESOLVED || natives::status_kind(cpu) != fall || natives::lr(cpu) != direction {
+                return None;
+            }
+            let row = niche::measured_row(8, niche::CANDIDATE_ROWS)?;
+            let flight = SoraFlight::start(facts, SoraBeat {
+                frame: 0,
+                status: fall,
+                position: facts.position,
+                velocity: inputs.speed,
+                player_x: facts.player[0],
+                jumps: inputs.jumps,
+                can_jump: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::SoraChain, true),
+                can_blade: niche_start_enabled(cpu, Move::Side, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Sora(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == olimar::KIND {
             let fall = konst(C::StatusFall);
             if fall == UNRESOLVED || natives::status_kind(cpu) != fall {
@@ -233,6 +261,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Pichu(_)) => Some(200),
             Some(MeasuredFlight::Olimar(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Sora(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
     }
@@ -271,6 +300,7 @@ impl NicheGuide {
         &mut self,
         ai: usize,
         cpu: usize,
+        p1: usize,
         [x, y]: Point,
         status: i32,
         frame: u32,
@@ -298,6 +328,22 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::Sora(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let free = matches!(status, sora_flight::FALL | sora_flight::FALL_AERIAL);
+            let player_x = if status == sora_flight::FALL { natives::pos_x(p1) } else { 0.0 };
+            return flight.step(SoraBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                player_x,
+                jumps: if free { remaining_jumps(cpu)? } else { 0 },
+                can_jump: status == sora_flight::FALL && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: free && reach.is_some() && niche_start_enabled(cpu, Move::SoraChain, available),
+                can_blade: free && niche_start_enabled(cpu, Move::Side, true),
             });
         }
         if let Some(MeasuredFlight::Olimar(flight)) = &mut self.measured {
