@@ -113,3 +113,38 @@ fn parry_practice_runs_while_it_is_the_running_game() {
     assert!(item(&practice, "pub fn stop()").contains("super::parry::stopped()"));
     assert!(item(&practice, "pub fn running()").contains("Game::Parry => super::parry::on()"));
 }
+
+#[test]
+fn egg_zone_camera_tracks_the_live_wizard() {
+    let camera = src("src/runtime/features/btt_camera.rs");
+    let frame = item(&camera, "pub unsafe fn frame(");
+    let lease = frame
+        .find("OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());")
+        .expect("the shared camera consumes the zone wizard's live lease");
+    assert!(lease < frame.find("camera.step(").unwrap());
+    let zone = src("src/runtime/features/egg_zone.rs");
+    assert!(item(&zone, "pub fn wizard_active()").contains("LIVE.load(Ordering::Acquire) == epoch()"));
+    assert!(item(&zone, "fn close()").contains("LIVE.swap(0,"));
+    assert!(item(&zone, "pub fn menu_opened()").contains("close();"));
+    assert!(item(&zone, "pub fn reset()").contains("menu_opened();"));
+    assert!(item(&zone, "pub unsafe fn prepare(").contains("close();"));
+    let zone_frame = item(&zone, "pub unsafe fn frame(");
+    assert!(zone_frame.contains("!scene::is_training()") && zone_frame.contains("close();"));
+    let poll = item(&zone, "pub unsafe fn poll(");
+    for exit in ["Outcome::Cancel", "Outcome::Apply"] {
+        let arm = &poll[poll.find(exit).unwrap()..];
+        assert!(arm[..arm.find("        }").unwrap()].contains("close();"), "{exit}");
+    }
+    let cpu = src("src/runtime/features/cpu.rs");
+    let on_frame = item(&cpu, "extern \"C\" fn on_frame(");
+    assert!(on_frame.find("features::hitbox::frame(").unwrap() < on_frame.find("btt_camera::frame(").unwrap());
+}
+
+#[test]
+fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
+    let zone = src("src/runtime/features/egg_zone.rs");
+    let draw = item(&zone, "pub fn draw(");
+    assert!(draw.contains("stroke_layers(width, color)"), "world marks draw the dark and colored layers");
+    assert!(draw.contains("INSET_BACKING"), "every inset mark has a dark background");
+    assert!(item(&zone, "fn prompt(").contains("notices::show_now("), "the built-in notice includes the dark label plate");
+}

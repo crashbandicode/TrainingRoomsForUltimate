@@ -1,4 +1,4 @@
-//! Break the Targets' camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
+//! Shared practice placement camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
 //! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, and the camera the game was in comes back on every placement exit. The switch is the game's own `change_active_camera`
 //! (`game::natives::change_active_camera`), asked from Player 1's pass on the game thread with no lock held (the camera hooks
 //! take the CPU lock). The row is the camera unit's: a rejected guard turns off this camera and nothing else (boundaries in
@@ -57,7 +57,7 @@ pub unsafe fn apply(want: bool) {
     request(1, want);
 }
 
-/// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
+/// BTT and Tech publish placement requests. The zone editor is sampled by frame().
 /// # Safety
 /// Callers release their bit on every placing exit. The game thread applies requests in frame().
 pub unsafe fn request(owner_bit: u8, want: bool) {
@@ -74,6 +74,8 @@ pub unsafe fn frame() {
     if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
+    // The editor's generation-checked lease ends on every close and reset path.
+    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
     let want = OWNERS.wanted();
     let mut camera = CAMERA.0.get();
     let act = camera.step(want, mode);

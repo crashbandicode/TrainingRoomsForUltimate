@@ -773,6 +773,9 @@ pub const fn pointer_ok(p: usize) -> bool {
 /// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
 /// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
 /// the frames left before it may ask again.
+/// Eggsercise's off-stage zone editor shares the placing camera with BTT and Tech.
+pub const EGG_ZONE_OWNER: u8 = 4;
+
 /// Lock-free owner requests; the game thread alone steps the camera state.
 pub struct CameraRequests(std::sync::atomic::AtomicU8);
 impl CameraRequests {
