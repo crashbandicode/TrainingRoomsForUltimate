@@ -266,7 +266,7 @@ const ROWS: [Row; 45] = [
     Row::new(super::snake::ROW, super::snake::KIND, Intent::Across, &[Jump, Hover]),
     Row::new(27, 0x2, Intent::Near, &[Bomb, Jump, Rise]),
     Row::new(28, 0x28, Intent::Across, &[Hold, Bolt]),
-    Row::new(29, 0x2c, Intent::Across, &[Hold, Travel]),
+    Row::new(super::lucario::ROW, super::lucario::KIND, Intent::Across, &[Hold, Jump, Travel]),
     Row::new(30, 0x2b, Intent::Across, &[Hold, Hover]),
     Row::new(31, 0x3a, Intent::Across, &[Side, Jump, Jump, Rise]),
     Row::new(32, 0x53, Intent::Across, &[Hold, Rise]),

@@ -12,6 +12,7 @@ use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
+use perfect::lucario::{self, AuraFlight, AuraSample};
 use perfect::mario::{self, CapeBeat, CapeStall};
 use perfect::recovery::Zone;
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
@@ -51,6 +52,7 @@ enum MeasuredFlight {
     Link(LinkFlight),
     Cypher(CypherFlight),
     Cape(CapeStall),
+    Aura(AuraFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
 }
@@ -386,6 +388,27 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == lucario::KIND {
+            let flight = AuraFlight::start(facts, AuraSample {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                damage: natives::damage(cpu, 0),
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_jump: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            let row = niche::measured_row(lucario::ROW, niche::CANDIDATE_ROWS)?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Aura(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == snake::KIND {
             let sample = CypherSample {
                 frame: 0,
@@ -485,6 +508,7 @@ impl NicheGuide {
             // 72 to the blast, 88 to Spin Attack, and up to 37 to catch; allow for the neutral wait.
             Some(MeasuredFlight::Link(_)) => Some(235),
             Some(MeasuredFlight::Cypher(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Aura(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
@@ -589,6 +613,21 @@ impl NicheGuide {
                 can_pull: flight.waiting_to_pull() && niche_start_enabled(cpu, Move::Bomb, true),
                 can_jump: flight.is_jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_spin: flight.is_spin_frame(frame) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            });
+        }
+        if let Some(MeasuredFlight::Aura(flight)) = &mut self.measured {
+            let free = matches!(status, lucario::FALL | lucario::AERIAL_JUMP);
+            return flight.step(AuraSample {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [0.0; 2],
+                damage: natives::damage(cpu, 0),
+                facing: if free { natives::lr(cpu) } else { 0.0 },
+                jumps: if free { remaining_jumps(cpu)? } else { 0 },
+                can_jump: flight.jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: flight.rise_frame(frame) && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Rise, available),
             });
         }
         if let Some(MeasuredFlight::Cypher(flight)) = &mut self.measured {

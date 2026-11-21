@@ -584,7 +584,7 @@ fn niche_lucas_pk_thunder_route_and_pad_sequence() {
 
 #[test]
 fn niche_lucario_extreme_speed_route_and_pad_sequence() {
-    verify(0x2c, "cross", 29, &[Move::Hold, Move::Travel]);
+    verify(0x2c, "cross", 29, &[Move::Hold, Move::Jump, Move::Travel]);
 }
 
 #[test]

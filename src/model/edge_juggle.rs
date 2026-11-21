@@ -598,7 +598,14 @@ impl Wizard {
         let link_left_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
             && perfect::link::in_region(stage_key, stage.ledges[0], [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
-        let left_start = if link_left_start {
+        let lucario_left_start = if drill == Drill::GuardEdge && fighter == Some(perfect::lucario::KIND) {
+            perfect::lucario::wizard_offset(stage_key, percent)
+        } else {
+            None
+        };
+        let left_start = if let Some(offset) = lucario_left_start {
+            Some((Area::LowerLeft, offset))
+        } else if link_left_start {
             Some((Area::UpperLeft, [30.0, 18.0]))
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::mario::KIND)
             && perfect::mario::reference_stage(stage_key)
@@ -1052,6 +1059,24 @@ mod tests {
         }
         for key in [(0, 1), (89, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn lucario_default_shares_the_flown_starts_at_measured_aura() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            for (damage, expected) in [(100, [-102.0, -14.0]), (130, [-102.0, -22.0])] {
+                let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], damage, key, Some(0x2c)).unwrap();
+                assert_eq!(wizard.setup.cpu, expected, "{key:?}, {damage}%");
+            }
+        }
+        for (key, damage) in [((89, 0), 100), ((3, 1), 100), ((3, 0), 65)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], damage, key, Some(0x2c)).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }
     }
