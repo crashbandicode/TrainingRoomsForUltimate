@@ -76,6 +76,7 @@ enum Intent {
     NearAbove,
     FakeOut,
     OilStall,
+    CapeStall,
     HaymakerGap,
     CounterContact,
     WhipGap,
@@ -103,6 +104,7 @@ impl Row {
             | Intent::NearAbove
             | Intent::FakeOut
             | Intent::OilStall
+            | Intent::CapeStall
             | Intent::HaymakerGap
             | Intent::CounterContact
             | Intent::WhipGap
@@ -185,7 +187,7 @@ impl Row {
                 Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
                 // A direct up special uses the generic route. The fake-out needs its baked cells.
-                Intent::GenericUp | Intent::FakeOut | Intent::OilStall => false,
+                Intent::GenericUp | Intent::FakeOut | Intent::OilStall | Intent::CapeStall => false,
                 intent => {
                     let travel = self.measured().map(|(_, travel)| travel);
                     facts.near.is_some_and(|near| intent.matches_near(near, facts.short, travel))
@@ -232,7 +234,7 @@ impl Intent {
 use Move::*;
 // A crossing glides and holds its height first. A special that ends in special
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
-const ROWS: [Row; 44] = [
+const ROWS: [Row; 45] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(super::pikachu::thunder::ROW, 0x8, Intent::ThunderOverhead, &[Side, Jump, Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
@@ -281,6 +283,7 @@ const ROWS: [Row; 44] = [
     Row::new(super::game_watch::ROW, super::game_watch::KIND, Intent::OilStall, &[Down, Rise]),
     Row::new(43, 0x13, Intent::FakeOut, &[Jump, QuickAttack]),
     Row::new(super::link::ROW, super::link::KIND, Intent::Across, &[Bomb, Jump, Rise]),
+    Row::new(super::mario::ROW, super::mario::KIND, Intent::CapeStall, &[Side]),
 ];
 
 const fn row_mask(extensions_only: bool) -> u64 {

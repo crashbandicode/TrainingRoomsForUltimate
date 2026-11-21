@@ -12,6 +12,8 @@ use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
+use perfect::mario::{self, CapeBeat, CapeStall};
+use perfect::recovery::Zone;
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::olimar::{self, OlimarBeat, OlimarFlight};
 use perfect::pacman::{self, PacBeat, PacFlight};
@@ -48,12 +50,16 @@ enum MeasuredFlight {
     Kart(KartFlight),
     Link(LinkFlight),
     Cypher(CypherFlight),
+    Cape(CapeStall),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
 pub(super) struct RowInputs {
+    pub frame: u32,
+    pub zone: Zone,
+    pub draw: u32,
     pub short: bool,
     pub speed: Point,
     pub air: AirPhysics,
@@ -79,6 +85,26 @@ impl NicheGuide {
         let outside = (near[0] - x) * direction;
         if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
+        }
+        if fighter == mario::KIND {
+            let row = niche::measured_row(mario::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = CapeStall::start(facts, inputs.zone, inputs.draw, CapeBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_cape: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: near,
+                measured: Some(MeasuredFlight::Cape(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
         }
         if fighter == 0x8 {
             band?;
@@ -525,6 +551,24 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(MeasuredFlight::Cape(flight)) = &mut self.measured {
+            let free = flight.awaiting_press();
+            let ((vx, vy), jumps, facing) = if free {
+                (super::super::recording_host::fighter_speed(cpu)?, remaining_jumps(cpu)?, natives::lr(cpu))
+            } else {
+                ((0.0, 0.0), 0, 0.0)
+            };
+            return flight.step(CapeBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing,
+                jumps,
+                can_cape: free && niche_start_enabled(cpu, Move::Side, true),
+                can_rise: free && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            });
+        }
         if let Some(MeasuredFlight::Link(flight)) = &mut self.measured {
             let sample_bomb = flight.needs_bomb_sample(frame);
             let velocity = if flight.waiting_to_pull() {

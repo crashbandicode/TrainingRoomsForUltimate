@@ -59,6 +59,7 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Mr. Game & Watch",
         "Pichu",
         "Link",
+        "Mario",
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
@@ -68,6 +69,18 @@ fn niche_roster_kinds_match_the_approved_plan() {
             .find_map(|&(kind, name)| (name == fighter).then_some(kind))
             .expect("fighter from the plan must be in the roster");
         assert_eq!(row.fighter as u32, kind, "row {} belongs to {fighter}", row.id);
+    }
+}
+
+#[test]
+fn mario_cape_is_a_distinct_near_timing_route() {
+    let row = tested_row(45);
+    assert_eq!(row.fighter, 0);
+    assert_eq!(row.route, Route::Near);
+    assert_eq!(row.moves, [Move::Side]);
+    for mode in ["cross", "center", "near"] {
+        assert!(select(facts(0, mode), EXTENSION_ROWS).is_none(),
+            "a generic budget cannot authorize the measured Cape stall");
     }
 }
 

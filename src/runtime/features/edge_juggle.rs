@@ -921,6 +921,9 @@ unsafe fn route_guide(
     let mut row = None;
     if fighter != UNRESOLVED {
         let inputs = niche_pad::RowInputs {
+            frame: run.rounds.frames,
+            zone,
+            draw: run.route_draw,
             short: recovery::short(reach, pos, speed, near_ledge, bottom),
             speed,
             air,

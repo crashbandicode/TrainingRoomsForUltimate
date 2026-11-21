@@ -11,9 +11,11 @@ pub mod kart;
 #[path = "perfect/peach.rs"]
 pub mod peach;
 #[path = "perfect/snake.rs"]
-pub(crate) mod snake;
+pub mod snake;
 #[path = "perfect/link.rs"]
 pub mod link;
+#[path = "perfect/mario.rs"]
+pub mod mario;
 #[path = "perfect/niche.rs"]
 pub mod niche;
 #[path = "perfect/olimar.rs"]

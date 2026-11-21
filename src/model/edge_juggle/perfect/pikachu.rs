@@ -173,7 +173,7 @@ pub struct SkullBashFlight {
     bottom: f32,
     bash_committed: bool,
     thunder_approach: bool,
-    pub(crate) thunder: Option<thunder::Thunder>,
+    pub thunder: Option<thunder::Thunder>,
     jump_accepted: bool,
     zips: Option<ZipPlan>,
 }
@@ -192,7 +192,7 @@ impl SkullBashFlight {
         }
     }
 
-    pub(crate) fn with_measured_thunder(mut self, ledges: [Point; 2], position: Point, speed: Point, facing: f32) -> Self {
+    pub fn with_measured_thunder(mut self, ledges: [Point; 2], position: Point, speed: Point, facing: f32) -> Self {
         self.thunder_approach = self.path.direction == 1.0
             && facing == 1.0
             && thunder::measured_approach(position, speed, ledges[0])
@@ -200,7 +200,7 @@ impl SkullBashFlight {
         self
     }
 
-    pub(crate) fn observe_bash_pad(&mut self, press: thunder::Bash) {
+    pub fn observe_bash_pad(&mut self, press: thunder::Bash) {
         if self.thunder_approach && self.thunder.is_none() {
             let near = [self.path.near[0] + 1.7, self.path.near[1] + 9.9];
             self.thunder = thunder::Thunder::from_bash(press, near);
@@ -503,7 +503,7 @@ impl FakeOutFlight {
 }
 
 #[path = "pikachu_thunder.rs"]
-pub(crate) mod thunder;
+pub mod thunder;
 
 #[cfg(test)]
 lib_unit_tests! {

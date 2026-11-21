@@ -3,7 +3,7 @@
 use super::{Correction, Point};
 use crate::model::edge_juggle::perfect::{niche::pad, JUMP, SPECIAL};
 
-pub(crate) const ROW: u8 = 2;
+pub const ROW: u8 = 2;
 
 const UP: Point = [0.0, 1.0];
 const SIDE_END: i32 = 0x1e6;
@@ -20,36 +20,36 @@ const CAST_AGE: u32 = 12;
 const BASH_DEPTH: std::ops::RangeInclusive<f32> = 53.519..=54.945;
 const OUTSIDE: std::ops::RangeInclusive<f32> = 8.0..=39.5;
 
-pub(crate) fn measured_approach(position: Point, velocity: Point, ledge: Point) -> bool {
+pub fn measured_approach(position: Point, velocity: Point, ledge: Point) -> bool {
     OUTSIDE.contains(&(ledge[0] - position[0]))
         && (18.0..=23.0).contains(&(ledge[1] - position[1]))
         && velocity[0] == 0.0
         && (-0.2..=0.0).contains(&velocity[1])
 }
 
-pub(crate) fn above_bash_line(y: f32, ledge_y: f32) -> bool {
+pub fn above_bash_line(y: f32, ledge_y: f32) -> bool {
     ledge_y - y < *BASH_DEPTH.start()
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct Bash {
-    pub(crate) frame: u32,
-    pub(crate) position: Point,
-    pub(crate) velocity: Point,
+pub struct Bash {
+    pub frame: u32,
+    pub position: Point,
+    pub velocity: Point,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct Jump {
-    pub(crate) frame: u32,
-    pub(crate) status: i32,
-    pub(crate) position: Point,
-    pub(crate) velocity: Point,
-    pub(crate) jumps: u8,
-    pub(crate) guarder: Option<Point>,
-    pub(crate) up_available: bool,
+pub struct Jump {
+    pub frame: u32,
+    pub status: i32,
+    pub position: Point,
+    pub velocity: Point,
+    pub jumps: u8,
+    pub guarder: Option<Point>,
+    pub up_available: bool,
 }
 
-pub(crate) struct Thunder {
+pub struct Thunder {
     press: Bash,
     ledge_y: f32,
     aim: Point,
@@ -57,7 +57,7 @@ pub(crate) struct Thunder {
 }
 
 impl Thunder {
-    pub(crate) fn from_bash(press: Bash, ledge: Point) -> Option<Self> {
+    pub fn from_bash(press: Bash, ledge: Point) -> Option<Self> {
         let outside = ledge[0] - press.position[0];
         if !OUTSIDE.contains(&outside)
             || !BASH_DEPTH.contains(&(ledge[1] - press.position[1]))
@@ -80,20 +80,20 @@ impl Thunder {
         })
     }
 
-    pub(crate) fn jump_due(&self, frame: u32) -> bool {
+    pub fn jump_due(&self, frame: u32) -> bool {
         frame.wrapping_sub(self.press.frame) == 98
     }
 
-    pub(crate) fn active(&self) -> bool {
+    pub fn active(&self) -> bool {
         self.jump_at.is_some()
     }
 
-    pub(crate) fn cast_due(&self, frame: u32) -> bool {
+    pub fn cast_due(&self, frame: u32) -> bool {
         self.jump_at
             .is_some_and(|jump| frame.wrapping_sub(jump) == CAST_AGE)
     }
 
-    pub(crate) fn begin(&mut self, jump: Jump) -> Option<Correction> {
+    pub fn begin(&mut self, jump: Jump) -> Option<Correction> {
         let [gx, gy] = jump.guarder?;
         let [sx, sy] = self.press.position;
         // Jump cancel on the particular native Skull Bash end row demonstrated
@@ -115,7 +115,7 @@ impl Thunder {
         Some(pad([0.0; 2], JUMP))
     }
 
-    pub(crate) fn step(
+    pub fn step(
         &self,
         frame: u32,
         status: i32,

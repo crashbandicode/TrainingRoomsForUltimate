@@ -600,6 +600,10 @@ impl Wizard {
             && perfect::link::in_region(stage_key, stage.ledges[0], [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
         let left_start = if link_left_start {
             Some((Area::UpperLeft, [30.0, 18.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::mario::KIND)
+            && perfect::mario::reference_stage(stage_key)
+        {
+            Some((Area::LowerLeft, [34.0, -46.0]))
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::snake::KIND)
             && perfect::is_crossing_stage(stage_key)
         {
@@ -1053,6 +1057,24 @@ mod tests {
     }
 
     #[test]
+    fn mario_lower_left_wizard_offers_the_flown_cape_start() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0)).unwrap();
+            let left = if perfect::mario::reference_stage(key) { [-114.0, -46.0] }
+                else { stage.area_default(Area::LowerLeft).unwrap() };
+            assert_eq!(wizard.setup.cpu, left);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
+            wizard.change_area(stage, -1);
+            assert_eq!(wizard.setup.cpu, left);
+        }
+    }
+
+    #[test]
     fn snake_wizard_offers_only_the_measured_left_cypher_start() {
         let stage = Stage::new(
             [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
@@ -1306,7 +1328,7 @@ mod tests {
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
         }
 
-        for (id, kind) in [((3, 1), pikachu), ((89, 0), pikachu), ((3, 0), Some(0)), ((3, 0), None)] {
+        for (id, kind) in [((3, 1), pikachu), ((89, 0), pikachu), ((3, 0), Some(0x18)), ((3, 0), None)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, id, kind).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }

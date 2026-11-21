@@ -6,17 +6,17 @@ use super::{
 #[path = "snake_envelope.rs"]
 mod envelope;
 
-pub(crate) const KIND: i32 = 0x22;
-pub(crate) const ROW: u8 = 26;
-pub(crate) const FALL: i32 = 0xe;
-pub(crate) const JUMP_AERIAL: i32 = 0xc;
+pub const KIND: i32 = 0x22;
+pub const ROW: u8 = 26;
+pub const FALL: i32 = 0xe;
+pub const JUMP_AERIAL: i32 = 0xc;
 const CYPHER_START: i32 = 0x1de;
 const CYPHER_RIDE: i32 = 0x1f4;
 const CYPHER_RELEASE: i32 = 0x1f5;
 const FORWARD: Point = [1.0, 0.0];
 const BACK: Point = [-1.0, 0.0];
 const UP: Point = [0.0, 1.0];
-pub(crate) fn in_region(stage: (i32, u32), near: Point, position: Point) -> bool {
+pub fn in_region(stage: (i32, u32), near: Point, position: Point) -> bool {
     super::is_crossing_stage(stage) && flight_time(near, position, 0.0).is_some()
 }
 
@@ -29,15 +29,15 @@ fn flight_time(near: Point, position: Point, vy: f32) -> Option<u16> {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct CypherSample {
-    pub(crate) frame: u32,
-    pub(crate) status: i32,
-    pub(crate) position: Point,
-    pub(crate) velocity: Point,
-    pub(crate) facing: f32,
-    pub(crate) jumps: u8,
-    pub(crate) can_jump: bool,
-    pub(crate) can_rise: bool,
+pub struct CypherSample {
+    pub frame: u32,
+    pub status: i32,
+    pub position: Point,
+    pub velocity: Point,
+    pub facing: f32,
+    pub jumps: u8,
+    pub can_jump: bool,
+    pub can_rise: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -50,7 +50,7 @@ enum Phase {
     Release,
 }
 
-pub(crate) struct CypherFlight {
+pub struct CypherFlight {
     near: Point,
     far: Point,
     bottom: f32,
@@ -60,7 +60,7 @@ pub(crate) struct CypherFlight {
 }
 
 impl CypherFlight {
-    pub(crate) fn start(facts: &RouteFacts<'_>, sample: CypherSample) -> Option<Self> {
+    pub fn start(facts: &RouteFacts<'_>, sample: CypherSample) -> Option<Self> {
         let [near, far] = facts.ledges;
         facts.crossing_band()?;
         if facts.fighter != KIND
@@ -84,15 +84,15 @@ impl CypherFlight {
         })
     }
 
-    pub(crate) fn exit_point(&self) -> Point {
+    pub fn exit_point(&self) -> Point {
         self.far
     }
 
-    pub(crate) fn crossing_frames(&self) -> u16 {
+    pub fn crossing_frames(&self) -> u16 {
         self.frames
     }
 
-    pub(crate) fn step(&mut self, sample: CypherSample) -> Option<Correction> {
+    pub fn step(&mut self, sample: CypherSample) -> Option<Correction> {
         let [x, y] = sample.position;
         if !x.is_finite()
             || !y.is_finite()
