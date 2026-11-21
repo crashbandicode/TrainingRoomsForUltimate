@@ -1219,7 +1219,7 @@ unsafe fn recovery_pad(
             }
         }
     }
-    if matches!(kind, perfect::ness::KIND | perfect::lucas::KIND)
+    if kind == perfect::ness::KIND
         && special.is_none()
         && !matches!(recovery, Some((_, false)))
     {

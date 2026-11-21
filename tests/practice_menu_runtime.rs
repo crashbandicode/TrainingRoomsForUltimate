@@ -113,3 +113,24 @@ fn parry_practice_runs_while_it_is_the_running_game() {
     assert!(item(&practice, "pub fn stop()").contains("super::parry::stopped()"));
     assert!(item(&practice, "pub fn running()").contains("Game::Parry => super::parry::on()"));
 }
+
+#[test]
+fn lucas_missing_special_reach_preserves_the_independent_detour_rule() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let recovery = item(&runtime, "unsafe fn recovery_pad(");
+    let (before_detour, detour_and_timing) = recovery
+        .split_once("    if attack && !can_punish {")
+        .expect("the envelope-independent R5 detour");
+    let (exception, _) = before_detour
+        .rsplit_once("&& special.is_none()")
+        .expect("the existing Ness-only stock fallback");
+    assert_eq!(
+        exception.trim_end().lines().last().unwrap().trim(),
+        "if kind == perfect::ness::KIND",
+        "an invalid Lucas envelope must not skip the existing R5 detour"
+    );
+    let (detour, _) = detour_and_timing
+        .split_once("if special.is_none() && !matches!(recovery, Some((_, false)))")
+        .expect("guard timing corrections after the independent detour");
+    assert!(detour.contains("PerfectRule::Detour"));
+}
