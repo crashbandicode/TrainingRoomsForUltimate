@@ -545,6 +545,18 @@ pub struct Setup {
     pub percent: u16,
 }
 
+pub fn link_faces_away(
+    drill: Drill,
+    stage_key: (i32, u32),
+    stage: Stage,
+    setup: Setup,
+    fighter: Option<i32>,
+) -> bool {
+    drill == Drill::GuardEdge
+        && fighter == Some(perfect::link::KIND)
+        && perfect::link::in_region(stage_key, stage.ledges[0], setup.cpu, setup.percent.into())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WizardStep {
     Area,
@@ -558,6 +570,7 @@ pub enum WizardStep {
 pub struct Wizard {
     drill: Drill,
     area_offset: Option<[f32; 2]>,
+    link_left_start: bool,
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -568,6 +581,9 @@ impl Wizard {
         stage_key: (i32, u32), fighter: Option<i32>,
     ) -> Option<Self> {
         let area = Area::default();
+        let link_left_start = drill == Drill::GuardEdge
+            && fighter == Some(perfect::link::KIND)
+            && perfect::link::in_region(stage_key, stage.ledges[0], [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
         let area_offset = match (drill, fighter) {
             (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -55.0])
@@ -614,6 +630,7 @@ impl Wizard {
         Some(Self {
             drill,
             area_offset,
+            link_left_start,
             step,
             setup: Setup {
                 area,
@@ -643,7 +660,12 @@ impl Wizard {
 
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        if let Some(cpu) = Self::area_release(stage, area, self.area_offset) {
+        let offset = if self.link_left_start && area == Area::UpperLeft {
+            Some([30.0, 18.0])
+        } else {
+            self.area_offset
+        };
+        if let Some(cpu) = Self::area_release(stage, area, offset) {
             self.setup.area = area;
             self.setup.cpu = cpu;
         }
@@ -994,6 +1016,29 @@ mod tests {
         for key in [(0, 1), (89, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn link_wizard_places_the_proven_left_bomb_start_in_both_difficulties() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-79.99, 0.0], [79.99, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x2)).unwrap();
+            wizard.change_area(stage, 2);
+            if perfect::is_crossing_stage(key) {
+                assert_eq!(wizard.setup.cpu, [-109.99, 18.0]);
+                assert!(link_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
+                assert!(!link_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x2)));
+                assert!(!link_faces_away(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)));
+            } else {
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            }
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+            assert!(!link_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
         }
     }
 

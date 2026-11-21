@@ -10,6 +10,8 @@ pub mod game_watch;
 pub mod kart;
 #[path = "perfect/peach.rs"]
 pub mod peach;
+#[path = "perfect/link.rs"]
+pub mod link;
 #[path = "perfect/niche.rs"]
 pub mod niche;
 #[path = "perfect/olimar.rs"]

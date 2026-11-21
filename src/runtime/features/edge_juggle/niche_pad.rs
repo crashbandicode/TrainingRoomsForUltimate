@@ -11,6 +11,7 @@ use crate::{
 use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::kart::{KartFlight, KartState};
+use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::olimar::{self, OlimarBeat, OlimarFlight};
 use perfect::pacman::{self, PacBeat, PacFlight};
@@ -42,6 +43,7 @@ enum MeasuredFlight {
     Sheik(SheikFlight),
     Sora(SoraFlight),
     Kart(KartFlight),
+    Link(LinkFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
 }
@@ -333,6 +335,31 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == link::KIND && inputs.special.is_some() {
+            let sample = LinkBeat {
+                frame: 0,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                damage: natives::damage(cpu, 0),
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                bomb: owned_link_bomb(cpu).map(|(owned, _)| owned),
+                can_pull: niche_start_enabled(cpu, Move::Bomb, true),
+                can_jump: false,
+                can_spin: niche_start_enabled(cpu, Move::Rise, true),
+            };
+            if let Some(flight) = LinkFlight::start(facts, sample) {
+                let row = niche::measured_row(link::ROW, niche::CANDIDATE_ROWS)?;
+                return Some((Self {
+                    sequence: Sequence::new(row),
+                    fighter,
+                    ledge: flight.exit_point(),
+                    measured: Some(MeasuredFlight::Link(flight)),
+                    body_clearance: facts.body_clearance,
+                }, 1.0));
+            }
+        }
         let row_facts = Facts {
             fighter,
             corridor: None,
@@ -382,6 +409,8 @@ impl NicheGuide {
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sora(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Kart(flight)) => Some(flight.crossing_frames()),
+            // 72 to the blast, 88 to Spin Attack, and up to 37 to catch; allow for the neutral wait.
+            Some(MeasuredFlight::Link(_)) => Some(235),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
@@ -438,6 +467,28 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(MeasuredFlight::Link(flight)) = &mut self.measured {
+            let sample_bomb = flight.needs_bomb_sample(frame);
+            let velocity = if flight.waiting_to_pull() {
+                let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+                [vx, vy]
+            } else {
+                [0.0; 2]
+            };
+            return flight.step(LinkBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity,
+                damage: natives::damage(cpu, 0),
+                facing: natives::lr(cpu),
+                jumps: remaining_jumps(cpu)?,
+                bomb: if sample_bomb { owned_link_bomb(cpu).map(|(owned, _)| owned) } else { None },
+                can_pull: flight.waiting_to_pull() && niche_start_enabled(cpu, Move::Bomb, true),
+                can_jump: flight.is_jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
+                can_spin: flight.is_spin_frame(frame) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            });
+        }
         if let Some(MeasuredFlight::Puff(flight)) = &mut self.measured {
             if !puff_active_status(status, airborne_recovery(cpu, status)) {
                 return None;
@@ -836,12 +887,7 @@ unsafe fn link_bomb_phase(
     inward: f32,
     clearance: f32,
 ) -> Option<(Motion, bool)> {
-    use smash::app::{lua_bind::ItemModule, BattleObjectModuleAccessor};
-
-    if !link_bomb_reads_granted() || !crate::runtime::roster::running() {
-        return None;
-    }
-    if status == UNRESOLVED {
+    if !link_bomb_reads_granted() || !crate::runtime::roster::running() || status == UNRESOLVED {
         return None;
     }
     if status == konst(C::StatusSpecialLw) {
@@ -858,25 +904,40 @@ unsafe fn link_bomb_phase(
     if !airborne_recovery(cpu, status) {
         return None;
     }
+    let (ownership, bomb) = owned_link_bomb(cpu)?;
+    match ownership {
+        OwnedBomb::Absent => return Some((Motion::Free, true)),
+        OwnedBomb::Held => return Some((Motion::ItemHeld, false)),
+        OwnedBomb::Loose => {}
+    }
+    let bomb = bomb?;
+    let dx = (x - natives::pos_x(bomb)) * inward;
+    let dy = y - natives::pos_y(bomb);
+    // Let the dropped bomb fall behind Link so the launch bends toward the stage.
+    (dx.hypot(dy) < clearance).then_some((Motion::ItemLoose, dx > 0.0 && dy >= 0.0))
+}
+
+unsafe fn owned_link_bomb(cpu: usize) -> Option<(OwnedBomb, Option<usize>)> {
+    use smash::app::{lua_bind::ItemModule, BattleObjectModuleAccessor};
+
+    if !link_bomb_reads_granted() || !crate::runtime::roster::running() {
+        return None;
+    }
     let body = cpu as *mut BattleObjectModuleAccessor;
-    let held = ItemModule::is_have_item(body, 0)
-        .then(|| ItemModule::get_have_item_id(body, 0));
+    let held = ItemModule::is_have_item(body, 0).then(|| ItemModule::get_have_item_id(body, 0));
     // FIGHTER_LINK_INSTANCE_WORK_ID_INT_BOMB_OBJECT_ID.
     let id = u32::try_from(natives::get_int(cpu, 0x1000_00c3)).ok()?;
     if id == 0x5000_0000 || !state::object_is_active(id) {
-        return held.is_none().then_some((Motion::Free, true));
+        return held.is_none().then_some((OwnedBomb::Absent, None));
     }
     let bomb = state::object_accessor(id);
     if bomb == 0 || natives::fighter_kind(bomb) != Some(0x78) {
         return None;
     }
     if let Some(held) = held {
-        return (held == u64::from(id)).then_some((Motion::ItemHeld, false));
+        return (held == u64::from(id)).then_some((OwnedBomb::Held, Some(bomb)));
     }
-    let dx = (x - natives::pos_x(bomb)) * inward;
-    let dy = y - natives::pos_y(bomb);
-    // Let the dropped bomb fall behind Link so the launch bends toward the stage.
-    (dx.hypot(dy) < clearance).then_some((Motion::ItemLoose, dx > 0.0 && dy >= 0.0))
+    Some((OwnedBomb::Loose, Some(bomb)))
 }
 
 pub(super) fn pyra_swapping(status: i32) -> bool {

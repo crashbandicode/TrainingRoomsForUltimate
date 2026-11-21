@@ -232,7 +232,7 @@ impl Intent {
 use Move::*;
 // A crossing glides and holds its height first. A special that ends in special
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
-const ROWS: [Row; 43] = [
+const ROWS: [Row; 44] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[Side, Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
@@ -280,6 +280,7 @@ const ROWS: [Row; 43] = [
     Row::new(41, 0x8, Intent::FakeOut, &[Jump, QuickAttack]),
     Row::new(super::game_watch::ROW, super::game_watch::KIND, Intent::OilStall, &[Down, Rise]),
     Row::new(43, 0x13, Intent::FakeOut, &[Jump, QuickAttack]),
+    Row::new(super::link::ROW, super::link::KIND, Intent::Across, &[Bomb, Jump, Rise]),
 ];
 
 const fn row_mask(extensions_only: bool) -> u64 {

@@ -1501,7 +1501,7 @@ unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool 
     true
 }
 
-unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -> bool {
+unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> bool {
     let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
         return false;
     };
@@ -1556,7 +1556,14 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage: Stage, setup: Setup) -
             z: 0.0,
         },
     );
-    state::set_lr(bodies.cpu, -facing);
+    let cpu_facing = if crate::model::edge_juggle::link_faces_away(
+        drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
+    ) {
+        -1.0
+    } else {
+        -facing
+    };
+    state::set_lr(bodies.cpu, cpu_facing);
     state::set_situation_kind(bodies.cpu, air);
     natives::set_int(bodies.cpu, 0, jump_count);
     state::heal(bodies.cpu, -damage);
@@ -1943,7 +1950,7 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
                 Placement::Grounded if obs.grounded => {
-                    if try_place(&Bodies { p1, cpu }, drill, run.stage, run.setup) {
+                    if try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
                         run.placement = Placement::Airborne;
                     }
                 }
