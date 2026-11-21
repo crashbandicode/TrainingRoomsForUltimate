@@ -116,10 +116,12 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let draw_settings = input_display::settings();
     let parry = strip_shown.then(parry::view).flatten();
     let card = if bar[cb::at::CONTAINER] != 0 {
-        combo::hud_tick(strip_shown, draw_settings.link_history, parry.is_some(), |local, look, changed| {
+        let mut drawn = None;
+        combo::hud_tick(strip_shown, draw_settings.link_history, parry.is_some(), &mut drawn, |local, look, changed| {
             write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
         });
-        combo::card(strip_shown)
+        // This draw's own card; only a contended tick falls back to the last one drawn.
+        drawn.unwrap_or_else(|| combo::card(strip_shown))
     } else {
         None
     };

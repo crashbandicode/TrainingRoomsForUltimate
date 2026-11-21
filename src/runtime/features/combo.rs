@@ -579,10 +579,12 @@ pub fn on_layout_registered() {
 /// game's task workers (`anchors::ui_pass_calculate`), while the fighter frame may hold `HELPER`, `NAME` or `PLAN`: it takes
 /// them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next pass draws). No plugin
 /// thread takes them (the menu worker posts: `NAME_POSTED`, `PLAN_POST`); this tick takes what it posted first.
+/// A tick that drew sets `drawn` to its card; a contended tick leaves it alone.
 pub fn hud_tick(
     strip_shown: bool,
     history_enabled: bool,
     parry: bool,
+    drawn: &mut Option<Option<bool>>,
     mut apply: impl FnMut(usize, &Look, Changed),
 ) -> usize {
     // Borrow the static Helper. Copying it exhausts the game task's stack.
@@ -619,10 +621,12 @@ pub fn hud_tick(
         }
     }
     CARD.store(card.map_or(0, |sequence| 1 + u8::from(sequence)), Ordering::Release);
+    *drawn = Some(card);
     writes
 }
 
-/// The card the last HUD tick that got to it drew, while the strip is shown: a combo (`Some(false)`) or a sequence (`Some(true)`).
+/// The card of the last HUD tick that drew, for a contended tick while the strip is shown: a combo (`Some(false)`) or a
+/// sequence (`Some(true)`).
 pub fn card(strip_shown: bool) -> Option<bool> {
     match CARD.load(Ordering::Acquire) {
         1 if strip_shown => Some(false),
