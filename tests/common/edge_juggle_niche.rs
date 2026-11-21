@@ -58,6 +58,7 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Pikachu",
         "Mr. Game & Watch",
         "Pichu",
+        "Link",
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
@@ -744,7 +745,7 @@ fn niche_crossing_rows_decline_an_infeasible_budget() {
             assert!(select(roomy, only).is_none(), "row {} needs a different setup", row.id);
             continue;
         }
-        if [4, 8, 14, 15, 26, 32, 35].contains(&row.id) {
+        if [4, 8, 14, 15, 26, 32, 35, perfect::link::ROW].contains(&row.id) {
             assert!(select(roomy, only).is_none(), "row {} needs a dedicated model", row.id);
             continue;
         }
