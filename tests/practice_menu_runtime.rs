@@ -72,7 +72,7 @@ fn unavailable_egg_zone_messages_remain_visible_with_combo_display_off() {
     let hitbox = src("src/runtime/features/hitbox.rs");
     let pass = item(&hitbox, "unsafe fn eggs_pass(");
     let fallback = &pass[pass.find("run.disable_offstage()").unwrap()..];
-    assert!(fallback.contains("notices::post_required(\"Eggs-ercise\", reason"));
+    assert!(fallback.contains("notices::post_required(HEADER, reason"));
 
     let wizard = src("src/runtime/features/egg_zone.rs");
     let frame = item(&wizard, "pub unsafe fn frame(");

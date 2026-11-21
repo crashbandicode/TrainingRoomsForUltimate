@@ -283,7 +283,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             }
             Geometry::Unavailable => {
                 if let Some(reason) = run.disable_offstage() {
-                    let _ = super::notices::post_required("Eggs-ercise", reason, 120, DEFAULT_COLOR);
+                    let _ = super::notices::post_required(HEADER, reason, 120, DEFAULT_COLOR);
                 }
             }
             Geometry::Pending => {}
