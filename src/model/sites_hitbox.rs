@@ -4,7 +4,7 @@
 //! it. Offsets are from the start of `.text`.
 //!
 //! Eight hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound`, rc.14 wind-articles, the four
-//! `AREA_WIND_2ND*` commands, and the optional spacing hit handler), fifteen called natives of the
+//! `AREA_WIND_2ND*` commands, and the optional spacing hit handler), fourteen called natives of the
 //! attack, damage, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
 //! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1), three of the
 //! DamageModule's damage record (spots-3 and spacing grading), five optional hit-pair windows, two shape-radius windows, and,
@@ -72,7 +72,6 @@ pub const HITBOX_KILL_OFFSET: usize = 0x201_7840;
 pub const HITBOX_IS_EXIST_OFFSET: usize = 0x201_7a20;
 pub const HITBOX_RGB_LAST_OFFSET: usize = 0x201_7c80;
 pub const HITBOX_RATE_LAST_OFFSET: usize = 0x201_7ce0;
-pub const HITBOX_SLEEP_EFFECT_OFFSET: usize = 0x206_9140;
 pub const HITBOX_ACCESSOR_OFFSET: usize = 0x227_daf0;
 /// `ArticleModule::get_article_from_no(accessor, kind, ordinal)`: nullable `Article*`, not an accessor.
 pub const HITBOX_ARTICLE_FROM_NO_OFFSET: usize = 0x209_2e10;
@@ -113,7 +112,7 @@ pub const HOOK_ROWS: [&str; 8] =
     ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler"];
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
-pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 46] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
 
 pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
     GRADER_ROWS.iter().all(|(name, _)| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))

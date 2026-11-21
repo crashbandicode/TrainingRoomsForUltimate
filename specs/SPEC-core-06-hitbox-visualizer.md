@@ -127,6 +127,12 @@ target in the air, `t-hbl-361b`); a centre dot for 362 and above. Up to two mark
 
 ## 4. Outputs and native state touched
 
+Preview visual fix, 2026-11-20. The visualizer leaves native animation-command effects enabled according to the
+game's own policy. Its overlays use only plugin panes, so neither the visualizer toggle nor fighter status writes
+the effect sleep flag. This supersedes the historical sleep and restore steps and the associated Q4 transition.
+With Hurtboxes on, the target's break boundary is visible over the full-colour picture. If Spacing Grader is on,
+the translucent outer grade rim also marks that boundary and the two inner zones use their own translucent discs.
+
 | Native state | How it is reached (`main+0x…`, 13.0.5) | When | Guard |
 | --- | --- | --- | --- |
 | `ATTACK` animation command | replace hook at `main+0x2284b20` (`sv_animcmd::ATTACK`, entry); the hook runs the plugin part first (Training only), then the original | every hitbox creation | 64-byte guard (fork row `hitbox_visualizer.handle_attack`), chain if the entry is owned |
@@ -134,7 +140,6 @@ target in the air, `t-hbl-361b`); a centre dot for 362 and above. Up to two mark
 | `GrabModule::set_rebound` | replace hook at `main+0x2027bb0` (16-byte lua_bind thunk; the neighbouring thunks sit inside its 64-byte window) | every rebound change | 64-byte guard (`hitbox_visualizer.handle_set_rebound`), window checked before any install |
 | Effect spawn | `EffectModule::req_follow(accessor, hash "sys_shield", bone hash, pos, zero rot, size×0.095, follow=true, attributes NO_JOINT_SCALE \| FOLLOW \| CONCLUDE_STATUS, 0, 0, 0, 0, true, true)` then `set_rgb_partial_last(r,g,b)` and `set_rate_last(8.0)` | per sphere per frame (per-frame pass) and at creation (command hooks) | called game functions (no hook) |
 | Effect removal | `EffectModule::set_visible_kind(accessor, "sys_shield", false)` then `kill_kind(accessor, "sys_shield", false, true)` | every frame before redrawing; on rebound cleared | called |
-| Effect sleep | `MotionAnimcmdModule::set_sleep_effect(accessor, bool)`: `false` at the start of every per-frame pass (restores), `true` when visualizing outside the exempt statuses | per fighter per frame | called |
 | Own orbs: bone position (§2a) | `ModelModule::joint_global_position_with_offset` lua_bind thunk `main+0x2057640`, last argument `false` | per held fighter sphere per pass | 64-byte guard (`orb_joint_position`) |
 | Own orbs: projection (§2a) | the projection behind `sv_camera_manager::world_to_screen`, `main+0x1341280` (`(out_x*, out_y*, pos&, false)`), and its screen-size words read at `main+0x13415f0` | per orb per layout tick | 64-byte guards (`orb_world_to_screen`, `orb_screen_size`) |
 | Own orbs: panes (§2a) | the plugin's own `TrOrbs` container and `tr_oa_*`/`tr_ob_*` pictures in `info_training` / `info_waiting` (position, size, colour, visibility) | per layout tick | the layout recipe digest |
@@ -144,7 +149,7 @@ No memory is written outside these calls.
 
 ## 5. Timing and frame rules
 
-- **Per fighter, per frame** (from the `on_frame` driver, SPEC-core-01 §5.2, after combo and before save states): (1) `set_sleep_effect(false)`; (2) if Off → stop; (3) if status in `CATCH..=CATCH_TURN` → stop; (4) if shielding → stop; (5) `set_sleep_effect(!(status in CATCH..=TREAD_FALL) && status != DOWN)`; (6) hide and kill `sys_shield`; (7) for each active attack slot spawn the spheres. The newest upstream (`077a8e43`) adds (0) if not Training → stop **before** step (1), so a non-Training scene never has its effect sleep flag touched by the plugin; required.
+- **Per fighter, per frame** (from the `on_frame` driver, SPEC-core-01 §5.2, after combo and before save states): clear owned overlays outside practice, with the display Off, or while shielding. During a grab, keep grab and hurtbox geometry and skip attack-slot reads. Otherwise reconcile the owned overlays with the current attack and hurtbox geometry.
 - **At hitbox creation** (`ATTACK` hook): draw once from the command parameters before the original runs, Training only. The per-frame pass redraws (and first kills) on the following frames.
 - **At grab-box creation** (`CATCH` hook): draw once; grab boxes are not redrawn per frame (the per-frame pass only reads attack slots), so they persist as `CONCLUDE_STATUS` effects until the status ends or the rebound hook kills them.
 - **Rebound cleared**: hide and kill `sys_shield` unless shielding.
@@ -190,12 +195,12 @@ lines record the HitModule read's cost and the pass's own cost on the integrated
 | --- | --- | --- | --- |
 | A capsule is its two end spheres (keys 0 and 1), one pill (HB-PILLS; replaces the `n = ceil(d/(1.75 s))+1` sampling); a single sphere for a point hitbox | `core06_capsule_is_two_ends`, `a_capsules_two_ends_are_one_orb`, `projected_orbs_map_onto_the_layout_canvas`, `the_pill_panes_are_cut_whole_hurtboxes_first` | `core06-E1` screenshot of an extended hitbox (e.g. a sword tilt) | `docs/EDEN-RESULTS.md` |
 | Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | `core06-E2` multi-hitbox move screenshot | `docs/EDEN-RESULTS.md` |
-| Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | `core06-E3` grab, shield, missed tech cases | — |
+| Fighter overlay gating (practice, setting, grab range and shield) | `core06_frame_rules_table` | `core06-E3` grab and shield cases | — |
 | First-frame draw from the `ATTACK`/`CATCH` parameters (indices as §3) | `core06_command_param_indices` (model: parameter extraction) | `core06-E4` frame-step the first active frame | — |
 | Rebound cleared → spheres killed unless shielding | `core06_rebound_rule` | `core06-E5` | — |
 | Training-only gate incl. `077a8e43` early return; no effect-sleep calls online | `core06_training_gate` | `core06-E6` Quickplay match with setting On: no spheres, effects normal | `docs/EDEN-RESULTS.md` |
 | Three sites guarded (64 B) and installed independently; neighbouring thunk windows checked first | `core06_site_guards` | `core06-E7` install line `handle_attack=stock/near …` | — |
-| Off restores effects next frame | `core06_off_restores` | `core06-E8` | — |
+| Native effects continue with Hurtboxes on | `preview_visual_core06_visualizer_does_not_sleep_native_effects` | Palutena up smash with Hurtboxes on and off | — |
 | rc.14 Frame data colours: Sweet red, Sour and Late pink, an unrankable hitbox red; Off is today's colours; one function chooses every tint | `the_hit_spheres_take_the_frame_data_colours`, `off_is_exactly_the_old_drawing`, `one_function_chooses_every_tint`, `the_strongest_hitbox_of_a_frame_is_sweet_and_a_weaker_one_sour`, `a_hitbox_weaker_than_an_earlier_one_of_the_action_is_late` | rc14 spots, Marth forward smash and Captain Falcon forward air at 1/4 speed | `artifacts/rc14-spots/` |
 | rc.14 checklist and legend: each item draws on its own, old On/Off migrates, grab purple, hurtboxes by the game's status, windboxes uncoloured, launch angles (line, dashes at 38, dot) mirrored by facing | `legend_checklist_items_draw_independently`, `legend_old_hitbox_vis_migrates`, `legend_hitbox_visualization_is_one_checklist`, `legend_part_status_is_the_games_max`, `legend_hurtbox_status_colours`, `legend_grab_is_purple_while_frame_data_colours_is_on`, `legend_off_keeps_todays_tints`, `legend_windboxes_keep_the_hit_colours`, `legend_angle_line_points_along_the_angle_mirrored_by_facing`, `legend_special_angles_are_dashed_or_a_dot`, `legend_marks_follow_their_hitbox_and_draw_last`, `legend_facts_match_the_owned_elf` | `hbl-trace-8fadea57-1`, `hbl-final-252e200b-1`, the checklist boot | `artifacts/rc14-hb-legend/` |
 

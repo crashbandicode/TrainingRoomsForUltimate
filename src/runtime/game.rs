@@ -625,11 +625,6 @@ pub mod natives {
         at::<extern "C" fn(usize, u32, bool, bool)>(crate::model::sites_hitbox::HITBOX_KILL_OFFSET).map_or_else(Default::default, |f| f(accessor, handle, false, true))
     }
 
-    /// `MotionAnimcmdModule::set_sleep_effect(accessor, sleep)`.
-    pub unsafe fn set_sleep_effect(accessor: usize, sleep: bool) {
-        at::<extern "C" fn(usize, bool)>(crate::model::sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET).map_or_else(Default::default, |f| f(accessor, sleep))
-    }
-
     /// `ModelModule::joint_global_position_with_offset(accessor, joint, offset, out, false)`: the world position of `offset`
     /// in the bone's frame (`None` when the row was not granted). The guarded thunk (`main+0x2057640`) jumps to the
     /// ModelModule's vtable slot `0x158` with the flag masked to one bit (`and w4, w4, #1`). The plugin passes `false`, which

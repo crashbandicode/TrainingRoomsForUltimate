@@ -5,8 +5,7 @@
 //! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
 //! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
-//! showed. The fighter's other animation-command effects are put to sleep meanwhile, except in the grab, tread and
-//! knockdown statuses.
+//! showed. The overlay leaves native animation-command effects to the game.
 //!
 //! The spheres are kept, not respawned (lead ruling 2026-11-02 on Q3): each fighter's pass works out the spheres it wants and
 //! `model::hitbox::HandleSet` holds them through `OrbSink` (never refused, ended at a status change), keeps the unchanged ones
@@ -39,7 +38,7 @@ use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, SleepBook, Sphere, StatusIds};
+use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::{SiteReport, Written};
@@ -66,15 +65,12 @@ fn shown(bit: u8) -> bool {
 }
 /// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
-static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
+static IDS: [AtomicI32; hitbox::STATUS_NAMES.len()] = [const { AtomicI32::new(0) }; hitbox::STATUS_NAMES.len()];
 /// The work id of a fighter's entry (`hitbox::ENTRY_ID_NAME`), for the lobby gate; resolved with the status ids.
 static ENTRY_WORK: AtomicI32 = AtomicI32::new(0);
 static ENTRY_WORK_READY: AtomicBool = AtomicBool::new(false);
 /// Calls of `ensure_ready` since boot: the table is asked again every 30th call until it answers.
 static TRIES: AtomicU32 = AtomicU32::new(0);
-/// Fighters whose effects the plugin put to sleep (by accessor address), and how many.
-static BOOK: Mutex<SleepBook> = Mutex::new(SleepBook::new());
-static SLEPT: AtomicUsize = AtomicUsize::new(0);
 
 /// Boot: the feature installed (or not).
 pub fn set_installed(on: bool) {
@@ -85,7 +81,10 @@ pub fn set_installed(on: bool) {
 pub fn publish(snapshot: &Snapshot) {
     let shown = hitbox::shown(snapshot);
     SHOWN.store(shown, Ordering::Release);
-    SETTING.store(legend::draws(shown), Ordering::Release);
+    let draws = legend::draws(shown);
+    if SETTING.swap(draws, Ordering::AcqRel) && !draws {
+        CLEAR_ARTICLES.store(true, Ordering::Release);
+    }
     let mut row_bytes = [0; 8];
     row_bytes[..5].copy_from_slice(&eggs::choices(snapshot));
     row_bytes[4] = eggs::checklist(snapshot, eggs::ROW_AREA);
@@ -585,7 +584,7 @@ unsafe fn drawn_player_height(player: usize, wants: &[Sphere]) -> Option<f32> {
         .reduce(f32::max)
 }
 
-/// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
+/// The status ids, resolved once through the game's constant table (`None` until it answers; it may not be
 /// built at boot). Asked again every 30th call.
 fn ensure_ready() -> bool {
     if READY.load(Ordering::Acquire) {
@@ -594,7 +593,7 @@ fn ensure_ready() -> bool {
     if TRIES.fetch_add(1, Ordering::Relaxed) % 30 != 0 {
         return false;
     }
-    let mut ids = [0i32; 6];
+    let mut ids = [0; hitbox::STATUS_NAMES.len()];
     for (slot, name) in ids.iter_mut().zip(hitbox::STATUS_NAMES) {
         // SAFETY: the constant lookup is a guarded called site (`lua_const` checks its grant).
         let Some(value) = (unsafe { game::lua_const(lua_bind_hash(name)) }) else { return false };
@@ -634,22 +633,6 @@ unsafe fn visualizes(accessor: usize) -> bool {
     );
     hitbox::visualizes_entry(scene, entry)
 }
-
-fn book_set(accessor: usize, slept: bool) {
-    let mut book = BOOK.lock();
-    let before = book.slept(accessor);
-    book.set(accessor, slept);
-    match (before, slept) {
-        (false, true) => {
-            SLEPT.fetch_add(1, Ordering::Relaxed);
-        }
-        (true, false) => {
-            SLEPT.fetch_sub(1, Ordering::Relaxed);
-        }
-        _ => {}
-    }
-}
-
 
 // ---- the spheres the plugin keeps (lead ruling 2026-11-02 on Q3) ------------------------------------------------------
 
@@ -798,8 +781,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
     let grader = super::input_display::grader_live();
-    // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
-    // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
+    // The break volume supplies the geometry for both the hurt disc and the grade zones.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
@@ -881,7 +863,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         looks = own.map(|look| {
             let ([x, y], look) = look?;
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
-            Some((plan(&dot, [255; 4])?, crate::model::spacing::picture_look(look, grader && !tech && !edge_wizard)))
+            Some((plan(&dot, [255; 4])?, look))
         });
         let hide = super::hide_cpu::draw_hide();
         let board = if on { BOARD.try_lock() } else { None };
@@ -905,7 +887,6 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             }
         }
         let drawn = orbs::targets_drawn(board.is_some() || !on, hurt_on || grader, n_targets);
-        let target_hurts = targets[..drawn].iter();
         let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {
             let Some((cap, band)) = used.take(pill.length > 0.0) else {
                 *over += 1;
@@ -935,14 +916,10 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             }
             write_pill(pill, &mut used, &mut over, &cache.panes);
         }
-        for target in target_hurts {
-            let Some(pill) = plan(target, target.color) else { continue };
-            write_pill(pill, &mut used, &mut over, &cache.panes);
-            if grader {
-                for zone in crate::model::spacing::zone_discs(target) {
-                    let Some(pill) = plan(&zone, zone.color) else { continue };
-                    write_pill(pill, &mut used, &mut over, &cache.panes);
-                }
+        for target in &targets[..drawn] {
+            for layer in crate::model::spacing::target_layers(target, hurt_on, grader).into_iter().flatten() {
+                let Some(pill) = plan(&layer, layer.color) else { continue };
+                write_pill(pill, &mut used, &mut over, &cache.panes);
             }
         }
     }
@@ -1107,6 +1084,18 @@ impl hitbox::AttackReader for GameAttacks {
 /// The articles whose `ATTACK`, `CATCH` or wind-area command ran and the items with a live attack slot or a wind area, drawn by
 /// every fighter pass (rc.13; wind areas rc.14 wind-articles). Locked before `BOARD`.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
+/// An Off transition clears tracked articles even when no fighter orbs are held.
+static CLEAR_ARTICLES: AtomicBool = AtomicBool::new(false);
+
+fn clear_articles() {
+    if CLEAR_ARTICLES.load(Ordering::Acquire) {
+        let Some(mut articles) = ARTICLES.try_lock() else { return };
+        let Some(mut board) = BOARD.try_lock() else { return };
+        if CLEAR_ARTICLES.swap(false, Ordering::AcqRel) {
+            articles.forget_all(Some(&mut board));
+        }
+    }
+}
 
 /// Each tracked article's live attack slots as its own orbs, placed on its bones, and with *Windboxes* ticked its wind areas; an
 /// article that is gone (its id inactive or now another object's), or whose attack, grab and wind ended, is forgotten.
@@ -1215,7 +1204,7 @@ unsafe fn fighter_launch(accessor: usize) -> crate::model::spots::Launch {
 // ---- the per-frame pass ---------------------------------------------------------------------------------------------
 
 /// One fighter's pass (SPEC-core-06 §5), after the game's frame for it. A readiness boundary: nothing happens before boot
-/// installed the feature. With the setting Off, nothing held and nothing to restore it makes no game call at all (Q4).
+/// installed the feature. With the setting Off and nothing held it makes no game call at all (Q4).
 ///
 /// # Safety
 /// `fighter` is the fighter object the game just ran a frame of.
@@ -1244,23 +1233,25 @@ pub unsafe fn frame(fighter: usize) {
         }
         None
     };
-    if !enabled && SLEPT.load(Ordering::Relaxed) == 0 && HELD.load(Ordering::Relaxed) == 0 {
-        return;
+    if !enabled {
+        clear_articles();
+        if HELD.load(Ordering::Relaxed) == 0 {
+            return;
+        }
     }
     let accessor = natives::fighter_accessor(fighter);
     if accessor == 0 {
         return;
     }
-    let slept = BOOK.lock().slept(accessor);
     let mut store = STORE.lock();
     let held = store.table.find(accessor).is_some_and(|i| !store.table.sets[i].is_empty());
-    // Off with nothing of this fighter's to restore or kill: no game call at all.
-    if !enabled && !slept && !held {
+    // Off with none of this fighter's overlays to clear: no game call at all.
+    if !enabled && !held {
         return;
     }
     let visualizes = visualizes(accessor);
     if !visualizes || !ensure_ready() {
-        // Not (or no longer) a practice fighter: its own spheres go, its effect flag is never touched.
+        // Not (or no longer) a practice fighter: its own spheres go.
         if let Some(i) = store.table.find(accessor) {
             clear_set(&mut store, i, accessor);
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
@@ -1273,14 +1264,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let ids = status_ids();
     let status = if enabled { natives::status_kind(accessor) } else { 0 };
-    let facts = FrameFacts { visualizes: true, enabled, slept, status, ids };
-    let plan = hitbox::plan(facts);
-    if plan.restore {
-        natives::set_sleep_effect(accessor, false);
-    }
-    if plan.sleep {
-        natives::set_sleep_effect(accessor, true);
-    }
+    let facts = FrameFacts { visualizes: true, enabled, status, ids };
     let i = store.table.index_for(accessor);
     let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
     let mut counts = Counts::default();
@@ -1323,8 +1307,6 @@ pub unsafe fn frame(fighter: usize) {
     // Off: the pass that clears the fighters' orbs forgets the articles too.
     if enabled {
         counts.dropped += draw_articles(accessor, |key| enabled.then(|| hitbox::GameHurt { accessor: key, load: mem_load }));
-    } else {
-        ARTICLES.lock().forget_all(BOARD.try_lock().as_deref_mut());
     }
     counts.kept += c.kept;
     counts.spawned += c.spawned;
@@ -1343,12 +1325,8 @@ pub unsafe fn frame(fighter: usize) {
     if enabled && visualizes {
         stats::hurt_census(accessor);
     }
-    let slept_now = hitbox::slept_after(facts, plan);
-    if slept_now != facts.slept {
-        book_set(accessor, slept_now);
-    }
     #[cfg(feature = "diag")]
-    stats::frame_end(plan, counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
+    stats::frame_end(facts.draws_attacks(), counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
     #[cfg(not(feature = "diag"))]
     let _ = (counts, held_now);
 }
@@ -1553,7 +1531,7 @@ pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport
 mod stats {
     use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-    use crate::model::hitbox::{self, Counts, FramePlan};
+    use crate::model::hitbox::{self, Counts};
     use crate::runtime::diag_log::diagnostic;
     use hos_lock::Mutex;
 
@@ -1567,8 +1545,6 @@ mod stats {
     static ENDED: AtomicU32 = AtomicU32::new(0);
     static FAILED: AtomicU32 = AtomicU32::new(0);
     static DROPPED: AtomicU32 = AtomicU32::new(0);
-    static SLEEPS: AtomicU32 = AtomicU32::new(0);
-    static RESTORES: AtomicU32 = AtomicU32::new(0);
     static COMMANDS: AtomicU32 = AtomicU32::new(0);
     static MAX_HELD: AtomicU32 = AtomicU32::new(0);
     static TICKS: AtomicU64 = AtomicU64::new(0);
@@ -1606,7 +1582,7 @@ mod stats {
         WANT_HURT.fetch_add(hurts, Ordering::Relaxed);
     }
 
-    pub fn frame_end(plan: FramePlan, c: Counts, held: u32, held_total: u32) {
+    pub fn frame_end(redraw: bool, c: Counts, held: u32, held_total: u32) {
         let ticks = now().wrapping_sub(START.load(Ordering::Relaxed));
         TICKS.fetch_add(ticks, Ordering::Relaxed);
         MAX_TICKS.fetch_max(ticks, Ordering::Relaxed);
@@ -1618,18 +1594,12 @@ mod stats {
         FAILED.fetch_add(c.failed, Ordering::Relaxed);
         DROPPED.fetch_add(c.dropped, Ordering::Relaxed);
         MAX_HELD.fetch_max(held_total, Ordering::Relaxed);
-        if plan.sleep {
-            SLEEPS.fetch_add(1, Ordering::Relaxed);
-        }
-        if plan.restore {
-            RESTORES.fetch_add(1, Ordering::Relaxed);
-        }
         // One line whenever this fighter's set changed (a sphere was requested, killed, ended or refused).
         let change = (u64::from(held) << 32) | u64::from(c.spawned + c.killed + c.ended + c.failed);
         if (c.spawned | c.killed | c.ended | c.failed) != 0 && LAST.swap(change, Ordering::Relaxed) != change {
             diagnostic(format_args!(
-                "[Hitbox] pass held={held} held_total={held_total} kept={} spawned={} killed={} ended={} failed={} dropped={} sleep={} redraw={}",
-                c.kept, c.spawned, c.killed, c.ended, c.failed, c.dropped, plan.sleep, plan.redraw
+                "[Hitbox] pass held={held} held_total={held_total} kept={} spawned={} killed={} ended={} failed={} dropped={} sleep=false redraw={redraw}",
+                c.kept, c.spawned, c.killed, c.ended, c.failed, c.dropped
             ));
         }
         let passes = PASSES.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1637,7 +1607,7 @@ mod stats {
             let take = |c: &AtomicU32| c.swap(0, Ordering::Relaxed);
             let passes = take(&PASSES).max(1);
             diagnostic(format_args!(
-                "[Hitbox] stats passes={passes} with_work={} want_hit={} want_hurt={} kept={} spawned={} killed={} ended={} failed={} dropped={} held_max={} held_now={held_total} sleeps={} restores={} commands={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
+                "[Hitbox] stats passes={passes} with_work={} want_hit={} want_hurt={} kept={} spawned={} killed={} ended={} failed={} dropped={} held_max={} held_now={held_total} sleeps=0 restores=0 commands={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
                 take(&WORK),
                 take(&WANT_HIT),
                 take(&WANT_HURT),
@@ -1648,8 +1618,6 @@ mod stats {
                 take(&FAILED),
                 take(&DROPPED),
                 take(&MAX_HELD),
-                take(&SLEEPS),
-                take(&RESTORES),
                 take(&COMMANDS),
                 TICKS.swap(0, Ordering::Relaxed) / u64::from(passes),
                 MAX_TICKS.swap(0, Ordering::Relaxed),

@@ -225,41 +225,31 @@ pub fn stack_cell(base: usize, top: usize, index: usize, load: impl Fn(usize) ->
 pub struct StatusIds {
     pub catch: i32,
     pub catch_turn: i32,
-    pub tread_fall: i32,
-    pub down: i32,
     pub guard_on: i32,
     pub guard_damage: i32,
 }
 
 /// The identifiers of `StatusIds`, in field order.
-pub const STATUS_NAMES: [&str; 6] = [
+pub const STATUS_NAMES: [&str; 4] = [
     "FIGHTER_STATUS_KIND_CATCH",
     "FIGHTER_STATUS_KIND_CATCH_TURN",
-    "FIGHTER_STATUS_KIND_TREAD_FALL",
-    "FIGHTER_STATUS_KIND_DOWN",
     "FIGHTER_STATUS_KIND_GUARD_ON",
     "FIGHTER_STATUS_KIND_GUARD_DAMAGE",
 ];
 
 impl StatusIds {
-    pub fn from_values(v: [i32; 6]) -> StatusIds {
-        StatusIds { catch: v[0], catch_turn: v[1], tread_fall: v[2], down: v[3], guard_on: v[4], guard_damage: v[5] }
+    pub fn from_values(v: [i32; 4]) -> StatusIds {
+        StatusIds { catch: v[0], catch_turn: v[1], guard_on: v[2], guard_damage: v[3] }
     }
 
-    /// In a grab status range (`CATCH..=CATCH_TURN`): no drawing and no sleeping, so the grab animation's effects show.
+    /// In a grab status range (`CATCH..=CATCH_TURN`): skip the attack-slot scan.
     pub fn in_grab(&self, status: i32) -> bool {
         (self.catch..=self.catch_turn).contains(&status)
     }
 
-    /// Shielding (`GUARD_ON..=GUARD_DAMAGE`): the shield bubble is itself a `sys_shield` effect, so nothing is killed.
+    /// Shielding (`GUARD_ON..=GUARD_DAMAGE`): keep the shield bubble clear of fighter overlays.
     pub fn shielding(&self, status: i32) -> bool {
         (self.guard_on..=self.guard_damage).contains(&status)
-    }
-
-    /// Statuses whose effects stay awake: grab, capture and throw, the tread (footstool) statuses (`CATCH..=TREAD_FALL`) and the
-    /// knockdown (`DOWN`), so missed-tech and footstool cues remain.
-    pub fn effects_stay_awake(&self, status: i32) -> bool {
-        (self.catch..=self.tread_fall).contains(&status) || status == self.down
     }
 }
 
@@ -269,57 +259,14 @@ pub struct FrameFacts {
     /// Training or lobby practice, and this fighter is one the practice visualizes (`false` in every other scene, online too).
     pub visualizes: bool,
     pub enabled: bool,
-    /// The plugin put this fighter's effects to sleep on an earlier frame and has not restored them.
-    pub slept: bool,
     pub status: i32,
     pub ids: StatusIds,
 }
 
-/// The pass's native calls for one fighter, in order: restore, put to sleep, hide and kill the old spheres then draw.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FramePlan {
-    /// `set_sleep_effect(false)`.
-    pub restore: bool,
-    /// `set_sleep_effect(true)` (after the restore).
-    pub sleep: bool,
-    /// `set_visible_kind(sys_shield, false)`, `kill_kind(sys_shield)`, then one sphere set per active slot.
-    pub redraw: bool,
-}
-
-impl FramePlan {
-    pub const NONE: FramePlan = FramePlan { restore: false, sleep: false, redraw: false };
-
-    #[cfg(test)]
-    pub const fn calls(self) -> bool {
-        self.restore || self.sleep || self.redraw
-    }
-}
-
-/// SPEC-core-06 section 5, in order: (0) not practice: nothing, so another scene's effect flag is never touched; (1) restore;
-/// (2) Off: stop; (3) grab range: stop; (4) shielding: stop; (5) sleep unless the status keeps effects awake; (6) kill the old
-/// spheres; (7) draw. With the setting Off the restore is made once, when the plugin had put the fighter to sleep (Q4's
-/// recommendation: no game call per frame while Off); while On it is made every frame, as the spec orders. The spec's step (5)
-/// `set_sleep_effect(!awake)` is the single `sleep` call after the restore: when the fighter stays awake the restore already set the
-/// flag to `false`, so a second `false` call is not made.
-pub fn plan(f: FrameFacts) -> FramePlan {
-    if !f.visualizes {
-        return FramePlan::NONE;
-    }
-    if !f.enabled {
-        return FramePlan { restore: f.slept, sleep: false, redraw: false };
-    }
-    if f.ids.in_grab(f.status) || f.ids.shielding(f.status) {
-        return FramePlan { restore: true, sleep: false, redraw: false };
-    }
-    FramePlan { restore: true, sleep: !f.ids.effects_stay_awake(f.status), redraw: true }
-}
-
-/// The fighter's `slept` flag after the pass.
-pub fn slept_after(f: FrameFacts, plan: FramePlan) -> bool {
-    if !f.visualizes {
-        f.slept
-    } else {
-        plan.sleep
+impl FrameFacts {
+    /// Whether to scan the fighter's attack slots. Grabbers still get hurtboxes.
+    pub fn draws_attacks(self) -> bool {
+        self.visualizes && self.enabled && !self.ids.shielding(self.status) && !self.ids.in_grab(self.status)
     }
 }
 
@@ -369,54 +316,6 @@ pub fn draw_on_command(enabled: bool, visualizes: bool) -> bool {
 /// The ticked items of the `hitbox_vis` checklist (`legend::shown`; none by default). The visualizer runs while one of them draws.
 pub fn shown(snapshot: &super::settings::Snapshot) -> u8 {
     snapshot.get(super::legend::ROW).map_or(0, super::legend::shown)
-}
-
-/// How many fighters the sleep bookkeeping tracks (eight entries and their partners).
-pub const BOOK_SLOTS: usize = 16;
-
-/// Which fighters (by their accessor address) the plugin has put to sleep: fixed storage, no allocation.
-#[derive(Clone, Copy, Debug)]
-pub struct SleepBook {
-    keys: [usize; BOOK_SLOTS],
-    next: usize,
-}
-
-impl SleepBook {
-    pub const fn new() -> SleepBook {
-        SleepBook { keys: [0; BOOK_SLOTS], next: 0 }
-    }
-
-    pub fn slept(&self, key: usize) -> bool {
-        key != 0 && self.keys.contains(&key)
-    }
-
-    /// Record `slept` for `key`: a sleeping fighter takes a free entry (the oldest is replaced when all are taken), a restored
-    /// one frees its entry.
-    pub fn set(&mut self, key: usize, slept: bool) {
-        if key == 0 {
-            return;
-        }
-        let at = self.keys.iter().position(|k| *k == key);
-        match (slept, at) {
-            (true, Some(_)) => {}
-            (true, None) => {
-                let free = self.keys.iter().position(|k| *k == 0).unwrap_or_else(|| {
-                    let i = self.next;
-                    self.next = (self.next + 1) % BOOK_SLOTS;
-                    i
-                });
-                self.keys[free] = key;
-            }
-            (false, Some(i)) => self.keys[i] = 0,
-            (false, None) => {}
-        }
-    }
-}
-
-impl Default for SleepBook {
-    fn default() -> Self {
-        SleepBook::new()
-    }
 }
 
 // ---- persistent spheres (lead ruling 2026-11-02 on Q3, after Eden hb-01) ------------------------------------------
@@ -836,7 +735,7 @@ pub fn reconcile_frame(set: &mut HandleSet, facts: FrameFacts, wants: &mut [Sphe
         return (set.clear(fx), 0);
     }
     let mut len = 0;
-    if facts.ids.in_grab(facts.status) {
+    if !facts.draws_attacks() {
         // The grabber stays hittable through a grab: its hurt spheres stay, its hit spheres go (upstream's grab rule).
         let left_out = hurt.map_or(0, |hurt| want_hurt(hurt, wants, &mut len, true, KIND_HURT));
         let mut counts = set.reconcile(&wants[..len], true, fx);

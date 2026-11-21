@@ -2,6 +2,8 @@ pub const ROW: &str = "spacing_grader";
 
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
+use crate::model::hitbox_orbs::Orb;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Grade {
@@ -391,26 +393,31 @@ pub fn hook(
     live.then(|| capture(read, owner, module, entry, lanes)).flatten()
 }
 
-pub fn zone_discs(target: &crate::model::hitbox_orbs::Orb) -> [crate::model::hitbox_orbs::Orb; 2] {
+fn zone_discs(target: &Orb) -> [Orb; 2] {
     let mut good = *target;
     good.radius = 8.0 / 3.0;
-    good.color = crate::model::panes::linear([244, 186, 64, 255]);
+    good.color = crate::model::panes::linear([244, 186, 64, 180]);
     let mut ok = *target;
     ok.radius = 4.0 / 3.0;
-    ok.color = crate::model::panes::linear([232, 232, 236, 255]);
+    ok.color = crate::model::panes::linear([232, 232, 236, 180]);
     [good, ok]
 }
 
-pub const PICTURE_ALPHA: u8 = 64;
-
-/// The target pictures' panes sit above the orb panes, so while grading a whole target is drawn see-through to show its zone
-/// discs; break animations and other looks are unchanged.
-pub fn picture_look(look: crate::model::panes::EggLook, grader: bool) -> crate::model::panes::EggLook {
-    if grader && look == crate::model::panes::EGG_WHOLE {
-        crate::model::panes::EggLook { alpha: PICTURE_ALPHA, ..look }
-    } else {
-        look
-    }
+/// Draw the optional overlays over the intact target art. The outer grade rim
+/// shares the target's hurt boundary, so a graded target draws that rim once.
+pub fn target_layers(target: &Orb, hurtboxes: bool, grader: bool) -> [Option<Orb>; 3] {
+    let outer = (hurtboxes || grader).then(|| {
+        let mut outer = *target;
+        outer.color = if grader {
+            crate::model::panes::linear([72, 208, 118, 180])
+        } else {
+            let [r, g, b, _] = target.color;
+            [r, g, b, 128]
+        };
+        outer
+    });
+    let [good, ok] = if grader { zone_discs(target).map(Some) } else { [None; 2] };
+    [outer, good, ok]
 }
 
 #[cfg(test)]
