@@ -594,10 +594,9 @@ impl Renderer {
         };
         let metrics = captions.metrics(helper.results().count());
         let plan = Plan { helper, seq, captions };
-        let band_top = spec.strip.band_top(history);
         self.show(|i| match plan.ink(i) {
             Some(ink) => Look { visible: true, text: ink.text, color: ink.color, ..Look::HIDDEN }
-                .at(spec.card.place(i, seq.is_some(), band_top, metrics, ink.detail)),
+                .at(spec.card.place(i, seq.is_some(), &spec.strip, history, metrics, ink.detail)),
             None => Look::HIDDEN,
         }, apply)
     }

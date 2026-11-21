@@ -52,6 +52,7 @@ fn runtime_and_archive_share_the_strip_layout() {
     let mut alternate = C;
     alternate.strip.origin_y -= 300.0;
     alternate.strip.width -= 40.0;
+    alternate.strip.base_height += 20.0;
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
         let (_, line, history) = Renderer::new().draw_with_spec(
@@ -60,11 +61,13 @@ fn runtime_and_archive_share_the_strip_layout() {
         );
         let root = strip_pane_spec(spec, IDX_IV + at::CONTAINER);
         assert_eq!((root.x, root.y), (looks[at::CONTAINER].x, looks[at::CONTAINER].y));
-        for i in [at::BACKDROP, at::READ_LABEL + 1, at::READ_SUB + 1] {
+        for i in [at::BACKDROP, at::SEPARATOR + 1, at::READ_LABEL + 1, at::READ_SUB + 1] {
             let pane = strip_pane_spec(spec, IDX_IV + i);
             let look = looks[i];
             assert_eq!((pane.x, pane.y, pane.w), (look.x, look.y, look.w));
         }
+        let rule = looks[at::SEPARATOR + 1];
+        assert!(rule.visible && rule.x.abs() + rule.w / 2.0 <= spec.strip.width / 2.0);
         (looks, line, history)
     };
     let (compact, line, history) = collect(&C);

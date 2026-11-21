@@ -691,8 +691,8 @@ const fn cb_name(local: usize) -> Name {
 }
 
 /// A hidden text box of the combo bar; `x` is the box's centre.
-const fn cb_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
-    hidden(under(text(name, [x, y, w, 26.0], align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
+const fn cb_text(name: Name, size: [f32; 4], align: Align, font: (f32, f32)) -> Spec {
+    hidden(under(text(name, size, align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
 }
 
 /// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
@@ -702,26 +702,25 @@ const fn cb_spec(layout: &strip_layout::LayoutSpec, local: usize, name: Name) ->
     use iv::{FONT_SUB, FONT_TAG};
     let parent = Name::new("TrCb");
     let (place, h) = layout.card.at_rest(local, &layout.strip);
-    let xyz = [place.x, place.y, place.w];
     let size = [place.x, place.y, place.w, h];
     match local {
         CONTAINER => container(name, Name::new("TrIv"), size),
         BACKDROP | SEQ_BACKDROP => hidden(under(rect(name, size, cb::BACKDROP_COLOR, true), parent)),
         HEADER | RESULT | REASON | SEQ_NAME | SEQ_LANDED =>
-            cb_text(name, xyz, Align::Left, FONT_SUB),
-        STREAK | SEQ_STEP | SEQ_TOLERANCE => cb_text(name, xyz, Align::Right, FONT_TAG),
-        SEQ_LINKS => cb_text(name, xyz, Align::Left, FONT_TAG),
-        SEQ_STREAK | SEQ_BEST => cb_text(name, xyz, Align::Left, FONT_SUB),
+            cb_text(name, size, Align::Left, FONT_SUB),
+        STREAK | SEQ_STEP | SEQ_TOLERANCE => cb_text(name, size, Align::Right, FONT_TAG),
+        SEQ_LINKS => cb_text(name, size, Align::Left, FONT_TAG),
+        SEQ_STREAK | SEQ_BEST => cb_text(name, size, Align::Left, FONT_SUB),
         SEQ_PILL => under(rect(name, size, SEQ_PILL_COLOR, false), parent),
         SEQ_PILL_TEXT => hidden(under(text(name, size, Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
         i if i < CELL => under(rect(name, size, TEXT, false), parent),
         i if i < TITLE => under(rect(name, size, CELL_COLOR, false), parent),
-        i if i < RULER => cb_text(name, xyz, Align::Center, FONT_TAG),
+        i if i < RULER => cb_text(name, size, Align::Center, FONT_TAG),
         i if i < WINDOW => under(rect(name, size, RULE, false), parent),
         i if i < SEQ_BACKDROP || (SEQ_CHIP_EDGE <= i && i < SEQ_CHIP_FILL)
             || (SEQ_CHECK_SHORT <= i && i < COUNT) => under(rect(name, size, TEXT, false), parent),
         i if i < SEQ_CHIP_TEXT => under(rect(name, size, SEQ_CHIP_COLOR, false), parent),
-        i if i < SEQ_CHECK_SHORT => cb_text(name, xyz, Align::Left, FONT_SUB),
+        i if i < SEQ_CHECK_SHORT => cb_text(name, size, Align::Left, FONT_SUB),
         _ => panic!("no such combo bar pane"),
     }
 }

@@ -45,6 +45,7 @@ pub enum Detail {
 pub struct CardSpec {
     pub left: f32,
     pub top: f32,
+    pub text_height: f32,
     width: f32,
     heights: [f32; 2],
     inset: f32,
@@ -76,8 +77,7 @@ struct ChipSpec {
 
 #[derive(Clone, Copy)]
 struct CellSpec {
-    left: f32,
-    right: f32,
+    edge_inset: f32,
     gap: f32,
     center_depth: f32,
     /// Width, height, and vertical offset for each pane in the cell.
@@ -92,6 +92,7 @@ struct CellSpec {
 pub const C: CardSpec = CardSpec {
     left: 660.0,
     top: strip::TOP,
+    text_height: 26.0,
     width: 288.0,
     heights: [84.0, 196.0],
     inset: 10.0,
@@ -124,15 +125,14 @@ pub const C: CardSpec = CardSpec {
         check_stroke: 3.0,
     },
     cells: CellSpec {
-        left: -super::super::iv::STRIP_W / 2.0 + 18.0,
-        right: super::super::iv::STRIP_W / 2.0 - 18.0,
+        edge_inset: 18.0,
         gap: 8.0,
         center_depth: 32.0,
         parts: [
             [0.0, 56.0, 0.0],
-            [0.0, 22.0, 16.0],
-            [96.0, 22.0, -2.0],
-            [100.0, 22.0, -2.0],
+            [0.0, 0.0, 16.0],
+            [96.0, 0.0, -2.0],
+            [100.0, 0.0, -2.0],
             [180.0, 3.0, -19.0],
             [6.0, 9.0, -19.0],
             [6.0, 16.0, -19.0],
@@ -170,7 +170,7 @@ impl CardSpec {
 
     /// Defaults and native pane dimensions for the archive. Relative placement at runtime uses this same spec.
     pub const fn at_rest(&self, index: usize, strip: &strip::StripSpec) -> (Place, f32) {
-        self.base(index, false, strip.band_top(false), Metrics::EMPTY)
+        self.base(index, false, strip.band_top(false), strip.width, Metrics::EMPTY)
     }
 
     fn fits(&self, a: f32, b: f32) -> bool {
@@ -181,15 +181,10 @@ impl CardSpec {
         units as f32 * self.font_widths[tag as usize]
     }
 
-    const fn text(&self, left: f32, row: f32, width: f32, tag: bool) -> (Place, f32) {
-        let font = if tag {
-            super::super::iv::FONT_TAG
-        } else {
-            super::super::iv::FONT_SUB
-        };
+    const fn text(&self, left: f32, row: f32, width: f32) -> (Place, f32) {
         (
             Place::new(left + width / 2.0, self.top - row, width),
-            font.1,
+            self.text_height,
         )
     }
 
@@ -207,6 +202,7 @@ impl CardSpec {
         i: usize,
         sequence: bool,
         band_top: f32,
+        strip_width: f32,
         metrics: Metrics,
     ) -> (Place, f32) {
         let left = self.content_left();
@@ -216,13 +212,12 @@ impl CardSpec {
         match i {
             CONTAINER => Self::box_at(0.0, 0.0, self.width, self.heights[1]),
             BACKDROP => self.plate(false),
-            HEADER => self.text(left, title, span, false),
-            STREAK => self.text(left, progress, span, true),
+            HEADER => self.text(left, title, span),
+            STREAK => self.text(left, progress, span),
             RESULT | REASON => self.text(
                 left,
                 if sequence { seq_result } else { result },
                 span,
-                false,
             ),
             i if i < CELL => Self::box_at(
                 left + self.pill[0] / 2.0 + (i - PILL) as f32 * self.pill[1],
@@ -230,7 +225,11 @@ impl CardSpec {
                 self.pill[0],
                 self.pill[0],
             ),
-            i if i < SEQ_BACKDROP => self.cells.default_place(i, band_top),
+            i if i < SEQ_BACKDROP => {
+                let (place, height) = self.cells.default_place(i, band_top, strip_width);
+                let height = if i >= TITLE && i < RULER { self.text_height } else { height };
+                (place, height)
+            }
             SEQ_BACKDROP => self.plate(true),
             SEQ_PILL | SEQ_PILL_TEXT => Self::box_at(
                 left + self.sequence_pill[0] / 2.0,
@@ -242,20 +241,19 @@ impl CardSpec {
                     self.sequence_pill[1]
                 },
             ),
-            SEQ_NAME => self.text(left, seq_name, span, false),
+            SEQ_NAME => self.text(left, seq_name, span),
             SEQ_STEP => self.text(
                 left + self.sequence_pill[0],
                 seq_header,
                 span - self.sequence_pill[0],
-                true,
             ),
-            SEQ_LINKS | SEQ_TOLERANCE => self.text(left, seq_stats, span, true),
-            SEQ_STREAK => self.text(left, seq_stats, span, false),
+            SEQ_LINKS | SEQ_TOLERANCE => self.text(left, seq_stats, span),
+            SEQ_STREAK => self.text(left, seq_stats, span),
             SEQ_BEST => {
                 let used = self.estimating(metrics.streak, false) + self.caption_gap;
-                self.text(left + used, seq_stats, span - used, false)
+                self.text(left + used, seq_stats, span - used)
             }
-            SEQ_LANDED => self.text(left, seq_result, span, false),
+            SEQ_LANDED => self.text(left, seq_result, span),
             i => {
                 let part = (i - SEQ_CHIP_EDGE) / cb::CHIPS;
                 let chip = (i - SEQ_CHIP_EDGE) % cb::CHIPS;
@@ -268,7 +266,7 @@ impl CardSpec {
                         span - self.chip.stroke * 2.0,
                         self.chip.height - self.chip.stroke * 2.0,
                     ),
-                    2 => self.text(left + self.chip.pad, row, span - self.chip.pad * 2.0, false),
+                    2 => self.text(left + self.chip.pad, row, span - self.chip.pad * 2.0),
                     _ => Self::box_at(
                         left,
                         self.top - row,
@@ -285,11 +283,12 @@ impl CardSpec {
         &self,
         i: usize,
         sequence: bool,
-        band_top: f32,
+        strip: &strip::StripSpec,
+        history: bool,
         metrics: Metrics,
         detail: Detail,
     ) -> Place {
-        let mut place = self.base(i, sequence, band_top, metrics).0;
+        let mut place = self.base(i, sequence, strip.band_top(history), strip.width, metrics).0;
         if (CELL..SEQ_BACKDROP).contains(&i) {
             return self.cells.place(place, detail);
         }
@@ -356,7 +355,6 @@ impl CardSpec {
                             self.content_left() + result_width + self.caption_gap,
                             footer,
                             self.content_width() - result_width - self.caption_gap,
-                            false,
                         )
                         .0;
                 }
@@ -379,7 +377,6 @@ impl CardSpec {
                         left + prev_width + self.caption_gap,
                         footer,
                         self.content_width() - prev_width - self.caption_gap,
-                        false,
                     )
                     .0;
             }
@@ -393,7 +390,6 @@ impl CardSpec {
                             result_low
                         },
                         self.content_width(),
-                        false,
                     )
                     .0;
             }
@@ -411,10 +407,10 @@ impl CardSpec {
                 footer
             };
             return if i == SEQ_LINKS {
-                self.text(self.content_right() - meta_width, row, meta_width, true)
+                self.text(self.content_right() - meta_width, row, meta_width)
                     .0
             } else {
-                self.text(left, row, self.content_width(), true).0
+                self.text(left, row, self.content_width()).0
             };
         }
         place
@@ -422,12 +418,12 @@ impl CardSpec {
 }
 
 impl CellSpec {
-    const fn default_place(&self, i: usize, band_top: f32) -> (Place, f32) {
+    const fn default_place(&self, i: usize, band_top: f32, strip_width: f32) -> (Place, f32) {
         let k = (i - CELL) % cb::CELLS;
         let part = (i - CELL) / cb::CELLS;
-        let pitch = (self.right - self.left + self.gap) / cb::CELLS as f32;
+        let pitch = (strip_width - 2.0 * self.edge_inset + self.gap) / cb::CELLS as f32;
         let width = pitch - self.gap;
-        let cx = self.left + width / 2.0 + k as f32 * pitch;
+        let cx = self.edge_inset - strip_width / 2.0 + width / 2.0 + k as f32 * pitch;
         let [w, h, dy] = self.parts[part];
         let w = match part {
             0 => width,

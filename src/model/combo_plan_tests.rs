@@ -185,7 +185,7 @@ fn the_current_combo_is_always_in_a_window_of_three() {
 }
 
 fn the_same_content_can_be_placed_in_a_second_layout() {
-    use crate::model::panes::{IDX_CB, strip_pane_spec};
+    use crate::model::panes::{IDX_CB, cb, strip_pane_spec};
     let mut h = helper(true, true);
     h.continue_with(reference());
     let next = Stepped { step: 0, summary: clean(), advance: Advance::Next(1) };
@@ -194,6 +194,8 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
     second.card.left -= 50.0;
     second.card.top -= 12.0;
     second.strip.base_height += 20.0;
+    second.strip.width -= 40.0;
+    second.card.text_height -= 4.0;
     for seq in [None, Some(&seq)] {
         let card = if seq.is_some() { at::SEQ_BACKDROP } else { at::BACKDROP };
         let draw = |spec: &LayoutSpec| {
@@ -204,15 +206,51 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
                 let look = looks[i];
                 assert_eq!((pane.x, pane.y, pane.w), (look.x, look.y, look.w));
             }
+            let half_width = spec.strip.width / 2.0;
+            for (n, cell) in looks[at::CELL..at::CELL + cb::CELLS].iter().enumerate() {
+                let pane = strip_pane_spec(spec, IDX_CB + at::CELL + n);
+                assert!(pane.x.abs() + pane.w / 2.0 <= half_width);
+                if cell.visible {
+                    assert!(cell.x.abs() + cell.w / 2.0 <= half_width);
+                }
+            }
+            for i in [at::TITLE, at::VERDICT, at::OFFSET] {
+                let pane = strip_pane_spec(spec, IDX_CB + i);
+                assert_eq!(pane.h, spec.card.text_height);
+            }
             looks
         };
         let (c, alternative) = (draw(&C), draw(&second));
         assert_ne!(c[at::CELL].y, alternative[at::CELL].y);
+        assert_ne!(c[at::CELL].w, alternative[at::CELL].w);
         assert_ne!((c[card].x, c[card].y), (alternative[card].x, alternative[card].y));
         for (a, b) in c.iter().zip(alternative) {
             assert_eq!((a.visible, a.text, a.color), (b.visible, b.text, b.color));
         }
     }
+    // A future layout can keep history and the link cells visible together.
+    use crate::model::{frame_strip::Tracker, frame_strip_plan as strip_plan};
+    second.keep_drill_history = true;
+    let mut rule = strip_plan::Look::HIDDEN;
+    let (_, _, history) = strip_plan::Renderer::new().draw_with_spec(
+        &Tracker::new(), true, false, None, true, true, &second,
+        |i, look, _| {
+            if i == strip_plan::at::SEPARATOR + 1 {
+                rule = *look;
+            }
+        },
+    );
+    let half_width = second.strip.width / 2.0;
+    assert!(history && rule.visible && rule.x.abs() + rule.w / 2.0 <= half_width);
+    Renderer::new().draw_with_spec(
+        &h, &Text::new("Jab"), None, true, (&second, history),
+        |i, look, _| {
+            if i == at::CELL {
+                assert!(look.visible && look.x.abs() + look.w / 2.0 <= half_width);
+                assert!(look.y < rule.y);
+            }
+        },
+    );
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

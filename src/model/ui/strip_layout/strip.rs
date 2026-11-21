@@ -41,7 +41,6 @@ pub const DIVIDER_H: f32 = 128.0;
 pub const NOW_Y: f32 = TOP - 52.0;
 pub const NOW_H: f32 = 96.0;
 pub const NOW_TEXT_Y: f32 = TOP - 11.0;
-pub const RULE_Y: f32 = TOP - NO_HISTORY_H;
 pub const LAST_Y: f32 = TOP - 153.5;
 pub const PILL_W: f32 = 96.0;
 pub const PILL_STRIDE: f32 = 300.0;
@@ -58,7 +57,8 @@ pub struct StripSpec {
     pub cells_height: f32,
     label_x: f32,
     lanes: [f32; 3],
-    separators: [Place; 2],
+    divider: Place,
+    history_rule_inset: f32,
     first_frame: f32,
     pitch: f32,
     cell_width: f32,
@@ -84,10 +84,8 @@ pub const C: StripSpec = StripSpec {
     cells_height: 64.0,
     label_x: LABEL_X,
     lanes: [IN_Y, P1_Y, CPU_Y],
-    separators: [
-        Place::new(DIVIDER_X, DIVIDER_Y, 1.5),
-        Place::new(0.0, RULE_Y, STRIP_W - 36.0),
-    ],
+    divider: Place::new(DIVIDER_X, DIVIDER_Y, 1.5),
+    history_rule_inset: 18.0,
     first_frame: FIRST_X,
     pitch: PITCH,
     cell_width: CELL_W,
@@ -142,7 +140,11 @@ impl StripSpec {
     }
 
     pub const fn rule(&self, rule: usize) -> Place {
-        self.separators[rule]
+        if rule == 0 {
+            self.divider
+        } else {
+            Place::new(0.0, self.band_top(false), self.width - 2.0 * self.history_rule_inset)
+        }
     }
 
     pub const fn now(&self, part: usize) -> Place {
