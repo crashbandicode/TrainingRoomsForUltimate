@@ -534,7 +534,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
             && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana);
         if primary_p1 {
-            unsafe { super::btt_camera::frame() };
+            let want_camera = super::btt_camera::update_placement();
+            unsafe { super::btt_camera::frame(want_camera) };
         }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
         // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.

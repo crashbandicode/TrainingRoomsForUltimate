@@ -117,7 +117,7 @@ fn parry_practice_runs_while_it_is_the_running_game() {
 #[test]
 fn egg_zone_camera_tracks_the_live_wizard() {
     let camera = src("src/runtime/features/btt_camera.rs");
-    let frame = item(&camera, "pub unsafe fn frame(");
+    let frame = item(&camera, "pub(super) fn update_placement(");
     let lease = frame
         .find("OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());")
         .expect("the shared camera consumes the zone wizard's live lease");
@@ -152,7 +152,7 @@ fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
 #[test]
 fn location_editors_use_one_camera_and_cpu_session() {
     let camera = src("src/runtime/features/btt_camera.rs");
-    let frame = item(&camera, "pub unsafe fn frame(");
+    let frame = item(&camera, "pub(super) fn update_placement(");
     assert!(frame.contains("model::EGG_ZONE_OWNER, super::egg_zone::wizard_active()"));
     assert!(frame.contains("model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active()"));
     let btt = src("src/runtime/features/btt.rs");

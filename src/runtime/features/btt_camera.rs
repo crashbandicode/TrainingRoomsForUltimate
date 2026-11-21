@@ -70,13 +70,17 @@ pub(super) fn placement_pad(buttons: u32) -> Option<crate::model::edge_juggle::p
     if placing() { crate::model::edge_juggle::Phase::Place.held_pad(buttons) } else { None }
 }
 
+/// Finalize both holds after the primary player's editor passes.
+pub(super) fn update_placement() -> bool {
+    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
+    OWNERS.request(model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active());
+    OWNERS.camera_wanted(covered())
+}
+
 /// Step once per game frame, after placing owners publish their requests.
 /// # Safety
 /// Player 1's non-Nana game-thread callback; no plugin lock is held.
-pub unsafe fn frame() {
-    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
-    OWNERS.request(model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active());
-    let want = OWNERS.camera_wanted(covered());
+pub unsafe fn frame(want: bool) {
     if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());

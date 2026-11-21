@@ -467,7 +467,7 @@ fn btt_camera_callbacks_take_no_lock_and_camera_lock_seeds_fail() {
     let mut graph = Graph::scan(&runtime, &[]);
     // A scene read imports the engine's read_unchecked as `read`, not the compat menu's typed read.
     graph.precise_imports = true;
-    let entries = ["btt_camera::request", "btt_camera::interrupt_placement", "btt_camera::placing", "btt_camera::placement_pad", "btt_camera::frame"];
+    let entries = ["btt_camera::request", "btt_camera::interrupt_placement", "btt_camera::placing", "btt_camera::placement_pad", "btt_camera::update_placement", "btt_camera::frame"];
     let mut locks = static_locks(&runtime);
     let camera = ("features/btt_camera.rs".to_owned(), "CAMERA".to_owned());
     if !locks.contains(&camera) {
