@@ -821,6 +821,12 @@ unsafe fn fighter_height(fighter: usize, foot: f32) -> Option<f32> {
     (height.is_finite() && height > 0.0).then_some(height)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MeasuredReach {
+    NessNs1,
+    LucasLx,
+}
+
 unsafe fn route_guide(
     run: &mut Run,
     p1: usize,
@@ -830,7 +836,7 @@ unsafe fn route_guide(
     speed: [f32; 2],
     special: Option<perfect::SpecialReach>,
     player_top: f32,
-    ness_ns1: bool,
+    measured: Option<MeasuredReach>,
 ) -> Option<RecoveryGuide> {
     let read_outline = || {
         let (midpoint, limits) =
@@ -889,7 +895,7 @@ unsafe fn route_guide(
             (jump_rise + special_rise + speed[1].max(0.0)).max(f32::EPSILON),
         ],
     };
-    if ness_ns1 {
+    if measured == Some(MeasuredReach::NessNs1) {
         if let Some(guide) = niche_pad::NicheGuide::prepare_ns1(cpu, p1, &facts, run.rounds.frames, speed, jumps) {
             let row = guide.selected_niche_row();
             run.route_history.planned(row.route);
@@ -934,6 +940,7 @@ unsafe fn route_guide(
             air,
             jumps,
             special,
+            lucas_lx: measured == Some(MeasuredReach::LucasLx),
         };
         row = niche_pad::NicheGuide::prepare_niche(cpu, p1, fighter, &facts, band, inputs);
     }
@@ -979,14 +986,14 @@ unsafe fn route_guide(
     });
     if let Some(guide) = guide {
         let row = guide.selected_niche_row();
-        if !guide.checking_crossing_drift() {
+        if !guide.awaiting_crossing_commit() {
             run.route_history.planned(row.route);
             planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
         }
         run.niche = Some(guide);
         return None;
     }
-    let Some(plan) = plan else {
+    let Some(plan) = plan.filter(|_| measured.is_none()) else {
         planner_chose(4, fighter as u32, crossable, 0);
         return None;
     };
@@ -1060,21 +1067,21 @@ unsafe fn niche_correction(
         }
         return Correction::default();
     }
-    let checking_drift = guide.checking_crossing_drift();
+    let awaiting_commit = guide.awaiting_crossing_commit();
     if let Some(edit) = guide.correct_niche_pad(ai, cpu, p1, position, status, run.rounds.frames) {
-        if guide.checking_crossing_drift() {
+        if guide.awaiting_crossing_commit() {
             return stock.observe(edit, PerfectRule::Route, run, 0, 3);
         }
-        if checking_drift {
+        if awaiting_commit {
             let row = guide.selected_niche_row();
             run.route_history.planned(row.route);
-            planner_chose(route_code(row.route), perfect::wings::META_KNIGHT as u32, 1, row.id.into());
+            planner_chose(route_code(row.route), row.fighter as u32, 1, row.id.into());
         }
         let id = guide.correction_row();
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
     }
     run.niche = None;
-    run.plan_pending |= checking_drift;
+    run.plan_pending |= awaiting_commit;
     Correction::default()
 }
 
@@ -1182,8 +1189,14 @@ unsafe fn recovery_pad(
         .filter(|&(_, available)| available)
         .and_then(|(snapshot, _)| read_special_reach(ai, snapshot));
     let special = envelope.filter(|&(_, reach)| reach.valid()).map(|(_, reach)| reach);
-    let ness_ns1 = envelope.is_some_and(|(variant, reach)| {
-        perfect::ness::measured_envelope(kind, variant, reach)
+    let measured = envelope.and_then(|(variant, reach)| {
+        if perfect::ness::measured_envelope(kind, variant, reach) {
+            Some(MeasuredReach::NessNs1)
+        } else if perfect::lucas::measured_envelope(kind, variant, reach) {
+            Some(MeasuredReach::LucasLx)
+        } else {
+            None
+        }
     });
     if run.plan_pending {
         run.guide = None;
@@ -1192,12 +1205,12 @@ unsafe fn recovery_pad(
             let plan = match (player_height, recovery, special) {
                 (None, _, _) => Err(PlanInput::PlayerHeight),
                 (Some(_), None, _) => Err(PlanInput::Snapshot),
-                (Some(_), Some((_, true)), None) if !ness_ns1 => Err(PlanInput::SpecialEnvelope),
+                (Some(_), Some((_, true)), None) if measured.is_none() => Err(PlanInput::SpecialEnvelope),
                 (Some(top), Some(_), reach) => Ok((top, reach)),
             };
             match plan {
                 Ok((top, reach)) => {
-                    run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top, ness_ns1);
+                    run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top, measured);
                     if run.niche.is_some() {
                         return niche_correction(run, ai, cpu, p1, pos, natives::status_kind(cpu), stock);
                     }
@@ -1206,7 +1219,10 @@ unsafe fn recovery_pad(
             }
         }
     }
-    if kind == perfect::ness::KIND && special.is_none() && !matches!(recovery, Some((_, false))) {
+    if matches!(kind, perfect::ness::KIND | perfect::lucas::KIND)
+        && special.is_none()
+        && !matches!(recovery, Some((_, false)))
+    {
         return Correction::default();
     }
     if kind == game_watch::KIND && run.oil_stall.due(run.rounds.frames) {

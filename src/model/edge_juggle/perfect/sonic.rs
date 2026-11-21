@@ -301,6 +301,12 @@ fn relative(near: Point, p: Point) -> Pose {
     ]
 }
 
+fn guarder_above_lip(near: Point, player: Point) -> bool {
+    // The dash passes through the near ledge's hang point. A hit there
+    // interrupts the measured Spin Dash timing and displaces its jump.
+    player.into_iter().all(f32::is_finite) && player[1] >= near[1]
+}
+
 fn on_line(actual: Pose, expected: Pose) -> bool {
     actual
         .into_iter()
@@ -314,6 +320,7 @@ impl SonicFlight {
         let [near, far] = facts.ledges;
         let out = near[0] - beat.position[0];
         if facts.fighter != KIND
+            || !guarder_above_lip(near, facts.player)
             || facts.position != beat.position
             || beat.status != FALL
             || beat.facing != 1.0
@@ -355,6 +362,10 @@ impl SonicFlight {
 
     pub fn side_press(&self, frame: u32) -> bool {
         self.age(frame) == u32::from(self.plan.timing.side)
+    }
+
+    pub fn guarder_clear(&self, player: Point) -> bool {
+        guarder_above_lip(self.near, player)
     }
 
     pub fn jump_press(&self, frame: u32) -> bool {

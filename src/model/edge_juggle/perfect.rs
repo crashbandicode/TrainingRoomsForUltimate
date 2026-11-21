@@ -8,6 +8,8 @@ pub mod fly;
 pub mod game_watch;
 #[path = "perfect/greninja.rs"]
 pub mod greninja;
+#[path = "perfect/hero.rs"]
+pub mod hero;
 #[path = "perfect/incineroar.rs"]
 pub mod incineroar;
 #[path = "perfect/kart.rs"]
@@ -22,6 +24,8 @@ pub mod link;
 pub mod mario;
 #[path = "perfect/lucario.rs"]
 pub mod lucario;
+#[path = "perfect/lucas.rs"]
+pub mod lucas;
 #[path = "perfect/ness.rs"]
 pub mod ness;
 #[path = "perfect/niche.rs"]

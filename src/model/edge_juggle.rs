@@ -668,7 +668,13 @@ impl Wizard {
         } else if drill == Drill::GuardEdge && perfect::is_crossing_stage(stage_key) {
             match fighter {
                 Some(perfect::ness::KIND) => perfect::ness::wizard_offset(stage_key).map(|offset| (Area::LowerLeft, offset)),
+                Some(perfect::lucas::KIND) if perfect::lucas::reference_stage(stage_key) => {
+                    Some((Area::UpperLeft, perfect::lucas::WIZARD_OFFSET))
+                }
                 Some(perfect::sonic::KIND) => Some((Area::UpperLeft, perfect::sonic::WIZARD_OFFSET)),
+                Some(perfect::hero::KIND) if perfect::hero::reference_stage(stage_key) => {
+                    Some((Area::UpperLeft, perfect::hero::WIZARD_OFFSET))
+                }
                 Some(perfect::steve::KIND) => Some((Area::UpperLeft, [18.0, 30.0])),
                 Some(perfect::pyra::PYRA) => Some((Area::LowerLeft, [104.0, -50.0])),
                 Some(perfect::incineroar::KIND) => Some((Area::UpperLeft, [110.0, 10.0])),
@@ -855,16 +861,6 @@ mod tests {
         assert_eq!(Placement::Airborne.action(fall), A::HoldStart);
         let stale_fall = PlacementFrame { fall: true, ..landing_light };
         assert_eq!(Placement::Airborne.action(stale_fall), A::RestartPlacement);
-    }
-
-    fn release(drill: Drill, limit: Option<u16>) -> Session {
-        let mut session = Session::new(drill, limit);
-        session.placed();
-        for _ in 0..drill.ready_frames() {
-            session.advance_attempt(Observation::default());
-        }
-        assert_eq!((session.phase, session.frames), (Phase::Live, 0));
-        session
     }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {

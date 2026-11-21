@@ -588,8 +588,12 @@ fn niche_bowser_jr_clown_kart_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_hero_woosh_route_and_pad_sequence() {
-    verify_pad_sequence(super::measured_row(32, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Rise]);
+fn niche_hero_kaswoosh_crossing_requires_a_measured_flight() {
+    let row = super::measured_row(32, CANDIDATE_ROWS).unwrap();
+    assert_eq!(row.fighter, 0x53);
+    assert_eq!(row.route, Route::Opposite);
+    assert!(super::measured_row(32, super::EXTENSION_ROWS).is_none());
+    verify_pad_sequence(row, &[Move::Hold, Move::Jump, Move::Rise]);
 }
 
 #[test]

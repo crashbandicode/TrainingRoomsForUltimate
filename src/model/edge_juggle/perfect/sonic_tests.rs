@@ -133,3 +133,14 @@ fn sonic_keeps_the_two_frame_up_back_press_and_uses_the_native_turn() {
     beat.position[1] = -103.0;
     assert!(interrupted.step(beat).is_none());
 }
+
+#[test]
+fn sonic_declines_the_crossing_when_the_near_ledge_guarder_can_drop_into_spin_dash() {
+    let position = [-105.986, 33.91026];
+    let sample = release(position);
+    let mut ring = facts((3, 0), position);
+    ring.player = [-79.03, 0.01];
+    assert!(SonicFlight::start(&ring, [0.0, -0.09], sample).is_some());
+    ring.player = [-81.7, -10.7];
+    assert!(SonicFlight::start(&ring, [0.0, -0.09], sample).is_none());
+}

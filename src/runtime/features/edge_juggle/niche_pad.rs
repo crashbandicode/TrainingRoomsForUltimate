@@ -11,10 +11,12 @@ use crate::{
 use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::greninja::{self, HydroFlight, HydroSample};
+use perfect::hero::{self, HeroBeat, HeroFlight};
 use perfect::incineroar::{self, WhipBeat, WhipReturn};
 use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
 use perfect::lucario::{self, AuraFlight, AuraSample};
+use perfect::lucas::{self, LucasBeat, UnderStage};
 use perfect::mario::{self, CapeBeat, CapeStall};
 use perfect::ness::{self, ThunderBeat, ThunderReturn};
 use perfect::recovery::Zone;
@@ -59,9 +61,11 @@ enum MeasuredFlight {
     Cypher(CypherFlight),
     SpinDash(SonicFlight),
     ThunderReturn(ThunderReturn),
+    Lucas(UnderStage),
     Cape(CapeStall),
     Aura(AuraFlight),
     Hydro(HydroFlight),
+    Hero(HeroFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
     Elytra(ElytraFlight),
@@ -79,6 +83,7 @@ pub(super) struct RowInputs {
     pub air: AirPhysics,
     pub jumps: u8,
     pub special: Option<SpecialReach>,
+    pub lucas_lx: bool,
 }
 
 impl NicheGuide {
@@ -91,7 +96,7 @@ impl NicheGuide {
         jumps: u8,
     ) -> Option<Self> {
         let row = niche::measured_row(ness::ROW, niche::CANDIDATE_ROWS)?;
-        if !ns1_guarder_waiting(p1) || natives::damage(cpu, 0) != 0.0 {
+        if !grounded_wait(p1) || natives::damage(cpu, 0) != 0.0 {
             return None;
         }
         let flight = ThunderReturn::start(facts, ThunderBeat {
@@ -170,6 +175,32 @@ impl NicheGuide {
                 fighter,
                 ledge: near,
                 measured: Some(MeasuredFlight::Cape(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == hero::KIND {
+            band?;
+            if inputs.zone == Zone::Far || natives::damage(cpu, 0) != 0.0 {
+                return None;
+            }
+            let row = niche::measured_row(hero::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = HeroFlight::start(facts, HeroBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_dodge: air_dodge_enabled(cpu),
+                can_jump: niche_start_enabled(cpu, Move::Jump, true),
+                can_cast: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+                mp: hero_mana(cpu),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Hero(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -354,6 +385,9 @@ impl NicheGuide {
             }, 1.0));
         }
         if fighter == sonic::KIND {
+            if !grounded_wait(p1) {
+                return None;
+            }
             let row = niche::measured_row(sonic::ROW, niche::CANDIDATE_ROWS)?;
             let flight = SonicFlight::start(facts, inputs.speed, SonicBeat {
                 frame: inputs.frame,
@@ -533,6 +567,31 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == lucas::KIND && inputs.lucas_lx {
+            band?;
+            if inputs.zone == Zone::Far || !grounded_wait(p1) || natives::damage(cpu, 0) != 0.0 {
+                return None;
+            }
+            let row = niche::measured_row(lucas::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = UnderStage::start(facts, LucasBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_dodge: air_dodge_enabled(cpu),
+                can_jump: niche_start_enabled(cpu, Move::Jump, true),
+                can_thunder: niche_start_enabled(cpu, Move::Bolt, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Lucas(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == lucario::KIND {
             let flight = AuraFlight::start(facts, AuraSample {
                 frame: inputs.frame,
@@ -636,8 +695,13 @@ impl NicheGuide {
         self.ledge
     }
 
-    pub(super) fn checking_crossing_drift(&self) -> bool {
-        matches!(&self.measured, Some(MeasuredFlight::Wings(flight)) if flight.checking_drift())
+    pub(super) fn awaiting_crossing_commit(&self) -> bool {
+        match &self.measured {
+            Some(MeasuredFlight::Wings(flight)) => flight.checking_drift(),
+            Some(MeasuredFlight::Lucas(flight)) => flight.before_dodge(),
+            Some(MeasuredFlight::Hero(flight)) => flight.before_dodge(),
+            _ => false,
+        }
     }
 
     pub(super) fn crossing_frames(&self) -> Option<u16> {
@@ -658,8 +722,10 @@ impl NicheGuide {
             Some(MeasuredFlight::Link(_)) => Some(235),
             Some(MeasuredFlight::Cypher(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::SpinDash(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Lucas(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Aura(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Hydro(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Hero(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Elytra(flight)) => Some(flight.crossing_frames()),
@@ -749,7 +815,7 @@ impl NicheGuide {
                 return None;
             }
             let pre_cast = flight.awaits_cast(frame);
-            if pre_cast && (!ns1_guarder_waiting(p1)
+            if pre_cast && (!grounded_wait(p1)
                 || !flight.still_clear([natives::pos_x(p1), natives::pos_y(p1)]))
             {
                 return None;
@@ -763,6 +829,39 @@ impl NicheGuide {
                 jumps: if pre_cast { remaining_jumps(cpu)? } else { 0 },
                 can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_thunder: flight.cast_press(frame) && available && niche_start_enabled(cpu, Move::Bolt, true),
+            });
+        }
+        if let Some(MeasuredFlight::Lucas(flight)) = &mut self.measured {
+            let (variant, reach) = read_special_reach(ai, snapshot)?;
+            if !lucas::measured_envelope(natives::fighter_kind(cpu)?, variant, reach)
+                || !game::granted(sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)
+            {
+                return None;
+            }
+            let dodge = flight.guard_frame(frame);
+            let jump = flight.jump_frame(frame);
+            let cast = flight.cast_frame(frame);
+            if dodge && (!grounded_wait(p1)
+                || !flight.guarder_clear([natives::pos_x(p1), natives::pos_y(p1)])
+                || natives::damage(cpu, 0) != 0.0)
+            {
+                return None;
+            }
+            let (vx, vy) = if dodge || jump || cast {
+                super::super::recording_host::fighter_speed(cpu)?
+            } else {
+                (0.0, 0.0)
+            };
+            return flight.step(LucasBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: if flight.launch_frame(frame) { natives::lr(cpu) } else { 0.0 },
+                jumps: if dodge || jump || flight.first_jump_row(frame) { remaining_jumps(cpu)? } else { 0 },
+                can_dodge: dodge && air_dodge_enabled(cpu),
+                can_jump: (dodge || jump) && niche_start_enabled(cpu, Move::Jump, true),
+                can_thunder: (dodge || cast) && niche_start_enabled(cpu, Move::Bolt, available),
             });
         }
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
@@ -817,6 +916,29 @@ impl NicheGuide {
                 can_whip: flight.whip_frame(frame) && niche_start_enabled(cpu, Move::Side, true),
                 can_jump: jump && niche_start_enabled(cpu, Move::Jump, true),
                 can_chop: chop && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
+        if let Some(MeasuredFlight::Hero(flight)) = &mut self.measured {
+            let observes_jumps = flight.observes_jump_reserve(frame);
+            let dodge = flight.shield_frame(frame);
+            let jump = flight.jump_frame(frame);
+            let cast = flight.cast_frame(frame);
+            let (vx, vy) = if dodge || jump || cast {
+                super::super::recording_host::fighter_speed(cpu)?
+            } else {
+                (0.0, 0.0)
+            };
+            return flight.step(HeroBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: 0.0,
+                jumps: if observes_jumps { remaining_jumps(cpu)? } else { 0 },
+                can_dodge: dodge && air_dodge_enabled(cpu),
+                can_jump: (dodge || jump) && niche_start_enabled(cpu, Move::Jump, true),
+                can_cast: (dodge || cast) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+                mp: if dodge || jump || cast { hero_mana(cpu) } else { None },
             });
         }
         if let Some(MeasuredFlight::Hydro(flight)) = &mut self.measured {
@@ -889,13 +1011,19 @@ impl NicheGuide {
             });
         }
         if let Some(MeasuredFlight::SpinDash(flight)) = &mut self.measured {
+            let press = flight.side_press(frame);
+            if press && (!grounded_wait(p1)
+                || !flight.guarder_clear([natives::pos_x(p1), natives::pos_y(p1)]))
+            {
+                return None;
+            }
             return flight.step(SonicBeat {
                 frame,
                 status,
                 position: [x, y],
                 facing: natives::lr(cpu),
                 jumps: remaining_jumps(cpu)?,
-                can_spindash: flight.side_press(frame) && niche_start_enabled(cpu, Move::Side, true),
+                can_spindash: press && niche_start_enabled(cpu, Move::Side, true),
                 can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_spring: flight.spring_press(frame) && reach.is_some()
                     && niche_start_enabled(cpu, Move::Rise, available),
@@ -1199,7 +1327,7 @@ fn normalized_stick([x, y]: Point) -> Point {
     }
 }
 
-unsafe fn ns1_guarder_waiting(p1: usize) -> bool {
+unsafe fn grounded_wait(p1: usize) -> bool {
     let ground = konst(C::SituationGround);
     let wait = konst(C::StatusWait);
     ground != UNRESOLVED && wait != UNRESOLVED
@@ -1419,6 +1547,17 @@ unsafe fn peach_float_unspent(cpu: usize) -> bool {
     // Peach and Daisy set UNIQ_FLOAT as fuwafuwa_start begins. The native
     // float decision admits the action only while the same flag is clear.
     game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) && !natives::is_flag(cpu, 0x2000_00e1)
+}
+
+unsafe fn hero_mana(cpu: usize) -> Option<f32> {
+    let mana = konst(C::WorkFloatBraveMana);
+    (mana != UNRESOLVED && game::granted(sites_pkg2::WORK_GET_FLOAT_OFFSET))
+        .then(|| natives::get_float(cpu, mana))
+}
+
+unsafe fn air_dodge_enabled(cpu: usize) -> bool {
+    let escape = konst(C::TermContEscapeAir);
+    escape != UNRESOLVED && natives::is_enable_transition_term(cpu, escape)
 }
 
 unsafe fn full_burner(cpu: usize) -> bool {

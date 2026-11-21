@@ -265,11 +265,11 @@ const ROWS: [Row; 45] = [
     Row::new(25, 0xe, Intent::Across, &[Float, Hold, Rise]),
     Row::new(super::snake::ROW, super::snake::KIND, Intent::Across, &[Jump, Hover]),
     Row::new(27, 0x2, Intent::Near, &[Bomb, Jump, Rise]),
-    Row::new(28, 0x28, Intent::Across, &[Hold, Bolt]),
+    Row::new(super::lucas::ROW, super::lucas::KIND, Intent::Across, &[Hold, Bolt]),
     Row::new(super::lucario::ROW, super::lucario::KIND, Intent::Across, &[Hold, Jump, Travel]),
     Row::new(30, 0x2b, Intent::Across, &[Hold, Hover]),
     Row::new(31, 0x3a, Intent::Across, &[Side, Jump, Jump, Rise]),
-    Row::new(32, 0x53, Intent::Across, &[Hold, Rise]),
+    Row::new(super::hero::ROW, super::hero::KIND, Intent::Across, &[Hold, Jump, Rise]),
     // Yoshi's climb is the double jump: it waits for the exit.
     Row::new(33, 0x5, Intent::Across, &[Hold, Jump, Rise]),
     Row::new(34, 0x9, Intent::NearAbove, &[Missile]),
