@@ -121,7 +121,7 @@ fn egg_zone_camera_tracks_the_live_wizard() {
     let lease = frame
         .find("OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());")
         .expect("the shared camera consumes the zone wizard's live lease");
-    assert!(lease < frame.find("camera.step(").unwrap());
+    assert!(lease < frame.find("OWNERS.camera_wanted(").unwrap());
     let zone = src("src/runtime/features/egg_zone.rs");
     assert!(item(&zone, "pub fn wizard_active()").contains("LIVE.load(Ordering::Acquire) == epoch()"));
     assert!(item(&zone, "fn close()").contains("LIVE.swap(0,"));
@@ -137,7 +137,10 @@ fn egg_zone_camera_tracks_the_live_wizard() {
     }
     let cpu = src("src/runtime/features/cpu.rs");
     let on_frame = item(&cpu, "extern \"C\" fn on_frame(");
-    assert!(on_frame.find("features::hitbox::frame(").unwrap() < on_frame.find("btt_camera::frame(").unwrap());
+    let hitbox = on_frame.find("features::hitbox::frame(").unwrap();
+    let placement = on_frame.find("btt_camera::update_placement(").unwrap();
+    let render = on_frame.find("btt_camera::frame(want_camera)").unwrap();
+    assert!(hitbox < placement && placement < render);
 }
 
 #[test]
