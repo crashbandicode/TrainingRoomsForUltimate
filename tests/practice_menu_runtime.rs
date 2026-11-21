@@ -130,7 +130,7 @@ fn lucas_missing_special_reach_preserves_the_independent_detour_rule() {
         "an invalid Lucas envelope must not skip the existing R5 detour"
     );
     let (detour, _) = detour_and_timing
-        .split_once("if special.is_none() && !matches!(recovery, Some((_, false)))")
+        .split_once("    if !recovery::generic_timing_allowed(kind, special, matches!(recovery, Some((_, false)))) {")
         .expect("guard timing corrections after the independent detour");
     assert!(detour.contains("PerfectRule::Detour"));
 }
