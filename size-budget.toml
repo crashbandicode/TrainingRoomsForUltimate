@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 178068
+ceiling = 178113
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Source b9f1821a measures 178068, an exact 7042 normalized-line delta over 171026. Includes the measured Pac-Man, Bowser Jr., Sora, Sheik, Pichu and zero-Pikmin Olimar routes and the earlier niche recovery, ownership and placement fixes."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Source f405c7ca measures 178113, an exact 7087 normalized-line delta over 171026. Includes measured Pac-Man, widened Sora, Bowser Jr., Sheik, Pichu and zero-Pikmin Olimar routes plus the earlier niche recovery, ownership and placement fixes."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
