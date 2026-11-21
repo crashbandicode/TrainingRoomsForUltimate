@@ -16,7 +16,7 @@ pub(crate) struct AttackForecast {
 }
 
 impl AttackForecast {
-    /// The owned slot must describe the live motion at this exact update.
+    /// An owned slot can describe this motion update or the immediately preceding one.
     pub(crate) fn for_motion(
         self,
         current: MotionSample,
@@ -30,7 +30,6 @@ impl AttackForecast {
             || self.source.motion != current.motion
             || !current.frame.is_finite()
             || current.frame < 0.0
-            || self.source.frame != current.frame
             || !(1..=40).contains(&first)
             || !(first..=40).contains(&last)
             || !self.bounds.into_iter().flatten().all(f32::is_finite)
@@ -39,12 +38,28 @@ impl AttackForecast {
         {
             return None;
         }
+        let source_frame = self.source.frame;
+        let elapsed = if source_frame == current.frame {
+            0
+        } else {
+            // Subtract the integers to reject a rounded addition beyond f32 precision.
+            if !source_frame.is_finite()
+                || source_frame < 0.0
+                || source_frame.fract() != 0.0
+                || current.frame.fract() != 0.0
+                || current.frame - source_frame != 1.0
+                || first == 1
+            {
+                return None;
+            }
+            1
+        };
         let bounds = match facing {
             1.0 => self.bounds,
             -1.0 => [[-right, low], [-left, high]],
             _ => return None,
         };
-        Some(([first as u8, last as u8], bounds))
+        Some(([(first - elapsed) as u8, (last - elapsed) as u8], bounds))
     }
 }
 

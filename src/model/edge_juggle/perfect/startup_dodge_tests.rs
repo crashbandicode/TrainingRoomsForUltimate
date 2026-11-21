@@ -156,6 +156,82 @@ fn native_startup_requires_a_current_finite_record_and_mirrors_its_attack_side()
 }
 
 #[test]
+fn j2_rebases_the_owned_forecast_to_the_exact_next_native_motion_update() {
+    // 1a2b203e Ally seq 2267, 2274 and 2279: stock 8, live 9, then stock 9.
+    let live = MotionSample {
+        status: 0x33,
+        motion: 0xa5598d745,
+        frame: 9.0,
+    };
+    let previous = AttackForecast {
+        source: MotionSample { frame: 8.0, ..live },
+        flags: 0x80000004,
+        bounds: [[-24.0, -2.0], [23.5, 45.0]],
+        countdown: [10, 17],
+    };
+    let current = AttackForecast {
+        source: live,
+        countdown: [9, 16],
+        ..previous
+    };
+    for (facing, bounds) in [
+        (1.0, previous.bounds),
+        (-1.0, [[-23.5, -2.0], [24.0, 45.0]]),
+    ] {
+        assert_eq!(current.for_motion(live, facing), Some(([9, 16], bounds)));
+        assert_eq!(previous.for_motion(live, facing), current.for_motion(live, facing));
+    }
+}
+
+#[test]
+fn j2_rejects_unqualified_motion_updates_and_already_active_forecasts() {
+    let live = MotionSample {
+        status: 0x33,
+        motion: 0xa5598d745,
+        frame: 9.0,
+    };
+    let previous = AttackForecast {
+        source: MotionSample { frame: 8.0, ..live },
+        flags: 0x80000004,
+        bounds: [[-24.0, -2.0], [23.5, 45.0]],
+        countdown: [10, 17],
+    };
+    for source in [7.0, 8.5, 10.0, -1.0, f32::INFINITY, f32::NAN] {
+        let unqualified = AttackForecast {
+            source: MotionSample { frame: source, ..live },
+            ..previous
+        };
+        assert_eq!(unqualified.for_motion(live, 1.0), None);
+    }
+    let fractional = AttackForecast {
+        source: MotionSample { frame: 8.5, ..live },
+        ..previous
+    };
+    assert_eq!(
+        fractional.for_motion(MotionSample { frame: 9.5, ..live }, 1.0),
+        None
+    );
+    let large = AttackForecast {
+        source: MotionSample { frame: 16_777_218.0, ..live },
+        ..previous
+    };
+    assert_eq!(
+        large.for_motion(MotionSample { frame: 16_777_220.0, ..live }, 1.0),
+        None
+    );
+    for invalid in [
+        AttackForecast { countdown: [1, 17], ..previous },
+        AttackForecast { countdown: [2, 41], ..previous },
+        AttackForecast { source: MotionSample { status: 0, ..previous.source }, ..previous },
+        AttackForecast { source: MotionSample { motion: 0, ..previous.source }, ..previous },
+        AttackForecast { flags: 0x84000004, ..previous },
+        AttackForecast { bounds: [[-24.0, -2.0], [23.5, -3.0]], ..previous },
+    ] {
+        assert_eq!(invalid.for_motion(live, 1.0), None);
+    }
+}
+
+#[test]
 fn neutral_dodge_window_uses_each_native_body_and_reserves_a_frame_at_each_end() {
     use super::neutral_dodge_window;
     use crate::model::fighter_choices::CHOICES;
