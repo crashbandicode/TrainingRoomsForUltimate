@@ -580,7 +580,7 @@ fn niche_olimar_winged_pikmin_route_and_pad_sequence() {
 
 #[test]
 fn niche_bowser_jr_clown_kart_route_and_pad_sequence() {
-    verify(0x3a, "cross", 31, &[Move::Side, Move::Hold, Move::Rise]);
+    verify(0x3a, "cross", 31, &[Move::Side, Move::Jump, Move::Jump, Move::Rise]);
 }
 
 #[test]
@@ -1007,4 +1007,11 @@ fn live_sequence_rows_include_near_extensions_and_exclude_crossing_estimates() {
     assert_eq!(select(facts(0x34, "counter"), EXTENSION_ROWS).map(|row| row.id), Some(10));
     assert!(ROWS.iter().filter(|row| EXTENSION_ROWS & (1 << (row.id - 1)) != 0)
         .all(|row| row.route == Route::Near));
+}
+
+#[test]
+fn bowser_jr_crosses_with_the_kart_jump_before_the_double_jump() {
+    let route = tested_row(31);
+    assert_eq!(route.route, Route::Opposite);
+    assert_eq!(route.moves, &[Move::Side, Move::Jump, Move::Jump, Move::Rise]);
 }

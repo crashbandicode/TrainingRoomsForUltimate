@@ -587,6 +587,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(perfect::olimar::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([26.0, 26.0])
             }
+            (Drill::GuardEdge, Some(perfect::kart::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([22.0, 42.0])
+            }
             _ => None,
         };
         let (step, cpu) = match drill {

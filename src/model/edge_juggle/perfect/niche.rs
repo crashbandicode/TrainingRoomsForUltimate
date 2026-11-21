@@ -266,7 +266,7 @@ const ROWS: [Row; 43] = [
     Row::new(28, 0x28, Intent::Across, &[Hold, Bolt]),
     Row::new(29, 0x2c, Intent::Across, &[Hold, Travel]),
     Row::new(30, 0x2b, Intent::Across, &[Hold, Hover]),
-    Row::new(31, 0x3a, Intent::Across, &[Side, Hold, Rise]),
+    Row::new(31, 0x3a, Intent::Across, &[Side, Jump, Jump, Rise]),
     Row::new(32, 0x53, Intent::Across, &[Hold, Rise]),
     // Yoshi's climb is the double jump: it waits for the exit.
     Row::new(33, 0x5, Intent::Across, &[Hold, Jump, Rise]),
