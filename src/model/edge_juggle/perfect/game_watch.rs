@@ -21,6 +21,8 @@ const TERMINAL: f32 = 1.24;
 const STALL_TERMINAL: f32 = 1.20;
 const STALL_GRAVITY: f32 = 0.04;
 const STALL_BRAKE: f32 = 0.0025;
+// Fire can grab the cliff 5 to 21 units below the lip while facing it.
+const FIRE_CATCH_DEPTH: f32 = 13.0;
 
 #[derive(Clone, Copy)]
 pub struct OilInputs {
@@ -202,7 +204,7 @@ impl OilStall {
         .returns(
             [from[0], from[1] - 4.0],
             [horizontal, -STALL_TERMINAL],
-            ledge,
+            [ledge[0], ledge[1] - FIRE_CATCH_DEPTH],
             4,
             bottom,
         )
@@ -262,6 +264,24 @@ lib_unit_tests! {
             oil.next_attempt();
             oil.arm(Zone::Ledge, u32::MAX / 5, 0);
             assert!(oil.begin_oil_panic(input).is_none(), "the stall share was halved");
+        }
+
+        #[test]
+        fn oil_panic_reserves_fire_to_the_measured_cliff_catch_box() {
+            // Exact FD reference GWB, start 20 out and 31.7 below the ledge.
+            let ordinary = opening();
+            let from_reference = OilInputs {
+                position: [ordinary.ledge[0] - 20.0, ordinary.ledge[1] - 31.7],
+                ..ordinary
+            };
+            let mut oil = OilStall::default();
+            oil.arm(Zone::Ledge, 0, ordinary.frame);
+            assert_eq!(oil.begin_oil_panic(from_reference), Some(pad([0.0, -1.0], SPECIAL)));
+
+            let mut short = OilStall::default();
+            short.arm(Zone::Ledge, 0, ordinary.frame);
+            let position = [from_reference.position[0], ordinary.ledge[1] - 55.0];
+            assert!(short.begin_oil_panic(OilInputs { position, ..from_reference }).is_none());
         }
 
         #[test]
