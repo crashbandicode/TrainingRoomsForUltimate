@@ -265,6 +265,51 @@ impl Phase {
     }
 }
 
+/// Placement has a native grounded resource reset before the airborne start.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Placement {
+    ResetResources,
+    Grounded,
+    Airborne,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlacementAction {
+    RestartPlacement,
+    ResetResources,
+    PlaceStart,
+    AwaitNativeWait,
+    RequestFall,
+    HoldStart,
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct PlacementFrame {
+    pub dead_or_rebirthing: bool,
+    pub grounded: bool,
+    pub airborne: bool,
+    pub wait: bool,
+    pub fall: bool,
+}
+
+impl Placement {
+    pub fn action(self, frame: PlacementFrame) -> PlacementAction {
+        use PlacementAction as A;
+        if frame.dead_or_rebirthing {
+            return A::RestartPlacement;
+        }
+        match self {
+            Self::ResetResources => A::ResetResources,
+            Self::Grounded if frame.grounded && frame.wait => A::PlaceStart,
+            Self::Grounded if frame.grounded => A::AwaitNativeWait,
+            Self::Grounded => A::RestartPlacement,
+            Self::Airborne if frame.airborne && frame.fall => A::HoldStart,
+            Self::Airborne if frame.airborne => A::RequestFall,
+            Self::Airborne => A::RestartPlacement,
+        }
+    }
+}
+
 /// Which live pad owner runs at the AI epilogue.
 pub const fn drill_owns_pad(owns_primary: bool, recorder_active: bool) -> bool {
     owns_primary && !recorder_active
@@ -788,6 +833,39 @@ impl Wizard {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn placement_defers_airborne_start_until_the_stock_escape_settles_in_wait() {
+        use PlacementAction as A;
+        let escape_back = PlacementFrame { grounded: true, ..PlacementFrame::default() };
+        assert_eq!(Placement::Grounded.action(escape_back), A::AwaitNativeWait);
+        let wait = PlacementFrame { wait: true, ..escape_back };
+        assert_eq!(Placement::Grounded.action(wait), A::PlaceStart);
+    }
+
+    #[test]
+    fn placement_restarts_refill_when_airborne_handoff_lands_before_fall() {
+        use PlacementAction as A;
+        let escape_air = PlacementFrame { airborne: true, ..PlacementFrame::default() };
+        assert_eq!(Placement::Airborne.action(escape_air), A::RequestFall);
+        let landing_light = PlacementFrame { grounded: true, ..PlacementFrame::default() };
+        assert_eq!(Placement::Airborne.action(landing_light), A::RestartPlacement);
+        assert_eq!(Placement::ResetResources.action(landing_light), A::ResetResources);
+        let fall = PlacementFrame { fall: true, ..escape_air };
+        assert_eq!(Placement::Airborne.action(fall), A::HoldStart);
+        let stale_fall = PlacementFrame { fall: true, ..landing_light };
+        assert_eq!(Placement::Airborne.action(stale_fall), A::RestartPlacement);
+    }
+
+    fn release(drill: Drill, limit: Option<u16>) -> Session {
+        let mut session = Session::new(drill, limit);
+        session.placed();
+        for _ in 0..drill.ready_frames() {
+            session.advance_attempt(Observation::default());
+        }
+        assert_eq!((session.phase, session.frames), (Phase::Live, 0));
+        session
+    }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {
         let mut session = Session::new(drill, limit);

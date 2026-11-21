@@ -21,8 +21,8 @@ use crate::model::edge_juggle::perfect::{
     PlanHeight, PlanInput, Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
-    Difficulty, Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
-    WizardStep,
+    Difficulty, Drill, Observation, Outcome, Phase, Placement, PlacementAction, PlacementFrame,
+    Reaction, Session, Setup, Stage, Wizard, WizardStep,
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
@@ -144,13 +144,6 @@ impl CpuBody {
             object_id: natives::battle_object_id(accessor),
         })
     }
-}
-
-#[derive(Clone, Copy)]
-enum Placement {
-    ResetResources,
-    Grounded,
-    Airborne,
 }
 
 struct Bodies {
@@ -1964,11 +1957,12 @@ pub unsafe fn frame(fighter: usize) {
     let player_ledge =
         (natives::situation_kind(p1) == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
     let cpu_ledge = side(natives::pos_x(cpu));
+    let situation = natives::situation_kind(cpu);
     let trump = drill == Drill::GuardEdge
         && (run.player_ledge == Some(cpu_ledge) || player_ledge == Some(cpu_ledge));
     let obs = Observation {
         dead_or_rebirthing,
-        grounded: natives::situation_kind(cpu) == konst(C::SituationGround),
+        grounded: situation == konst(C::SituationGround),
         cliff_catch: status == konst(C::StatusCliffCatch) && !trump,
         hit: damage_stop && !run.damage_stop
             || damage
@@ -1984,30 +1978,42 @@ pub unsafe fn frame(fighter: usize) {
     run.damage_stop = damage_stop;
     run.player_ledge = player_ledge;
     if run.rounds.phase == Phase::Place {
-        if dead_or_rebirthing {
-            run.placement = Placement::ResetResources;
-        } else {
-            match run.placement {
-                Placement::ResetResources => {
-                    if reset_recovery_resources(p1, cpu, run.stage) {
-                        run.placement = Placement::Grounded;
-                    }
+        let [wait, fall, ground, air] = [
+            C::StatusWait,
+            C::StatusFall,
+            C::SituationGround,
+            C::SituationAir,
+        ]
+        .map(konst);
+        if [wait, fall, ground, air].contains(&UNRESOLVED) {
+            return;
+        }
+        let frame = PlacementFrame {
+            dead_or_rebirthing,
+            grounded: situation == ground,
+            airborne: situation == air,
+            wait: status == wait,
+            fall: status == fall,
+        };
+        match run.placement.action(frame) {
+            PlacementAction::RestartPlacement => run.placement = Placement::ResetResources,
+            PlacementAction::ResetResources => {
+                if reset_recovery_resources(p1, cpu, run.stage) {
+                    run.placement = Placement::Grounded;
                 }
-                Placement::Grounded if obs.grounded => {
-                    if try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
-                        run.placement = Placement::Airborne;
-                    }
+            }
+            PlacementAction::PlaceStart => {
+                if try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
+                    run.placement = Placement::Airborne;
                 }
-                Placement::Grounded => run.placement = Placement::ResetResources,
-                Placement::Airborne if status == konst(C::StatusFall) => {
-                    hold_cpu(cpu, run.setup.cpu);
-                    *held_cpu = Some(body);
-                    run.rounds.placed();
-                    run.placement = Placement::ResetResources;
-                }
-                Placement::Airborne => {
-                    state::status_request(cpu, konst(C::StatusFall));
-                }
+            }
+            PlacementAction::AwaitNativeWait => {}
+            PlacementAction::RequestFall => state::status_request(cpu, fall),
+            PlacementAction::HoldStart => {
+                hold_cpu(cpu, run.setup.cpu);
+                *held_cpu = Some(body);
+                run.rounds.placed();
+                run.placement = Placement::ResetResources;
             }
         }
     } else {
