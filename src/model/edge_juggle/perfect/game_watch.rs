@@ -86,7 +86,7 @@ impl OilStall {
         self.phase = Phase::Spent;
     }
 
-    pub fn launch(&mut self, inputs: OilInputs) -> Option<Correction> {
+    pub fn begin_oil_panic(&mut self, inputs: OilInputs) -> Option<Correction> {
         let Phase::Waiting(due) = self.phase else {
             return None;
         };
@@ -246,11 +246,11 @@ lib_unit_tests! {
             let mut oil = OilStall::default();
             oil.arm(Zone::Ledge, 0, 11);
             let input = opening();
-            assert!(oil.launch(OilInputs { frame: 10, ..input }).is_none());
-            let press = oil.launch(input).expect("one safe tap");
+            assert!(oil.begin_oil_panic(OilInputs { frame: 10, ..input }).is_none());
+            let press = oil.begin_oil_panic(input).expect("one safe tap");
             assert_eq!(press.stick, Some([0.0, -1.0]));
             assert_eq!(press.press, SPECIAL);
-            assert!(oil.launch(input).is_none());
+            assert!(oil.begin_oil_panic(input).is_none());
             for (frame, status) in [(12, 0x1e3), (15, 0x1e3), (16, 0x1e4), (40, 0x1e4), (41, 0x1e8), (55, 0x1e8)] {
                 let pad = oil.sustain(status, frame).expect("release the native stance");
                 assert_eq!(pad.press & SPECIAL, 0);
@@ -258,10 +258,10 @@ lib_unit_tests! {
             }
             assert!(oil.sustain(0xe, 56).is_none());
             oil.arm(Zone::Ledge, 0, 0);
-            assert!(oil.launch(input).is_none(), "the same airtime cannot stall again");
+            assert!(oil.begin_oil_panic(input).is_none(), "the same airtime cannot stall again");
             oil.next_attempt();
             oil.arm(Zone::Ledge, u32::MAX / 5, 0);
-            assert!(oil.launch(input).is_none(), "the stall share was halved");
+            assert!(oil.begin_oil_panic(input).is_none(), "the stall share was halved");
         }
 
         #[test]
@@ -277,13 +277,13 @@ lib_unit_tests! {
             ] {
                 let mut oil = OilStall::default();
                 oil.arm(invalid.zone, 0, 0);
-                assert!(oil.launch(invalid).is_none());
+                assert!(oil.begin_oil_panic(invalid).is_none());
             }
             for (zone, expected) in [(Zone::Ledge, 30), (Zone::Hang, 30), (Zone::OffLow, 30), (Zone::Mid, 15), (Zone::Far, 0)] {
                 let count = (0..100u64).filter(|&i| {
                     let mut oil = OilStall::default();
                     oil.arm(zone, (((2 * i + 1) * (1u64 << 32)) / 200) as u32, 0);
-                    oil.launch(OilInputs { zone, ..safe }).is_some()
+                    oil.begin_oil_panic(OilInputs { zone, ..safe }).is_some()
                 }).count();
                 assert_eq!(count, expected, "zone {}", zone as usize);
             }

@@ -1184,7 +1184,7 @@ unsafe fn recovery_pad(
                 && niche_pad::niche_start_enabled(cpu, perfect::niche::Move::Down, true)
                 && niche_pad::niche_start_enabled(cpu, perfect::niche::Move::Rise, true);
             let zone = guarder_zone(p1, player, run.player_reach, ledge, pos);
-            if let Some(pad) = run.oil_stall.launch(OilInputs {
+            if let Some(pad) = run.oil_stall.begin_oil_panic(OilInputs {
                 frame: run.rounds.frames,
                 status: natives::status_kind(cpu),
                 position: pos,
