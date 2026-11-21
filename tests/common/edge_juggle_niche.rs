@@ -28,6 +28,7 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Sheik",
         "Sheik",
         "Greninja",
+        "Ness",
         "Steve",
         "Pichu",
         "Jigglypuff",
@@ -58,14 +59,22 @@ fn niche_roster_kinds_match_the_approved_plan() {
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
-        // The table skips the reserved ID 14.
-        assert_eq!(usize::from(row.id), index + 1 + usize::from(index >= 13));
+        assert_eq!(usize::from(row.id), index + 1);
         let kind = CHOICES
             .iter()
             .find_map(|&(kind, name)| (name == fighter).then_some(kind))
             .expect("fighter from the plan must be in the roster");
         assert_eq!(row.fighter as u32, kind, "row {} belongs to {fighter}", row.id);
     }
+}
+
+#[test]
+fn ness_pk_thunder_has_a_row_without_joining_the_unmeasured_extension_pool() {
+    let row = tested_row(14);
+    assert_eq!(row.moves, [Move::Hold, Move::Bolt]);
+    assert_eq!(row.route, Route::Opposite);
+    assert!(select(facts(0x0a, "cross"), EXTENSION_ROWS).is_none());
+    assert_eq!(tested_row(28).fighter, 0x28, "Lucas has its own PK Thunder row");
 }
 
 /// A slow faller with five jumps and a strong up special: every row's crossing fits.
@@ -987,14 +996,6 @@ fn niche_rob_budget_and_takeoff_allow_the_burner_startup_rise() {
     };
     assert!(rob.margin(facts).is_none());
 }
-
-#[test]
-fn the_rc15_candidate_does_not_admit_ness_from_the_wider_reference_list() {
-    assert!(super::measured_row(14, CANDIDATE_ROWS).is_none());
-    assert!(select(facts(0xa, "cross"), CANDIDATE_ROWS).is_none());
-    assert_eq!(super::measured_row(28, CANDIDATE_ROWS).unwrap().fighter, 0x28);
-}
-
 
 #[test]
 fn live_sequence_rows_include_near_extensions_and_exclude_crossing_estimates() {

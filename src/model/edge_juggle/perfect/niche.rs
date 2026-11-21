@@ -230,7 +230,7 @@ impl Intent {
 use Move::*;
 // A crossing glides and holds its height first. A special that ends in special
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
-const ROWS: [Row; 40] = [
+const ROWS: [Row; 41] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
     Row::new(2, 0x8, Intent::ThunderOverhead, &[Side, Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
@@ -245,7 +245,8 @@ const ROWS: [Row; 40] = [
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
     Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
     Row::new(13, 0x35, Intent::Across, &[ChargedSide, Hold, Travel]),
-    // ID 14 is reserved for Ness pending the live PK Thunder envelope capture.
+    // Ness PK Thunder needs a measured projectile route before runtime dispatch.
+    Row::new(14, 0x0a, Intent::Across, &[Hold, Bolt]),
     Row::new(15, 0x58, Intent::Across, &[Hold, Glide]),
     Row::new(16, 0x13, Intent::Across, &[Hold, QuickAttack]),
     Row::new(17, 0xc, Intent::Across, &[Hold]),

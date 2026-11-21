@@ -88,6 +88,10 @@ impl NicheGuide {
             return Some((guide, 1.0));
         }
         if fighter == 0xc {
+            let fall = konst(C::StatusFall);
+            if fall == UNRESOLVED || natives::status_kind(cpu) != fall || natives::lr(cpu) != direction {
+                return None;
+            }
             let row = niche::measured_row(17, niche::CANDIDATE_ROWS)?;
             let flight = PuffFlight::start(facts, FlyState {
                 position: facts.position,
@@ -144,6 +148,8 @@ impl NicheGuide {
         match &self.measured {
             // Measured from the Skull Bash press to the exit: 13+39+46+27+33.
             Some(MeasuredFlight::SkullBash(_)) => Some(158),
+            // The FLY-L ring bake runs in at most 283 frames at the cell centers.
+            Some(MeasuredFlight::Puff(_)) => Some(300),
             _ => None,
         }
     }

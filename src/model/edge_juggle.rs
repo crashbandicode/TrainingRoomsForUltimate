@@ -548,7 +548,7 @@ pub enum WizardStep {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
-    pikachu_low_release: bool,
+    lower_release: Option<[f32; 2]>,
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -559,16 +559,22 @@ impl Wizard {
         stage_key: (i32, u32), fighter: Option<i32>,
     ) -> Option<Self> {
         let area = Area::default();
-        let pikachu_low_release = drill == Drill::GuardEdge
-            && fighter == Some(0x8)
-            && perfect::is_crossing_stage(stage_key);
+        let lower_release = match (drill, fighter) {
+            (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, 55.0])
+            }
+            (Drill::GuardEdge, Some(0xc)) if perfect::fly::puff_stage(stage_key) => {
+                Some([20.0, 28.0])
+            }
+            _ => None,
+        };
         let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, pikachu_low_release)?),
+            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, lower_release)?),
             Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
         };
         Some(Self {
             drill,
-            pikachu_low_release,
+            lower_release,
             step,
             setup: Setup {
                 area,
@@ -579,14 +585,14 @@ impl Wizard {
         })
     }
 
-    fn area_release(stage: Stage, area: Area, pikachu_low_release: bool) -> Option<[f32; 2]> {
-        if pikachu_low_release {
+    fn area_release(stage: Stage, area: Area, lower_release: Option<[f32; 2]>) -> Option<[f32; 2]> {
+        if let Some([outside, below]) = lower_release {
             let point = match area {
-                Area::LowerLeft => Some([stage.ledges[0][0] - 20.0, stage.ledges[0][1] - 55.0]),
-                Area::LowerRight => Some([stage.ledges[1][0] + 20.0, stage.ledges[1][1] - 55.0]),
+                Area::LowerLeft => Some([stage.ledges[0][0] - outside, stage.ledges[0][1] - below]),
+                Area::LowerRight => Some([stage.ledges[1][0] + outside, stage.ledges[1][1] - below]),
                 Area::UpperLeft | Area::UpperRight => None,
             };
-            // The measured Skull Bash approach is below the near cliff grab.
+            // Each measured approach starts below the near cliff catch.
             // Preserve the normal default if the stage bounds would change it.
             if let Some(point) = point.filter(|&point| stage.edge_start(area, point) == Some(point)) {
                 return Some(point);
@@ -597,7 +603,7 @@ impl Wizard {
 
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        if let Some(cpu) = Self::area_release(stage, area, self.pikachu_low_release) {
+        if let Some(cpu) = Self::area_release(stage, area, self.lower_release) {
             self.setup.area = area;
             self.setup.cpu = cpu;
         }
@@ -856,6 +862,28 @@ mod tests {
         }
         assert_eq!(session.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
         assert_eq!((session.secured, session.attempts), (0, 0));
+    }
+
+    #[test]
+    fn puff_fd_wizard_releases_inside_the_measured_ring() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let puff = Some(0xc);
+        let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, (3, 0), puff)
+            .unwrap();
+        assert_eq!(wizard.setup.cpu, [-100.0, -28.0]);
+        wizard.change_area(stage, 1);
+        assert_eq!(wizard.setup.cpu, [100.0, -28.0]);
+        wizard.change_area(stage, 1);
+        assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+
+        for key in [(3, 1), (0, 0), (311, 0)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
     }
 
     #[test]

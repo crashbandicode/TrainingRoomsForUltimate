@@ -10,19 +10,31 @@ const FALL: f32 = 0.98;
 const AIR_SPEED: f32 = 1.332;
 const DRIFT: f32 = 0.13;
 const JUMP_DRIFT: f32 = 0.114;
-const JUMP_VX: f32 = 0.8;
+const JUMP_VX: f32 = 0.914;
+const JUMP_GAP: u32 = 30;
+const TURN_BRAKE: u32 = 8;
+const TURN_OUTSIDE: f32 = 8.0;
 
-// FLY-5 on the common ring in reference-crossings/gen_regions.py.
+// FLY-L, the 189-cell ring baked by reference-crossings/g1/g1_sim.py.
 const RING_CELLS: [u32; 44] = [
-    0x00000000, 0x1ffffffc, 0x1ffffffc, 0x1ffffffc, 0x1ffffffc, 0x1ffffffc,
-    0x1ffffffc, 0x1ffffffc, 0x1ffffffc, 0x07fffffc, 0x03fffffc, 0x00fffffc,
-    0x007ffffc, 0x003ffffc, 0x001ffffc, 0x0007fffc, 0x0003fffc, 0x0000fffc,
-    0x00007ffc, 0x00003ffc, 0x00000ffc, 0x000007fc, 0x000003fc, 0x000001fc,
-    0x0000007c, 0x0000001c, 0x0000000c, 0x00000004, 0x00000004, 0x00000000,
+    0x00000000, 0x0fffffc0, 0x03ffffc0, 0x01ffffc0, 0x00ffffc0, 0x003fffc0,
+    0x001fffc0, 0x000fffc0, 0x0003ffc0, 0x0001ffc0, 0x00007fc0, 0x00003fc0,
+    0x00001fc0, 0x000007c0, 0x000003c0, 0x000001c0, 0x00000040, 0x00000020,
+    0x0000001c, 0x00000004, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000,
 ];
+
+/// The live shape must still match the measured profile.
+pub fn puff_stage(stage: (i32, u32)) -> bool {
+    stage == (3, 0)
+}
+
+fn falling(vy: f32) -> f32 {
+    (vy - GRAVITY).max(-FALL)
+}
 
 /// Puff stays in native FLY, not JUMP_AERIAL, during its multijumps (fd-4, seq 121241).
 pub fn puff_active_status(status: i32, standard_airborne: bool) -> bool {
@@ -45,8 +57,9 @@ pub struct PuffFlight {
     bottom: f32,
     flat: f32,
     inward: f32,
-    going: bool,
-    jump_frame: Option<u32>,
+    descended: bool,
+    jump: Option<(u32, f32)>,
+    turn_frame: Option<u32>,
 }
 
 impl PuffFlight {
@@ -56,7 +69,7 @@ impl PuffFlight {
             || !state.velocity.into_iter().all(f32::is_finite)
             || state.velocity[0].abs() > DRIFT
             || !(-FALL..=0.0).contains(&state.velocity[1])
-            || !matches!(facts.stage, (0 | 3 | 311, 0))
+            || !puff_stage(facts.stage)
             || !(facts.body_clearance > 0.0 && facts.body_clearance <= HEAD)
         {
             return None;
@@ -84,7 +97,7 @@ impl PuffFlight {
         for &line in facts.outline {
             hull.add(line);
         }
-        Some(Self { hull, near, far, bottom, flat, inward, going: false, jump_frame: None })
+        Some(Self { hull, near, far, bottom, flat, inward, descended: false, jump: None, turn_frame: None })
     }
 
     pub fn exit_point(&self) -> Point {
@@ -92,28 +105,31 @@ impl PuffFlight {
     }
 
     fn clear(&self, from: Point, to: Point) -> bool {
-        to[1] > self.bottom + 4.0 && [-HALF, 0.0, HALF].into_iter().all(|dx| {
+        to[1] > self.bottom + 6.0 && [-HALF, 0.0, HALF].into_iter().all(|dx| {
             let segment = [[from[0] + dx, from[1]], [to[0] + dx, to[1]]];
             !self.hull.segments().iter().any(|&line| blocked(segment, line, HEAD + 1.0))
         })
     }
 
-    /// Wait until drifting can take the feet past the near slope without touching it.
+    fn near_catch(&self, [x, y]: Point) -> bool {
+        let into_stage = (x - self.near[0]) * self.inward;
+        (-18.0..=12.0).contains(&into_stage) && (-26.0..=-6.0).contains(&(y - self.near[1]))
+    }
+
     fn glide_clear(&self, mut pos: Point, [mut vx, mut vy]: Point) -> bool {
-        let mid = self.near[0].midpoint(self.far[0]);
-        for _ in 0..140 {
+        for _ in 0..160 {
             vx = (vx + DRIFT).min(AIR_SPEED);
-            vy = (vy - GRAVITY).max(-FALL);
+            vy = falling(vy);
             let next = [pos[0] + self.inward * vx, pos[1] + vy];
-            if !self.clear(pos, next) {
+            if !self.clear(pos, next) || self.near_catch(next) {
                 return false;
             }
-            if (next[0] - mid) * self.inward >= 0.0 {
+            if next[1] <= self.flat - HEAD - 2.0 {
                 return true;
             }
             pos = next;
         }
-        true
+        false
     }
 
     fn ceiling(&self, x: f32) -> f32 {
@@ -136,18 +152,40 @@ impl PuffFlight {
         roof - HEAD - 2.0
     }
 
-    fn jump_clears(&self, mut pos: Point, mut vy: f32) -> bool {
+    fn jump_clears(&self, state: FlyState, mut vy: f32) -> bool {
+        let [x, y] = state.position;
+        let pre_launch = [
+            x + self.inward * (state.velocity[0] * self.inward + JUMP_DRIFT).min(AIR_SPEED),
+            y + falling(state.velocity[1]),
+        ];
+        if !self.clear(state.position, pre_launch) {
+            return false;
+        }
+        let mut pos = pre_launch;
         let mut vx = JUMP_VX;
         while vy > 0.0 {
-            vx = (vx + JUMP_DRIFT).min(AIR_SPEED);
             let next = [pos[0] + self.inward * vx, pos[1] + vy];
-            if next[1] > self.ceiling(next[0]) || !self.clear(pos, next) {
+            // An inward jump must finish rising before the far-side turn.
+            // A moving Puff cannot brake in time while waiting for that jump's apex.
+            if (next[0] - self.far[0]) * self.inward >= TURN_OUTSIDE
+                || next[1] > self.ceiling(next[0])
+                || !self.clear(pos, next)
+            {
                 return false;
             }
             pos = next;
             vy -= GRAVITY;
+            vx = (vx + JUMP_DRIFT).min(AIR_SPEED);
         }
         true
+    }
+
+    fn pad(steer: f32, jump: bool) -> Correction {
+        Correction {
+            stick: Some([steer, 0.0]),
+            press: if jump { JUMP } else { 0 },
+            release: JUMP | SPECIAL | ATTACK | GUARD,
+        }
     }
 
     pub fn step(&mut self, state: FlyState) -> Option<Correction> {
@@ -159,34 +197,54 @@ impl PuffFlight {
         {
             return None;
         }
-        let next_jump = fly_launch(PUFF, state.remaining).map(|speed| speed - GRAVITY);
-        let launch = vy <= 0.0 && state.can_jump && next_jump.is_some();
-        let (steer, want_jump) = if (x - self.far[0]) * self.inward >= HALF + 1.0 {
-            let target = self.exit_point();
-            let brake = if vy > 0.0 { JUMP_DRIFT } else { DRIFT };
-            let ahead = x + vx * vx.abs() / (2.0 * brake);
-            let dx = target[0] - ahead;
-            let steer = if dx.abs() > 0.5 { dx.signum() } else { 0.0 };
-            (steer, launch && y < target[1] + 2.0)
-        } else {
-            if !self.going {
-                self.going = self.glide_clear(state.position, [vx * self.inward, vy]);
+        if let Some((frame, steer)) = self.jump {
+            if state.frame.saturating_sub(frame) < 2 {
+                return Some(Self::pad(steer, true));
             }
-            let steer = if self.going { self.inward } else { 0.0 };
-            let jump = self.going && launch
-                && next_jump.is_some_and(|rise| self.jump_clears(state.position, rise));
-            (steer, jump)
-        };
-        let held = self.jump_frame == Some(state.frame);
-        let fresh = want_jump && self.jump_frame.is_none_or(|last| last.saturating_add(1) < state.frame);
-        if fresh {
-            self.jump_frame = Some(state.frame);
         }
-        Some(Correction {
-            stick: Some([steer, 0.0]),
-            press: if held || fresh { JUMP } else { 0 },
-            release: JUMP | SPECIAL | ATTACK | GUARD,
-        })
+        let next_y = y + falling(vy);
+        if !self.descended {
+            if self.near_catch(state.position) {
+                return None;
+            }
+            if next_y > self.flat - HEAD - 2.0 {
+                let steer = if self.glide_clear(state.position, [vx * self.inward, vy]) {
+                    self.inward
+                } else {
+                    0.0
+                };
+                return Some(Self::pad(steer, false));
+            }
+            self.descended = true;
+        }
+        let launch = vy <= 0.0
+            && state.can_jump
+            && state.remaining > 0
+            && self.jump.is_none_or(|(frame, _)| state.frame.saturating_sub(frame) >= JUMP_GAP);
+        let outside_far = (x - self.far[0]) * self.inward;
+        let (steer, jump) = if let Some(turn) = self.turn_frame {
+            if state.frame.saturating_sub(turn) < 2 + TURN_BRAKE {
+                (self.inward, false)
+            } else {
+                (0.0, launch && y < self.far[1] - 23.0)
+            }
+        } else if outside_far >= TURN_OUTSIDE {
+            if launch {
+                self.turn_frame = Some(state.frame);
+                (-self.inward, true)
+            } else {
+                (0.0, false)
+            }
+        } else {
+            let jump = launch && state.remaining > 1 && outside_far < -4.0
+                && fly_launch(PUFF, state.remaining)
+                    .is_some_and(|rise| self.jump_clears(state, rise - GRAVITY));
+            (self.inward, jump)
+        };
+        if jump {
+            self.jump = Some((state.frame, steer));
+        }
+        Some(Self::pad(steer, jump))
     }
 }
 
@@ -251,76 +309,121 @@ mod tests {
     }
 
     #[test]
-    fn puff_crosses_the_ring_with_the_measured_jump_budget() {
-        for (start, maximum_frames, expected_jumps) in [
-            ([-100.0, -28.0], 184, 4),
-            ([-91.986, 30.0], 260, 4),
-            ([-93.986, -66.0], 188, 5),
-        ] {
-            let mut state = live(start, [0.0; 2]);
-            let mut flight = PuffFlight::start(&facts(start), state).unwrap();
-            let [hang_x, hang_y] = flight.exit_point();
-            for frame in 0..maximum_frames {
-                state.frame = frame;
-                let edit = flight.step(state).expect("fits the stage and blast margins");
-                let x = edit.stick.unwrap()[0];
-                let [vx, vy] = &mut state.velocity;
-                if edit.press & JUMP != 0 {
-                    let first_step = if state.position[0] >= RIGHT[0] + 3.0 { 0.0 } else { JUMP_DRIFT };
-                    *vx = x * (JUMP_VX + first_step);
-                    *vy = fly_launch(PUFF, state.remaining).unwrap() - GRAVITY;
-                    state.remaining -= 1;
-                } else {
-                    let drift = if *vy > 0.0 { JUMP_DRIFT } else { DRIFT };
-                    *vx = if x == 0.0 {
-                        vx.signum() * (vx.abs() - drift).max(0.0)
-                    } else {
-                        (*vx + x * drift).clamp(-AIR_SPEED, AIR_SPEED)
-                    };
-                    *vy = (*vy - GRAVITY).max(-FALL);
-                }
-                state.position[0] += *vx;
-                state.position[1] += *vy;
-                if state.position[1] >= hang_y && (state.position[0] - hang_x).abs() <= 4.0 {
-                    break;
-                }
+    fn puff_fly_l_admits_only_the_measured_ring() {
+        let inside = live([-100.0, -28.0], [0.0; 2]);
+        assert!(PuffFlight::start(&facts(inside.position), inside).is_some());
+        let old_low_cell = live([-93.986, -66.0], [0.0; 2]);
+        assert!(PuffFlight::start(&facts(old_low_cell.position), old_low_cell).is_none());
+    }
+
+    #[test]
+    fn puff_fly_l_turn_has_a_two_frame_press_before_braking() {
+        let start = live([-100.0, -28.0], [0.0; 2]);
+        let mut flight = PuffFlight::start(&facts(start.position), start).unwrap();
+        flight.descended = true;
+        let turn = FlyState {
+            frame: 197,
+            remaining: 3,
+            ..live([88.47, -45.4], [1.332, -0.98])
+        };
+        let reverse = flight.step(turn).unwrap();
+        assert_eq!((reverse.stick, reverse.press), (Some([-1.0, 0.0]), JUMP));
+        assert_eq!(flight.step(turn).unwrap(), reverse);
+        let before_launch = FlyState {
+            frame: 198,
+            position: [89.69, -46.38],
+            ..turn
+        };
+        assert_eq!(flight.step(before_launch).unwrap(), reverse);
+
+        let launched = FlyState {
+            frame: 199,
+            position: [88.66, -44.96],
+            velocity: [-0.914, 1.417],
+            remaining: 2,
+            ..turn
+        };
+        let braking = flight.step(launched).unwrap();
+        assert_eq!((braking.stick, braking.press), (Some([1.0, 0.0]), 0));
+    }
+
+    fn verify_flight(start: Point, far: Point, direction: f32, vy: f32) {
+        let mut state = live(start, [0.0, vy]);
+        let mut flight = PuffFlight::start(&facts(start), state).unwrap();
+        let mut first_press = false;
+        let mut caught = false;
+        let mut presses = Vec::new();
+        for frame in 0..330 {
+            state.frame = frame;
+            let edit = flight.step(state).unwrap_or_else(|| {
+                panic!("start {start:?} off route at {:?}, frame {frame}", state.position)
+            });
+            let steer = edit.stick.unwrap()[0];
+            let press = edit.press & JUMP != 0;
+            if press && !first_press {
+                presses.push((frame, steer, state.position));
             }
-            assert!(
-                state.position[1] >= hang_y && (state.position[0] - hang_x).abs() <= 4.0,
-                "{start:?} reached only {:?} at frame {}", state.position, state.frame
-            );
-            assert_eq!(5 - state.remaining, expected_jumps, "{start:?}");
+            let [vx, vy] = &mut state.velocity;
+            if press && first_press {
+                *vx = steer * JUMP_VX;
+                *vy = fly_launch(PUFF, state.remaining).unwrap() - GRAVITY;
+                state.remaining -= 1;
+                first_press = false;
+            } else {
+                let accel = if press || *vy > 0.0 { JUMP_DRIFT } else { DRIFT };
+                *vx = if steer == 0.0 {
+                    vx.signum() * (vx.abs() - 0.0375).max(0.0)
+                } else {
+                    (*vx + steer * accel).clamp(-AIR_SPEED, AIR_SPEED)
+                };
+                *vy = falling(*vy);
+                first_press = press;
+            }
+            state.position[0] += *vx;
+            state.position[1] += *vy;
+            let out_far = (state.position[0] - far[0]) * direction;
+            if *vy < 0.0 && (4.5..=8.0).contains(&out_far)
+                && (-23.5..=-8.0).contains(&state.position[1])
+            {
+                caught = true;
+                break;
+            }
+        }
+        assert!(caught, "start {start:?} at vy {vy} reached {:?} at frame {} (presses {presses:?})", state.position, state.frame);
+        assert!((1..=2).contains(&state.remaining), "start {start:?} overspent jumps");
+    }
+
+    #[test]
+    fn puff_crosses_the_measured_fd_routes_in_both_directions() {
+        for [out, y] in [[20.0, -28.0], [40.0, 20.0], [90.0, 30.0], [26.0, -14.0]] {
+            verify_flight([LEFT[0] - out, y], RIGHT, 1.0, 0.0);
+            verify_flight([RIGHT[0] + out, y], LEFT, -1.0, 0.0);
         }
     }
 
     #[test]
-    fn puff_stays_below_the_live_hull_and_steers_at_far_hang_height() {
-        let start = live([-90.0, 30.0], [0.0; 2]);
+    fn puff_fly_l_baked_cell_centers_keep_a_jump_in_reserve() {
+        for (row, mask) in RING_CELLS.into_iter().enumerate() {
+            for cell in 0..30 {
+                if mask & (1 << cell) != 0 {
+                    let start = [LEFT[0] - (4 * cell + 2) as f32, 38.0 - 4.0 * row as f32];
+                    for vy in [0.0, -0.49, -0.98] {
+                        verify_flight(start, RIGHT, 1.0, vy);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn puff_avoids_a_near_ledge_snap_during_descent() {
+        let start = live([-106.0, 25.0], [0.0; 2]);
         let mut flight = PuffFlight::start(&facts(start.position), start).unwrap();
-        let first = flight.step(start).unwrap();
-        assert_eq!(first.stick, Some([0.0, 0.0]));
-        assert_eq!(first.press, 0);
-
-        let glide = FlyState { frame: 60, ..live([-90.0, -33.0], [0.0, -0.98]) };
-        assert_eq!(flight.step(glide).unwrap().stick, Some([1.0, 0.0]));
-        let under = FlyState { frame: 100, ..live([-30.0, -74.0], [1.332, -0.98]) };
-        assert_eq!(flight.step(under).unwrap().press, 0);
-        let room = FlyState { frame: 105, position: [-30.0, -78.5], ..under };
-        let jump = flight.step(room).unwrap();
-        assert_eq!(jump.press, crate::model::edge_juggle::perfect::JUMP);
-        assert_eq!(jump.stick, Some([1.0, 0.0]));
-        assert_eq!(flight.step(room).unwrap(), jump);
-        let rising = FlyState { frame: 106, remaining: 4, velocity: [0.914, 1.597], ..room };
-        assert_eq!(flight.step(rising).unwrap().press, 0);
-
-        let beside = FlyState {
-            frame: 180,
-            remaining: 2,
-            ..live([83.2, -22.0], [0.0, -0.98])
-        };
-        let climb = flight.step(beside).unwrap();
-        assert_eq!(climb.stick, Some([1.0, 0.0]));
-        assert_eq!(climb.press, crate::model::edge_juggle::perfect::JUMP);
+        assert_eq!(flight.step(start).unwrap().stick, Some([0.0, 0.0]));
+        let in_catch = live([-90.0, -19.0], [0.0, -0.98]);
+        assert!(flight.step(in_catch).is_none());
+        let below_lip = live([-100.0, -28.0], [0.0, -0.98]);
+        assert_eq!(flight.step(below_lip).unwrap().stick, Some([1.0, 0.0]));
     }
     }
 }
