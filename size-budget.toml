@@ -2293,3 +2293,11 @@ ceiling = 187815
 date = "2026-11-21"
 reason = "Keep Perfect recovery's unchanged early pose sampling in invocation-local scratch and distinguish inline from replace writes in the shared install line. Exact normalized delta +10 over 187805, no spare. The exact release receipt measures NRO and BSS against 3448686c."
 approved_by = "Operator through tr-primary-2 on 2026-11-21 requested completion through source review under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187823
+date = "2026-11-21"
+reason = "Keep diagnostic article signatures and the fighter hurt census in the already-acquired sampler store. The normalized delta is +8 over 187815, with zero spare. The exact release receipt measures NRO and BSS against 3448686c."
+approved_by = "Operator through tr-primary-2 on 2026-11-21 requested that the new hook not block, under the measured LOC rule for memory-efficient changes."

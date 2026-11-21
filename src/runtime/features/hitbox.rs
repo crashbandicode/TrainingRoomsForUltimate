@@ -660,10 +660,21 @@ struct Store {
     table: SetTable,
     seen_epoch: [u32; hitbox::FIGHTER_SETS],
     wants: [Sphere; hitbox::WANT_SCRATCH],
+    #[cfg(feature = "diag")]
+    article_signatures: [(u32, u64); 8],
+    #[cfg(feature = "diag")]
+    census: stats::CensusBook,
 }
 
-static STORE: Mutex<Store> =
-    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::WANT_SCRATCH] });
+static STORE: Mutex<Store> = Mutex::new(Store {
+    table: SetTable::new(),
+    seen_epoch: [0; hitbox::FIGHTER_SETS],
+    wants: [Sphere::NONE; hitbox::WANT_SCRATCH],
+    #[cfg(feature = "diag")]
+    article_signatures: [(0, 0); 8],
+    #[cfg(feature = "diag")]
+    census: stats::CensusBook::new(),
+});
 
 // ---- own orbs (decision HB-OWN-ORBS, option 1; `model::hitbox_orbs`) -------------------------------------------------
 //
@@ -1182,7 +1193,12 @@ static CLEAR_ARTICLES: AtomicBool = AtomicBool::new(false);
 /// Each tracked article's live attack slots as its own orbs, placed on its bones, and with *Windboxes* ticked its wind areas; an
 /// article that is gone (its id inactive or now another object's), or whose attack, grab and wind ended, is forgotten.
 /// `sv_battle_object` as `cpu_pilot` uses it.
-unsafe fn draw_articles(board: &mut Board, articles: &mut orbs::Articles, owners: &[usize]) -> u32 {
+unsafe fn draw_articles(
+    board: &mut Board,
+    articles: &mut orbs::Articles,
+    owners: &[usize],
+    #[cfg(feature = "diag")] article_signatures: &mut [(u32, u64); 8],
+) -> u32 {
     articles.clear_evicted(board);
     let hide = super::hide_cpu::draw_hide();
     let wind = shown(legend::WINDBOXES);
@@ -1233,7 +1249,7 @@ unsafe fn draw_articles(board: &mut Board, articles: &mut orbs::Articles, owners
         let kept = live && {
             let found = if wind { object_wind_areas(key, &mut areas) } else { 0 };
             #[cfg(feature = "diag")]
-            stats::object(id, key, &areas[..found]);
+            stats::object(article_signatures, id, key, &areas[..found]);
             let mut len = 0;
             if hurt {
                 let mut reader = hitbox::GameHurt { accessor: key, load: mem_load };
@@ -1399,7 +1415,13 @@ unsafe fn sample_overlay() {
         sample_fighter(&mut store, board, accessor, enabled);
     }
     if owner_count != 0 {
-        let _ = draw_articles(board, &mut articles, &owners[..owner_count]);
+        let _ = draw_articles(
+            board,
+            &mut articles,
+            &owners[..owner_count],
+            #[cfg(feature = "diag")]
+            &mut store.article_signatures,
+        );
     }
     HELD.store(store.table.held_spheres(), Ordering::Relaxed);
     *pictures = if active {
@@ -1462,7 +1484,7 @@ unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, 
     // shipped build has no census at all (the module notes).
     #[cfg(feature = "diag")]
     if enabled {
-        stats::hurt_census(accessor);
+        stats::hurt_census(&mut store.census, accessor);
     }
     #[cfg(feature = "diag")]
     stats::frame_end(facts.draws_attacks(), counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
@@ -1670,7 +1692,6 @@ mod stats {
 
     use crate::model::hitbox::{self, Counts};
     use crate::runtime::diag_log::diagnostic;
-    use hos_lock::Mutex;
 
     static PASSES: AtomicU32 = AtomicU32::new(0);
     static WORK: AtomicU32 = AtomicU32::new(0);
@@ -1783,13 +1804,10 @@ mod stats {
         diagnostic(format_args!("[Hitbox] item tracked id={id:#x} slot={slot} size={size:.2}"));
     }
 
-    /// The last line group's signature per tracked object (by battle-object id), so the probe writes only on a change.
-    static LAST_OBJECT: Mutex<[(u32, u64); 8]> = Mutex::new([(0, 0); 8]);
-
     /// rc.14 wind-articles probe (diag only): a tracked article's or item's live attack slots (the no-reaction byte, the knockback
     /// words, the damage) and its wind areas (shape, angle), one group of `[Legend] object` lines whenever they change. The Eden
     /// settle rows read them (Sheik's Burst Grenade, R.O.B.'s Gyro, items).
-    pub fn object(id: u32, key: usize, areas: &[crate::model::legend::WindArea]) {
+    pub(super) fn object(last: &mut [(u32, u64); 8], id: u32, key: usize, areas: &[crate::model::legend::WindArea]) {
         use crate::model::legend::{self, AreaShape};
         use hitbox::AttackReader;
         let fnv = |h: u64, v: u64| (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
@@ -1817,14 +1835,11 @@ mod stats {
             };
             sig = words.iter().chain(area.angle.iter()).fold(sig, |h, v| fnv(h, (*v as i32) as u32 as u64));
         }
-        {
-            let mut last = LAST_OBJECT.lock();
-            let i = last.iter().position(|e| e.0 == id).or_else(|| last.iter().position(|e| e.0 == 0)).unwrap_or(id as usize % 8);
-            if last[i] == (id, sig) {
-                return;
-            }
-            last[i] = (id, sig);
+        let i = last.iter().position(|e| e.0 == id).or_else(|| last.iter().position(|e| e.0 == 0)).unwrap_or(id as usize % 8);
+        if last[i] == (id, sig) {
+            return;
         }
+        last[i] = (id, sig);
         // SAFETY: `key` is the live tracked object's accessor (draw_articles checked it this pass).
         let status = unsafe { super::natives::status_kind(key) };
         diagnostic(format_args!("[Legend] object id={id:#x} status={status} slots={live} areas={}", areas.len()));
@@ -1885,9 +1900,9 @@ mod stats {
     /// recently used slot).
     const CENSUS_KINDS: usize = 8;
 
-    /// One slot per fighter kind: the kind's open census window and its LRU clock. Game-thread state (the
-    /// per-frame pass), one uncontended lock like `BOOK`.
-    struct CensusBook {
+    /// One slot per fighter kind: the kind's open census window and its LRU clock.
+    /// The sampler owns this state for the duration of the phase-8 pass.
+    pub(super) struct CensusBook {
         kinds: [i32; CENSUS_KINDS],
         used: [u64; CENSUS_KINDS],
         clock: u64,
@@ -1895,7 +1910,7 @@ mod stats {
     }
 
     impl CensusBook {
-        const fn new() -> CensusBook {
+        pub(super) const fn new() -> CensusBook {
             CensusBook { kinds: [i32::MIN; CENSUS_KINDS], used: [0; CENSUS_KINDS], clock: 0, states: [hitbox::HurtCensus::EMPTY; CENSUS_KINDS] }
         }
 
@@ -1915,15 +1930,12 @@ mod stats {
         }
     }
 
-    static CENSUS: Mutex<CensusBook> = Mutex::new(CensusBook::new());
-
     /// The census read of one fighter's pass: the enabled parts and the spheres they want, the read's cost in
     /// ticks, one bounded line per fighter kind per `REPORT_EVERY` frames. No sphere is requested, nothing drawn.
-    pub fn hurt_census(accessor: usize) {
+    pub(super) fn hurt_census(book: &mut CensusBook, accessor: usize) {
         // SAFETY: the current fighter's pass, after the feature's closure passed; the native checks its own grant.
         let kind = unsafe { crate::runtime::game::natives::fighter_kind(accessor) }.unwrap_or(-1);
         let window = {
-            let mut book = CENSUS.lock();
             let slot = book.slot_for(kind);
             let mut reader = hitbox::GameHurt { accessor, load: super::mem_load };
             let start = now();
