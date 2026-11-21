@@ -615,6 +615,10 @@ impl Wizard {
             && perfect::is_crossing_stage(stage_key)
         {
             Some((Area::LowerLeft, [20.0, -4.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::incineroar::KIND)
+            && perfect::is_crossing_stage(stage_key)
+        {
+            Some((Area::UpperLeft, [110.0, 10.0]))
         } else {
             None
         };
@@ -1060,6 +1064,21 @@ mod tests {
         for key in [(0, 1), (89, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn incineroar_upper_left_wizard_offers_the_measured_long_whip_start() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x47)).unwrap();
+            wizard.change_area(stage, 2);
+            assert_eq!(wizard.setup.cpu, [-190.0, 10.0], "native stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
         }
     }
 

@@ -10,6 +10,7 @@ use crate::{
 };
 use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
+use perfect::incineroar::{self, WhipBeat, WhipReturn};
 use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
 use perfect::lucario::{self, AuraFlight, AuraSample};
@@ -55,6 +56,7 @@ enum MeasuredFlight {
     Aura(AuraFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
+    Whip(WhipReturn),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -105,6 +107,27 @@ impl NicheGuide {
                 fighter,
                 ledge: near,
                 measured: Some(MeasuredFlight::Cape(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == incineroar::KIND {
+            let row = niche::measured_row(incineroar::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = WhipReturn::start(facts, inputs.draw, WhipBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_whip: niche_start_enabled(cpu, Move::Side, true),
+                can_jump: false,
+                can_chop: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: near,
+                measured: Some(MeasuredFlight::Whip(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -575,6 +598,26 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(MeasuredFlight::Whip(flight)) = &mut self.measured {
+            let jump = flight.jump_frame(frame);
+            let chop = flight.chop_frame(frame);
+            let (vx, vy) = if chop {
+                super::super::recording_host::fighter_speed(cpu)?
+            } else {
+                (0.0, 0.0)
+            };
+            return flight.step(WhipBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: if jump || chop { natives::lr(cpu) } else { 0.0 },
+                jumps: if jump || chop { remaining_jumps(cpu)? } else { 0 },
+                can_whip: flight.whip_frame(frame) && niche_start_enabled(cpu, Move::Side, true),
+                can_jump: jump && niche_start_enabled(cpu, Move::Jump, true),
+                can_chop: chop && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
         if let Some(MeasuredFlight::Cape(flight)) = &mut self.measured {
             let free = flight.awaiting_press();
             let ((vx, vy), jumps, facing) = if free {

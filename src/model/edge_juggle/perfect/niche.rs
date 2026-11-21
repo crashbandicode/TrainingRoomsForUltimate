@@ -274,7 +274,7 @@ const ROWS: [Row; 45] = [
     Row::new(33, 0x5, Intent::Across, &[Hold, Jump, Rise]),
     Row::new(34, 0x9, Intent::NearAbove, &[Missile]),
     Row::new(35, 0x26, Intent::Across, &[Hold, Rise]),
-    Row::new(36, 0x47, Intent::WhipGap, &[Side, Rise]),
+    Row::new(super::incineroar::ROW, super::incineroar::KIND, Intent::WhipGap, &[Side, Jump, Rise]),
     Row::new(37, 0x47, Intent::GenericUp, &[Rise]),
     Row::new(38, 0x5a, Intent::SwapGap, &[Swap]),
     Row::new(39, 0x5b, Intent::PhotonGap, &[Side]),
