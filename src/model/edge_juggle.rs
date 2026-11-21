@@ -600,7 +600,7 @@ impl Wizard {
         let area = Area::default();
         let link_left_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
-            && perfect::link::in_region(stage_key, stage.ledges[0], [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
+            && perfect::link::in_region(stage_key, stage.ledges, [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
         let lucario_left_start = if drill == Drill::GuardEdge && fighter == Some(perfect::lucario::KIND) {
             perfect::lucario::wizard_offset(stage_key, percent)
         } else {
@@ -1080,8 +1080,8 @@ mod tests {
             [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
             [[-80.0, 0.0], [80.0, 0.0]],
         ).unwrap();
-        let left = Setup { cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
-        let right = Setup { cpu: [118.0, 38.0], percent: 105, ..left };
+        let left = Setup { area: Area::LowerLeft, cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
+        let right = Setup { area: Area::UpperRight, cpu: [118.0, 38.0], percent: 105, ..left };
         let facing = |drill, stage_key, start| {
             recovery_away_facing(drill, stage_key, stage, start, Some(perfect::link::KIND))
         };
@@ -1168,11 +1168,12 @@ mod tests {
             let left = if perfect::is_crossing_stage(key) { [-100.0, -4.0] }
                 else { stage.area_default(Area::LowerLeft).unwrap() };
             assert_eq!(wizard.setup.cpu, left);
-            assert_eq!(recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)), perfect::is_crossing_stage(key));
-            assert!(!recovery_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x22)));
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)),
+                perfect::is_crossing_stage(key).then_some(-1.0));
+            assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x22)), None);
             wizard.change_area(stage, 1);
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
-            assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)));
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)), None);
             wizard.change_area(stage, -1);
             assert_eq!(wizard.setup.cpu, left);
         }
@@ -1189,15 +1190,15 @@ mod tests {
             wizard.change_area(stage, 2);
             if perfect::is_crossing_stage(key) {
                 assert_eq!(wizard.setup.cpu, [-109.99, 18.0]);
-                assert!(recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
-                assert!(!recovery_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x2)));
-                assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)));
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), Some(-1.0));
+                assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x2)), None);
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)), None);
             } else {
                 assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
             }
             wizard.change_area(stage, 1);
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
-            assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), None);
         }
     }
 
