@@ -48,7 +48,9 @@ pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
 pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
 pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
 pub static EGGS_AREA: [&str; 3] = ["In view", "Whole stage", "Off stage"];
-pub static EGGS_PATHS: [&str; 4] = ["Richter's Axe", "Pac-Man's Galaxian", "Link's Boomerang", "Samus's Homing Missile"];
+pub static EGGS_PATHS: [&str; 5] = [
+    "Richter's Axe", "Pac-Man's Galaxian", "Link's Boomerang", "Samus's Homing Missile", "Pop up",
+];
 pub static EGGS_EXPIRY: [&str; 11] = [
     "Off", "1 second", "2 seconds", "3 seconds", "4 seconds", "5 seconds",
     "6 seconds", "7 seconds", "8 seconds", "9 seconds", "10 seconds",

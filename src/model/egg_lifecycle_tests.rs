@@ -113,6 +113,68 @@ fn seeded_selection_reaches_every_enabled_area_evenly() {
     }
 }
 
+fn spawn_with_paths(paths: u8, seed: u32, blast: Option<Rect>) -> Run {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], seed);
+    run.configure(paths, 0);
+    if let Some(blast) = blast {
+        run.set_blast(blast);
+    }
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    assert!(run.egg_at().is_some());
+    run
+}
+
+#[test]
+fn egg_paths_draw_includes_pop_up_alongside_axe() {
+    let blast = Some([[-145.0, -100.0], [140.0, 125.0]]);
+    let mask = 0b1_0001;
+    let axe = spawn_with_paths(mask, 7, blast);
+    let popup = spawn_with_paths(mask, 1200, blast);
+    assert!(matches!(axe.path, Some(Path::Axe)));
+    assert!(popup.path.is_none(), "the fifth checked cell should select Pop up");
+}
+
+#[test]
+fn all_five_egg_paths_are_reached_evenly_on_spawn() {
+    let mut counts = [0u32; 5];
+    const SAMPLES: u32 = 5_000;
+    let blast = Some([[-145.0, -100.0], [140.0, 125.0]]);
+    for index in 0..SAMPLES {
+        let seed = index.wrapping_mul(0x9e37_79b9);
+        let run = spawn_with_paths(0b1_1111, seed, blast);
+        let chosen = match run.path {
+            Some(Path::Axe) => 0,
+            Some(Path::Galaxian) => 1,
+            Some(Path::Boomerang) => 2,
+            Some(Path::Missile) => 3,
+            None => 4,
+        };
+        counts[chosen] += 1;
+    }
+    assert!(counts.iter().all(|&count| count.abs_diff(SAMPLES / 5) <= 100), "{counts:?}");
+}
+
+#[test]
+fn egg_paths_pop_up_only_matches_empty_flight_and_geometry_queries() {
+    let [mut empty, mut popup] = [0, 0b1_0000].map(|paths| spawn_with_paths(paths, 7, None));
+    for run in [&empty, &popup] {
+        assert!(!run.uses_paths());
+        assert!(!run.wants_blast());
+        assert!(!run.wants_zone());
+    }
+    assert_eq!(empty.egg_at(), popup.egg_at());
+    for _ in 0..150 {
+        for run in [&mut empty, &mut popup] {
+            run.step(true, 0.0, &[], false, 0);
+        }
+        assert_eq!(empty.egg_at(), popup.egg_at());
+    }
+}
+
 fn cpu_at_deadline() -> Run {
     let mut run = Run::IDLE;
     run.start([FREE, ANY, NORMAL, CPU, IN_VIEW], 19);

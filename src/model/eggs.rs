@@ -21,6 +21,9 @@ pub const WHOLE: u8 = 1;
 pub const OFF_STAGE: u8 = 2;
 pub const ROW_PATHS: &str = "eggsercise_paths";
 pub const ROW_EXPIRY: &str = "eggsercise_expiry";
+// Checklist bits 0–3 use projectile flight. Index 4 uses the original Pop up flight.
+const MOVING_PATHS: u8 = 0b1111;
+const POP_UP_PATH: u8 = 1 << 4;
 
 /// Encode checklist cells without losing additional checked options.
 pub fn checklist(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
@@ -463,7 +466,7 @@ impl Run {
     }
 
     pub fn configure(&mut self, paths: u8, seconds: u8) {
-        self.paths = paths & 0b1111;
+        self.paths = paths & (MOVING_PATHS | POP_UP_PATH);
         self.expiry = u16::from(seconds.min(10)) * 60;
     }
 
@@ -498,7 +501,7 @@ impl Run {
     }
 
     pub fn wants_blast(&self) -> bool {
-        self.paths != 0 && self.blast.is_none()
+        self.uses_paths() && self.blast.is_none()
     }
 
     pub fn set_zone(&mut self, zone: Zone) {
@@ -517,7 +520,7 @@ impl Run {
     }
 
     pub fn uses_paths(&self) -> bool {
-        self.paths != 0
+        self.paths & MOVING_PATHS != 0
     }
 
     pub fn set_blast(&mut self, blast: Rect) {
