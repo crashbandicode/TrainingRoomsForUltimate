@@ -36,7 +36,6 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Pit",
         "Dark Pit",
         "PAC-MAN",
-        "Bayonetta",
         "Sonic",
         "Peach",
         "Daisy",
@@ -60,10 +59,12 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Pichu",
         "Link",
         "Mario",
+        "Ness",
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {
-        assert_eq!(usize::from(row.id), index + 1);
+        let expected_id = index + 1 + usize::from(index >= 21);
+        assert_eq!(usize::from(row.id), expected_id);
         let kind = CHOICES
             .iter()
             .find_map(|&(kind, name)| (name == fighter).then_some(kind))
@@ -515,20 +516,9 @@ fn niche_pac_man_pac_jump_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_bayonetta_twists_once_per_jump() {
-    // One Witch Twist per jump (SmashWiki "Bayonetta (SSBU)/Up special"): the double jump sits between the two.
-    let twists = [
-        Move::Hold,
-        Move::Travel,
-        Move::Jump,
-        Move::Travel,
-        Move::Side,
-    ];
-    verify(0x40, "cross", 22, &twists);
-    assert!(tested_row(22)
-        .moves
-        .windows(2)
-        .all(|pair| pair != [Move::Travel, Move::Travel] && pair != [Move::Side, Move::Travel]));
+fn bayonetta_crossing_is_inactive_on_the_candidate() {
+    assert!(super::measured_row(22, CANDIDATE_ROWS).is_none());
+    assert!(select(facts(0x40, "cross"), CANDIDATE_ROWS).is_none());
 }
 
 #[test]
@@ -774,7 +764,7 @@ fn niche_crossing_rows_decline_an_infeasible_budget() {
             );
         }
     }
-    assert_eq!(crossings, 20);
+    assert_eq!(crossings, 19);
 }
 
 #[test]

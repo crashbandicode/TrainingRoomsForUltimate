@@ -77,6 +77,7 @@ enum Intent {
     FakeOut,
     OilStall,
     CapeStall,
+    ThunderReturn,
     HaymakerGap,
     CounterContact,
     WhipGap,
@@ -105,6 +106,7 @@ impl Row {
             | Intent::FakeOut
             | Intent::OilStall
             | Intent::CapeStall
+            | Intent::ThunderReturn
             | Intent::HaymakerGap
             | Intent::CounterContact
             | Intent::WhipGap
@@ -187,7 +189,7 @@ impl Row {
                 Intent::NearAbove => facts.short && facts.climb <= 0.0,
                 Intent::CounterContact => facts.counter_contact,
                 // A direct up special uses the generic route. The fake-out needs its baked cells.
-                Intent::GenericUp | Intent::FakeOut | Intent::OilStall | Intent::CapeStall => false,
+                Intent::GenericUp | Intent::FakeOut | Intent::OilStall | Intent::CapeStall | Intent::ThunderReturn => false,
                 intent => {
                     let travel = self.measured().map(|(_, travel)| travel);
                     facts.near.is_some_and(|near| intent.matches_near(near, facts.short, travel))
@@ -258,8 +260,6 @@ const ROWS: [Row; 45] = [
     Row::new(19, 0x1e, Intent::Across, &[Hold, Travel]),
     Row::new(20, 0x1f, Intent::Across, &[Hold, Travel]),
     Row::new(21, 0x37, Intent::Across, &[Side, Jump, Rise]),
-    // One Witch Twist per jump: the second needs the double jump between.
-    Row::new(22, 0x40, Intent::Across, &[Hold, Travel, Jump, Travel, Side]),
     Row::new(super::sonic::ROW, super::sonic::KIND, Intent::Across, &[Side, Jump, Rise]),
     Row::new(24, 0xd, Intent::Across, &[Float, Hold, Rise]),
     Row::new(25, 0xe, Intent::Across, &[Float, Hold, Rise]),
@@ -284,6 +284,7 @@ const ROWS: [Row; 45] = [
     Row::new(43, 0x13, Intent::FakeOut, &[Jump, QuickAttack]),
     Row::new(super::link::ROW, super::link::KIND, Intent::Across, &[Bomb, Jump, Rise]),
     Row::new(super::mario::ROW, super::mario::KIND, Intent::CapeStall, &[Side]),
+    Row::new(super::ness::ROW, super::ness::KIND, Intent::ThunderReturn, &[Bolt]),
 ];
 
 const fn row_mask(extensions_only: bool) -> u64 {

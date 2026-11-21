@@ -622,6 +622,7 @@ impl Wizard {
             Some((Area::LowerLeft, [20.0, -4.0]))
         } else if drill == Drill::GuardEdge && perfect::is_crossing_stage(stage_key) {
             match fighter {
+                Some(perfect::ness::KIND) => perfect::ness::wizard_offset(stage_key).map(|offset| (Area::LowerLeft, offset)),
                 Some(perfect::sonic::KIND) => Some((Area::UpperLeft, perfect::sonic::WIZARD_OFFSET)),
                 Some(perfect::steve::KIND) => Some((Area::UpperLeft, [18.0, 30.0])),
                 Some(perfect::pyra::PYRA) => Some((Area::LowerLeft, [104.0, -50.0])),

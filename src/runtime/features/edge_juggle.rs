@@ -837,6 +837,7 @@ unsafe fn route_guide(
     speed: [f32; 2],
     special: Option<perfect::SpecialReach>,
     player_top: f32,
+    ness_ns1: bool,
 ) -> Option<RecoveryGuide> {
     let read_outline = || {
         let (midpoint, limits) =
@@ -895,6 +896,17 @@ unsafe fn route_guide(
             (jump_rise + special_rise + speed[1].max(0.0)).max(f32::EPSILON),
         ],
     };
+    if ness_ns1 {
+        if let Some(guide) = niche_pad::NicheGuide::prepare_ns1(cpu, p1, &facts, run.rounds.frames, speed, jumps) {
+            let row = guide.selected_niche_row();
+            run.route_history.planned(row.route);
+            planner_chose(route_code(row.route), fighter as u32, 0, row.id.into());
+            run.niche = Some(guide);
+        } else {
+            planner_chose(4, fighter as u32, 0, 0);
+        }
+        return None;
+    }
     let [near, high, low] = perfect::possible_routes(&facts);
     let (near_ledge, inward) = if pos[0] <= left[0].midpoint(right[0]) {
         (left, 1.0)
@@ -1083,6 +1095,11 @@ unsafe fn recovery_snapshot(ai: usize) -> Option<(usize, bool)> {
 }
 
 unsafe fn special_reach(ai: usize, snapshot: usize) -> Option<perfect::SpecialReach> {
+    let (_, reach) = read_special_reach(ai, snapshot)?;
+    reach.valid().then_some(reach)
+}
+
+unsafe fn read_special_reach(ai: usize, snapshot: usize) -> Option<(i32, perfect::SpecialReach)> {
     use crate::engine::seams::native_fields as field;
     if !SPECIAL_TABLE.load(Ordering::Acquire) {
         return None;
@@ -1096,7 +1113,7 @@ unsafe fn special_reach(ai: usize, snapshot: usize) -> Option<perfect::SpecialRe
         horizontal: field::read_unchecked(ai, 0xae0 + at),
         rise: field::read_unchecked(ai, 0xad0 + at),
     };
-    reach.valid().then_some(reach)
+    Some((variant, reach))
 }
 
 unsafe fn last_dodge_reach(snapshot: usize, cpu: usize) -> perfect::DodgeReach {
@@ -1156,9 +1173,13 @@ unsafe fn recovery_pad(
             run.plan_pending = run.route_watch.observe_guarder(zone, run.rounds.frames);
         }
     }
-    let special = recovery
+    let envelope = recovery
         .filter(|&(_, available)| available)
-        .and_then(|(snapshot, _)| special_reach(ai, snapshot));
+        .and_then(|(snapshot, _)| read_special_reach(ai, snapshot));
+    let special = envelope.filter(|&(_, reach)| reach.valid()).map(|(_, reach)| reach);
+    let ness_ns1 = envelope.is_some_and(|(variant, reach)| {
+        perfect::ness::measured_envelope(kind, variant, reach)
+    });
     if run.plan_pending {
         run.guide = None;
         if let Some(player_height) = run.player_height.take() {
@@ -1166,12 +1187,12 @@ unsafe fn recovery_pad(
             let plan = match (player_height, recovery, special) {
                 (None, _, _) => Err(PlanInput::PlayerHeight),
                 (Some(_), None, _) => Err(PlanInput::Snapshot),
-                (Some(_), Some((_, true)), None) => Err(PlanInput::SpecialEnvelope),
+                (Some(_), Some((_, true)), None) if !ness_ns1 => Err(PlanInput::SpecialEnvelope),
                 (Some(top), Some(_), reach) => Ok((top, reach)),
             };
             match plan {
                 Ok((top, reach)) => {
-                    run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top);
+                    run.guide = route_guide(run, p1, cpu, physics, pos, speed, reach, top, ness_ns1);
                     if run.niche.is_some() {
                         return niche_correction(run, ai, cpu, p1, pos, natives::status_kind(cpu), stock);
                     }
@@ -1179,6 +1200,9 @@ unsafe fn recovery_pad(
                 Err(input) => planner_unavailable(input),
             }
         }
+    }
+    if kind == perfect::ness::KIND && special.is_none() && !matches!(recovery, Some((_, false))) {
+        return Correction::default();
     }
     if kind == game_watch::KIND && run.oil_stall.due(run.rounds.frames) {
         let ledge = if pos[0] < left[0] { Some(left) } else { (pos[0] > right[0]).then_some(right) };

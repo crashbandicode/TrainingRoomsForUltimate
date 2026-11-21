@@ -2,7 +2,7 @@
 
 use super::{
     airborne_recovery, attack_reaches_core, konst, natives, perfect,
-    recovery_snapshot, remaining_jumps, special_reach, state, C, UNRESOLVED,
+    read_special_reach, recovery_snapshot, remaining_jumps, special_reach, state, C, UNRESOLVED,
 };
 use crate::{
     model::{sites_pkg2, sites_pkg3},
@@ -16,6 +16,7 @@ use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
 use perfect::lucario::{self, AuraFlight, AuraSample};
 use perfect::mario::{self, CapeBeat, CapeStall};
+use perfect::ness::{self, ThunderBeat, ThunderReturn};
 use perfect::recovery::Zone;
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::olimar::{self, OlimarBeat, OlimarFlight};
@@ -57,6 +58,7 @@ enum MeasuredFlight {
     Link(LinkFlight),
     Cypher(CypherFlight),
     SpinDash(SonicFlight),
+    ThunderReturn(ThunderReturn),
     Cape(CapeStall),
     Aura(AuraFlight),
     Hydro(HydroFlight),
@@ -80,6 +82,37 @@ pub(super) struct RowInputs {
 }
 
 impl NicheGuide {
+    pub(super) unsafe fn prepare_ns1(
+        cpu: usize,
+        p1: usize,
+        facts: &RouteFacts<'_>,
+        frame: u32,
+        speed: Point,
+        jumps: u8,
+    ) -> Option<Self> {
+        let row = niche::measured_row(ness::ROW, niche::CANDIDATE_ROWS)?;
+        if !ns1_guarder_waiting(p1) || natives::damage(cpu, 0) != 0.0 {
+            return None;
+        }
+        let flight = ThunderReturn::start(facts, ThunderBeat {
+            frame,
+            status: natives::status_kind(cpu),
+            position: facts.position,
+            velocity: speed,
+            facing: natives::lr(cpu),
+            jumps,
+            can_jump: niche_start_enabled(cpu, Move::Jump, true),
+            can_thunder: niche_start_enabled(cpu, Move::Bolt, true),
+        })?;
+        Some(Self {
+            sequence: Sequence::new(row),
+            fighter: ness::KIND,
+            ledge: facts.ledges[0],
+            measured: Some(MeasuredFlight::ThunderReturn(flight)),
+            body_clearance: facts.body_clearance,
+        })
+    }
+
     /// The fighter's row for this plan with its spare climb. The caller rolls a crossing among
     /// the routes; an extension row is a need.
     pub(super) unsafe fn prepare_niche(
@@ -703,6 +736,31 @@ impl NicheGuide {
             return None;
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
+        if let Some(MeasuredFlight::ThunderReturn(flight)) = &mut self.measured {
+            let (variant, reach) = read_special_reach(ai, snapshot)?;
+            let kind = natives::fighter_kind(cpu)?;
+            if !ness::measured_envelope(kind, variant, reach)
+                || !game::granted(sites_pkg2::TRANSITION_TERM_HOOK_OFFSET)
+            {
+                return None;
+            }
+            let pre_cast = flight.awaits_cast(frame);
+            if pre_cast && (!ns1_guarder_waiting(p1)
+                || !flight.still_clear([natives::pos_x(p1), natives::pos_y(p1)]))
+            {
+                return None;
+            }
+            return flight.step(ThunderBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [0.0; 2],
+                facing: if pre_cast { natives::lr(cpu) } else { 0.0 },
+                jumps: if pre_cast { remaining_jumps(cpu)? } else { 0 },
+                can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
+                can_thunder: flight.cast_press(frame) && available && niche_start_enabled(cpu, Move::Bolt, true),
+            });
+        }
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
         if let Some(MeasuredFlight::Swap(flight)) = &mut self.measured {
             let fighter = natives::fighter_kind(cpu)?;
@@ -1135,6 +1193,13 @@ fn normalized_stick([x, y]: Point) -> Point {
     } else {
         [0.0, 1.0]
     }
+}
+
+unsafe fn ns1_guarder_waiting(p1: usize) -> bool {
+    let ground = konst(C::SituationGround);
+    let wait = konst(C::StatusWait);
+    ground != UNRESOLVED && wait != UNRESOLVED
+        && natives::situation_kind(p1) == ground && natives::status_kind(p1) == wait
 }
 
 pub(super) unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {

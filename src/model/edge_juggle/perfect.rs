@@ -22,6 +22,8 @@ pub mod link;
 pub mod mario;
 #[path = "perfect/lucario.rs"]
 pub mod lucario;
+#[path = "perfect/ness.rs"]
+pub mod ness;
 #[path = "perfect/niche.rs"]
 pub mod niche;
 #[path = "perfect/olimar.rs"]

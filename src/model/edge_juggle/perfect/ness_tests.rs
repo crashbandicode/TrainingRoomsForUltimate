@@ -1,0 +1,233 @@
+use super::*;
+use crate::model::edge_juggle::perfect::{Segment, JUMP, SPECIAL};
+
+const NEAR: Point = [-79.9856, 0.0];
+const LEDGES: [Point; 2] = [NEAR, [79.989, 0.0]];
+const OUTLINE: [Segment; 5] = [
+    [[-79.986, -8.319], [-64.395, -25.111]],
+    [[-64.395, -25.111], [-41.396, -40.099]],
+    [[-41.396, -40.099], [41.416, -40.118]],
+    [[41.416, -40.118], [64.387, -25.103]],
+    [[64.387, -25.103], [79.989, -8.319]],
+];
+
+fn fixture(stage: i32, out: f32, below: f32) -> (RouteFacts<'static>, ThunderBeat) {
+    let position = [NEAR[0] - out, -below];
+    let facts = RouteFacts {
+        fighter: 0x0a,
+        stage: (stage, 0),
+        position,
+        player: [-75.0, 0.010259508],
+        player_reach: 10.0,
+        ledges: LEDGES,
+        blast: [-230.0, 230.0, 180.0, -140.0],
+        outline: &OUTLINE,
+        body_clearance: 8.0,
+        ledge_distance: 8.0,
+        fall_budget: 1.31,
+        reach: [0.0; 2],
+    };
+    let beat = ThunderBeat {
+        frame: 0,
+        status: 0xe,
+        position,
+        velocity: [0.0; 2],
+        facing: 1.0,
+        jumps: 1,
+        can_jump: true,
+        can_thunder: true,
+    };
+    (facts, beat)
+}
+
+#[test]
+fn ness_offers_the_proven_near_side_programs_with_both_native_resources() {
+    for (stage, starts) in [
+        (
+            3,
+            &[
+                (20.0, 28.0),
+                (84.0, 88.0),
+                (120.0, 108.0),
+            ][..],
+        ),
+        (0, &[(20.0, 28.0), (84.0, 88.0)][..]),
+        (311, &[(20.0, 28.0), (84.0, 88.0)][..]),
+    ] {
+        for &(out, below) in starts {
+            let (mut facts, release) = fixture(stage, out, below);
+            assert!(
+                ThunderReturn::start(&facts, release).is_some(),
+                "{stage} {out} {below}"
+            );
+            let no_up = ThunderBeat {
+                can_thunder: false,
+                ..release
+            };
+            assert!(ThunderReturn::start(&facts, no_up).is_none());
+            let no_jump = ThunderBeat {
+                jumps: 0,
+                ..release
+            };
+            assert!(ThunderReturn::start(&facts, no_jump).is_none());
+            let away = ThunderBeat {
+                facing: -1.0,
+                ..release
+            };
+            assert!(ThunderReturn::start(&facts, away).is_none());
+            facts.player = [0.0, 0.0];
+            assert!(ThunderReturn::start(&facts, release).is_none());
+        }
+        for (out, below) in [(20.0, 56.0), (44.0, 40.0), (56.0, 72.0), (120.2, 108.2)] {
+            let (facts, release) = fixture(stage, out, below);
+            assert!(ThunderReturn::start(&facts, release).is_none());
+        }
+    }
+    let (facts, release) = fixture(11, 20.0, 28.0);
+    assert!(ThunderReturn::start(&facts, release).is_none());
+}
+
+#[test]
+fn ness_deep_route_replays_both_jump_presses_then_casts_the_measured_loop() {
+    let (facts, base) = fixture(3, 120.0, 108.0);
+    let mut flight = ThunderReturn::start(&facts, base).expect("FD deep reference");
+    for (frame, status, x, y, vx, vy, jumps, press, stick) in [
+        (0, 0xe, -199.986, -108.0, 0.0, 0.0, 1, 0, [0.0, 0.0]),
+        (4, 0xe, -199.986, -108.770, 0.0, -0.308, 1, JUMP, [1.0, 0.0]),
+        (5, 0xc, -199.886, -109.155, 0.1, -0.385, 0, JUMP, [1.0, 0.0]),
+        (54, 0xc, -149.637, -65.785, 0.889, -0.618, 0, 0, [1.0, 0.0]),
+        (
+            55,
+            0xc,
+            -148.7692,
+            -66.4798,
+            0.8675,
+            -0.6947,
+            0,
+            SPECIAL,
+            [0.0, 1.0],
+        ),
+        (
+            56,
+            0x1de,
+            -147.9224,
+            -67.2483,
+            0.8468,
+            -0.7685,
+            0,
+            SPECIAL,
+            [0.0, 1.0],
+        ),
+        (
+            75,
+            0x1e4,
+            -144.1488,
+            -67.2483,
+            0.0,
+            0.0,
+            0,
+            0,
+            [-118.0 / 120.0, -21.0 / 120.0],
+        ),
+        (
+            112,
+            0x1e6,
+            -144.1488,
+            -73.6743,
+            0.0,
+            -0.459,
+            0,
+            0,
+            [104.0 / 120.0, 0.5],
+        ),
+    ] {
+        let beat = ThunderBeat {
+            frame,
+            status,
+            position: [x, y],
+            velocity: [vx, vy],
+            jumps,
+            ..base
+        };
+        let pad = flight.step(beat).unwrap_or_else(|| panic!("step {frame}"));
+        assert_eq!(
+            (pad.press, pad.stick),
+            (press, Some(stick)),
+            "frame {frame}"
+        );
+    }
+    let mut lost = ThunderReturn::start(&facts, base).unwrap();
+    let impact = ThunderBeat {
+        frame: 55,
+        status: 0x48,
+        ..base
+    };
+    assert!(lost.step(impact).is_none());
+}
+
+#[test]
+fn only_ness_variant_zero_can_substitute_the_measured_sentinel() {
+    let sentinel = SpecialReach {
+        horizontal: -1.0,
+        rise: 46.0,
+    };
+    assert!(!sentinel.valid());
+    assert!(measured_envelope(KIND, 0, sentinel));
+    for (kind, variant, horizontal, rise) in [
+        (0x28, 0, -1.0, 46.0),
+        (KIND, 1, -1.0, 46.0),
+        (KIND, 0, -2.0, 46.0),
+        (KIND, 0, -1.0, 78.0),
+        (KIND, 0, f32::NAN, 46.0),
+        (KIND, 0, -1.0, f32::INFINITY),
+    ] {
+        assert!(!measured_envelope(
+            kind,
+            variant,
+            SpecialReach { horizontal, rise }
+        ));
+    }
+}
+
+#[test]
+fn ness_leading_fall_is_anchored_to_the_native_release_and_lost_cast_returns_stock() {
+    let (mut facts, mut beat) = fixture(3, 20.0, 28.0);
+    beat.frame = 3;
+    beat.position[1] -= drop(3);
+    beat.velocity[1] = -3.0 * GRAVITY;
+    facts.position = beat.position;
+    let mut flight = ThunderReturn::start(&facts, beat).unwrap();
+    assert_eq!(flight.step(beat).unwrap().press, 0);
+    assert!(!flight.still_clear([0.0, 0.0]));
+    beat.frame = 4;
+    beat.position[1] = -28.0 - drop(4);
+    beat.can_thunder = false;
+    assert!(flight.step(beat).is_none());
+}
+
+#[test]
+fn ness_deep_fixture_is_a_shared_stage_specific_wizard_default() {
+    use crate::model::edge_juggle::{Area, Drill, Stage, Wizard};
+    let stage = Stage::new(
+        [-230.0, 230.0, 180.0, -140.0],
+        [-210.0, 210.0, 160.0, -130.0],
+        LEDGES,
+    )
+    .unwrap();
+    for (key, expected) in [
+        ((3, 0), [120.0, -108.0]),
+        ((0, 0), [84.0, -88.0]),
+        ((311, 0), [84.0, -88.0]),
+    ] {
+        let mut wizard =
+            Wizard::new(Drill::GuardEdge, stage, [-75.0, 0.0], 0, key, Some(KIND)).unwrap();
+        for _ in 0..4 {
+            if wizard.setup.area == Area::LowerLeft {
+                break;
+            }
+            wizard.change_area(stage, 1);
+        }
+        assert_eq!(wizard.setup.area, Area::LowerLeft);
+        assert_eq!(wizard.setup.cpu, [NEAR[0] - expected[0], expected[1]]);
+    }
+}
