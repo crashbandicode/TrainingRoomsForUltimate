@@ -74,6 +74,7 @@ const BOUNDARIES: &[Boundary] = &[
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
     Boundary { function: "niche_pad::link_bomb_phase", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
+    Boundary { function: "niche_pad::owned_link_bomb", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
     Boundary { function: "state_restore::olimar_pikmin_count", owner: None, gate: Gate::Flag("olimar_reads_granted") },
     Boundary { function: "startup_dodge::covers_contact", owner: None, gate: Gate::Flag("forecast_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
