@@ -83,6 +83,50 @@ pub const fn step_mask(style: u32) -> u32 {
     }
 }
 
+/// rc.15 review (tr-primary-2, 2026-11-21 16:55Z and 17:38Z): the step button's raw bits Player 1's poll takes out of
+/// the controller for the game's own reader: all of it while the speed hold is open, and the step button of a chord
+/// that passed (`owned`, the detector's kept buttons: Save State's ZL) until that button is let go. Neither ever steps.
+pub const fn step_take(style: u32, hold_open: bool, owned: u32) -> u32 {
+    step_mask(style) & if hold_open { u32::MAX } else { owned }
+}
+
+/// The step bits the last poll took out of the controller's current set while they were down. The game's reader
+/// (`FUN_0177e8f0`: Training's step at `.1556a78`/`.1556ae0`, a press is `just_down & current`, a hold `current`) runs
+/// after the mapping call, so the bits are not put back; the pause check (`.1558e20`) is the same reader, kept from
+/// Plus by its edges alone, but Training also reads the hold.
+///
+/// With the bit gone from the current set, the next poll can't read "still down" there. Its just-down bit says it
+/// instead: the poll leaves it set, and the game's refresh sets it again as long as the button is down (a press
+/// rebuilt from the cleared current set, 6e226733) and clears it once the button is up. A poll that runs again before
+/// a refresh (6e226733's trace has two) reads the same.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StepKeep(pub u32);
+
+impl StepKeep {
+    /// The current and just-down sets as the button is: a kept bit still down is held, never a new press.
+    pub const fn seen(self, current: u32, just_down: u32) -> (u32, u32) {
+        let down = (current | just_down) & self.0;
+        (current | down, just_down & !down)
+    }
+
+    /// One poll: `sets` are the controller's four button sets as found (`chords::field::BUTTONS`), `take` is
+    /// `step_take`. The sets to leave in the controller, and what is kept now. A bit no longer taken goes back as
+    /// held without a press.
+    pub const fn keep(self, [current, previous, just_down, just_release]: [u32; 4], take: u32) -> (Self, [u32; 4]) {
+        let (held, pressed) = self.seen(current, just_down);
+        let kept = take & held;
+        (Self(kept), [held & !take, previous & !take, pressed & !take | kept, just_release & !take])
+    }
+}
+
+/// The lobby's step input by the native reader's rules (a press is `pressed & held`), on the sets as `StepKeep::seen`
+/// reads them, without `kept`: what the poll takes (`step_take`) and the raw buttons the chord stage keeps from the
+/// game on this poll. A chord's step button is neither a press nor a hold.
+pub const fn step_input(style: u32, held: u32, pressed: u32, kept: u32) -> (bool, bool) {
+    let mask = step_mask(style) & !kept;
+    (pressed & held & mask != 0, held & mask != 0)
+}
+
 /// rc.15: every row 1 Frame relies on (group `speed_frame`, plus the `lobby_speed` entry rows the hold reads): all must
 /// pass at boot or the bind offers no 1 Frame and the hold is not installed.
 pub const FRAME_ROWS: [&str; 16] = [

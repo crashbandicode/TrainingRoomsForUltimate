@@ -15,8 +15,11 @@ waiting-room practice.
 
 The scale's slowest step is 1 Frame, one step left of 1/4: 1 Frame, 1/4, 1/2, 2/3, x1, x1.5. At 1 Frame the game
 holds still. Each press of ZL (L on a GameCube controller) moves it one frame. Hold the button and the game runs from
-the 18th frame on, until you let go. This is the same button Training uses for its 1 Frame. While you hold the speed
-chord, ZL doesn't step.
+the 18th frame on, until you let go. This is the same button Training uses for its 1 Frame.
+
+While you hold the speed chord, ZL doesn't step and doesn't reach the game. If ZL is still down when you let go of the
+chord, it counts as held, not as a new press. A ZL that is part of another chord never steps, however long you hold
+it: D-pad Down + ZL saves a state and the game stays on its frame.
 
 While you hold the chord, D-pad Left and Right don't reach the game and no other chord fires, so ZL + D-pad Left can't
 cycle the CPU by accident. The chord doesn't work while a menu is open (this one or the game's pause menu).

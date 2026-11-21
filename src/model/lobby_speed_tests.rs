@@ -5,7 +5,7 @@ lib_unit_tests! {
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
-use super::super::game_speed::{fresh_table, table, Held, LobbyNow, LobbySlot, LobbyStep, Speed};
+use super::super::game_speed::{fresh_table, table, Held, HoldEvent, LobbyNow, LobbySlot, LobbyStep, Speed};
 use super::*;
 
 // --- plans -----------------------------------------------------------------------------------------------------------
@@ -544,6 +544,142 @@ fn a_step_press_under_the_speed_hold_is_not_a_frame_step() {
     assert_eq!([step_mask(0), step_mask(8)], [0, 0]);
 }
 
+/// P1's controller under 1 Frame. The game's refresh makes the four button sets (current, previous, just down, just
+/// released; each edge from the current set as the last poll left it). P1's poll follows as `chords::on_poll` composes
+/// it: the detector on the sets `StepKeep` reads, the lobby's step input, the step button taken out of the sets. Then
+/// Training's mode object reads the step button from the sets left (`.1556a78` newly pressed, `.1556ae0` held) and
+/// counts by the rule the lobby copies (`FrameStep`).
+#[derive(Default)]
+struct Pad {
+    style: u32,
+    sets: [u32; 4],
+    detector: crate::model::chords::Detector,
+    keep: StepKeep,
+    lobby: FrameStep,
+    training: FrameStep,
+}
+
+/// What one poll did: the speed hold's event, a lobby frame due, a Training update run.
+type Polled = (HoldEvent, bool, bool);
+const NO_STEP: Polled = (HoldEvent::Idle, false, false);
+const STEP: Polled = (HoldEvent::Idle, true, true);
+
+impl Pad {
+    fn new(style: u32) -> Self {
+        Self { style, ..Self::default() }
+    }
+
+    fn update(&mut self, hw: u32) -> Polled {
+        let was = self.sets[0];
+        self.sets = [hw, was, hw & !was, !hw & was];
+        self.poll()
+    }
+
+    /// The poll alone: the same controller once more before the next refresh (6e226733's trace has such polls).
+    fn poll(&mut self) -> Polled {
+        use crate::model::chords::{physical_mask, ChordSet, Sample};
+        let (held, pressed) = self.keep.seen(self.sets[0], self.sets[2]);
+        self.detector.poll(&ChordSet::factory(), Sample::of(self.style, held, pressed), false);
+        let event = self.detector.hold_event();
+        let open = matches!(event, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
+        let take = step_take(self.style, open, physical_mask(self.style, self.detector.hidden()));
+        let (pressed, held) = step_input(self.style, held, pressed, take);
+        self.lobby.poll(pressed, held, open);
+        (self.keep, self.sets) = self.keep.keep(self.sets, take);
+        let ([current, _, just_down, _], step) = (self.sets, step_mask(self.style));
+        self.training.poll(just_down & current & step != 0, current & step != 0, false);
+        (event, self.lobby.take(), self.training.take())
+    }
+
+    /// `updates` refreshes with `hw` held, every third polled twice: the first update that stepped, if any.
+    fn hold(&mut self, hw: u32, updates: usize) -> Option<usize> {
+        (1..=updates).find(|n| {
+            let once = self.update(hw);
+            let twice = if n % 3 == 0 { self.poll() } else { NO_STEP };
+            once.1 || once.2 || twice.1 || twice.2
+        })
+    }
+}
+
+fn a_plain_step_press_steps_the_lobby_once() {
+    use crate::model::chords::bit;
+    // ZL on a Pro Controller, the L trigger on a GameCube pad: nobody's chord, one frame per press, here and in Training.
+    for (style, button) in [(5, bit::ZL), (7, bit::L)] {
+        let mut pad = Pad::new(style);
+        assert_eq!(pad.update(button), STEP, "style {style}: the press steps");
+        assert_eq!((pad.detector.hidden(), pad.keep), (0, StepKeep(0)));
+        assert_eq!(pad.update(button), NO_STEP, "style {style}: held, one frame");
+        assert_eq!(pad.update(0), NO_STEP);
+        assert_eq!(pad.update(button), STEP, "style {style}: the next press");
+        assert_eq!(pad.sets, [button, 0, button, 0], "a plain step button stays the game's");
+    }
+}
+
+/// A plain held ZL is still the game's: Training repeats by its own count, and so does the lobby.
+fn a_plain_held_step_button_still_runs_from_the_eighteenth_update() {
+    use crate::model::chords::bit::ZL;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(ZL), STEP);
+    let ran: Vec<Polled> = (0..30).map(|_| pad.update(ZL)).collect();
+    let run = usize::from(HOLD_RUN) - 1;
+    assert!(ran[..run].iter().all(|polled| *polled == NO_STEP));
+    assert!(ran[run..].iter().all(|polled| *polled == STEP), "from the 18th held update on, every update");
+    assert_eq!((pad.sets, pad.keep), ([ZL, ZL, 0, 0], StepKeep(0)));
+}
+
+/// rc.15 review (tr-primary-2, 2026-11-21 17:38Z): a ZL that belongs to a chord never steps for as long as it is held.
+/// 2bd5445d took its edges only, so Training read the hold and ran from its 18th update.
+fn a_held_save_state_chord_never_steps() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    // The reviewer's replay of 985c79c6 (the save raised and a frame due together): Down held, ZL pressed.
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP, "the Save State chord must not step");
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(step_input(5, DOWN | ZL, ZL, 0), (true, true), "as 985c79c6 read it: a press");
+    assert_eq!(pad.poll(), NO_STEP, "polled again before the refresh");
+    // Held far past the run count: the mode object reads no ZL at all, and the chord stays one save.
+    assert_eq!(pad.hold(DOWN | ZL, 60), None);
+    assert_eq!((pad.sets[0], pad.sets[1], pad.keep), (DOWN, DOWN, StepKeep(ZL)));
+    // Down let go first: the ZL is the chord's until it is let go itself.
+    assert_eq!(pad.hold(ZL, 60), None);
+    assert!(!pad.detector.consume(Request::SaveState), "one save");
+    // Let go and pressed again with Down held: it saves again and doesn't step. All let go: a plain ZL steps.
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.keep, StepKeep(0));
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.update(0), NO_STEP);
+    assert_eq!(pad.update(ZL), STEP);
+}
+
+/// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, in Training or here.
+fn holding_the_speed_chord_never_steps() {
+    use crate::model::chords::bit::{DPAD_RIGHT as RIGHT, DPAD_UP as UP, R, ZL};
+    use crate::model::game_speed::Dir;
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    // R kept held: three ZL presses, then ZL held far past the run count.
+    for hw in [R | ZL, R, R | ZL, R, R | ZL, R] {
+        assert_eq!(pad.update(hw), (HoldEvent::Held, false, false));
+    }
+    assert_eq!(pad.hold(R | ZL, 60), None);
+    assert_eq!(pad.sets[0], R, "ZL is not in the current set the mode object reads");
+    assert_eq!(pad.update(R | ZL | RIGHT), (HoldEvent::Step(Dir::Right), false, false), "the hold still steps the speed");
+    // The chord let go with ZL still down: held from here (the game's count), never a new press.
+    assert_eq!(pad.update(ZL), (HoldEvent::Closed, false, false));
+    assert_eq!((pad.sets[0], pad.sets[2], pad.keep), (ZL, 0, StepKeep(0)));
+    let first = (2..=30).find(|_| pad.update(ZL) != NO_STEP);
+    assert_eq!(first, Some(usize::from(HOLD_RUN)), "the close was its first held update");
+    // Opened with ZL already down: taken from the poll the hold opens on.
+    pad.update(0);
+    assert_eq!(pad.update(R | ZL), STEP, "outside the hold ZL is the game's");
+    assert_eq!(pad.update(R | ZL | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.hold(R | ZL, 60), None);
+}
+
 fn the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice() {
     assert!(entry_holds(LOBBY_ENTRY, false));
     assert!(!entry_holds(LOBBY_ENTRY, true), "a due step runs the entry");
@@ -625,6 +761,10 @@ fn case_table() {
         ("the_lobby_step_lets_exactly_one_entry_run_per_press", the_lobby_step_lets_exactly_one_entry_run_per_press as fn()),
         ("holding_the_step_button_runs_from_the_eighteenth_poll", holding_the_step_button_runs_from_the_eighteenth_poll as fn()),
         ("a_step_press_under_the_speed_hold_is_not_a_frame_step", a_step_press_under_the_speed_hold_is_not_a_frame_step as fn()),
+        ("a_plain_step_press_steps_the_lobby_once", a_plain_step_press_steps_the_lobby_once as fn()),
+        ("a_plain_held_step_button_still_runs_from_the_eighteenth_update", a_plain_held_step_button_still_runs_from_the_eighteenth_update as fn()),
+        ("a_held_save_state_chord_never_steps", a_held_save_state_chord_never_steps as fn()),
+        ("holding_the_speed_chord_never_steps", holding_the_speed_chord_never_steps as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
         ("the_lobby_path_never_writes_the_update_rate_words", the_lobby_path_never_writes_the_update_rate_words as fn()),

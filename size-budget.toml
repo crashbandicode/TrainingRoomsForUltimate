@@ -2252,3 +2252,12 @@ ceiling = 187566
 date = "2026-11-21"
 reason = "merge_budget for 1 Frame 985c79c6 on the intermediate card d6074747. Measured normalized implementation 187566, +235 over the intermediate ceiling 187331, with zero spare. Intermediate release NRO 5124096 B and BSS 1720320 B. Standalone 1 Frame release NRO 5128192 B and BSS 1720320 B. The exact integrated release receipt records the combined NRO and BSS against the intermediate baseline."
 approved_by = "Operator via tr-primary-2 at 16:47Z authorized the exact merge budget under the rule that line count may grow when memory remains efficient and nothing is wasteful."
+
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187597
+date = "2026-11-21"
+reason = "merge_budget for the independently reviewed 1 Frame input-mask correction c07abb77 (including 2bd5445d) on ca42bf71. Exact normalized implementation delta +31 over 187566; zero spare. Paired integrated baseline NRO 5132288 B and BSS 1720320 B. The release-first exact gate and its retained ELF/NRO receipt remeasure both values for this merge."
+approved_by = "Operator 2026-11-21 17:09Z approved the integrated 8192 B NRO increase and authorized this follow-up. Primary tr-primary-2 directs a measured entry under the operator's rule that LOC may grow when memory stays efficient and the changes are not wasteful."
