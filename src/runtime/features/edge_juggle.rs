@@ -544,8 +544,9 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
             return niche_correction(run, ai, accessor, position, status, stock);
         }
         if run.oil_stall.active() {
+            // Transition terms may be unavailable in the active stance.
             if recovery_snapshot(ai).is_some_and(|(snapshot, available)| {
-                available && special_reach(ai, snapshot).is_some()
+                !available || special_reach(ai, snapshot).is_some()
             }) {
                 if let Some(pad) = run.oil_stall.sustain(status, run.rounds.frames) {
                     return stock.observe(pad, PerfectRule::Niche, run, 0, game_watch::ROW.into());
