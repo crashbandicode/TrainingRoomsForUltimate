@@ -84,7 +84,14 @@ const BATTLE_OBJECT_ID_FIELD: usize = 0x8;
 ///
 /// # Safety
 /// `accessor` belongs to a live Olimar body.
+fn olimar_reads_granted() -> bool {
+    crate::runtime::game::granted(crate::model::sites_pkg3::STATE_WORK_GET_INT64_OFFSET)
+}
+
 pub(super) unsafe fn olimar_pikmin_count(accessor: usize) -> Option<u8> {
+    if !olimar_reads_granted() {
+        return None;
+    }
     let manager = usize::try_from(n::work_get_int64(accessor, TROOPS_MANAGER_ID)).ok()?;
     if manager == 0 || !manager.is_multiple_of(std::mem::align_of::<u32>()) {
         return None;

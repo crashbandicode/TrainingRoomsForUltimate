@@ -74,6 +74,7 @@ const BOUNDARIES: &[Boundary] = &[
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
     Boundary { function: "niche_pad::link_bomb_phase", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
+    Boundary { function: "state_restore::olimar_pikmin_count", owner: None, gate: Gate::Flag("olimar_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
@@ -650,6 +651,25 @@ fn missing_pk_thunder_reads_leave_general_drill_ownership_available() {
         assert!(!granted.allows(row.offset), "{name} must stay ungranted");
         assert!(!offsets.iter().copied().all(|offset| granted.allows(offset)));
     }
+}
+
+#[test]
+fn a_missing_olimar_troop_read_declines_the_route_and_preserves_both_drills() {
+    let a = Analysis::new();
+    let row = capabilities::find("state_work_get_int64").expect("guarded WorkModule reader");
+    let read = a.graph.find("state_restore::olimar_pikmin_count")[0];
+    let check = &a.graph.funcs[a.graph.find("state_restore::olimar_reads_granted")[0]];
+    let (reached, _) = a.reach(read);
+    let expected = BTreeSet::from([row.offset]);
+    assert_eq!(a.own_offsets(check), expected);
+    assert_eq!(reached, expected);
+    let call = callgraph::lex("game::granted(");
+    assert!(check.body.windows(call.len()).any(|ts| ts == call));
+
+    let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+    let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+    assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
 }
 
 #[test]
