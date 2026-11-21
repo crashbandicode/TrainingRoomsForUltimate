@@ -2,6 +2,8 @@
 
 #[path = "perfect/fly.rs"]
 pub mod fly;
+#[path = "perfect/game_watch.rs"]
+pub mod game_watch;
 #[path = "perfect/niche.rs"]
 pub mod niche;
 #[path = "perfect/pichu.rs"]

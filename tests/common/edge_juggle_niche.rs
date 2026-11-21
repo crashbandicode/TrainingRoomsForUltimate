@@ -56,6 +56,8 @@ fn niche_roster_kinds_match_the_approved_plan() {
         "Mythra",
         "Mythra",
         "Pikachu",
+        "Mr. Game & Watch",
+        "Pichu",
     ];
     assert_eq!(super::ROWS.len(), fighters.len());
     for (index, (row, fighter)) in super::ROWS.iter().zip(fighters).enumerate() {

@@ -11,6 +11,7 @@ use crate::model::cpu::{
     rng::Rng,
     role::FighterKey,
 };
+use crate::model::edge_juggle::perfect::game_watch::{self, OilInputs, OilStall};
 use crate::model::edge_juggle::perfect::recovery::{
     self, Guarder, Hold, HoldFacts, LedgeWatch, Reach, Zone,
 };
@@ -111,6 +112,8 @@ struct Run {
     route_history: recovery::RouteHistory,
     guide: Option<RecoveryGuide>,
     niche: Option<niche_pad::NicheGuide>,
+    oil_stall: OilStall,
+    oil_draw: [u32; 2],
     last_cpu_status: i32,
     bounce: MeteorBounce,
     sdi_start: Option<u32>,
@@ -540,6 +543,19 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
         if run.niche.is_some() {
             return niche_correction(run, ai, accessor, position, status, stock);
         }
+        if run.oil_stall.active() {
+            if recovery_snapshot(ai).is_some_and(|(snapshot, available)| {
+                available && special_reach(ai, snapshot).is_some()
+            }) {
+                if let Some(pad) = run.oil_stall.sustain(status, run.rounds.frames) {
+                    return stock.observe(pad, PerfectRule::Niche, run, 0, game_watch::ROW.into());
+                }
+                run.plan_pending = true;
+            } else {
+                run.oil_stall.cancel();
+                return Correction::default();
+            }
+        }
         if !airborne_recovery(accessor, status) {
             return Correction::default();
         }
@@ -893,6 +909,10 @@ unsafe fn route_guide(
     run.route_watch.set_guarder_zone(zone);
     run.hold.replan();
     let reach = Reach::trusted(air, jumps != 0, special);
+    if fighter == game_watch::KIND && special.is_some() {
+        let [pick, timing] = run.oil_draw;
+        run.oil_stall.arm(zone, pick, timing);
+    }
     let deadline = reach.deadline(pos, speed, near_ledge, bottom);
     let mut row = None;
     if fighter != UNRESOLVED {
@@ -940,7 +960,7 @@ unsafe fn route_guide(
         if needed || chosen == Some(Route::Opposite) {
             Some(guide)
         } else if perfect::pikachu::fake_out_selected(chosen, zone, last, run.route_draw) {
-            guide.pikachu_fake_out()
+            guide.fake_out(pos, speed)
         } else {
             None
         }
@@ -1149,6 +1169,36 @@ unsafe fn recovery_pad(
                     }
                 }
                 Err(input) => planner_unavailable(input),
+            }
+        }
+    }
+    if kind == game_watch::KIND && run.oil_stall.due(run.rounds.frames) {
+        let ledge = if pos[0] < left[0] { Some(left) } else { (pos[0] > right[0]).then_some(right) };
+        if let (Some(ledge), Some(special)) = (ledge, special) {
+            let player = guarder.unwrap_or_else(|| [natives::pos_x(p1), natives::pos_y(p1)]);
+            let inward = (ledge[0] - pos[0]).signum();
+            let air = konst(C::SituationAir);
+            let can_start = air != UNRESOLVED && natives::situation_kind(cpu) == air
+                && natives::lr(cpu) == inward
+                && niche_pad::niche_start_enabled(cpu, perfect::niche::Move::Down, true)
+                && niche_pad::niche_start_enabled(cpu, perfect::niche::Move::Rise, true);
+            let zone = guarder_zone(p1, player, run.player_reach, ledge, pos);
+            if let Some(pad) = run.oil_stall.launch(OilInputs {
+                frame: run.rounds.frames,
+                status: natives::status_kind(cpu),
+                position: pos,
+                velocity: speed,
+                ledge,
+                player,
+                player_reach: run.player_reach,
+                zone,
+                reach: Reach::trusted(physics, false, Some(special)),
+                bottom: run.stage.blast()[3],
+                can_start,
+            }) {
+                planner_chose(route_code(Route::Near), kind as u32, 0, game_watch::ROW.into());
+                run.route_history.planned(Route::Near);
+                return stock.observe(pad, PerfectRule::Niche, run, 0, game_watch::ROW.into());
             }
         }
     }
@@ -1759,6 +1809,8 @@ pub unsafe fn frame(fighter: usize) {
             route_history: recovery::RouteHistory::default(),
             guide: None,
             niche: None,
+            oil_stall: OilStall::default(),
+            oil_draw: [0; 2],
             last_cpu_status: UNRESOLVED,
             bounce: MeteorBounce::default(),
             sdi_start: None,
@@ -1811,6 +1863,7 @@ pub unsafe fn frame(fighter: usize) {
     } else if run.body != body {
         run.body = body;
         run.route_history = recovery::RouteHistory::default();
+        run.oil_stall = OilStall::default();
         *held_cpu = None;
         run.rounds.restart_drill();
         run.placement = Placement::ResetResources;
@@ -1910,6 +1963,10 @@ pub unsafe fn frame(fighter: usize) {
         }
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.route_history.start();
+            if kind == game_watch::KIND && drill == Drill::GuardEdge && run.difficulty == Difficulty::Perfect {
+                run.oil_stall.next_attempt();
+                run.oil_draw = [rng.next_u32(), rng.next_u32()];
+            }
             run.landing_draw = rng.below(9);
             run.jump_delay = 0;
             run.route_draw = rng.next_u32();

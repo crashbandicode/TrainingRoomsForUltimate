@@ -4,6 +4,10 @@ use super::{
     aerial_clear, niche::pad, Correction, Outline, Point, RouteFacts, Segment, JUMP, SPECIAL,
 };
 
+#[path = "pichu_fake.rs"]
+mod fake;
+pub use fake::PichuFakeOut;
+
 const FALL: i32 = 0xe;
 const JUMP_AERIAL: i32 = 0xc;
 const BASH_START: i32 = 0x1dd;
@@ -27,6 +31,7 @@ pub struct PichuBeat {
 
 pub struct PichuFlight {
     outline: Outline,
+    near: Point,
     far: Point,
     bottom: f32,
     direction: f32,
@@ -101,6 +106,7 @@ impl PichuFlight {
         }
         Some(Self {
             outline,
+            near,
             far,
             bottom: facts.blast[3],
             direction,
@@ -110,6 +116,22 @@ impl PichuFlight {
 
     pub fn exit_point(&self) -> Point {
         [self.far[0] + self.direction * 8.85, self.far[1] - 14.6]
+    }
+
+    pub fn into_fake_out(self, position: Point, velocity: Point) -> Option<PichuFakeOut> {
+        if !matches!(self.phase, PichuPhase::Descend) {
+            return None;
+        }
+        PichuFakeOut::start(self.outline, self.near, self.direction, self.bottom, PichuBeat {
+            frame: 0,
+            status: FALL,
+            position,
+            velocity,
+            jumps: 1,
+            can_jump: false,
+            side: true,
+            up: true,
+        })
     }
 
     fn aim_from(&self, point: Point) -> Option<ZipPlan> {
@@ -453,6 +475,7 @@ lib_unit_tests! {
                 outline.add(line);
             }
             let mut flight = PichuFlight {
+                near: [-79.986, 0.0],
                 outline,
                 far: FAR,
                 bottom: -140.0,

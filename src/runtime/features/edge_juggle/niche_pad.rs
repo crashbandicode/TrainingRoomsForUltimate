@@ -10,7 +10,7 @@ use crate::{
 };
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
-use perfect::pichu::{PichuBeat, PichuFlight};
+use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
@@ -27,6 +27,7 @@ enum MeasuredFlight {
     FakeOut(FakeOutFlight),
     Puff(PuffFlight),
     Pichu(PichuFlight),
+    PichuFakeOut(PichuFakeOut),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -181,14 +182,21 @@ impl NicheGuide {
         }
     }
 
-    pub(super) fn pikachu_fake_out(mut self) -> Option<Self> {
-        let MeasuredFlight::SkullBash(flight) = self.measured.take()? else {
-            return None;
+    pub(super) fn fake_out(mut self, position: Point, velocity: Point) -> Option<Self> {
+        let (row, ledge, flight) = match self.measured.take()? {
+            MeasuredFlight::SkullBash(flight) => {
+                let flight = flight.into_fake_out();
+                (41, flight.near_ledge(), MeasuredFlight::FakeOut(flight))
+            }
+            MeasuredFlight::Pichu(flight) => {
+                let flight = flight.into_fake_out(position, velocity)?;
+                (43, flight.exit_point(), MeasuredFlight::PichuFakeOut(flight))
+            }
+            _ => return None,
         };
-        let flight = flight.into_fake_out();
-        self.ledge = flight.near_ledge();
-        self.sequence = Sequence::new(niche::measured_row(41, niche::CANDIDATE_ROWS)?);
-        self.measured = Some(MeasuredFlight::FakeOut(flight));
+        self.ledge = ledge;
+        self.sequence = Sequence::new(niche::measured_row(row, niche::CANDIDATE_ROWS)?);
+        self.measured = Some(flight);
         Some(self)
     }
 
@@ -250,6 +258,21 @@ impl NicheGuide {
                 can_jump: status == perfect::pichu::BASH_END
                     && niche_start_enabled(cpu, Move::Jump, true),
                 side: status == fall && niche_start_enabled(cpu, Move::Side, true),
+                up: status == aerial && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            });
+        }
+        if let Some(MeasuredFlight::PichuFakeOut(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let fall = konst(C::StatusFall);
+            let aerial = konst(C::StatusJumpAerial);
+            return flight.step(PichuBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                jumps: remaining_jumps(cpu)?,
+                can_jump: status == fall && niche_start_enabled(cpu, Move::Jump, true),
+                side: false,
                 up: status == aerial && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
             });
         }
@@ -331,7 +354,7 @@ fn normalized_stick([x, y]: Point) -> Point {
     }
 }
 
-unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {
+pub(super) unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {
     use Move::*;
     if movement == SoraChain && !game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) {
         return false;
