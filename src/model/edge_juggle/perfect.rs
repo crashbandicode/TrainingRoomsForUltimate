@@ -6,6 +6,8 @@ pub mod diddy;
 pub mod fly;
 #[path = "perfect/game_watch.rs"]
 pub mod game_watch;
+#[path = "perfect/greninja.rs"]
+pub mod greninja;
 #[path = "perfect/incineroar.rs"]
 pub mod incineroar;
 #[path = "perfect/kart.rs"]

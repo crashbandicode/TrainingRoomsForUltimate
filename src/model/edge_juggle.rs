@@ -607,6 +607,8 @@ impl Wizard {
             Some((Area::LowerLeft, offset))
         } else if link_left_start {
             Some((Area::UpperLeft, [30.0, 18.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::greninja::KIND) {
+            perfect::greninja::wizard_offset(stage_key).map(|offset| (Area::UpperLeft, offset))
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::mario::KIND)
             && perfect::mario::reference_stage(stage_key)
         {

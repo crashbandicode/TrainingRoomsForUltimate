@@ -10,6 +10,7 @@ use crate::{
 };
 use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
+use perfect::greninja::{self, HydroFlight, HydroSample};
 use perfect::incineroar::{self, WhipBeat, WhipReturn};
 use perfect::kart::{KartFlight, KartState};
 use perfect::link::{self, LinkBeat, LinkFlight, OwnedBomb};
@@ -54,6 +55,7 @@ enum MeasuredFlight {
     Cypher(CypherFlight),
     Cape(CapeStall),
     Aura(AuraFlight),
+    Hydro(HydroFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
     Whip(WhipReturn),
@@ -269,6 +271,27 @@ impl NicheGuide {
                 fighter,
                 ledge: flight.exit_point(),
                 measured: Some(MeasuredFlight::Sheik(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == greninja::KIND {
+            band?;
+            let row = niche::measured_row(greninja::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = HydroFlight::start(facts, HydroSample {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_jump: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Travel, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Hydro(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -532,6 +555,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Link(_)) => Some(235),
             Some(MeasuredFlight::Cypher(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Aura(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Hydro(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
@@ -616,6 +640,20 @@ impl NicheGuide {
                 can_whip: flight.whip_frame(frame) && niche_start_enabled(cpu, Move::Side, true),
                 can_jump: jump && niche_start_enabled(cpu, Move::Jump, true),
                 can_chop: chop && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
+        if let Some(MeasuredFlight::Hydro(flight)) = &mut self.measured {
+            let jump = flight.jump_frame(frame);
+            let rise = flight.rise_frame(frame);
+            return flight.step(HydroSample {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [0.0; 2],
+                facing: if jump || rise { natives::lr(cpu) } else { 0.0 },
+                jumps: remaining_jumps(cpu)?,
+                can_jump: jump && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: rise && reach.is_some() && niche_start_enabled(cpu, Move::Travel, available),
             });
         }
         if let Some(MeasuredFlight::Cape(flight)) = &mut self.measured {
