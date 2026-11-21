@@ -1,8 +1,5 @@
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model/macros/completion_trace.rs"]
-mod completion_trace;
+use crate::engine::macros::completion_trace;
 use completion_trace::{CompletionTrace, Event};
 
 fn idle_and_invalid_entries_never_consume_a_live_observation() {

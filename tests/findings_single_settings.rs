@@ -1,10 +1,5 @@
 //! Combined Single values must have one meaning in the menu, defaults and runtime gate.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::menu::input::Button;
 use model::menu::table::ROWS;
@@ -177,13 +172,16 @@ fn saved_defaults_continue_in_a_fresh_process() {
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let file = std::env::temp_dir().join(format!("tr-single-{}-{stamp}.json", std::process::id()));
     for stage in ["save", "restore"] {
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "saved_defaults_continue_in_a_fresh_process", "--nocapture"])
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "findings_single_settings::saved_defaults_continue_in_a_fresh_process", "--nocapture"])
             .env(STAGE, stage)
             .env(FILE, &file)
-            .status()
+            .output()
             .unwrap();
-        assert!(status.success(), "{stage} process failed");
+        assert!(output.status.success(), "{stage} process failed: {}", String::from_utf8_lossy(&output.stderr));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("running 1 test"), "{stage} did not execute the child test: {stdout}");
+        print!("{stdout}");
     }
     std::fs::remove_file(file).unwrap();
 }

@@ -1,18 +1,10 @@
 //! SPEC-core-08 (first-boot import), the pure plan. Test paths are the spec's §9 rows
 //! (`migration::…`). Not here: the item-on-load conversion (N6), receipt hashes, the copy loop.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-mod migration {
+mod cases {
     use super::model::migration::{self as m, Action, ImportResult, Outcome, Part, Plan, Skip, Source};
     use super::model::settings::{self, Settings};
     use super::model::storage;

@@ -1,14 +1,6 @@
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model/nowait_channel.rs"]
-#[allow(dead_code)]
-mod nowait_channel;
-#[path = "../src/model/catalog_reply.rs"]
-mod catalog_reply;
+use crate::model::nowait_channel;
+use crate::model::catalog_reply;
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::Arc;
 
@@ -16,27 +8,14 @@ thread_local! {
     static TRACK: Cell<bool> = const { Cell::new(false) };
     static ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
 }
-struct Count;
 fn allocation() {
     let _ = TRACK.try_with(|track| {
         if track.get() { let _ = ALLOCATIONS.try_with(|n| n.set(n.get() + 1)); }
     });
 }
-unsafe impl GlobalAlloc for Count {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        allocation();
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-        allocation();
-        unsafe { System.realloc(ptr, layout, size) }
-    }
+pub(super) fn count_allocation() {
+    allocation();
 }
-#[global_allocator]
-static ALLOCATOR: Count = Count;
 fn native<T>(f: impl FnOnce() -> T) -> T {
     ALLOCATIONS.with(|n| n.set(0));
     TRACK.with(|n| n.set(true));
@@ -67,8 +46,7 @@ fn native_submit_full_retry_poll_and_reuse_allocate_nothing() {
     assert_eq!(native(|| replies.poll().unwrap().unwrap())[0], 23);
 }
 
-#[path = "../src/model/reusable_snapshot.rs"]
-mod reusable_snapshot;
+use crate::model::reusable_snapshot;
 
 #[test]
 fn helper_snapshot_publish_reader_retirement_and_reuse_allocate_nothing() {
@@ -84,9 +62,7 @@ fn helper_snapshot_publish_reader_retirement_and_reuse_allocate_nothing() {
         assert!(storage.available());
     }
 }
-#[path = "../src/model/replay_jobs.rs"]
-#[allow(dead_code)]
-mod replay_jobs;
+use crate::model::replay_jobs;
 
 #[test]
 fn replay_request_retirement_completion_and_poll_reuse_allocate_nothing() {
@@ -122,10 +98,8 @@ fn boot_reserved_import_box_and_endpoint_survive_full_retry_and_completion() {
     }
 }
 
-#[path = "../src/model/catalog_mailbox.rs"]
-mod catalog_mailbox;
-#[path = "../src/model/close_handoff.rs"]
-mod close_handoff;
+use crate::model::catalog_mailbox;
+use crate::model::close_handoff;
 
 #[test]
 fn native_close_first_full_cancel_reopen_and_retry_allocate_nothing() {
@@ -161,8 +135,7 @@ fn native_catalog_post_full_retry_and_worker_take_allocate_nothing() {
     }
 }
 
-#[path = "../src/model/pooled_reply.rs"]
-mod pooled_reply;
+use crate::model::pooled_reply;
 #[test]
 fn reply_pool_first_use_full_drop_and_reuse_allocate_nothing() {
     let pool = pooled_reply::Pool::new(1);

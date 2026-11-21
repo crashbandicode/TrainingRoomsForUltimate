@@ -2,22 +2,11 @@
 //! owned 13.0.5 ELF, and the facts the plugin relies on for the `AttackData` layout and the Lua stack, each shown by the
 //! instruction that does the access in the game's own code (`docs/test-provenance/core-06.md` names the derivation).
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
+use crate::callgraph;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::capabilities;
 use model::guard::SeamKind;

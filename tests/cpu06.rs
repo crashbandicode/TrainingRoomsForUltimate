@@ -4,15 +4,7 @@
 //! Test names are the spec's §9 rows; `cpu06_roll_points` is in `tests/cpu_core.rs`.
 
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::cpu::command::CmdFacts;
 use model::cpu::facts::FrameFacts;

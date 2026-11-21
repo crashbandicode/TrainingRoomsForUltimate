@@ -2,20 +2,7 @@
 //! saved Mii; they are not a native fixture. Player index 0 is that row's own
 //! record, not a copy of CPU index 1.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
 
 use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};
 

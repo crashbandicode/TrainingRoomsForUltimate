@@ -3,15 +3,9 @@
 //! on the one path that follows the controller write, and no site or guard window is near a site of the
 //! CPU pilot plugin or of another row of this plugin.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::guard::{SeamKind, GUARD_BYTES};
 use model::sites;

@@ -1,10 +1,8 @@
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
 #[path = "../src/model/swap/pristine_load.rs"]
-mod pristine_load;
+mod load;
 
-use pristine_load::{fingerprint, VerifiedLoad};
+use load::{fingerprint, VerifiedLoad};
 
 const BASE: usize = 0x1000_0000;
 // Synthetic 592-byte range; no game instructions. Independent Python FNV oracle.

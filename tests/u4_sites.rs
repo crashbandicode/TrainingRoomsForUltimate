@@ -2,15 +2,9 @@
 //! decoded service slot, the readiness test the plugin copies, the field offsets of the game's UI texture and the two vtable
 //! values the helper compares pointers against.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::sites_u4::{self, SITES};
 use model::sites_ui::decode_adrp_ldr;

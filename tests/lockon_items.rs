@@ -1,5 +1,4 @@
-#[path = "../src/model/lockon.rs"]
-mod lockon;
+use crate::model::lockon;
 
 use lockon::{ItemHost, Target, Tracker};
 

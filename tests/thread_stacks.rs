@@ -2,15 +2,9 @@
 //! The Eden s4-07 / u4b-02 fault (`tr-trace-writer`, a 59,712 B frame on a 65,536 B stack) fails `rows_cover_their_need`
 //! with that row's numbers (see `the_fault_s_numbers_fail_the_rule`).
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-use model::hook_stats::{hook_allocations, CountingAllocator, HookId, HookScope};
+use model::hook_stats::{hook_allocations, HookId, HookScope};
 // The slot is an engine module; it reaches crate::model::store, which the module above provides.
 #[path = "../src/model/lobby/trace_slot.rs"]
 #[allow(dead_code)]
@@ -18,9 +12,6 @@ mod trace_slot;
 
 use trace_slot::{flush_boxed, BoxedSlot};
 use model::thread_stacks::{self, ThreadId, PAINT, SDK_RESERVE, THREADS};
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 #[test]
 fn rows_are_in_id_order_with_unique_names() {
@@ -283,6 +274,7 @@ fn a_prepared_boxed_slot_allocates_nothing() {
     let slot = BoxedSlot::new();
     slot.prepare(&Big { n: 0, pad: [0; 1400] });
     let value = Big { n: 5, pad: [5; 1400] };
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::UiArchive);

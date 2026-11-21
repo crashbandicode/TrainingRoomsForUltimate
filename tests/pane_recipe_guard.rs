@@ -5,9 +5,7 @@
 //! committed beside the recipes; this test recomputes it.
 
 // rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-#[path = "../src/model/ui/panes.rs"]
-#[allow(dead_code)]
-mod panes;
+use crate::model::panes;
 #[path = "../tools/layout-builder/src/pane_table.rs"]
 mod pane_table;
 

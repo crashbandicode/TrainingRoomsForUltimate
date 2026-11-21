@@ -1,17 +1,8 @@
 //! SPEC-input-05 §9 host rows: the notification queue and the damage display helper.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
 use model::damage_display::*;
@@ -115,20 +106,9 @@ thread_local! {
     static ALLOCS: Cell<usize> = const { Cell::new(0) };
 }
 
-struct Counting;
-
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let _ = ALLOCS.try_with(|c| c.set(c.get() + 1));
-        System.alloc(layout)
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
-    }
+pub(super) fn count_allocation() {
+    let _ = ALLOCS.try_with(|count| count.set(count.get() + 1));
 }
-
-#[global_allocator]
-static A: Counting = Counting;
 
 fn full_queue_drops_the_oldest_waiting_never_the_one_on_screen() {
     let mut q = Queue::new();

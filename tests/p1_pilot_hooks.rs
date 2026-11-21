@@ -9,13 +9,7 @@
 //! The writers the hooks use now are proven here under the plugin's counting allocator; the wiring of the Switch-only
 //! `runtime/p1/cpu_pilot.rs` (no file and no heap call on a hook path; the file work on the heartbeat) is pinned by its source.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 #[path = "../src/model/compat/fixed.rs"]
 #[allow(dead_code)]
 mod fixed;
@@ -26,13 +20,8 @@ use std::fmt::{self, Write as _};
 
 use fixed::FixedQueue;
 use json_line::{DebugStr, Json, Obj};
-use model::hook_stats::{hook_allocations, CountingAllocator, HookId, HookScope};
+use model::hook_stats::{hook_allocations, HookId, HookScope};
 
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
-
-/// The counters are process-wide and the harness runs tests on several threads: the tests take turns.
-static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// A diag line on the stack, as the diag ring's `StackLine` holds one.
 struct Line {
@@ -84,7 +73,7 @@ const BINDING: Binding = Binding { ai: 77_040_471_552, local_boid: 524_288, loca
 
 #[test]
 fn an_admission_line_is_written_without_the_heap_the_json_value_needed() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     // The fork's line: a `serde_json::Value` per line, inside the hook.
     let before = hook_allocations();
     let old = {
@@ -109,7 +98,7 @@ fn an_admission_line_is_written_without_the_heap_the_json_value_needed() {
 
 #[test]
 fn strings_floats_options_and_debug_text_are_written_without_the_heap() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     let mut line = Line::new();
     {
@@ -131,7 +120,7 @@ fn strings_floats_options_and_debug_text_are_written_without_the_heap() {
 
 #[test]
 fn a_line_that_does_not_fit_stops_without_the_heap() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let long = [BINDING; 32];
     let before = hook_allocations();
     let mut line = Line::new();
@@ -145,7 +134,7 @@ fn a_line_that_does_not_fit_stops_without_the_heap() {
 
 #[test]
 fn receipts_move_through_the_queue_without_the_heap() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let mut queue = FixedQueue::<(u32, Vec<u64>), 2>::new();
     let traces: Vec<Vec<u64>> = (0..3).map(|n| Vec::with_capacity(128 + n)).collect();
     let before = hook_allocations();

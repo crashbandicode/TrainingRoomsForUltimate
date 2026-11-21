@@ -11,22 +11,14 @@
 //! - names the threads that reach each edge: game-thread hooks (`#[skyline::hook]`) and every plugin thread's entry
 //!   (`model::thread_stacks::THREADS`, as `hook_locks.rs` derives them, plus the publishing path).
 //!
-//! `cargo test --test lock_order -- --nocapture` prints the lock table and the edges. The test fails on a cycle in the
+//! `cargo test --test all -- lock_order:: --nocapture` prints the lock table and the edges. The test fails on a cycle in the
 //! order graph (two locks taken in both orders), and on a lock retaken while held. Limits are `hook_locks.rs`'s: calls
 //! through `dyn`, trait methods and stored closures are not seen; native locks (the game's own) are not seen.
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
-#[path = "common/tech_callbacks.rs"]
-mod tech_callbacks;
+use crate::callgraph;
+use crate::tech_callbacks;
 
-#[path = "../src/model/thread_stacks.rs"]
-#[allow(dead_code)]
-mod thread_stacks;
+use crate::model::thread_stacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

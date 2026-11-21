@@ -165,3 +165,11 @@ fn the_solo_marks_never_cover_the_tile_name() {
         }
     }
 }
+
+// The pane traversal uses the same host types as the production renderer probe above.
+#[path = "../src/test_table.rs"]
+mod test_table;
+mod ui_pane_boundary;
+
+// The byte meter needs the System allocator for unrelated test allocations.
+mod hook_heap_meter;

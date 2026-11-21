@@ -1,13 +1,6 @@
 //! Regression for Loop list confirmation, cancellation and its existing shared cycling setter.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
-#[path = "support/playback_engine.rs"]
-#[allow(dead_code)]
-pub mod engine;
+use crate::model;
+use crate::engine;
 
 use engine::library::{LoopCount, RecordingIndex, Role};
 use engine::macros::{InputFrame, MacroRecording, StartState};

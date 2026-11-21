@@ -2,15 +2,9 @@
 //! 64 bytes are the ELF's, every replace hook's far jump fits without touching another function, no
 //! window is near a site of the CPU pilot, and the install line stays under its buffer.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::guard::{HookForm, Placement, SeamKind};
 use model::sites::{self, Feature};

@@ -8057,7 +8057,7 @@
       "dest": "tests/mii_helper147_headgear.rs",
       "crate": "mii",
       "src_sha256": "0deda79e22972927e655373b79f29baea059ce0eb964e5089999b351529981b6",
-      "dest_sha256": "a934fb590348453dc2ad21564d17e4cad927fe57a61e11de9b084c4829d03990",
+      "dest_sha256": "052542b9b42c8ba0dc44257278f73aa53f7d49973c6fc11805cb79ccab346983",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8083,6 +8083,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! slots 2/3. Waiting uses slots 5/6. Synthetic hat ids only; no native fixture.\n\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::ordinary_cpu as cpu};\n",
+          "new": "//! slots 2/3. Waiting uses slots 5/6. Synthetic hat ids only; no native fixture.\n\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::ordinary_cpu as cpu};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8091,7 +8096,7 @@
       "dest": "tests/mii_ldn_handshake.rs",
       "crate": "mii",
       "src_sha256": "958bfb6b45fa72514d23ffb3f477df5332d7d6b30b8c68a40ac59f0a3eb485f3",
-      "dest_sha256": "6a9d2ba5f89d36df72cfc01479c43fee261eb0a7742311bc127225b19e18b2b7",
+      "dest_sha256": "6378baf40c86b5e015303546aae9563ae0d19ee2c6c27500c3eb0ab111df8d3c",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8149,6 +8154,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! owned the scene (ack 0,1,1 / resolved 0,1,1, deque unchanged) and the\n//! audited native consumer predicate. Addresses are identity tokens only.\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse crate::engine::mii::ldn_handshake::{\n",
+          "new": "//! owned the scene (ack 0,1,1 / resolved 0,1,1, deque unchanged) and the\n//! audited native consumer predicate. Addresses are identity tokens only.\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse crate::engine::mii::ldn_handshake::{\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8157,7 +8167,7 @@
       "dest": "tests/mii_bank_groups.rs",
       "crate": "mii",
       "src_sha256": "101fa5ca3b74af22a7c58eaa9f1aeb873f09a83c419f1224b0f2784e81aab057",
-      "dest_sha256": "23f5940063846ccf23eb987be44d896579ccd664597aaf9016be0efe4570751d",
+      "dest_sha256": "08ae3a2565af97e8da87a8548122144f57f078940b23378a616a6216612f67b6",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8183,6 +8193,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Value rules of the Mii one-member group switch (MII-GROUPS-DESIGN §5): the\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Value rules of the Mii one-member group switch (MII-GROUPS-DESIGN §5): the\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8191,7 +8206,7 @@
       "dest": "tests/mii_bank_publication.rs",
       "crate": "mii",
       "src_sha256": "e52d41ffa711a1d75f345676a03c17f1e5c9c5b90ef8b3257fa0d0ec6dd1a7da",
-      "dest_sha256": "8d246b4449ace4e810e696b028c3569de8055ad2374e80f67edecfee801e7490",
+      "dest_sha256": "42dcdbea0397c67314c37911a4e14adf5d1cee7187ce694bc1fde84262186ceb",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8222,6 +8237,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// MII-PHASEB part 2: the switch-time publication of a Mii group switch is part of the\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// MII-PHASEB part 2: the switch-time publication of a Mii group switch is part of the\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8230,7 +8250,7 @@
       "dest": "tests/mii_setup_preflight.rs",
       "crate": "mii",
       "src_sha256": "ed0cbedbfa6380329e52a254458f16dc7e7b856cf4453836cfa4e1e9d4dbc0c9",
-      "dest_sha256": "ed550683d0d012ed66d9b1486ecc1cafef055f82d406a8216c7d171700dda14e",
+      "dest_sha256": "1cd274611539a709a407dce378a90c329ac60122b8893c171677ece1f70cca9b",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8271,6 +8291,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Value rules of the native Mii-setup adapter (WP-M2 step 2): the preflight that must\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Value rules of the native Mii-setup adapter (WP-M2 step 2): the preflight that must\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8279,7 +8304,7 @@
       "dest": "tests/mii_player146_headgear_ownership.rs",
       "crate": "mii",
       "src_sha256": "67c0fb189b4fefec4f57f0271ca8c0bdf49b1f5100fe51b13027c02abf2cec9b",
-      "dest_sha256": "522747785b0d1aaff80dbbd18ec46c741e95c77bba3e5b67e3390c4da8270bb0",
+      "dest_sha256": "331693b74c1f0dc0c2919d74158ef700736bcc765780b54d1972f1714c946792",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8317,6 +8342,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! record, not a copy of CPU index 1.\n\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};\n",
+          "new": "//! record, not a copy of CPU index 1.\n\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8325,7 +8355,7 @@
       "dest": "tests/mii_role_adapter.rs",
       "crate": "mii",
       "src_sha256": "c0afddd51f968b3bc5e7db8f72abde8bb9b8439cdfb3ba5b310ac0af7cd58b58",
-      "dest_sha256": "a450251c2ff22d1fc1375fe7153bc55727af1237ecfc39f6b787c943ea622a8d",
+      "dest_sha256": "fad11992e093747e28212143fae55e0e92625f9cf44b3395e250de70f539f81c",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8361,6 +8391,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Copied CPU01 configuration/token/association evidence. Epoch7 is a TEST generation:\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Copied CPU01 configuration/token/association evidence. Epoch7 is a TEST generation:\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -30213,7 +30248,7 @@
       "dest": "tests/mii_replay185_headgear.rs",
       "crate": "mii",
       "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
-      "dest_sha256": "cb96c59775822f865b78a95445ba3e374e1798764bd90a4a396930f9e332aa2c",
+      "dest_sha256": "14687ff221a486408fb1ad30c0c01c57a27cb80b3251cb7390aea2f9da4402bf",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -30276,6 +30311,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! CharInfo's noncanonical create-id/name prefix is redacted. Hat7 is explicitly\n//! a synthetic variation; its resource presence is not claimed.\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};\n",
+          "new": "//! CharInfo's noncanonical create-id/name prefix is redacted. Hat7 is explicitly\n//! a synthetic variation; its resource presence is not claimed.\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },

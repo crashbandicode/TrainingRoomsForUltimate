@@ -4,9 +4,7 @@
 //! (rows well formed, card-scan export, ELF check over its rows) are not carried; this plugin's own
 //! site table has its tests in `tests/core01_sites.rs`. See CARRY-OVER.md.
 
-#[path = "../src/model/guard.rs"]
-#[allow(dead_code)]
-mod guard;
+use crate::model::guard;
 
 use guard::*;
 const HOOK: SeamKind = SeamKind::Hook { form: HookForm::Replace, placement: Placement::Entry };

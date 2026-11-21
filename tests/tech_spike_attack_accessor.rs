@@ -1,15 +1,13 @@
 //! Native setter thunks determine which module the diagnostic's guard must inspect.
 //! Red runtime evidence: frozen 776a165a receipt #844 (setter_target), not a new red boot.
 
-mod common;
+use crate::common;
 
-#[path = "../src/runtime/features/tech_direct_v1_guards.rs"]
-mod direct_guards;
+use crate::model::sites_tech_launch::v1 as direct_guards;
 
 #[path = "../src/runtime/features/tech_spike_guards.rs"]
 mod guards;
-#[path = "../src/runtime/features/tech_direct_v3_guards.rs"]
-mod v3_guards;
+use crate::model::sites_tech_launch::v3 as v3_guards;
 
 const SETTERS: [(&str, usize); 5] = [
     ("realhit_set_power", 0x1fd0270),
@@ -310,8 +308,7 @@ fn info_launch_uses_one_pre_init_damage_stop_without_energy_rewrite() {
     assert!(!product.contains("fixed9"));
 }
 
-#[path = "../src/runtime/features/tech_reaction_guard.rs"]
-mod reaction_guard;
+use crate::model::sites_tech_launch::core as reaction_guard;
 #[test]
 fn product_reaction_guard_matches_owned_and_diag_window() {
     let guard = guards::SITES.iter().find(|x| x.1 == 0x404ec0).unwrap();

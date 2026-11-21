@@ -2,15 +2,9 @@
 //! ELF: every row's 64 bytes, the manager slot the helper decodes, and every structure offset the walk relies on, checked against the
 //! instructions of the game's own functions that read and write those structures.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::effect_texture as e;
 use model::sites_u4b::{self, SITES};

@@ -1,18 +1,11 @@
 //! Exact process-wide byte deltas for the allocator used by the plugin.
 //!
-//! The test binary's global allocator stays System. This test calls the same
-//! production CountingAllocator methods directly, so libtest's concurrent
-//! allocations do not enter the byte meter. hook_alloc.rs separately tests
-//! CountingAllocator installed as the global allocator with actual hook allocations.
+//! This suite uses the System allocator for unrelated allocations, leaving the
+//! production meter free to record only the direct calls below. hook_alloc.rs
+//! checks the shared global allocator with real hook scopes.
 
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 
-#[path = "../src/model/hook_stats.rs"]
-pub mod hook_stats;
-
-use hook_stats::{heap_bytes, CountingAllocator};
+use crate::model::hook_stats::{heap_bytes, CountingAllocator};
 
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 

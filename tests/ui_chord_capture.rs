@@ -1,12 +1,6 @@
 //! N7 original physical-input regression: never injects Menu::chord_entry.
 //! Delivery uses the same adapter/whole-poll ring/capture boundary as the worker.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::adapter::{bit, Adapter, Style};
 use model::menu::chord::Chord;
@@ -15,23 +9,16 @@ use model::menu::table::ROWS;
 use model::menu::{Entry, Env, Menu, Screen};
 use model::ui_events::{Event, Packet, Ring};
 
-struct Allocator;
 thread_local! {
     static TRACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static ALLOCS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 // Host-thread attribution only; no TLS or allocator is added to the plugin.
-unsafe impl std::alloc::GlobalAlloc for Allocator {
-    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
-        TRACK.with(|track| if track.get() { ALLOCS.with(|count| count.set(count.get() + 1)); });
-        unsafe { std::alloc::GlobalAlloc::alloc(&std::alloc::System, layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
-        unsafe { std::alloc::GlobalAlloc::dealloc(&std::alloc::System, ptr, layout); }
+pub(super) fn count_allocation() {
+    if TRACK.try_with(std::cell::Cell::get).unwrap_or(false) {
+        let _ = ALLOCS.try_with(|count| count.set(count.get() + 1));
     }
 }
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
 
 fn shortcut_editor() -> Menu {
     let mut menu = Menu::new(model::settings::Settings::factory(), Env::default());
@@ -355,7 +342,7 @@ fn n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text() {
     fs::create_dir(&root).unwrap();
     fs::write(root.join("button_config.ini"), "# private note\n[menu]\nshortcut_1=Minus\nshortcut_2=disabled\nother_key=untouched\n[foreign]\ncolour=blue\n").unwrap();
     let exe = std::env::current_exe().unwrap();
-    let run = |mode| Command::new(&exe).args(["--exact", "n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text", "--nocapture"])
+    let run = |mode| Command::new(&exe).args(["--exact", "ui_chord_capture::n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text", "--nocapture"])
         .env(MODE, mode).env(ROOT, &root).output().unwrap();
     let saved = run("save");
     assert!(saved.status.success(), "saver failed: {}", String::from_utf8_lossy(&saved.stderr));

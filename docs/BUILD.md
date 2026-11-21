@@ -8,6 +8,12 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 - **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
   use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
+- **Focused integration tests** use `cargo test --test all -- module_name::`. To select a single
+  test, pass its full name and `--exact`, for example `cargo test --test all -- capabilities::print_cross_needs --exact --ignored`.
+  Register new integration modules in `tests/all/main.rs`. The `native_ui` target supplies the
+  Skyline UI shim and uses the system allocator so the direct hook heap-meter test can measure
+  exact byte deltas. The `parry_start_fresh_set` target substitutes the practice runtime's engine
+  and diagnostic services at the crate root.
 - **Vendored crates' own tests** (2026-11-02): the root package has no workspace, so `cargo test` does not run
   `crates/*/tests`. Each gate run adds one call per crate: `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and

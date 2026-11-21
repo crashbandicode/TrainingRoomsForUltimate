@@ -6,22 +6,10 @@
 //! for each poisoned row, the natives an installed entry point may call are computed from the code and every
 //! one must be allowed by the `Granted` set the boot would hand the native-call layer.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
-#[path = "common/tech_callbacks.rs"]
-mod tech_callbacks;
+use crate::callgraph;
+use crate::tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -334,7 +322,8 @@ fn declared() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     capabilities::CROSS_NEEDS.iter().map(|(unit, names)| (unit.name(), names.iter().copied().collect())).collect()
 }
 
-/// Prints `CROSS_NEEDS` as Rust source: `cargo test --test capabilities print_cross_needs -- --ignored --nocapture`.
+/// Prints `CROSS_NEEDS` as Rust source with
+/// `cargo test --test all -- capabilities::print_cross_needs --exact --ignored --nocapture`.
 #[test]
 #[ignore]
 fn print_cross_needs() {

@@ -1,6 +1,4 @@
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
 #[path = "../src/model/mii/bust_context.rs"]
 mod policy;
 

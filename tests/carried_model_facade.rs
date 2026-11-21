@@ -2,9 +2,7 @@
 //! supported game identity and the guard's comparison. Carried over from the earlier fork's
 //! `training_mod_consts/tests/model_facade.rs` (stage m5o, ours-new); see CARRY-OVER.md.
 
-#[path = "../src/model/version.rs"]
-#[allow(dead_code, unused_imports)]
-mod model;
+use crate::model::version as model;
 
 use model::{find_gnu_build_id, gnu_build_id_at, verdict, Hex, Printable, Verdict};
 

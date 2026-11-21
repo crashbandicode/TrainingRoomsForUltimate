@@ -1,8 +1,7 @@
 //! rc.8 §6: the typed menu's writeback is wait-free on both sides. `compat/menu.rs::PENDING` was a mutex game threads took
 //! (the native service's poll: `sync_selection` -> `menu::store`) while the menu worker could hold it, the rc.6 freeze class.
 //! `tests/lock_order.rs` (`no_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread`) checks the class; this checks the handoff.
-#[path = "../src/model/menu_writeback.rs"]
-mod menu_writeback;
+use crate::model::menu_writeback;
 use menu_writeback::newest;
 
 fn pick(game: (Option<(u64, char)>, bool), publish: (Option<(u64, char)>, bool), adopted: u64) -> Option<(u64, char)> {

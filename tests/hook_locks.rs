@@ -20,14 +20,8 @@
 //! `the_scan_catches_a_seeded_violation` runs the same scan on `tests/fixtures/hook_locks/`, a small runtime with one plugin thread
 //! that takes a hook's lock through a method call and through a helper, and requires both to be reported.
 
-// rc.9 test cut: the call-graph scanner's own tests (`tests/common/callgraph.rs`) run here, once.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => { $($body)* };
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
-#[path = "common/tech_callbacks.rs"]
-mod tech_callbacks;
+use crate::callgraph;
+use crate::tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -82,9 +76,7 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("macros/live_replay.rs", "CAPTURE"),
 ];
 
-#[path = "../src/model/thread_stacks.rs"]
-#[allow(dead_code)]
-mod thread_stacks;
+use crate::model::thread_stacks;
 
 /// Thread entries that exist only under a non-shipped probe feature, in a block the call-graph scan does not resolve: skipped while the
 /// graph has no such function (the scan still follows them when it does). Every other missing entry fails the test.
@@ -1008,7 +1000,7 @@ fn tech_frame_audit_follows_game_branch_and_switch_implementation() {
 
 /// The audit's raw material (IMPLEMENTATION-PROGRESS-sync.md (removed after v0.2.0-rc.1; see that tag)): every static lock (ours and carried package-6 code, std or hos-lock)
 /// a plugin-thread entry reaches, with the function that takes it. Prints; never fails
-/// (`cargo test --test hook_locks report -- --nocapture`).
+/// (`cargo test --test all -- hook_locks::report_locks_reached_from_plugin_threads --exact --nocapture`).
 #[test]
 fn report_locks_reached_from_plugin_threads() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
