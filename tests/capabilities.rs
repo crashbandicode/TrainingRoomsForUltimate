@@ -794,6 +794,20 @@ fn ui_tech_frame_is_once_after_adapter_and_independent_of_hitbox() {
 }
 
 #[test]
+fn edge_releases_before_the_shared_hb1_player_sample() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("cpu::on_frame")[0]].body;
+    let sequence = callgraph::lex(
+        "unsafe { super::edge_juggle::frame(a0) };
+         unsafe { crate::runtime::features::hitbox::frame(a0) };",
+    );
+    assert!(
+        body.windows(sequence.len()).any(|calls| calls == sequence),
+        "the release callback must open the live plan before HB1 can sample P1",
+    );
+}
+
+#[test]
 fn surface_rows_are_registered_through_boot() {
     let boot = include_str!("../src/runtime/boot.rs");
     for step in [
