@@ -2244,3 +2244,11 @@ ceiling = 187331
 date = "2026-11-21"
 reason = "merge_budget for the intermediate card: measured 187331 normalized implementation lines at d6074747, +298 over the gated partial base 5fb35633 and zero spare. Includes reviewed Windboxes 8a5435c4 (+33), placement wizard and immediate on-stage credit 7bc239e2 (+138), and Eggsercise paths and per-side zone a7e4802f (+127). The partial base and all three shipping lane witnesses independently measured NRO 5124096 B and BSS 1720320 B. The exact combined gate remeasures both."
 approved_by = "Operator via tr-primary-2, 2026-11-21 15:09Z, authorized measured merge budgets under the operator's LOC rule: memory stays efficient and nothing is wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187566
+date = "2026-11-21"
+reason = "merge_budget for 1 Frame 985c79c6 on the intermediate card d6074747. Measured normalized implementation 187566, +235 over the intermediate ceiling 187331, with zero spare. Intermediate release NRO 5124096 B and BSS 1720320 B. Standalone 1 Frame release NRO 5128192 B and BSS 1720320 B. The exact integrated release receipt records the combined NRO and BSS against the intermediate baseline."
+approved_by = "Operator via tr-primary-2 at 16:47Z authorized the exact merge budget under the rule that line count may grow when memory remains efficient and nothing is wasteful."
