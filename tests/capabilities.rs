@@ -75,6 +75,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
     Boundary { function: "niche_pad::link_bomb_phase", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
     Boundary { function: "state_restore::olimar_pikmin_count", owner: None, gate: Gate::Flag("olimar_reads_granted") },
+    Boundary { function: "startup_dodge::covers_contact", owner: None, gate: Gate::Flag("forecast_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
@@ -665,6 +666,29 @@ fn a_missing_olimar_troop_read_declines_the_route_and_preserves_both_drills() {
     assert_eq!(reached, expected);
     let call = callgraph::lex("game::granted(");
     assert!(check.body.windows(call.len()).any(|ts| ts == call));
+
+    let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+    let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+    assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
+}
+
+#[test]
+fn a_missing_motion_frame_read_declines_startup_forecast_and_preserves_both_drills() {
+    let a = Analysis::new();
+    let row = capabilities::find("motion_frame").expect("guarded motion-frame reader");
+    let forecast = "startup_dodge::covers_contact";
+    let start = a.graph.find(forecast)[0];
+    assert!(a.reach(start).0.contains(&row.offset), "forecast must reach the motion-frame site");
+    let boundary = BOUNDARIES.iter().find(|b| b.function == forecast)
+        .expect("the startup forecast must check its own native grants");
+    assert_eq!(boundary.owner, None, "startup-only reads must stay optional for both drills");
+    let Gate::Flag(name) = boundary.gate;
+    let key = format!("startup_dodge::{name}");
+    let guard = &a.graph.funcs[a.graph.find(&key)[0]];
+    assert!(a.own_offsets(guard).contains(&row.offset));
+    let check = callgraph::lex("game::granted(MOTION_FRAME_OFFSET)");
+    assert!(guard.body.windows(check.len()).any(|ts| ts == check));
 
     let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
     let usable = |site: &model::sites::Site| !rejected.contains(&site.name);

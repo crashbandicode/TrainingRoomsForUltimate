@@ -8,7 +8,7 @@ use crate::{
             neutral_dodge_window, AttackForecast, MotionSample, ThreatProjection,
         },
         hash40::hash40,
-        sites_pkg2::WORK_GET_INT_OFFSET,
+        sites_pkg2::{MOTION_FRAME_OFFSET, WORK_GET_INT_OFFSET},
     },
     runtime::{game, roster::body_graph::PAD_MANAGER, seams::seam_install},
 };
@@ -74,13 +74,19 @@ unsafe fn player_forecast(p1: usize, status: i32) -> Option<AttackForecast> {
     None
 }
 
+fn forecast_reads_granted() -> bool {
+    game::granted(MOTION_FRAME_OFFSET) && game::granted(WORK_GET_INT_OFFSET)
+}
+
 /// Only predict an unstaled neutral dodge against a grounded, currently
 /// forecast attack. Active hitboxes retain the existing capsule path.
 pub(super) unsafe fn covers_contact(p1: usize, cpu: usize, status: i32) -> bool {
+    if !forecast_reads_granted() {
+        return false;
+    }
     let ground = konst(C::SituationGround);
     if ground == UNRESOLVED
         || natives::situation_kind(p1) != ground
-        || !game::granted(WORK_GET_INT_OFFSET)
         || natives::get_int(cpu, ESCAPE_PENALTY_FRAME) != 0
     {
         return false;

@@ -30,6 +30,7 @@
 
 //! rc.15 article hurtboxes adds the approved Called `article_get_from_no` row: 270 site rows to 271.
 //! rc.15 Mash adds its separately frozen 17 approved reader rows in a 26th data file. The historical digests stay unchanged.
+//! rc.15 Juggler adds seven optional stock attack forecast readers to the Edge/Juggler table: 17 to 24 rows.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -99,8 +100,8 @@ fn every_data_row_has_a_64_byte_guard() {
 
 const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
-const EDGE_JUGGLE_ROWS: usize = 17;
-const EDGE_JUGGLE_DIGEST: &str = "fd91e2d01937ed4e7dda885c8e2beb853c6e42a46e13110dbbc7254cdbd8e1bb";
+const EDGE_JUGGLE_ROWS: usize = 24;
+const EDGE_JUGGLE_DIGEST: &str = "f915f3d91b813ad276a78aa65678cd901c6eed6d2041df78c838811e2791ec0b";
 const SITE_ROWS: usize = 272;
 const SITE_DIGEST: &str = "ba93529340967f0bf151474e5235469b69d4637fdd1d5991ce903cd392743c15";
 const UI_ROWS: usize = 6;
