@@ -2212,3 +2212,11 @@ ceiling = 187033
 date = "2026-11-21"
 reason = "merge_budget for partial Guard the Edge and Juggler: integrate gated niche 6395498b with card main a4ff59cb. Exact merged count is 187033, +12252 versus the measured main count of 174781 and +3690 versus niche's 183343. No spare. Main release NRO 4997120 B and niche release NRO 5058560 B; both have 1720320 B BSS. The combined gate remeasures release size and BSS."
 approved_by = "Operator 2026-11-21 12:20Z authorized the partial card build. Primary tr-primary-2 at 12:30Z directed measured merge_budget entries under the operator rule: LOC can grow when memory remains efficient and changes are not wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187066
+date = "2026-11-21"
+reason = "Windboxes gameplay-area classification and projected rectangle bounds. Measured normalized implementation 187033 to 187066 (+33). Relative to the clean build prerequisite tree 5fb35633, release NRO 5124096 B to 5124096 B and BSS 1720320 B to 1720320 B. The installed a4ff59cb release is 4997120 B with 1720320 B BSS."
+approved_by = "Operator rc.15 windbox work order 2026-11-21 13:10Z via tr-primary-2 allows measured LOC growth when memory stays efficient. This entry is the measured delta with zero spare."

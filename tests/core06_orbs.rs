@@ -489,6 +489,18 @@ fn projected_orbs_map_onto_the_layout_canvas() {
     assert_eq!(orbs::edge_points([1.0, 2.0, 3.0], 0.5), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
 }
 
+#[test]
+fn wind_box_projection_uses_its_corners() {
+    use model::legend::{area_orbs, AreaShape, WindArea};
+
+    let area = WindArea { shape: AreaShape::Box { min: [-16.0, 8.0], max: [32.0, 24.0] }, angle: Some(170.0) };
+    let orb = area_orbs(&area, 0, 0.0, [255; 4])[0].unwrap();
+    let project = |[x, y, _]: [f32; 3]| Some([512.0 + 2.0 * x, 512.0 - y]);
+    let (centre, size) = orbs::plan_wind_box(&orb, [512.0; 2], project).unwrap();
+    assert_eq!(centre, [30.0, 16.875]);
+    assert_eq!(size, [180.0, 16.875]);
+}
+
 /// rc.15 target-hurtbox-size: the game's hurt radius is the part's size at its bone's world scale (Eden
 /// target-hurtbox-d6393cb0-yoga-4: the 0.6-posed lock-on Sandbag's size-5 parts touch at 3.45, its world scale 0.69;
 /// Mario's size-1.2 parts at 1.14). A hurtbox orb is drawn at that radius; a hitbox orb keeps its size.
