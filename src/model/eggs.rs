@@ -442,7 +442,7 @@ impl Run {
 
     /// The runtime is to read the stage's floors for this run (once per start: a reset may have changed the stage).
     pub fn floors_wanted(&self) -> bool {
-        self.running() && self.areas & 0b011 != 0 && !self.scanned
+        self.running() && self.available_areas() & 0b011 != 0 && !self.scanned
     }
 
     /// The runtime began reading the floors: the first target waits for them (`set_floors`), so it is never put by the

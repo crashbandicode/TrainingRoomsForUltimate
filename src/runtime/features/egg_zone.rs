@@ -177,7 +177,7 @@ pub unsafe fn frame(fighter: usize) {
             .compare_exchange(generation, 0, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
         {
-            notices::post(
+            let _ = notices::post_required(
                 "Off-stage zone",
                 "No usable Off stage zone on this stage.",
                 120,

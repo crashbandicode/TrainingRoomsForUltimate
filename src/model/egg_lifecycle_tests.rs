@@ -274,6 +274,27 @@ fn unavailable_offstage_falls_back_and_preserves_the_next_runs_choices() {
 }
 
 #[test]
+fn unavailable_offstage_uses_the_normal_in_view_floor_scan() {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, OFF_STAGE], 7);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    assert!(!run.floors_wanted());
+    assert!(run.disable_offstage().is_some());
+    assert!(run.floors_wanted());
+    run.want_floors();
+    run.step(true, 0.0, &[], false, 0);
+    assert!(run.egg_at().is_none());
+    run.set_floors(&[[[-35.0, 12.0], [35.0, 16.0]]]);
+    run.step(true, 0.0, &[], false, 0);
+    let [x, y] = run.egg_at().expect("target above the scanned floor");
+    assert!((-35.0..=35.0).contains(&x));
+    assert!(y >= 12.0 + RADIUS);
+    assert!(!run.floors_wanted());
+}
+
+#[test]
 fn training_offstage_draws_and_counts_each_path_on_the_real_recovery_side() {
     use crate::model::edge_juggle::perfect::Outline;
     use crate::model::egg_zone::Stage;

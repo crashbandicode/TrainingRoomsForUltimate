@@ -58,6 +58,31 @@ fn eggsercise_rows_and_cpu_during_a_game_are_latched_at_start() {
 }
 
 #[test]
+fn unavailable_egg_zone_scans_fallback_floors_before_spawning() {
+    let hitbox = src("src/runtime/features/hitbox.rs");
+    let pass = item(&hitbox, "unsafe fn eggs_pass(");
+    let fallback = pass.find("run.disable_offstage()").unwrap();
+    let floor_scan = pass.find("run.floors_wanted()").unwrap();
+    let spawn = pass.find("run.pass(").unwrap();
+    assert!(fallback < floor_scan && floor_scan < spawn);
+}
+
+#[test]
+fn unavailable_egg_zone_messages_remain_visible_with_combo_display_off() {
+    let hitbox = src("src/runtime/features/hitbox.rs");
+    let pass = item(&hitbox, "unsafe fn eggs_pass(");
+    let fallback = &pass[pass.find("run.disable_offstage()").unwrap()..];
+    assert!(fallback.contains("notices::post_required(\"Eggs-ercise\", reason"));
+
+    let wizard = src("src/runtime/features/egg_zone.rs");
+    let frame = item(&wizard, "pub unsafe fn frame(");
+    let refusal = &frame[frame.find("if prepare(p1) == Geometry::Unavailable").unwrap()..];
+    let refusal = &refusal[..refusal.find("return;").unwrap()];
+    assert!(refusal.contains("notices::post_required("));
+    assert!(refusal.contains("No usable Off stage zone on this stage."));
+}
+
+#[test]
 fn the_tech_camera_follows_the_running_session() {
     let tech = src("src/runtime/features/tech.rs");
     let frame = item(&tech, "pub unsafe fn frame(");
