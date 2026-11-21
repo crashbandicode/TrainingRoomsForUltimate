@@ -18,6 +18,7 @@ use perfect::pacman::{self, PacBeat, PacFlight};
 use perfect::peach::{FloatBeat, FloatFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
+use perfect::rob::{self, BurnerFlight, BurnerState};
 use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::sora_flight::{self, SoraBeat, SoraFlight};
 use perfect::wings::{self, WingsFlight};
@@ -36,6 +37,7 @@ enum MeasuredFlight {
     FakeOut(FakeOutFlight),
     Puff(PuffFlight),
     Parasol(FloatFlight),
+    Burner(BurnerFlight),
     Wings(WingsFlight),
     Pichu(PichuFlight),
     PichuFakeOut(PichuFakeOut),
@@ -147,6 +149,27 @@ impl NicheGuide {
                 fighter,
                 ledge: flight.exit_point(),
                 measured: Some(MeasuredFlight::Parasol(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == rob::KIND {
+            band?;
+            let row = niche::measured_row(rob::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = BurnerFlight::start(facts, BurnerState {
+                frame: 0,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                full_fuel: full_burner(cpu),
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_start: inputs.special.is_some() && niche_start_enabled(cpu, Move::Hover, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Burner(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -403,6 +426,7 @@ impl NicheGuide {
             // The FLY-L ring bake runs in at most 283 frames at the cell centers.
             Some(MeasuredFlight::Puff(_)) => Some(300),
             Some(MeasuredFlight::Parasol(_)) => Some(400),
+            Some(MeasuredFlight::Burner(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Wings(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Pichu(_)) => Some(200),
             Some(MeasuredFlight::Olimar(flight)) => Some(flight.crossing_frames()),
@@ -516,6 +540,20 @@ impl NicheGuide {
                 can_float: flight.needs_float() && peach_float_unspent(cpu),
                 can_jump: airborne && niche_start_enabled(cpu, Move::Jump, true),
                 can_rise: airborne && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
+        if let Some(MeasuredFlight::Burner(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let takeoff = flight.needs_fuel_sample();
+            return flight.step(BurnerState {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                full_fuel: takeoff && full_burner(cpu),
+                facing: if takeoff { natives::lr(cpu) } else { 0.0 },
+                jumps: if takeoff { remaining_jumps(cpu)? } else { 0 },
+                can_start: takeoff && reach.is_some() && niche_start_enabled(cpu, Move::Hover, available),
             });
         }
         if let Some(MeasuredFlight::Wings(flight)) = &mut self.measured {
@@ -699,9 +737,6 @@ impl NicheGuide {
             Some(phase) => (phase, phase == Motion::Free),
             None => link_bomb_phase(cpu, status, [x, y], direction, self.body_clearance)?,
         };
-        if movement == Move::Hover && self.fighter == 0x2d && !has_burner(cpu) {
-            return None;
-        }
         if matches!(movement, Move::Bolt) && phase == Motion::Charging {
             aim = bolt_input(cpu, self.fighter, [x, y], direction, aim)?;
         }
@@ -823,7 +858,6 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x27, Barrel, 0x1f2)
         | (0x2b, Hover, 0x1e5)
         | (0x2c, Travel, 0x1e6)
-        | (0x2d, Hover, 0x1e3)
         | (0x34, Side, 0x1e8 | 0x1ea)
         | (0x34, Rise, 0x1ec | 0x1ed)
         | (0x34, Counter, 0x1ee)
@@ -951,13 +985,10 @@ unsafe fn peach_float_unspent(cpu: usize) -> bool {
     game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) && !natives::is_flag(cpu, 0x2000_00e1)
 }
 
-unsafe fn has_burner(cpu: usize) -> bool {
+unsafe fn full_burner(cpu: usize) -> bool {
     // FIGHTER_ROBOT_INSTANCE_WORK_ID_FLOAT_BURNER_ENERGY_VALUE
-    if !game::granted(sites_pkg2::WORK_GET_FLOAT_OFFSET) {
-        return false;
-    }
-    let fuel = natives::get_float(cpu, 0x4e);
-    fuel.is_finite() && fuel > 0.0
+    game::granted(sites_pkg2::WORK_GET_FLOAT_OFFSET)
+        && rob::full_fuel(natives::get_float(cpu, 0x4e))
 }
 
 fn bolt_reads_granted() -> bool {

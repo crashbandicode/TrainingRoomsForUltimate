@@ -602,7 +602,7 @@ impl Wizard {
             (Drill::GuardEdge, Some(0xc)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -28.0])
             }
-            (Drill::GuardEdge, Some(0xd | 0xe)) if perfect::is_crossing_stage(stage_key) => {
+            (Drill::GuardEdge, Some(0xd | 0xe | perfect::rob::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([40.0, 20.0])
             }
             (Drill::GuardEdge, Some(0x1d..=0x1f)) if perfect::is_crossing_stage(stage_key) => {
@@ -1057,6 +1057,33 @@ mod tests {
             wizard.change_area(stage, 1);
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
             assert!(!link_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
+        }
+    }
+
+    #[test]
+    fn rob_upper_release_uses_the_flown_cell_on_each_allowed_stage() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0],
+            [-200.0, 200.0, 120.0, -120.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(3, 0), (0, 0), (311, 0), (0, 1), (89, 0)] {
+            let mut wizard = Wizard::new(
+                Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x2d),
+            ).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            for (area, expected) in [(Area::UpperLeft, [-120.0, 20.0]),
+                                     (Area::UpperRight, [120.0, 20.0])] {
+                while wizard.setup.area != area {
+                    wizard.change_area(stage, 1);
+                }
+                let actual = if perfect::is_crossing_stage(key) {
+                    expected
+                } else {
+                    stage.area_default(area).unwrap()
+                };
+                assert_eq!(wizard.setup.cpu, actual, "stage {key:?}, area {area:?}");
+            }
         }
     }
 

@@ -26,6 +26,8 @@ pub mod pikachu;
 pub mod recovery;
 #[path = "perfect/region.rs"]
 mod region;
+#[path = "perfect/rob.rs"]
+pub mod rob;
 #[path = "perfect/rule_counts.rs"]
 pub mod rule_counts;
 #[path = "perfect/sheik.rs"]

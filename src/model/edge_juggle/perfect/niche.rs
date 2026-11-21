@@ -239,7 +239,7 @@ const ROWS: [Row; 44] = [
     Row::new(4, 0x1c, Intent::Across, &[Hold, Rise]),
     Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),
     Row::new(6, 0x27, Intent::LongApproach, &[Side, Hold, Barrel]),
-    Row::new(7, 0x2d, Intent::Across, &[Hold, Hover]),
+    Row::new(super::rob::ROW, super::rob::KIND, Intent::Across, &[Hold, Hover]),
     // Sonic Blade is special fall: it follows Aerial Sweep at its apex, at the exit.
     Row::new(8, 0x5d, Intent::Across, &[Hold, SoraChain]),
     Row::new(9, 0x34, Intent::HaymakerGap, &[Side, Rise]),
