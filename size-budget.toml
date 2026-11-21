@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 183343
+ceiling = 183635
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 42745d30 measures 183343, an exact 12317 normalized-line delta over 171026. Adds Greninja Hydro Pump, Link's reviewed bomb flight and Steve Elytra. Preserves Bowser Jr.'s stock up special when delaying a jump."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 58ea02c9 measures 183635, an exact 12609 normalized-line delta over 171026. Adds the measured Pyra to Mythra swap return and the reviewed Final Destination mirror of Snake Cypher."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
