@@ -8,7 +8,7 @@ use hos_lock::Mutex;
 
 use crate::model::chords::{field, Sample};
 use crate::model::edge_juggle::perfect::{self, Outline, Point, Segment};
-use crate::model::egg_zone::{blast_rect, Outcome, Side, Stage, Step, Wizard, Zone};
+use crate::model::egg_zone::{blast_rect, stroke_layers, Outcome, Side, Stage, Step, Wizard, Zone};
 use crate::model::eggs::View;
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
@@ -18,6 +18,7 @@ use crate::runtime::{game::natives, published, scene, ui::worker};
 use super::{edge_juggle, mashout::FloorRay, notices, states, tech_surfaces};
 
 const NOTICE: u8 = 0x35;
+const INSET_BACKING: [u8; 4] = [10, 15, 27, 235];
 
 struct State {
     epoch: u32,
@@ -158,7 +159,11 @@ pub unsafe fn frame(fighter: usize) {
         REQUEST.store(0, Ordering::Release);
         return;
     }
-    if fighter == 0 || owners.covers_hud() {
+    if owners.covers_hud() {
+        close();
+        return;
+    }
+    if fighter == 0 {
         return;
     }
     let Some(p1) = natives::module_accessor(0).filter(|&a| a == natives::fighter_accessor(fighter))
@@ -314,14 +319,24 @@ pub fn draw(view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
     let View(scale, origin, ..) = view;
     let map = |p: Point| [p[0] * scale[0] + origin[0], p[1] * scale[1] + origin[1]];
     let Some(display) = display(map) else { return };
-    display.guides(map, &mut line);
+    display.guides(map, &mut |segment, width, color| {
+        for (width, color) in stroke_layers(width, color) {
+            line(segment, width, color);
+        }
+    });
     if let Some(outline) = &display.overview {
         let [bottom, top] = display.zone.vertical();
         let [left, _] = display.zone.horizontal(Side::Left);
         let [_, right] = display.zone.horizontal(Side::Right);
-        let span = (right - left).max(top - bottom);
-        let scale = 218.0 / span;
         let origin = [left.midpoint(right), bottom.midpoint(top)];
+        let span = outline.segments().iter().flatten().fold(
+            (right - left).max(top - bottom),
+            |span, p| span.max(2.0 * (p[0] - origin[0]).abs()).max(2.0 * (p[1] - origin[1]).abs()),
+        );
+        let scale = 218.0 / span;
+        // One dark pane backs every inset stroke. With 28 guides per view and
+        // up to 64 contour segments, both views use at most 149 of 172 bands.
+        line([[681.0, 347.0], [919.0, 347.0]], 238.0, INSET_BACKING);
         let overview = |p: Point| {
             [
                 800.0 + (p[0] - origin[0]) * scale,
@@ -339,7 +354,7 @@ pub fn draw(view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
 impl Display {
     fn guides(&self, map: impl Fn(Point) -> Point, line: &mut impl FnMut(Segment, f32, [u8; 4])) {
         for segment in self.hatching.iter().flatten() {
-            line(segment.map(&map), 3.0, [97, 229, 216, 115]);
+            line(segment.map(&map), 5.0, [112, 204, 255, 222]);
         }
         let [bottom, top] = self.zone.vertical();
         let [left, inner_left] = self.zone.horizontal(Side::Left);

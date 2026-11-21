@@ -56,6 +56,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         )
     };
     if lra_reset::hub_should_run(role_cpu, training, hot_swap) {
+        super::btt_camera::interrupt_placement();
         hub::run(Clear::TrainingReset);
         // rc.14: L+R+A and Change Stage restart an Eggs-ercise run; a fighter swap (hot swap) does not.
         crate::runtime::features::hitbox::eggs_reset();

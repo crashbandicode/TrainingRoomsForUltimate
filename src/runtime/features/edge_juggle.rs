@@ -283,6 +283,10 @@ pub fn wizard_active() -> bool {
     WIZARD.load(Ordering::Acquire) && wanted().is_some()
 }
 
+pub(super) fn placement_active() -> bool {
+    !OPEN.load(Ordering::Acquire) && wizard_active()
+}
+
 pub fn allowed(drill: Drill) -> bool {
     if !INSTALLED.load(Ordering::Acquire) || !scene::is_native_training() {
         return false;
@@ -534,12 +538,14 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     {
         return Correction::default();
     }
-    // The wizard is in Place. Its stock CPU must also stay neutral so it
-    // cannot move or hit P1 before the selected start is applied.
+    // A live editor gets its neutral pad from the shared placement session.
+    if run.wizard.is_some() {
+        return Correction::default();
+    }
     if let Some(hold) = run.rounds.phase.held_pad(buttons) {
         return hold;
     }
-    if run.wizard.is_some() || run.rounds.phase != Phase::Live {
+    if run.rounds.phase != Phase::Live {
         return Correction::default();
     }
     match run.opponent.mode {
@@ -1846,6 +1852,9 @@ pub unsafe fn frame(fighter: usize) {
         return;
     };
     let stage_key = (id, form);
+    if engine.run.as_ref().is_some_and(|run| run.wizard.is_some() && run.stage_key != stage_key) {
+        super::btt_camera::interrupt_placement();
+    }
     if start != 0
         || engine
             .run

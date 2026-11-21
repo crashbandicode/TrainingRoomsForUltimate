@@ -1362,7 +1362,7 @@ fn hitbox_board_never_blocks_a_game_hook() {
 /// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
 /// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
 #[test]
-fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
+fn btt_camera_is_lock_free_and_owning_hooks_reach_seeded_waits() {
     let mut graph = runtime_graph();
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let mut locks = static_locks(&runtime);
@@ -1371,28 +1371,35 @@ fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
         locks.push(camera.clone());
     }
     let camera_lock = locks.iter().position(|lock| lock == &camera).unwrap();
-    let callbacks: Vec<usize> = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"].iter().map(|entry| {
+    let callbacks = [
+        ("btt_camera::request", "cpu::on_frame"),
+        ("btt_camera::interrupt_placement", "cpu::on_frame"),
+        ("btt_camera::placing", "cpu::on_frame"),
+        ("btt_camera::placement_pad", "recorder::ai_epilogue"),
+        ("btt_camera::update_placement", "cpu::on_frame"),
+        ("btt_camera::frame", "cpu::on_frame"),
+    ].map(|(entry, hook)| {
         let found = graph.find(entry);
         assert_eq!(found.len(), 1, "camera callback {entry}");
-        found[0]
-    }).collect();
+        (found[0], hook)
+    });
     {
         let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
-        for &at in &callbacks {
+        for &(at, _) in &callbacks {
             let reached: Vec<String> = scan.reach[at].iter().map(|&lock| lock_name(&ctx, lock)).collect();
             assert!(reached.is_empty(), "{} reaches blocking locks: {reached:?}", graph.funcs[at].key());
         }
     }
-    for at in callbacks {
+    for (at, hook) in callbacks {
         let original = graph.funcs[at].body.clone();
         graph.funcs[at].body.extend(callgraph::lex("CAMERA.lock();"));
         {
             let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
             assert!(scan.reach[at].contains(&camera_lock), "camera lock seed was not parsed");
             let shared = shared_locks(&ctx, &scan);
-            let want = format!("{} (hook cpu::on_frame)", graph.funcs[at].key());
+            let want = format!("{} (hook {hook})", graph.funcs[at].key());
             assert!(shared.game_waits.get(&camera_lock).is_some_and(|waits| waits.contains(&want)),
-                    "CPU frame did not reach the camera seed: {want}");
+                    "the owning hook did not reach the camera seed: {want}");
         }
         graph.funcs[at].body = original;
     }

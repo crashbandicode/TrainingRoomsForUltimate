@@ -1,6 +1,6 @@
 use super::chords::logical as key;
 use super::edge_juggle::perfect::Outline;
-use super::egg_zone::{Outcome, Side, Stage, Step, Wizard};
+use super::egg_zone::{stroke_layers, Outcome, Side, Stage, Step, Wizard};
 
 fn stage(blast: [f32; 4], points: &[[f32; 2]]) -> Stage {
     let mut outline = Outline::new();
@@ -103,5 +103,17 @@ fn zone_wizard_polls_guard_edge_controls() {
     for side in [Side::Left, Side::Right] {
         let [lo, hi] = resolved.rect(side);
         assert!(lo.into_iter().zip(hi).all(|(a, b)| a <= b));
+    }
+}
+
+#[test]
+fn zone_overlay_paints_a_dark_outline_behind_each_stroke() {
+    for width in [2.0, 3.0, 5.0] {
+        for color in [[66, 142, 255, 250], [255, 221, 77, 180], [206, 132, 255, 190], [112, 204, 255, 222]] {
+            let [(outline, dark), foreground] = stroke_layers(width, color);
+            assert!(outline - width >= 4.0);
+            assert!(dark[..3].iter().all(|&v| v < 32) && dark[3] >= 224);
+            assert_eq!(foreground, (width, color));
+        }
     }
 }

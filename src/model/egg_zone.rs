@@ -283,6 +283,11 @@ fn crosses([a, b]: Segment, [c, d]: Segment) -> bool {
     straddles(a, b, c, d) && straddles(c, d, a, b)
 }
 
+/// The world overlay paints a shadow before each colored stroke.
+pub fn stroke_layers(width: f32, color: [u8; 4]) -> [(f32, [u8; 4]); 2] {
+    [(width + 5.0, [10, 15, 27, 235]), (width, color)]
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Top,

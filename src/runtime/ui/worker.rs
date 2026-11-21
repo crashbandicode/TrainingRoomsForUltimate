@@ -532,6 +532,7 @@ fn handle(event: Event, s: &mut Session) {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
+        crate::runtime::features::btt_camera::interrupt_placement();
         crate::runtime::features::btt::menu_opened();
         crate::runtime::features::tech::menu_opened();
         crate::runtime::features::edge_juggle::menu_opened();

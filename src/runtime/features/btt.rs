@@ -195,7 +195,7 @@ pub fn reset() {
 unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut(usize, [f32; 2]) -> Option<u32>) -> u8 {
     let facts = scene::facts();
     if facts.busy {
-        btt_camera::apply(false);
+        btt_camera::request(btt::BTT_PLACEMENT_OWNER, false);
         return 0;
     }
     let on = on();
@@ -219,7 +219,9 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
         }
         mode.close_menu(false, false);
     } else {
+        let was_placing = mode.phase() == Phase::Placing;
         if stage >= 0 && mode.enter(stage) {
+            if was_placing { btt_camera::interrupt_placement(); }
             STAGE.store(stage, Ordering::Release);
             READ.store(true, Ordering::Release);
         }
@@ -277,7 +279,7 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
     }
     drop(mode);
     // Placement alone owns Fixed; X start, Off and UI/scene ownership restore the saved native mode.
-    btt_camera::apply(btt::wants_camera(phase, owners.covers_strip(), facts));
+    btt_camera::request(btt::BTT_PLACEMENT_OWNER, btt::wants_camera(phase, owners.covers_strip(), facts));
     broken
 }
 

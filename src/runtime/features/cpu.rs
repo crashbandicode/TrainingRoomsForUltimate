@@ -399,7 +399,10 @@ fn role_of(accessor: usize) -> Option<FighterKey> {
     let scene = role_scene();
     with(|cpu| role_adapter::role(cpu, scene, accessor))
         .flatten()
-        .filter(|&key| !super::edge_juggle::suspends_cpu_settings(key))
+        .filter(|&key| {
+            !(super::edge_juggle::suspends_cpu_settings(key)
+                || key.entry == primary_entry(scene == Some(Scene::Lobby)) && super::btt_camera::placing())
+        })
 }
 
 /// Ask the game's table for every constant, once. Returns whether the table is ready. Called from the
@@ -531,7 +534,8 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0
             && unsafe { ((a0 + FIGHTER_KIND_FIELD) as *const i32).read() } != konst(C::KindNana);
         if primary_p1 {
-            unsafe { super::btt_camera::frame() };
+            let want_camera = super::btt_camera::update_placement();
+            unsafe { super::btt_camera::frame(want_camera) };
         }
         // The Eggs-ercise CPU target's player tag: the game turns its flag off for the placed CPU, so when the pass just run asked
         // for it (`hide_cpu::keep_cursor`) the flag is written on again, the one write after the placement.
@@ -640,7 +644,9 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let primary = !key.partner && key.entry == primary_entry(lobby);
     let tech = tech_facts(accessor, status, primary);
     let speed = crate::runtime::features::game_speed::current();
-    let practice_owned = super::mashout::owns_cpu(accessor) || super::edge_juggle::suspends_cpu_settings(key);
+    let practice_owned = super::mashout::owns_cpu(accessor)
+        || super::edge_juggle::suspends_cpu_settings(key)
+        || key.entry == primary_entry(lobby) && super::btt_camera::placing();
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }

@@ -55,10 +55,34 @@ fn deadline_contact_wins_and_off_never_expires() {
 }
 
 #[test]
+fn offstage_contact_scores_immediately_from_stage() {
+    for (where_p1, observation) in [
+        ("grounded at the lip", Recovery::Returned),
+        ("grounded on a platform", Recovery::Unchanged),
+        ("airborne inboard above the floor", Recovery::Unchanged),
+        ("caught the ledge", Recovery::Returned),
+    ] {
+        let mut run = target(0);
+        run.area = Some(OFF_STAGE);
+        let original = run.target_id();
+        let broken = run.egg_at().unwrap();
+        run.observe_recovery(observation);
+        contact(&mut run);
+        assert_eq!((run.event(), run.score, run.recovering()), (TargetEvent::Hit, 1, false), "{where_p1}");
+        assert_eq!(run.bursts[0], Some((broken, 0)));
+        assert_ne!(run.target_id(), original, "{where_p1}");
+        assert!(run.egg_at().is_some(), "{where_p1}");
+        let mut hud = String::new();
+        run.write_notice(&mut hud).unwrap();
+        assert_eq!(hud, "Eggs 1", "{where_p1}");
+    }
+}
+
+#[test]
 fn offstage_contact_waits_for_an_excursion_then_a_return() {
     let mut run = target(1);
     run.area = Some(OFF_STAGE);
-    run.observe_recovery(Recovery::Returned);
+    run.observe_recovery(Recovery::Away);
     contact(&mut run);
     assert_eq!((run.event(), run.score), (TargetEvent::Pending, 0));
     assert!(run.egg_at().is_none());
@@ -140,6 +164,20 @@ fn cpu_native_contact_wins_the_deadline_and_can_be_deferred() {
     run.step(true, 0.0, &[], false, 0);
     assert_eq!((run.event(), run.score), (TargetEvent::Recovered, 1));
     assert!(matches!(run.cpu_pass(10.0, false), Some((_, Put::Fresh(_)))));
+}
+
+#[test]
+fn cpu_offstage_contact_also_scores_immediately() {
+    let mut run = cpu_at_deadline();
+    let original = run.target_id();
+    run.area = Some(OFF_STAGE);
+    run.observe_recovery(Recovery::Unchanged);
+    assert_eq!(run.cpu_pass(10.0, true), None);
+    assert_eq!((run.event(), run.score, run.recovering()), (TargetEvent::Hit, 1, false));
+    assert_eq!(run.cpu_pass(10.0, true), None, "the struck CPU can finish hitlag");
+    assert_eq!(run.target_id(), original);
+    assert!(matches!(run.cpu_pass(10.0, false), Some((_, Put::Fresh(_)))));
+    assert_ne!(run.target_id(), original);
 }
 
 #[test]

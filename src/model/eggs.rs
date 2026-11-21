@@ -268,14 +268,16 @@ pub enum Plan {
     Read,
 }
 
-/// Only an actual offstage excursion followed by a stage landing or ledge catch qualifies.
+/// Live P1 observation. A pending hit resolves only on a main-floor landing or ledge catch.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Recovery {
-    #[default]
+    /// On the stage without completing a pending recovery, including platforms.
     Unchanged,
     Away,
     Returned,
     Lost,
+    #[default]
+    Unknown,
 }
 
 /// The score and streak consume the outcome at the point of contact, expiry, or recovery.
@@ -404,7 +406,7 @@ impl Run {
         area: None,
         path: None,
         serial: 0,
-        recovery: Recovery::Unchanged,
+        recovery: Recovery::Unknown,
         pending_hit: None,
         zone: None,
         zone_prefs: None,
@@ -558,13 +560,13 @@ impl Run {
         self.age = 0;
     }
 
-    fn contact(&mut self, egg: [f32; 2], melee: bool) {
+    fn contact(&mut self, egg: [f32; 2], melee: bool, recovery: Recovery) {
         self.melee = melee;
-        if self.area == Some(OFF_STAGE) {
-            self.event = if self.recovery == Recovery::Lost {
+        if self.area == Some(OFF_STAGE) && !matches!(recovery, Recovery::Unchanged | Recovery::Returned) {
+            self.event = if recovery == Recovery::Lost {
                 TargetEvent::Miss
             } else {
-                self.pending_hit = Some((egg, self.recovery == Recovery::Away));
+                self.pending_hit = Some((egg, recovery == Recovery::Away));
                 TargetEvent::Pending
             };
             self.empty_target();
@@ -1001,7 +1003,7 @@ impl Run {
                 let additional = if melee.is_none() && disc { breaks(egg) } else { None };
                 if melee.is_some() || additional.is_some() {
                     self.bursts = [Some((egg, 0)), self.bursts[0]];
-                    self.contact(egg, melee.is_some());
+                    self.contact(egg, melee.is_some(), self.recovery);
                     depth = melee.or_else(|| additional.flatten());
                     if self.event == TargetEvent::Hit {
                         self.empty_target();
@@ -1057,10 +1059,17 @@ impl Run {
     /// not count puts the CPU back on its flight where it was hit). `cpu`: 0 place, 1 wait for 0%, 2 armed, 3 counted hit in
     /// hitlag, 4 uncounted.
     pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<(Point, Put)> {
-        self.cpu_pass_in(damage, stopped, NO_HULL)
+        let recovery = self.recovery;
+        self.cpu_pass_in(damage, stopped, NO_HULL, || recovery)
     }
 
-    pub fn cpu_pass_in(&mut self, damage: f32, stopped: bool, clear: &Clearance<'_>) -> Option<(Point, Put)> {
+    pub fn cpu_pass_in(
+        &mut self,
+        damage: f32,
+        stopped: bool,
+        clear: &Clearance<'_>,
+        recovery_at_contact: impl FnOnce() -> Recovery,
+    ) -> Option<(Point, Put)> {
         self.event = TargetEvent::None;
         self.egg.filter(|_| self.cpu_target() && !self.ended())?;
         let fresh = match (self.cpu, damage > 0.0) {
@@ -1068,7 +1077,8 @@ impl Run {
                 let counts = counts(self.rows[1], self.air, damage);
                 self.cpu = 3 + u8::from(!counts);
                 if counts {
-                    self.contact(self.egg_at()?, false);
+                    let recovery = if self.area == Some(OFF_STAGE) { recovery_at_contact() } else { Recovery::Unknown };
+                    self.contact(self.egg_at()?, false, recovery);
                 }
                 return None;
             }
