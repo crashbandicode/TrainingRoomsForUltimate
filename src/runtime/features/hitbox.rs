@@ -1639,12 +1639,6 @@ pub fn check(poisoned: &dyn Fn(&str) -> bool) -> [GuardOutcome; N] {
 /// Install the overlay hooks after its full closure and the CPU frame wrapper pass their guards.
 /// Returns the installed flag and the per-site result for the boot log.
 pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N]) {
-    let mut written = [Written::Skipped; N];
-    for (slot, outcome) in written.iter_mut().zip(found) {
-        if outcome.usable() {
-            *slot = Written::Checked;
-        }
-    }
     if closure {
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
@@ -1654,12 +1648,8 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_rad_hook);
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
         skyline::install_hook!(overlay_process_end_hook);
-        for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
-            if sites_hitbox::HOOK_ROWS[..8].contains(&site.name) {
-                *slot = Written::Far;
-            }
-        }
     }
+    let written = std::array::from_fn(|i| sites_hitbox::visualizer_written(&sites_hitbox::SITES[i], found[i], closure));
     set_installed(closure);
     (closure, written)
 }

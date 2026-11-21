@@ -14,7 +14,8 @@
 //! feature shares with other packages (`status_kind`, the constant lookup, `set_visible_kind`) stay in those packages' tables
 //! and enter the closure through `CROSS_NEEDS`.
 
-use super::guard::{HookForm, Placement, SeamKind};
+use super::guard::{GuardOutcome, HookForm, Placement, SeamKind};
+use super::install_line::Written;
 use super::sites::{Feature, Site};
 
 pub const HITBOX_ATTACK_OFFSET: usize = 0x228_4b20;
@@ -110,12 +111,25 @@ pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
 /// End of the native battle-object simulation phases, after the model callbacks.
 pub const OVERLAY_PROCESS_END_OFFSET: usize = 0x3a_de50;
 
-/// Hook rows in installation order, with the optional grader last.
+/// Hook rows in the guard table order.
 pub const HOOK_ROWS: [&str; 9] =
     ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler", "overlay_process_end"];
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+
+/// Report only hook writes made by the visualizer installer. The spacing installer owns its own write.
+pub fn visualizer_written(site: &Site, guard: GuardOutcome, installed: bool) -> Written {
+    if installed && matches!(site.kind, SeamKind::Hook { .. })
+        && !GRADER_ROWS.iter().any(|&(name, _)| name == site.name)
+    {
+        Written::Far
+    } else if guard.usable() {
+        Written::Checked
+    } else {
+        Written::Skipped
+    }
+}
 
 pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
     GRADER_ROWS.iter().all(|(name, _)| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))

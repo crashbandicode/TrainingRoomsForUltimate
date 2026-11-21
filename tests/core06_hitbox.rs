@@ -406,6 +406,23 @@ fn grader_rows_resolve_in_the_hitbox_table() {
 }
 
 #[test]
+fn core06_install_report_only_marks_visualizer_hook_writes() {
+    use model::guard::GuardOutcome;
+    use model::install_line::Written;
+
+    let site = |name| SITES.iter().find(|site| site.name == name).unwrap();
+    let written = sites_hitbox::visualizer_written;
+    let usable = GuardOutcome::Stock;
+    let phase_end = site("overlay_process_end");
+    let spacing = site("spacing_hit_handler");
+    assert_eq!(written(phase_end, usable, true), Written::Far);
+    assert_eq!(written(phase_end, usable, false), Written::Checked);
+    assert_eq!(written(spacing, usable, true), Written::Checked);
+    assert_eq!(written(spacing, GuardOutcome::Foreign { first_diff: 0 }, true), Written::Skipped);
+    assert_eq!(SITES.iter().filter(|site| written(site, usable, true) == Written::Far).count(), 8);
+}
+
+#[test]
 fn core06_site_guards() {
     // The fifteen called natives include indexed article lookup and TeamModule ownership.
     // Fourteen main relied windows cover layout, camera, damage and hitbox reads; spacing-grader rows are optional.
