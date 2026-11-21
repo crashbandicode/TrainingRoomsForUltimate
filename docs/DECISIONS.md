@@ -5,6 +5,9 @@ picture the recommended option has a **green outline**. The images are in [`deci
 by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep
 their numbers), the specs' *Open questions* sections, `PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10.
 
+**Open now (2026-11-21):** five Guard the Edge and bridge decisions, in
+[*Open — 2026-11-21 morning*](#open-2026-11-21-morning-guard-the-edge-bridge) further down.
+
 **Answered 2026-11-01 (late evening ET):** the operator approved the proposal with the answers in the *Decision*
 column below, and implementation may begin. Items marked **open** were not answered; their recommendation is the
 working default until they are. The new requirements the answers add are collected in
@@ -736,6 +739,130 @@ Line counts are the review's estimates; the size gate measures the real ones.
 ![SL3 / S6: a setup's own screen with Delete](decisions/rc14-setup-S6-own-screen.png)
 
 ![SL4 / S7: Save setup here keeps the live spot](decisions/rc14-setup-S7-save-here.png)
+
+## Open — 2026-11-21 morning (Guard the Edge + bridge)
+
+Opened by tr-primary-2 for the operator from the lanes' posts of 2026-11-21 (06:36Z to 11:10Z). Five decisions, each
+one answerable in under a minute. Four are Guard the Edge fighters whose listed trick, a recovery **under the stage to
+the far ledge** (the "crossing"), is blocked or proven only in part. The fifth is the hardware-test bridge. In each
+picture the recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1121.py` from
+the posts' numbers. The stage is Final Destination to scale (the level data in
+`edge-juggle/reference-crossings/MODEL.md` §2); between two measured points a path is a plain curve.
+
+Words used below: **near side** means recovering to the nearer ledge; **Level 9** is the game's own CPU; **Perfect** is
+Guard the Edge's improved recovery. Evidence paths are relative to `artifacts/phase23/` in the workspace; "inbox" is
+`INBOX-opus-rc6-integration.md` there, by post time.
+
+Answer by number, for example: "Hero 1, Sonic 1, Bayo 1, Bridge 1, Lucario 1".
+
+| # | Decision | Recommendation |
+| --- | --- | --- |
+| GTE-HERO | Hero's crossing, which no recovery start reaches | **1:** ship Hero without it; his near side is Level 9 quality |
+| GTE-SONIC | Sonic's crossing, which the far ledge never catches | **1:** ship Sonic without it; his near side is equal to Level 9 |
+| GTE-BAYO | A new start, "CPU hanging on the near ledge", for Bayonetta's crossing | **1:** no, as for Mr. Game & Watch. The hang start is proven and ready if you want it |
+| BRIDGE-40MS | Let one unreadable menu frame wait up to 40 ms before the bridge turns Off | **1:** approve |
+| GTE-LUCARIO | The lowest damage at which Lucario's crossing is offered | **1:** from 100 %, as tabled |
+
+#### GTE-HERO · Hero: the crossing under the stage
+
+Hero's crossing falls about 55 units short from every off-stage start (23 of 23 traced attempts were KO), so what does
+Hero ship with?
+
+![GTE-HERO: from 17 to 20 out the crossing is held under the stage and passes 55.5 below the far ledge's box; KO 23 of 23. Near side: Level 9 already plays jump + full Kaswoosh](decisions/GTE-HERO.png)
+
+- **1 · Ship Hero without the crossing (recommended).** His near side is already Level 9 quality: the game's CPU does
+  jump + full Kaswoosh. Perfect only picks the cheapest spell that still reaches, which saves MP. Optionally, add a
+  Zoom-to-ledge mixup tied to the existing Hero Zoom drill.
+- **2 · Allow it only from an on-stage jump** off the near lip, as in the public clip (about 60 more height and 20
+  closer). That isn't a recovery, so it sits outside Guard the Edge.
+- **3 · Name a Hero trick** we haven't flown.
+
+Evidence: inbox 06:36Z fusion-g4; `edge-juggle/reference-crossings/hero.md`; `edge-juggle/evidence/fg4-m5b-xps-2/`,
+`edge-juggle/evidence/fg4-m7b-xps/`.
+
+#### GTE-SONIC · Sonic: the crossing under the stage
+
+The far ledge never catches Sonic's Spring, his only rise that reaches ledge height (0 of 8 facing it from under the far
+slope, 0 of 4 facing away outside it; 38 traced plays in 5 boots), though the same spot catches other fighters' moves.
+What does Sonic ship with?
+
+![GTE-SONIC: Spin Dash under the stage, Spring under the far slope, tops out 17.2 to 19.8 below the far ledge, not caught 0 of 8; facing away outside, 0 of 4; Lucario, PAC-MAN and Greninja are caught at the same spot](decisions/GTE-SONIC.png)
+
+- **1 · Ship Sonic without the crossing (recommended).** His near side stays equal to Level 9.
+- **2 · Allow it only from a stage or ledge start,** as in your clip, which starts on the stage with a ground jump and
+  both jumps. That is outside Guard the Edge's off-stage situation.
+- **3 · Name a Sonic trick.** Two are still untried: a Homing Attack aimed at you standing near the far ledge, and
+  inputs later in the Homing Attack's dive.
+
+Evidence: inbox 09:02Z fusion-g2; `edge-juggle/reference-crossings/g2/HANDOFF.md`;
+`edge-juggle/reference-crossings/g2/evidence/*/frames-sonic.tsv`.
+
+#### GTE-BAYO · Bayonetta: a start hanging on the near ledge?
+
+Bayonetta's crossing works only when she starts hanging on the near ledge (48 of 48), never from a release in the air
+(KO 9 of 9: she must first fall about 25 under the near ledge and runs out of height). Should the wizard get a new
+start, "CPU hanging on the near ledge", for her?
+
+![GTE-BAYO: from the hang, jump and Witch Twist near the bottom, After Burner Kick under the stage, jump and Witch Twist, caught by the far ledge 48 of 48; released in the air, KO 9 of 9](decisions/GTE-BAYO.png)
+
+- **1 · No hang start, as for Mr. Game & Watch (recommended).** When G&W's crossing didn't fit, you dropped it and asked
+  for a stall mixup instead (the Oil Panic stall). The same here: Bayonetta ships without the crossing, her near side
+  is Level 9, and she gets a substitute mixup if you name one.
+- **2 · Add the hang start.** A new wizard start type, CPU hanging on the near ledge; the first result after she lets go
+  is counted, in Perfect and in Level 9. Ordinary free-fall starts and their scoring stay as they are. It's proven 48 of
+  48 (Final Destination 28, Battlefield 10, Waiting Room 10) and passed model review, so it's ready if you want it.
+
+Evidence: inbox 10:35Z fusion-g1, 10:37Z edge-juggle-sol, 10:39Z edge-recovery-fable;
+`edge-juggle/reference-crossings/g1/bayonetta.md`, `edge-juggle/reference-crossings/g1/REVIEW-bayonetta-fable.md`.
+
+#### BRIDGE-40MS · Bridge: one unreadable menu frame
+
+The bridge (the hardware-test plugin) must turn itself Off whenever it can't prove the game is on an offline screen.
+The first time a menu page appears, one frame sees it before the bridge's background worker has learned it (3 to 11 ms
+later), and today that one unreadable frame turns the bridge Off and fails the menu row. May that frame count as "no
+reading yet" for at most 40 ms instead?
+
+![BRIDGE-40MS: today one unreadable frame turns the bridge Off; with the window it waits up to 40 ms with no inputs, and the next real read decides](decisions/BRIDGE-40MS.png)
+
+- **1 · Approve the 40 ms window (recommended).** It applies only when the read was refused because the page is
+  waiting for the worker or the page table is briefly out of date. It is safe because:
+  - the bridge's action fence stays closed, so the bridge sends nothing during the window;
+  - 40 ms is the bridge's existing, reviewed age limit for menu readings (`MAX_MAIN_AGE_MS`), not a new timer;
+  - a bad pointer, a wrong shape or a replaced object still turns it Off at once, and so does Online, Popup or Unknown
+    on the next real read.
+
+  The cost: a real move to an online screen is noticed up to 40 ms late, while the game, not the bridge, drives the
+  screen. It's built and tested on a separate branch (`opus/workaround-40ms` `a00d182`, never loaded). Next come
+  review-bridge-astra's behaviour review, the gate and a counted run.
+- **2 · Reject.** The bridge ships without reliable menu rows, or the work continues on another design. The fallback
+  (a faster worker that learns nearby memory early) narrows the gap but can't close the first-frame case, so BRIDGE
+  READY (all 25 rows in one run) stays unlikely.
+
+The reviewer, review-bridge-astra, says this can't be approved under the current rules without you. They also note
+that the logs don't prove every non-blocking alternative impossible. Load 13 (the last diagnostic run): 8 menu rows
+passed. The rest were:
+- one Off of this kind (the reviewer says its timing doesn't prove the cause);
+- a separate Off when a reading aged past its 300 ms limit (cause still being investigated);
+- a test-harness navigation fault (fixed since);
+- rows that never ran.
+
+Evidence: `bridge-menu-introspection/OPERATOR-DECISION-40MS.md`; inbox 09:55Z bridge-opus and review-bridge-astra,
+10:44Z bridge-opus, 10:45Z review-bridge-astra, 11:01Z bridge-opus, 11:02Z review-bridge-astra, 11:10Z bridge-opus.
+
+#### GTE-LUCARIO · Lucario: from what damage?
+
+Lucario's crossing works at 100 % and 130 % damage, where it has tables. His rush gets shorter at lower damage, and
+there is no table below 100 %. From what damage should Perfect offer it?
+
+![GTE-LUCARIO: the rush is 67.3 at 0 %, 83.6 at 65 %, 100.3 at 130 %; tables at 100 and 130 %: 108 of 108; 65 %: 30 of 30 planned live; 0 %: one line, no margin](decisions/GTE-LUCARIO.png)
+
+- **1 · From 100 %, as tabled (recommended).** There are tables at 100 % and 130 % (64 and 85 cells). 108 of 108 inside
+  starts reached the far ledge on Final Destination, Battlefield and the Waiting Room; outside starts, 0 of 34.
+- **2 · Also from 65 %, on plans solved live without a table.** 6 planned starts flew 30 of 30 on Final Destination.
+  Choose this if the mixup should show up earlier in a stock.
+- **3 · The 0 % line as flown.** One line crossed (2 of 2). It was caught on the rush's last step, so there's no margin.
+
+Evidence: inbox 09:58Z fusion-g2; `edge-juggle/reference-crossings/g2/lucario.md`.
 
 ## Open (2026-11-13/14)
 
