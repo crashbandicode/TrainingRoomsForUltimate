@@ -785,7 +785,7 @@ impl NicheGuide {
                 bomb: if sample_bomb { owned_link_bomb(cpu).map(|(owned, _)| owned) } else { None },
                 can_pull: flight.waiting_to_pull() && niche_start_enabled(cpu, Move::Bomb, true),
                 can_jump: flight.is_jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
-                can_spin: flight.is_spin_frame(frame) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+                can_spin: flight.needs_spin_sample(frame) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
             });
         }
         if let Some(MeasuredFlight::Aura(flight)) = &mut self.measured {

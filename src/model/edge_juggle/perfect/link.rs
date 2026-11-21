@@ -196,8 +196,8 @@ impl LinkFlight {
         self.samples_edge(frame, self.jump_age())
     }
 
-    pub fn is_spin_frame(&self, frame: u32) -> bool {
-        self.samples_edge(frame, self.jump_age() + JUMP_TO_SPIN)
+    pub fn needs_spin_sample(&self, frame: u32) -> bool {
+        self.waiting_to_pull() || self.samples_edge(frame, self.jump_age() + JUMP_TO_SPIN)
     }
 
     pub fn needs_bomb_sample(&self, frame: u32) -> bool {
@@ -419,6 +419,25 @@ lib_unit_tests! {
             for stage in [(3, 1), (44, 0), (89, 0)] {
                 assert!(LinkFlight::start(&facts(stage, beat.position), beat).is_none());
             }
+        }
+
+        #[test]
+        fn link_samples_spin_availability_before_committing_the_bomb_pull() {
+            let high = LinkBeat { position: [117.99, 38.0], facing: 1.0, velocity: [0.0; 2], ..release() };
+            let mut flight = LinkFlight::start(&facts((0, 0), high.position), high).unwrap();
+            let spin_sample = |flight: &LinkFlight, beat: LinkBeat| LinkBeat {
+                can_spin: flight.needs_spin_sample(beat.frame), ..beat
+            };
+            assert_eq!(flight.step(spin_sample(&flight, high)), Some(pad([0.0; 2], 0)));
+            let pull = LinkBeat { frame: high.frame + 28, position: [117.99, 9.104],
+                velocity: [0.0, -1.6], ..high };
+            let sample = spin_sample(&flight, pull);
+            assert_eq!(flight.step(LinkBeat { can_spin: false, ..sample }), None);
+            assert_eq!(flight.step(sample).unwrap().press, SPECIAL);
+            assert!(!flight.needs_spin_sample(pull.frame + 20));
+            assert!(flight.needs_spin_sample(pull.frame + 160));
+            assert!(flight.needs_spin_sample(pull.frame + 161));
+            assert!(!flight.needs_spin_sample(pull.frame + 162));
         }
 
         #[test]
