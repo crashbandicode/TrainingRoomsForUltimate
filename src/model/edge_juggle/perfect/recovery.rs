@@ -253,7 +253,8 @@ impl Reach {
         if gap == 0.0 && speed == 0.0 {
             return Some(0.0);
         }
-        if !(stopping_distance(speed) < gap) {
+        let stopping = stopping_distance(speed);
+        if stopping.is_nan() || stopping >= gap {
             return None;
         }
         let inward = (speed + acceleration).min(self.air.horizontal_speed);
