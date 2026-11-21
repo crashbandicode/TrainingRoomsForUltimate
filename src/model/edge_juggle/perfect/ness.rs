@@ -102,6 +102,23 @@ fn jump_position(start: Point, rows: u32) -> Point {
         })
 }
 
+fn jump_cast_launch(start: Point, jump_rows: u32) -> Point {
+    // PK Thunder brakes on the cast row, halves that speed, and keeps
+    // braking through the startup and hold until horizontal speed is zero.
+    const AIR_BRAKE: f32 = 0.0225;
+    let jump_speed = f32::from(data::JUMP_STEPS[jump_rows as usize - 1][0]) * 0.0001;
+    let mut displacement = -AIR_BRAKE;
+    let mut speed = (jump_speed - AIR_BRAKE) * 0.5;
+    for _ in 1..HIT {
+        speed -= AIR_BRAKE;
+        if speed <= 0.0 {
+            break;
+        }
+        displacement += speed;
+    }
+    add(jump_position(start, jump_rows), [displacement, -HOLD_DROP])
+}
+
 fn clean_start(foot: Point, ledge: Point) -> bool {
     foot[0] <= ledge[0] - 16.0 && foot[1] >= ledge[1] - 125.0
 }
@@ -203,8 +220,7 @@ impl ThunderReturn {
         let launch = if program.jump_rows == 0 {
             add(start, [0.0, -7.581])
         } else {
-            let cast_end = jump_position(start, program.jump_rows);
-            let launch = add(cast_end, [data::START_X, -HOLD_DROP]);
+            let launch = jump_cast_launch(start, program.jump_rows);
             if !clean_start(jump_position(start, 0), ledge)
                 || (1..=program.jump_rows).any(|n| !clean_start(jump_position(start, n), ledge))
             {
@@ -281,10 +297,7 @@ impl ThunderReturn {
                     return None;
                 }
                 let nominal_launch = if started_jump {
-                    add(
-                        jump_position(self.start, self.program.jump_rows),
-                        [data::START_X, -HOLD_DROP],
-                    )
+                    jump_cast_launch(self.start, self.program.jump_rows)
                 } else {
                     add(self.start, [0.0, -7.581])
                 };

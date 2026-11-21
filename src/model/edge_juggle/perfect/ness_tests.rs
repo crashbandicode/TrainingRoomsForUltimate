@@ -78,7 +78,7 @@ fn ness_offers_the_proven_near_side_programs_with_both_native_resources() {
             facts.player = [0.0, 0.0];
             assert!(ThunderReturn::start(&facts, release).is_none());
         }
-        for (out, below) in [(20.0, 56.0), (44.0, 40.0), (56.0, 72.0), (120.2, 108.2)] {
+        for (out, below) in [(20.0, 56.0), (36.0, 24.0), (36.0, 28.0), (84.0, 52.0), (56.0, 72.0), (120.2, 108.2)] {
             let (facts, release) = fixture(stage, out, below);
             assert!(ThunderReturn::start(&facts, release).is_none());
         }
@@ -229,5 +229,44 @@ fn ness_deep_fixture_is_a_shared_stage_specific_wizard_default() {
         }
         assert_eq!(wizard.setup.area, Area::LowerLeft);
         assert_eq!(wizard.setup.cpu, [NEAR[0] - expected[0], expected[1]]);
+    }
+}
+
+#[test]
+fn ness_jump_to_thunder_launch_matches_six_native_cast_rows() {
+    for (out, below, rows, actual_x) in [
+        (46.0, 42.0, 14, -102.16),
+        (58.0, 74.0, 17, -111.43),
+        (84.0, 88.0, 21, -133.85),
+        (108.0, 108.0, 48, -134.79),
+        (110.0, 110.0, 48, -136.79),
+        (114.0, 110.0, 49, -139.91),
+    ] {
+        let predicted = jump_cast_launch([NEAR[0] - out, -below], rows);
+        assert!(
+            (predicted[0] - actual_x).abs() <= 0.02,
+            "{out} out, {below} below, cast at row {rows}: {predicted:?}, native x {actual_x}"
+        );
+    }
+}
+
+#[test]
+fn ness_v3_uses_the_reviewed_program_at_the_live_start() {
+    assert_eq!(data::CELLS.len(), 232);
+    for (out, below, jump_rows, loop_kind) in [
+        (60.0, 76.0, 18, 0),
+        (64.0, 84.0, 25, 0),
+        (68.0, 84.0, 20, 0),
+        (80.0, 56.0, 12, 1),
+        (84.0, 56.0, 12, 2),
+        (84.0, 60.0, 12, 2),
+    ] {
+        let selected = program((3, 0), out + 1.0, below + 1.0).unwrap();
+        assert_eq!((selected.jump_rows, selected.loop_kind), (jump_rows, loop_kind));
+    }
+
+    for (out, below) in [(108.0, 108.0), (110.0, 110.0), (114.0, 110.0)] {
+        let (facts, beat) = fixture(3, out, below);
+        assert!(ThunderReturn::start(&facts, beat).is_some(), "{out} out, {below} below");
     }
 }
