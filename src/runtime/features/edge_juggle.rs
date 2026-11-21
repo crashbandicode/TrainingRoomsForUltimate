@@ -1565,7 +1565,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     };
     state::set_lr(bodies.cpu, cpu_facing);
     state::set_situation_kind(bodies.cpu, air);
-    natives::set_int(bodies.cpu, 0, jump_count);
+    natives::set_int(bodies.cpu, drill.placed_jump_count(), jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
     state::status_request(bodies.cpu, fall);

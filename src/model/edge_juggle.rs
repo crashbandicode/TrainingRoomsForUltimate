@@ -29,6 +29,14 @@ impl Drill {
         }
     }
 
+    /// The Edge recovery start is already airborne, so only aerial jumps are restored.
+    pub const fn placed_jump_count(self) -> i32 {
+        match self {
+            Self::GuardEdge => 1,
+            Self::Juggler => 0,
+        }
+    }
+
     pub const fn ready_frames(self) -> u16 {
         match self {
             Self::GuardEdge => 60,
@@ -745,6 +753,16 @@ mod tests {
         }
         assert_eq!((session.phase, session.frames), (Phase::Live, 0));
         session
+    }
+
+    #[test]
+    fn edge_free_fall_restores_stock_aerial_jump_reserve() {
+        // Stock jump_count_max includes the ground jump. The verified Sheik,
+        // Pit and Meta Knight starts have one, three and five aerial jumps.
+        for (native_max, reference_reserve) in [(2, 1), (4, 3), (6, 5)] {
+            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
+        }
+        assert_eq!(Drill::Juggler.placed_jump_count(), 0);
     }
 
     #[test]
