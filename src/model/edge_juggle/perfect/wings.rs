@@ -117,8 +117,8 @@ const FLIGHT_CARRY: f32 = 8.9;
 const HALF: f32 = 2.0;
 const DRIFT: f32 = 0.075;
 const JUMP_DRIFT: f32 = 0.062;
-const META_DRIFT_CHECK_FRAMES: u32 = 8;
-const META_HALF_SPEED: f32 = 0.52;
+const META_DRIFT_CHECK_FRAMES: u32 = 10;
+const META_CLEAR_DRIFT: f32 = 0.70;
 const LOOP_MIN_HEIGHT: f32 = -77.68;
 const LOOP_MAX_HEIGHT: f32 = -75.0;
 pub const META_KNIGHT: i32 = 0x1d;
@@ -326,12 +326,12 @@ impl WingsFlight {
             let descending = y + self.fall(vy) > self.descent_target();
             let glide = descending && self.can_glide(entry.position, entry.velocity);
             if self.checking_drift() {
-                // The same release and pads can yield either 0.52 or 1.04
-                // initial fall speed. Only the full-speed approach reaches the far lip.
+                // A cut Shuttle Loop can leave Fall capped at 0.520 or 0.624.
+                // The clean Fall reaches 0.750 on its tenth inward step.
                 if live.status != 0xe || entry.remaining != self.profile.jumps || !entry.can_special {
                     return None;
                 }
-                if vx * self.inward >= META_HALF_SPEED + DRIFT * 0.5 {
+                if vx * self.inward >= META_CLEAR_DRIFT {
                     self.drift_check = DriftCheck::Ready;
                 } else {
                     match self.drift_check {
@@ -503,7 +503,7 @@ lib_unit_tests! {
             // released at the same point and produced the same starting pads.
             let start = falling(-109.9856, 5.8902593, 5);
             let route = facts(0x1d, start.entry.position, (3, 0));
-            for (x, vx, expected) in [(-107.2856, 0.6, true), (-107.3706, 0.52, false)] {
+            for (x, vx, expected) in [(-105.860603, 0.75, true), (-106.330620, 0.52, false)] {
                 let mut flight = WingsFlight::start(&route, start).unwrap();
                 assert_eq!(flight.step(start), Some(pad([0.0, 0.0], 0)));
                 let mut first_drift = start;
@@ -513,12 +513,35 @@ lib_unit_tests! {
                 assert_eq!(flight.step(first_drift), Some(pad([1.0, 0.0], 0)));
                 assert!(flight.checking_drift(), "the initial drift alone cannot select a route");
                 let mut live = first_drift;
-                live.entry.position = [x, -8.859741];
+                live.entry.position = [x, -12.179741];
                 live.entry.velocity = [vx, -1.66];
-                live.entry.frame = 16;
+                live.entry.frame = 18;
                 assert_eq!(flight.step(live).is_some(), expected, "live fall drift {vx}");
                 assert_eq!(flight.checking_drift(), !expected);
             }
+        }
+
+        #[test]
+        fn meta_knight_requires_drift_past_the_retained_shuttle_loop_cap() {
+            let start = falling(-109.9856, 5.8902593, 5);
+            let route = facts(0x1d, start.entry.position, (3, 0));
+            let mut flight = WingsFlight::start(&route, start).unwrap();
+            let mut live = start;
+            live.entry.position[1] = 2.0402594;
+            live.entry.velocity[1] = -0.88;
+            live.entry.frame = 8;
+            assert_eq!(flight.step(live), Some(pad([1.0, 0.0], 0)));
+            // A clean Fall and a Fall capped by the prior special still
+            // look the same after eight inward pads (fg1-pp-fd-8).
+            live.entry.position = [-107.2856, -8.859741];
+            live.entry.velocity = [0.6, -1.66];
+            live.entry.frame = 16;
+            assert!(flight.step(live).is_some());
+            assert!(flight.checking_drift(), "0.600 cannot distinguish the two falls");
+            live.entry.frame = 18;
+            live.entry.position = [-106.037605, -12.179741];
+            live.entry.velocity = [0.624001, -1.66];
+            assert_eq!(flight.step(live), None);
         }
 
         #[test]
