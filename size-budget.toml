@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 176521
+ceiling = 177352
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Source a0503405 measures 176521, an exact 5495 normalized-line delta over 171026, including the measured Vanish crossing for Sheik, the zero-Pikmin Winged Pikmin crossing for Olimar, and the earlier recovery, ownership and placement fixes."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Source 299fc8ff measures 177352, an exact 6326 normalized-line delta over 171026, including the measured Sora and Bowser Jr. crossings, the guarded zero-Pikmin Olimar route, and the earlier niche recovery, ownership and placement fixes."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
