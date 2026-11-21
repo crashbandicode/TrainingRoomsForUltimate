@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 184092
+ceiling = 184683
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. The Sonic turned-Spring integration and Bowser Jr. stock activation fix at 2e43b68f add 453 normalized implementation lines over the canonical 183639 measurement at 2ecd1229. The ceiling 184092 is 13066 over the approved 171026 base."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Approved Ness near-side PK Thunder and removal of Bayonetta crossing at 83ac0266 measure 184683 normalized implementation lines, 591 above 90b51e2a. The ceiling is exactly 13657 over the approved 171026 base."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
