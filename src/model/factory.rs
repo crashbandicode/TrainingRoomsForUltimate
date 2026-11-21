@@ -221,7 +221,7 @@ pub static DEFS: [Def; COUNT] = [
     row!("eggsercise_area", Multiple, 3, [0]),
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
-    row!("eggsercise_paths", Multiple, 4, []),
+    row!("eggsercise_paths", Multiple, 5, [4]),
     row!("eggsercise_expiry", Single, 11, [0]),
     // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
     // appended like lobby_items.

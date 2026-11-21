@@ -164,6 +164,10 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
     }
     // Two-slot Spawn area was a dropdown. Three slots are independent checklist bits.
     let legacy_area = def.id == "eggsercise_area" && elements.len() == 2;
+    // The original four unchecked paths used Pop up. Preserve that choice in old saves.
+    if def.id == super::eggs::ROW_PATHS && elements.as_slice() == [0; 4] {
+        elements.push(1);
+    }
     elements.resize(def.len, 0);
     // Single rows use the first selected option, as the menu displays them. Old files may
     // contain several; normalize at both file load and Snapshot::set so defaults/writeback

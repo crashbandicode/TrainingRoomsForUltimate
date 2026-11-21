@@ -364,7 +364,11 @@ fn moving_paths_checklist_and_expiry_options_save_independently() {
     let mut m = opened(Game::Eggs);
     let paths = row("Moving paths", table::game_group(Game::Eggs));
     let expiry = row("Target expiry", table::game_group(Game::Eggs));
-    assert_eq!(m.get("eggsercise_paths"), &[0, 0, 0, 0]);
+    let Control::MultiSelect(labels) = table::ROWS[paths].control else {
+        panic!("the paths row should be a checklist");
+    };
+    assert_eq!(labels, ["Richter's Axe", "Pac-Man's Galaxian", "Link's Boomerang", "Samus's Homing Missile", "Pop up"]);
+    assert_eq!(m.get("eggsercise_paths"), &[0, 0, 0, 0, 1]);
     assert_eq!(m.value(expiry), RowValue::Choice(Some(0)));
     assert_eq!(m.option_count(expiry), 11);
     m.activate(paths);
@@ -372,13 +376,54 @@ fn moving_paths_checklist_and_expiry_options_save_independently() {
     m.press(Button::A);
     m.press(Button::Down);
     m.press(Button::A);
+    for _ in 0..3 {
+        m.press(Button::Down);
+    }
+    m.press(Button::A);
+    assert_eq!(m.get("eggsercise_paths"), &[1, 1, 0, 0, 0]);
+    m.press(Button::A);
     m.press(Button::B);
     m.cycle(expiry, false);
     assert_eq!(m.value(expiry), RowValue::Choice(Some(10)));
     let restored = settings::parse(&m.commit().to_json());
     assert!(restored.issues.is_empty(), "{:?}", restored.issues);
-    assert_eq!(restored.settings.menu.get("eggsercise_paths"), Some(&[1, 1, 0, 0][..]));
+    assert_eq!(restored.settings.menu.get("eggsercise_paths"), Some(&[1, 1, 0, 0, 1][..]));
     assert_eq!(restored.settings.menu.get("eggsercise_expiry").and_then(|options| options.iter().position(|&v| v == 1)), Some(10));
+}
+
+#[test]
+fn legacy_egg_paths_migrate_without_changing_selected_projectiles() {
+    for (paths, want) in [
+        ([0, 0, 0, 0], [0, 0, 0, 0, 1]),
+        ([1, 0, 1, 0], [1, 0, 1, 0, 0]),
+        ([0, 1, 0, 1], [0, 1, 0, 1, 0]),
+    ] {
+        let json = serde_json::json!({
+            "menu": {"eggsercise_paths": paths},
+            "defaults_menu": {"eggsercise_paths": paths},
+        });
+        let loaded = settings::parse(&json.to_string());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let restored = settings::parse(&loaded.settings.to_json());
+        assert!(restored.issues.is_empty(), "{:?}", restored.issues);
+        for settings in [loaded.settings, restored.settings] {
+            assert_eq!(settings.menu.get("eggsercise_paths"), Some(want.as_slice()));
+            assert_eq!(settings.defaults.get("eggsercise_paths"), Some(want.as_slice()));
+        }
+    }
+}
+
+#[test]
+fn current_egg_paths_preserve_a_five_slot_empty_checklist() {
+    let json = r#"{"menu":{"eggsercise_paths":[0,0,0,0,0]},"defaults_menu":{"eggsercise_paths":[0,0,0,0,0]}}"#;
+    let loaded = settings::parse(json);
+    assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+    let restored = settings::parse(&loaded.settings.to_json());
+    assert!(restored.issues.is_empty(), "{:?}", restored.issues);
+    for settings in [loaded.settings, restored.settings] {
+        assert_eq!(settings.menu.get("eggsercise_paths"), Some(&[0, 0, 0, 0, 0][..]));
+        assert_eq!(settings.defaults.get("eggsercise_paths"), Some(&[0, 0, 0, 0, 0][..]));
+    }
 }
 
 #[test]

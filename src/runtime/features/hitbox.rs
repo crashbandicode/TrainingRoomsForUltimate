@@ -228,9 +228,6 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let held = owners.covers_strip() || super::egg_zone::wizard_active() || super::states::is_loading();
     (plan == eggs::Plan::Read).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
-    if run.floors_wanted() {
-        eggs_floors(run, at);
-    }
     let tick = run.keeper(at) && !held;
     #[cfg(feature = "diag")]
     {
@@ -269,16 +266,31 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         at
     };
     if run.wants_zone() && primary == at && !held {
+        use super::egg_zone::{self, Geometry};
         let id = natives::stage_id();
-        if id >= 0 {
-            let preferences = run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id));
-            super::egg_zone::prepare(at);
-            if let Some(zone) = super::egg_zone::with_stage(|stage| {
-                (stage.id() == id).then(|| stage.resolve(preferences))
-            }).flatten() {
-                run.set_zone(zone);
+        let preferences = (id >= 0)
+            .then(|| run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id)))
+            .flatten();
+        match egg_zone::prepare(at) {
+            Geometry::Ready => {
+                if let Some(zone) = egg_zone::with_stage(|stage| {
+                    (stage.id() == id).then(|| stage.resolve(preferences))
+                })
+                .flatten()
+                {
+                    run.set_zone(zone);
+                }
             }
+            Geometry::Unavailable => {
+                if let Some(reason) = run.disable_offstage() {
+                    let _ = super::notices::post_required(HEADER, reason, 120, DEFAULT_COLOR);
+                }
+            }
+            Geometry::Pending => {}
         }
+    }
+    if run.floors_wanted() {
+        eggs_floors(run, at);
     }
     if run.wants_blast() && !held {
         if let Some(blast) = super::egg_zone::blast() {

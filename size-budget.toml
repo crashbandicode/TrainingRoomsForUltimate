@@ -2228,3 +2228,11 @@ ceiling = 187171
 date = "2026-11-21"
 reason = "Shared practice placement camera and CPU session, bright-stage contrast, and on-stage off-stage-target scoring. Exact normalized line count 187033 to 187171 (+138). The buildable partial baseline 5fb35633 and measured implementation f113b778 each have 5124096 B NRO and 1720320 B BSS. The exact final pin is rechecked in the binary-size receipt."
 approved_by = "Operator through tr-primary-2 at 13:06Z authorized one measured entry: as long as memory stays efficient I don't mind as much about loc as long as we aren't wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187160
+date = "2026-11-21"
+reason = "Eggsercise moving paths and Off-stage zone. Canonical size on ab5b7524 is 187160, +127 versus 187033 on the partial card base, with zero spare. Adds Pop up selection and legacy settings migration, per-side recovery geometry, and a fallback for stages with no usable Off stage zone."
+approved_by = "Primary tr-primary-2, 2026-11-21 14:29Z, approved 187160 for ab5b7524 in the primary handoff."

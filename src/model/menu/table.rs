@@ -534,7 +534,7 @@ pub static ROWS: [Row; 166] = [
     r(EGGS, "Off-stage zone…", "eggsercise_zone", Control::Editor(Editor::EggZone),
       "Set top, bottom, inner and outer edges for this stage.\nPress A to edit. Applies to Eggs-ercise at the next Start."),
     r(EGGS, "Moving paths", "eggsercise_paths", Control::MultiSelect(&o::EGGS_PATHS),
-      "Each checked flight path has the same chance on a spawn.\nNone uses the standard flight. Applies at the next Start."),
+      "Each checked flight path has the same chance on a spawn.\nIf none are checked, Pop up is used. Applies at the next Start."),
     r(EGGS, "Target expiry", "eggsercise_expiry", Control::Dropdown(&o::EGGS_EXPIRY),
       "Replace an unhit target after this many seconds of play.\nExpiry resets the current hit streak. Applies at the next Start."),
     r(EGGS, "Hit streak", "eggsercise_hit_streak", Control::Dropdown(&o::BTT),
