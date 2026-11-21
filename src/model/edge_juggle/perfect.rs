@@ -802,6 +802,7 @@ impl ThreatClock {
             }
             self.dodged = true;
             return Correction {
+                stick: Some([0.0; 2]),
                 press: GUARD,
                 ..Correction::default()
             };
@@ -812,6 +813,10 @@ impl ThreatClock {
         }
     }
 }
+
+#[cfg(any(test, target_os = "switch"))]
+#[path = "perfect/startup_dodge.rs"]
+pub(crate) mod startup_dodge;
 
 #[derive(Clone, Copy)]
 pub struct Capsule {

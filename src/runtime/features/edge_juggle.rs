@@ -35,6 +35,8 @@ use crate::runtime::{
 
 #[path = "edge_juggle/niche_pad.rs"]
 mod niche_pad;
+#[path = "edge_juggle/startup_dodge.rs"]
+mod startup_dodge;
 
 const NOTICE: u8 = 0x34;
 const JUGGLE_PERCENT: u16 = 60;
@@ -184,6 +186,7 @@ pub fn install(dependencies: bool) -> bool {
             &["edge_juggle.special_height", "edge_juggle.special_length"],
             false,
         );
+    startup_dodge::install(installed);
     SPECIAL_TABLE.store(special_table, Ordering::Release);
     INSTALLED.store(installed, Ordering::Release);
     installed
@@ -573,7 +576,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     }
     let air = konst(C::SituationAir);
     if air != UNRESOLVED && natives::situation_kind(accessor) == air {
-        let correction = landing_dodge(run, p1, accessor, buttons);
+        let correction = landing_dodge(run, p1, accessor, status, buttons);
         if correction != Correction::default() {
             return stock.observe(
                 correction, PerfectRule::ReactDodge, run, run.threat.trigger_frame(), run.reaction.frames().into(),
@@ -741,7 +744,7 @@ unsafe fn player_attack(p1: usize) -> (Option<u64>, i32) {
     (attack, status)
 }
 
-unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> Correction {
+unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, cpu_status: i32, buttons: u32) -> Correction {
     let (attack, status) = player_attack(p1);
     if attack.is_none() && status != konst(C::StatusWait) {
         run.threat = ThreatClock::default();
@@ -753,7 +756,7 @@ unsafe fn landing_dodge(run: &mut Run, p1: usize, cpu: usize, buttons: u32) -> C
         let Some(contact) = attack_reaches_core(p1, cpu) else {
             return Correction::default();
         };
-        contact
+        contact || (falling(cpu_status) && startup_dodge::covers_contact(p1, cpu, status))
     } else {
         false
     };
