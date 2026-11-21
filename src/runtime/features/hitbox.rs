@@ -269,15 +269,27 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         at
     };
     if run.wants_zone() && primary == at && !held {
+        use super::egg_zone::{self, Geometry};
         let id = natives::stage_id();
-        if id >= 0 {
-            let preferences = run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id));
-            super::egg_zone::prepare(at);
-            if let Some(zone) = super::egg_zone::with_stage(|stage| {
-                (stage.id() == id).then(|| stage.resolve(preferences))
-            }).flatten() {
-                run.set_zone(zone);
+        let preferences = (id >= 0)
+            .then(|| run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id)))
+            .flatten();
+        match egg_zone::prepare(at) {
+            Geometry::Ready => {
+                if let Some(zone) = egg_zone::with_stage(|stage| {
+                    (stage.id() == id).then(|| stage.resolve(preferences))
+                })
+                .flatten()
+                {
+                    run.set_zone(zone);
+                }
             }
+            Geometry::Unavailable => {
+                if let Some(reason) = run.disable_offstage() {
+                    super::notices::post("Eggs-ercise", reason, 120, DEFAULT_COLOR);
+                }
+            }
+            Geometry::Pending => {}
         }
     }
     if run.wants_blast() && !held {

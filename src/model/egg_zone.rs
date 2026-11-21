@@ -26,18 +26,28 @@ pub struct Stage {
     blast: [f32; 4],
     ledges: [Point; 2],
     outline: Outline,
+    available: [bool; 2],
 }
 
 /// Physical lines, before egg-radius clearance. Each interval is ascending.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Zone {
     vertical: [f32; 2],
-    horizontal: [[f32; 2]; 2],
+    horizontal: [Option<[f32; 2]>; 2],
 }
 
 impl Zone {
-    pub fn horizontal(self, side: Side) -> [f32; 2] {
+    pub fn horizontal(self, side: Side) -> Option<[f32; 2]> {
         self.horizontal[side as usize]
+    }
+
+    #[cfg(target_os = "switch")]
+    pub fn horizontal_span(self) -> Option<[f32; 2]> {
+        match self.horizontal {
+            [Some([left, _]), Some([_, right])] => Some([left, right]),
+            [Some(side), None] | [None, Some(side)] => Some(side),
+            [None, None] => None,
+        }
     }
 
     pub fn vertical(self) -> [f32; 2] {
@@ -45,13 +55,13 @@ impl Zone {
     }
 
     /// Bounding box of legal egg centers before main-stage clipping.
-    pub fn rect(self, side: Side) -> [Point; 2] {
-        let [left, right] = self.horizontal(side);
+    pub fn rect(self, side: Side) -> Option<[Point; 2]> {
+        let [left, right] = self.horizontal(side)?;
         let [bottom, top] = self.vertical;
-        [
+        Some([
             [left + RADIUS, bottom + RADIUS],
             [right - RADIUS, top - RADIUS],
-        ]
+        ])
     }
 }
 
@@ -86,8 +96,11 @@ impl Stage {
     pub fn new(id: i32, blast: [f32; 4], ledges: [Point; 2], outline: Outline) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;
-        let enough_room = left + EDGE_MARGIN + DIAMETER <= lx
-            && rx + EDGE_MARGIN + DIAMETER <= right
+        let available = [
+            left + EDGE_MARGIN + DIAMETER <= lx && lx <= right - EDGE_MARGIN,
+            left + EDGE_MARGIN <= rx && rx + EDGE_MARGIN + DIAMETER <= right,
+        ];
+        let enough_room = available.contains(&true)
             && lx < rx
             && top - EDGE_MARGIN - DIAMETER >= bottom + BOTTOM_MARGIN;
         (enough_room
@@ -108,6 +121,7 @@ impl Stage {
             blast,
             ledges,
             outline,
+            available,
         })
     }
 
@@ -138,7 +152,10 @@ impl Stage {
     pub fn inner_limit(&self) -> [f32; 2] {
         let [left, right] = self.main_span();
         let center = left.midpoint(right);
-        [left.midpoint(center), right.midpoint(center)]
+        [
+            left.midpoint(center).min(self.blast[1] - EDGE_MARGIN),
+            right.midpoint(center).max(self.blast[0] + EDGE_MARGIN),
+        ]
     }
 
     fn vertical_ranges(&self) -> [[f32; 3]; 2] {
@@ -162,17 +179,20 @@ impl Stage {
         let limits = self.inner_limit();
         let horizontal = Side::BOTH.map(|side| {
             let i = side as usize;
+            if !self.available[i] {
+                return None;
+            }
             let direction = [-1.0, 1.0][i];
             let ledge = ledges[i];
             let distance = (self.blast[i] - ledge).abs() - EDGE_MARGIN;
             let outer_default = (distance * 0.35).max(DIAMETER);
             let inside = limits[i] + (ledge - limits[i]) * (f32::from(inner) / 255.0);
             let outside = ledge + direction * value(outer, [DIAMETER, outer_default, distance]);
-            if side == Side::Left {
+            Some(if side == Side::Left {
                 [outside, inside]
             } else {
                 [inside, outside]
-            }
+            })
         });
         Zone {
             vertical: [bottom, top],
@@ -213,7 +233,9 @@ impl Stage {
     }
 
     pub fn contains(&self, zone: &Zone, side: Side, at: Point) -> bool {
-        let [lo, hi] = zone.rect(side);
+        let Some([lo, hi]) = zone.rect(side) else {
+            return false;
+        };
         let [left, right] = self.main_span();
         let outside = at[0] < left || at[0] > right;
         (0..2).all(|i| (lo[i]..=hi[i]).contains(&at[i]))

@@ -357,6 +357,7 @@ pub struct Run {
     recovery: Recovery,
     pending_hit: Option<(Point, bool)>,
     zone: Option<Zone>,
+    offstage_unavailable: bool,
     zone_prefs: Option<(i32, Option<[u8; 4]>)>,
     blast: Option<Rect>,
     motion: Option<Motion>,
@@ -410,6 +411,7 @@ impl Run {
         recovery: Recovery::Unchanged,
         pending_hit: None,
         zone: None,
+        offstage_unavailable: false,
         zone_prefs: None,
         blast: None,
         motion: None,
@@ -493,11 +495,11 @@ impl Run {
     /// The P1 pass only needs recovery reads for an off-stage target or an unsettled hit.
     pub fn needs_recovery(&self) -> bool {
         self.area == Some(OFF_STAGE) || self.recovering()
-            || self.area.is_none() && self.areas & (1 << OFF_STAGE) != 0
+            || self.area.is_none() && self.available_areas() & (1 << OFF_STAGE) != 0
     }
 
     pub fn wants_zone(&self) -> bool {
-        self.areas & (1 << OFF_STAGE) != 0 && self.zone.is_none()
+        self.areas & (1 << OFF_STAGE) != 0 && self.zone.is_none() && !self.offstage_unavailable
     }
 
     pub fn wants_blast(&self) -> bool {
@@ -506,6 +508,33 @@ impl Run {
 
     pub fn set_zone(&mut self, zone: Zone) {
         self.zone = Some(zone);
+    }
+
+    /// Keep the configured areas for the next reset, but retire an unavailable
+    /// Off stage choice for this run. A pending draw can now pick a usable area.
+    #[cfg(any(test, target_os = "switch"))]
+    pub fn disable_offstage(&mut self) -> Option<&'static str> {
+        if !self.wants_zone() {
+            return None;
+        }
+        self.offstage_unavailable = true;
+        if self.area == Some(OFF_STAGE) {
+            self.area = None;
+            self.path = None;
+        }
+        Some(if self.areas == 1 << OFF_STAGE {
+            "No usable Off stage zone. Using In view."
+        } else {
+            "No usable Off stage zone. Using other checked areas."
+        })
+    }
+
+    fn available_areas(&self) -> u8 {
+        if self.offstage_unavailable {
+            (self.areas & !(1 << OFF_STAGE)).max(1 << IN_VIEW)
+        } else {
+            self.areas
+        }
     }
 
     pub fn zone_preferences(&mut self, stage: i32, published: impl FnOnce() -> Option<[u8; 4]>) -> Option<[u8; 4]> {
@@ -717,7 +746,7 @@ impl Run {
         let area = if let Some(area) = self.area {
             area
         } else {
-            let area = self.pick(self.areas);
+            let area = self.pick(self.available_areas());
             self.area = Some(area);
             self.path = (self.paths != 0).then(|| self.pick(self.paths)).and_then(Path::from_index);
             area
@@ -740,7 +769,7 @@ impl Run {
             let [lo, hi] = [inside(range[0] + DRIFT), inside(range[1] - DRIFT)];
             (lo, hi, edge(1, 1.0), edge(1, -1.0))
         };
-        let path_bounds = if self.path.is_some() {
+        let path_bounds = self.path.and_then(|_| {
             let [[left, low], [right, high]] = self.blast?;
             let [west, east] = if whole {
                 [range[0] + RADIUS, range[1] - RADIUS]
@@ -749,17 +778,24 @@ impl Run {
             };
             let west = west.max(left + RADIUS);
             let east = east.min(right - RADIUS);
-            bottom = bottom.max(low + RADIUS);
-            top = top.min(high - RADIUS);
-            if east < west || top < bottom {
+            let low = bottom.max(low + RADIUS);
+            let high = top.min(high - RADIUS);
+            (west <= east && low <= high).then_some([[west, low], [east, high]])
+        });
+        if self.path.is_some() && path_bounds.is_none() {
+            if !self.offstage_unavailable {
                 return None;
             }
+            // The Off stage fallback must also work if native blast bounds
+            // cannot constrain a moving path. Use the ordinary visible flight.
+            self.path = None;
+        }
+        if let Some([[west, low], [east, high]]) = path_bounds {
             x0 = x0.clamp(west, east);
             x1 = x1.clamp(west, east);
-            Some([[west, bottom], [east, top]])
-        } else {
-            None
-        };
+            bottom = low;
+            top = high;
+        }
         // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
         let lift = [0.0, -RADIUS][usize::from(self.rows[3] == CPU)];
@@ -835,7 +871,7 @@ impl Run {
         let mut best = None;
         let mut penalty = f32::INFINITY;
         for side in if first_right { [Side::Right, Side::Left] } else { [Side::Left, Side::Right] } {
-            let bounds = zone.rect(side);
+            let Some(bounds) = zone.rect(side) else { continue };
             if (0..2).any(|axis| bounds[1][axis] < bounds[0][axis]) {
                 continue;
             }

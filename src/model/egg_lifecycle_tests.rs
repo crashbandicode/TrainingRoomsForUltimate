@@ -239,6 +239,76 @@ fn zone_assignment_latches_preference_for_the_run_and_reads_new_stage_on_reset()
 }
 
 #[test]
+fn unavailable_offstage_falls_back_and_preserves_the_next_runs_choices() {
+    for (areas, fallback, blast_available, notice) in [
+        (1 << OFF_STAGE, IN_VIEW, true, "No usable Off stage zone. Using In view."),
+        (1 << OFF_STAGE, IN_VIEW, false, "No usable Off stage zone. Using In view."),
+        ((1 << OFF_STAGE) | (1 << WHOLE), WHOLE, true, "No usable Off stage zone. Using other checked areas."),
+    ] {
+        let mut run = Run::IDLE;
+        run.start([FREE, ANY, NORMAL, DISC, OFF_STAGE], 7);
+        run.configure(0b1111, 0);
+        run.set_areas(areas);
+        if blast_available {
+            run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+        }
+        for _ in 0..=SETTLE {
+            run.look(true, || Some(VIEW));
+        }
+        // Simulate an Off stage selection waiting for native geometry.
+        run.area = Some(OFF_STAGE);
+        run.path = Some(Path::Axe);
+        run.step(true, 0.0, &[], false, 0);
+        assert!(run.egg_at().is_none());
+        assert_eq!(run.disable_offstage(), Some(notice));
+        assert_eq!(run.disable_offstage(), None);
+        assert!(!run.wants_zone());
+        run.step(true, 0.0, &[], false, 0);
+        assert_eq!(run.area, Some(fallback));
+        assert_eq!(run.motion.is_some(), blast_available);
+        assert!(run.look(false, || None)[0].is_some());
+        run.reset(8);
+        assert!(run.wants_zone());
+        assert_eq!(run.areas, areas);
+    }
+}
+
+#[test]
+fn training_offstage_draws_and_counts_each_path_on_the_real_recovery_side() {
+    use crate::model::edge_juggle::perfect::Outline;
+    use crate::model::egg_zone::Stage;
+
+    let corners = [[-80.0, 0.0], [620.0, 0.0], [620.0, -30.0], [-80.0, -30.0]];
+    let mut outline = Outline::new();
+    for index in 0..corners.len() {
+        outline.add([corners[index], corners[(index + 1) % corners.len()]]);
+    }
+    let stage = Stage::new(308, [-589.9998, 500.0, 360.00015, -137.85207],
+                           [corners[0], corners[1]], outline).unwrap();
+    let zone = stage.resolve(None);
+    let clear = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
+    for path in [1, 2, 4, 8, 16, 31] {
+        let mut run = Run::IDLE;
+        run.start([FREE, ANY, NORMAL, DISC, OFF_STAGE], 7);
+        run.configure(path, 0);
+        run.set_zone(zone);
+        let step = |run: &mut Run| run.pass(Pass { tick: true, y: 0.0, hits: &[], air: false, kind: 0 },
+                                           |_| None, &clear);
+        step(&mut run);
+        let target = run.egg_at().expect("the usable left side spawns a target");
+        assert_eq!(run.motion.unwrap().side, Some(Side::Left));
+        assert!(stage.contains(&zone, Side::Left, target));
+        assert_eq!(run.look(false, || None)[0].map(|(at, _)| at), Some(target));
+        run.observe_recovery(Recovery::Away);
+        contact(&mut run);
+        assert_eq!((run.event(), run.score), (TargetEvent::Pending, 0));
+        run.observe_recovery(Recovery::Returned);
+        step(&mut run);
+        assert_eq!((run.event(), run.score), (TargetEvent::Recovered, 1));
+    }
+}
+
+#[test]
 fn offstage_spawns_without_view_and_sweeps_motion_in_its_original_side() {
     use crate::model::edge_juggle::perfect::Outline;
     use crate::model::egg_zone::Stage;

@@ -41,8 +41,8 @@ fn zone_vertical_lines_respect_blast_margins_and_egg_diameter() {
 fn zone_fractions_remap_and_clip_to_each_stages_real_outline() {
     let stage = battlefield();
     let zone = stage.resolve(Some([128, 0, 0, 255]));
-    assert_eq!(zone.horizontal(Side::Left), [-182.0, -35.0]);
-    assert_eq!(zone.horizontal(Side::Right), [35.0, 182.0]);
+    assert_eq!(zone.horizontal(Side::Left), Some([-182.0, -35.0]));
+    assert_eq!(zone.horizontal(Side::Right), Some([35.0, 182.0]));
     assert!(stage.contains(&zone, Side::Right, [48.0, -34.0]));
     assert!(!stage.contains(&zone, Side::Right, [48.0, -12.0]));
     assert!(!stage.contains(&zone, Side::Right, [48.0, -25.0]));
@@ -58,8 +58,8 @@ fn zone_fractions_remap_and_clip_to_each_stages_real_outline() {
         &[[-30.0, 10.0], [90.0, -6.0], [51.0, -25.0], [-15.0, -25.0]],
     );
     let zone = asymmetric.resolve(Some([255, 0, 0, 255]));
-    assert_eq!(zone.horizontal(Side::Left), [-142.0, 0.0]);
-    assert_eq!(zone.horizontal(Side::Right), [60.0, 182.0]);
+    assert_eq!(zone.horizontal(Side::Left), Some([-142.0, 0.0]));
+    assert_eq!(zone.horizontal(Side::Right), Some([60.0, 182.0]));
     assert_eq!(zone.vertical(), [-60.0, 132.0]);
     assert!(asymmetric.supports([[-30.0, 10.0], [90.0, -6.0]]));
     assert!(!asymmetric.supports([[15.0, 27.0], [45.0, 27.0]]));
@@ -77,6 +77,32 @@ fn a_solid_contour_can_protrude_outboard_of_the_ledge() {
 }
 
 #[test]
+fn training_keeps_the_real_recovery_side_when_the_other_end_is_past_blast() {
+    // Card trace measured the two floor endpoints and blast bounds on stage 308.
+    let ledges = [[-80.0, 0.0], [620.0, 0.0]];
+    let blast = [-589.9998, 500.0, 360.00015, -137.85207];
+    let mut outline = Outline::new();
+    let points = [ledges[0], ledges[1], [620.0, -30.0], [-80.0, -30.0]];
+    for i in 0..points.len() {
+        outline.add([points[i], points[(i + 1) % points.len()]]);
+    }
+    let stage = Stage::new(308, blast, ledges, outline).expect("the left ledge has recovery room");
+    assert_eq!(stage.ledges(), ledges);
+    let mut wizard = Wizard::new(None);
+    assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::X), Outcome::Editing);
+    let Outcome::Apply(bins) = wizard.input(&stage, [0.0; 2], 1 << key::PLUS) else {
+        panic!("the single-sided zone must be applicable");
+    };
+    let zone = stage.resolve(Some(bins));
+    assert!(zone.horizontal(Side::Left).is_some());
+    assert!(zone.horizontal(Side::Right).is_none());
+    assert!(stage.contains(&zone, Side::Left, [-100.0, -10.0]));
+    assert!(!stage.contains(&zone, Side::Right, [490.0, -40.0]));
+    assert!(stage.supports(ledges));
+    assert!(Stage::new(308, [-70.0, blast[1], blast[2], blast[3]], ledges, outline).is_none());
+}
+
+#[test]
 fn zone_wizard_polls_guard_edge_controls() {
     let stage = battlefield();
     let mut wizard = Wizard::new(None);
@@ -90,9 +116,9 @@ fn zone_wizard_polls_guard_edge_controls() {
     }
     press(&mut wizard, key::B);
     assert_eq!(wizard.step(), Step::Outer);
-    let before = wizard.zone(&stage).horizontal(Side::Right)[1];
+    let before = wizard.zone(&stage).horizontal(Side::Right).unwrap()[1];
     wizard.input(&stage, [1.0, 0.0], 0);
-    assert!(wizard.zone(&stage).horizontal(Side::Right)[1] > before);
+    assert!(wizard.zone(&stage).horizontal(Side::Right).unwrap()[1] > before);
     assert_eq!(press(&mut wizard, key::X), Outcome::Editing);
     assert_eq!(wizard.step(), Step::Preview);
     let Outcome::Apply(value) = press(&mut wizard, key::PLUS) else {
@@ -101,7 +127,7 @@ fn zone_wizard_polls_guard_edge_controls() {
     let resolved = stage.resolve(Some(value));
     assert_eq!(resolved, wizard.zone(&stage));
     for side in [Side::Left, Side::Right] {
-        let [lo, hi] = resolved.rect(side);
+        let [lo, hi] = resolved.rect(side).unwrap();
         assert!(lo.into_iter().zip(hi).all(|(a, b)| a <= b));
     }
 }

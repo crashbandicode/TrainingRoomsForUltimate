@@ -95,16 +95,23 @@ pub unsafe fn blast() -> Option<[Point; 2]> {
         .then(|| blast_rect(range))
 }
 
+#[derive(PartialEq, Eq)]
+pub enum Geometry {
+    Pending,
+    Ready,
+    Unavailable,
+}
+
 /// Call with the current primary P1 accessor. Native calls run outside the
 /// state lock so fighter, input and HUD callbacks can read the last snapshot.
-pub unsafe fn prepare(p1: usize) {
+pub unsafe fn prepare(p1: usize) -> Geometry {
     let generation = epoch();
     let id = natives::stage_id();
     let Some(mut state) = STATE.try_lock() else {
-        return;
+        return Geometry::Pending;
     };
     if state.epoch == generation && state.stage.as_ref().is_some_and(|s| s.id() == id) {
-        return;
+        return Geometry::Ready;
     }
     // A same-match stage change retires both the geometry and the editor.
     if state.stage.is_some() {
@@ -116,34 +123,34 @@ pub unsafe fn prepare(p1: usize) {
     drop(state);
 
     if id < 0 || !scene::is_training() || states::is_loading() {
-        return;
+        return Geometry::Pending;
     }
-    let Some([[left, bottom], [right, top]]) = blast() else {
-        return;
+    let stage = read_stage(p1, id);
+    let Some(mut state) = STATE.try_lock() else {
+        return Geometry::Pending;
     };
-    let Some(camera) = natives::camera_limit_range() else {
-        return;
-    };
-    let range = [left, right, top, bottom];
-    let Some((mid, limits)) = perfect::outline_probe(camera, range) else {
-        return;
-    };
-    let Some(ray) = FloorRay::new(p1) else { return };
-    let Some((ledges, _)) = edge_juggle::stage_floor(&ray, camera) else {
-        return;
-    };
-    let Some(outline) = tech_surfaces::training_outline(&ray, mid, limits) else {
-        return;
-    };
-    let Some(stage) = Stage::new(id, range, ledges, outline) else {
-        return;
-    };
+    if generation != epoch() || state.epoch != generation {
+        return Geometry::Pending;
+    }
+    if state.stage.is_none() {
+        state.stage = stage;
+    }
+    match state.stage.as_ref() {
+        Some(stage) if stage.id() == id => Geometry::Ready,
+        Some(_) => Geometry::Pending,
+        None => Geometry::Unavailable,
+    }
+}
 
-    if let Some(mut state) = STATE.try_lock() {
-        if generation == epoch() && state.epoch == generation && state.stage.is_none() {
-            state.stage = Some(stage);
-        }
-    }
+unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
+    let [[left, bottom], [right, top]] = blast()?;
+    let camera = natives::camera_limit_range()?;
+    let range = [left, right, top, bottom];
+    let (mid, limits) = perfect::outline_probe(camera, range)?;
+    let ray = FloorRay::new(p1)?;
+    let (ledges, _) = edge_juggle::stage_floor(&ray, camera)?;
+    let outline = tech_surfaces::training_outline(&ray, mid, limits)?;
+    Stage::new(id, range, ledges, outline)
 }
 
 /// A request arrives from the menu after it has committed the selected rows.
@@ -165,7 +172,20 @@ pub unsafe fn frame(fighter: usize) {
     else {
         return;
     };
-    prepare(p1);
+    if prepare(p1) == Geometry::Unavailable {
+        if REQUEST
+            .compare_exchange(generation, 0, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            notices::post(
+                "Off-stage zone",
+                "No usable Off stage zone on this stage.",
+                120,
+                DEFAULT_COLOR,
+            );
+        }
+        return;
+    }
     let Some(mut state) = STATE.try_lock() else {
         return;
     };
@@ -197,10 +217,14 @@ fn prompt(step: Step, zone: Zone) {
         Step::Outer => "4/5 Outer edges · Stick left/right · A next · B back · X defaults",
         Step::Preview => {
             let [bottom, top] = zone.vertical();
-            let [outer_left, inner_left] = zone.horizontal(Side::Left);
-            let [inner_right, outer_right] = zone.horizontal(Side::Right);
             let _ = write!(preview,
-                "5/5 Preview · Y {bottom:.0}…{top:.0} · L {outer_left:.0}…{inner_left:.0} · R {inner_right:.0}…{outer_right:.0} · A/+ apply · B back · X defaults");
+                "5/5 Preview · Y {bottom:.0}…{top:.0}");
+            for (side, label) in [(Side::Left, "L"), (Side::Right, "R")] {
+                if let Some([lo, hi]) = zone.horizontal(side) {
+                    let _ = write!(preview, " · {label} {lo:.0}…{hi:.0}");
+                }
+            }
+            let _ = write!(preview, " · A/+ apply · B back · X defaults");
             preview.as_str()
         }
     };
@@ -248,6 +272,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
 
 struct Display {
     zone: Zone,
+    span: [f32; 2],
     inward: [f32; 2],
     step: Step,
     hatching: [Option<Segment>; 10],
@@ -266,14 +291,13 @@ fn display(map: impl Fn(Point) -> Point) -> Option<Display> {
     let wizard = state.wizard?;
     let zone = wizard.zone(stage);
     let [bottom, top] = zone.vertical();
-    let [left, _] = zone.horizontal(Side::Left);
-    let [_, right] = zone.horizontal(Side::Right);
+    let [left, right] = zone.horizontal_span()?;
     let [lo, hi] = [[left, bottom], [right, top]].map(map);
     let overview = (lo[0] < -940.0 || lo[1] < -500.0 || hi[0] > 940.0 || hi[1] > 500.0)
         .then(|| *stage.outline());
     let hatching = std::array::from_fn(|i| {
         let side = Side::BOTH[i / 5];
-        let [[left, low], [right, high]] = zone.rect(side);
+        let [[left, low], [right, high]] = zone.rect(side)?;
         let [outer, inner] = if side == Side::Left {
             [left, right]
         } else {
@@ -301,6 +325,7 @@ fn display(map: impl Fn(Point) -> Point) -> Option<Display> {
     });
     Some(Display {
         zone,
+        span: [left, right],
         inward: stage.inner_limit(),
         step: wizard.step(),
         hatching,
@@ -317,8 +342,7 @@ pub fn draw(view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
     display.guides(map, &mut line);
     if let Some(outline) = &display.overview {
         let [bottom, top] = display.zone.vertical();
-        let [left, _] = display.zone.horizontal(Side::Left);
-        let [_, right] = display.zone.horizontal(Side::Right);
+        let [left, right] = display.span;
         let span = (right - left).max(top - bottom);
         let scale = 218.0 / span;
         let origin = [left.midpoint(right), bottom.midpoint(top)];
@@ -342,8 +366,7 @@ impl Display {
             line(segment.map(&map), 3.0, [97, 229, 216, 115]);
         }
         let [bottom, top] = self.zone.vertical();
-        let [left, inner_left] = self.zone.horizontal(Side::Left);
-        let [inner_right, right] = self.zone.horizontal(Side::Right);
+        let [left, right] = self.span;
         let mut guide = |a, b, k, color: [u8; 3]| {
             let active = self.step == k || self.step == Step::Preview;
             let [r, g, b0] = color;
@@ -356,13 +379,19 @@ impl Display {
         for (y, step) in [(top, Step::Top), (bottom, Step::Bottom)] {
             guide([left, y], [right, y], step, [66, 142, 255]);
         }
-        for x in [inner_left, inner_right] {
-            guide([x, bottom], [x, top], Step::Inner, [255, 221, 77]);
+        for side in Side::BOTH {
+            let Some([lo, hi]) = self.zone.horizontal(side) else {
+                continue;
+            };
+            let [outer, inner] = if side == Side::Left { [lo, hi] } else { [hi, lo] };
+            guide([inner, bottom], [inner, top], Step::Inner, [255, 221, 77]);
+            guide([outer, bottom], [outer, top], Step::Outer, [206, 132, 255]);
         }
-        for x in [left, right] {
-            guide([x, bottom], [x, top], Step::Outer, [206, 132, 255]);
-        }
-        for x in self.inward {
+        for side in Side::BOTH {
+            if self.zone.horizontal(side).is_none() {
+                continue;
+            }
+            let x = self.inward[side as usize];
             let slice = (top - bottom) / 11.0;
             for i in (0..11).step_by(2) {
                 let y = bottom + i as f32 * slice;
