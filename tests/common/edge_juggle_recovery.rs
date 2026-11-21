@@ -330,6 +330,17 @@ fn held(button: u32, planned: u8, can_wait: bool, buttons: u32) -> HoldFacts {
     }
 }
 
+#[test]
+fn robot_stock_burner_stays_available_at_the_first_press() {
+    use crate::model::edge_juggle::perfect::rob;
+
+    // A rectangular table cannot predict R.O.B.'s fuel-dependent climb or
+    // a stock sequence that presses special again to sustain the burner.
+    assert!(super::stock_timing_reach(rob::KIND, Some(UP)).is_none());
+    assert!(super::stock_timing_reach(0, Some(UP)).is_some());
+    assert!(super::stock_timing_reach(0, None).is_none());
+}
+
 /// A hold stepped once per game frame.
 #[derive(Default)]
 struct Ticking(Hold, u32);

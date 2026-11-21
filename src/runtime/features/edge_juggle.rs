@@ -1244,6 +1244,7 @@ unsafe fn recovery_pad(
         run.hold = Hold::default();
         return Correction::default();
     };
+    let special = recovery::stock_timing_reach(kind, special);
     if jumps == Some(0) {
         let bottom = run.stage.blast()[3];
         let coasts = physics.reaches_with_jump(pos, speed, ledge, u8::MAX, bottom);
@@ -1285,7 +1286,7 @@ unsafe fn recovery_pad(
     // still returns one frame later. Each frame re-checks from the live position.
     let bottom = run.stage.blast()[3];
     let term = konst(C::TermContSpecialHi);
-    // A missing snapshot or an invalid special table is no reach sample: the stock pad stands.
+    // Time an available special only when its model supplies a reach sample.
     if special.is_none() && !matches!(recovery, Some((_, false))) {
         return Correction::default();
     }
