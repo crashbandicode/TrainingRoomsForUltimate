@@ -168,7 +168,7 @@ fn clip_editor_hides_and_restores_both_hud_renderers() {
                 strip.draw(&tracker, shown, |i, look, _| {
                     if i == at::CONTAINER { visible[0] = look.visible; }
                 });
-                bar.draw(&helper, &Text::new("Target"), None, shown, |i, look, _| {
+                bar.draw(&helper, &Text::new("Target"), None, shown, (&C, false), |i, look, _| {
                     if i == combo_plan::at::CONTAINER { visible[1] = look.visible; }
                 });
                 visible

@@ -584,31 +584,26 @@ pub fn hud_tick(
     history_enabled: bool,
     parry: bool,
     mut apply: impl FnMut(usize, &Look, Changed),
-) -> Option<bool> {
-    let last_card = || match CARD.load(Ordering::Acquire) {
-        1 if strip_shown => Some(false),
-        2 if strip_shown => Some(true),
-        _ => None,
-    };
+) -> usize {
     // Borrow the static Helper. Copying it exhausts the game task's stack.
     let Some(helper) = HELPER.try_lock() else {
-        return last_card();
+        return 0;
     };
     let Some(name) = NAME.try_lock().map(|mut name| {
         take_posted_name(&mut name);
         *name
     }) else {
-        return last_card();
+        return 0;
     };
-    let Some(seq) = seq_view() else { return last_card() };
+    let Some(seq) = seq_view() else { return 0 };
     let Some(mut renderer) = RENDERER.try_lock() else {
-        return last_card();
+        return 0;
     };
     let card = combo_plan::shown(&helper, strip_shown).then_some(seq.is_some());
     let history = C.history_row(history_enabled, parry, card.is_some());
     let (panes, changes) = &mut *renderer;
     changes.fill(None);
-    panes.draw_with_spec(
+    let writes = panes.draw(
         &helper,
         &name,
         seq.as_ref(),
@@ -624,5 +619,14 @@ pub fn hud_tick(
         }
     }
     CARD.store(card.map_or(0, |sequence| 1 + u8::from(sequence)), Ordering::Release);
-    card
+    writes
+}
+
+/// The card the last HUD tick that got to it drew, while the strip is shown: a combo (`Some(false)`) or a sequence (`Some(true)`).
+pub fn card(strip_shown: bool) -> Option<bool> {
+    match CARD.load(Ordering::Acquire) {
+        1 if strip_shown => Some(false),
+        2 if strip_shown => Some(true),
+        _ => None,
+    }
 }

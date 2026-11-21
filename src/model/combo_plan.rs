@@ -9,8 +9,6 @@ use super::frame_strip::{Button, Verdict};
 use super::frame_strip_plan::{Changed, Look, Text, BAD, GOOD, MUTED, RULE, TEXT, WARN};
 use super::panes::cb::*;
 use super::panes::strip_layout::{card::{Detail, Metrics}, LayoutSpec};
-#[cfg(test)]
-use super::panes::strip_layout::C;
 pub use super::panes::cb::{at, COUNT};
 
 pub const fn button_name(button: Button) -> &'static str {
@@ -562,21 +560,8 @@ pub fn shown(helper: &Helper, strip_shown: bool) -> bool {
 impl Renderer {
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. A drilled sequence
-    /// (`seq`) draws the sequence bar. Returns the writes.
-    #[cfg(test)]
+    /// (`seq`) draws the sequence bar. Returns the writes. The flag indicates a visible history row above the cells.
     pub fn draw(
-        &mut self,
-        helper: &Helper,
-        name: &Text,
-        seq: Option<&SeqView>,
-        strip_shown: bool,
-        apply: impl FnMut(usize, &Look, Changed),
-    ) -> usize {
-        self.draw_with_spec(helper, name, seq, strip_shown, (&C, false), apply)
-    }
-
-    /// Draw the same content in the selected layout. The flag indicates a visible history row above the cells.
-    pub fn draw_with_spec(
         &mut self,
         helper: &Helper,
         name: &Text,

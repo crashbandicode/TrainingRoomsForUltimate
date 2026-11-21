@@ -5,6 +5,7 @@ use super::*;
 use crate::model::combo::{Aim, Combo, Event, Settings};
 use crate::model::drill::{Advance, Stepped};
 use crate::model::frame_strip::Move;
+use crate::model::panes::strip_layout::C;
 
 fn reference() -> Combo {
     let link = LinkRec::presses(
@@ -29,7 +30,7 @@ fn helper(on: bool, target: bool) -> Helper {
 
 fn draw(r: &mut Renderer, h: &Helper, shown: bool) -> Vec<(usize, Look)> {
     let mut writes = Vec::new();
-    r.draw(h, &Text::new("Jab loop"), None, shown, |i, look, _| writes.push((i, *look)));
+    r.draw(h, &Text::new("Jab loop"), None, shown, (&C, false), |i, look, _| writes.push((i, *look)));
     writes
 }
 
@@ -110,7 +111,7 @@ fn view(at: usize, last: Option<Stepped>, last_name: &str) -> SeqView {
 
 fn draw_seq(h: &Helper, seq: &SeqView) -> Vec<Look> {
     let mut looks = vec![Look::HIDDEN; COUNT];
-    Renderer::new().draw(h, &Text::new("Nair loop combo"), Some(seq), true, |i, look, _| looks[i] = *look);
+    Renderer::new().draw(h, &Text::new("Nair loop combo"), Some(seq), true, (&C, false), |i, look, _| looks[i] = *look);
     looks
 }
 
@@ -200,7 +201,7 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
         let card = if seq.is_some() { at::SEQ_BACKDROP } else { at::BACKDROP };
         let draw = |spec: &LayoutSpec| {
             let mut looks = vec![Look::HIDDEN; COUNT];
-            Renderer::new().draw_with_spec(&h, &Text::new("Jab"), seq, true, (spec, false), |i, look, _| looks[i] = *look);
+            Renderer::new().draw(&h, &Text::new("Jab"), seq, true, (spec, false), |i, look, _| looks[i] = *look);
             for i in [at::CELL, card] {
                 let pane = strip_pane_spec(spec, IDX_CB + i);
                 let look = looks[i];
@@ -242,7 +243,7 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
     );
     let half_width = second.strip.width / 2.0;
     assert!(history && rule.visible && rule.x.abs() + rule.w / 2.0 <= half_width);
-    Renderer::new().draw_with_spec(
+    Renderer::new().draw(
         &h, &Text::new("Jab"), None, true, (&second, history),
         |i, look, _| {
             if i == at::CELL {
