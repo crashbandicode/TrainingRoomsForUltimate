@@ -168,6 +168,18 @@ def ko(c, xy, col=BAD, s=11):
     c.line([(x - s, y + s), (x + s, y - s)], col, 5)
 
 
+def clip_right(poly, xmax):
+    """The part of a polygon left of x = xmax (Sutherland-Hodgman against one vertical edge)."""
+    out = []
+    for i, (x0, y0) in enumerate(poly):
+        x1, y1 = poly[(i + 1) % len(poly)]
+        if x0 <= xmax:
+            out.append((x0, y0))
+        if (x0 <= xmax) != (x1 <= xmax):
+            out.append((xmax, y0 + (xmax - x0) / (x1 - x0) * (y1 - y0)))
+    return out
+
+
 def stage(c, wd, names=True):
     c.polygon(wd.ps(RING), fill=STAGE, outline=LINE, width=2)
     for sx, name in ((-LEDGE_X, "near ledge"), (LEDGE_X, "far ledge")):
@@ -483,7 +495,80 @@ def gte_lucario():
     finish(c, y, "GTE-LUCARIO")
 
 
-ALL = [gte_hero, gte_sonic, gte_bayo, bridge_40ms, gte_lucario]
+# ---------------------------------------------------------------------------------------------------
+# GTE-NESS: inbox 11:36Z fusion-g2 (boots fg2-g1-yoga-12, fg2-g1-yoga-13; the facing case fg2-m-xps-6).
+# The path is one traced attempt: fg2-g1-yoga-12/frames-ness.tsv, ness-r1-4out-y-26-d80-k39, attempt 1.
+# ---------------------------------------------------------------------------------------------------
+def gte_ness():
+    c = canvas()
+    y = header(c, "Ness · the crossing under the stage",
+               "Guard the Edge, Final Destination to scale. 24 traced launches from under the stage, two boots.")
+    wd = World(PAD + 14, y + 56, W - PAD - 14, -110, 110, 14, -128)
+    panel_box(c, y, wd.h + 70)
+    stage(c, wd)
+    start = (-84.0, -26.0)
+    low = (-7.0, -121.6)  # the double jump
+    ball = (38.4, -83.0)  # PK Thunder: he waits while the ball is steered, then it launches him
+    path(c, wd, [start, (-64.4, -47.0), (-40.2, -78.4), (-16.1, -109.8), low, (11.4, -106.8), (23.6, -86.7),
+                 (34.6, -76.6), (38.4, -76.6), ball], CPU, 4, dash=(10, 7), arrow=False)
+    top = (81.3, -20.6)
+    path(c, wd, [ball, (45.7, -71.1), (63.6, -42.1), (75.4, -25.2), top], BAD, 5, arrow=False, smooth=False)
+    path(c, wd, [top, (82.0, -26.9), (82.0, -34.9), (91.5, -52.3), (106.6, -72.0)], BAD, 3, dash=(8, 6),
+         arrow=False)
+    ko(c, wd.p(106.6, -72.0))
+    rx, ry = wd.p(80.4, -19.5)
+    c.circle(rx, ry, 24, outline=BAD, width=4)
+    sx, sy = wd.p(*start)
+    c.circle(sx, sy, 8, fill=CPU)
+    marker(c, (sx - 22, sy + 24), "1", CPU)
+    marker(c, wd.p(-7.0, -112), "2", CPU)
+    marker(c, wd.p(28, -97), "3", CPU)
+    mx, my = wd.p(40, -50)
+    c.line([(mx, my), (rx - 20, ry + 14)], BAD, 2)
+    marker(c, (mx, my), "4", BAD)
+    c.text(mx - 22, my - 13, "not taken: 24 of 24", "P_b", BAD, "r")
+    y = legend(c, y + wd.h + 84, [
+        ("1", CPU, "Start: the pocket next to the near ledge (4 to 8 out, 24 to 30 below), the only place he reaches "
+                   "the launch point from."),
+        ("2", CPU, "Drift under the stage, double jump."),
+        ("3", CPU, "PK Thunder: the ball launches him (PK Thunder 2) up under the far slope."),
+        ("4", BAD, "He passes 0.3 to 4.2 inside the far ledge, 18.1 to 22.3 below it, clear of the slope: not "
+                   "taken, 24 of 24."),
+        ("x", BAD, "Past the ledge the launch tops out 15 to 17 below and falls back untaken: KO."),
+    ])
+    y = para(c, PAD + 16, y + 2, "The lane's reading, not a measured rule: he flies outward facing away, so the "
+             "ledge would have to take him from behind. Lucario's, PAC-MAN's and Greninja's moves are taken that "
+             "way; PK Thunder 2 and Sonic's Spring are not.", W - 2 * PAD - 32, "P_s", MUTED) + 10
+    # Inset: facing the stage, the ledge does take PK Thunder 2 (launched from outside the near ledge, fg2-m-xps-6).
+    iw = World(PAD + 16, y + 52 + 30, PAD + 16 + 230, -114, -56, 6, -42)
+    inset_h = 52 + 30 + iw.h + 18
+    top_y = panel_box(c, y, inset_h, "Facing the stage, it is taken")
+    c.polygon(iw.ps(clip_right(RING, -56)), fill=STAGE, outline=LINE, width=2)
+    lx, ly = iw.p(-LEDGE_X, 0)
+    c.circle(lx, ly, 6, fill=ADV)
+    c.text(lx, ly - 30, "near ledge", "P_s", ADV, "m")
+    a0, a1 = iw.p(-110, -38), iw.p(-86, -18.8)
+    ln = math.hypot(a1[0] - a0[0], a1[1] - a0[1])
+    tip = (a1[0] - (a1[0] - a0[0]) * 22 / ln, a1[1] - (a1[1] - a0[1]) * 22 / ln)
+    c.line([a0, tip], OURS, 5)
+    head(c, a0, tip, OURS, 20)
+    c.circle(a0[0], a0[1], 7, fill=OURS)
+    c.circle(*a1, 18, outline=OURS, width=4)
+    para(c, PAD + 300, top_y + 6, "Launched from outside the ledge, facing the stage, PK Thunder 2 is taken 18.8 "
+         "below it: 2 of 2.", W - PAD - 16 - (PAD + 300), "P_s", FG)
+    y = options(c, y + inset_h + 10, [
+        ("1 · Ship Ness without it", [
+            ("His near side = Level 9, plus the PK Thunder path around you that the design asks for (being proven "
+             "now).", MUTED)]),
+        ("2 · Only from a stage or ledge start", [
+            ("Two launches, the second from outside the far ledge, as in the community video. Outside Guard the "
+             "Edge's off-stage situation.", MUTED)]),
+        ("3 · You suggest a trick", [("A Ness trick not yet flown.", MUTED)]),
+    ], 0)
+    finish(c, y, "GTE-NESS")
+
+
+ALL = [gte_hero, gte_sonic, gte_bayo, bridge_40ms, gte_lucario, gte_ness]
 
 
 def main():

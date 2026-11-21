@@ -5,7 +5,7 @@ picture the recommended option has a **green outline**. The images are in [`deci
 by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep
 their numbers), the specs' *Open questions* sections, `PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10.
 
-**Open now (2026-11-21):** five Guard the Edge and bridge decisions, in
+**Open now (2026-11-21):** six Guard the Edge and bridge decisions, in
 [*Open — 2026-11-21 morning*](#open-2026-11-21-morning-guard-the-edge-bridge) further down.
 
 **Answered 2026-11-01 (late evening ET):** the operator approved the proposal with the answers in the *Decision*
@@ -742,9 +742,9 @@ Line counts are the review's estimates; the size gate measures the real ones.
 
 ## Open — 2026-11-21 morning (Guard the Edge + bridge)
 
-Opened by tr-primary-2 for the operator from the lanes' posts of 2026-11-21 (06:36Z to 11:10Z). Five decisions, each
-one answerable in under a minute. Four are Guard the Edge fighters whose listed trick, a recovery **under the stage to
-the far ledge** (the "crossing"), is blocked or proven only in part. The fifth is the hardware-test bridge. In each
+Opened by tr-primary-2 for the operator from the lanes' posts of 2026-11-21 (06:36Z to 11:36Z). Six decisions, each
+one answerable in under a minute. Five are Guard the Edge fighters whose trick, a recovery **under the stage to the far
+ledge** (the "crossing"), is blocked or proven only in part. The sixth is the hardware-test bridge. In each
 picture the recommended option has a **green outline**. The pictures are drawn by `tools/render_decisions_1121.py` from
 the posts' numbers. The stage is Final Destination to scale (the level data in
 `edge-juggle/reference-crossings/MODEL.md` §2); between two measured points a path is a plain curve.
@@ -753,7 +753,7 @@ Words used below: **near side** means recovering to the nearer ledge; **Level 9*
 Guard the Edge's improved recovery. Evidence paths are relative to `artifacts/phase23/` in the workspace; "inbox" is
 `INBOX-opus-rc6-integration.md` there, by post time.
 
-Answer by number, for example: "Hero 1, Sonic 1, Bayo 1, Bridge 1, Lucario 1".
+Answer by number, for example: "Hero 1, Sonic 1, Bayo 1, Bridge 1, Lucario 1, Ness 1".
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
@@ -762,6 +762,7 @@ Answer by number, for example: "Hero 1, Sonic 1, Bayo 1, Bridge 1, Lucario 1".
 | GTE-BAYO | A new start, "CPU hanging on the near ledge", for Bayonetta's crossing | **1:** no, as for Mr. Game & Watch. The hang start is proven and ready if you want it |
 | BRIDGE-40MS | Let one unreadable menu frame wait up to 40 ms before the bridge turns Off | **1:** approve |
 | GTE-LUCARIO | The lowest damage at which Lucario's crossing is offered | **1:** from 100 %, as tabled |
+| GTE-NESS | Ness's crossing, which the far ledge never catches (never on the design's crossing list) | **1:** ship Ness without it; his near side is Level 9 plus the PK Thunder path around you |
 
 #### GTE-HERO · Hero: the crossing under the stage
 
@@ -863,6 +864,30 @@ there is no table below 100 %. From what damage should Perfect offer it?
 - **3 · The 0 % line as flown.** One line crossed (2 of 2). It was caught on the rush's last step, so there's no margin.
 
 Evidence: inbox 09:58Z fusion-g2; `edge-juggle/reference-crossings/g2/lucario.md`.
+
+#### GTE-NESS · Ness: the crossing under the stage
+
+The far ledge never takes Ness's PK Thunder 2 at the end of the crossing: 24 of 24 passed just inside the ledge and
+were not caught. From a start at rest he also can't set up the second launch the community video uses. What does Ness
+ship with?
+
+The scope, in plain words: Ness was never on the design's list of crossings. What the design asks of Ness is to steer
+his PK Thunder ball around you, so that the launch doesn't run into you ("PK Thunder path around P1"). That is being
+proven now and isn't part of this decision. The crossing was tried only because the community video shows it.
+
+![GTE-NESS: from the pocket by the near ledge, PK Thunder 2 passes 0.3 to 4.2 inside the far ledge, 18.1 to 22.3 below it, not taken 24 of 24; facing the stage it is taken 18.8 below, 2 of 2](decisions/GTE-NESS.png)
+
+- **1 · Ship Ness without the crossing (recommended).** His near side is Level 9, plus the PK Thunder path around you
+  that the design asks for.
+- **2 · Allow it only from a stage or ledge start.** That means two launches, the second from outside the far ledge, as
+  in the community video. It is outside Guard the Edge's off-stage situation.
+- **3 · Name a Ness trick** we haven't flown.
+
+Evidence: inbox 11:36Z fusion-g2; `edge-juggle/reference-crossings/g2/HANDOFF.md`;
+`edge-juggle/reference-crossings/g2/evidence/fg2-g1-yoga-12/frames-ness.tsv`, `…/fg2-g1-yoga-13/frames-ness.tsv`,
+`…/fg2-m-xps-6/frames-ness.tsv` (the facing case). Scope: `edge-juggle/DESIGN.md` §11 (line 245) and R6 (line 105);
+`edge-juggle/reference-under-fd/CROSSING-AUDIT.md` line 5; `edge-juggle/reference-under-fd/REFERENCE.md` (Ness "Hard")
+and `master-worksheet.csv`.
 
 ## Open (2026-11-13/14)
 
