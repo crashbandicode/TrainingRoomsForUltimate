@@ -95,9 +95,9 @@ Earlier recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
-| `assets/info_training.tra1` | `83731aa31a9c2c43a8b71b374f5fdf5874c23ce0aa8fa050d4e13afdf7e06d8a` (rc.15; before: dcf0f43d's, 426,633 B) | 427,187 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 1,004,436 B, fnv `fd6b974bf59415fc` |
-| `assets/info_waiting.tra1` | `3cded2d9dcfb72bcf3cc600a558166ec32111bb7b2e3a7477c799aab3ef93d3c` (rc.15; before: dcf0f43d's, 430,566 B) | 431,167 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,836,932 B, fnv `7b0ef62db81a5d4c` |
-| `assets/panes-recipe.sha256` | `17f6def2374d48c0b686e979033df0875d8aa87a41ecd8474378d626da384396` (the digest, rc.15; file SHA-256 `897fcd520521827578826fe625d787dd0bf511e6a6b9c1922a0ac8741da41101`) | 65 | |
+| `assets/info_training.tra1` | `645de1c083283e42bf8208a4cb1002feba3b45a6c4d33d5c46058f1a5f4dc5ef` (rc.15; before: dcf0f43d's, 426,633 B) | 427,187 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 1,004,436 B, fnv `45acc7ee1d167001` |
+| `assets/info_waiting.tra1` | `8f2e45adaf2bfcb015e018c49e1544af3ef49c0661ad8b31d293ab7605be952c` (rc.15; before: dcf0f43d's, 430,566 B) | 431,167 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,836,932 B, fnv `c344d50f3c4ae895` |
+| `assets/panes-recipe.sha256` | `33a75c25bcdd5737ea2623913468d4b1e2ffeccdddbcddbfb22122aef84a21a2` (the digest, rc.15; file SHA-256 `497a710115e435ed6b6e9ca38b4be8b41a8900181a710b374405c1e090a20d48`) | 65 | |
 
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).

@@ -696,12 +696,12 @@ const fn cb_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)
 }
 
 /// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
-const fn cb_spec(local: usize, name: Name) -> Spec {
+const fn cb_spec(layout: &strip_layout::LayoutSpec, local: usize, name: Name) -> Spec {
     use cb::at::*;
     use cb::{CELL_COLOR, SEQ_CHIP_COLOR, SEQ_PILL_COLOR, SEQ_PILL_TEXT_COLOR};
     use iv::{FONT_SUB, FONT_TAG};
     let parent = Name::new("TrCb");
-    let (place, h) = strip_layout::C.card.at_rest(local);
+    let (place, h) = layout.card.at_rest(local, &layout.strip);
     let xyz = [place.x, place.y, place.w];
     let size = [place.x, place.y, place.w, h];
     match local {
@@ -916,6 +916,16 @@ pub fn btt_hud_box(body: &str, strip: bool, bar: bool) -> [f32; 4] {
     [-936.0, y, width, 48.0]
 }
 
+/// Archive placement for a strip or card pane, using the same spec as the live HUD.
+pub const fn strip_pane_spec(layout: &strip_layout::LayoutSpec, index: usize) -> Spec {
+    let name = name_of(index);
+    if index < IDX_CB {
+        strip_layout::strip::iv_spec(&layout.strip, index - IDX_IV, name)
+    } else {
+        cb_spec(layout, index - IDX_CB, name)
+    }
+}
+
 /// Pane `index`'s kind and place.
 pub const fn spec(index: usize) -> Spec {
     let name = name_of(index);
@@ -937,8 +947,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_LONG_PLATE => under(rect(name, NOTICE_BOX, NOTICE_PLATE, false), name_of(IDX_NOTICE)),
         IDX_NOTICE_LONG => under(hidden(text(name, NOTICE_BOX, Align::Left, NOTICE_BODY_FONT, NOTICE_LONG_UNITS, TEXT)), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
-        i if i >= IDX_IV && i < IDX_CB => strip_layout::strip::iv_spec(i - IDX_IV, name),
-        i if i >= IDX_CB && i < IDX_ORBS => cb_spec(i - IDX_CB, name),
+        i if i >= IDX_IV && i < IDX_ORBS => strip_pane_spec(&strip_layout::C, i),
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),

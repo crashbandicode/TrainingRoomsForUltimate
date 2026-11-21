@@ -169,8 +169,8 @@ impl CardSpec {
     }
 
     /// Defaults and native pane dimensions for the archive. Relative placement at runtime uses this same spec.
-    pub const fn at_rest(&self, index: usize) -> (Place, f32) {
-        self.base(index, false, strip::TOP - strip::BASE_H, Metrics::EMPTY)
+    pub const fn at_rest(&self, index: usize, strip: &strip::StripSpec) -> (Place, f32) {
+        self.base(index, false, strip.band_top(false), Metrics::EMPTY)
     }
 
     fn fits(&self, a: f32, b: f32) -> bool {

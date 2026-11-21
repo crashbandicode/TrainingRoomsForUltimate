@@ -185,6 +185,7 @@ fn the_current_combo_is_always_in_a_window_of_three() {
 }
 
 fn the_same_content_can_be_placed_in_a_second_layout() {
+    use crate::model::panes::{IDX_CB, strip_pane_spec};
     let mut h = helper(true, true);
     h.continue_with(reference());
     let next = Stepped { step: 0, summary: clean(), advance: Advance::Next(1) };
@@ -192,15 +193,21 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
     let mut second = C;
     second.card.left -= 50.0;
     second.card.top -= 12.0;
+    second.strip.base_height += 20.0;
     for seq in [None, Some(&seq)] {
-        let draw = |spec: &LayoutSpec, history| {
+        let card = if seq.is_some() { at::SEQ_BACKDROP } else { at::BACKDROP };
+        let draw = |spec: &LayoutSpec| {
             let mut looks = vec![Look::HIDDEN; COUNT];
-            Renderer::new().draw_with_spec(&h, &Text::new("Jab"), seq, true, (spec, history), |i, look, _| looks[i] = *look);
+            Renderer::new().draw_with_spec(&h, &Text::new("Jab"), seq, true, (spec, false), |i, look, _| looks[i] = *look);
+            for i in [at::CELL, card] {
+                let pane = strip_pane_spec(spec, IDX_CB + i);
+                let look = looks[i];
+                assert_eq!((pane.x, pane.y, pane.w), (look.x, look.y, look.w));
+            }
             looks
         };
-        let (c, alternative) = (draw(&C, false), draw(&second, true));
+        let (c, alternative) = (draw(&C), draw(&second));
         assert_ne!(c[at::CELL].y, alternative[at::CELL].y);
-        let card = if seq.is_some() { at::SEQ_BACKDROP } else { at::BACKDROP };
         assert_ne!((c[card].x, c[card].y), (alternative[card].x, alternative[card].y));
         for (a, b) in c.iter().zip(alternative) {
             assert_eq!((a.visible, a.text, a.color), (b.visible, b.text, b.color));

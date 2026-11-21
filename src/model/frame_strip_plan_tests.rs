@@ -46,7 +46,8 @@ fn true_combo() -> Tracker {
 }
 
 #[test]
-fn changing_layout_preserves_strip_content() {
+fn runtime_and_archive_share_the_strip_layout() {
+    use crate::model::panes::{IDX_IV, strip_pane_spec};
     let tracker = true_combo();
     let mut alternate = C;
     alternate.strip.origin_y -= 300.0;
@@ -54,14 +55,22 @@ fn changing_layout_preserves_strip_content() {
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
         let (_, line, history) = Renderer::new().draw_with_spec(
-            &tracker, true, true, None, false, false, spec,
+            &tracker, true, true, None, true, false, spec,
             |i, look, _| looks[i] = *look,
         );
+        let root = strip_pane_spec(spec, IDX_IV + at::CONTAINER);
+        assert_eq!((root.x, root.y), (looks[at::CONTAINER].x, looks[at::CONTAINER].y));
+        for i in [at::BACKDROP, at::READ_LABEL + 1, at::READ_SUB + 1] {
+            let pane = strip_pane_spec(spec, IDX_IV + i);
+            let look = looks[i];
+            assert_eq!((pane.x, pane.y, pane.w), (look.x, look.y, look.w));
+        }
         (looks, line, history)
     };
     let (compact, line, history) = collect(&C);
     let (other, other_line, other_history) = collect(&alternate);
     assert_ne!((compact[0].y, compact[1].w), (other[0].y, other[1].w));
+    assert_ne!(compact[at::READ_SUB + 1].x, other[at::READ_SUB + 1].x);
     assert_eq!(compact.map(|l| (l.visible, l.color, l.text)), other.map(|l| (l.visible, l.color, l.text)));
     assert_eq!((line, history), (other_line, other_history));
 }

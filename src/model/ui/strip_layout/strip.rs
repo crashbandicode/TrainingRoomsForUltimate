@@ -34,7 +34,6 @@ pub const BRACKET_TEXT_Y: f32 = LEG_Y - 18.0;
 pub const READ_X: f32 = 276.0;
 pub const READ_VALUE_Y: [f32; 3] = [TOP - 26.0, TOP - 68.5, TOP - 111.0];
 pub const READ_SUB_X: f32 = READ_X + 75.0;
-pub const LINK_BOX_W: f32 = STRIP_W / 2.0 - READ_SUB_X - 12.0;
 pub const LINK_UNITS: u16 = 32;
 pub const DIVIDER_X: f32 = 262.5;
 pub const DIVIDER_Y: f32 = TOP - 69.0;
@@ -128,25 +127,25 @@ impl StripSpec {
             }
     }
 
-    pub fn bounds(&self, history: bool, cells: bool) -> [f32; 4] {
+    pub const fn bounds(&self, history: bool, cells: bool) -> [f32; 4] {
         let height = self.top - self.band_top(history);
         let h = height + if cells { self.cells_height } else { 0.0 };
         [0.0, self.top - h / 2.0, self.width, h]
     }
 
-    pub fn container(&self) -> Place {
+    pub const fn container(&self) -> Place {
         Place::new(self.origin_x, self.origin_y, 0.0)
     }
 
-    pub fn lane_label(&self, lane: usize) -> Place {
+    pub const fn lane_label(&self, lane: usize) -> Place {
         Place::new(self.label_x, self.lanes[lane], 0.0)
     }
 
-    pub fn rule(&self, rule: usize) -> Place {
+    pub const fn rule(&self, rule: usize) -> Place {
         self.separators[rule]
     }
 
-    pub fn now(&self, part: usize) -> Place {
+    pub const fn now(&self, part: usize) -> Place {
         self.now[part]
     }
 
@@ -231,22 +230,32 @@ impl StripSpec {
         }
     }
 
-    pub fn readout(&self, row: usize, part: usize) -> Place {
-        let y = self.readout_rows[row];
-        let [value, label] = self.readout_left;
-        match part {
-            0 => Place::new(label + 60.0, y + 11.0, 0.0),
-            1 => Place::new(value + 30.0, y, 0.0),
-            _ if row == 1 => Place::new(label + LINK_BOX_W / 2.0, y - 10.0, 0.0),
-            _ => Place::new(label + 90.0, y - 10.0, 0.0),
-        }
+    const fn link_box_width(&self) -> f32 {
+        self.width / 2.0 - self.readout_left[1] - 12.0
     }
 
-    pub fn last_label(&self) -> Place {
+    pub const fn readout(&self, row: usize, part: usize) -> Place {
+        let y = self.readout_rows[row];
+        let [value, label] = self.readout_left;
+        let w = match part {
+            0 => 120.0,
+            1 => 60.0,
+            _ if row == 1 => self.link_box_width(),
+            _ => 180.0,
+        };
+        let (left, y) = match part {
+            0 => (label, y + 11.0),
+            1 => (value, y),
+            _ => (label, y - 10.0),
+        };
+        Place::new(left + w / 2.0, y, w)
+    }
+
+    pub const fn last_label(&self) -> Place {
         Place::new(self.label_x, self.history[0], 0.0)
     }
 
-    pub fn last(&self, part: usize, n: usize) -> Place {
+    pub const fn last(&self, part: usize, n: usize) -> Place {
         let [y, x0, stride, w] = self.history;
         let x = x0 + n as f32 * stride;
         match part {
@@ -265,48 +274,59 @@ const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)
     ))
 }
 
-/// The frame strip's panes: kind, place and size, all hidden until the input package draws them.
-pub(in super::super) const fn iv_spec(local: usize, name: Name) -> Spec {
+/// The recipes seed visible anchors from the same coordinates as the live strip. Hidden frame slots
+/// start empty and are positioned by their slot on the first live update.
+pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name) -> Spec {
     use iv::at::*;
-    use iv::{
-        BACKDROP_COLOR, BAR_Y, BRACKET_TEXT_Y, CELL_W, CHIP, DIVIDER_X, FONT_SUB, FONT_TAG,
-        FONT_VALUE, IN_Y, LABEL_X, LANE_H, LAST_Y, LEG_H, LEG_Y, NOW_H, NOW_TEXT_Y, NOW_X, NOW_Y,
-        PILL_W, READ_SUB_X, READ_X, RULE_Y, STICK_Y, STRIP_H, STRIP_W, STRIP_Y, TEXT_UNITS, TICK_H,
-        TICK_Y, TOP, WINDOW_H, WINDOW_Y,
-    };
+    use iv::{BACKDROP_COLOR, FONT_SUB, FONT_TAG, FONT_VALUE, TEXT_UNITS};
     let parent = Name::new("TrIv");
     match local {
-        CONTAINER => container(name, ROOT_PANE, [0.0, STRIP_Y, STRIP_W, STRIP_H]),
+        CONTAINER => container(
+            name,
+            ROOT_PANE,
+            [
+                spec.origin_x,
+                spec.origin_y,
+                spec.width,
+                spec.history_height,
+            ],
+        ),
         BACKDROP => under(
-            rect(
-                name,
-                [0.0, TOP - STRIP_H / 2.0, STRIP_W, STRIP_H],
-                BACKDROP_COLOR,
-                true,
-            ),
+            rect(name, spec.bounds(true, false), BACKDROP_COLOR, true),
             parent,
         ),
-        i if i < SEPARATOR => iv_text(name, [LABEL_X, 0.0, 60.0], Align::Center, FONT_TAG),
+        i if i < SEPARATOR => iv_text(
+            name,
+            with_width(spec.lane_label(i - LANE_LABEL), 60.0),
+            Align::Center,
+            FONT_TAG,
+        ),
         SEPARATOR => under(
+            rect(name, with_height(spec.rule(0), DIVIDER_H), RULE, false),
+            parent,
+        ),
+        i if i < RUN => under(
+            rect(name, with_height(spec.rule(1), 1.5), RULE, false),
+            parent,
+        ),
+        i if i < RUN_LABEL => under(
+            rect(name, [0.0, 0.0, spec.cell_width, LANE_H], TEXT, false),
+            parent,
+        ),
+        i if i < CHIP_BOX => iv_text(name, [0.0, 0.0, 60.0], Align::Center, FONT_TAG),
+        i if i < CHIP_GLYPH => under(
             rect(
                 name,
-                [DIVIDER_X, iv::DIVIDER_Y, 1.5, iv::DIVIDER_H],
-                RULE,
+                [0.0, spec.lanes[0], spec.chip, spec.chip],
+                TEXT,
                 false,
             ),
             parent,
         ),
-        i if i < RUN => under(
-            rect(name, [0.0, RULE_Y, STRIP_W - 36.0, 1.5], RULE, false),
-            parent,
-        ),
-        i if i < RUN_LABEL => under(rect(name, [0.0, 0.0, CELL_W, LANE_H], TEXT, false), parent),
-        i if i < CHIP_BOX => iv_text(name, [0.0, 0.0, 60.0], Align::Center, FONT_TAG),
-        i if i < CHIP_GLYPH => under(rect(name, [0.0, IN_Y, CHIP, CHIP], TEXT, false), parent),
         i if i < CHIP_SHAFT => hidden(under(
             text(
                 name,
-                [0.0, IN_Y, CHIP, CHIP],
+                [0.0, spec.lanes[0], spec.chip, spec.chip],
                 Align::Center,
                 FONT_SUB,
                 2,
@@ -314,33 +334,45 @@ pub(in super::super) const fn iv_spec(local: usize, name: Name) -> Spec {
             ),
             parent,
         )),
-        i if i < CHIP_HEAD => under(rect(name, [0.0, IN_Y, 4.5, 14.0], TEXT, false), parent),
-        i if i < CHIP_TICK => under(rect(name, [0.0, IN_Y, 9.0, 9.0], TEXT, false), parent),
-        i if i < WINDOW_BAR => under(rect(name, [0.0, TICK_Y, 1.5, TICK_H], TEXT, false), parent),
-        WINDOW_BAR => under(
-            rect(name, [0.0, WINDOW_Y, 1.5, WINDOW_H], TEXT, false),
+        i if i < CHIP_HEAD => under(
+            rect(name, [0.0, spec.lanes[0], 4.5, 14.0], TEXT, false),
             parent,
         ),
-        WINDOW_TEXT => iv_text(name, [0.0, WINDOW_Y, 120.0], Align::Center, FONT_TAG),
-        i if i < BRACKET_TEXT && (i - BRACKET) % 3 == 1 => {
-            under(rect(name, [0.0, BAR_Y, 3.0, 3.0], TEXT, false), parent)
-        }
-        i if i < BRACKET_TEXT => under(rect(name, [0.0, LEG_Y, 3.0, LEG_H], TEXT, false), parent),
-        i if i < NOW => iv_text(name, [0.0, BRACKET_TEXT_Y, 120.0], Align::Center, FONT_TAG),
-        NOW => under(rect(name, [NOW_X, NOW_Y, 1.5, NOW_H], TEXT, false), parent),
-        NOW_TEXT => iv_text(
-            name,
-            [NOW_X - 24.0, NOW_TEXT_Y, 48.0],
-            Align::Center,
-            FONT_TAG,
+        i if i < CHIP_TICK => under(
+            rect(name, [0.0, spec.lanes[0], 9.0, 9.0], TEXT, false),
+            parent,
         ),
+        i if i < WINDOW_BAR => under(
+            rect(name, [0.0, spec.tick_y, 1.5, TICK_H], TEXT, false),
+            parent,
+        ),
+        WINDOW_BAR => under(
+            rect(name, [0.0, spec.window_y, 1.5, WINDOW_H], TEXT, false),
+            parent,
+        ),
+        WINDOW_TEXT => iv_text(name, [0.0, spec.window_y, 120.0], Align::Center, FONT_TAG),
+        i if i < BRACKET_TEXT && (i - BRACKET) % 3 == 1 => under(
+            rect(name, [0.0, spec.legs[1], 3.0, 3.0], TEXT, false),
+            parent,
+        ),
+        i if i < BRACKET_TEXT => under(
+            rect(name, [0.0, spec.legs[0], 3.0, LEG_H], TEXT, false),
+            parent,
+        ),
+        i if i < NOW => iv_text(name, [0.0, spec.legs[2], 120.0], Align::Center, FONT_TAG),
+        NOW => under(
+            rect(name, with_height(spec.now(0), NOW_H), TEXT, false),
+            parent,
+        ),
+        NOW_TEXT => iv_text(name, with_width(spec.now(1), 48.0), Align::Center, FONT_TAG),
         i if i < READ_VALUE => {
-            iv_text(name, [READ_SUB_X + 60.0, 0.0, 120.0], Align::Left, FONT_TAG)
+            let place = spec.readout(i - READ_LABEL, 0);
+            iv_text(name, [place.x, place.y, place.w], Align::Left, FONT_TAG)
         }
         i if i < READ_SUB => hidden(under(
             text(
                 name,
-                [READ_X + 30.0, 0.0, 60.0, 40.0],
+                with_height(spec.readout(i - READ_VALUE, 1), 40.0),
                 Align::Left,
                 FONT_VALUE,
                 TEXT_UNITS,
@@ -348,26 +380,47 @@ pub(in super::super) const fn iv_spec(local: usize, name: Name) -> Spec {
             ),
             parent,
         )),
-        i if i == READ_SUB + 1 => hidden(under(
-            text(
-                name,
-                [READ_SUB_X + iv::LINK_BOX_W / 2.0, 0.0, iv::LINK_BOX_W, 30.0],
-                Align::Left,
-                FONT_SUB,
-                iv::LINK_UNITS,
-                TEXT,
-            ),
+        i if i < LAST_TEXT => {
+            let row = i - READ_SUB;
+            let capacity = if row == 1 { LINK_UNITS } else { TEXT_UNITS };
+            hidden(under(
+                text(
+                    name,
+                    with_height(spec.readout(row, 2), 30.0),
+                    Align::Left,
+                    FONT_SUB,
+                    capacity,
+                    TEXT,
+                ),
+                parent,
+            ))
+        }
+        LAST_TEXT => iv_text(
+            name,
+            with_width(spec.last_label(), 60.0),
+            Align::Center,
+            FONT_TAG,
+        ),
+        i if i < PILL_TEXT => under(
+            rect(name, with_height(spec.last(0, i - PILL), 24.0), TEXT, false),
             parent,
-        )),
-        i if i < LAST_TEXT => iv_text(name, [READ_SUB_X + 90.0, 0.0, 180.0], Align::Left, FONT_SUB),
-        LAST_TEXT => iv_text(name, [LABEL_X, LAST_Y, 60.0], Align::Center, FONT_TAG),
-        i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
-        i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
-        i if i < STICK => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
+        ),
+        i if i < MOVE_TEXT => iv_text(
+            name,
+            with_width(spec.last(1, i - PILL_TEXT), spec.history[3]),
+            Align::Center,
+            FONT_TAG,
+        ),
+        i if i < STICK => iv_text(
+            name,
+            with_width(spec.last(2, i - MOVE_TEXT), 200.0),
+            Align::Left,
+            FONT_TAG,
+        ),
         i if i < TAG_BOX => hidden(under(
             text(
                 name,
-                [0.0, STICK_Y, 16.0, 18.0],
+                [0.0, spec.stick_y, 16.0, 18.0],
                 Align::Center,
                 FONT_TAG,
                 2,
@@ -376,13 +429,28 @@ pub(in super::super) const fn iv_spec(local: usize, name: Name) -> Spec {
             parent,
         )),
         i if i < TAG_TEXT => hidden(under(
-            rect(name, [0.0, 0.0, 92.0, LANE_H + 4.0], TEXT, false),
+            rect(
+                name,
+                [0.0, 0.0, spec.tag_widths[0], LANE_H + 4.0],
+                TEXT,
+                false,
+            ),
             parent,
         )),
-        i if i < COUNT => iv_text(name, [0.0, 0.0, 92.0], Align::Center, FONT_TAG),
-        _ => {
-            let _ = TEXT_UNITS;
-            panic!("no such frame strip pane")
-        }
+        i if i < COUNT => iv_text(
+            name,
+            [0.0, 0.0, spec.tag_widths[0]],
+            Align::Center,
+            FONT_TAG,
+        ),
+        _ => panic!("no such frame strip pane"),
     }
+}
+
+const fn with_height(place: Place, height: f32) -> [f32; 4] {
+    [place.x, place.y, place.w, height]
+}
+
+const fn with_width(place: Place, width: f32) -> [f32; 3] {
+    [place.x, place.y, width]
 }
