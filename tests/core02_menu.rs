@@ -127,6 +127,32 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
+fn link_history_choices_persist() {
+    let mut m = menu();
+    let row = goto(&mut m, "link_history");
+    assert_eq!(m.page(), Page::DisplayControls);
+    assert_eq!(ROWS[row].title, "Link history");
+    assert!(matches!(ROWS[row].control, Control::Dropdown(labels) if labels == ["On", "Off"]));
+
+    for expected in [[1, 0], [0, 1], [1, 0]] {
+        let loaded = settings::parse(&m.settings().to_json());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.menu.get("link_history"), Some(expected.as_slice()));
+        assert_eq!(model::frame_strip::Settings::from_snapshot(&loaded.settings.menu).link_history, expected[0] == 1);
+        assert_eq!(loaded.settings.defaults.get("link_history"), Some(&[1, 0][..]));
+        m.press(Button::Right);
+    }
+}
+
+fn legacy_settings_default_link_history_to_on() {
+    let old = settings::parse(r#"{"menu":{"input_display_strip":[1,0]},"defaults_menu":{"spots_strip":[0,1]}}"#);
+    assert!(old.issues.is_empty(), "{:?}", old.issues);
+    for snapshot in [&old.settings.menu, &old.settings.defaults] {
+        assert_eq!(snapshot.get("link_history"), Some(&[1, 0][..]));
+        assert!(model::frame_strip::Settings::from_snapshot(snapshot).link_history);
+    }
+}
+
 fn spacing_grader_row_after_hitbox_visualization() {
     let hitbox = ROWS.iter().position(|row| row.id == "hitbox_vis").expect("Hitbox Visualization row");
     let row = &ROWS[hitbox + 1];
@@ -228,7 +254,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
     // Spacing grader adds one Display & Controls row (145 → 146).
-    assert_eq!(ROWS.len(), 166);
+    assert_eq!(ROWS.len(), 167);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -1237,6 +1263,8 @@ fn case_table() {
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
+        ("link_history_choices_persist", link_history_choices_persist as fn()),
+        ("legacy_settings_default_link_history_to_on", legacy_settings_default_link_history_to_on as fn()),
         ("spacing_grader_row_after_hitbox_visualization", spacing_grader_row_after_hitbox_visualization as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),

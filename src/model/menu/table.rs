@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 166] = [
+pub static ROWS: [Row; 167] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -474,6 +474,8 @@ pub static ROWS: [Row; 166] = [
       "Frame strip: the last second of P1 and CPU frames,\nhow each follow-up linked and the frame advantage."),
     r(SCREEN, "Spot labels", "spots_strip", TOGGLE,
       "On: each hit on the frame strip says Sweet, Sour or Late.\nOff: no labels."),
+    r(SCREEN, "Link history", "link_history", Control::Dropdown(&["On", "Off"]),
+      "Show the last four follow-ups beneath the frame strip."),
     r(SCREEN, "Input Delay", "input_delay", Control::Number { first: 0, step: 1 },
       "Frames Player 1's inputs are held back, 0 to 30.\nChords are not delayed."),
     // Display & Controls > Controls

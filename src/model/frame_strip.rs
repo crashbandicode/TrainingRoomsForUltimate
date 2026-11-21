@@ -957,12 +957,13 @@ pub mod ids {
     }
 }
 
-/// The row (`input_display_strip`: Off, Frame strip).
+/// Settings read by the frame strip.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub on: bool,
     /// Sweet/sour spot labels on the hit blocks (rc.14, SP3), Off by default.
     pub spots: bool,
+    pub link_history: bool,
     pub grader: bool,
 }
 
@@ -972,7 +973,7 @@ pub const OLD_ROW: &str = "input_display";
 
 impl Settings {
     pub const fn factory() -> Self {
-        Self { on: true, spots: false, grader: false }
+        Self { on: true, spots: false, link_history: true, grader: false }
     }
 
     pub const fn samples(self, parry: bool) -> bool {
@@ -987,6 +988,7 @@ impl Settings {
         Self {
             on,
             spots: spots::row_on(snapshot, spots::ROW_STRIP),
+            link_history: snapshot.get("link_history").and_then(|row| row.iter().position(|v| *v != 0)).is_none_or(|choice| choice == 0),
             grader: spots::row_on(snapshot, super::spacing::ROW),
         }
     }
