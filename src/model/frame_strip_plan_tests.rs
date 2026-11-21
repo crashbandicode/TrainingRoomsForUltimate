@@ -45,6 +45,71 @@ fn true_combo() -> Tracker {
     t
 }
 
+#[test]
+fn changing_layout_preserves_strip_content() {
+    let tracker = true_combo();
+    let mut alternate = C;
+    alternate.strip.origin_y -= 300.0;
+    alternate.strip.width -= 40.0;
+    let collect = |spec: &LayoutSpec| {
+        let mut looks = [Look::HIDDEN; COUNT];
+        let (_, line, history) = Renderer::new().draw_with_spec(
+            &tracker, true, true, None, false, false, spec,
+            |i, look, _| looks[i] = *look,
+        );
+        (looks, line, history)
+    };
+    let (compact, line, history) = collect(&C);
+    let (other, other_line, other_history) = collect(&alternate);
+    assert_ne!((compact[0].y, compact[1].w), (other[0].y, other[1].w));
+    assert_eq!(compact.map(|l| (l.visible, l.color, l.text)), other.map(|l| (l.visible, l.color, l.text)));
+    assert_eq!((line, history), (other_line, other_history));
+}
+
+#[test]
+fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
+    let tracker = true_combo();
+    let mut renderer = Renderer::new();
+    let mut draw = |on| {
+        let (_, line, history) = renderer.draw_with_spec(
+            &tracker, true, false, None, on, false, &C, |_, _, _| {},
+        );
+        let last = renderer.written(at::LAST_TEXT).unwrap().visible;
+        let pill = renderer.written(at::PILL).unwrap().visible;
+        assert_eq!((history, last, pill), (on, on, on));
+        String::from_utf16(line.unwrap().units()).unwrap()
+    };
+    assert_eq!(draw(true), "TRUE combo");
+    assert_eq!(draw(false), "TRUE · Jab > Up tilt");
+    assert_eq!(draw(true), "TRUE combo");
+}
+
+#[test]
+fn compact_bounds_and_fade_follow_the_scene_and_visible_rows() {
+    assert_eq!(C.strip.bounds(true, false), [0.0, 23.0, 1296.0, 170.0]);
+    assert_eq!(C.strip.bounds(false, false), [0.0, 39.0, 1296.0, 138.0]);
+    assert_eq!(C.strip.bounds(false, true), [0.0, 7.0, 1296.0, 202.0]);
+    let seen = C.opacity(0.0, false, Some(true), [[0.0, 535.0]]);
+    assert_eq!(seen, u8::MAX);
+    assert_eq!(
+        C.opacity(0.0, false, Some(true), [[0.0, 500.0]]),
+        C.covered_alpha
+    );
+    assert_eq!(
+        C.opacity(0.0, false, Some(true), [[804.0, 400.0]]),
+        C.covered_alpha
+    );
+    assert_eq!(C.opacity(0.0, false, None, [[804.0, 400.0]]), u8::MAX);
+    assert_eq!(
+        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 500.0]]),
+        u8::MAX
+    );
+    assert_eq!(
+        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 400.0]]),
+        C.covered_alpha
+    );
+}
+
 fn draw_all(r: &mut Renderer, t: &Tracker, shown: bool) -> (usize, Vec<(usize, Look, Changed)>) {
     let mut seen = Vec::new();
     let n = r.draw(t, shown, |i, look, changed| seen.push((i, *look, changed)));

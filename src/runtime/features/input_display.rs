@@ -18,7 +18,8 @@ use skyline::hooks::InlineCtx;
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
 use crate::model::spacing::{Grade, Grader, Lanes};
-use crate::model::frame_strip_plan::{Changed, Look, Renderer};
+use crate::model::frame_strip_plan::{Changed, LinkLine, Look, Renderer};
+use crate::model::panes::strip_layout::C;
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::natives;
@@ -49,7 +50,7 @@ pub fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Release);
 }
 
-fn settings() -> Settings {
+pub(super) fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.input_display)
 }
 
@@ -627,20 +628,25 @@ pub fn on_layout_registered() {
 
 /// One HUD tick: hand every pane write the strip needs to `apply`. Shown unless a menu is open, the row is Off or
 /// boot did not enable the display. Returns how many panes were written.
-pub fn hud_tick(menu_open: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
-    let shown = !menu_open && sampling();
+pub fn hud_tick(
+    shown: bool,
+    draw_settings: Settings,
+    parry: Option<&crate::model::parry::View>,
+    cells: bool,
+    mut apply: impl FnMut(usize, &Look, Changed),
+) -> (Option<LinkLine>, bool) {
     let tracker = *TRACKER.lock();
-    let parry = super::parry::view();
-    RENDERER.lock().draw_parry(&tracker, shown, settings().spots, parry.as_ref(), |local, look, changed| {
-        // Diag build: every show or hide of the strip, with why (the menu, the vanilla pause, the row Off).
-        #[cfg(feature = "diag")]
-        if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
-            crate::runtime::diag_log::diagnostic(format_args!(
-                "[FrameStrip] shown={} menu_open={menu_open} on={}",
-                look.visible,
-                sampling()
-            ));
-        }
-        apply(local, look, changed)
-    })
+    let (_, line, history) = RENDERER.lock().draw_with_spec(
+        &tracker, shown, draw_settings.spots, parry, draw_settings.link_history, cells, &C,
+        |local, look, changed| {
+            #[cfg(feature = "diag")]
+            if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
+                crate::runtime::diag_log::diagnostic(format_args!(
+                    "[FrameStrip] shown={} on={}", look.visible, sampling(),
+                ));
+            }
+            apply(local, look, changed)
+        },
+    );
+    (line, history)
 }

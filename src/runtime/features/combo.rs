@@ -13,7 +13,7 @@
 //!   the order and at the point it did when the worker wrote it under the lock; the worker reads copies (`SAMPLE`,
 //!   `PROGRESS`) and keeps the menu's labels itself (`LABELS`).
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 
@@ -22,6 +22,7 @@ use crate::model::combo_plan::{self, Renderer, SeqView};
 use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Tracker, Verdict};
 use crate::model::frame_strip_plan::{Changed, Look, Text};
+use crate::model::panes::strip_layout::C;
 use crate::runtime::published;
 
 /// The fighter frame's (`after_strip`, `session_clear`) and the HUD tick's; the menu worker never takes it: it stages a target
@@ -47,8 +48,8 @@ struct Sample {
 // Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
 static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
     Mutex::new((Renderer::new(), [None; combo_plan::COUNT]));
-/// The bar was drawn shown on the last HUD tick that got to it: the wide BTT chip sits under it (`panes::btt_hud_box`).
-static BAR_SHOWN: AtomicBool = AtomicBool::new(false);
+/// Last drawn card: none (0), combo (1), or sequence (2). A contended tick preserves the visible card.
+static CARD: AtomicU8 = AtomicU8::new(0);
 static INPUT_TARGET: AtomicBool = AtomicBool::new(false);
 pub fn input_observation_wanted() -> bool {
     INPUT_TARGET.load(Ordering::Acquire) && settings().on
@@ -578,29 +579,41 @@ pub fn on_layout_registered() {
 /// game's task workers (`anchors::ui_pass_calculate`), while the fighter frame may hold `HELPER`, `NAME` or `PLAN`: it takes
 /// them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next pass draws). No plugin
 /// thread takes them (the menu worker posts: `NAME_POSTED`, `PLAN_POST`); this tick takes what it posted first.
-pub fn hud_tick(strip_shown: bool, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
-    // The old 11 KB Helper copy (and an intermediate Option copy) exhausted game-task stack; borrow static storage.
+pub fn hud_tick(
+    strip_shown: bool,
+    history_enabled: bool,
+    parry: bool,
+    mut apply: impl FnMut(usize, &Look, Changed),
+) -> Option<bool> {
+    let last_card = || match CARD.load(Ordering::Acquire) {
+        1 if strip_shown => Some(false),
+        2 if strip_shown => Some(true),
+        _ => None,
+    };
+    // Borrow the static Helper. Copying it exhausts the game task's stack.
     let Some(helper) = HELPER.try_lock() else {
-        return 0;
+        return last_card();
     };
     let Some(name) = NAME.try_lock().map(|mut name| {
         take_posted_name(&mut name);
         *name
     }) else {
-        return 0;
+        return last_card();
     };
-    let Some(seq) = seq_view() else { return 0 };
+    let Some(seq) = seq_view() else { return last_card() };
     let Some(mut renderer) = RENDERER.try_lock() else {
-        return 0;
+        return last_card();
     };
-    BAR_SHOWN.store(combo_plan::shown(&helper, strip_shown), Ordering::Release);
+    let card = combo_plan::shown(&helper, strip_shown).then_some(seq.is_some());
+    let history = C.history_row(history_enabled, parry, card.is_some());
     let (panes, changes) = &mut *renderer;
     changes.fill(None);
-    let writes = panes.draw(
+    panes.draw_with_spec(
         &helper,
         &name,
         seq.as_ref(),
         strip_shown,
+        (&C, history),
         |i, _, changed| changes[i] = Some(changed),
     );
     drop(helper);
@@ -610,10 +623,6 @@ pub fn hud_tick(strip_shown: bool, mut apply: impl FnMut(usize, &Look, Changed))
             apply(i, panes.written(i).unwrap(), *changed);
         }
     }
-    writes
-}
-
-/// The combo bar is shown (the rule of `Renderer::draw`, as of the last HUD tick).
-pub fn bar_shown() -> bool {
-    BAR_SHOWN.load(Ordering::Acquire)
+    CARD.store(card.map_or(0, |sequence| 1 + u8::from(sequence)), Ordering::Release);
+    card
 }

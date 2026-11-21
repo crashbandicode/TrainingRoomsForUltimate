@@ -89,10 +89,14 @@ Record yourself with ZR + D-pad Down and let the CPU play it back with ZR + D-pa
 
 ![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*
 
-Save a combo you landed and drill it: **B + D-pad Up → Recording → Combos & Sequences → + Save last combo…**, and a bar
-grades each try.
+Save a combo you landed and drill it: **B + D-pad Up → Recording → Combos & Sequences → + Save last combo…**, and the link cells under the frame strip grade each try. The card on the right shows the drill, result and streak.
+For sequences, it stacks three combos and marks the current one. The strip and card fade together when a fighter moves
+behind either one.
 
 ![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*
+
+Turn **Display & Controls → Link history** off to make the strip shorter. The **LINK** readout then shows the newest
+move pair with its verdict, for example **TRUE · Jab > Jab**. During a drill, its link cells use the LAST row’s space.
 
 Cut failed attempts out of a macro, combo or input drill: open its **Crop** row with **A**, use **L/R** and **Left/Right** to pick what stays, then **A** saves a new named copy.
 

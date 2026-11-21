@@ -1,5 +1,5 @@
 //! The combo bar's panes (SPEC-input-07 §7): what each shows for the helper, and the renderer that writes only what
-//! changed (the frame strip's rule, SPEC-input-06 §5.2). Positions are relative to the bar's container `TrCb`.
+//! changed (the frame strip's rule, SPEC-input-06 §5.2). The layout spec places these readouts.
 
 use core::fmt::Write as _;
 
@@ -8,7 +8,9 @@ use super::drill::{Advance, Stepped};
 use super::frame_strip::{Button, Verdict};
 use super::frame_strip_plan::{Changed, Look, Text, BAD, GOOD, MUTED, RULE, TEXT, WARN};
 use super::panes::cb::*;
-use super::panes::iv::{FONT_SUB, FONT_TAG};
+use super::panes::strip_layout::{card::{Detail, Metrics}, LayoutSpec};
+#[cfg(test)]
+use super::panes::strip_layout::C;
 pub use super::panes::cb::{at, COUNT};
 
 pub const fn button_name(button: Button) -> &'static str {
@@ -173,22 +175,6 @@ fn pill_color(s: &Summary) -> [u8; 4] {
     }
 }
 
-/// The x of `frames` from A₁ on cell `cell`'s ruler, clamped to its ends.
-#[cfg(test)]
-pub fn ruler_x(cell: usize, frames: i32) -> f32 {
-    ruler_at(CELL_X0 + cell as f32 * CELL_PITCH, frames)
-}
-
-fn ruler_at(cx: f32, frames: i32) -> f32 {
-    cx - RULER_W / 2.0 + (frames - RULER_FROM).clamp(0, RULER_FRAMES) as f32 * PER_FRAME
-}
-
-/// An estimate of a text's width in layout units in `font` (the game's font is proportional; the bar places its
-/// texts one after another from it, and sizes a combo's chip around its name).
-pub fn est_width(text: &Text, font: (f32, f32)) -> f32 {
-    text.units().len() as f32 * font.0 * 0.56
-}
-
 /// What the bar shows for a drilled sequence (docs/RECORDING.md § Sequences and the one drill; mockup
 /// `r8-sequence-bar`). The runtime copies it each UI tick from the staged plan and the frame hook's run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,9 +199,6 @@ impl SeqView {
         at.saturating_sub(1).min(steps.saturating_sub(CHIPS))
     }
 
-    fn current(&self) -> Text {
-        self.at.checked_sub(self.first).and_then(|c| self.chips.get(c)).copied().unwrap_or(Text::EMPTY)
-    }
 }
 
 /// A chip's state in the row of combos.
@@ -234,25 +217,6 @@ fn waiting_after(helper: &Helper, seq: &SeqView) -> Option<Advance> {
     }
     seq.last.map(|s| s.advance).filter(|a| matches!(a, Advance::Finished | Advance::Dropped))
 }
-
-/// The chips' left edges and widths (layout units), left to right.
-fn chip_boxes(seq: &SeqView, done: impl Fn(usize) -> bool) -> [(f32, f32); CHIPS] {
-    let mut boxes = [(0.0, 0.0); CHIPS];
-    let mut x = SEQ_LEFT;
-    for (c, slot) in boxes.iter_mut().enumerate() {
-        let label = chip_label(seq, c);
-        let check = if done(seq.first + c) { CHECK_ROOM } else { 0.0 };
-        let w = CHIP_PAD * 2.0 + est_width(&label, FONT_SUB) + check;
-        *slot = (x, w);
-        x += w + ARROW_ROOM;
-    }
-    boxes
-}
-
-const CHIP_PAD: f32 = 14.0;
-const CHECK_ROOM: f32 = 24.0;
-const ARROW_ROOM: f32 = 44.0;
-const GAP: f32 = 10.0;
 
 fn chip_label(seq: &SeqView, c: usize) -> Text {
     let mut t = Text::EMPTY;
@@ -283,21 +247,177 @@ fn shown_drift(helper: &Helper) -> Option<Dir> {
         .last()
 }
 
+#[derive(Clone, Copy)]
+struct Ink {
+    text: Text,
+    color: [u8; 4],
+    detail: Detail,
+}
+
+impl Ink {
+    const fn text(text: Text, color: [u8; 4]) -> Self {
+        Self { text, color, detail: Detail::Fixed }
+    }
+
+    const fn shape(color: [u8; 4]) -> Self {
+        Self::text(Text::EMPTY, color)
+    }
+
+    const fn detail(self, detail: Detail) -> Self {
+        Self { detail, ..self }
+    }
+
+    fn optional(self) -> Option<Self> {
+        (!self.text.units().is_empty()).then_some(self)
+    }
+}
+
+struct Captions {
+    name: Ink,
+    result: Ink,
+    reason: Ink,
+    streak: Ink,
+    best: Ink,
+    step: Ink,
+    links: Ink,
+    tolerance: Ink,
+    previous: Ink,
+}
+
+impl Captions {
+    const EMPTY: Self = {
+        let empty = Ink::shape(MUTED);
+        Self { name: empty, result: empty, reason: empty, streak: empty, best: empty,
+            step: empty, links: empty, tolerance: empty, previous: empty }
+    };
+
+    fn single(helper: &Helper, mut name: Text) -> Self {
+        let attempt = helper.attempt();
+        let summary = attempt.and_then(|a| a.summary);
+        let total = helper.target().map_or(0, |t| t.len());
+        let input = helper.target().is_some_and(|t| t.input_only);
+        let units = if input { "steps" } else { "links" };
+        if name.units().is_empty() {
+            name = Text::new(if input { "Drill" } else { "Combo" });
+        }
+        let mut streak = Text::EMPTY;
+        let _ = write!(streak, "streak {}  best {}/{total}", helper.streak(), helper.best());
+
+        let mut result = Text::EMPTY;
+        let color = match (attempt, summary) {
+            (_, Some(s)) => {
+                result = result_mode(&s, input);
+                if s.clean { GOOD } else { TEXT }
+            }
+            (Some(a), None) => {
+                let _ = write!(result, "{} {} of {total}", if input { "step" } else { "link" }, a.len());
+                TEXT
+            }
+            (None, None) => {
+                let _ = write!(result, "ready: {total} {units}");
+                MUTED
+            }
+        };
+        let reason = match summary {
+            Some(s) if s.fault.is_some() => Ink::text(reason_mode(&s, input), if s.clean { GOOD } else { WARN }),
+            Some(s) if s.clean => Ink::text(shown_drift(helper).map_or(Text::EMPTY, drift_text), MUTED),
+            _ => Self::EMPTY.reason,
+        };
+        Self { name: Ink::text(name, TEXT), result: Ink::text(result, color), reason,
+            streak: Ink::text(streak, MUTED), ..Self::EMPTY }
+    }
+
+    fn sequence(helper: &Helper, seq: &SeqView) -> Self {
+        let total = helper.target().map_or(0, |t| t.len());
+        let mut step = Text::EMPTY;
+        let mut streak = Text::EMPTY;
+        let mut best = Text::EMPTY;
+        let mut links = Text::EMPTY;
+        let mut tolerance = Text::EMPTY;
+        let waiting = waiting_after(helper, seq);
+        if waiting == Some(Advance::Dropped) {
+            let _ = write!(step, "restart 1/{}", seq.steps);
+        } else {
+            let _ = write!(step, "{} of {}", seq.at + 1, seq.steps);
+        }
+        let _ = write!(streak, "streak {}", seq.streak);
+        let _ = write!(best, "· best {}", seq.best);
+        let _ = write!(links, "{total} {}", if total == 1 { "link" } else { "links" });
+        let _ = write!(tolerance, "±{}f", helper.settings().tolerance);
+        let mut captions = Self {
+            name: Ink::text(seq.name, TEXT),
+            step: Ink::text(step, MUTED),
+            streak: Ink::text(streak, GOOD),
+            best: Ink::text(best, GOOD),
+            links: Ink::text(links, MUTED),
+            tolerance: Ink::text(tolerance, MUTED),
+            ..Self::EMPTY
+        };
+        let mut previous = Text::EMPTY;
+        let attempt = helper.attempt();
+        match waiting {
+            Some(Advance::Dropped) => {
+                push_text(&mut previous, &seq.last_name);
+                let _ = previous.write_str(" dropped");
+                let reason = match seq.last.map(|s| s.summary) {
+                    Some(s) if s.fault.is_some() => reason_text(&s),
+                    Some(s) if s.outcome == Outcome::Cleared => Text::new("cleared"),
+                    _ => Text::new("the exchange ended"),
+                };
+                captions.previous = Ink::text(previous, BAD);
+                captions.reason = Ink::text(reason, WARN);
+            }
+            waiting => {
+                if waiting == Some(Advance::Finished) {
+                    captions.previous = Ink::text(Text::new("sequence done"), GOOD);
+                } else if attempt.is_some() && seq.last.is_some_and(|s| matches!(s.advance, Advance::Next(_))) {
+                    push_text(&mut previous, &seq.last_name);
+                    let _ = previous.write_str(" landed");
+                    captions.previous = Ink::text(previous, TEXT);
+                }
+                captions.result = match (attempt, attempt.and_then(|a| a.summary)) {
+                    (_, Some(s)) => Ink::text(result_text(&s), if s.clean { GOOD } else { TEXT }),
+                    (Some(a), None) if !a.is_empty() => {
+                        let mut result = Text::EMPTY;
+                        let newest_true = a.grades().last().is_some_and(Grade::is_true);
+                        let _ = write!(result, "link {} of {total}{}", a.len(), if newest_true { " true" } else { "" });
+                        Ink::text(result, TEXT)
+                    }
+                    _ => {
+                        let mut result = Text::EMPTY;
+                        let _ = write!(result, "ready: {total} {}", if total == 1 { "link" } else { "links" });
+                        Ink::text(result, MUTED)
+                    }
+                };
+            }
+        }
+        captions
+    }
+
+    fn metrics(&self, pills: usize) -> Metrics {
+        let len = |ink: Ink| ink.text.units().len();
+        Metrics {
+            pills,
+            result: len(self.result),
+            reason: len(self.reason),
+            previous: len(self.previous),
+            streak: len(self.streak),
+            best: len(self.best),
+            links: len(self.links),
+            tolerance: len(self.tolerance),
+            title: len(self.name),
+        }
+    }
+}
+
+/// Scores, names and marks emitted without reference to canvas dimensions.
 struct Plan<'a> {
     helper: &'a Helper,
-    name: &'a Text,
     seq: Option<&'a SeqView>,
+    captions: Captions,
 }
 
 impl Plan<'_> {
-    /// Cell `c`'s centre and the backdrop's width: the strip-wide spread for a sequence, the combo bar's otherwise.
-    fn cell_geometry(&self, c: usize) -> (f32, f32) {
-        match self.seq {
-            Some(_) => (SEQ_CELL_X0 + c as f32 * SEQ_CELL_PITCH, SEQ_CELL_W),
-            None => (CELL_X0 + c as f32 * CELL_PITCH, CELL_W),
-        }
-    }
-
     fn chip_state(&self, seq: &SeqView, k: usize) -> ChipState {
         match waiting_after(self.helper, seq) {
             Some(Advance::Finished) => ChipState::Done,
@@ -308,61 +428,27 @@ impl Plan<'_> {
         }
     }
 
-    /// The sequence's panes, header, chips and footer (mockup `r8-sequence-bar`).
-    fn seq_look(&self, i: usize, seq: &SeqView) -> Look {
+    fn sequence(&self, i: usize, seq: &SeqView) -> Option<Ink> {
         use at::*;
-        let total = self.helper.target().map_or(0, |t| t.len());
-        let tolerance = self.helper.settings().tolerance;
-        let left_text = |left: f32, y: f32, box_w: f32, text: Text, color: [u8; 4]| Look::text(left + box_w / 2.0, y, text, color);
+        let captions = &self.captions;
         match i {
-            SEQ_BACKDROP => Look::rect(0.0, SEQ_BAND_Y, SEQ_W, BACKDROP_COLOR),
-            SEQ_PILL => Look::rect(SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, SEQ_PILL_COLOR),
-            SEQ_PILL_TEXT => Look::text(SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, Text::new("SEQUENCE"), SEQ_PILL_TEXT_COLOR),
-            SEQ_STREAK | SEQ_BEST => {
-                let mut streak = Text::EMPTY;
-                let _ = write!(streak, "streak {}", seq.streak);
-                let mut best = Text::EMPTY;
-                let _ = write!(best, "· best {}", seq.best);
-                if i == SEQ_BEST {
-                    Look::text(SEQ_RIGHT - SEQ_TAG_BOX / 2.0, SEQ_HEADER_Y, best, GOOD)
-                } else {
-                    let right = SEQ_RIGHT - est_width(&best, FONT_SUB) - 6.0;
-                    Look::text(right - SEQ_TAG_BOX / 2.0, SEQ_HEADER_Y, streak, GOOD)
-                }
-            }
-            SEQ_NAME..=SEQ_TOLERANCE => {
-                let mut x = SEQ_LEFT + SEQ_PILL_W + 14.0;
-                let mut texts = [(Text::EMPTY, TEXT, FONT_SUB, SEQ_NAME_BOX); 4];
-                texts[0].0 = seq.name;
-                let _ = write!(texts[1].0, "combo {} of {} ·", seq.at + 1, seq.steps);
-                texts[2].0 = seq.current();
-                let _ = write!(texts[3].0, "· {total} {}", if total == 1 { "link" } else { "links" });
-                for t in &mut texts[1..] {
-                    t.1 = MUTED;
-                    t.2 = FONT_TAG;
-                    t.3 = SEQ_TAG_BOX;
-                }
-                let mut tol = Text::EMPTY;
-                let _ = write!(tol, "· tolerance ±{tolerance}f");
-                let all = [texts[0], texts[1], texts[2], texts[3], (tol, MUTED, FONT_TAG, SEQ_TAG_BOX)];
-                for (k, (text, color, font, box_w)) in all.into_iter().enumerate() {
-                    if k == i - SEQ_NAME {
-                        return left_text(x, SEQ_HEADER_Y, box_w, text, color);
-                    }
-                    x += est_width(&text, font) + if k == 0 { 16.0 } else { 6.0 };
-                }
-                Look::HIDDEN
-            }
-            SEQ_LANDED | SEQ_CURRENT | RESULT | REASON => self.seq_footer(i, seq, total),
-            i if (SEQ_CHIP_EDGE..SEQ_ARROW).contains(&i) => {
+            SEQ_BACKDROP => Some(Ink::shape(BACKDROP_COLOR)),
+            SEQ_PILL => Some(Ink::shape(SEQ_PILL_COLOR)),
+            SEQ_PILL_TEXT => Some(Ink::text(Text::new("SEQUENCE"), SEQ_PILL_TEXT_COLOR)),
+            SEQ_NAME => captions.name.optional(),
+            SEQ_STEP => Some(captions.step),
+            SEQ_LINKS => Some(captions.links),
+            SEQ_TOLERANCE => Some(captions.tolerance),
+            SEQ_STREAK => Some(captions.streak),
+            SEQ_BEST => Some(captions.best),
+            SEQ_LANDED => captions.previous.optional(),
+            _ => {
                 let c = (i - SEQ_CHIP_EDGE) % CHIPS;
                 let k = seq.first + c;
                 if k >= seq.steps {
-                    return Look::HIDDEN;
+                    return None;
                 }
                 let state = self.chip_state(seq, k);
-                let boxes = chip_boxes(seq, |k| k < seq.steps && self.chip_state(seq, k) == ChipState::Done);
-                let (left, w) = boxes[c];
                 let (edge, ink) = match state {
                     ChipState::Done => (GOOD, GOOD),
                     ChipState::Current => (TEXT, TEXT),
@@ -370,289 +456,98 @@ impl Plan<'_> {
                     ChipState::Later => (RULE, MUTED),
                 };
                 let label = chip_label(seq, c);
-                // The check's lowest point, after the name.
-                let bx = left + CHIP_PAD + est_width(&label, FONT_SUB) + 8.0;
-                let by = SEQ_CHIP_Y - 5.0;
-                let stroke = |len: f32, deg: f32| {
-                    let (s, co) = deg.to_radians().sin_cos();
-                    Look { rot: deg, ..Look::rect(bx + co * len / 2.0, by + s * len / 2.0, len, GOOD) }
+                let check = state == ChipState::Done;
+                let detail = Detail::Chip { units: label.units().len(), check };
+                let part = match (i - SEQ_CHIP_EDGE) / CHIPS {
+                    0 => Ink::shape(edge),
+                    1 => Ink::shape(SEQ_CHIP_COLOR),
+                    2 => Ink::text(label, ink),
+                    _ if check => Ink::shape(GOOD),
+                    _ => return None,
                 };
-                match (i - SEQ_CHIP_EDGE) / CHIPS {
-                    0 => Look::rect(left + w / 2.0, SEQ_CHIP_Y, w, edge),
-                    1 => Look::rect(left + w / 2.0, SEQ_CHIP_Y, w - 4.0, SEQ_CHIP_COLOR),
-                    2 => left_text(left + CHIP_PAD, SEQ_CHIP_Y, SEQ_CHIP_TEXT_BOX, label, ink),
-                    3 if state == ChipState::Done => stroke(9.0, 135.0),
-                    4 if state == ChipState::Done => stroke(16.0, 50.0),
-                    _ => Look::HIDDEN,
-                }
+                Some(part.detail(detail))
             }
-            i if (SEQ_ARROW..COUNT).contains(&i) => {
-                let a = i - SEQ_ARROW;
-                if seq.first + a + 1 >= seq.steps {
-                    return Look::HIDDEN;
-                }
-                let boxes = chip_boxes(seq, |k| k < seq.steps && self.chip_state(seq, k) == ChipState::Done);
-                let (left, w) = boxes[a];
-                Look::text(left + w + ARROW_ROOM / 2.0, SEQ_CHIP_Y, Text::new("→"), MUTED)
-            }
-            _ => Look::HIDDEN,
         }
     }
 
-    /// The footer: "Ryu BnB landed · Nair loop combo: link 1 of 4 true"; after a drop "Nair loop combo dropped ·
-    /// L2 Attack 3f late · restart at combo 1"; after a finished run "sequence done · Ryu BnB: ready: 1 link".
-    fn seq_footer(&self, i: usize, seq: &SeqView, total: usize) -> Look {
-        use at::*;
-        let mut parts = [(Text::EMPTY, TEXT, SEQ_SUB_BOX); 4];
-        let [landed, reason, current, result] = &mut parts;
-        let attempt = self.helper.attempt();
-        match waiting_after(self.helper, seq) {
-            Some(Advance::Dropped) => {
-                let last = seq.last.map(|s| s.summary);
-                push_text(&mut landed.0, &seq.last_name);
-                let _ = landed.0.write_str(" dropped ·");
-                landed.1 = BAD;
-                reason.0 = match last {
-                    Some(s) if s.fault.is_some() => reason_text(&s),
-                    Some(s) if s.outcome == Outcome::Cleared => Text::new("cleared"),
-                    _ => Text::new("the exchange ended"),
-                };
-                reason.1 = WARN;
-                current.0 = Text::new("· restart at combo 1");
-                current.1 = MUTED;
-            }
-            waiting => {
-                if waiting == Some(Advance::Finished) {
-                    landed.0 = Text::new("sequence done ·");
-                    landed.1 = GOOD;
-                } else if attempt.is_some() && seq.last.is_some_and(|s| matches!(s.advance, Advance::Next(_))) {
-                    push_text(&mut landed.0, &seq.last_name);
-                    let _ = landed.0.write_str(" landed ·");
-                }
-                push_text(&mut current.0, &seq.current());
-                let _ = current.0.write_char(':');
-                match (attempt, attempt.and_then(|a| a.summary)) {
-                    (_, Some(s)) => {
-                        result.0 = result_text(&s);
-                        result.1 = if s.clean { GOOD } else { TEXT };
-                    }
-                    (Some(a), None) if !a.is_empty() => {
-                        let newest_true = a.grades().last().is_some_and(Grade::is_true);
-                        let _ = write!(result.0, "link {} of {total}{}", a.len(), if newest_true { " true" } else { "" });
-                    }
-                    _ => {
-                        let _ = write!(result.0, "ready: {total} {}", if total == 1 { "link" } else { "links" });
-                        result.1 = MUTED;
-                    }
-                }
-            }
-        }
-        reason.2 = 400.0;
-        result.2 = 240.0;
-        let order = [SEQ_LANDED, REASON, SEQ_CURRENT, RESULT];
-        let mut x = SEQ_LEFT;
-        for (pane, (text, color, box_w)) in order.into_iter().zip(parts) {
-            if text.units().is_empty() {
-                if pane == i {
-                    return Look::HIDDEN;
-                }
-                continue;
-            }
-            if pane == i {
-                return Look::text(x + box_w / 2.0, FOOTER_Y, text, color);
-            }
-            x += est_width(&text, FONT_SUB) + GAP;
-        }
-        Look::HIDDEN
-    }
-
-    /// Cell `c`'s link: its reference and, once graded, its grade.
+    /// Cell c's link: its reference and, once graded, its grade.
     fn cell(&self, c: usize) -> Option<(usize, LinkRec, Option<Grade>)> {
         let target = self.helper.target()?;
         let attempt = self.helper.attempt();
         let k = first_cell(attempt.map_or(0, |a| a.len()), target.len()) + c;
-        let reference = *target.get(k)?;
         Some((
             k,
-            reference,
+            *target.get(k)?,
             attempt.and_then(|a| a.grades().nth(k).copied()),
         ))
     }
 
-    fn look(&self, i: usize) -> Look {
+    fn ink(&self, i: usize) -> Option<Ink> {
         use at::*;
-        let last = self.helper.attempt().and_then(|a| a.summary);
-        let total = self.helper.target().map_or(0, |t| t.len());
-        let input = self.helper.target().is_some_and(|t| t.input_only);
-        let units = if input { "steps" } else { "links" };
-        if let Some(seq) = self.seq {
-            match i {
-                CONTAINER => {
-                    return Look {
-                        visible: true,
-                        x: 0.0,
-                        y: SEQ_BAR_Y,
-                        ..Look::HIDDEN
-                    }
-                }
-                BACKDROP => return Look::rect(0.0, 0.0, SEQ_W, BACKDROP_COLOR),
-                HEADER | STREAK => return Look::HIDDEN,
-                i if (PILL..CELL).contains(&i) => return Look::HIDDEN,
-                RESULT | REASON => return self.seq_look(i, seq),
-                i if i >= SEQ_BACKDROP => return self.seq_look(i, seq),
-                _ => return self.cell_look(i),
-            }
-        }
+        let captions = &self.captions;
         match i {
-            CONTAINER => Look {
-                visible: true,
-                x: 0.0,
-                y: BAR_Y,
-                ..Look::HIDDEN
-            },
-            BACKDROP => Look::rect(0.0, 0.0, BAR_W, BACKDROP_COLOR),
-            i if i >= SEQ_BACKDROP => Look::HIDDEN,
-            HEADER => {
-                let name = if self.name.units().is_empty() {
-                    Text::new(if input { "Drill" } else { "Combo" })
-                } else {
-                    *self.name
-                };
-                Look::text(LEFT + 180.0, HEADER_Y, name, TEXT)
-            }
-            STREAK => {
-                let mut t = Text::EMPTY;
-                let _ = write!(
-                    t, "streak {}  best {}/{total}",
-                    self.helper.streak(),
-                    self.helper.best());
-                Look::text(STREAK_X, HEADER_Y, t, MUTED)
-            }
-            RESULT => match (self.helper.attempt(), last) {
-                (_, Some(s)) => Look::text(
-                    LEFT + 120.0,
-                    FOOTER_Y,
-                    result_mode(&s, input),
-                    if s.clean { GOOD } else { TEXT },
-                ),
-                (Some(a), None) => {
-                    let mut t = Text::EMPTY;
-                    let _ = write!(t, "{} {} of {total}", if input { "step" } else { "link" }, a.len());
-                    Look::text(LEFT + 120.0, FOOTER_Y, t, TEXT)
-                }
-                (None, None) => {
-                    let mut t = Text::EMPTY;
-                    let _ = write!(t, "ready: {total} {units}");
-                    Look::text(LEFT + 120.0, FOOTER_Y, t, MUTED)
-                }
-            },
-            REASON => match last {
-                Some(s) if s.fault.is_some() => Look::text(
-                    LEFT + 460.0,
-                    FOOTER_Y,
-                    reason_mode(&s, input),
-                    if s.clean { GOOD } else { WARN },
-                ),
-                Some(s) if s.clean => match shown_drift(self.helper) {
-                    Some(dir) => Look::text(LEFT + 460.0, FOOTER_Y, drift_text(dir), MUTED),
-                    None => Look::HIDDEN,
-                },
-                _ => Look::HIDDEN,
-            },
-            i if i < CELL => match self.helper.results().nth(i - PILL) {
-                Some(s) => Look::rect(
-                    PILL_X0 + (i - PILL) as f32 * PILL_PITCH,
-                    HEADER_Y,
-                    PILL_SIZE,
-                    pill_color(s),
-                ),
-                None => Look::HIDDEN,
-            },
-            _ => self.cell_look(i),
+            CONTAINER => Some(Ink::shape([0; 4])),
+            RESULT => captions.result.optional(),
+            REASON => captions.reason.optional(),
+            i if (CELL..SEQ_BACKDROP).contains(&i) => self.cell_ink(i),
+            i if i >= SEQ_BACKDROP => self.seq.and_then(|seq| self.sequence(i, seq)),
+            _ if self.seq.is_some() => None,
+            BACKDROP => Some(Ink::shape(BACKDROP_COLOR)),
+            HEADER => captions.name.optional(),
+            STREAK => Some(captions.streak),
+            i if (PILL..CELL).contains(&i) => self.helper.results().nth(i - PILL).map(|s| Ink::shape(pill_color(s))),
+            _ => None,
         }
     }
 
-    fn cell_look(&self, i: usize) -> Look {
+    fn cell_ink(&self, i: usize) -> Option<Ink> {
         use at::*;
         let tolerance = self.helper.settings().tolerance;
         let c = (i - CELL) % CELLS;
-        let Some((k, reference, grade)) = self.cell(c) else {
-            return Look::HIDDEN;
-        };
-        let (cx, cell_w) = self.cell_geometry(c);
+        let (k, reference, grade) = self.cell(c)?;
         let input = self.helper.target().is_some_and(|t| t.input_only);
-        let origin = if input { reference.events().next().map_or(0,|e|e.offset) } else { 0 };
-        let ruler_x = |_: usize, frames: i32| ruler_at(cx, frames - origin);
+        let origin = if input { reference.events().next().map_or(0, |e| e.offset) } else { 0 };
         let first_step = reference.events[0];
-        match (i - CELL) / CELLS {
-            0 => Look::rect(cx, CELL_Y, cell_w, CELL_COLOR),
+        let ink = match (i - CELL) / CELLS {
+            0 => Ink::shape(CELL_COLOR),
             1 => {
-                let mut t = Text::EMPTY;
-                if input { let _ = write!(t, "Step {}", k + 1); } else { let _ = write!(
-                    t,
-                    "{} {}>{}",
-                    k + 1,
-                    reference.from.name(),
-                    reference.to.name()
-                ); }
-                Look::text(cx, CELL_Y + TITLE_DY, t, MUTED)
+                let mut text = Text::EMPTY;
+                if input {
+                    let _ = write!(text, "Step {}", k + 1);
+                } else {
+                    let _ = write!(text, "{} {}>{}", k + 1, reference.from.name(), reference.to.name());
+                }
+                Ink::text(text, MUTED)
             }
-            2 if input => Look::HIDDEN,
+            2 if input => return None,
             2 => match grade {
-                Some(g) if g.wrong_move => {
-                    Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG MOVE"), BAD)
+                Some(g) if g.wrong_move => Ink::text(Text::new("WRONG MOVE"), BAD),
+                Some(g) if g.wrong_spot && self.helper.settings().match_spot => Ink::text(Text::new("WRONG SPOT"), BAD),
+                Some(g) => Ink::text(verdict_text(g.link.verdict), if g.is_true() { GOOD } else { BAD }),
+                None => Ink::text(verdict_text(reference.verdict), RULE),
+            },
+            3 => {
+                let mark = grade?.marks[0]?;
+                let step = first_step?;
+                let (text, color) = mark_text(mark, event_label(step.kind), tolerance);
+                Ink::text(text, color)
+            }
+            4 => Ink::shape(RULE),
+            5 if input => return None,
+            5 => {
+                let (a, b) = grade.map_or(reference.window, |g| g.link.window)?;
+                Ink::shape(GOOD).detail(Detail::Window(a - origin, b + 1 - origin))
+            }
+            6 => Ink::shape(MUTED).detail(Detail::Marker(first_step?.offset - origin)),
+            _ => match grade?.marks[0]? {
+                Mark::At(d) => {
+                    let color = if d.unsigned_abs() <= u32::from(tolerance) { GOOD } else { WARN };
+                    Ink::shape(color).detail(Detail::Marker(first_step?.offset + d - origin))
                 }
-                Some(g) if g.wrong_spot && self.helper.settings().match_spot => {
-                    Look::text(cx - 48.0, CELL_Y + VERDICT_DY, Text::new("WRONG SPOT"), BAD)
-                }
-                Some(g) => Look::text(
-                    cx - 48.0,
-                    CELL_Y + VERDICT_DY,
-                    verdict_text(g.link.verdict),
-                    if g.is_true() { GOOD } else { BAD },
-                ),
-                None => Look::text(
-                    cx - 48.0,
-                    CELL_Y + VERDICT_DY,
-                    verdict_text(reference.verdict),
-                    RULE,
-                ),
+                _ => return None,
             },
-            3 => match (grade.map(|g| g.marks[0]), first_step) {
-                (Some(Some(mark)), Some(step)) => {
-                    let (t, color) = mark_text(mark, event_label(step.kind), tolerance);
-                    Look::text(cx + 50.0, CELL_Y + VERDICT_DY, t, color)
-                }
-                _ => Look::HIDDEN,
-            },
-            4 => Look::rect(cx, CELL_Y + RULER_DY, RULER_W, RULE),
-            5 if input => Look::HIDDEN,
-            5 => match grade.map_or(reference.window, |g| g.link.window) {
-                Some((a, b)) => {
-                    let (x0, x1) = (ruler_x(c, a), ruler_x(c, b + 1));
-                    Look::rect((x0 + x1) / 2.0, CELL_Y + RULER_DY, (x1 - x0).max(2.0), GOOD)
-                }
-                None => Look::HIDDEN,
-            },
-            6 => match first_step {
-                Some(step) => Look::rect(ruler_x(c, step.offset), CELL_Y + RULER_DY, 6.0, MUTED),
-                None => Look::HIDDEN,
-            },
-            _ => match (grade, first_step) {
-                (Some(g), Some(step)) => match g.marks[0] {
-                    Some(Mark::At(d)) => {
-                        let color = if d.unsigned_abs() <= u32::from(tolerance) {
-                            GOOD
-                        } else {
-                            WARN
-                        };
-                        Look::rect(ruler_x(c, step.offset + d), CELL_Y + RULER_DY, 6.0, color)
-                    }
-                    _ => Look::HIDDEN,
-                },
-                _ => Look::HIDDEN,
-            },
-        }
+        };
+        Some(ink)
     }
 }
 
@@ -668,6 +563,7 @@ impl Renderer {
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. A drilled sequence
     /// (`seq`) draws the sequence bar. Returns the writes.
+    #[cfg(test)]
     pub fn draw(
         &mut self,
         helper: &Helper,
@@ -676,11 +572,34 @@ impl Renderer {
         strip_shown: bool,
         apply: impl FnMut(usize, &Look, Changed),
     ) -> usize {
+        self.draw_with_spec(helper, name, seq, strip_shown, (&C, false), apply)
+    }
+
+    /// Draw the same content in the selected layout. The flag indicates a visible history row above the cells.
+    pub fn draw_with_spec(
+        &mut self,
+        helper: &Helper,
+        name: &Text,
+        seq: Option<&SeqView>,
+        strip_shown: bool,
+        (spec, history): (&LayoutSpec, bool),
+        apply: impl FnMut(usize, &Look, Changed),
+    ) -> usize {
         if !shown(helper, strip_shown) {
             return self.hide(at::CONTAINER, Look::HIDDEN, apply);
         }
-        let plan = Plan { helper, name, seq };
-        self.show(|i| plan.look(i), apply)
+        let captions = match seq {
+            Some(seq) => Captions::sequence(helper, seq),
+            None => Captions::single(helper, *name),
+        };
+        let metrics = captions.metrics(helper.results().count());
+        let plan = Plan { helper, seq, captions };
+        let band_top = spec.strip.band_top(history);
+        self.show(|i| match plan.ink(i) {
+            Some(ink) => Look { visible: true, text: ink.text, color: ink.color, ..Look::HIDDEN }
+                .at(spec.card.place(i, seq.is_some(), band_top, metrics, ink.detail)),
+            None => Look::HIDDEN,
+        }, apply)
     }
 }
 

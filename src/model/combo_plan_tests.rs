@@ -56,9 +56,10 @@ fn shown_it_writes_every_pane_once_and_then_only_changes() {
     assert_eq!(at(at::VERDICT).text, Text::new("TRUE -3"), "the recorded verdict, before an attempt");
     assert!(!at(at::TITLE + 2).visible, "a two-link combo uses two cells");
     assert!(!at(at::PILL).visible && !at(at::YOURS).visible);
-    // The recorded press is one frame after A1 on the ruler, the window 0..=4.
-    assert_eq!(at(at::RECORDED).x, ruler_x(0, 1));
-    assert_eq!(at(at::WINDOW).w, 5.0 * PER_FRAME);
+    // The recorded press is one frame to the right of the window start (0..=4).
+    let window = at(at::WINDOW);
+    assert_eq!(at(at::RECORDED).x - (window.x - window.w / 2.0), 6.0);
+    assert_eq!(window.w, 30.0);
     assert!(draw(&mut r, &h, true).is_empty(), "nothing changed");
     r.invalidate();
     assert_eq!(draw(&mut r, &h, true).len(), COUNT);
@@ -113,7 +114,7 @@ fn draw_seq(h: &Helper, seq: &SeqView) -> Vec<Look> {
     looks
 }
 
-fn a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells() {
+fn a_drilled_sequence_draws_the_corner_card_and_helper_cells() {
     let mut h = helper(true, true);
     h.continue_with(reference());
     let next = Stepped { step: 0, summary: clean(), advance: Advance::Next(1) };
@@ -122,37 +123,31 @@ fn a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells() {
         assert!(looks[i].visible, "pane {i} is shown");
         looks[i].text
     };
-    assert_eq!(looks[at::CONTAINER].y, SEQ_BAR_Y, "the bar moves down by the sequence band");
-    assert_eq!(looks[at::BACKDROP].w, SEQ_W, "as wide as the strip");
-    assert!(looks[at::SEQ_BACKDROP].visible && looks[at::SEQ_PILL].visible);
+    assert!(!looks[at::BACKDROP].visible, "the single-combo plate is hidden");
+    assert_eq!(C.card.bounds(true), [804.0, 10.0, 288.0, 196.0]);
+    assert!(looks[at::SEQ_BACKDROP].x > 648.0 && looks[at::SEQ_PILL].visible);
     assert_eq!(looks[at::SEQ_PILL].color, SEQ_PILL_COLOR);
     assert_eq!(text(at::SEQ_PILL_TEXT), Text::new("SEQUENCE"));
     assert_eq!(text(at::SEQ_NAME), Text::new("Corner to kill"));
-    assert_eq!(text(at::SEQ_STEP), Text::new("combo 2 of 2 ·"));
-    assert_eq!(text(at::SEQ_COMBO), Text::new("Nair loop combo"));
-    assert_eq!(text(at::SEQ_LINKS), Text::new("· 2 links"));
-    assert_eq!(text(at::SEQ_TOLERANCE), Text::new("· tolerance ±1f"));
+    assert_eq!(text(at::SEQ_STEP), Text::new("2 of 2"));
+    assert_eq!(text(at::SEQ_LINKS), Text::new("2 links"));
+    assert_eq!(text(at::SEQ_TOLERANCE), Text::new("±1f"));
     assert_eq!((text(at::SEQ_STREAK), looks[at::SEQ_STREAK].color), (Text::new("streak 4"), GOOD));
     assert_eq!((text(at::SEQ_BEST), looks[at::SEQ_BEST].color), (Text::new("· best 9"), GOOD));
-    let header = [at::SEQ_NAME, at::SEQ_STEP, at::SEQ_COMBO, at::SEQ_LINKS, at::SEQ_TOLERANCE];
-    assert!(header.windows(2).all(|w| looks[w[0]].x < looks[w[1]].x), "left to right");
-    assert!(looks[at::SEQ_TOLERANCE].x < looks[at::SEQ_STREAK].x);
-    // Combo 1 is done (green, with the drawn check), combo 2 is current (white), and an arrow joins them.
+    // Combo 1 is done (green, with the drawn check), and combo 2 is stacked beneath it.
     assert_eq!((text(at::SEQ_CHIP_TEXT), looks[at::SEQ_CHIP_EDGE].color), (Text::new("1  Ryu BnB"), GOOD));
     assert!(looks[at::SEQ_CHECK_SHORT].visible && looks[at::SEQ_CHECK_LONG].visible);
     assert_eq!((text(at::SEQ_CHIP_TEXT + 1), looks[at::SEQ_CHIP_EDGE + 1].color), (Text::new("2  Nair loop combo"), TEXT));
     assert!(!looks[at::SEQ_CHECK_SHORT + 1].visible && !looks[at::SEQ_CHIP_EDGE + 2].visible);
-    assert_eq!(text(at::SEQ_ARROW), Text::new("→"));
-    assert!(!looks[at::SEQ_ARROW + 1].visible);
-    assert!(looks[at::SEQ_CHIP_EDGE].x < looks[at::SEQ_ARROW].x && looks[at::SEQ_ARROW].x < looks[at::SEQ_CHIP_EDGE + 1].x);
-    // The footer: "Ryu BnB landed · Nair loop combo: ready: 2 links".
-    assert_eq!(text(at::SEQ_LANDED), Text::new("Ryu BnB landed ·"));
-    assert_eq!(text(at::SEQ_CURRENT), Text::new("Nair loop combo:"));
+    assert_eq!(looks[at::SEQ_CHIP_EDGE].y - looks[at::SEQ_CHIP_EDGE + 1].y, 28.0);
+    assert_eq!(text(at::SEQ_LANDED), Text::new("Ryu BnB landed"));
     assert_eq!(text(at::RESULT), Text::new("ready: 2 links"));
-    assert!(looks[at::SEQ_LANDED].x < looks[at::SEQ_CURRENT].x && looks[at::SEQ_CURRENT].x < looks[at::RESULT].x);
-    // The helper's own cells, spread over the wider bar; the combo bar's header and pills are not shown.
+    assert_eq!(looks[at::SEQ_LANDED].y, looks[at::RESULT].y, "short captions share a row");
+    assert!(looks[at::SEQ_LANDED].x < looks[at::RESULT].x);
+    // The cells stay below the central strip at full width.
     assert_eq!(text(at::TITLE), Text::new("1 Jab>Up tilt"));
-    assert_eq!(looks[at::CELL].w, SEQ_CELL_W);
+    assert_eq!(looks[at::CELL].w, 309.0);
+    assert_eq!(looks[at::CELL].y, C.strip.band_top(false) - 32.0);
     assert!(!looks[at::HEADER].visible && !looks[at::STREAK].visible && !looks[at::PILL].visible);
 }
 
@@ -164,9 +159,9 @@ fn after_a_drop_the_bar_names_it_and_restarts_at_combo_one() {
     let mut seq = view(0, Some(dropped), "Nair loop combo");
     seq.streak = 0;
     let looks = draw_seq(&h, &seq);
-    assert_eq!((looks[at::SEQ_LANDED].text, looks[at::SEQ_LANDED].color), (Text::new("Nair loop combo dropped ·"), BAD));
+    assert_eq!((looks[at::SEQ_LANDED].text, looks[at::SEQ_LANDED].color), (Text::new("Nair loop combo dropped"), BAD));
     assert_eq!((looks[at::REASON].text, looks[at::REASON].color), (Text::new("L2 Attack 3f late"), WARN));
-    assert_eq!(looks[at::SEQ_CURRENT].text, Text::new("· restart at combo 1"));
+    assert_eq!(looks[at::SEQ_STEP].text, Text::new("restart 1/2"));
     assert!(!looks[at::RESULT].visible);
     assert_eq!(looks[at::SEQ_CHIP_EDGE].color, TEXT, "combo 1 is current again");
     assert_eq!(looks[at::SEQ_CHIP_EDGE + 1].color, BAD, "the dropped combo");
@@ -176,6 +171,43 @@ fn after_a_drop_the_bar_names_it_and_restarts_at_combo_one() {
     assert_eq!(draw_seq(&h, &seq)[at::REASON].text, Text::new("the exchange ended"));
 }
 
+fn the_current_combo_is_always_in_a_window_of_three() {
+    assert_eq!(CHIPS, 3);
+    assert_eq!(SeqView::first_chip(0, 6), 0);
+    assert_eq!(SeqView::first_chip(2, 6), 1);
+    assert_eq!(SeqView::first_chip(5, 6), 3);
+    for total in 1..=16 {
+        for current in 0..total {
+            let first = SeqView::first_chip(current, total);
+            assert!((first..first + CHIPS).contains(&current));
+        }
+    }
+}
+
+fn the_same_content_can_be_placed_in_a_second_layout() {
+    let mut h = helper(true, true);
+    h.continue_with(reference());
+    let next = Stepped { step: 0, summary: clean(), advance: Advance::Next(1) };
+    let seq = view(1, Some(next), "Ryu BnB");
+    let mut second = C;
+    second.card.left -= 50.0;
+    second.card.top -= 12.0;
+    for seq in [None, Some(&seq)] {
+        let draw = |spec: &LayoutSpec, history| {
+            let mut looks = vec![Look::HIDDEN; COUNT];
+            Renderer::new().draw_with_spec(&h, &Text::new("Jab"), seq, true, (spec, history), |i, look, _| looks[i] = *look);
+            looks
+        };
+        let (c, alternative) = (draw(&C, false), draw(&second, true));
+        assert_ne!(c[at::CELL].y, alternative[at::CELL].y);
+        let card = if seq.is_some() { at::SEQ_BACKDROP } else { at::BACKDROP };
+        assert_ne!((c[card].x, c[card].y), (alternative[card].x, alternative[card].y));
+        for (a, b) in c.iter().zip(alternative) {
+            assert_eq!((a.visible, a.text, a.color), (b.visible, b.text, b.color));
+        }
+    }
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -183,8 +215,10 @@ fn case_table() {
         ("the_bar_is_hidden_without_the_strip_the_helper_or_a_target", the_bar_is_hidden_without_the_strip_the_helper_or_a_target as fn()),
         ("shown_it_writes_every_pane_once_and_then_only_changes", shown_it_writes_every_pane_once_and_then_only_changes as fn()),
         ("texts_name_verdicts_marks_results_and_reasons", texts_name_verdicts_marks_results_and_reasons as fn()),
-        ("a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells", a_drilled_sequence_draws_the_header_the_combo_row_and_the_helper_cells as fn()),
+        ("a_drilled_sequence_draws_the_corner_card_and_helper_cells", a_drilled_sequence_draws_the_corner_card_and_helper_cells as fn()),
         ("after_a_drop_the_bar_names_it_and_restarts_at_combo_one", after_a_drop_the_bar_names_it_and_restarts_at_combo_one as fn()),
+        ("the_current_combo_is_always_in_a_window_of_three", the_current_combo_is_always_in_a_window_of_three as fn()),
+        ("the_same_content_can_be_placed_in_a_second_layout", the_same_content_can_be_placed_in_a_second_layout as fn()),
     ]);
 }
 }

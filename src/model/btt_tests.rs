@@ -791,15 +791,16 @@ fn btt_best_pool_retains_sixteen_fifo_layouts() {
 }
 
 fn btt_compact_hud_geometry() {
-    use crate::model::panes::{self as p, cb, iv, Kind};
+    use crate::model::panes::{self as p, iv, Kind, strip_layout::C};
     for (strip, bar) in [(false, false), (true, false), (true, true)] {
         let [x, y, w, h] = p::btt_hud_box("10/10 0:07.12", strip, bar);
         assert_eq!([x, y, w, h], [-936.0, 504.0, 276.0, 48.0]);
         assert!(x + w <= -iv::STRIP_W / 2.0 - 12.0, "left gutter clears the default strip by 8px at 1280w");
-        assert!(y - h / 2.0 > iv::STRIP_Y + cb::SEQ_BAR_Y + cb::BAR_H / 2.0, "the helper bar is below the compact run box");
         let [_, py, _, ph] = p::btt_hud_box("3/10   A place  B undo  X start", strip, bar);
-        if bar { assert!(py + ph / 2.0 <= iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0 - 8.0); }
-        else if strip { assert!(py + ph / 2.0 <= iv::STRIP_Y - iv::STRIP_H / 2.0 - 8.0); }
+        if strip {
+            let [_, y, _, h] = C.strip.bounds(true, bar);
+            assert!(py + ph / 2.0 <= C.strip.origin_y + y - h / 2.0 - 8.0);
+        }
     }
     assert_eq!(p::spec(p::IDX_BTT + 2).parent, p::name_of(p::IDX_BTT));
     assert!(matches!(p::spec(p::IDX_BTT + 3).kind, Kind::Text { chars: 96, .. }));
