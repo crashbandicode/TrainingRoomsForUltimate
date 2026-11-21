@@ -6,7 +6,9 @@
 use core::fmt::Write as _;
 
 use super::frame_strip::{Cell, Link, Tracker, Verdict, WINDOW};
-use super::panes::strip_layout::{C, LayoutSpec, Place, strip::StripSpec};
+use super::panes::strip_layout::{LayoutSpec, Place, strip::StripSpec};
+#[cfg(test)]
+use super::panes::strip_layout::C;
 use super::spacing::Grade;
 
 pub use super::panes::iv::{at, COUNT};
@@ -558,39 +560,48 @@ impl<const N: usize> Panes<N> {
     }
 }
 
+/// What one strip draw shows around the tracker, and the layout that places it.
+#[derive(Clone, Copy)]
+pub struct StripDraw<'a> {
+    pub shown: bool,
+    pub spots: bool,
+    pub parry: Option<&'a super::parry::View>,
+    pub history_enabled: bool,
+    pub cells: bool,
+    pub spec: &'a LayoutSpec,
+}
+
 /// What was last written to each of the strip's panes.
 pub type Renderer = Panes<COUNT>;
 
 impl Renderer {
     /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
     /// changed, with what changed. Returns how many panes were written.
+    #[cfg(test)]
     pub fn draw(&mut self, tracker: &Tracker, shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         self.draw_spots(tracker, shown, false, apply)
     }
 
     /// `draw`, with the spot labels on the hit blocks when `spots` (rc.14, SP3).
+    #[cfg(test)]
     pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         self.draw_parry(tracker, shown, spots, None, apply)
     }
 
     /// `draw_spots`, with Parry practice's readouts, window and pills when `parry` (rc.15).
+    #[cfg(test)]
     pub fn draw_parry(&mut self, tracker: &Tracker, shown: bool, spots: bool, parry: Option<&super::parry::View>, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-        self.draw_with_spec(tracker, shown, spots, parry, true, false, &C, apply).0
+        self.draw_with_spec(tracker, StripDraw { shown, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
     }
 
     /// The wide LINK line travels separately from the cached panes.
-    #[allow(clippy::too_many_arguments)]
     pub fn draw_with_spec(
         &mut self,
         tracker: &Tracker,
-        shown: bool,
-        spots: bool,
-        parry: Option<&super::parry::View>,
-        history_enabled: bool,
-        cells: bool,
-        spec: &LayoutSpec,
+        draw: StripDraw<'_>,
         apply: impl FnMut(usize, &Look, Changed),
     ) -> (usize, Option<LinkLine>, bool) {
+        let StripDraw { shown, spots, parry, history_enabled, cells, spec } = draw;
         let history = spec.history_row(history_enabled, parry.is_some(), cells);
         if !shown {
             return (self.hide(at::CONTAINER, Look::HIDDEN, apply), None, history);

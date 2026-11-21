@@ -56,7 +56,7 @@ fn runtime_and_archive_share_the_strip_layout() {
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
         let (_, line, history) = Renderer::new().draw_with_spec(
-            &tracker, true, true, None, true, false, spec,
+            &tracker, StripDraw { shown: true, spots: true, parry: None, history_enabled: true, cells: false, spec },
             |i, look, _| looks[i] = *look,
         );
         let root = strip_pane_spec(spec, IDX_IV + at::CONTAINER);
@@ -84,7 +84,7 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
     let mut renderer = Renderer::new();
     let mut draw = |on| {
         let (_, line, history) = renderer.draw_with_spec(
-            &tracker, true, false, None, on, false, &C, |_, _, _| {},
+            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C }, |_, _, _| {},
         );
         let last = renderer.written(at::LAST_TEXT).unwrap().visible;
         let pill = renderer.written(at::PILL).unwrap().visible;

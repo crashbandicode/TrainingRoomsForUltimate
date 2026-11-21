@@ -233,7 +233,7 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
     second.keep_drill_history = true;
     let mut rule = strip_plan::Look::HIDDEN;
     let (_, _, history) = strip_plan::Renderer::new().draw_with_spec(
-        &Tracker::new(), true, false, None, true, true, &second,
+        &Tracker::new(), strip_plan::StripDraw { shown: true, spots: false, parry: None, history_enabled: true, cells: true, spec: &second },
         |i, look, _| {
             if i == strip_plan::at::SEPARATOR + 1 {
                 rule = *look;

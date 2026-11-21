@@ -18,7 +18,7 @@ use skyline::hooks::InlineCtx;
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{Sample, Settings, Tracker};
 use crate::model::spacing::{Grade, Grader, Lanes};
-use crate::model::frame_strip_plan::{Changed, LinkLine, Look, Renderer};
+use crate::model::frame_strip_plan::{Changed, LinkLine, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
@@ -637,7 +637,7 @@ pub fn hud_tick(
 ) -> (Option<LinkLine>, bool) {
     let tracker = *TRACKER.lock();
     let (_, line, history) = RENDERER.lock().draw_with_spec(
-        &tracker, shown, draw_settings.spots, parry, draw_settings.link_history, cells, &C,
+        &tracker, StripDraw { shown, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {
             #[cfg(feature = "diag")]
             if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
