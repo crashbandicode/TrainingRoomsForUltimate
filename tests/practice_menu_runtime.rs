@@ -67,6 +67,16 @@ fn the_tech_camera_follows_the_running_session() {
     assert!(frame.contains("camera = run.config.camera"), "the session's camera comes from its latched config");
 }
 
+#[test]
+fn edge_juggle_holds_the_cpu_while_its_wizard_is_open() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let correction = item(&runtime, "pub(super) unsafe fn ai_correction(");
+    let hold = correction.find("run.rounds.phase.held_pad(buttons)").expect("the shared placement hold");
+    let wizard = correction.find("run.wizard.is_").expect("the wizard exclusion for live corrections");
+    let perfect = correction.find("run.difficulty != Difficulty::Perfect").expect("the Perfect rule boundary");
+    assert!(hold < wizard && hold < perfect, "the primary CPU must reach the placement hold while either wizard is open, before the live-only checks");
+}
+
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
 /// submodules included, and the models Game never shadows the runtime struct Game of mashout.rs.
 #[test]

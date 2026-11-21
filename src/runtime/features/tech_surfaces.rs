@@ -441,7 +441,8 @@ impl Source for FrameOutlineReader {
 /// geometry has no raw line identities or borrowed native pointers.
 pub(super) unsafe fn training_outline(
     ray: &super::mashout::FloorRay, x: f32, limits: [f32; 2],
-) -> Option<crate::model::edge_juggle::perfect::Outline> {
+) -> Option<(crate::model::edge_juggle::perfect::Outline, Option<[[f32; 2]; 2]>)> {
+    use crate::model::edge_juggle::perfect::{floor_ledges, Outline};
     use crate::model::tech::surface::{Walk, MAX_LINES};
     if !guarded() || !game::granted(0x15cbc60) {
         return None;
@@ -458,11 +459,15 @@ pub(super) unsafe fn training_outline(
         match walk.step(&mut reader) {
             Walk::More => {}
             Walk::Closed => {
-                let mut outline = crate::model::edge_juggle::perfect::Outline::new();
+                let mut outline = Outline::new();
+                let ends = |line: crate::model::tech::surface::Line| {
+                    line.ends.map(|point| [point.x, point.y])
+                };
                 for line in walk.lines() {
-                    outline.add(line.ends.map(|point| [point.x, point.y]));
+                    outline.add(ends(line));
                 }
-                return Some(outline);
+                let floor = walk.lines().filter(|line| line.kind() == Some(Kind::Floor) && !line.passable);
+                return Some((outline, floor_ledges(floor.map(ends))));
             }
             _ => return None,
         }

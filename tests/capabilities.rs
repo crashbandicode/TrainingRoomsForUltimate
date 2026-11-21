@@ -73,6 +73,13 @@ const BOUNDARIES: &[Boundary] = &[
     // Zoom alone requires Hero's menu rows and the damage/capture readers.
     Boundary { function: "zoom::zoom_pad", owner: None, gate: Gate::Flag("installed") },
     Boundary { function: "zoom::observe_zoom", owner: None, gate: Gate::Flag("installed") },
+    // Steering PK Thunder needs the existing article grants. If any are missing,
+    // the read yields to stock; other drill corrections do not depend on them.
+    Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
+    Boundary { function: "niche_pad::link_bomb_phase", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
+    Boundary { function: "niche_pad::owned_link_bomb", owner: None, gate: Gate::Flag("link_bomb_reads_granted") },
+    Boundary { function: "state_restore::olimar_pikmin_count", owner: None, gate: Gate::Flag("olimar_reads_granted") },
+    Boundary { function: "startup_dodge::covers_contact", owner: None, gate: Gate::Flag("forecast_reads_granted") },
     Boundary { function: "cpu_level::poll_drill", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("DRILL_BEHAVIOR") },
     // The save-state step of the per-fighter frame wrapper: a no-op until boot activates package 3.
     Boundary { function: "states::frame", owner: Some(Feature::StateCore), gate: Gate::Flag("ACTIVE") },
@@ -628,6 +635,101 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
 }
 
 #[test]
+fn missing_pk_thunder_reads_leave_general_drill_ownership_available() {
+    let a = Analysis::new();
+    let grant = &a.graph.funcs[a.graph.find("niche_pad::bolt_reads_granted")[0]];
+    let offsets = a.own_offsets(grant);
+    let article_rows = [
+        "state_article_get_article",
+        "state_article_is_exist",
+        "state_article_object_id",
+        "state_object_is_active",
+        "state_object_module_accessor",
+    ];
+    let expected: BTreeSet<_> = article_rows
+        .into_iter()
+        .map(|name| capabilities::find(name).unwrap().offset)
+        .collect();
+    assert_eq!(offsets, expected);
+    let grant_check = callgraph::lex(".all(game::granted)");
+    assert!(grant.body.windows(grant_check.len()).any(|ts| ts == grant_check));
+    for name in article_rows {
+        let row = capabilities::find(name).unwrap();
+        let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+        let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+        assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable), "{name} disabled basic drill ownership");
+        let granted = Granted::from_usable(&usable);
+        assert!(!granted.allows(row.offset), "{name} must stay ungranted");
+        assert!(!offsets.iter().copied().all(|offset| granted.allows(offset)));
+    }
+}
+
+#[test]
+fn a_missing_olimar_troop_read_declines_the_route_and_preserves_both_drills() {
+    let a = Analysis::new();
+    let row = capabilities::find("state_work_get_int64").expect("guarded WorkModule reader");
+    let read = a.graph.find("state_restore::olimar_pikmin_count")[0];
+    let check = &a.graph.funcs[a.graph.find("state_restore::olimar_reads_granted")[0]];
+    let (reached, _) = a.reach(read);
+    let expected = BTreeSet::from([row.offset]);
+    assert_eq!(a.own_offsets(check), expected);
+    assert_eq!(reached, expected);
+    let call = callgraph::lex("game::granted(");
+    assert!(check.body.windows(call.len()).any(|ts| ts == call));
+
+    let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+    let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+    assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
+}
+
+#[test]
+fn a_missing_motion_frame_read_declines_startup_forecast_and_preserves_both_drills() {
+    let a = Analysis::new();
+    let row = capabilities::find("motion_frame").expect("guarded motion-frame reader");
+    let forecast = "startup_dodge::covers_contact";
+    let start = a.graph.find(forecast)[0];
+    assert!(a.reach(start).0.contains(&row.offset), "forecast must reach the motion-frame site");
+    let boundary = BOUNDARIES.iter().find(|b| b.function == forecast)
+        .expect("the startup forecast must check its own native grants");
+    assert_eq!(boundary.owner, None, "startup-only reads must stay optional for both drills");
+    let Gate::Flag(name) = boundary.gate;
+    let key = format!("startup_dodge::{name}");
+    let guard = &a.graph.funcs[a.graph.find(&key)[0]];
+    assert!(a.own_offsets(guard).contains(&row.offset));
+    let check = callgraph::lex("game::granted(MOTION_FRAME_OFFSET)");
+    assert!(guard.body.windows(check.len()).any(|ts| ts == check));
+
+    let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+    let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+    assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable));
+    assert!(!Granted::from_usable(&usable).allows(row.offset));
+}
+
+#[test]
+fn missing_link_bomb_reads_leave_general_drill_ownership_available() {
+    let a = Analysis::new();
+    let grant = &a.graph.funcs[a.graph.find("niche_pad::link_bomb_reads_granted")[0]];
+    let offsets = a.own_offsets(grant);
+    let object_rows = ["state_object_is_active", "state_object_module_accessor"];
+    let expected: BTreeSet<_> = object_rows.into_iter().chain(["work_get_int"])
+        .map(|name| capabilities::find(name).unwrap().offset)
+        .collect();
+    assert_eq!(offsets, expected);
+    let grant_check = callgraph::lex(".all(game::granted)");
+    assert!(grant.body.windows(grant_check.len()).any(|ts| ts == grant_check));
+    for name in object_rows {
+        let row = capabilities::find(name).unwrap();
+        let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+        let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+        assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable), "{name} disabled basic drill ownership");
+        let granted = Granted::from_usable(&usable);
+        assert!(!granted.allows(row.offset), "{name} must stay ungranted");
+        assert!(!offsets.iter().copied().all(|offset| granted.allows(offset)));
+    }
+}
+
+#[test]
 fn optional_tech_poison_preserves_existing_features() {
     use model::install_line::{FeatureReport, InstallLine};
     for poison in ["tech_cos", "tech_magnitude", "state_set_sleep", "tech_guard_count"].into_iter()
@@ -698,6 +800,20 @@ fn ui_tech_frame_is_once_after_adapter_and_independent_of_hitbox() {
     let tech = &a.graph.funcs[a.graph.find("tech::frame")[0]].body;
     let first = callgraph::lex("if !super::tech_adapter::tech_ready() { return; }");
     assert!(tech.starts_with(&first), "refused Tech returns before any UI/native work");
+}
+
+#[test]
+fn edge_releases_before_the_shared_hb1_player_sample() {
+    let a = Analysis::new();
+    let body = &a.graph.funcs[a.graph.find("cpu::on_frame")[0]].body;
+    let sequence = callgraph::lex(
+        "unsafe { super::edge_juggle::frame(a0) };
+         unsafe { crate::runtime::features::hitbox::frame(a0) };",
+    );
+    assert!(
+        body.windows(sequence.len()).any(|calls| calls == sequence),
+        "the release callback must open the live plan before HB1 can sample P1",
+    );
 }
 
 #[test]

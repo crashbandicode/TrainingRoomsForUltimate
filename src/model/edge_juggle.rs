@@ -33,6 +33,14 @@ impl Drill {
         }
     }
 
+    /// The Edge recovery start is already airborne, so only aerial jumps are restored.
+    pub const fn placed_jump_count(self) -> i32 {
+        match self {
+            Self::GuardEdge => 1,
+            Self::Juggler => 0,
+        }
+    }
+
     pub const fn ready_frames(self) -> u16 {
         match self {
             Self::GuardEdge => 60,
@@ -402,6 +410,27 @@ impl Session {
         }
     }
 
+    /// The scored window starts at release and ends at its first result.
+    /// Return the attempt number and the stable event code for the trace.
+    pub fn trace_event(self, before: Phase) -> Option<(u16, u8)> {
+        let outcome = match (before, self.phase) {
+            (Phase::Ready(_), Phase::Live) => return Some((self.attempts.saturating_add(1), 0)),
+            (Phase::Live, Phase::Result(outcome, _)) => outcome,
+            _ => return None,
+        };
+        let code = match outcome {
+            Outcome::Secured => 1,
+            Outcome::RecoveredAtLedge => 2,
+            Outcome::RecoveredOnStage => 3,
+            Outcome::Unresolved => return Some((self.attempts.saturating_add(1), 4)),
+            Outcome::Landed => 5,
+            Outcome::GrabbedLedge => 6,
+            Outcome::KnockedOut => 7,
+            Outcome::ZoomWin | Outcome::ZoomMiss => return None,
+        };
+        Some((self.attempts, code))
+    }
+
     pub fn record_result<K: Copy + Eq, const N: usize>(
         &self,
         bests: &mut [Option<(K, u32)>; N],
@@ -514,6 +543,15 @@ impl Stage {
         clamp_point(point, self.camera)
     }
 
+    pub fn player_cursor(self, drill: Drill, point: [f32; 2]) -> Option<[f32; 2]> {
+        let [x, y] = self.camera_point(point)?;
+        let x = match drill {
+            Drill::GuardEdge => x.clamp(self.ledges[0][0], self.ledges[1][0]),
+            Drill::Juggler => x,
+        };
+        Some([x, y])
+    }
+
     pub fn default_juggle(self, p1: [f32; 2]) -> [f32; 2] {
         [p1[0], p1[1].midpoint(self.camera[2])]
     }
@@ -532,6 +570,27 @@ pub struct Setup {
     pub percent: u16,
 }
 
+pub fn recovery_away_facing(
+    drill: Drill,
+    stage_key: (i32, u32),
+    stage: Stage,
+    setup: Setup,
+    fighter: Option<i32>,
+) -> Option<f32> {
+    if drill != Drill::GuardEdge {
+        return None;
+    }
+    let [left, right] = stage.ledges;
+    let takes_bomb_route = match fighter {
+        Some(perfect::link::KIND) => {
+            perfect::link::in_region(stage_key, stage.ledges, setup.cpu, setup.percent.into())
+        }
+        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, left, setup.cpu),
+        _ => false,
+    };
+    takes_bomb_route.then_some(if setup.cpu[0] < left[0].midpoint(right[0]) { -1.0 } else { 1.0 })
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WizardStep {
     Area,
@@ -544,32 +603,131 @@ pub enum WizardStep {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
+    area_offset: Option<[f32; 2]>,
+    left_start: Option<(Area, [f32; 2])>,
     pub step: WizardStep,
     pub setup: Setup,
 }
 
 impl Wizard {
-    pub fn new(drill: Drill, stage: Stage, p1: [f32; 2], percent: u16) -> Option<Self> {
+    pub fn new(
+        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
+        stage_key: (i32, u32), fighter: Option<i32>,
+    ) -> Option<Self> {
         let area = Area::default();
+        let link_left_start = drill == Drill::GuardEdge
+            && fighter == Some(perfect::link::KIND)
+            && perfect::link::in_region(stage_key, stage.ledges, [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
+        let lucario_left_start = if drill == Drill::GuardEdge && fighter == Some(perfect::lucario::KIND) {
+            perfect::lucario::wizard_offset(stage_key, percent)
+        } else {
+            None
+        };
+        let left_start = if let Some(offset) = lucario_left_start {
+            Some((Area::LowerLeft, offset))
+        } else if link_left_start {
+            Some((Area::UpperLeft, [30.0, 18.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::greninja::KIND) {
+            perfect::greninja::wizard_offset(stage_key).map(|offset| (Area::UpperLeft, offset))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::mario::KIND)
+            && perfect::mario::reference_stage(stage_key)
+        {
+            Some((Area::LowerLeft, [34.0, -46.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::snake::KIND)
+            && perfect::is_crossing_stage(stage_key)
+        {
+            Some((Area::LowerLeft, [20.0, -4.0]))
+        } else if drill == Drill::GuardEdge && perfect::is_crossing_stage(stage_key) {
+            match fighter {
+                Some(perfect::steve::KIND) => Some((Area::UpperLeft, [18.0, 30.0])),
+                Some(perfect::incineroar::KIND) => Some((Area::UpperLeft, [110.0, 10.0])),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let area_offset = match (drill, fighter) {
+            (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, -55.0])
+            }
+            (Drill::GuardEdge, Some(0xc)) if stage_key == (311, 0) => {
+                Some([40.0, 20.0])
+            }
+            (Drill::GuardEdge, Some(0xc)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, -28.0])
+            }
+            (Drill::GuardEdge, Some(0xd | 0xe | perfect::rob::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([40.0, 20.0])
+            }
+            (Drill::GuardEdge, Some(0x1d..=0x1f)) if perfect::is_crossing_stage(stage_key) => {
+                Some([30.0, 6.0])
+            }
+            (Drill::GuardEdge, Some(0x10)) if perfect::is_crossing_stage(stage_key) => {
+                Some([18.0, -30.0])
+            }
+            (Drill::GuardEdge, Some(0x13)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, -28.0])
+            }
+            (Drill::GuardEdge, Some(perfect::sora_flight::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, -28.0])
+            }
+            (Drill::GuardEdge, Some(perfect::olimar::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([26.0, -26.0])
+            }
+            (Drill::GuardEdge, Some(perfect::kart::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([22.0, -42.0])
+            }
+            (Drill::GuardEdge, Some(perfect::diddy::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([14.0, -30.0])
+            }
+            (Drill::GuardEdge, Some(perfect::pacman::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([26.0, 14.0])
+            }
+            _ => None,
+        };
         let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, stage.area_default(area)?),
+            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, Self::release_offset(area, left_start, area_offset))?),
             Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
         };
         Some(Self {
             drill,
+            area_offset,
+            left_start,
             step,
             setup: Setup {
                 area,
                 cpu,
-                p1: stage.camera_point(p1)?,
+                p1: stage.player_cursor(drill, p1)?,
                 percent: percent.min(300),
             },
         })
     }
 
+    fn area_release(stage: Stage, area: Area, area_offset: Option<[f32; 2]>) -> Option<[f32; 2]> {
+        if let Some([outside, height]) = area_offset {
+            let lower = matches!(area, Area::LowerLeft | Area::LowerRight);
+            if lower == (height < 0.0) {
+                let left = matches!(area, Area::LowerLeft | Area::UpperLeft);
+                let ledge = stage.ledges[usize::from(!left)];
+                let x = if left { ledge[0] - outside } else { ledge[0] + outside };
+                let point = [x, ledge[1] + height];
+                // Preserve the ordinary default on stages that would clip this release.
+                if stage.edge_start(area, point) == Some(point) {
+                    return Some(point);
+                }
+            }
+        }
+        stage.area_default(area)
+    }
+
+    fn release_offset(area: Area, left: Option<(Area, [f32; 2])>, shared: Option<[f32; 2]>) -> Option<[f32; 2]> {
+        left.filter(|(side, _)| *side == area).map(|(_, offset)| offset).or(shared)
+    }
+
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        if let Some(cpu) = stage.area_default(area) {
+        let offset = Self::release_offset(area, self.left_start, self.area_offset);
+        if let Some(cpu) = Self::area_release(stage, area, offset) {
             self.setup.area = area;
             self.setup.cpu = cpu;
         }
@@ -582,6 +740,29 @@ impl Wizard {
         } {
             self.setup.cpu = point;
         }
+    }
+
+    pub fn player_floor(
+        &self,
+        stage: Stage,
+        cursor: [f32; 2],
+        confirm: bool,
+        mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>,
+    ) -> Option<[f32; 2]> {
+        sample(cursor).or_else(|| {
+            let previous = self.setup.p1;
+            // A ray at a shared lip can hit the wall. Confirm the displayed
+            // floor point only after its own fresh sample succeeds.
+            if confirm
+                && self.drill == Drill::GuardEdge
+                && cursor[0] != previous[0]
+                && stage.ledges.iter().any(|ledge| cursor[0] == ledge[0])
+            {
+                sample(previous)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn change_percent(&mut self, delta: i16) {
@@ -626,6 +807,16 @@ mod tests {
         }
         assert_eq!((session.phase, session.frames), (Phase::Live, 0));
         session
+    }
+
+    #[test]
+    fn edge_free_fall_restores_stock_aerial_jump_reserve() {
+        // Stock jump_count_max includes the ground jump. The verified Sheik,
+        // Pit and Meta Knight starts have one, three and five aerial jumps.
+        for (native_max, reference_reserve) in [(2, 1), (4, 3), (6, 5)] {
+            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
+        }
+        assert_eq!(Drill::Juggler.placed_jump_count(), 0);
     }
 
     #[test]
@@ -732,6 +923,56 @@ mod tests {
     }
 
     #[test]
+    fn edge_player_cursor_reverses_immediately_after_the_yoshi_story_lip() {
+        let stage = Stage::new(
+            [-180.0, 180.0, 120.0, -90.0],
+            [-160.0, 160.0, 118.0, -80.0],
+            [[-68.0, -4.25], [68.0, -4.25]],
+        ).unwrap();
+        for side in [-1.0, 1.0] {
+            let lip = [side * 68.0, -4.25];
+            let outside = [side * 130.0, -4.25];
+            let cursor = stage.player_cursor(Drill::GuardEdge, outside).unwrap();
+            assert_eq!(
+                stage.player_cursor(Drill::GuardEdge, [cursor[0] - side * 2.0, cursor[1]]),
+                Some([side * 66.0, -4.25]),
+            );
+            assert_eq!(cursor, lip);
+            assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
+        }
+    }
+
+    #[test]
+    fn edge_player_confirms_the_last_solid_floor_when_the_endpoint_is_a_wall() {
+        let stage = Stage::new(
+            [-180.0, 180.0, 120.0, -90.0],
+            [-160.0, 160.0, 118.0, -80.0],
+            [[-68.0, -4.25], [68.0, -4.25]],
+        ).unwrap();
+        let previous = [-66.140_594, -3.862];
+        let edge = Wizard::new(Drill::GuardEdge, stage, previous, 100, (0, 0), Some(0)).unwrap();
+        let lip = [-68.0, -3.862];
+        let mut queries = Vec::new();
+        assert_eq!(edge.player_floor(stage, lip, true, |point| {
+            queries.push(point);
+            (point == previous).then_some(previous)
+        }), Some(previous));
+        assert_eq!(queries, [lip, previous]);
+        assert!(edge.player_floor(stage, lip, false, |point| {
+            assert_eq!(point, lip, "only fresh confirmation revalidates the prior point");
+            None
+        }).is_none());
+        assert!(edge.player_floor(stage, lip, true, |_| None).is_none());
+        assert!(edge.player_floor(stage, [-60.0, 0.0], true, |point| {
+            (point == previous).then_some(previous)
+        }).is_none(), "a failed interior sample needs a new cursor location");
+        let juggler = Wizard::new(Drill::Juggler, stage, previous, 60, (0, 0), Some(0)).unwrap();
+        assert!(juggler.player_floor(stage, lip, true, |point| {
+            (point == previous).then_some(previous)
+        }).is_none(), "Juggler selects the current platform height");
+    }
+
+    #[test]
     fn both_ice_climbers_yield_cpu_settings_but_only_primary_owns_the_pad() {
         use crate::model::cpu::role::FighterKey;
 
@@ -772,6 +1013,36 @@ mod tests {
     }
 
     #[test]
+    fn attempt_trace_follows_release_and_first_scored_contact() {
+        let mut session = Session::new(Drill::GuardEdge, Some(2));
+        session.placed();
+        let before = session.phase;
+        session.advance_attempt(Observation::default());
+        assert_eq!(session.trace_event(before), None);
+        session = release(Drill::GuardEdge, Some(2));
+        assert_eq!(session.trace_event(Phase::Ready(1)), Some((1, 0)));
+        assert_eq!(session.trace_event(Phase::Live), None);
+
+        session.advance_attempt(Observation { grounded: true, ..Observation::default() });
+        assert_eq!(session.trace_event(Phase::Live), Some((1, 3)));
+        assert_eq!(session.frames, 1);
+        let before = session.phase;
+        session.advance_attempt(Observation { cliff_catch: true, ..Observation::default() });
+        assert_eq!(session.trace_event(before), None);
+
+        let mut juggle = release(Drill::Juggler, None);
+        juggle.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        assert_eq!(juggle.trace_event(Phase::Live), Some((1, 7)));
+
+        let mut timeout = release(Drill::GuardEdge, None);
+        for _ in 0..EDGE_TIMEOUT {
+            timeout.advance_attempt(Observation::default());
+        }
+        assert_eq!(timeout.trace_event(Phase::Live), Some((1, 4)));
+        assert_eq!(timeout.attempts, 0);
+    }
+
+    #[test]
     fn edge_scores_ko_and_waits_for_respawn() {
         let mut session = release(Drill::GuardEdge, None);
         let dead = Observation { dead_or_rebirthing: true, ..Observation::default() };
@@ -801,9 +1072,375 @@ mod tests {
     }
 
     #[test]
+    fn diddy_lower_wizard_defaults_to_the_measured_rocketbarrel_release() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
+            assert_eq!(wizard.setup.cpu, [-94.0, -30.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [94.0, -30.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(0, 1), (89, 0)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn link_starts_facing_away_on_each_proven_side() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let left = Setup { area: Area::LowerLeft, cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
+        let right = Setup { area: Area::UpperRight, cpu: [118.0, 38.0], percent: 105, ..left };
+        let facing = |drill, stage_key, start| {
+            recovery_away_facing(drill, stage_key, stage, start, Some(perfect::link::KIND))
+        };
+        assert_eq!(facing(Drill::GuardEdge, (3, 0), left), Some(-1.0));
+        assert_eq!(facing(Drill::GuardEdge, (3, 0), right), Some(1.0));
+        assert_eq!(facing(Drill::GuardEdge, (0, 0), right), None);
+        assert_eq!(facing(Drill::Juggler, (3, 0), right), None);
+    }
+
+    #[test]
+    fn steve_wizard_places_the_left_elytra_release_in_a_flown_column() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x58)).unwrap();
+            wizard.change_area(stage, 2);
+            assert_eq!(wizard.setup.cpu, [-98.0, 30.0], "native stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+        }
+    }
+
+    #[test]
+    fn incineroar_upper_left_wizard_offers_the_measured_long_whip_start() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x47)).unwrap();
+            wizard.change_area(stage, 2);
+            assert_eq!(wizard.setup.cpu, [-190.0, 10.0], "native stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+        }
+    }
+
+    #[test]
+    fn lucario_default_shares_the_flown_starts_at_measured_aura() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            for (damage, expected) in [(100, [-102.0, -14.0]), (130, [-102.0, -22.0])] {
+                let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], damage, key, Some(0x2c)).unwrap();
+                assert_eq!(wizard.setup.cpu, expected, "{key:?}, {damage}%");
+            }
+        }
+        for (key, damage) in [((89, 0), 100), ((3, 1), 100), ((3, 0), 65)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], damage, key, Some(0x2c)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn mario_lower_left_wizard_offers_the_flown_cape_start() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0)).unwrap();
+            let left = if perfect::mario::reference_stage(key) { [-114.0, -46.0] }
+                else { stage.area_default(Area::LowerLeft).unwrap() };
+            assert_eq!(wizard.setup.cpu, left);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
+            wizard.change_area(stage, -1);
+            assert_eq!(wizard.setup.cpu, left);
+        }
+    }
+
+    #[test]
+    fn snake_wizard_offers_only_the_measured_left_cypher_start() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x22)).unwrap();
+            let left = if perfect::is_crossing_stage(key) { [-100.0, -4.0] }
+                else { stage.area_default(Area::LowerLeft).unwrap() };
+            assert_eq!(wizard.setup.cpu, left);
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)),
+                perfect::is_crossing_stage(key).then_some(-1.0));
+            assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x22)), None);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)), None);
+            wizard.change_area(stage, -1);
+            assert_eq!(wizard.setup.cpu, left);
+        }
+    }
+
+    #[test]
+    fn link_wizard_places_the_proven_left_bomb_start_in_both_difficulties() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-79.99, 0.0], [79.99, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x2)).unwrap();
+            wizard.change_area(stage, 2);
+            if perfect::is_crossing_stage(key) {
+                assert_eq!(wizard.setup.cpu, [-109.99, 18.0]);
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), Some(-1.0));
+                assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x2)), None);
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)), None);
+            } else {
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            }
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), None);
+        }
+    }
+
+    #[test]
+    fn rob_upper_release_uses_the_flown_cell_on_each_allowed_stage() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0],
+            [-200.0, 200.0, 120.0, -120.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(3, 0), (0, 0), (311, 0), (0, 1), (89, 0)] {
+            let mut wizard = Wizard::new(
+                Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x2d),
+            ).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            for (area, expected) in [(Area::UpperLeft, [-120.0, 20.0]),
+                                     (Area::UpperRight, [120.0, 20.0])] {
+                while wizard.setup.area != area {
+                    wizard.change_area(stage, 1);
+                }
+                let actual = if perfect::is_crossing_stage(key) {
+                    expected
+                } else {
+                    stage.area_default(area).unwrap()
+                };
+                assert_eq!(wizard.setup.cpu, actual, "stage {key:?}, area {area:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn wing_wizard_defaults_to_the_measured_upper_release_on_each_normal_crossing_stage() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for fighter in [0x1d, 0x1e, 0x1f] {
+            for key in [(0, 0), (3, 0), (311, 0), (0, 1)] {
+                let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+                wizard.change_area(stage, 2);
+                let expected = if key.1 == 0 { [-110.0, 6.0] } else { stage.area_default(Area::UpperLeft).unwrap() };
+                assert_eq!(wizard.setup.cpu, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn peach_and_daisy_wizard_offers_the_measured_parasol_start_on_both_sides() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for fighter in [0xd, 0xe] {
+            for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
+                let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+                wizard.change_area(stage, 2);
+                assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
+                    [-120.0, 20.0]
+                } else {
+                    stage.area_default(Area::UpperLeft).unwrap()
+                });
+                wizard.change_area(stage, 1);
+                assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
+                    [120.0, 20.0]
+                } else {
+                    stage.area_default(Area::UpperRight).unwrap()
+                });
+            }
+        }
+    }
+
+    #[test]
+    fn pacman_upper_wizard_defaults_to_the_measured_pellet_start() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0],
+            [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x37)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            while wizard.setup.area != Area::UpperLeft {
+                wizard.change_area(stage, 1);
+            }
+            assert_eq!(wizard.setup.cpu, [-106.0, 14.0]);
+            while wizard.setup.area != Area::UpperRight {
+                wizard.change_area(stage, 1);
+            }
+            assert_eq!(wizard.setup.cpu, [106.0, 14.0]);
+        }
+    }
+
+    #[test]
+    fn pichu_lower_wizard_starts_in_its_measured_skull_bash_region() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let pichu = Some(0x13);
+        for key in [(3, 0), (0, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(89, 0), (3, 1)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn puff_wizard_releases_inside_the_measured_three_stage_ring() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let puff = Some(0xc);
+        for key in [(3, 0), (0, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff)
+                .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0], "stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        let mut waiting_room =
+            Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (311, 0), puff).unwrap();
+        assert_eq!(waiting_room.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        waiting_room.change_area(stage, 2);
+        assert_eq!(waiting_room.setup.cpu, [-120.0, 20.0]);
+        waiting_room.change_area(stage, 1);
+        assert_eq!(waiting_room.setup.cpu, [120.0, 20.0]);
+        for key in [(3, 1), (0, 1), (311, 1)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn sora_wizard_uses_the_widened_default_release_on_the_three_measured_stages() {
+        let stage = Stage::new(
+            [-200.0, 200.0, 180.0, -140.0],
+            [-160.0, 160.0, 120.0, -100.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        )
+        .unwrap();
+        for id in [0, 3, 311] {
+            let mut wizard = Wizard::new(
+                Drill::GuardEdge,
+                stage,
+                [0.0, 0.0],
+                100,
+                (id, 0),
+                Some(perfect::sora_flight::KIND),
+            )
+            .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0]);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0]);
+        }
+    }
+
+    #[test]
+    fn sheik_lower_wizard_release_remains_in_the_proven_fish_region() {
+        let stage = Stage::new(
+            [-200.0, 200.0, 180.0, -140.0],
+            [-160.0, 160.0, 120.0, -100.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let sheik = Some(0x10);
+        for id in [0, 3, 311] {
+            let mut wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, (id, 0), sheik).unwrap();
+            assert_eq!(wiz.setup.cpu, [-98.0, -30.0]);
+            wiz.change_area(stage, 1);
+            assert_eq!(wiz.setup.cpu, [98.0, -30.0]);
+            wiz.change_area(stage, 1);
+            assert_eq!(wiz.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(89, 0), (0, 1)] {
+            let wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, sheik).unwrap();
+            assert_eq!(wiz.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn pikachu_low_wizard_release_starts_below_the_cliff_inside_the_crossing_region() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let pikachu = Some(0x8);
+        for stage_key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, stage_key, pikachu)
+                .unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -55.0]);
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -55.0]);
+            wizard.advance();
+            wizard.move_cpu(stage, [125.0, -40.0]);
+            assert_eq!(wizard.setup.cpu, [125.0, -40.0], "the wizard still edits the point");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+
+        for (id, kind) in [((3, 1), pikachu), ((89, 0), pikachu), ((3, 0), Some(0x18)), ((3, 0), None)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, id, kind).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+        let juggle = Wizard::new(Drill::Juggler, stage, [0.0, 0.0], 100, (3, 0), pikachu).unwrap();
+        assert_eq!(juggle.setup.cpu, stage.default_juggle([0.0, 0.0]));
+    }
+
+    #[test]
     fn juggle_wizard_percent_and_player_step() {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
-        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60).unwrap();
+        let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60, (3, 0), None).unwrap();
         assert_eq!(wizard.step, WizardStep::Cpu);
         wizard.move_cpu(stage, [-150.0, 90.0]);
         wizard.advance();
