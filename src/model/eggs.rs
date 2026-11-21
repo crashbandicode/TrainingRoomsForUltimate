@@ -27,7 +27,9 @@ pub const HEADER: &str = "Eggs-ercise";
 pub const OFF: u8 = 0;
 pub const TIMED: u8 = 1;
 /// `10 targets`, `20 targets` (SPEC V2.4): the clock counts up and stops at the Nth target (`goal`).
+#[cfg(test)]
 pub const TEN: u8 = 2;
+#[cfg(test)]
 pub const TWENTY: u8 = 3;
 pub const FREE: u8 = 4;
 /// The `eggsercise_break` row's options: what breaks an egg (D3 b: any attack by default; projectiles never).
@@ -72,6 +74,7 @@ pub const RUN_FRAMES: u32 = 3600;
 pub const END_FRAMES: u16 = 180;
 /// The `eggsercise_speed` row's options (§2.3b): time runs `SPEEDS[option]` times as fast; the path stays the same.
 pub const NORMAL: u8 = 0;
+#[cfg(test)]
 pub const SLOW: u8 = 1;
 pub const FAST: u8 = 2;
 pub const SPEEDS: [f32; 3] = [1.0, 0.5, 1.5];
@@ -86,6 +89,7 @@ pub const RADIUS: f32 = 4.0;
 pub const LAUNCH: f32 = 1.44;
 pub const GRAVITY: f32 = 0.048;
 /// The flight's apex above its spawn, the same at every speed (`LAUNCH² / 2 GRAVITY`: 21.6).
+#[cfg(test)]
 pub const APEX: f32 = LAUNCH * LAUNCH / (2.0 * GRAVITY);
 pub const BOUNCE: f32 = 0.6;
 pub const DRIFT_SPEED: f32 = 0.1;
@@ -103,7 +107,7 @@ pub const BODY: f32 = 8.0;
 /// A break freezes the fighter that broke it for `HITLAG` ticks (V2.1: no native gives an attack's own hitlag, so the
 /// spec's fixed 6).
 pub const HITLAG: i32 = 6;
-/// Draw ticks the camera must hold still before a run's first target spawns: L+R+A sends it gliding to the new spot for a
+/// Draw ticks the camera must hold still after a fighter reset: L+R+A sends it gliding to the new spot for a
 /// moment, and the target must land in the view it keeps (Eden wa-eggsfly-a6266ac1-1: a target spawned at x 70 by the view
 /// before the glide was off screen for 92 of its 93 ticks).
 pub const SETTLE: u32 = 10;
@@ -308,7 +312,7 @@ impl Run {
         owner: (0, 2),
         shown: None,
         view: None,
-        still: 0,
+        still: SETTLE,
         air: false,
         cpu: 0,
         aloft: false,
@@ -339,10 +343,7 @@ impl Run {
 
     /// The stage's floors, as the game's collision has them (none when it could not be read: the run's ground is used).
     pub fn set_floors(&mut self, floors: &[Floor]) {
-        self.floors = [None; FLOORS];
-        for (slot, f) in self.floors.iter_mut().zip(floors) {
-            *slot = Some(*f);
-        }
+        self.floors = core::array::from_fn(|i| floors.get(i).copied());
         (self.scanned, self.pending) = (true, false);
     }
 
@@ -390,7 +391,9 @@ impl Run {
     pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Look; 3] {
         if active && self.rows[0] != OFF && !self.ended() {
             let seen = look();
-            self.still = if seen == self.view { self.still + 1 } else { 0 };
+            if self.still < SETTLE {
+                self.still = if seen.is_some() && seen == self.view { self.still + 1 } else { 0 };
+            }
             self.view = seen;
         }
         let [a, b] = self.bursts.map(|b| b.map(burst));
@@ -410,6 +413,7 @@ impl Run {
     pub fn reset(&mut self, seed: u32) {
         if self.rows[0] != OFF {
             self.start(self.rows, seed);
+            self.still = 0;
         }
     }
 
@@ -456,34 +460,31 @@ impl Run {
     /// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
     /// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
     /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
-    /// A first target that uses the screen bounds waits for the camera to settle. Complete Whole stage bounds
-    /// are in world coordinates and remain usable while the camera moves.
+    /// Screen bounds are usable on the first draw after Start. A fighter reset waits for its camera glide before
+    /// using screen bounds. Complete Whole stage bounds are in world coordinates.
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
         let View(s, o, range, vertical) = self.view.filter(|_| !self.pending)?;
         let whole = self.rows[4] == WHOLE;
         (last.is_some() || self.still >= SETTLE || (whole && vertical.is_some())).then_some(())?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let (sx0, sx1, top, bottom) = if whole {
+        let (x0, x1, top, bottom) = if whole {
             let (top, bottom) = match vertical {
                 Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
                 None => (edge(1, 1.0), edge(1, -1.0)),
             };
-            (range[0] + RADIUS, range[1] - RADIUS, top, bottom)
+            (range[0] + RADIUS + DRIFT, range[1] - RADIUS - DRIFT, top, bottom)
         } else {
-            let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
-            (sx0, sx1, edge(1, 1.0), edge(1, -1.0))
+            let inside = |x: f32| x.max(edge(0, -1.0) + DRIFT).min(edge(0, 1.0) - DRIFT);
+            let [lo, hi] = [inside(range[0] + DRIFT), inside(range[1] - DRIFT)];
+            (lo, hi, edge(1, 1.0), edge(1, -1.0))
         };
-        let (x0, x1) = (sx0 + DRIFT, sx1 - DRIFT);
         // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
         let lift = [0.0, -RADIUS][usize::from(self.rows[3] == CPU)];
-        let flat = [Some([[sx0, self.ground], [sx1, self.ground]])];
-        let known = self.floors.iter().any(Option::is_some);
         let mut spans = [([0.0f32; 2], [[0.0f32; 2]; 2]); FLOORS];
         let mut total = 0.0;
-        let floors = if known { &self.floors[..] } else { &flat[..] };
         let mut n = 0;
-        for f in floors.iter().flatten() {
+        for f in self.floors.iter().flatten() {
             let [a, b] = if f[0][0] <= f[1][0] { *f } else { [f[1], f[0]] };
             let (lo, hi) = ((a[0] + DRIFT).max(x0), (b[0] - DRIFT).min(x1));
             let height = a[1].max(b[1]) + RADIUS;
@@ -492,8 +493,10 @@ impl Run {
             }
         }
         if n == 0 {
-            // Nothing of the stage on screen, or no floor read: the run's ground across the screen.
-            (spans[0], total, n) = (([x0, x1.max(x0)], flat[0]?), (x1 - x0).max(0.0), 1);
+            // With no usable floor, keep the run's fallback ground in the spawn bounds.
+            let ground = self.ground.max(bottom - RADIUS).min(top - RADIUS);
+            let flat = [[x0, ground], [x1, ground]];
+            (spans[0], total, n) = (([x0, x1.max(x0)], flat), (x1 - x0).max(0.0), 1);
         }
         let spans = &spans[..n];
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
@@ -520,13 +523,12 @@ impl Run {
             let air = if room < 2.0 * RADIUS || random() < 0.5 { 0.0 } else { random() * REACH.min(room) };
             ([x, on + RADIUS + air], air > 0.0, (2.0 * random() - 1.0) * DRIFT_SPEED * speed)
         };
-        let tries = [(); 32].map(|_| pick());
         let dist = |p: [f32; 2], q: [f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]);
         let short = |disc: [f32; 2]| {
             let from_last = last.map_or(0.0, |l| spacing - dist([disc[0], disc[1] + lift], l));
             from_last.max(P1_GAP - dist(disc, body)).max(0.0)
         };
-        let (disc, perch, vx) = tries.into_iter().min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
+        let (disc, perch, vx) = (0..32).map(|_| pick()).min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
         let launch = (LAUNCH * speed).min((2.0 * g * (top - disc[1]).max(0.0)).sqrt());
         (self.egg, self.age, self.fly, self.perch) = (Some([disc[0], disc[1] + lift]), 0, [launch, vx, g], perch);
         Some(())
@@ -568,6 +570,7 @@ impl Run {
     /// One pass of an entry-0 fighter (`plan` said `Read`): `tick` (the clock keeper's pass, menu closed), `y` (its height:
     /// the ground of a run's first egg), its pills, whether it is in an aerial (`air`) and its kind (the session's best when the
     /// minute ends). The notice's length when its text changed (`write_notice`).
+    #[cfg(test)]
     pub fn step(&mut self, tick: bool, y: f32, hits: &[Hit], air: bool, kind: i32) -> Option<u16> {
         self.step_with_depth(tick, y, hits, |_| None, air, kind).0
     }
@@ -698,6 +701,29 @@ mod standing_notice_tests {
 
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
     const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH], None);
+
+    #[test]
+    fn in_view_uses_the_current_moving_projection_after_floor_read() {
+        let mut run = Run::IDLE;
+        run.start([TIMED, ANY, FAST, DISC, IN_VIEW], 7);
+        run.want_floors();
+        run.look(true, || Some(VIEW));
+        run.step(true, 0.0, &[], false, 0);
+        assert!(run.egg_at().is_none());
+        assert_eq!(run.frames, RUN_FRAMES);
+
+        // A projection across empty space can happen while following an off-stage fighter.
+        run.set_floors(&[[[-80.0, 0.0], [80.0, 0.0]]]);
+        let view = View([18.0; 2], [-2700.0, -2400.0], VIEW.2, None);
+        run.look(true, || Some(view));
+        run.step(true, -80.0, &[], false, 0);
+        let at = run.egg_at().expect("a current projection suffices for the first target");
+        for i in 0..2 {
+            let canvas = at[i] * view.0[i] + view.1[i];
+            assert!(canvas.abs() + RADIUS * view.0[i] <= CANVAS_HALF[i] + 0.01);
+        }
+        assert_eq!(run.frames, RUN_FRAMES - 1);
+    }
 
     #[test]
     fn whole_stage_starts_with_moving_camera_after_floor_read() {

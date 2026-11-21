@@ -893,42 +893,38 @@ fn notice_after(run: &mut Run) -> String {
     pass(run, &[], false);
     notice(run)
 }
-/// A restart (a menu close, L+R+A, Change Stage) spawns its first target by the camera it keeps, not by the one from
-/// before or the one right after the reset: L+R+A sends the camera gliding back for a moment. Eden `wa-eggsfly-9c16babe-1`
+/// L+R+A and Change Stage spawn their first target after the reset camera's glide. Eden `wa-eggsfly-9c16babe-1`
 /// and `-a6266ac1-1` spawned a target (x 32.7, x 70.3) by the panned camera of the walk before the reset, then drew it off
 /// screen for 95 of 96 and 92 of 93 ticks.
 fn eggs_restart_waits_for_camera() {
     let panned = View([27.09, 27.09], [-900.0, -264.4], BOX, None);
-    let restarts: [fn(&mut Run); 2] = [|run| run.reset(11), |run| _ = run.plan([FREE, ANY, NORMAL, DISC, IN_VIEW], Some(11), 0, || TRAINING)];
-    for restart in restarts {
-        for seed in 0..40 {
-            let mut run = started(FREE, ANY, seed);
-            settle(&mut run, panned);
-            restart(&mut run);
-            // The notice resets immediately; the target still waits for the new camera.
-            assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "seed {seed}: no target before the draw published the new camera");
-            assert!(target(&mut run).is_none());
-            // The camera still shows the panned view for a draw, then glides to the default over a few more.
-            for k in 0..7u8 {
-                let at = View([27.09; 2], [-900.0 + 1308.7 * f32::from(k) / 7.0, -264.4], BOX, None);
-                run.look(true, || Some(at));
-                assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: the camera is gliding (draw {k})");
-            }
-            for _ in 0..SETTLE {
-                run.look(true, || Some(RESET_CENTRE));
-                assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: the camera is not yet still");
-            }
+    for seed in 0..40 {
+        let mut run = started(FREE, ANY, seed);
+        settle(&mut run, panned);
+        run.reset(11);
+        // The notice resets immediately; the target still waits for the new camera.
+        assert_eq!(pass(&mut run, &[], false), Some(u16::MAX), "seed {seed}: no target before the draw published the new camera");
+        assert!(target(&mut run).is_none());
+        // The camera still shows the panned view for a draw, then glides to the default over a few more.
+        for k in 0..7u8 {
+            let at = View([27.09; 2], [-900.0 + 1308.7 * f32::from(k) / 7.0, -264.4], BOX, None);
+            run.look(true, || Some(at));
+            assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: the camera is gliding (draw {k})");
+        }
+        for _ in 0..SETTLE {
             run.look(true, || Some(RESET_CENTRE));
+            assert_eq!(pass(&mut run, &[], false), None, "seed {seed}: the camera is not yet still");
+        }
+        run.look(true, || Some(RESET_CENTRE));
+        pass(&mut run, &[], false);
+        for _ in 0..200 {
+            let egg = run.egg_at().expect("spawned");
+            let ([cx, cy], pad) = ([0, 1].map(|i| egg[i] * RESET_CENTRE.0[i] + RESET_CENTRE.1[i]), RADIUS * RESET_CENTRE.0[0] - 0.01);
+            assert!(cx.abs() <= 960.0 - pad && cy.abs() <= 540.0 - pad, "seed {seed}: {egg:?} off screen");
             pass(&mut run, &[], false);
-            for _ in 0..200 {
-                let egg = run.egg_at().expect("spawned");
-                let ([cx, cy], pad) = ([0, 1].map(|i| egg[i] * RESET_CENTRE.0[i] + RESET_CENTRE.1[i]), RADIUS * RESET_CENTRE.0[0] - 0.01);
-                assert!(cx.abs() <= 960.0 - pad && cy.abs() <= 540.0 - pad, "seed {seed}: {egg:?} off screen");
-                pass(&mut run, &[], false);
-            }
         }
     }
-    // Only a run's first target waits: the next ones spawn at once, by the camera as it is (the player may be walking).
+    // A replacement uses the current moving view as soon as the target breaks.
     let mut run = started(FREE, ANY, 3);
     pass(&mut run, &[], false);
     run.look(true, || Some(panned));
