@@ -456,12 +456,12 @@ fn niche_sheik_vanish_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_greninja_shadow_sneak_route_and_pad_sequence() {
+fn niche_greninja_hydro_pump_route_registry_uses_the_measured_sequence() {
     verify(
         0x35,
         "cross",
         13,
-        &[Move::ChargedSide, Move::Hold, Move::Travel],
+        &[Move::Hold, Move::Jump, Move::Travel],
     );
 }
 
