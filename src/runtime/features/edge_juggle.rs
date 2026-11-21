@@ -1556,7 +1556,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
             z: 0.0,
         },
     );
-    let cpu_facing = if crate::model::edge_juggle::link_faces_away(
+    let cpu_facing = if crate::model::edge_juggle::recovery_faces_away(
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
     ) {
         -1.0

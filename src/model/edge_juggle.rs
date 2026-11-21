@@ -553,16 +553,22 @@ pub struct Setup {
     pub percent: u16,
 }
 
-pub fn link_faces_away(
+pub fn recovery_faces_away(
     drill: Drill,
     stage_key: (i32, u32),
     stage: Stage,
     setup: Setup,
     fighter: Option<i32>,
 ) -> bool {
-    drill == Drill::GuardEdge
-        && fighter == Some(perfect::link::KIND)
-        && perfect::link::in_region(stage_key, stage.ledges[0], setup.cpu, setup.percent.into())
+    if drill != Drill::GuardEdge {
+        return false;
+    }
+    let near = stage.ledges[0];
+    match fighter {
+        Some(perfect::link::KIND) => perfect::link::in_region(stage_key, near, setup.cpu, setup.percent.into()),
+        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, near, setup.cpu),
+        _ => false,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -578,7 +584,7 @@ pub enum WizardStep {
 pub struct Wizard {
     drill: Drill,
     area_offset: Option<[f32; 2]>,
-    link_left_start: bool,
+    left_start: Option<(Area, [f32; 2])>,
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -592,6 +598,15 @@ impl Wizard {
         let link_left_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
             && perfect::link::in_region(stage_key, stage.ledges[0], [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
+        let left_start = if link_left_start {
+            Some((Area::UpperLeft, [30.0, 18.0]))
+        } else if drill == Drill::GuardEdge && fighter == Some(perfect::snake::KIND)
+            && perfect::is_crossing_stage(stage_key)
+        {
+            Some((Area::LowerLeft, [20.0, -4.0]))
+        } else {
+            None
+        };
         let area_offset = match (drill, fighter) {
             (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -55.0])
@@ -632,13 +647,13 @@ impl Wizard {
             _ => None,
         };
         let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, area_offset)?),
+            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, Self::release_offset(area, left_start, area_offset))?),
             Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
         };
         Some(Self {
             drill,
             area_offset,
-            link_left_start,
+            left_start,
             step,
             setup: Setup {
                 area,
@@ -666,13 +681,13 @@ impl Wizard {
         stage.area_default(area)
     }
 
+    fn release_offset(area: Area, left: Option<(Area, [f32; 2])>, shared: Option<[f32; 2]>) -> Option<[f32; 2]> {
+        left.filter(|(side, _)| *side == area).map(|(_, offset)| offset).or(shared)
+    }
+
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        let offset = if self.link_left_start && area == Area::UpperLeft {
-            Some([30.0, 18.0])
-        } else {
-            self.area_offset
-        };
+        let offset = Self::release_offset(area, self.left_start, self.area_offset);
         if let Some(cpu) = Self::area_release(stage, area, offset) {
             self.setup.area = area;
             self.setup.cpu = cpu;
@@ -1038,6 +1053,27 @@ mod tests {
     }
 
     #[test]
+    fn snake_wizard_offers_only_the_measured_left_cypher_start() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 180.0, -140.0], [-180.0, 180.0, 110.0, -85.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x22)).unwrap();
+            let left = if perfect::is_crossing_stage(key) { [-100.0, -4.0] }
+                else { stage.area_default(Area::LowerLeft).unwrap() };
+            assert_eq!(wizard.setup.cpu, left);
+            assert_eq!(recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)), perfect::is_crossing_stage(key));
+            assert!(!recovery_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x22)));
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
+            assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)));
+            wizard.change_area(stage, -1);
+            assert_eq!(wizard.setup.cpu, left);
+        }
+    }
+
+    #[test]
     fn link_wizard_places_the_proven_left_bomb_start_in_both_difficulties() {
         let stage = Stage::new(
             [-240.0, 240.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
@@ -1048,15 +1084,15 @@ mod tests {
             wizard.change_area(stage, 2);
             if perfect::is_crossing_stage(key) {
                 assert_eq!(wizard.setup.cpu, [-109.99, 18.0]);
-                assert!(link_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
-                assert!(!link_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x2)));
-                assert!(!link_faces_away(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)));
+                assert!(recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
+                assert!(!recovery_faces_away(Drill::Juggler, key, stage, wizard.setup, Some(0x2)));
+                assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)));
             } else {
                 assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
             }
             wizard.change_area(stage, 1);
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
-            assert!(!link_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
+            assert!(!recovery_faces_away(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)));
         }
     }
 

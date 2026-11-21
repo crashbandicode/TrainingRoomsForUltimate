@@ -535,7 +535,7 @@ fn niche_daisy_float_route_and_pad_sequence() {
 
 #[test]
 fn niche_snake_cypher_route_and_pad_sequence() {
-    verify_pad_sequence(super::measured_row(26, CANDIDATE_ROWS).unwrap(), &[Move::Hold, Move::Hover]);
+    verify_pad_sequence(super::measured_row(perfect::snake::ROW, CANDIDATE_ROWS).unwrap(), &[Move::Jump, Move::Hover]);
 }
 
 #[test]

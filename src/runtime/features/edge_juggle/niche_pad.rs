@@ -20,6 +20,7 @@ use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::rob::{self, BurnerFlight, BurnerState};
 use perfect::sheik::{SheikBeat, SheikFlight};
+use perfect::snake::{self, CypherFlight, CypherSample};
 use perfect::sora_flight::{self, SoraBeat, SoraFlight};
 use perfect::wings::{self, WingsFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
@@ -46,6 +47,7 @@ enum MeasuredFlight {
     Sora(SoraFlight),
     Kart(KartFlight),
     Link(LinkFlight),
+    Cypher(CypherFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
 }
@@ -358,6 +360,27 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == snake::KIND {
+            let sample = CypherSample {
+                frame: 0,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_jump: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            };
+            let flight = CypherFlight::start(facts, sample)?;
+            let row = niche::measured_row(snake::ROW, niche::CANDIDATE_ROWS)?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Cypher(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == link::KIND && inputs.special.is_some() {
             let sample = LinkBeat {
                 frame: 0,
@@ -435,6 +458,8 @@ impl NicheGuide {
             Some(MeasuredFlight::Kart(flight)) => Some(flight.crossing_frames()),
             // 72 to the blast, 88 to Spin Attack, and up to 37 to catch; allow for the neutral wait.
             Some(MeasuredFlight::Link(_)) => Some(235),
+            // Near-rest Cypher reaches the far lip about 203 rows after release.
+            Some(MeasuredFlight::Cypher(_)) => Some(235),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
@@ -511,6 +536,21 @@ impl NicheGuide {
                 can_pull: flight.waiting_to_pull() && niche_start_enabled(cpu, Move::Bomb, true),
                 can_jump: flight.is_jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_spin: flight.is_spin_frame(frame) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            });
+        }
+        if let Some(MeasuredFlight::Cypher(flight)) = &mut self.measured {
+            let free = matches!(status, snake::FALL | snake::JUMP_AERIAL);
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            return flight.step(CypherSample {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: natives::lr(cpu),
+                jumps: if free { remaining_jumps(cpu)? } else { 0 },
+                can_jump: status == snake::FALL && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: status == snake::JUMP_AERIAL && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Rise, available),
             });
         }
         if let Some(MeasuredFlight::Puff(flight)) = &mut self.measured {
