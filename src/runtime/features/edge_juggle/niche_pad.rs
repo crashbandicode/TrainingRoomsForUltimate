@@ -96,10 +96,10 @@ impl NicheGuide {
         jumps: u8,
     ) -> Option<Self> {
         let row = niche::measured_row(ness::ROW, niche::CANDIDATE_ROWS)?;
-        if !grounded_wait(p1) || natives::damage(cpu, 0) != 0.0 {
+        if natives::damage(cpu, 0) != 0.0 {
             return None;
         }
-        let flight = ThunderReturn::start(facts, ThunderBeat {
+        let beat = ThunderBeat {
             frame,
             status: natives::status_kind(cpu),
             position: facts.position,
@@ -108,7 +108,8 @@ impl NicheGuide {
             jumps,
             can_jump: niche_start_enabled(cpu, Move::Jump, true),
             can_thunder: niche_start_enabled(cpu, Move::Bolt, true),
-        })?;
+        };
+        let flight = ThunderReturn::start(facts, beat, grounded_wait(p1))?;
         Some(Self {
             sequence: Sequence::new(row),
             fighter: ness::KIND,
@@ -420,7 +421,7 @@ impl NicheGuide {
                 jumps: inputs.jumps,
                 can_jump: false,
                 can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Travel, true),
-            })?;
+            }, inputs.zone)?;
             return Some((Self {
                 sequence: Sequence::new(row),
                 fighter,
@@ -816,11 +817,9 @@ impl NicheGuide {
                 return None;
             }
             let pre_cast = flight.awaits_cast(frame);
-            if pre_cast && (!grounded_wait(p1)
-                || !flight.still_clear([natives::pos_x(p1), natives::pos_y(p1)]))
-            {
-                return None;
-            }
+            let guarder = pre_cast.then(|| {
+                ([natives::pos_x(p1), natives::pos_y(p1)], grounded_wait(p1))
+            });
             return flight.step(ThunderBeat {
                 frame,
                 status,
@@ -830,7 +829,7 @@ impl NicheGuide {
                 jumps: if pre_cast { remaining_jumps(cpu)? } else { 0 },
                 can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_thunder: flight.cast_press(frame) && available && niche_start_enabled(cpu, Move::Bolt, true),
-            });
+            }, guarder);
         }
         if let Some(MeasuredFlight::Lucas(flight)) = &mut self.measured {
             let (variant, reach) = read_special_reach(ai, snapshot)?;

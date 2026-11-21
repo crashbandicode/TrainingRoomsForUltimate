@@ -17,7 +17,7 @@ fn fixture(stage: i32, out: f32, below: f32) -> (RouteFacts<'static>, ThunderBea
         fighter: 0x0a,
         stage: (stage, 0),
         position,
-        player: [-75.0, 0.010259508],
+        player: [-74.0, 0.010259508],
         player_reach: 10.0,
         ledges: LEDGES,
         blast: [-230.0, 230.0, 180.0, -140.0],
@@ -57,40 +57,40 @@ fn ness_offers_the_proven_near_side_programs_with_both_native_resources() {
         for &(out, below) in starts {
             let (mut facts, release) = fixture(stage, out, below);
             assert!(
-                ThunderReturn::start(&facts, release).is_some(),
+                ThunderReturn::start(&facts, release, true).is_some(),
                 "{stage} {out} {below}"
             );
             let no_up = ThunderBeat {
                 can_thunder: false,
                 ..release
             };
-            assert!(ThunderReturn::start(&facts, no_up).is_none());
+            assert!(ThunderReturn::start(&facts, no_up, true).is_none());
             let no_jump = ThunderBeat {
                 jumps: 0,
                 ..release
             };
-            assert!(ThunderReturn::start(&facts, no_jump).is_none());
+            assert!(ThunderReturn::start(&facts, no_jump, true).is_none());
             let away = ThunderBeat {
                 facing: -1.0,
                 ..release
             };
-            assert!(ThunderReturn::start(&facts, away).is_none());
-            facts.player = [0.0, 0.0];
-            assert!(ThunderReturn::start(&facts, release).is_none());
+            assert!(ThunderReturn::start(&facts, away, true).is_none());
+            facts.player = [NEAR[0] - 2.0, 0.0];
+            assert_eq!(ThunderReturn::start(&facts, release, true).is_some(), deep_stock_loss(facts.stage, out, below));
         }
         for (out, below) in [(20.0, 56.0), (36.0, 24.0), (36.0, 28.0), (84.0, 52.0), (56.0, 72.0), (120.2, 108.2)] {
             let (facts, release) = fixture(stage, out, below);
-            assert!(ThunderReturn::start(&facts, release).is_none());
+            assert!(ThunderReturn::start(&facts, release, true).is_none());
         }
     }
     let (facts, release) = fixture(11, 20.0, 28.0);
-    assert!(ThunderReturn::start(&facts, release).is_none());
+    assert!(ThunderReturn::start(&facts, release, true).is_none());
 }
 
 #[test]
 fn ness_deep_route_replays_both_jump_presses_then_casts_the_measured_loop() {
     let (facts, base) = fixture(3, 120.0, 108.0);
-    let mut flight = ThunderReturn::start(&facts, base).expect("FD deep reference");
+    let mut flight = ThunderReturn::start(&facts, base, true).expect("FD deep reference");
     for (frame, status, x, y, vx, vy, jumps, press, stick) in [
         (0, 0xe, -199.986, -108.0, 0.0, 0.0, 1, 0, [0.0, 0.0]),
         (4, 0xe, -199.986, -108.770, 0.0, -0.308, 1, JUMP, [1.0, 0.0]),
@@ -149,20 +149,20 @@ fn ness_deep_route_replays_both_jump_presses_then_casts_the_measured_loop() {
             jumps,
             ..base
         };
-        let pad = flight.step(beat).unwrap_or_else(|| panic!("step {frame}"));
+        let pad = flight.step(beat, Some((facts.player, true))).unwrap_or_else(|| panic!("step {frame}"));
         assert_eq!(
             (pad.press, pad.stick),
             (press, Some(stick)),
             "frame {frame}"
         );
     }
-    let mut lost = ThunderReturn::start(&facts, base).unwrap();
+    let mut lost = ThunderReturn::start(&facts, base, true).unwrap();
     let impact = ThunderBeat {
         frame: 55,
         status: 0x48,
         ..base
     };
-    assert!(lost.step(impact).is_none());
+    assert!(lost.step(impact, Some((facts.player, true))).is_none());
 }
 
 #[test]
@@ -196,13 +196,14 @@ fn ness_leading_fall_is_anchored_to_the_native_release_and_lost_cast_returns_sto
     beat.position[1] -= drop(3);
     beat.velocity[1] = -3.0 * GRAVITY;
     facts.position = beat.position;
-    let mut flight = ThunderReturn::start(&facts, beat).unwrap();
-    assert_eq!(flight.step(beat).unwrap().press, 0);
-    assert!(!flight.still_clear([0.0, 0.0]));
+    let mut flight = ThunderReturn::start(&facts, beat, true).unwrap();
+    assert_eq!(flight.step(beat, Some((facts.player, true))).unwrap().press, 0);
+    let mut moved = ThunderReturn::start(&facts, beat, true).unwrap();
+    assert!(moved.step(beat, Some(([0.0, 0.0], true))).is_none());
     beat.frame = 4;
     beat.position[1] = -28.0 - drop(4);
     beat.can_thunder = false;
-    assert!(flight.step(beat).is_none());
+    assert!(flight.step(beat, Some((facts.player, true))).is_none());
 }
 
 #[test]
@@ -267,6 +268,50 @@ fn ness_v3_uses_the_reviewed_program_at_the_live_start() {
 
     for (out, below) in [(108.0, 108.0), (110.0, 110.0), (114.0, 110.0)] {
         let (facts, beat) = fixture(3, out, below);
-        assert!(ThunderReturn::start(&facts, beat).is_some(), "{out} out, {below} below");
+        assert!(ThunderReturn::start(&facts, beat, true).is_some(), "{out} out, {below} below");
     }
+}
+
+#[test]
+fn ness_standing_window_has_a_lip_minimum_and_no_far_cap() {
+    let (mut facts, release) = fixture(3, 20.0, 28.0);
+    facts.player = [NEAR[0] + 16.0, 0.01];
+    assert!(ThunderReturn::start(&facts, release, true).is_some());
+    assert!(ThunderReturn::start(&facts, release, false).is_none());
+    facts.player[0] = NEAR[0] + 4.98;
+    assert!(ThunderReturn::start(&facts, release, true).is_none());
+}
+
+#[test]
+fn ness_deep_stock_losses_can_offer_against_a_moving_guarder() {
+    for (out, below) in [(108.0, 108.0), (110.0, 110.0), (114.0, 110.0), (120.0, 108.0)] {
+        let (mut facts, release) = fixture(3, out, below);
+        facts.player = [-125.0, -42.0];
+        assert!(ThunderReturn::start(&facts, release, false).is_some(), "{out}, {below}");
+    }
+    let (mut facts, release) = fixture(3, 84.0, 88.0);
+    facts.player = [-125.0, -42.0];
+    assert!(ThunderReturn::start(&facts, release, false).is_none());
+}
+
+#[test]
+fn ness_keeps_the_spent_jump_and_replans_at_cast_against_live_p1() {
+    let (facts, start) = fixture(3, 110.0, 110.0);
+    let mut flight = ThunderReturn::start(&facts, start, true).unwrap();
+    assert_eq!(flight.program.loop_kind, 1);
+    // Both measured loops can catch here. In this P1 pose, loop 2 has the
+    // wider minimum normalized squared approach margin (-0.772 vs -0.815).
+    let moving_guarder = Some(([-126.7856, -80.5964], false));
+    let cast = ThunderBeat {
+        frame: 52,
+        status: JUMP_AERIAL,
+        position: [-141.3681, -66.6417],
+        jumps: 0,
+        ..start
+    };
+    assert_eq!(flight.step(cast, moving_guarder), Some(pad([0.0, 1.0], SPECIAL)));
+    assert_eq!(flight.program.loop_kind, 2, "switch to the farther loop at the cast");
+    let no_thunder = ThunderBeat { can_thunder: false, ..cast };
+    let mut invalid = ThunderReturn::start(&facts, start, true).unwrap();
+    assert!(invalid.step(no_thunder, moving_guarder).is_none());
 }

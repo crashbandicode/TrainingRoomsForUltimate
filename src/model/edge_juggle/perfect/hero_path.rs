@@ -41,9 +41,6 @@ pub(super) struct Path {
     pub wait: u32,
     pub shield: u32,
     pub cast: u32,
-    pub jump_at: Sample,
-    pub cast_at: Sample,
-    pub shield_at: Sample,
     pub arrival: u16,
 }
 
@@ -260,12 +257,6 @@ pub(super) fn local(ledge: super::Point, position: super::Point) -> [f64; 2] {
     ]
 }
 
-pub(super) fn matches_position(live: [f64; 2], expected: Sample) -> bool {
-    live.into_iter()
-        .zip(expected.position)
-        .all(|(a, b)| (a - b).abs() <= 1.0)
-}
-
 /// Advance gravity and drift separately when ranking the first 16 shield
 /// poses. Time spent neutral does not change the x or y prefixes of drift.
 pub(super) fn plan(start: Sample, facing: f64) -> Option<Path> {
@@ -338,9 +329,6 @@ pub(super) fn plan(start: Sample, facing: f64) -> Option<Path> {
             wait: t.wait as u32,
             shield,
             cast: cast_frame,
-            jump_at: jump.sample,
-            cast_at: cast.sample,
-            shield_at: t.pad,
             arrival: (cast_frame + flight_frames) as u16,
         })
     })

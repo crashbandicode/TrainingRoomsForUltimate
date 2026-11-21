@@ -159,7 +159,6 @@ impl HeroFlight {
                 && beat.can_dodge
                 && beat.can_jump
                 && beat.can_cast
-                && path::matches_position(sample.position, route.shield_at)
                 && path::shield_reaches(sample, self.facing, jump_frames))
             .then(|| pad(FORWARD, GUARD));
         }
@@ -174,7 +173,6 @@ impl HeroFlight {
                 && beat.jumps == 1
                 && has_mana(beat)
                 && beat.can_jump
-                && path::matches_position(sample.position, route.jump_at)
                 && path::jump_reaches(sample, self.facing, jump_frames))
             .then(|| pad(FORWARD, JUMP));
         }
@@ -187,7 +185,6 @@ impl HeroFlight {
                 && beat.jumps == 0
                 && has_mana(beat)
                 && beat.can_cast
-                && path::matches_position(sample.position, route.cast_at)
                 && path::cast_reaches(sample, self.facing))
             .then(|| pad(UP, SPECIAL));
         }
@@ -344,6 +341,19 @@ lib_unit_tests! {
             let mut unavailable = HeroFlight::start(&facts(START), START).unwrap();
             unavailable.step(START).unwrap();
             assert!(unavailable.step(HeroBeat { can_dodge: false, ..shield }).is_none());
+        }
+
+        #[test]
+        fn hero_cast_uses_live_reach_when_the_position_differs_from_the_planned_waypoint() {
+            let mut flight = HeroFlight::start(&facts(START), START).unwrap();
+            flight.step(START).unwrap();
+            let cast = HeroBeat {
+                frame: 151, status: JUMP_AERIAL, jumps: 0, position: [26.51, -95.76],
+                velocity: [1.01, -0.735], ..START
+            };
+            let sample = path::Sample { position: path::local(LEFT, cast.position), velocity: cast.velocity.map(f64::from) };
+            assert!(path::cast_reaches(sample, 1.0), "the live trajectory reaches the far ledge");
+            assert_eq!(flight.step(cast), Some(pad(UP, SPECIAL)));
         }
 
         #[test]

@@ -44,6 +44,7 @@ pub struct ThunderReturn {
     player: Point,
     origin: u32,
     lead_elapsed: u32,
+    deep_rescue: bool,
     last_pad: Option<(u32, Correction)>,
 }
 
@@ -60,12 +61,24 @@ pub fn wizard_offset(stage: (i32, u32)) -> Option<Point> {
     }
 }
 
+fn at_flown_start(out: f32, below: f32, [ref_out, ref_below]: Point) -> bool {
+    (out - ref_out).abs() <= 0.03 && (below - ref_below).abs() <= 0.03
+}
+
+fn deep_stock_loss(stage: (i32, u32), out: f32, below: f32) -> bool {
+    // Each reference is a measured Final Destination save with zero stock returns.
+    stage == (3, 0)
+        && [[108.0, 108.0], [110.0, 110.0], [114.0, 110.0], [120.0, 108.0]]
+            .into_iter()
+            .any(|start| at_flown_start(out, below, start))
+}
+
 fn program(stage: (i32, u32), out: f32, below: f32) -> Option<Program> {
     if !(16.0..=156.0).contains(&out) || !(0.0..120.0).contains(&below) {
         return None;
     }
     let key = (out / 4.0) as u16 * 30 + (below / 4.0) as u16;
-    let code = if stage == (3, 0) && (out - 120.0).abs() <= 0.03 && (below - 108.0).abs() <= 0.03 {
+    let code = if stage == (3, 0) && at_flown_start(out, below, [120.0, 108.0]) {
         // Independent deep sweep: the centre completed 5/5 against five
         // stock KOs. The nearby points were not certified by the cell bake.
         51 * 4 + 2
@@ -133,15 +146,22 @@ impl Program {
         ][self.loop_kind]
     }
 
-    fn can_finish(self, mut pos: Point, ledge: Point, player: Point) -> bool {
+    fn can_finish(self, pos: Point, ledge: Point, player: Point) -> bool {
+        self.guard_clearance(pos, ledge, player)
+            .is_some_and(|clearance| clearance >= 0.0)
+    }
+
+    /// Minimum squared separation above the ball/body safety bounds, in units of each bound.
+    /// Only a trajectory that retains the measured ledge catch supplies a clearance.
+    fn guard_clearance(self, mut pos: Point, ledge: Point, player: Point) -> Option<f32> {
+        if !clean_start(pos, ledge) {
+            return None;
+        }
         let ball = [&data::BALL_0, &data::BALL_1, &data::BALL_2, &data::BALL_3][self.loop_kind];
-        if !clean_start(pos, ledge)
-            || ball.iter().any(|&[dx, dy]| {
-                let centre = add(pos, [dx as f32 * 0.0001, dy as f32 * 0.0001 + 5.0]);
-                distance_squared(centre, add(player, [0.0, 6.0])) < 20.0 * 20.0
-            })
-        {
-            return false;
+        let mut clearance = f32::MAX;
+        for &[dx, dy] in ball {
+            let centre = add(pos, [dx as f32 * 0.0001, dy as f32 * 0.0001 + 5.0]);
+            clearance = clearance.min(distance_squared(centre, add(player, [0.0, 6.0])) / (20.0 * 20.0) - 1.0);
         }
         let mut approaching = false;
         let mut trusted = false;
@@ -150,19 +170,29 @@ impl Program {
             let out = ledge[0] - pos[0];
             let below = ledge[1] - pos[1];
             approaching |= (-0.5..=15.5).contains(&out) && (7.5..=22.5).contains(&below);
-            if approaching && distance_squared(pos, player) < 14.0 * 14.0 {
-                return false;
+            if approaching {
+                clearance = clearance.min(distance_squared(pos, player) / (14.0 * 14.0) - 1.0);
             }
             if (1.5..=13.0).contains(&out) && (9.5..=18.5).contains(&below) {
                 if trusted {
-                    return true;
+                    return Some(clearance);
                 }
                 trusted = true;
             } else if trusted || out < 1.5 {
-                return false;
+                return None;
             }
         }
-        false
+        None
+    }
+
+    fn farthest_loop(self, pos: Point, ledge: Point, player: Point) -> Option<Self> {
+        (0..4)
+            .filter_map(|loop_kind| {
+                let program = Self { loop_kind, ..self };
+                Some((program, program.guard_clearance(pos, ledge, player)?))
+            })
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map(|(program, _)| program)
     }
 
     fn steering(self, age: u32) -> Point {
@@ -190,9 +220,8 @@ fn pad(stick: Point, press: u32) -> Correction {
 }
 
 impl ThunderReturn {
-    pub fn start(facts: &RouteFacts<'_>, beat: ThunderBeat) -> Option<Self> {
+    pub fn start(facts: &RouteFacts<'_>, beat: ThunderBeat, guarder_wait: bool) -> Option<Self> {
         let [ledge, far] = facts.ledges;
-        let inside = facts.player[0] - ledge[0];
         let below = ledge[1] - beat.position[1];
         let elapsed = (-beat.velocity[1] / GRAVITY).round();
         if facts.fighter != KIND
@@ -207,8 +236,6 @@ impl ThunderReturn {
             || beat.velocity[0] != 0.0
             || !(0.0..=LEAD as f32).contains(&elapsed)
             || (beat.velocity[1] + elapsed * GRAVITY).abs() > 0.003
-            || !(4.5..=8.9).contains(&inside)
-            || (facts.player[1] - ledge[1]).abs() > 0.12
             || !region::has_common_underside([ledge, far], facts.blast[3], facts.outline)
         {
             return None;
@@ -216,7 +243,15 @@ impl ThunderReturn {
         let lead_elapsed = elapsed as u32;
         let start = add(beat.position, [0.0, drop(lead_elapsed)]);
         let out = ledge[0] - start[0];
-        let program = program(facts.stage, out, below - drop(lead_elapsed))?;
+        let below = below - drop(lead_elapsed);
+        let deep_rescue = deep_stock_loss(facts.stage, out, below);
+        if !deep_rescue
+            && (!guarder_wait || facts.player[0] - ledge[0] < 4.99
+                || (facts.player[1] - ledge[1]).abs() > 0.12)
+        {
+            return None;
+        }
+        let program = program(facts.stage, out, below)?;
         let launch = if program.jump_rows == 0 {
             add(start, [0.0, -7.581])
         } else {
@@ -228,15 +263,15 @@ impl ThunderReturn {
             }
             launch
         };
-        program
-            .can_finish(launch, ledge, facts.player)
-            .then_some(Self {
+        let clearance = program.guard_clearance(launch, ledge, facts.player)?;
+        (deep_rescue || clearance >= 0.0).then_some(Self {
                 program,
                 start,
                 ledge,
                 player: facts.player,
                 origin: beat.frame,
                 lead_elapsed,
+                deep_rescue,
                 last_pad: None,
             })
     }
@@ -263,11 +298,7 @@ impl ThunderReturn {
         self.age(frame).is_some_and(|age| age <= self.cast_frame())
     }
 
-    pub fn still_clear(&self, player: Point) -> bool {
-        player.into_iter().all(f32::is_finite) && distance_squared(self.player, player) <= 1.0
-    }
-
-    pub fn step(&mut self, beat: ThunderBeat) -> Option<Correction> {
+    pub fn step(&mut self, beat: ThunderBeat, guarder: Option<(Point, bool)>) -> Option<Correction> {
         if !beat.position.into_iter().all(f32::is_finite)
             || beat.position[1] <= self.ledge[1] - 125.0
         {
@@ -280,6 +311,13 @@ impl ThunderReturn {
         let cast = self.cast_frame();
         let correction = if age <= cast {
             let started_jump = age > LEAD;
+            let (player, waiting) = guarder?;
+            if !player.into_iter().all(f32::is_finite)
+                || (!self.deep_rescue && !started_jump
+                    && (!waiting || distance_squared(self.player, player) > 1.0))
+            {
+                return None;
+            }
             let (expected, status, jumps) = if started_jump {
                 (jump_position(self.start, age - LEAD - 1), JUMP_AERIAL, 0)
             } else {
@@ -308,9 +346,13 @@ impl ThunderReturn {
                         beat.position[1] - expected[1],
                     ],
                 );
-                self.program
-                    .can_finish(live_launch, self.ledge, self.player)
-                    .then(|| pad([0.0, 1.0], SPECIAL))?
+                if !self.program.can_finish(live_launch, self.ledge, player) {
+                    if !started_jump && !self.deep_rescue {
+                        return None;
+                    }
+                    self.program = self.program.farthest_loop(live_launch, self.ledge, player)?;
+                }
+                pad([0.0, 1.0], SPECIAL)
             } else if age == LEAD {
                 beat.can_jump.then(|| pad([1.0, 0.0], JUMP))?
             } else if age > LEAD {

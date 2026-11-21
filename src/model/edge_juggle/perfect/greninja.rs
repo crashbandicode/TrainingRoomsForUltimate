@@ -1,4 +1,5 @@
 //! Greninja's measured Hydro Pump recovery on the common stage ring.
+use super::recovery::Zone;
 use super::{niche::pad, region, Correction, Point, RouteFacts, JUMP, SPECIAL};
 
 #[path = "greninja_path.rs"]
@@ -59,14 +60,15 @@ fn at_waypoint(actual: [f64; 2], expected: [f64; 2]) -> bool {
 }
 
 impl HydroFlight {
-    pub fn start(facts: &RouteFacts<'_>, sample: HydroSample) -> Option<Self> {
+    pub fn start(facts: &RouteFacts<'_>, sample: HydroSample, guarder: Zone) -> Option<Self> {
         facts.crossing_band()?;
         let [near, far] = facts.ledges;
         let [vx, vy] = sample.velocity;
         let [x, y] = local(near, sample.position);
         let outside = near[0] - sample.position[0];
         let height = sample.position[1] - near[1];
-        if facts.fighter != KIND
+        if guarder == Zone::Hang
+            || facts.fighter != KIND
             || facts.position != sample.position
             || !region::has_common_underside(facts.ledges, facts.blast[3], facts.outline)
             || sample.status != FALL
@@ -235,7 +237,7 @@ mod tests {
     fn hydro_pump_offers_the_proven_left_start_on_each_live_ring() {
         let sample = fresh([-97.986, 34.0]);
         for stage in [(0, 0), (3, 0), (311, 0)] {
-            let flight = HydroFlight::start(&facts(stage, sample.position), sample)
+            let flight = HydroFlight::start(&facts(stage, sample.position), sample, Zone::Ledge)
                 .expect("the 18 out, 34 above release completed on all three stages");
             assert!((140..=180).contains(&flight.crossing_frames()));
         }
@@ -245,15 +247,28 @@ mod tests {
             } else {
                 sample
             };
-            assert!(HydroFlight::start(&facts(stage, sample.position), sample).is_none());
+            assert!(HydroFlight::start(&facts(stage, sample.position), sample, Zone::Ledge).is_none());
         }
+    }
+
+    #[test]
+    fn hydro_pump_declines_the_hanging_guarder_from_the_two_divergent_flights() {
+        let sample = fresh([-97.9856, 34.0]);
+        let mut route = facts((3, 0), sample.position);
+        route.player = [-81.699, -10.696];
+        assert!(HydroFlight::start(&route, sample, Zone::Hang).is_none());
+
+        route.player = [-79.03, 0.010259508];
+        assert!(HydroFlight::start(&route, sample, Zone::Ledge).is_some());
+        route.player = [-82.0, 23.0];
+        assert!(HydroFlight::start(&route, sample, Zone::OffLow).is_some());
     }
 
     #[test]
     fn hydro_pump_follows_the_native_jump_two_up_presses_and_burst_aim() {
         // 990288d6, fg2-g2-yoga-12, attempt 1, 18 out/34 above.
         let mut sample = fresh([-97.986, 34.0]);
-        let mut flight = HydroFlight::start(&facts((0, 0), sample.position), sample).unwrap();
+        let mut flight = HydroFlight::start(&facts((0, 0), sample.position), sample, Zone::Ledge).unwrap();
         assert_eq!(
             flight.step(sample).unwrap().stick,
             Some([0.0, -13.0 / 120.0])
@@ -311,10 +326,10 @@ mod tests {
                 ..sample
             },
         ] {
-            assert!(HydroFlight::start(&facts, sample).is_none());
+            assert!(HydroFlight::start(&facts, sample, Zone::Ledge).is_none());
         }
         facts.outline = &RING[1..];
-        assert!(HydroFlight::start(&facts, sample).is_none());
+        assert!(HydroFlight::start(&facts, sample, Zone::Ledge).is_none());
         assert!(wizard_offset((89, 0)).is_none());
     }
 }
