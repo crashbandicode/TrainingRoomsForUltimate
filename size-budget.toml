@@ -2269,3 +2269,11 @@ ceiling = 187778
 date = "2026-11-21"
 reason = "Sample the current world geometry and fighter anchors after the stock simulation. Render input-driven editor pictures from the current HUD tick. Exact normalized implementation count 187597 to 187778 (+181), with zero spare. The overlay-frame-sync release receipt measures NRO and aligned BSS against 3448686c."
 approved_by = "Operator through tr-primary-2 at 18:34Z added the shared overlay fix to the intermediate card under the existing measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187791
+date = "2026-11-21"
+reason = "Keep the committed BTT layout visible while a held run waits for its first phase-8 sample. Exact normalized delta +13 over 187778, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
+approved_by = "Operator through tr-primary-2 at 19:07Z requested the held editor correction under the measured LOC rule for memory-efficient changes."

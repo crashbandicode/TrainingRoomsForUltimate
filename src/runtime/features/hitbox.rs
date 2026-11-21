@@ -869,9 +869,11 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
     RUN.lock().run.see(active, || view());
-    let editor = btt::editor_pictures(active, || view());
     let board = scene.and_then(read_overlay_sample);
     let (eggs_orbs, targets_in_play) = board.as_ref().map_or(([None; 3], [None; btt::LOOKS]), |s| s.pictures);
+    // Resolve the editor handoff while this sample is held, so the first Running
+    // sample and its updated target pictures become visible together.
+    let editor = btt::editor_pictures(active, || view());
     let marks = editor.unwrap_or_else(|| if btt::running() { targets_in_play } else { [None; btt::LOOKS] });
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);

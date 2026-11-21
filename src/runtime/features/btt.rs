@@ -185,7 +185,7 @@ pub fn overlay_pictures() -> [crate::model::eggs::Look; LOOKS] {
     if !running() {
         return [None; LOOKS];
     }
-    BTT.try_lock().map_or([None; LOOKS], |mode| mode.simulation_pictures())
+    BTT.try_lock().map_or([None; LOOKS], |mut mode| mode.sample_simulation_pictures())
 }
 
 /// L+R+A or Change Stage initialised the fighters again (the reset hub, the game thread): a run starts over.

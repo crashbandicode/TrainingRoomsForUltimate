@@ -633,8 +633,8 @@ fn overlay_board_exposes_only_the_completed_simulation_frame() {
 
 #[test]
 fn paused_editor_polls_update_pictures_without_advancing_the_world_sample() {
-    use model::btt::{Btt, Pad};
-    use model::chords::logical::A;
+    use model::btt::{Btt, Pad, Phase};
+    use model::chords::logical::{A, X};
     use model::panes::EggPicture;
 
     let mut board = Board::new();
@@ -663,7 +663,27 @@ fn paused_editor_polls_update_pictures_without_advancing_the_world_sample() {
     assert!(placed.into_iter().flatten().any(|(point, look)| {
         look.picture == EggPicture::Whole && Some(point) == cursor(moved)
     }));
-    assert!(mode.simulation_pictures().iter().all(Option::is_none));
+    assert!(mode.sample_simulation_pictures().iter().all(Option::is_none));
+
+    let confirm = 1u16 << X;
+    assert!(mode.feed(Pad { held: confirm, pressed: confirm, ..Pad::default() }));
+    assert_eq!(mode.phase(), Phase::Ready);
+    assert!(!mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+    assert_eq!(mode.phase(), Phase::Running);
+    for _ in 0..3 {
+        let still_visible = mode.editor_pictures()
+            .expect("a held run keeps its committed layout visible before the first sample");
+        assert!(still_visible.into_iter().flatten().any(|(point, look)| {
+            look.picture == EggPicture::Whole && Some(point) == cursor(moved)
+        }));
+    }
     assert!(board.is_frame(7));
     assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [orb]);
+
+    assert_eq!(mode.pass_indexed(true, |_, _| true), 1);
+    assert_eq!(mode.phase(), Phase::Done);
+    let sample = mode.sample_simulation_pictures();
+    assert!(sample.into_iter().flatten().any(|(point, _)| Some(point) == cursor(moved)));
+    assert!(sample.into_iter().flatten().all(|(_, look)| look.picture != EggPicture::Whole));
+    assert!(mode.editor_pictures().is_none(), "the HUD uses the current simulation sample");
 }

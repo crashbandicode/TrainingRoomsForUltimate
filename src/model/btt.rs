@@ -323,6 +323,7 @@ pub struct Btt {
     n: usize,
     broken: u16,
     bursts: Bursts,
+    layout_pending: bool,
     cursor: [f32; 2],
     /// The clock in game frames, and the frames left of Done.
     frames: u32,
@@ -366,6 +367,7 @@ impl Btt {
         n: 0,
         broken: 0,
         bursts: [None; 2],
+        layout_pending: false,
         cursor: [0.0; 2],
         frames: 0,
         left: 0,
@@ -427,14 +429,26 @@ impl Btt {
         out
     }
 
-    /// Placement feedback follows controller polls, including the committed layout while it waits to start.
-    pub fn editor_pictures(&self) -> Option<[crate::model::eggs::Look; LOOKS]> {
-        matches!(self.phase, Phase::Placing | Phase::Ready).then(|| self.look())
+    /// Input can start a run before the game advances. Its committed layout remains
+    /// visible until the first active-target sample, when the world board takes over.
+    pub fn editor_pictures(&self) -> Option<[eggs::Look; LOOKS]> {
+        match self.phase {
+            Phase::Placing | Phase::Ready => Some(self.look()),
+            Phase::Running | Phase::Done if self.layout_pending => {
+                let mut pictures = [None; LOOKS];
+                for (slot, &at) in pictures.iter_mut().zip(self.layout()) {
+                    *slot = Some((at, EGG_WHOLE));
+                }
+                Some(pictures)
+            }
+            _ => None,
+        }
     }
 
     /// Active targets and their break animation advance with the simulation.
-    pub fn simulation_pictures(&self) -> [crate::model::eggs::Look; LOOKS] {
+    pub fn sample_simulation_pictures(&mut self) -> [eggs::Look; LOOKS] {
         if matches!(self.phase, Phase::Running | Phase::Done) {
+            self.layout_pending = false;
             self.look()
         } else {
             [None; LOOKS]
@@ -566,7 +580,7 @@ impl Btt {
                 let tilt = p.stick.iter().any(|v| v.abs() >= DEAD);
                 self.still |= !tilt;
                 if p.pressed != 0 || tilt && self.still {
-                    self.phase = Phase::Running;
+                    (self.phase, self.layout_pending) = (Phase::Running, true);
                 }
             }
             _ => {}
