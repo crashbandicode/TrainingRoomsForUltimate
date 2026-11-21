@@ -1360,6 +1360,34 @@ fn hitbox_board_never_blocks_a_game_hook() {
     }
 }
 
+/// The phase-8 sampler and the separate early Perfect measurement never acquire a blocking lock.
+#[test]
+fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let locks = static_locks(&runtime);
+    let store = locks.iter().position(|(file, name)| file == "features/hitbox.rs" && name == "STORE").unwrap();
+    let callbacks = [
+        ("hitbox::sample_overlay", "hitbox::overlay_process_end_hook", "hitbox::sample_fighter"),
+        ("hitbox::perfect_visualizer_height", "cpu::on_frame", "hitbox::perfect_visualizer_height"),
+    ];
+    for (entry, hook, seed) in callbacks {
+        let at = graph.find(entry);
+        let seed = graph.find(seed);
+        assert_eq!(at.len(), 1, "{entry}");
+        assert_eq!(seed.len(), 1, "{entry} seed");
+        let (_, scan) = scan_with_locks(&graph, locks.clone(), false);
+        assert!(scan.reach[at[0]].is_empty(), "{entry} can wait on {:?}", scan.reach[at[0]]);
+        let original = graph.funcs[seed[0]].body.clone();
+        graph.funcs[seed[0]].body.extend(callgraph::lex("STORE.lock();"));
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        assert!(scan.reach[at[0]].contains(&store), "{entry} missed the seeded lock");
+        let witness = format!("{} (hook {hook})", graph.funcs[seed[0]].key());
+        assert!(shared_locks(&ctx, &scan).game_waits[&store].contains(&witness), "{witness}");
+        graph.funcs[seed[0]].body = original;
+    }
+}
+
 /// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
 /// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
 #[test]

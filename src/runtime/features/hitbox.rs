@@ -1332,13 +1332,12 @@ unsafe fn perfect_visualizer_height(player: usize) -> Option<f32> {
     if facts.ids.shielding(status) {
         return None;
     }
-    let mut store = STORE.lock();
-    let wants = &mut store.wants;
+    let mut wants = [Sphere::NONE; hitbox::WANT_SCRATCH];
     let mut len = 0;
     if facts.draws_attacks() {
-        hitbox::want_hits(&mut GameAttacks(player), wants, &mut len, true);
+        hitbox::want_hits(&mut GameAttacks(player), &mut wants, &mut len, true);
     }
-    hitbox::want_hurt(&mut hitbox::GameHurt { accessor: player, load: mem_load }, wants, &mut len, true, hitbox::KIND_HURT);
+    hitbox::want_hurt(&mut hitbox::GameHurt { accessor: player, load: mem_load }, &mut wants, &mut len, true, hitbox::KIND_HURT);
     drawn_player_height(player, &wants[..len])
 }
 

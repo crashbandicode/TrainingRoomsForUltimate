@@ -121,12 +121,11 @@ pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_
 /// Report each hook's actual installer outcome in the shared table.
 pub fn reported_write(site: &Site, guard: GuardOutcome, visualizer: bool, spacing: bool) -> Written {
     let installed = if site.name == "spacing_hit_handler" { spacing } else { visualizer };
-    if installed && matches!(site.kind, SeamKind::Hook { .. }) {
-        Written::Far
-    } else if guard.usable() {
-        Written::Checked
-    } else {
-        Written::Skipped
+    match (installed, site.kind) {
+        (true, SeamKind::Hook { form: HookForm::Inline, .. }) => Written::Near,
+        (true, SeamKind::Hook { form: HookForm::Replace, .. }) => Written::Far,
+        _ if guard.usable() => Written::Checked,
+        _ => Written::Skipped,
     }
 }
 

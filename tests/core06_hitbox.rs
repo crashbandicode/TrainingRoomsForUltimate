@@ -417,11 +417,12 @@ fn core06_install_report_distinguishes_visualizer_and_spacing_writes() {
     let spacing = site("spacing_hit_handler");
     assert_eq!(written(phase_end, usable, true, false), Written::Far);
     assert_eq!(written(phase_end, usable, false, true), Written::Checked);
-    assert_eq!(written(spacing, usable, false, true), Written::Far);
+    assert_eq!(written(spacing, usable, false, true), Written::Near);
     assert_eq!(written(spacing, usable, true, false), Written::Checked);
     assert_eq!(written(spacing, GuardOutcome::Foreign { first_diff: 0 }, true, false), Written::Skipped);
-    for (visualizer, grader, expected) in [(true, true, 9), (true, false, 8), (false, true, 1), (false, false, 0)] {
-        assert_eq!(SITES.iter().filter(|site| written(site, usable, visualizer, grader) == Written::Far).count(), expected);
+    for (visualizer, grader, far, near) in [(true, true, 8, 1), (true, false, 8, 0), (false, true, 0, 1), (false, false, 0, 0)] {
+        let count = |kind| SITES.iter().filter(|site| written(site, usable, visualizer, grader) == kind).count();
+        assert_eq!((count(Written::Far), count(Written::Near)), (far, near));
     }
     let boot = include_str!("../src/runtime/boot.rs");
     assert!(boot.contains("let spacing_installed = input_display::set_grader_read("));
