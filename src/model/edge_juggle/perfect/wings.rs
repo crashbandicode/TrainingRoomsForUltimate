@@ -1,6 +1,12 @@
-//! Native finishing moves for Pit and Dark Pit's measured crossings.
+//! Native finishing moves for Pit, Dark Pit and Meta Knight's measured crossings.
 
 use super::{aerial_clear, fly_launch, niche::pad, Correction, Outline, Point, RouteFacts, JUMP, SPECIAL};
+
+#[derive(Clone, Copy)]
+enum Move {
+    PowerOfFlight,
+    ShuttleLoop,
+}
 
 #[derive(Clone, Copy)]
 pub struct Entry {
@@ -13,11 +19,12 @@ pub struct Entry {
 }
 
 struct Finisher {
+    movement: Move,
     started: u32,
 }
 
 impl Finisher {
-    fn start(far: Point, inward: f32, entry: Entry) -> Option<Self> {
+    fn start(movement: Move, far: Point, inward: f32, entry: Entry) -> Option<Self> {
         if !entry.can_special
             || entry.remaining != 0
             || !matches!(inward, -1.0 | 1.0)
@@ -27,19 +34,30 @@ impl Finisher {
         }
         let outside = (entry.position[0] - far[0]) * inward;
         let height = entry.position[1] - far[1];
-        // The fourteen start rows carry 8.9 times the entering horizontal speed.
-        let after_start = outside + FINISH_CARRY * entry.velocity[0] * inward;
-        (entry.facing == inward
-            && (5.0..=8.5).contains(&after_start)
-            && (-120.0..=-40.0).contains(&height))
-            .then_some(Self { started: entry.frame })
+        let reaches = match movement {
+            Move::PowerOfFlight => {
+                // The fourteen start rows carry 8.9 times the entering horizontal speed.
+                let after_start = outside + FLIGHT_CARRY * entry.velocity[0] * inward;
+                entry.facing == inward
+                    && (5.0..=8.5).contains(&after_start)
+                    && (-120.0..=-40.0).contains(&height)
+            }
+            Move::ShuttleLoop => {
+                // Only turn-jump-apex entries were measured at this height.
+                entry.facing == -inward
+                    && (0.0..=0.11).contains(&entry.velocity[1])
+                    && (-77.68..=-75.0).contains(&height)
+            }
+        };
+        reaches.then_some(Self { movement, started: entry.frame })
     }
 
     fn step(&self, frame: u32, status: i32) -> Option<Correction> {
         let age = frame.checked_sub(self.started)?;
-        match (age, status) {
-            (0, 0xd..=0xf) => Some(pad([0.0, 1.0], SPECIAL)),
-            (1..=67, 0x1de | 0x1e7) => Some(pad([0.0, 1.0], 0)),
+        match (self.movement, age, status) {
+            (_, 0, 0xd..=0xf) => Some(pad([0.0, 1.0], SPECIAL)),
+            (Move::PowerOfFlight, 1..=67, 0x1de | 0x1e7) => Some(pad([0.0, 1.0], 0)),
+            (Move::ShuttleLoop, 1..=63, 0x1de | 0x1e8) => Some(pad([0.0, 0.0], 0)),
             _ => None,
         }
     }
@@ -52,17 +70,50 @@ pub struct Sample {
     pub can_jump: bool,
 }
 
-const GRAVITY: f32 = 0.081;
-const FALL_SPEED: f32 = 1.48;
-const DRIFT_SPEED: f32 = 0.935;
-const BODY_HEIGHT: f32 = 16.5;
-const JUMP_X_SPEED: f32 = 0.81;
-const JUMP_GAP: u32 = 31;
-const JUMPS: u8 = 3;
-const NEAR_CATCH: [f32; 3] = [-18.0, -27.0, -9.0];
-const PIT_CROSS_RING: [u32; 11] = [0, 0x1fc0, 0xfc0, 0x7c0, 0x7c0, 0x3c0, 0x3c0, 0x1c0, 0xc0, 0xc0, 0x40];
-const FINISH_CARRY: f32 = 8.9;
+struct Profile {
+    movement: Move,
+    gravity: f32,
+    fall: f32,
+    speed: f32,
+    brake: f32,
+    head: f32,
+    jump_vx: f32,
+    gap: u32,
+    jumps: u8,
+    catch: [f32; 3],
+    ring: [u32; 11],
+}
 
+const META: Profile = Profile {
+    movement: Move::ShuttleLoop,
+    gravity: 0.11,
+    fall: 1.66,
+    speed: 1.04,
+    brake: 0.012,
+    head: 9.0,
+    jump_vx: 0.862,
+    gap: 26,
+    jumps: 5,
+    catch: [-17.0, -27.0, -8.0],
+    // 32 cells from metaknight-ring.txt. The retained cells all leave room
+    // for the backward fifth jump and the first Shuttle Loop catch.
+    ring: [0, 0xfc0, 0x7c0, 0x7c0, 0x3c0, 0x3c0, 0x1c0, 0xc0, 0xc0, 0x40, 0],
+};
+const PIT: Profile = Profile {
+    movement: Move::PowerOfFlight,
+    gravity: 0.081,
+    fall: 1.48,
+    speed: 0.935,
+    brake: 0.008,
+    head: 16.5,
+    jump_vx: 0.81,
+    gap: 31,
+    jumps: 3,
+    catch: [-18.0, -27.0, -9.0],
+    ring: [0, 0x1fc0, 0xfc0, 0x7c0, 0x7c0, 0x3c0, 0x3c0, 0x1c0, 0xc0, 0xc0, 0x40],
+};
+
+const FLIGHT_CARRY: f32 = 8.9;
 const HALF: f32 = 2.0;
 const DRIFT: f32 = 0.075;
 const JUMP_DRIFT: f32 = 0.062;
@@ -70,10 +121,12 @@ const JUMP_DRIFT: f32 = 0.062;
 enum Phase {
     Descend,
     Bounce,
+    Turned,
     Finish(Finisher),
 }
 
 pub struct WingsFlight {
+    profile: &'static Profile,
     fighter: i32,
     hull: Outline,
     near: Point,
@@ -82,21 +135,25 @@ pub struct WingsFlight {
     flat: f32,
     inward: f32,
     phase: Phase,
-    jump_frame: Option<u32>,
+    jump: Option<(u32, f32)>,
 }
 
 impl WingsFlight {
     pub fn start(facts: &RouteFacts<'_>, live: Sample) -> Option<Self> {
+        let profile = match facts.fighter {
+            0x1d => &META,
+            0x1e | 0x1f => &PIT,
+            _ => return None,
+        };
         let entry = live.entry;
-        if !matches!(facts.fighter, 0x1e | 0x1f)
-            || !super::is_crossing_stage(facts.stage)
+        if !super::is_crossing_stage(facts.stage)
             || live.status != 0xe
-            || entry.remaining != JUMPS
+            || entry.remaining != profile.jumps
             || !entry.can_special
             || !entry.position.into_iter().chain(entry.velocity).all(f32::is_finite)
             || entry.velocity[0] != 0.0
-            || !(-FALL_SPEED..=0.0).contains(&entry.velocity[1])
-            || !(facts.body_clearance > 0.0 && facts.body_clearance <= BODY_HEIGHT)
+            || !(-profile.fall..=0.0).contains(&entry.velocity[1])
+            || !(facts.body_clearance > 0.0 && facts.body_clearance <= profile.head)
         {
             return None;
         }
@@ -113,7 +170,7 @@ impl WingsFlight {
             || (right[1] - left[1]).abs() > 0.5
             || (flat - near[1] + 40.1).abs() > 1.0
             || (bottom - near[1] + 140.0).abs() > 1.0
-            || !super::region::contains(&PIT_CROSS_RING, outside, height)
+            || !super::region::contains(&profile.ring, outside, height)
         {
             return None;
         }
@@ -122,8 +179,8 @@ impl WingsFlight {
             hull.add(line);
         }
         Some(Self {
-            fighter: facts.fighter, hull, near, far, bottom, flat, inward,
-            phase: Phase::Descend, jump_frame: None,
+            profile, fighter: facts.fighter, hull, near, far, bottom, flat, inward,
+            phase: Phase::Descend, jump: None,
         })
     }
 
@@ -135,29 +192,29 @@ impl WingsFlight {
         330
     }
 
-    fn fall(vy: f32) -> f32 {
-        (vy - GRAVITY).max(-FALL_SPEED)
+    fn fall(&self, vy: f32) -> f32 {
+        (vy - self.profile.gravity).max(-self.profile.fall)
     }
 
     fn clear(&self, from: Point, to: Point) -> bool {
-        aerial_clear(self.hull.segments(), [from, to], self.bottom + 6.0, BODY_HEIGHT + 1.0, HALF)
+        aerial_clear(self.hull.segments(), [from, to], self.bottom + 6.0, self.profile.head + 1.0, HALF)
     }
 
     fn near_catch(&self, [x, y]: Point) -> bool {
-        let [inbound, low, top] = NEAR_CATCH;
+        let [inbound, low, top] = self.profile.catch;
         (inbound..=12.0).contains(&((x - self.near[0]) * self.inward))
             && (low..=top).contains(&(y - self.near[1]))
     }
 
     fn descent_target(&self) -> f32 {
-        self.flat - BODY_HEIGHT - 2.0
+        self.flat - self.profile.head - 2.0
     }
 
     fn can_glide(&self, mut pos: Point, [vx, mut vy]: Point) -> bool {
         let mut forward = vx * self.inward;
         for _ in 0..160 {
-            forward = (forward + DRIFT).min(DRIFT_SPEED);
-            vy = Self::fall(vy);
+            forward = (forward + DRIFT).min(self.profile.speed);
+            vy = self.fall(vy);
             let next = [pos[0] + self.inward * forward, pos[1] + vy];
             if self.near_catch(next) || !self.clear(pos, next) {
                 return false;
@@ -185,34 +242,38 @@ impl WingsFlight {
                 }
             }
         }
-        if roof.is_finite() { roof - BODY_HEIGHT - 2.0 } else { flat }
+        if roof.is_finite() { roof - self.profile.head - 2.0 } else { flat }
     }
 
-    fn jump_clears(&self, entry: Entry, launch: f32) -> bool {
+    fn jump_clears(&self, entry: Entry, launch: f32, steer: f32) -> bool {
         let [x, y] = entry.position;
         let [vx, vy] = entry.velocity;
-        let steer = self.inward;
-        let carry_x = (vx + steer * JUMP_DRIFT).clamp(-DRIFT_SPEED, DRIFT_SPEED);
-        let mut pos = [x + carry_x, y + Self::fall(vy)];
+        let carry_x = (vx + steer * JUMP_DRIFT).clamp(-self.profile.speed, self.profile.speed);
+        let mut pos = [x + carry_x, y + self.fall(vy)];
         if !self.clear(entry.position, pos) {
             return false;
         }
-        let mut rise = launch - GRAVITY;
-        let mut drift = steer * JUMP_X_SPEED;
+        let mut rise = launch - self.profile.gravity;
+        let mut drift = steer * self.profile.jump_vx;
         while rise > 0.0 {
             let next = [pos[0] + drift, pos[1] + rise];
-            if !self.clear(pos, next) || next[1] > self.ceiling(next[0]) {
+            if !self.clear(pos, next) || (steer == self.inward && next[1] > self.ceiling(next[0])) {
                 return false;
             }
             pos = next;
-            rise -= GRAVITY;
-            drift = (drift + steer * JUMP_DRIFT).clamp(-DRIFT_SPEED, DRIFT_SPEED);
+            rise -= self.profile.gravity;
+            // The inward bounce keeps steering; the turn releases after the launch.
+            drift = if steer == self.inward {
+                (drift + steer * JUMP_DRIFT).clamp(-self.profile.speed, self.profile.speed)
+            } else {
+                drift.signum() * (drift.abs() - self.profile.brake).max(0.0)
+            };
         }
         true
     }
 
     fn start_finish(&mut self, live: Sample) -> Option<Correction> {
-        let flight = Finisher::start(self.far, self.inward, live.entry)?;
+        let flight = Finisher::start(self.profile.movement, self.far, self.inward, live.entry)?;
         let edit = flight.step(live.entry.frame, live.status)?;
         self.phase = Phase::Finish(flight);
         Some(edit)
@@ -225,14 +286,14 @@ impl WingsFlight {
         }
         if !matches!(live.status, 0xd..=0xf)
             || !entry.position.into_iter().chain(entry.velocity).all(f32::is_finite)
-            || entry.remaining > JUMPS
+            || entry.remaining > self.profile.jumps
             || !self.clear(entry.position, entry.position)
         {
             return None;
         }
-        if let Some(frame) = self.jump_frame {
+        if let Some((frame, steer)) = self.jump {
             if entry.frame.saturating_sub(frame) < 2 {
-                return Some(pad([self.inward, 0.0], JUMP));
+                return Some(pad([steer, 0.0], JUMP));
             }
         }
         let [x, y] = entry.position;
@@ -241,24 +302,48 @@ impl WingsFlight {
             if self.near_catch(entry.position) {
                 return None;
             }
-            if y + Self::fall(vy) > self.descent_target() {
+            if y + self.fall(vy) > self.descent_target() {
                 let steer = if self.can_glide(entry.position, entry.velocity) { self.inward } else { 0.0 };
                 return Some(pad([steer, 0.0], 0));
             }
             self.phase = Phase::Bounce;
         }
         let outside = (x - self.far[0]) * self.inward;
-        if outside + FINISH_CARRY * vx * self.inward >= 5.0 {
+        let power = matches!(self.profile.movement, Move::PowerOfFlight);
+        if power && outside + FLIGHT_CARRY * vx * self.inward >= 5.0 {
             return self.start_finish(live);
         }
+        if matches!(self.phase, Phase::Turned) {
+            return if vy <= self.profile.gravity {
+                self.start_finish(live)
+            } else {
+                Some(pad([0.0, 0.0], 0))
+            };
+        }
         let launch = (live.can_jump && vy <= 0.0
-            && self.jump_frame.is_none_or(|frame| entry.frame.saturating_sub(frame) >= JUMP_GAP))
+            && self.jump.is_none_or(|(frame, _)| entry.frame.saturating_sub(frame) >= self.profile.gap))
             .then(|| fly_launch(self.fighter, entry.remaining))
             .flatten();
-        let bounce = outside < -4.0
-            && launch.is_some_and(|launch| self.jump_clears(entry, launch));
+        if !power && outside >= 6.0 {
+            if let Some(launch) = launch.filter(|_| entry.remaining == 1) {
+                let mut speed = launch - self.profile.gravity;
+                let mut rise = 0.0;
+                while speed > 0.0 {
+                    rise += speed;
+                    speed -= self.profile.gravity;
+                }
+                if y + rise <= self.far[1] - 73.5 && self.jump_clears(entry, launch, -self.inward) {
+                    self.phase = Phase::Turned;
+                    self.jump = Some((entry.frame, -self.inward));
+                    return Some(pad([-self.inward, 0.0], JUMP));
+                }
+            }
+            return Some(pad([0.0, 0.0], 0));
+        }
+        let bounce = (power || entry.remaining > 1) && outside < -4.0
+            && launch.is_some_and(|launch| self.jump_clears(entry, launch, self.inward));
         if bounce {
-            self.jump_frame = Some(entry.frame);
+            self.jump = Some((entry.frame, self.inward));
         }
         Some(pad([self.inward, 0.0], if bounce { JUMP } else { 0 }))
     }
@@ -293,9 +378,9 @@ lib_unit_tests! {
                 ledges: [LEFT, RIGHT],
                 blast: [-230.0, 230.0, 185.0, -140.0],
                 outline: &RING,
-                body_clearance: 16.5,
+                body_clearance: if fighter == 0x1d { 9.0 } else { 16.5 },
                 ledge_distance: 15.0,
-                fall_budget: 1.48,
+                fall_budget: if fighter == 0x1d { 1.66 } else { 1.48 },
                 reach: [90.0, 105.0],
             }
         }
@@ -316,8 +401,8 @@ lib_unit_tests! {
         }
 
         #[test]
-        fn pit_and_dark_pit_start_in_their_baked_cells_with_the_measured_jump_reserve() {
-            for (fighter, jumps) in [(0x1e, 3), (0x1f, 3)] {
+        fn wing_routes_start_in_their_baked_cells_with_the_measured_jump_reserve() {
+            for (fighter, jumps) in [(0x1d, 5), (0x1e, 3), (0x1f, 3)] {
                 for stage in [(3, 0), (0, 0)] {
                     for [x, y] in [[LEFT[0] - 30.0, 6.0], [RIGHT[0] + 26.0, 34.0]] {
                         let mut live = falling(x, y, jumps);
@@ -337,6 +422,7 @@ lib_unit_tests! {
             }
         }
 
+
         #[test]
         fn pit_and_dark_pit_admit_both_waiting_room_confirm_starts_but_never_a_stage_form() {
             for fighter in [0x1e, 0x1f] {
@@ -348,11 +434,30 @@ lib_unit_tests! {
             }
         }
 
+        #[test]
+        fn meta_knight_uses_his_measured_region_and_backward_turn_before_shuttle_loop() {
+            for stage in [(3, 0), (0, 0), (311, 0)] {
+                for side in [-1.0, 1.0] {
+                    let lip = if side < 0.0 { LEFT } else { RIGHT };
+                    let live = falling(lip[0] + side * 30.0, 6.0, 5);
+                    let route = facts(0x1d, live.entry.position, stage);
+                    assert!(WingsFlight::start(&route, live).is_some(),
+                        "normal stage {stage:?}, side {side}");
+                    let mut spent = live;
+                    spent.entry.remaining = 4;
+                    assert!(WingsFlight::start(&route, spent).is_none());
+                    let wrong_height = falling(lip[0] + side * 30.0, -2.0, 5);
+                    assert!(WingsFlight::start(&route, wrong_height).is_none());
+                }
+            }
+        }
+
         fn run_to_finish(fighter: i32, mut live: Sample) -> (u32, Entry) {
             let route = facts(fighter, live.entry.position, (3, 0));
             let mut flight = WingsFlight::start(&route, live).unwrap();
             let start = live.entry;
-                let mut pressed_last = false;
+            let profile = flight.profile;
+            let mut pressed_last = false;
             let mut jump_facing = None;
             for frame in 0..400 {
                 live.entry.frame = frame;
@@ -367,8 +472,8 @@ lib_unit_tests! {
                 let [steer, _] = pad.stick.unwrap();
                 let press = pad.press & JUMP != 0;
                 if press && pressed_last {
-                    live.entry.velocity = [steer * JUMP_X_SPEED,
-                        fly_launch(fighter, live.entry.remaining).unwrap() - GRAVITY];
+                    live.entry.velocity = [steer * profile.jump_vx,
+                        fly_launch(fighter, live.entry.remaining).unwrap() - profile.gravity];
                     live.entry.remaining -= 1;
                     live.status = 0xd;
                     jump_facing = Some(steer);
@@ -380,11 +485,11 @@ lib_unit_tests! {
                     let [vx, vy] = &mut live.entry.velocity;
                     let accel = if press || *vy > 0.0 { JUMP_DRIFT } else { DRIFT };
                     *vx = if steer == 0.0 {
-                        vx.signum() * (vx.abs() - 0.008).max(0.0)
+                        vx.signum() * (vx.abs() - profile.brake).max(0.0)
                     } else {
-                        (*vx + steer * accel).clamp(-DRIFT_SPEED, DRIFT_SPEED)
+                        (*vx + steer * accel).clamp(-profile.speed, profile.speed)
                     };
-                    *vy = (*vy - GRAVITY).max(-FALL_SPEED);
+                    *vy = (*vy - profile.gravity).max(-profile.fall);
                     pressed_last = press;
                 }
                 for axis in 0..2 {
@@ -396,8 +501,8 @@ lib_unit_tests! {
 
         #[test]
         fn wing_regions_reach_the_measured_finisher_window() {
-                for fighter in [0x1e, 0x1f] {
-                for (row, mask) in PIT_CROSS_RING.into_iter().enumerate() {
+            for (fighter, profile) in [(0x1d, &META), (0x1e, &PIT)] {
+                for (row, mask) in profile.ring.into_iter().enumerate() {
                     for col in 0..30 {
                         if mask & (1 << col) == 0 {
                             continue;
@@ -405,8 +510,8 @@ lib_unit_tests! {
                         let out = 4.0 * col as f32 + 2.0;
                         let y = 38.0 - 4.0 * row as f32;
                         for [dx, dy] in [[0.0, 0.0], [-1.95, 0.0], [1.95, 0.0], [0.0, -1.95], [0.0, 1.95]] {
-                            for speed in [0.0, -FALL_SPEED * 0.5, -FALL_SPEED] {
-                                let mut live = falling(LEFT[0] - out + dx, y + dy, JUMPS);
+                            for speed in [0.0, -profile.fall * 0.5, -profile.fall] {
+                                let mut live = falling(LEFT[0] - out + dx, y + dy, profile.jumps);
                                 live.entry.velocity[1] = speed;
                                 let (frame, entry) = run_to_finish(fighter, live);
                                 assert!(frame < 330 && entry.remaining == 0);
@@ -414,7 +519,7 @@ lib_unit_tests! {
                         }
                     }
                 }
-                let mirrored = falling(RIGHT[0] + 30.0, 6.0, JUMPS);
+                let mirrored = falling(RIGHT[0] + 30.0, 6.0, profile.jumps);
                 run_to_finish(fighter, mirrored);
             }
         }
@@ -431,7 +536,7 @@ lib_unit_tests! {
                 can_special: true,
                 frame: 237,
             };
-            let flight = Finisher::start(far, 1.0, entry).unwrap();
+            let flight = Finisher::start(Move::PowerOfFlight, far, 1.0, entry).unwrap();
             assert_eq!(flight.step(237, 0xf), Some(pad([0.0, 1.0], SPECIAL)));
             assert_eq!(flight.step(238, 0x1de), Some(pad([0.0, 1.0], 0)));
             assert_eq!(flight.step(252, 0x1e7), Some(pad([0.0, 1.0], 0)));
@@ -442,12 +547,39 @@ lib_unit_tests! {
                 facing: -1.0,
                 ..entry
             };
-            assert!(Finisher::start([-far[0], far[1]], -1.0, mirrored).is_some());
+            assert!(Finisher::start(Move::PowerOfFlight, [-far[0], far[1]], -1.0, mirrored).is_some());
             let fast = Entry { velocity: [1.3, -1.48], ..entry };
             let late = Entry { position: [entry.position[0], -124.0], ..entry };
-            assert!(Finisher::start(far, 1.0, fast).is_none());
-            assert!(Finisher::start(far, 1.0, late).is_none());
+            assert!(Finisher::start(Move::PowerOfFlight, far, 1.0, fast).is_none());
+            assert!(Finisher::start(Move::PowerOfFlight, far, 1.0, late).is_none());
         }
 
+        #[test]
+        fn meta_knight_finishes_shuttle_loop_only_after_the_turn_jump_apex() {
+            // Battlefield reference metaknight-bf-in3-1, departure seq 191007.
+            let far = [79.989, 0.0];
+            let entry = Entry {
+                position: [80.90212, -76.14011],
+                velocity: [-0.694, 0.1000],
+                remaining: 0,
+                facing: -1.0,
+                can_special: true,
+                frame: 242,
+            };
+            let flight = Finisher::start(Move::ShuttleLoop, far, 1.0, entry).unwrap();
+            assert_eq!(flight.step(242, 0xd), Some(pad([0.0, 1.0], SPECIAL)));
+            assert_eq!(flight.step(243, 0x1de), Some(pad([0.0, 0.0], 0)));
+            assert_eq!(flight.step(249, 0x1e8), Some(pad([0.0, 0.0], 0)));
+            assert!(flight.step(256, 0x75).is_none());
+            for invalid in [
+                Entry { facing: 1.0, ..entry },
+                Entry { remaining: 1, ..entry },
+                Entry { velocity: [-0.7, 0.23], ..entry },
+                Entry { can_special: false, ..entry },
+                Entry { position: [80.0, -81.0], ..entry },
+            ] {
+                assert!(Finisher::start(Move::ShuttleLoop, far, 1.0, invalid).is_none());
+            }
+        }
     }
 }

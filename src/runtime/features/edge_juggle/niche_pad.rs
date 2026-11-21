@@ -148,8 +148,8 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
-        if matches!(fighter, 0x1e | 0x1f) {
-            let row = niche::measured_row(if fighter == 0x1e { 19 } else { 20 }, niche::CANDIDATE_ROWS)?;
+        if (0x1d..=0x1f).contains(&fighter) {
+            let row = niche::measured_row((fighter - 0x1d + 18) as u8, niche::CANDIDATE_ROWS)?;
             let flight = WingsFlight::start(facts, wings::Sample {
                 entry: wings::Entry {
                     frame: 0,
@@ -766,7 +766,6 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x8, Down, 0x1e7)
         | (0x10, Down, 0x1e9)
         | (0x10, Travel, 0x1e7)
-        | (0x1d, Side, 0x1e3)
         | (0x1e | 0x1f, Travel, 0x1e7)
         | (0x22, Hover, 0x1f4)
         | (0x27, Side, 0x1e5 | 0x1ee)
@@ -803,7 +802,6 @@ unsafe fn niche_motion_phase(cpu: usize, fighter: i32, movement: Move, status: i
         | (0x10, Down, 0x1ea | 0x1eb)
         | (0x10, Travel, 0x1e8)
         | (0x1c, Rise, 0x1e1 | 0x1e2)
-        | (0x1d, Side, 0x1e4)
         | (0x1e | 0x1f, Travel, 0x1e8)
         | (0x22, Hover, 0x1f5)
         | (0x2c, Travel, 0x1e7)

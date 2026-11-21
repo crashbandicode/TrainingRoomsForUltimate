@@ -581,7 +581,7 @@ impl Wizard {
             (Drill::GuardEdge, Some(0xd | 0xe)) if perfect::is_crossing_stage(stage_key) => {
                 Some([40.0, 20.0])
             }
-            (Drill::GuardEdge, Some(0x1e | 0x1f)) if perfect::is_crossing_stage(stage_key) => {
+            (Drill::GuardEdge, Some(0x1d..=0x1f)) if perfect::is_crossing_stage(stage_key) => {
                 Some([30.0, 6.0])
             }
             (Drill::GuardEdge, Some(0x10)) if perfect::is_crossing_stage(stage_key) => {
@@ -998,12 +998,12 @@ mod tests {
     }
 
     #[test]
-    fn pit_wizard_defaults_to_the_measured_upper_release_on_each_normal_crossing_stage() {
+    fn wing_wizard_defaults_to_the_measured_upper_release_on_each_normal_crossing_stage() {
         let stage = Stage::new(
             [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
             [[-80.0, 0.0], [80.0, 0.0]],
         ).unwrap();
-        for fighter in [0x1e, 0x1f] {
+        for fighter in [0x1d, 0x1e, 0x1f] {
             for key in [(0, 0), (3, 0), (311, 0), (0, 1)] {
                 let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
                 assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
