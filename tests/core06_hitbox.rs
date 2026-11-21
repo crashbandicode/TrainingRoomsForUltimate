@@ -2003,6 +2003,40 @@ fn core06_fighter_sets_and_keys() {
 }
 
 #[test]
+fn fighter_init_on_a_worker_retires_only_its_cached_set() {
+    let retirements = hitbox::SetRetirements::new();
+    let mut table = hitbox::SetTable::new();
+    for key in [0x1000, 0x2000] {
+        let slot = table.index_for(key);
+        retirements.bind(slot, key);
+        assert!(table.sets[slot].push_grab(hitbox::Sphere::NONE, None));
+    }
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            retirements.retire(0x1000);
+            retirements.retire(0x1000);
+        });
+    });
+    for (i, set) in table.sets.iter_mut().enumerate() {
+        if retirements.take(i) {
+            set.forget();
+        }
+    }
+    let reset = table.find(0x1000).unwrap();
+    let other = table.find(0x2000).unwrap();
+    assert!(table.sets[reset].is_empty());
+    assert!(!table.sets[other].is_empty());
+    assert!(!retirements.take(reset));
+    assert!(table.sets[reset].push_grab(hitbox::Sphere::NONE, None));
+
+    // Eviction drops the retired cache. A late init for the old key cannot retire its replacement.
+    retirements.retire(0x1000);
+    retirements.bind(reset, 0x3000);
+    retirements.retire(0x1000);
+    assert!(!retirements.take(reset));
+}
+
+#[test]
 fn core06_native_emitter_limits_are_distinct_from_pool_capacity() {
     let Some(main) = common::owned_main("core06_native_emitter_limits_are_distinct_from_pool_capacity") else { return };
     let w = |offset: usize| word_at(&main, offset);

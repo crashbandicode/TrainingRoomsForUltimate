@@ -943,6 +943,52 @@ impl HandleSet {
     }
 }
 
+/// Each cached fighter slot publishes its accessor so native init can retire it without taking the cache lock.
+/// Fighter accessors are pointer-aligned, leaving the low bit available for the retirement flag.
+pub struct SetRetirements([core::sync::atomic::AtomicUsize; FIGHTER_SETS]);
+
+impl SetRetirements {
+    const RETIRED: usize = 1;
+
+    pub const fn new() -> Self {
+        Self([const { core::sync::atomic::AtomicUsize::new(0) }; FIGHTER_SETS])
+    }
+
+    /// Publish a replacement slot, whose prior records the cache already forgot.
+    pub fn bind(&self, slot: usize, accessor: usize) {
+        use core::sync::atomic::Ordering::Release;
+        debug_assert!(accessor != 0 && accessor & Self::RETIRED == 0);
+        self.0[slot].store(accessor, Release);
+    }
+
+    /// Mark the exact slot that still belongs to this accessor. Repeated init before a read coalesces.
+    pub fn retire(&self, accessor: usize) {
+        use core::sync::atomic::Ordering::{AcqRel, Acquire};
+        for slot in &self.0 {
+            if slot.load(Acquire) == accessor {
+                // A failed exchange means the cache replaced the slot or another init already retired it.
+                let _ = slot.compare_exchange(accessor, accessor | Self::RETIRED, AcqRel, Acquire);
+            }
+        }
+    }
+
+    /// The cache owns slot binding and consumption. A retirement arriving after this call stays pending.
+    pub fn take(&self, slot: usize) -> bool {
+        use core::sync::atomic::Ordering::{AcqRel, Acquire};
+        let slot = &self.0[slot];
+        if slot.load(Acquire) & Self::RETIRED == 0 {
+            return false;
+        }
+        slot.fetch_and(!Self::RETIRED, AcqRel) & Self::RETIRED != 0
+    }
+}
+
+impl Default for SetRetirements {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The fighters' sets, by accessor address; a new fighter takes a free or the least recently used set (forgotten, no call).
 #[derive(Clone, Copy, Debug)]
 pub struct SetTable {

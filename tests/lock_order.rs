@@ -1370,6 +1370,7 @@ fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
     let callbacks = [
         ("hitbox::sample_overlay", "hitbox::overlay_process_end_hook", "hitbox::sample_fighter"),
         ("hitbox::perfect_visualizer_height", "cpu::on_frame", "hitbox::perfect_visualizer_height"),
+        ("hitbox::forget_fighter", "reset_hub::on_init", "hitbox::forget_fighter"),
     ];
     for (entry, hook, seed) in callbacks {
         let at = graph.find(entry);

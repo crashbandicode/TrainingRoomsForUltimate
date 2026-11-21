@@ -23,7 +23,7 @@
 //! The diag build additionally runs the reader once per
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
-//! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
+//! every entry point counts under a `HookScope`. Fighter initialization can run on a stock worker.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
@@ -35,7 +35,7 @@ use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, Sphere, StatusIds};
+use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetRetirements, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::SiteReport;
@@ -666,6 +666,27 @@ struct Store {
     census: stats::CensusBook,
 }
 
+static RETIREMENTS: SetRetirements = SetRetirements::new();
+
+impl Store {
+    fn slot_for(&mut self, accessor: usize) -> usize {
+        let new = self.table.find(accessor).is_none();
+        let i = self.table.index_for(accessor);
+        if new {
+            RETIREMENTS.bind(i, accessor);
+        }
+        i
+    }
+
+    fn forget_retired(&mut self) {
+        for (i, set) in self.table.sets.iter_mut().enumerate() {
+            if RETIREMENTS.take(i) {
+                set.forget();
+            }
+        }
+    }
+}
+
 static STORE: Mutex<Store> = Mutex::new(Store {
     table: SetTable::new(),
     seen_epoch: [0; hitbox::FIGHTER_SETS],
@@ -1136,11 +1157,7 @@ pub fn forget_fighter(fighter: usize) {
     if accessor == 0 {
         return;
     }
-    let mut store = STORE.lock();
-    if let Some(i) = store.table.find(accessor) {
-        store.table.sets[i].forget();
-    }
-    HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+    RETIREMENTS.retire(accessor);
     // SAFETY: this accessor belongs to the fighter the game just initialized.
     let id = unsafe { (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id };
     clear_board(accessor, Some(id));
@@ -1374,6 +1391,7 @@ unsafe fn sample_overlay() {
     let Some(mut sample) = BOARD.try_lock() else { return };
     let Some(mut store) = STORE.try_lock() else { return };
     let Some(mut articles) = ARTICLES.try_lock() else { return };
+    store.forget_retired();
     let OverlaySample { board, scene: sampled_scene, pictures, anchors } = &mut *sample;
     board.begin_frame(sample_id);
     *sampled_scene = scene::current();
@@ -1438,7 +1456,7 @@ unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, 
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let facts = FrameFacts { visualizes: true, enabled, status, ids };
-    let i = store.table.index_for(accessor);
+    let i = store.slot_for(accessor);
     let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
     let mut counts = Counts::default();
     if store.seen_epoch[i] != epoch {
@@ -1531,7 +1549,8 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let (mut store, mut articles);
     let set = if fighter {
         store = STORE.lock();
-        let i = store.table.index_for(accessor);
+        store.forget_retired();
+        let i = store.slot_for(accessor);
         &mut store.table.sets[i]
     } else {
         let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
@@ -1621,6 +1640,7 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     let shielding = status_ids().shielding(natives::status_kind(accessor));
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
         let mut store = STORE.lock();
+        store.forget_retired();
         if let Some(i) = store.table.find(accessor) {
             clear_board(accessor, None);
             let c = store.table.sets[i].clear(&mut OrbSink { status: i32::MIN });
