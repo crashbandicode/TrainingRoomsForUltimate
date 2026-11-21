@@ -104,6 +104,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
 static PLAY_PLAYER: AtomicBool = AtomicBool::new(false);
 static PLAY_CPU: AtomicBool = AtomicBool::new(false);
+static RESET_CPU: AtomicBool = AtomicBool::new(false);
 static MASH: AtomicBool = AtomicBool::new(false);
 /// SAV-002: a save-state load stops both roles' runs (save-states.md: "Load only warps … it stops one that is playing").
 static LOAD: AtomicBool = AtomicBool::new(false);
@@ -335,6 +336,7 @@ pub fn pending() -> bool {
     RECORD_EDGE.load(Ordering::Acquire) != 0
         || PLAY_PLAYER.load(Ordering::Acquire)
         || PLAY_CPU.load(Ordering::Acquire)
+        || RESET_CPU.load(Ordering::Acquire)
         || MASH.load(Ordering::Acquire)
         || LOAD.load(Ordering::Acquire)
         || menu_pending()
@@ -355,12 +357,15 @@ fn playing() -> bool {
 
 /// The machine still steps the role, or its hook still has live frames to play.
 fn role_playing(role: Role) -> bool {
+    if role == Role::Cpu && RESET_CPU.load(Ordering::Acquire) {
+        return false;
+    }
     run_flag(role).load(Ordering::Acquire) || !cut_flag(role).load(Ordering::Acquire) && !role_frames(role).is_empty()
 }
 
 /// A queued Play, running Recording-page CPU macro, or its still-live buffered tail.
 pub fn cpu_playback_blocks_drill() -> bool {
-    PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu)
+    !RESET_CPU.load(Ordering::Acquire) && (PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu))
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -471,6 +476,19 @@ pub fn playback_controller(frame: InputFrame) -> Inject {
     inject_values(to_mapped(frame), 1)
 }
 
+/// Resolve the Recording page's contribution to the CPU controller.
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn cpu_controller(take_frame: impl FnOnce() -> Option<InputFrame>) -> Option<Inject> {
+    if RESET_CPU.load(Ordering::Acquire) {
+        return None;
+    }
+    // Sample ownership before the pop: the worker can enqueue the tail and end the run concurrently.
+    let running = RUN_CPU.load(Ordering::Acquire);
+    take_frame().map(playback_controller).or_else(|| {
+        (running && !CUT_CPU.load(Ordering::Acquire)).then_some(Inject::NEUTRAL)
+    })
+}
+
 /// The menu worker posts one effect. The recording worker applies it. A `None` does not clear a pending effect.
 #[cfg(test)]
 pub fn post_effect(effect: Effect) {
@@ -523,6 +541,15 @@ pub fn note_mash() {
     cut(Role::Cpu);
 }
 
+#[cfg(any(test, target_os = "switch"))]
+pub fn clear_playback(cause: crate::model::input_delay::Clear) {
+    // SaveStateLoad also runs this hub during a macro's own start warp.
+    if cause == crate::model::input_delay::Clear::TrainingReset {
+        PLAY_CPU.store(false, Ordering::Release);
+        RESET_CPU.store(true, Ordering::Release);
+    }
+}
+
 /// A save-state load was accepted. A Play's own warp (`WARP_HOLD`) is the start of that playback, not a stop.
 /// Both runs stop at once, as for a mash (`note_mash`); the tick still drives the machine (`LOAD`).
 pub fn note_load() {
@@ -539,7 +566,8 @@ pub fn note_load() {
 /// are owed its playback runs between them too, so a configured Mash asks it to stop (Parry ignores that) instead of
 /// queueing an action on top of the replay (Eden accept-8, 26c93533). Game hooks read this using atomics.
 pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
-    let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0;
+    let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0
+        && !RESET_CPU.load(Ordering::Acquire);
     PlaybackState { running: recorder.running || role_playing(Role::Cpu) || owed, ..recorder }
 }
 
@@ -710,6 +738,23 @@ pub fn service_at(
     let edge = RECORD_EDGE.swap(0, Ordering::AcqRel);
     let mut play_player = PLAY_PLAYER.swap(false, Ordering::AcqRel);
     let mut play_cpu = PLAY_CPU.swap(false, Ordering::AcqRel);
+    if RESET_CPU.load(Ordering::Acquire) {
+        play_cpu = false;
+        // Keep the hook gated until the worker has retired the run and everything that could resume it.
+        if let Some(machine) = lock(&MACHINE).as_mut() {
+            drive_mash(machine, Role::Cpu, true);
+        }
+        RUN_CPU.store(false, Ordering::Release);
+        PARRY_PASSES.store(0, Ordering::Release);
+        clear_cut(Role::Cpu);
+        let mut held = lock(&HELD);
+        if *held == Some(Role::Cpu) {
+            *held = None;
+            lock(&ANSWER).take();
+            lock(&LAST_ASK).take();
+        }
+        RESET_CPU.store(false, Ordering::Release);
+    }
     let mash = MASH.swap(false, Ordering::AcqRel);
     let load = LOAD.swap(false, Ordering::AcqRel);
     if edge == 1 {
@@ -1890,7 +1935,9 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
 fn take_frame(role: Role) -> Option<InputFrame> {
-    if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire) {
+    if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire)
+        || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
+    {
         return None;
     }
     role_frames(role).pop().map(unpack)
@@ -1949,6 +1996,7 @@ fn reset_host() {
     RECORD_EDGE.store(0, Ordering::Release);
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
+    RESET_CPU.store(false, Ordering::Release);
     MASH.store(false, Ordering::Release);
     PARRY.store(false, Ordering::Release);
     PARRY_PASSES.store(0, Ordering::Release);
@@ -2509,17 +2557,73 @@ mod tests {
         on_chords(false, false, true);
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
-        assert!(take_cpu_frame().is_none(), "frame 0 must not be fed before the restore");
+        let stock_ai = Inject { buttons: 0x8004, stick_x: 1.0, clamped_x: 1.0, ..Inject::NEUTRAL };
+        assert_eq!(
+            cpu_controller(take_cpu_frame).unwrap_or(stock_ai),
+            Inject::NEUTRAL,
+            "restore pending: the CPU sees neutral, not its stock jump"
+        );
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        assert!(take_cpu_frame().is_none(), "the run holds while the restore is pending");
+        assert_eq!(cpu_controller(take_cpu_frame), Some(Inject::NEUTRAL));
 
+        clear_playback(crate::model::input_delay::Clear::SaveStateLoad);
         warp_landed();
+        assert_eq!(
+            cpu_controller(take_cpu_frame).unwrap_or(stock_ai),
+            Inject::NEUTRAL,
+            "restore committed: neutral lasts until the worker queues frame zero"
+        );
         let mut fed = Vec::new();
         for _ in 0..jab.len() {
             let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-            fed.push(take_cpu_frame().expect("a frame after the restore").buttons);
+            fed.push(cpu_controller(take_cpu_frame).expect("a frame after the restore").buttons);
         }
         assert_eq!(fed, jab, "the whole file, from its first press, reaches the CPU");
+        assert_eq!(cpu_controller(take_cpu_frame).unwrap_or(stock_ai), stock_ai, "stock control returns after the tail");
+    }
+
+    #[test]
+    fn training_reset_releases_cpu_with_an_empty_queue() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("reset-cpu-empty");
+        active_plain_macro(&root, Role::Cpu, 4);
+        on_chords(false, false, true);
+        WARP_HOLD.store(true, Ordering::Release);
+        tick(&root);
+        assert!(CPU_FRAMES.is_empty());
+        assert_eq!(cpu_controller(take_cpu_frame), Some(Inject::NEUTRAL));
+
+        clear_playback(crate::model::input_delay::Clear::TrainingReset);
+        let stock_ai = Inject { buttons: 0x8004, stick_x: 1.0, clamped_x: 1.0, ..Inject::NEUTRAL };
+        assert_eq!(cpu_controller(take_cpu_frame).unwrap_or(stock_ai), stock_ai);
+        warp_landed();
+        tick(&root);
+        assert_eq!(cpu_controller(take_cpu_frame), None, "pending frame zero stays canceled");
+    }
+
+    #[test]
+    fn training_reset_discards_the_buffered_cpu_tail_and_pending_play() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("reset-cpu-tail");
+        active_plain_macro(&root, Role::Cpu, 4);
+        on_chords(false, false, true);
+        tick(&root);
+        assert_eq!(cpu_controller(take_cpu_frame).unwrap().buttons, 1);
+        assert!(!CPU_FRAMES.is_empty());
+
+        on_chords(false, false, true);
+        clear_playback(crate::model::input_delay::Clear::TrainingReset);
+        assert_eq!(cpu_controller(take_cpu_frame), None, "no buffered frame reaches the next think");
+        tick(&root);
+        assert!(CPU_FRAMES.is_empty());
+        tick(&root);
+        assert_eq!(cpu_controller(take_cpu_frame), None, "the old Play cannot restart after reset");
+
+        on_chords(false, false, true);
+        tick(&root);
+        assert_eq!(cpu_controller(take_cpu_frame).unwrap().buttons, 1, "a new Play starts normally");
     }
 
     /// Parry practice (DESIGN rev 2 §2.3): each Loop pass is one play-once run warped to the macro's start save, and
