@@ -27,6 +27,7 @@ use perfect::pyra::{self, Beat as PyraBeat, SwapReturn};
 use perfect::rob::{self, BurnerFlight, BurnerState};
 use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::snake::{self, CypherFlight, CypherSample};
+use perfect::sonic::{self, SonicBeat, SonicFlight};
 use perfect::sora_flight::{self, SoraBeat, SoraFlight};
 use perfect::steve::{self, ElytraBeat, ElytraFlight};
 use perfect::wings::{self, WingsFlight};
@@ -55,6 +56,7 @@ enum MeasuredFlight {
     Kart(KartFlight),
     Link(LinkFlight),
     Cypher(CypherFlight),
+    SpinDash(SonicFlight),
     Cape(CapeStall),
     Aura(AuraFlight),
     Hydro(HydroFlight),
@@ -315,6 +317,26 @@ impl NicheGuide {
                 fighter,
                 ledge: flight.exit_point(),
                 measured: Some(MeasuredFlight::Sheik(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == sonic::KIND {
+            let row = niche::measured_row(sonic::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = SonicFlight::start(facts, inputs.speed, SonicBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_spindash: niche_start_enabled(cpu, Move::Side, true),
+                can_jump: niche_start_enabled(cpu, Move::Jump, true),
+                can_spring: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::SpinDash(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -598,6 +620,7 @@ impl NicheGuide {
             // 72 to the blast, 88 to Spin Attack, and up to 37 to catch; allow for the neutral wait.
             Some(MeasuredFlight::Link(_)) => Some(235),
             Some(MeasuredFlight::Cypher(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::SpinDash(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Aura(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Hydro(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
@@ -800,6 +823,19 @@ impl NicheGuide {
                 jumps: if free { remaining_jumps(cpu)? } else { 0 },
                 can_jump: flight.jump_frame(frame) && niche_start_enabled(cpu, Move::Jump, true),
                 can_rise: flight.rise_frame(frame) && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
+        if let Some(MeasuredFlight::SpinDash(flight)) = &mut self.measured {
+            return flight.step(SonicBeat {
+                frame,
+                status,
+                position: [x, y],
+                facing: natives::lr(cpu),
+                jumps: remaining_jumps(cpu)?,
+                can_spindash: flight.side_press(frame) && niche_start_enabled(cpu, Move::Side, true),
+                can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
+                can_spring: flight.spring_press(frame) && reach.is_some()
                     && niche_start_enabled(cpu, Move::Rise, available),
             });
         }

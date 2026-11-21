@@ -49,6 +49,8 @@ pub mod sheik;
 mod sora;
 #[path = "perfect/sora_flight.rs"]
 pub mod sora_flight;
+#[path = "perfect/sonic.rs"]
+pub mod sonic;
 #[path = "perfect/steve.rs"]
 pub mod steve;
 #[path = "perfect/wings.rs"]

@@ -533,7 +533,7 @@ fn niche_bayonetta_twists_once_per_jump() {
 
 #[test]
 fn niche_sonic_spring_jump_route_and_pad_sequence() {
-    verify(0x29, "cross", 23, &[Move::Side, Move::Hold, Move::Rise]);
+    verify(0x29, "cross", 23, &[Move::Side, Move::Jump, Move::Rise]);
 }
 
 #[test]
