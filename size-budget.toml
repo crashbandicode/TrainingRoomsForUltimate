@@ -2261,3 +2261,11 @@ ceiling = 187597
 date = "2026-11-21"
 reason = "merge_budget for the independently reviewed 1 Frame input-mask correction c07abb77 (including 2bd5445d) on ca42bf71. Exact normalized implementation delta +31 over 187566; zero spare. Paired integrated baseline NRO 5132288 B and BSS 1720320 B. The release-first exact gate and its retained ELF/NRO receipt remeasure both values for this merge."
 approved_by = "Operator 2026-11-21 17:09Z approved the integrated 8192 B NRO increase and authorized this follow-up. Primary tr-primary-2 directs a measured entry under the operator's rule that LOC may grow when memory stays efficient and the changes are not wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187682
+date = "2026-11-21"
+reason = "Sample and publish all world-space overlay geometry from the stock simulation's phase-8 return. Exact normalized implementation count 187597 to 187682 (+85), with zero spare. The overlay-frame-sync release receipt measures NRO and aligned BSS against 3448686c."
+approved_by = "Operator through tr-primary-2 at 18:34Z added the shared overlay fix to the intermediate card under the existing measured LOC rule for memory-efficient changes."

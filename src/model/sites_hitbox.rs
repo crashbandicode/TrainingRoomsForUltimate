@@ -3,8 +3,8 @@
 //! read from the owned 13.0.5 ELF by `tools/gen_hitbox_sites.py` and `tests/core06_hitbox.rs` re-checks every row against
 //! it. Offsets are from the start of `.text`.
 //!
-//! Eight hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound`, rc.14 wind-articles, the four
-//! `AREA_WIND_2ND*` commands, and the optional spacing hit handler), fourteen called natives of the
+//! Nine hooks (the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound`, rc.14 wind-articles, the four
+//! `AREA_WIND_2ND*` commands, the post-update overlay sampler, and the optional spacing hit handler), fourteen called natives of the
 //! attack, damage, effect and motion modules, the Lua state's accessor getter, two relied-on windows (the Lua stack reads the plugin
 //! repeats from the game's own command code), three relied-on windows of HitModule (the hurtbox tables, decision HB1), three of the
 //! DamageModule's damage record (spots-3 and spacing grading), five optional hit-pair windows, two shape-radius windows, and,
@@ -107,12 +107,15 @@ pub const AREA_WIND_OFFSET: usize = 0x22a_98c0;
 pub const AREA_WIND_ARG10_OFFSET: usize = 0x22a_9960;
 pub const AREA_WIND_RAD_OFFSET: usize = 0x22a_8e90;
 pub const AREA_WIND_RAD_ARG9_OFFSET: usize = 0x22a_8f30;
-/// All hook rows in this table.
-pub const HOOK_ROWS: [&str; 8] =
-    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler"];
+/// End of the native battle-object simulation phases, after the model callbacks.
+pub const OVERLAY_PROCESS_END_OFFSET: usize = 0x3a_de50;
+
+/// Hook rows in installation order, with the optional grader last.
+pub const HOOK_ROWS: [&str; 9] =
+    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "overlay_process_end", "spacing_hit_handler"];
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
-pub static SITES: [Site; 46] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
+pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));
 
 pub fn grader_usable(usable: impl Fn(&Site) -> bool) -> bool {
     GRADER_ROWS.iter().all(|(name, _)| SITES.iter().find(|site| site.name == *name).is_some_and(&usable))

@@ -490,6 +490,7 @@ fn core06_site_guards() {
         (sites_hitbox::AREA_WIND_ARG10_OFFSET, "hitbox_area_wind_arg10"),
         (sites_hitbox::AREA_WIND_RAD_OFFSET, "hitbox_area_wind_rad"),
         (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, "hitbox_area_wind_rad_arg9"),
+        (sites_hitbox::OVERLAY_PROCESS_END_OFFSET, "overlay_process_end"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
     }

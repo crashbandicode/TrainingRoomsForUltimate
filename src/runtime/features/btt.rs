@@ -169,16 +169,20 @@ pub unsafe fn poll(controller: usize, sample: Sample, keys: Option<(bool, bool)>
     hide
 }
 
-/// The layout tick (`hitbox::draw_orbs`): the pictures of the targets, their break animations and the cursor (Eggs-ercise's
-/// panes). The camera's map (`view`, read only while the mode is on) is kept for the placing box.
-pub fn look(active: bool, view: impl FnOnce() -> Option<View>) -> [Option<([f32; 2], EggLook)>; LOOKS] {
-    if !active || !running() {
+/// The layout tick supplies the camera at the original cadence for the placing box.
+pub fn see(active: bool, view: impl FnOnce() -> Option<View>) {
+    if active && running() {
+        let seen = view();
+        BTT.lock().see(seen);
+    }
+}
+
+/// Sample the targets, break animations, and the placement cursor on the game thread.
+pub fn overlay_pictures() -> [Option<([f32; 2], EggLook)>; LOOKS] {
+    if !running() {
         return [None; LOOKS];
     }
-    let seen = view();
-    let mut mode = BTT.lock();
-    mode.see(seen);
-    mode.look()
+    BTT.try_lock().map_or([None; LOOKS], |mode| mode.look())
 }
 
 /// L+R+A or Change Stage initialised the fighters again (the reset hub, the game thread): a run starts over.

@@ -667,7 +667,7 @@ impl Run {
     /// The draw's tick on the practice's layout (`active`): a run that wants eggs takes the camera `look` reads (nothing
     /// is read otherwise); the pictures to draw, each at its spot of the fighters' plane: the target, then the break
     /// animations.
-    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Look; 3] {
+    pub fn see(&mut self, active: bool, look: impl FnOnce() -> Option<View>) {
         if active && self.running() {
             let seen = look();
             if self.still < SETTLE {
@@ -675,6 +675,15 @@ impl Run {
             }
             self.view = seen;
         }
+    }
+
+    #[cfg(test)]
+    pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Look; 3] {
+        self.see(active, look);
+        self.pictures()
+    }
+
+    pub fn pictures(&self) -> [Look; 3] {
         let [a, b] = self.bursts.map(|b| b.map(burst));
         let whole = self.egg_at().filter(|_| self.rows[3] == DISC);
         [whole.map(|at| (at, EGG_WHOLE)), a, b]

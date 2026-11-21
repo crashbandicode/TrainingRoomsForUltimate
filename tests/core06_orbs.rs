@@ -610,3 +610,23 @@ fn visible_frame_native_reads_are_lazy() {
     assert!(cpu.contains("body.object_id = (body.away && BASE.load"), "the CPU's object ID read requires an admitted hide");
     assert!(runtime.contains("owner: hide.owner(|| article_owner(id, key))"), "the live caller must use the tested conditional owner read");
 }
+
+#[test]
+fn overlay_board_exposes_only_the_completed_simulation_frame() {
+    let fighter = orbs::orb_of(&sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 0.0, 2.0), [1.0, 0.0, 0.0]);
+    let article = orbs::orb_of(&sphere(hitbox::sphere_key(hitbox::KIND_HIT, 0, 0), 0.0, 2.0), [3.0, 0.0, 0.0]);
+    let mut board = Board::new();
+    assert!(!board.is_frame(0));
+
+    board.begin_frame(1);
+    board.publish(10, [fighter].into_iter());
+    board.publish(20, [article].into_iter());
+    assert!(board.is_frame(1));
+    assert!(!board.is_frame(2), "a skipped publication must not reuse the old pose");
+
+    board.begin_frame(2);
+    let current = Orb { centre: [2.0, 0.0, 0.0], tail: [2.0, 0.0, 0.0], ..fighter };
+    board.publish(10, [current].into_iter());
+    assert!(board.is_frame(2));
+    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [current], "the removed object has no pane in frame 2");
+}

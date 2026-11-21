@@ -106,10 +106,6 @@ impl DrawHide {
         Self(read.map(|(generation, words)| Some(HiddenFrame { generation, words })).ok_or(()))
     }
 
-    pub fn is_visible(&self) -> bool {
-        matches!(self.0, Ok(None))
-    }
-
     pub fn generation(&self) -> Option<u32> {
         self.0.as_ref().ok()?.as_ref().map(|frame| frame.generation)
     }
@@ -130,6 +126,7 @@ pub struct Board {
     lens: [usize; FIGHTER_SETS],
     orbs: [[Orb; BOARD_ORBS]; FIGHTER_SETS],
     clock: u32,
+    frame: Option<u32>,
 }
 
 impl Default for Board {
@@ -140,7 +137,19 @@ impl Default for Board {
 
 impl Board {
     pub const fn new() -> Board {
-        Board { keys: [0; FIGHTER_SETS], article_ids: [None; FIGHTER_SETS], owners: [None; FIGHTER_SETS], article_generation: None, stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0 }
+        Board { keys: [0; FIGHTER_SETS], article_ids: [None; FIGHTER_SETS], owners: [None; FIGHTER_SETS], article_generation: None, stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0, frame: None }
+    }
+
+    /// Start a complete sample. Each producer must republish its visible geometry.
+    pub fn begin_frame(&mut self, frame: u32) {
+        self.lens.fill(0);
+        self.article_generation = None;
+        self.frame = Some(frame);
+    }
+
+    /// A failed sample may leave the previous board in memory.
+    pub fn is_frame(&self, frame: u32) -> bool {
+        self.frame == Some(frame)
     }
 
     /// Replace `key`'s orbs (at most `BOARD_ORBS`; a new key takes a free or the stalest slot). A capsule's second end
