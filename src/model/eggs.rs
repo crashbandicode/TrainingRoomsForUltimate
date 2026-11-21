@@ -18,7 +18,7 @@ pub const IN_VIEW: u8 = 0;
 pub const WHOLE: u8 = 1;
 /// Hide CPU's row (CPU page): with it On the CPU cannot be the target.
 pub const ROW_HIDE_CPU: &str = "hide_cpu";
-/// V2.6: `Hide` (the first option) hides the CPU while a practice game runs (`Run::running`); Hide CPU's rule reads it.
+/// V2.6: `Hide` (the first option) hides the CPU while a practice game is armed; Hide CPU's rule reads it.
 pub const ROW_PRACTICE_CPU: &str = "practice_cpu";
 /// The standing notice (D5).
 pub const NOTICE_ID: u8 = 0x2E;
@@ -182,7 +182,7 @@ pub fn choice(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
 }
 
 /// V2.6: whether a practice game asks for the CPU to be hidden this frame (`hide_cpu::hide`, the `request` of
-/// `cpu::hide::step`). `practice_hide`: CPU during a game says Hide; `running`: an Eggs-ercise run is on (`Run::running`);
+/// `cpu::hide::step`). `practice_hide`: CPU during a game says Hide; `running`: an Eggs-ercise run is armed;
 /// `cpu_target`: the CPU is its target (`Run::cpu_target`); `btt`: Break the Targets runs. An Eggs-ercise run hides the CPU
 /// unless the CPU is its target: the target wins, and then the CPU's body, its tag and its panel all stay, because all three
 /// follow the one step this request feeds (`cpu::hide::step`, `tag` and `panels`). Break the Targets hides it whatever the
@@ -367,15 +367,18 @@ impl Run {
         [0, 0, 10, 20, 0][usize::from(self.rows[0].min(FREE))]
     }
 
-    /// V2.6: a practice game is running, from the menu close that starts a mode until Off or the scene is left (Time!, the
-    /// end notice and the wait for a restart count).
-    pub fn running(&self) -> bool {
+    /// A started mode remains armed through the result so L+R+A can restart it and Stop can disarm it.
+    pub fn armed(&self) -> bool {
         self.rows[0] != OFF
+    }
+
+    pub fn running(&self) -> bool {
+        self.armed() && !self.ended()
     }
 
     /// A run has the CPU as its target.
     pub fn cpu_target(&self) -> bool {
-        self.rows[3] == CPU && self.running()
+        self.rows[3] == CPU && self.armed()
     }
 
     fn ended(&self) -> bool {
@@ -389,7 +392,7 @@ impl Run {
     /// is read otherwise); the pictures to draw, each at its spot of the fighters' plane: the target, then the break
     /// animations.
     pub fn look(&mut self, active: bool, look: impl FnOnce() -> Option<View>) -> [Look; 3] {
-        if active && self.rows[0] != OFF && !self.ended() {
+        if active && self.running() {
             let seen = look();
             if self.still < SETTLE {
                 self.still = if seen.is_some() && seen == self.view { self.still + 1 } else { 0 };
@@ -701,6 +704,23 @@ mod standing_notice_tests {
 
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
     const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH], None);
+
+    #[test]
+    fn expired_time_is_finished_and_reset_restarts_the_round() {
+        let mut run = Run::IDLE;
+        let rows = [TIMED, ANY, FAST, DISC, IN_VIEW];
+        run.start(rows, 7);
+        run.look(true, || Some(VIEW));
+        assert!(run.running());
+        run.frames = 1;
+        assert_eq!(run.step(true, 0.0, &[], false, 0), Some(END_FRAMES));
+        assert!(run.egg_at().is_none());
+        assert!(!run.running(), "a completed round must leave the Running state");
+
+        run.reset(11);
+        assert_eq!((run.frames, run.running()), (RUN_FRAMES, true));
+        assert_eq!(run.plan(rows, None, 0, || TRAINING), Plan::Read);
+    }
 
     #[test]
     fn in_view_uses_the_current_moving_projection_after_floor_read() {

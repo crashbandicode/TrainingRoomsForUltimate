@@ -164,6 +164,7 @@ fn env() -> Env {
         custom_stages: crate::runtime::lobby::custom_stages::published()
             .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),
         running: crate::runtime::features::practice::running(),
+        eggs_finished: crate::runtime::features::hitbox::eggs_finished(),
         ..Env::default()
     }
 }
@@ -388,7 +389,9 @@ fn publish_bridge_state(s: &mut Session) {
             editor_sel_key: &editor_sel_key,
             keyboard,
             game: active.map(|g| g.title()),
-            game_running: crate::runtime::features::practice::running().is_some(),
+            game_running: crate::runtime::features::practice::running().is_some_and(|game| {
+                game != crate::model::practice_games::Game::Eggs || !crate::runtime::features::hitbox::eggs_finished()
+            }),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),

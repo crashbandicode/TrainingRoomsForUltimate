@@ -2172,3 +2172,11 @@ ceiling = 172701
 date = "2026-11-20"
 reason = "Merge Guard the Edge/Juggler CPU picker + Hero Zoom drill (rc15/drill-picker 14d4cf9a) onto main 53c8fa13. Branch gate measured 172620 = its 171833 base + 787; main ceiling 171914 + 787 = 172701. Combined gate on the merge re-measures."
 approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: measured delta only; operator-ordered feature (CPU picker + Hero Zoom), REVIEW PASS review-games-astra 14:44 EST."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 172736
+date = "2026-11-20"
+reason = "Eggsercise reports a timed-out round as Finished and keeps the game selected for Stop or L+R+A restart. Raises the 172701 ceiling by the approved 35 normalized lines."
+approved_by = "Primary e7ee8f1c (tr-primary-2) approved +35, citing the operator at 23:48Z: \"as long as memory stays efficient I don't mind as much about loc as long as we aren't wasteful\"."

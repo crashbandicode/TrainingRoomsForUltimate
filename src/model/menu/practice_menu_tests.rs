@@ -185,6 +185,25 @@ fn stop_ends_the_game_and_the_menu_stays_open() {
 }
 
 #[test]
+fn finished_eggs_can_be_stopped_from_the_menu() {
+    let mut m = Menu::new(
+        Settings::factory(),
+        Env { running: Some(Game::Eggs), eggs_finished: true, ..Env::default() },
+    );
+    on_list(&mut m, Game::Eggs);
+    let list = frame(&m);
+    assert_eq!(list.rows[usize::from(list.focus.unwrap())].value.string_lossy(), "Finished  >");
+    m.press(Button::A);
+    let closed_round = frame(&m);
+    assert_eq!(closed_round.rows[0].label.string_lossy(), "Stop");
+    assert_eq!(closed_round.rows[0].value.string_lossy(), "Finished  >");
+    assert_eq!(closed_round.help[0].string_lossy(), "Eggs-ercise finished. A stops it.");
+    m.press(Button::A);
+    assert!(m.take_stop());
+    assert_eq!(frame(&m).rows[0].label.string_lossy(), "Start");
+}
+
+#[test]
 fn running_shows_in_green_on_the_list_and_stop_on_the_sub_screen() {
     let mut m = running(Game::Eggs);
     on_list(&mut m, Game::Eggs);
