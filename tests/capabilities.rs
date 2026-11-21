@@ -114,6 +114,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The own orbs' layout-tick draw (decision HB-OWN-ORBS).
     Boundary { function: "hitbox::draw_orbs", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
+    // The compact strip's fade reads the overlay's fighter anchors on the layout tick: none until boot installs the overlay.
+    Boundary { function: "hitbox::fighter_screen_anchors", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // SPEC-input-06: the frame strip's frame, from the CPU core's player-entry frame: dormant until boot enables the display.

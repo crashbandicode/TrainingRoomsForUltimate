@@ -10,7 +10,7 @@ The phase-1 caller queues fighter identities. At the phase-8 return, one sample 
 
 The layout tick reads the live input-driven editor state and passes it through the same projection and pane writer. BTT placement shows cursor movement and edited targets before the next simulation step. After X confirms and A starts the run, the committed layout remains visible until phase 8 supplies the first active-target sample. Holding the board during the HUD read makes that handoff use one snapshot. The egg-zone wizard, Tech placement and Guard the Edge placement likewise read live editor state. BTT targets in play and moving Eggs-ercise discs come from the phase-8 sample. Egg and BTT camera feedback, practice gameplay, the Perfect recovery height probe, input and speed keep their original callbacks.
 
-The same phase-8 publication carries fighter anchors independently of the legend setting. The compact strip's `fighter_screen_anchors(layout_name)` reader yields a fighter ID, its sampled top joint and that point projected into the current HUD canvas. It requires a matching active scene, a current snapshot and a valid render projection.
+The same phase-8 publication carries fighter anchors independently of the legend setting. The compact strip's `fighter_screen_anchors(layout_name)` reader yields a fighter ID, its sampled top joint and that point projected into the current HUD canvas. It requires a matching active scene, a current snapshot and a valid render projection. The reader is a readiness boundary: it returns no anchors until boot has installed the overlay unit, so a refused orb row turns the strip's fade off, leaves the strip drawn and reaches no overlay native from the UI pass.
 
 ## Overlay store ownership
 
@@ -37,6 +37,14 @@ The layout worker at `main+0x375efa8` calls `draw_orbs` and `fighter_screen_anch
 
 Stock `main+0x135ca00` invokes the registered phase callbacks synchronously through `main+0x137b4d0` or `main+0x137b5a0`. Exact RED observes phase 1, HitModule phase 4 and phase 8 on guest thread 80, with layout on guest thread 99. Historical records also put the observed ATTACK calls and two wind variants on thread 80. The stock task roots `main+0x353d514` and `main+0x37ccad8` can dispatch both wind scripts and worker init. They do not identify a unique thread. CATCH, rebound and the wind exports also have independent indirect entry from stock fighter modules. The archive contains 3,466 ATTACK entries and 20 stacks for the arg10 box and circle wind variants, all on the observed simulation thread. It contains no off-main observation for CATCH, rebound, plain-box wind or arg9-circle wind. The complete scheduling ownership of those callers remains unproven. The primary's 21:06Z ruling accepts this evidence for the intermediate build's inherited callbacks. Before rc.15 ships, those commands need a lossless handoff from thread-owned state so their hooks can complete without waiting on a plugin lock.
 
+## Board storage
+
+`BOARD` starts as the all-zero pattern, written as a zeroed initializer, so the linker keeps it in `.bss`. In `f6c81d24` the empty scene and the sixteen empty practice pictures were encoded with nonzero bytes. That moved the whole 45,800-byte object into initialized data and grew the NRO file by about 45 KB. The zero pattern is a valid sample that no reader accepts: `read_overlay_sample` is the only read path and requires the board's first completed frame, and the board's own zero pattern is `Board::new()`.
+
+## Documented deviation: hook placement
+
+The phase-8 hook is a replace hook at the entry of `BattleObjectManager::process_end` (`main+0x3ade50`). The playbook asks for a hook after the prologue, or a call of the game function. The sample has to run after the stock task has returned, so the wrapper calls the stock task first, with its argument unchanged. The site has its exact 64-byte guard, and the dated card scan found no other plugin at it. tr-primary-2 kept this placement for the intermediate card on 2026-11-21 (21:47Z). Whether rc.15 moves the hook after the prologue is open.
+
 ## Requirement trace
 
 | Operator clause | Design | Test |
@@ -46,6 +54,8 @@ Stock `main+0x135ca00` invokes the registered phase callbacks synchronously thro
 | Keep editor input visible while the simulation is held | The same layout writer draws live cursor and target placement, the committed layout until the first running sample, and the active targets afterward | `paused_editor_polls_update_pictures_without_advancing_the_world_sample` |
 | Check the new native site and avoid blocking the game hook | Exact 64-byte guard and bounded acquisition | `core06_rows_match_the_owned_elf`, `overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data` |
 | Keep worker init nonblocking and preserve the current fighter publication | Stamp by native fighter slot before cache or pose reads and revalidate in the HUD | `delayed_worker_init_cannot_erase_a_fresh_overlay_sample`, `retirement_during_a_busy_board_invalidates_only_the_old_fighter`, `retirement_overlapping_first_bind_cannot_carry_an_old_grab_into_the_new_lifetime`, `core06_fighter_generations_use_the_stock_object_pool`, `overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data` |
+| Make the capability model correct: if the overlay row that owns orb_world_to_screen is poisoned or refused, the UI-pass path that calls it must be disabled through the existing capability mechanism | `fighter_screen_anchors` is a readiness boundary owned by the overlay unit | `a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_one_calls_it`, `cross_needs_match_the_call_graph`, `every_boundary_checks_its_gate_first` |
+| Make BOARD zero-initializable again | A zeroed initializer; every read requires the board's first frame | `the_overlay_board_starts_as_zero_bytes_that_no_reader_accepts` |
 
 ## Exact runtime evidence
 

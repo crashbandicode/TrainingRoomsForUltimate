@@ -777,3 +777,21 @@ fn overlay_worker_retirement_reaches_both_hud_readers_without_a_board_write() {
     assert!(body("fn fighter_screen_anchors(").contains("FIGHTER_GENERATIONS.is_current(life)"));
     assert!(body("fn draw_orbs(").contains("b.draw_slots(&hide, &FIGHTER_GENERATIONS)"));
 }
+
+/// The overlay board is all zero bytes, so it stays in `.bss`, and that pattern is never drawn: the one read path
+/// requires the board's first completed frame.
+#[test]
+fn the_overlay_board_starts_as_zero_bytes_that_no_reader_accepts() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    assert!(src.contains("static BOARD: Mutex<OverlaySample> = Mutex::new(unsafe { core::mem::zeroed() });"));
+    let body = |name: &str| src.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    assert!(body("fn read_overlay_sample(").contains("sample.board.is_frame(SAMPLE.load(Ordering::Acquire))"));
+    assert_eq!(src.matches("BOARD.try_lock()").count(), 3, "clear_board, read_overlay_sample and sample_overlay");
+    assert_eq!(src.matches("BOARD.lock()").count(), 0);
+    // SAFETY: zero is a valid value of every field of the board.
+    let zero: Board = unsafe { std::mem::zeroed() };
+    let generations = hitbox::FighterGenerations::new();
+    assert!(!zero.is_frame(0) && !Board::new().is_frame(0));
+    let slots = zero.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+    assert_eq!(zero.draw_slots_in_order(slots).count(), 0);
+}

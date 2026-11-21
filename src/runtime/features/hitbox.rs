@@ -697,12 +697,9 @@ struct OverlaySample {
     anchors: [Option<WorldAnchor>; hitbox::FIGHTER_SETS],
 }
 
-static BOARD: Mutex<OverlaySample> = Mutex::new(OverlaySample {
-    board: Board::new(),
-    scene: None,
-    pictures: ([None; 3], [None; btt::LOOKS]),
-    anchors: [None; hitbox::FIGHTER_SETS],
-});
+// All zero bytes, which keeps the board in `.bss`. No reader accepts a sample before the board's first frame.
+// SAFETY: zero is a valid value of every field; the compiler rejects this initializer otherwise.
+static BOARD: Mutex<OverlaySample> = Mutex::new(unsafe { core::mem::zeroed() });
 static SAMPLE: AtomicU32 = AtomicU32::new(0);
 static FIGHTERS: Mutex<[Option<(u32, usize)>; hitbox::FIGHTER_SETS]> =
     Mutex::new([None; hitbox::FIGHTER_SETS]);
@@ -839,11 +836,15 @@ pub struct FighterScreenAnchor {
     pub canvas: [f32; 2],
 }
 
-/// Read the same scene/pose as the orb renderer, even with its legend toggled off.
+/// Read the same scene/pose as the orb renderer, even with its legend toggled off. A readiness boundary: no anchors
+/// before boot installed the overlay.
 ///
 /// # Safety
 /// Call on the HUD layout thread while the named layout is current.
 pub unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScreenAnchor>; hitbox::FIGHTER_SETS]> {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return None;
+    }
     let scene = overlay_layout_scene(name).ok()??;
     let anchors = read_overlay_sample(scene)?.anchors;
     let half = hud_half()?;
