@@ -79,8 +79,8 @@ fn eggs_rows_and_help() {
     let g = usize::from(rows[0].group);
     assert_eq!((GROUPS[g].title, GROUPS[g].page, GROUPS[g].advanced, GROUPS[g].sub), ("Eggs-ercise", Page::FightersStages, false, true));
     assert_eq!(GROUPS[usize::from(crate::model::menu::table::GAMES)].title, "Practice games");
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Hit streak", "CPU during a game"]));
-    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_AREA, "eggsercise_hit_streak", ROW_PRACTICE_CPU]), "the seven rows follow Start, in order");
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).map(|r| r.title).eq(["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Off-stage zone…", "Moving paths", "Target expiry", "Hit streak", "CPU during a game"]));
+    assert!(ROWS.iter().filter(|r| usize::from(r.group) == g).skip(1).map(|r| r.id).eq([ROW, ROW_BREAK, ROW_TARGET, ROW_SPEED, ROW_AREA, "eggsercise_zone", "eggsercise_paths", "eggsercise_expiry", "eggsercise_hit_streak", ROW_PRACTICE_CPU]), "the settings follow Start, in order");
     let values = |r: &crate::model::menu::table::Row| match r.control {
         Control::Dropdown(v) => v.to_vec(),
         _ => panic!("{} is not a dropdown", r.title),
@@ -104,10 +104,10 @@ fn eggs_rows_and_help() {
         rows[3].help_lines(),
         ("How fast targets fly. Normal is Melee's Eggs-ercise speed.", "Slow: half speed. Fast: one and a half times as fast.")
     );
-    assert_eq!((rows[4].title, values(rows[4])), ("Spawn area", vec!["In view", "Whole stage"]));
+    assert!(matches!(rows[4].control, Control::MultiSelect(["In view", "Whole stage", "Off stage"])));
     assert_eq!(
         rows[4].help_lines(),
-        ("In view: targets appear on screen, with your camera.", "Whole stage: any stage floor, even off screen. From the next Start.")
+        ("Each checked area has the same chance on each spawn.", "In view is used when none are checked. Applies at the next Start.")
     );
     assert_eq!((rows[5].title, values(rows[5])), ("Hit streak", vec!["Off", "On"]));
     // V2.6's second row: Hide CPU (B-2's) reads it with `eggs_running`.
@@ -120,7 +120,7 @@ fn eggs_rows_and_help() {
         let (a, b) = r.help_lines();
         assert!(a.chars().count() <= 67 && b.chars().count() <= 67, "{}", r.title);
     }
-    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_AREA, &[1, 0]), ("eggsercise_hit_streak", &[1, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
+    for (id, default) in [(ROW, &[1, 0, 0, 0, 0][..]), (ROW_BREAK, &[1, 0, 0]), (ROW_TARGET, &[1, 0]), (ROW_SPEED, &[1, 0, 0]), (ROW_AREA, &[1, 0, 0]), ("eggsercise_hit_streak", &[1, 0]), (ROW_PRACTICE_CPU, &[1, 0])] {
         let def = crate::model::factory::DEFS.iter().find(|d| d.id == id).unwrap_or_else(|| panic!("factory {id}"));
         assert_eq!(def.default, default, "{id}: the first option (Off, Any attack) by default");
     }

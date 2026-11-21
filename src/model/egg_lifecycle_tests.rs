@@ -1,0 +1,216 @@
+use super::*;
+
+const VIEW: View = View([14.0; 2], [0.0, -250.0], [-100.0, 100.0], Some([-60.0, 90.0]));
+
+fn target(seconds: u8) -> Run {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], 7);
+    run.configure(0, seconds);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    assert!(run.egg_at().is_some());
+    run
+}
+
+fn contact(run: &mut Run) {
+    let [x, y] = run.egg_at().expect("live target");
+    let point = [x, y, 0.0];
+    run.step(true, 0.0, &[Hit(point, point, 2.0, 15.0)], true, 0);
+}
+
+#[test]
+fn expiry_uses_active_ticks_and_rolls_a_new_target() {
+    let mut run = target(1);
+    let original = run.target_id();
+    for _ in 0..59 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    for _ in 0..120 {
+        run.step(false, 0.0, &[], false, 0);
+    }
+    assert_eq!(run.target_id(), original);
+    assert_eq!(run.event(), TargetEvent::None);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!((run.event(), run.score), (TargetEvent::Miss, 0));
+    assert_ne!(run.target_id(), original);
+    assert!(run.egg_at().is_some());
+}
+
+#[test]
+fn deadline_contact_wins_and_off_never_expires() {
+    let mut run = target(1);
+    for _ in 0..59 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    contact(&mut run);
+    assert_eq!((run.event(), run.score), (TargetEvent::Hit, 1));
+    let mut untimed = target(0);
+    let id = untimed.target_id();
+    for _ in 0..601 {
+        untimed.step(true, 0.0, &[], false, 0);
+    }
+    assert_eq!(untimed.target_id(), id);
+}
+
+#[test]
+fn offstage_contact_waits_for_an_excursion_then_a_return() {
+    let mut run = target(1);
+    run.area = Some(OFF_STAGE);
+    run.observe_recovery(Recovery::Returned);
+    contact(&mut run);
+    assert_eq!((run.event(), run.score), (TargetEvent::Pending, 0));
+    assert!(run.egg_at().is_none());
+    let mut hud = String::new();
+    run.write_notice(&mut hud).unwrap();
+    assert!(hud.contains("Recover!"));
+    for _ in 0..61 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    assert_eq!((run.event(), run.score), (TargetEvent::None, 0));
+    run.observe_recovery(Recovery::Away);
+    run.step(true, 0.0, &[], false, 0);
+    run.observe_recovery(Recovery::Unchanged);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!(run.score, 0, "a platform or ordinary airborne frame is not a return");
+    run.observe_recovery(Recovery::Returned);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!((run.event(), run.score), (TargetEvent::Recovered, 1));
+}
+
+#[test]
+fn offstage_contact_is_cancelled_by_ko_or_bottom_blast() {
+    let mut run = target(1);
+    run.area = Some(OFF_STAGE);
+    run.observe_recovery(Recovery::Away);
+    contact(&mut run);
+    run.observe_recovery(Recovery::Lost);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!((run.event(), run.score), (TargetEvent::Miss, 0));
+    run.observe_recovery(Recovery::Returned);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!(run.score, 0);
+    assert!(run.egg_at().is_some());
+}
+
+#[test]
+fn seeded_selection_reaches_every_enabled_area_evenly() {
+    let mut run = target(0);
+    for mask in 0b001u8..=0b111 {
+        let mut counts = [0u32; 3];
+        for _ in 0..12_000 {
+            counts[usize::from(run.pick(mask))] += 1;
+        }
+        let expected = 12_000 / mask.count_ones();
+        for (bit, count) in counts.into_iter().enumerate() {
+            if mask & (1 << bit) == 0 {
+                assert_eq!(count, 0);
+            } else {
+                assert!(count.abs_diff(expected) < 300, "{mask:03b}: {counts:?}");
+            }
+        }
+    }
+}
+
+fn cpu_at_deadline() -> Run {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, CPU, IN_VIEW], 19);
+    run.configure(0, 1);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    run.cpu_pass(0.0, false);
+    run.cpu_pass(0.0, false);
+    for _ in 0..60 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    run
+}
+
+#[test]
+fn cpu_native_contact_wins_the_deadline_and_can_be_deferred() {
+    let mut run = cpu_at_deadline();
+    run.area = Some(OFF_STAGE);
+    run.observe_recovery(Recovery::Away);
+    assert_eq!(run.cpu_pass(10.0, true), None);
+    assert_eq!((run.event(), run.score, run.egg_at()), (TargetEvent::Pending, 0, None));
+    run.observe_recovery(Recovery::Returned);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!((run.event(), run.score), (TargetEvent::Recovered, 1));
+    assert!(matches!(run.cpu_pass(10.0, false), Some((_, Put::Fresh(_)))));
+}
+
+#[test]
+fn cpu_target_expires_unhit_and_starts_fresh() {
+    let mut run = cpu_at_deadline();
+    let prior = run.target_id();
+    assert!(matches!(run.cpu_pass(0.0, false), Some((_, Put::Fresh(_)))));
+    assert_eq!((run.event(), run.score), (TargetEvent::Miss, 0));
+    assert_ne!(run.target_id(), prior);
+}
+
+#[test]
+fn time_cancels_unresolved_hit_and_never_accepts_post_round_recovery() {
+    let mut run = target(0);
+    run.rows[0] = TIMED;
+    run.frames = 2;
+    run.area = Some(OFF_STAGE);
+    run.observe_recovery(Recovery::Away);
+    contact(&mut run);
+    assert_eq!(run.event(), TargetEvent::Pending);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!((run.event(), run.score, run.ended()), (TargetEvent::Miss, 0, true));
+    run.observe_recovery(Recovery::Returned);
+    run.step(true, 0.0, &[], false, 0);
+    assert_eq!(run.score, 0);
+}
+
+#[test]
+fn zone_assignment_latches_preference_for_the_run_and_reads_new_stage_on_reset() {
+    let mut run = target(0);
+    assert_eq!(run.zone_preferences(1, || Some([1; 4])), Some([1; 4]));
+    assert_eq!(run.zone_preferences(1, || panic!("already latched")), Some([1; 4]));
+    run.reset(8);
+    assert_eq!(run.zone_preferences(2, || Some([2; 4])), Some([2; 4]));
+}
+
+#[test]
+fn offstage_spawns_without_view_and_sweeps_motion_in_its_original_side() {
+    use crate::model::edge_juggle::perfect::Outline;
+    use crate::model::egg_zone::Stage;
+
+    let hull = [[-50.0, 0.0], [50.0, 0.0], [34.0, -25.0], [-34.0, -25.0]];
+    let mut outline = Outline::new();
+    for index in 0..hull.len() {
+        outline.add([hull[index], hull[(index + 1) % hull.len()]]);
+    }
+    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline).unwrap();
+    let zone = stage.resolve(None);
+    let clearance = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
+
+    for path in [0, 1, 2, 4, 8] {
+        let mut run = Run::IDLE;
+        run.start([FREE, ANY, NORMAL, DISC, OFF_STAGE], u32::from(path) + 7);
+        run.configure(path, 0);
+        run.set_zone(zone);
+        let step = |run: &mut Run| run.pass(Pass { tick: true, y: 0.0, hits: &[], air: false, kind: 0 },
+                                           |_| None, &clearance);
+        step(&mut run);
+        let side = run.motion.unwrap().side.unwrap();
+        let first = run.egg_at().expect("world area does not require a view");
+        let mut last = first;
+        let mut moved = false;
+        for t in 0..150 {
+            run.sense([78.0, -50.0 + 4.0 * t as f32]);
+            step(&mut run);
+            let next = run.egg_at().unwrap();
+            assert!(clearance(&zone, side, last, next), "{path} at tick {t}");
+            assert_eq!(run.look(false, || None)[0].map(|(at, _)| at), Some(next));
+            moved |= first != next;
+            last = next;
+        }
+        assert!(moved, "selected flight {path} should move");
+    }
+}

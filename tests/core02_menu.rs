@@ -205,16 +205,17 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Eggs spawn area adds the "Spawn area" setting row to Eggs-ercise: 70 → 71.
     // Guard the Edge and Juggler add their list entries and eleven sub-screen rows.
     // Spacing grader adds one Display & Controls row (12 → 13).
-    assert_eq!(counts(false), [34, 11, 13, 88, 13, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 88, 13, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 159);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 158);
+    // Off-stage zone, Moving paths and Target expiry add three Eggs-ercise rows.
+    assert_eq!(counts(false), [34, 11, 13, 91, 13, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 91, 13, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 162);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 161);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
     // Randomize slots, Button slots and Save-state slots left the menu (revision 8.2).
-    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 12, "the checklists that stayed, Hitbox Visualization (rc.14) and Swap groups");
+    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 14, "includes Spawn area and Moving paths");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 9);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
@@ -227,7 +228,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
     // Spacing grader adds one Display & Controls row (145 → 146).
-    assert_eq!(ROWS.len(), 163);
+    assert_eq!(ROWS.len(), 166);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }

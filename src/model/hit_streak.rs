@@ -124,6 +124,7 @@ impl Body {
 
 pub struct Streak {
     enabled: bool,
+    reserved: bool,
     current: u32,
     best: u32,
     bodies: [Body; 2],
@@ -132,6 +133,7 @@ pub struct Streak {
 impl Streak {
     pub const EMPTY: Self = Self {
         enabled: false,
+        reserved: false,
         current: 0,
         best: 0,
         bodies: [Body::EMPTY; 2],
@@ -146,7 +148,7 @@ impl Streak {
         for body in &mut self.bodies {
             *body = Body::EMPTY;
         }
-        (self.enabled, self.current) = (enabled, 0);
+        (self.enabled, self.reserved, self.current) = (enabled, false, 0);
     }
 
     pub fn counts(&self) -> (u32, u32) {
@@ -206,15 +208,79 @@ impl Streak {
         }
     }
 
+    fn credit(&mut self, owner: u32, source: u32) -> bool {
+        self.enabled && self.bodies.iter_mut().find(|body| body.owner == Some(owner))
+            .is_some_and(|body| body.credit(source))
+    }
+
+    fn increment(&mut self) {
+        self.current = self.current.saturating_add(1);
+        self.best = self.best.max(self.current);
+    }
+
     /// A scored target hit, using the actual damaging object and its P1 owner.
     pub fn hit(&mut self, owner: u32, source: u32) {
-        if self.enabled && self.bodies.iter_mut().find(|body| body.owner == Some(owner)).is_some_and(|body| body.credit(source)) {
-            self.current = self.current.saturating_add(1);
-            self.best = self.best.max(self.current);
+        if self.credit(owner, source) {
+            self.increment();
         }
+    }
+
+    /// Mark the attack while it is still live. Score it only if recovery succeeds.
+    pub fn defer(&mut self, owner: u32, source: u32) {
+        self.reserved = self.credit(owner, source);
+    }
+
+    pub fn recover(&mut self) {
+        if core::mem::take(&mut self.reserved) {
+            self.increment();
+        }
+    }
+
+    pub fn miss(&mut self) {
+        (self.current, self.reserved) = (0, false);
     }
 }
 
 #[cfg(test)]
 #[path = "hit_streak_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod egg_pending_tests {
+    use super::*;
+
+    #[test]
+    fn reserved_attack_is_counted_on_return_even_after_its_weapon_expires() {
+        let mut streak = Streak::EMPTY;
+        streak.restart(true);
+        let owner = 1;
+        let body = streak.begin(owner, Motion { status: 1, kind: 1, frame: 1.0 }, true);
+        streak.hit(owner, owner);
+        let flight = Motion { status: 2, kind: 2, frame: 1.0 };
+        streak.begin(owner, flight, true);
+        streak.projectile(body, 99, || true);
+        streak.defer(owner, 99);
+        streak.begin(owner, Motion::EMPTY, false);
+        streak.end(body);
+        streak.end(body);
+        assert_eq!(streak.counts(), (1, 1));
+        streak.recover();
+        assert_eq!(streak.counts(), (2, 2));
+        streak.recover();
+        assert_eq!(streak.counts(), (2, 2));
+    }
+
+    #[test]
+    fn target_miss_clears_current_and_discards_reserved_credit() {
+        let mut streak = Streak::EMPTY;
+        streak.restart(true);
+        let owner = 1;
+        streak.begin(owner, Motion { status: 1, kind: 1, frame: 1.0 }, true);
+        streak.hit(owner, owner);
+        streak.begin(owner, Motion { status: 2, kind: 2, frame: 1.0 }, true);
+        streak.defer(owner, owner);
+        streak.miss();
+        streak.recover();
+        assert_eq!(streak.counts(), (0, 1));
+    }
+}

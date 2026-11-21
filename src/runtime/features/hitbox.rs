@@ -34,7 +34,8 @@ use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::cpu::role::LOBBY_CPU_ENTRY;
-use crate::model::eggs::{self, Run, HEADER, NOTICE_ID};
+use crate::model::eggs::{self, Recovery, Run, TargetEvent, HEADER, NOTICE_ID};
+use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
@@ -87,7 +88,10 @@ pub fn publish(snapshot: &Snapshot) {
     SETTING.store(legend::draws(shown), Ordering::Release);
     let mut row_bytes = [0; 8];
     row_bytes[..5].copy_from_slice(&eggs::choices(snapshot));
+    row_bytes[4] = eggs::checklist(snapshot, eggs::ROW_AREA);
     row_bytes[5] = eggs::choice(snapshot, "eggsercise_hit_streak");
+    row_bytes[6] = eggs::checklist(snapshot, eggs::ROW_PATHS);
+    row_bytes[7] = eggs::choice(snapshot, eggs::ROW_EXPIRY);
     let rows = u64::from_le_bytes(row_bytes);
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -114,27 +118,35 @@ static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
 static PRACTICE_HIDE_RUN: AtomicBool = AtomicBool::new(true);
 /// Start (rc.15 practice menu; D9 (c) is reversed: a close no longer restarts it): the next pass starts a run.
 static EGG_START: AtomicBool = AtomicBool::new(false);
+// Save-state placement cannot complete an off-stage recovery.
+static EGG_STATE_LOAD: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn egg_state_loaded() {
+    EGG_STATE_LOAD.store(true, Ordering::Release);
+}
 struct EggState {
     run: eggs::Run,
     streak: crate::model::hit_streak::Streak,
+    cpu_streak_dirty: bool,
 }
 static RUN: Mutex<EggState> = Mutex::new(EggState {
     run: eggs::Run::IDLE,
     streak: crate::model::hit_streak::Streak::EMPTY,
+    cpu_streak_dirty: false,
 });
 /// The menu reads the round state without taking `RUN`.
 static EGG_ARMED: AtomicBool = AtomicBool::new(false);
 static EGG_FINISHED: AtomicBool = AtomicBool::new(false);
 static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
 
-fn lockon_key(score: u32) -> u64 {
-    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(score)
+fn lockon_key(serial: u32) -> u64 {
+    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(serial)
 }
 
 pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
     let state = RUN.try_lock()?;
     let run = &state.run;
-    let key = lockon_key(run.score);
+    let key = lockon_key(run.target_id());
     let egg = run.egg_at().filter(|_| Run::running(run) && !run.cpu_target());
     Some(egg.map(|at| crate::model::lockon::Target { key, at }))
 }
@@ -169,6 +181,7 @@ pub fn eggs_finished() -> bool {
 pub fn eggs_reset() {
     let mut state = RUN.lock();
     state.run.reset(seed());
+    state.cpu_streak_dirty = false;
     if state.streak.enabled() {
         state.streak.restart(true);
     }
@@ -182,15 +195,18 @@ pub fn eggs_reset() {
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
     let bytes = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
-    let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]];
+    let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], eggs::IN_VIEW];
     // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
     // The fighter object's own entry field, as the reset hub reads it: not a game call.
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
     let mut state = RUN.lock();
-    let EggState { run, streak } = &mut *state;
+    let EggState { run, streak, cpu_streak_dirty } = &mut *state;
     let plan = run.plan(rows, seed, entry, scene::facts);
     if seed.is_some() {
+        run.set_areas(bytes[4]);
+        run.configure(bytes[6], bytes[7]);
+        *cpu_streak_dirty = false;
         streak.restart(bytes[5] == 1 && Run::running(run));
         EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
     }
@@ -205,12 +221,12 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         super::notices::clear(NOTICE_ID);
     }
     if entry != 0 {
-        return eggs_cpu(run, streak, fighter, entry);
+        return eggs_cpu(run, streak, cpu_streak_dirty, fighter, entry);
     }
     // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
     let owners = crate::runtime::published::input_owners();
-    let held = owners.covers_strip();
+    let held = owners.covers_strip() || super::egg_zone::wizard_active() || super::states::is_loading();
     (plan == eggs::Plan::Read).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     if run.floors_wanted() {
@@ -225,14 +241,14 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         }
     }
     let (top, hits, n, aerial, kind) = p1_read(at);
-    let hits = &hits[..n];
+    let hits = &hits[..if held { 0 } else { n }];
     let before = streak.counts();
     let owner = if !held && !run.ended() {
         super::btt_projectiles::sample(streak, at, hits.iter().any(|h| h.3 > 0.0))
     } else {
         None
     };
-    let score = run.score;
+    let target = lockon_key(run.target_id());
     let mut source = None;
     #[cfg(feature = "diag")]
     if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
@@ -240,6 +256,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     }
     #[cfg(feature = "diag")]
     if n != 0 {
+        let score = run.score;
         let egg = run.egg_at();
         let breaks = |e| hits.iter().any(|h| eggs::breaks(eggs::ANY, true, h, e));
         let overlap = egg.is_some_and(breaks);
@@ -247,16 +264,45 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={score} hits={hits:?}"
         ));
     }
-    run.sense([top[0], top[1]]);
+    let primary = if run.uses_paths() || run.needs_recovery() || run.wants_zone() {
+        natives::module_accessor(0).unwrap_or(at)
+    } else {
+        at
+    };
+    if run.wants_zone() && primary == at && !held {
+        let id = natives::stage_id();
+        if id >= 0 {
+            let preferences = run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id));
+            super::egg_zone::prepare(at);
+            if let Some(zone) = super::egg_zone::with_stage(|stage| {
+                (stage.id() == id).then(|| stage.resolve(preferences))
+            }).flatten() {
+                run.set_zone(zone);
+            }
+        }
+    }
+    if run.wants_blast() && !held {
+        if let Some(blast) = super::egg_zone::blast() {
+            run.set_blast(blast);
+        }
+    }
+    let state_loaded = tick && EGG_STATE_LOAD.swap(false, Ordering::AcqRel);
+    if !held && run.needs_recovery() {
+        let recovery = if state_loaded && run.recovering() { Recovery::Lost } else { egg_recovery(primary) };
+        run.observe_recovery(recovery);
+    }
+    let player = if primary == at { [top[0], top[1]] } else { [natives::pos_x(primary), natives::pos_y(primary)] };
+    run.sense(player);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
     let grader = super::input_display::grader_live();
-    let (length, depth) = run.step_with_depth(
-        tick,
-        top[1],
-        hits,
+    let (length, depth) = run.pass(
+        eggs::Pass { tick, y: top[1], hits, air: aerial, kind },
         |egg| {
-            let helper = super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true);
+            if held {
+                return None;
+            }
+            let helper = super::lockon::hit(at, 0, target, rule, aerial, true);
             source = helper;
             eggs::other_break(grader, helper.is_some(), |deepest| {
                 let (projectile, depth) = super::btt_projectiles::hit(
@@ -271,27 +317,27 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
                 Some(depth)
             })
         },
-        aerial,
-        kind,
+        &egg_clearance,
     );
     if let Some(depth) = depth {
         super::input_display::target_grade(depth);
     }
-    // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
-    let scored = run.score > score;
-    if let Some((owner, body)) = owner {
-        if scored {
-            if let Some(source) = if run.melee() { Some(owner) } else { source } {
-                streak.hit(owner, source);
-            }
-        }
+    let event = run.event();
+    let contact = matches!(event, TargetEvent::Hit | TargetEvent::Pending);
+    let credit = owner.and_then(|(owner, _)| {
+        if run.melee() { Some((owner, owner)) } else { source.map(|source| (owner, source)) }
+    });
+    egg_streak(streak, event, credit);
+    if let Some((_, body)) = owner {
         streak.end(body);
     }
-    let broke = scored && run.melee();
+    // The fighter whose attack broke the egg freezes on contact, including a pending break.
+    let broke = contact && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         let _ = natives::set_hit_stop_frame(at, frames, false);
     }
-    let length = length.or_else(|| (streak.counts() != before).then_some(u16::MAX))?;
+    let streak_changed = core::mem::take(cpu_streak_dirty) || streak.counts() != before;
+    let length = length.or_else(|| streak_changed.then_some(u16::MAX))?;
     let mut text = crate::model::storage::FixedPath::<96>::new();
     let _ = run.write_notice(&mut text);
     let _ = streak.write(&mut text);
@@ -305,6 +351,64 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         run.view
     ));
     Some(())
+}
+
+fn egg_clearance(zone: &Zone, side: Side, from: [f32; 2], to: [f32; 2]) -> bool {
+    super::egg_zone::with_stage(|stage| stage.allows_move(zone, side, from, to)) == Some(true)
+}
+
+unsafe fn egg_recovery(primary: usize) -> Recovery {
+    use crate::model::cpu::ids::{C, UNRESOLVED};
+    use crate::model::sites_pkg2::{SITUATION_KIND_OFFSET, STATUS_KIND_OFFSET};
+    use crate::model::tech::surface::Kind;
+    use super::cpu::konst;
+
+    if !game::granted(STATUS_KIND_OFFSET) || !game::granted(SITUATION_KIND_OFFSET) {
+        return Recovery::Unchanged;
+    }
+    let matches_id = |id, kind| id != UNRESOLVED && id == konst(kind);
+    let status = natives::status_kind(primary);
+    let situation = natives::situation_kind(primary);
+    if matches_id(status, C::StatusDead) || matches_id(status, C::StatusRebirth) {
+        return Recovery::Lost;
+    }
+
+    let player = [natives::pos_x(primary), natives::pos_y(primary)];
+    let terrain = super::egg_zone::with_stage(|stage| {
+        let [left, right] = stage.main_span();
+        (player[1] <= stage.bottom_blast(), player[0] < left || player[0] > right || stage.under_main(player))
+    });
+    let Some((below_blast, away)) = terrain else { return Recovery::Unchanged };
+    if below_blast {
+        return Recovery::Lost;
+    }
+    if matches_id(status, C::StatusCliffCatch) || matches_id(status, C::StatusCliffWait) {
+        return Recovery::Returned;
+    }
+    if matches_id(situation, C::SituationGround) {
+        if let Some(line) = super::tech_surfaces::NativeSource::new(primary).and_then(|mut source| source.touched()) {
+            if !line.passable && line.kind() == Some(Kind::Floor)
+                && super::egg_zone::with_stage(|stage| stage.supports(line.ends.map(|p| [p.x, p.y]))) == Some(true)
+            {
+                return Recovery::Returned;
+            }
+        }
+    }
+    if away { Recovery::Away } else { Recovery::Unchanged }
+}
+
+fn egg_streak(
+    streak: &mut crate::model::hit_streak::Streak,
+    event: TargetEvent,
+    credit: Option<(u32, u32)>,
+) {
+    match (event, credit) {
+        (TargetEvent::Hit, Some((owner, source))) => streak.hit(owner, source),
+        (TargetEvent::Pending, Some((owner, source))) => streak.defer(owner, source),
+        (TargetEvent::Recovered, _) => streak.recover(),
+        (TargetEvent::Miss, _) => streak.miss(),
+        _ => {}
+    }
 }
 
 /// Native rays of the floor read a pass (`eggs_floors`): Training's stage, the widest, takes about a hundred.
@@ -348,19 +452,38 @@ unsafe fn eggs_floors(run: &mut eggs::Run, at: usize) {
 /// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): put it where the run
 /// asks, on the target's flight (the operator, 11-15), its speed cleared; afresh, at 0% and in the game's own fall (in the
 /// air) or standing (at rest), as a save state's load places a fighter; and standing once the flight comes to rest.
-unsafe fn eggs_cpu(run: &mut eggs::Run, streak: &mut crate::model::hit_streak::Streak, fighter: usize, entry: i32) -> Option<()> {
+unsafe fn eggs_cpu(
+    run: &mut eggs::Run,
+    streak: &mut crate::model::hit_streak::Streak,
+    streak_dirty: &mut bool,
+    fighter: usize,
+    entry: i32,
+) -> Option<()> {
     run.cpu_target().then_some(())?;
     let primary = [1, LOBBY_CPU_ENTRY][usize::from(scene::current()? == Scene::Lobby)];
     (entry == primary).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
     let (damage, stopped) = (natives::damage(at, 0), natives::is_stop(at));
+    #[cfg(feature = "diag")]
     let score = run.score;
-    let moved = run.cpu_pass(damage, stopped);
-    if streak.enabled() && run.score > score && super::lockon::damage_source_ready() {
-        if let Some((owner, source)) = super::lockon::damage_source(at) {
-            streak.hit(owner, source);
-        }
-    }
+    let moved = if crate::runtime::published::input_owners().covers_strip()
+        || super::egg_zone::wizard_active() || super::states::is_loading()
+    {
+        return Some(());
+    } else {
+        run.cpu_pass_in(damage, stopped, &egg_clearance)
+    };
+    let event = run.event();
+    let before = streak.counts();
+    let source = if streak.enabled() && matches!(event, TargetEvent::Hit | TargetEvent::Pending)
+        && super::lockon::damage_source_ready()
+    {
+        super::lockon::damage_source(at)
+    } else {
+        None
+    };
+    egg_streak(streak, event, source);
+    *streak_dirty |= before != streak.counts();
     #[cfg(feature = "diag")]
     eggs_cpu_diag(run, score, at, damage, stopped, moved);
     // The game turns the placed CPU's tag flag off in the air: while TR owns the placement and the body is shown, the CPU frame
@@ -671,6 +794,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let (eggs_orbs, marks) = (RUN.lock().run.look(active, || view()), btt::look(active, || view()));
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let zone_wizard = super::egg_zone::wizard_active();
     let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
     let grader = super::input_display::grader_live();
@@ -679,7 +803,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if (hurt_on || grader) && !tech && !edge_wizard {
+    if (hurt_on || grader) && !tech && !edge_wizard && !zone_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
@@ -691,6 +815,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         marks
     };
     own[3..].copy_from_slice(&marks);
+    if zone_wizard {
+        own.fill(None);
+    }
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if !active {
@@ -704,8 +831,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         }
         return;
     }
-    let on = SETTING.load(Ordering::Acquire);
-    let any = on || own.iter().any(Option::is_some);
+    let on = SETTING.load(Ordering::Acquire) && !zone_wizard;
+    let any = on || zone_wizard || own.iter().any(Option::is_some);
     if !any && cache.shown == [0; 2] && cache.egg.1 == [0; 3] && cache.layout == layout as usize {
         return;
     }
@@ -763,6 +890,20 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
         // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
+        if zone_wizard {
+            if let Some(view) = view() {
+                super::egg_zone::draw(view, |[a, b], width, color| {
+                    let [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+                    let length = dx.hypot(dy);
+                    if length > 0.0 && length.is_finite() {
+                        if let Some(band) = used.take_band() {
+                            let center = [a[0].midpoint(b[0]), a[1].midpoint(b[1])];
+                            write_pane(cache.panes[p::CAPS + band], center, [length, width], dy.atan2(dx).to_degrees(), color);
+                        }
+                    }
+                });
+            }
+        }
         let drawn = orbs::targets_drawn(board.is_some() || !on, hurt_on || grader, n_targets);
         let target_hurts = targets[..drawn].iter();
         let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {

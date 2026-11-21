@@ -197,6 +197,8 @@ pub enum Editor {
     /// Stage tech: close into the guided exercise draft.
     TechWizard,
     EdgeJuggleSetup(Game),
+    /// Eggs-ercise: close into the stage spawn-zone editor.
+    EggZone,
     /// Parry practice: the saved practices (a file each, the hot five first), and saving the current wiring as one.
     ParrySaved,
     ParrySave,
@@ -283,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 163] = [
+pub static ROWS: [Row; 166] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -527,8 +529,14 @@ pub static ROWS: [Row; 163] = [
       "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
     r(EGGS, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
-    r(EGGS, "Spawn area", "eggsercise_area", Control::Dropdown(&o::EGGS_AREA),
-      "In view: targets appear on screen, with your camera.\nWhole stage: any stage floor, even off screen. From the next Start."),
+    r(EGGS, "Spawn area", "eggsercise_area", Control::MultiSelect(&o::EGGS_AREA),
+      "Each checked area has the same chance on each spawn.\nIn view is used when none are checked. Applies at the next Start."),
+    r(EGGS, "Off-stage zone…", "eggsercise_zone", Control::Editor(Editor::EggZone),
+      "Set top, bottom, inner and outer edges for this stage.\nPress A to edit. Applies to Eggs-ercise at the next Start."),
+    r(EGGS, "Moving paths", "eggsercise_paths", Control::MultiSelect(&o::EGGS_PATHS),
+      "Each checked flight path has the same chance on a spawn.\nNone uses the standard flight. Applies at the next Start."),
+    r(EGGS, "Target expiry", "eggsercise_expiry", Control::Dropdown(&o::EGGS_EXPIRY),
+      "Replace an unhit target after this many seconds of play.\nExpiry resets the current hit streak. Applies at the next Start."),
     r(EGGS, "Hit streak", "eggsercise_hit_streak", Control::Dropdown(&o::BTT),
       "Show your current hit streak and session best.\nA whiff resets the streak. Applies at the next Start."),
     r(EGGS, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),

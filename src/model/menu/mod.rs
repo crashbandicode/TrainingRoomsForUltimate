@@ -144,6 +144,8 @@ pub struct Outbox {
     /// Stage tech: close into the guided exercise draft.
     pub tech_wizard: bool,
     pub edge_juggle_setup: bool,
+    /// Close into the Eggs-ercise spawn-zone wizard, without starting a practice game.
+    pub egg_zone: bool,
     /// A saved Parry practice activates its mode and keeps the current set.
     pub resume_parry: bool,
     /// rc.15 practice menu: the game the close starts (Start, Place targets, Tech point, Tech wizard). Only these start a
@@ -1506,6 +1508,13 @@ impl Menu {
                 self.put_one_hot("tech_surface", 4);
                 self.outbox.tech_point = true;
                 self.start(Game::Tech);
+                return;
+            }
+            Editor::EggZone => {
+                self.outbox.egg_zone = true;
+                self.outbox.start = None;
+                self.outbox.resume_parry = false;
+                self.closed = true;
                 return;
             }
             Editor::EdgeJuggleSetup(game) => {

@@ -141,6 +141,8 @@ pub mod spots;
 pub mod legend;
 #[path = "model/eggs.rs"]
 pub mod eggs;
+#[path = "model/egg_paths.rs"]
+pub mod egg_paths;
 #[path = "model/spacing.rs"]
 pub mod spacing;
 #[path = "model/btt.rs"]
@@ -291,3 +293,12 @@ pub mod tech_hitlag;
 
 #[path = "model/sites_tech_hitlag.rs"]
 pub mod sites_tech_hitlag;
+
+#[cfg(test)]
+lib_unit_tests! {
+    #[path = "model/egg_zone_tests.rs"]
+    mod egg_zone_tests;
+}
+
+#[path = "model/egg_zone.rs"]
+pub mod egg_zone;

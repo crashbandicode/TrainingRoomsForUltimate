@@ -1122,22 +1122,26 @@ unsafe fn ledge(
     None
 }
 
-unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
-    let bounds @ [left, right, top, bottom] = natives::camera_limit_range()?;
+pub(super) unsafe fn stage_floor(
+    ray: &FloorRay,
+    [left, right, top, bottom]: [f32; 4],
+) -> Option<(perfect::Segment, perfect::Point)> {
     let x = left.midpoint(right);
-    let ray = FloorRay::new(p1)?;
     let limits = [top, bottom];
     let floor = ray.floor(x, limits, false)?;
+    let ledges = [
+        ledge(ray, floor, false, limits)?,
+        ledge(ray, floor, true, limits)?,
+    ];
+    Some((ledges, [x, floor.height(x)?]))
+}
+
+unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
+    let bounds = natives::camera_limit_range()?;
+    let ray = FloorRay::new(p1)?;
+    let (ledges, start) = stage_floor(&ray, bounds)?;
     let blast = super::tech_surfaces::training_blast_bounds()?;
-    let stage = Stage::new(
-        blast,
-        bounds,
-        [
-            ledge(&ray, floor, false, limits)?,
-            ledge(&ray, floor, true, limits)?,
-        ],
-    )?;
-    Some((stage, [x, floor.height(x)?]))
+    Some((Stage::new(blast, bounds, ledges)?, start))
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {

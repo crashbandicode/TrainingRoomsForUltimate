@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 172;
+pub const COUNT: usize = 174;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -217,10 +217,12 @@ pub static DEFS: [Def; COUNT] = [
     row!("practice_cpu", Single, 2, [0]),
     // V2.1: Disc / CPU.
     row!("eggsercise_target", Single, 2, [0]),
-    // rc.15 Spawn area: In view / Whole stage.
-    row!("eggsercise_area", Single, 2, [0]),
+    // rc.15 Spawn area: independent In view, Whole stage and Off stage selections.
+    row!("eggsercise_area", Multiple, 3, [0]),
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
+    row!("eggsercise_paths", Multiple, 4, []),
+    row!("eggsercise_expiry", Single, 11, [0]),
     // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
     // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),

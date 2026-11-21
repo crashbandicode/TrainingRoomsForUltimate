@@ -60,7 +60,8 @@ pub fn on_p1_poll(holder: usize) {
     // Consume any pending request from the chord engine. The adapter also sees
     // this poll's raw permanent/INI chords before modal Plus suppression below.
     let chord_open = chords::take_open_menu() || crate::runtime::features::tech::take_menu_request()
-        || crate::runtime::features::edge_juggle::take_menu_request();
+        || crate::runtime::features::edge_juggle::take_menu_request()
+        || crate::runtime::features::egg_zone::take_menu_request();
     let Some(mut state) = ADAPTER.try_lock() else { return };
     let generation = worker::input_generation();
     if state.1 != generation {
@@ -95,7 +96,10 @@ pub fn on_p1_poll(holder: usize) {
         state::POPUP_REQ.store(true, Ordering::Release);
         worker::wake();
     }
-    if !prompt && ((!crate::runtime::features::tech::wizard_active() && !crate::runtime::features::edge_juggle::wizard_active() && step.open) || (chord_open && allowed && !open)) {
+    let wizard = crate::runtime::features::tech::wizard_active()
+        || crate::runtime::features::edge_juggle::wizard_active()
+        || crate::runtime::features::egg_zone::wizard_active();
+    if !prompt && ((!wizard && step.open) || (chord_open && allowed && !open)) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);
         OPEN.store(true, Ordering::Release);

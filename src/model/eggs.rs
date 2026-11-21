@@ -3,6 +3,8 @@
 //! whether Hitbox Visualization is On or Off (`Run::look`) and broken when one of Player 1's live attack pills overlaps it;
 //! nothing is written to the game. The runtime half is `runtime::features::hitbox::eggs_pass`.
 
+use super::egg_paths::{Flight, Path};
+use super::egg_zone::{Side, Zone};
 use super::hitbox::{Sphere, KIND_HIT, SCALE};
 use super::hitbox_orbs::CANVAS_HALF;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
@@ -16,6 +18,15 @@ pub const ROW_TARGET: &str = "eggsercise_target";
 pub const ROW_AREA: &str = "eggsercise_area";
 pub const IN_VIEW: u8 = 0;
 pub const WHOLE: u8 = 1;
+pub const OFF_STAGE: u8 = 2;
+pub const ROW_PATHS: &str = "eggsercise_paths";
+pub const ROW_EXPIRY: &str = "eggsercise_expiry";
+
+/// Encode checklist cells without losing additional checked options.
+pub fn checklist(snapshot: &super::settings::Snapshot, id: &str) -> u8 {
+    snapshot.get(id).unwrap_or_default().iter().take(8).enumerate()
+        .fold(0, |mask, (bit, value)| mask | (u8::from(*value != 0) << bit))
+}
 /// Hide CPU's row (CPU page): with it On the CPU cannot be the target.
 pub const ROW_HIDE_CPU: &str = "hide_cpu";
 /// V2.6: `Hide` (the first option) hides the CPU while a practice game is armed; Hide CPU's rule reads it.
@@ -257,11 +268,96 @@ pub enum Plan {
     Read,
 }
 
+/// Only an actual offstage excursion followed by a stage landing or ledge catch qualifies.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Recovery {
+    #[default]
+    Unchanged,
+    Away,
+    Returned,
+    Lost,
+}
+
+/// The score and streak consume the outcome at the point of contact, expiry, or recovery.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TargetEvent {
+    #[default]
+    None,
+    Hit,
+    Pending,
+    Recovered,
+    Miss,
+}
+
+type Point = [f32; 2];
+type Rect = [Point; 2];
+
+/// The runtime supplies a scoped clearance check against the current stage's actual outline.
+pub type Clearance<'a> = dyn Fn(&Zone, Side, Point, Point) -> bool + 'a;
+const NO_HULL: &Clearance<'_> = &|_, _, _, _| false;
+
+#[derive(Clone, Copy, Debug)]
+struct Motion {
+    flight: Option<Flight>,
+    at: Point,
+    scale: f32,
+    bounds: Rect,
+    side: Option<Side>,
+}
+
+impl Motion {
+    fn new(path: Option<Path>, anchor: Point, bounds: Rect, side: Option<Side>, right: bool) -> Self {
+        let envelope = path.map_or([[0.0; 2]; 2], |path| {
+            let [mut low, mut high] = path.envelope();
+            if !right {
+                (low[0], high[0]) = (-high[0], -low[0]);
+            }
+            [low, high]
+        });
+        let mut scale = 1.0f32;
+        for axis in 0..2 {
+            let span = envelope[1][axis] - envelope[0][axis];
+            if span > 0.0 {
+                scale = scale.min((bounds[1][axis] - bounds[0][axis]) / span);
+            }
+        }
+        let at = core::array::from_fn(|axis| {
+            let lo = bounds[0][axis] - scale * envelope[0][axis];
+            let hi = bounds[1][axis] - scale * envelope[1][axis];
+            anchor[axis].clamp(lo, hi.max(lo))
+        });
+        Self { flight: path.map(|path| Flight::new(path, right)), at, scale, bounds, side }
+    }
+}
+
+/// Native P1 inputs for one pass. The keeper ticks time and every live P1 body can hit.
+pub struct Pass<'a> {
+    pub tick: bool,
+    pub y: f32,
+    pub hits: &'a [Hit],
+    pub air: bool,
+    pub kind: i32,
+}
+
 /// The run: armed by a menu close with the row on, until Off or the end of practice.
 #[derive(Clone, Copy, Debug)]
 pub struct Run {
     /// The mode, rule, speed, target and spawn area (`choices`) of the Start that began it.
     rows: [u8; 5],
+    areas: u8,
+    paths: u8,
+    expiry: u16,
+    clock_started: bool,
+    area: Option<u8>,
+    path: Option<Path>,
+    serial: u32,
+    recovery: Recovery,
+    pending_hit: Option<(Point, bool)>,
+    zone: Option<Zone>,
+    zone_prefs: Option<(i32, Option<[u8; 4]>)>,
+    blast: Option<Rect>,
+    motion: Option<Motion>,
+    event: TargetEvent,
     /// Eggs broken this run.
     pub score: u32,
     frames: u32,
@@ -275,7 +371,7 @@ pub struct Run {
     rng: u32,
     /// The clock keeper (`keeper`) and its rivals' passes since its last.
     owner: (usize, u8),
-    shown: Option<(u32, u32)>,
+    shown: Option<(u32, u32, bool)>,
     pub view: Option<View>,
     /// Draw ticks the camera has held the same `view`.
     still: u32,
@@ -301,6 +397,20 @@ pub struct Run {
 impl Run {
     pub const IDLE: Run = Run {
         rows: [OFF, ANY, NORMAL, DISC, IN_VIEW],
+        areas: 1 << IN_VIEW,
+        paths: 0,
+        expiry: 0,
+        clock_started: false,
+        area: None,
+        path: None,
+        serial: 0,
+        recovery: Recovery::Unchanged,
+        pending_hit: None,
+        zone: None,
+        zone_prefs: None,
+        blast: None,
+        motion: None,
+        event: TargetEvent::None,
         score: 0,
         frames: 0,
         ground: 0.0,
@@ -327,7 +437,7 @@ impl Run {
 
     /// The runtime is to read the stage's floors for this run (once per start: a reset may have changed the stage).
     pub fn floors_wanted(&self) -> bool {
-        self.running() && !self.scanned
+        self.running() && self.areas & 0b011 != 0 && !self.scanned
     }
 
     /// The runtime began reading the floors: the first target waits for them (`set_floors`), so it is never put by the
@@ -350,6 +460,138 @@ impl Run {
     /// Player 1's `top` joint this pass (each pass, before `step`).
     pub fn sense(&mut self, p1: [f32; 2]) {
         self.p1 = p1;
+    }
+
+    pub fn configure(&mut self, paths: u8, seconds: u8) {
+        self.paths = paths & 0b1111;
+        self.expiry = u16::from(seconds.min(10)) * 60;
+    }
+
+    pub fn set_areas(&mut self, areas: u8) {
+        self.areas = (areas & 0b111).max(1);
+    }
+
+    pub fn target_id(&self) -> u32 {
+        self.serial
+    }
+
+    pub fn event(&self) -> TargetEvent {
+        self.event
+    }
+
+    pub fn recovering(&self) -> bool {
+        self.pending_hit.is_some()
+    }
+
+    pub fn observe_recovery(&mut self, status: Recovery) {
+        self.recovery = status;
+    }
+
+    /// The P1 pass only needs recovery reads for an off-stage target or an unsettled hit.
+    pub fn needs_recovery(&self) -> bool {
+        self.area == Some(OFF_STAGE) || self.recovering()
+            || self.area.is_none() && self.areas & (1 << OFF_STAGE) != 0
+    }
+
+    pub fn wants_zone(&self) -> bool {
+        self.areas & (1 << OFF_STAGE) != 0 && self.zone.is_none()
+    }
+
+    pub fn wants_blast(&self) -> bool {
+        self.paths != 0 && self.blast.is_none()
+    }
+
+    pub fn set_zone(&mut self, zone: Zone) {
+        self.zone = Some(zone);
+    }
+
+    pub fn zone_preferences(&mut self, stage: i32, published: impl FnOnce() -> Option<[u8; 4]>) -> Option<[u8; 4]> {
+        if let Some((id, preference)) = self.zone_prefs {
+            if id == stage {
+                return preference;
+            }
+        }
+        let preference = published();
+        self.zone_prefs = Some((stage, preference));
+        preference
+    }
+
+    pub fn uses_paths(&self) -> bool {
+        self.paths != 0
+    }
+
+    pub fn set_blast(&mut self, blast: Rect) {
+        self.blast = Some(blast);
+    }
+
+    fn next_random(&mut self) -> u32 {
+        self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
+        self.rng
+    }
+
+    /// Uniform over checked cells. A singleton preserves the ordinary spawn RNG sequence.
+    fn pick(&mut self, mut mask: u8) -> u8 {
+        let count = mask.count_ones();
+        let mut index = 0;
+        if count > 1 {
+            let threshold = count.wrapping_neg() % count;
+            loop {
+                let scaled = u64::from(self.next_random()) * u64::from(count);
+                if scaled as u32 >= threshold {
+                    index = (scaled >> 32) as u32;
+                    break;
+                }
+            }
+        }
+        for _ in 0..index {
+            mask &= mask - 1;
+        }
+        mask.trailing_zeros() as u8
+    }
+
+    fn empty_target(&mut self) {
+        self.egg = None;
+        self.motion = None;
+        self.area = None;
+        self.path = None;
+        self.cpu = 0;
+        self.age = 0;
+    }
+
+    fn contact(&mut self, egg: [f32; 2], melee: bool) {
+        self.melee = melee;
+        if self.area == Some(OFF_STAGE) {
+            self.event = if self.recovery == Recovery::Lost {
+                TargetEvent::Miss
+            } else {
+                self.pending_hit = Some((egg, self.recovery == Recovery::Away));
+                TargetEvent::Pending
+            };
+            self.empty_target();
+        } else {
+            self.event = TargetEvent::Hit;
+            self.score += 1;
+        }
+    }
+
+    fn resolve_hit(&mut self) -> Option<[f32; 2]> {
+        let (egg, away) = self.pending_hit.as_mut()?;
+        if self.recovery == Recovery::Away {
+            *away = true;
+        }
+        self.event = match self.recovery {
+            Recovery::Lost => TargetEvent::Miss,
+            Recovery::Returned if *away => TargetEvent::Recovered,
+            _ => return None,
+        };
+        self.score += u32::from(self.event == TargetEvent::Recovered);
+        let egg = *egg;
+        self.pending_hit = None;
+        Some(egg)
+    }
+
+    fn expired(&self) -> bool {
+        self.expiry != 0 && self.age >= u32::from(self.expiry)
     }
 
     /// Whether the last break was Player 1's own attack (the fighter freezes), not one of its articles'.
@@ -410,13 +652,16 @@ impl Run {
         *self = Run::IDLE;
         let frames = RUN_FRAMES * u32::from(rows[0] == TIMED);
         (self.rows, self.frames, self.rng, self.best) = (rows, frames, rng, best);
+        self.set_areas(1u8.checked_shl(rows[4].into()).unwrap_or(1));
     }
 
     /// The game initialised the fighters again (L+R+A, Change Stage; the reset hub): an armed run starts over.
     pub fn reset(&mut self, seed: u32) {
         if self.rows[0] != OFF {
+            let settings = (self.areas, self.paths, self.expiry);
             self.start(self.rows, seed);
             self.still = 0;
+            (self.areas, self.paths, self.expiry) = settings;
         }
     }
 
@@ -465,12 +710,23 @@ impl Run {
     /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
     /// Screen bounds are usable on the first draw after Start. A fighter reset waits for its camera glide before
     /// using screen bounds. Complete Whole stage bounds are in world coordinates.
-    fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
+    fn spawn(&mut self, last: Option<Point>, clear: &Clearance<'_>) -> Option<()> {
+        let area = if let Some(area) = self.area {
+            area
+        } else {
+            let area = self.pick(self.areas);
+            self.area = Some(area);
+            self.path = (self.paths != 0).then(|| self.pick(self.paths)).and_then(Path::from_index);
+            area
+        };
+        if area == OFF_STAGE {
+            return self.spawn_offstage(last, clear);
+        }
         let View(s, o, range, vertical) = self.view.filter(|_| !self.pending)?;
-        let whole = self.rows[4] == WHOLE;
+        let whole = area == WHOLE;
         (last.is_some() || self.still >= SETTLE || (whole && vertical.is_some())).then_some(())?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let (x0, x1, top, bottom) = if whole {
+        let (mut x0, mut x1, mut top, mut bottom) = if whole {
             let (top, bottom) = match vertical {
                 Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
                 None => (edge(1, 1.0), edge(1, -1.0)),
@@ -480,6 +736,26 @@ impl Run {
             let inside = |x: f32| x.max(edge(0, -1.0) + DRIFT).min(edge(0, 1.0) - DRIFT);
             let [lo, hi] = [inside(range[0] + DRIFT), inside(range[1] - DRIFT)];
             (lo, hi, edge(1, 1.0), edge(1, -1.0))
+        };
+        let path_bounds = if self.path.is_some() {
+            let [[left, low], [right, high]] = self.blast?;
+            let [west, east] = if whole {
+                [range[0] + RADIUS, range[1] - RADIUS]
+            } else {
+                [edge(0, -1.0), edge(0, 1.0)]
+            };
+            let west = west.max(left + RADIUS);
+            let east = east.min(right - RADIUS);
+            bottom = bottom.max(low + RADIUS);
+            top = top.min(high - RADIUS);
+            if east < west || top < bottom {
+                return None;
+            }
+            x0 = x0.clamp(west, east);
+            x1 = x1.clamp(west, east);
+            Some([[west, bottom], [east, top]])
+        } else {
+            None
         };
         // The disc's centre is `RADIUS` above its floor; the CPU target's feet are on it, and it flies the disc's flight
         // (the operator, 11-15): its feet trace the disc's bottom edge.
@@ -534,7 +810,95 @@ impl Run {
         let (disc, perch, vx) = (0..32).map(|_| pick()).min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
         let launch = (LAUNCH * speed).min((2.0 * g * (top - disc[1]).max(0.0)).sqrt());
         (self.egg, self.age, self.fly, self.perch) = (Some([disc[0], disc[1] + lift]), 0, [launch, vx, g], perch);
+        if let Some(bounds) = path_bounds {
+            let right = if matches!(self.path, Some(Path::Missile)) {
+                self.p1[0] >= disc[0]
+            } else {
+                self.next_random() >> 31 == 0
+            };
+            self.motion = Some(Motion::new(self.path, disc, bounds, None, right));
+            self.perch = true;
+        }
+        self.serial = self.serial.wrapping_add(1);
+        self.clock_started = true;
         Some(())
+    }
+
+    fn spawn_offstage(&mut self, last: Option<Point>, clear: &Clearance<'_>) -> Option<()> {
+        let zone = self.zone?;
+        let first_right = self.next_random() >> 31 == 0;
+        let body = [self.p1[0], self.p1[1] + BODY];
+        let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
+        let mut best = None;
+        let mut penalty = f32::INFINITY;
+        for side in if first_right { [Side::Right, Side::Left] } else { [Side::Left, Side::Right] } {
+            let bounds = zone.rect(side);
+            if (0..2).any(|axis| bounds[1][axis] < bounds[0][axis]) {
+                continue;
+            }
+            for _ in 0..32 {
+                let anchor = core::array::from_fn(|axis| {
+                    let t = (self.next_random() >> 8) as f32 / (1u32 << 24) as f32;
+                    bounds[0][axis] + (bounds[1][axis] - bounds[0][axis]) * t
+                });
+                if !clear(&zone, side, anchor, anchor) {
+                    continue;
+                }
+                let right = if matches!(self.path, Some(Path::Missile)) {
+                    self.p1[0] >= anchor[0]
+                } else {
+                    side == Side::Right
+                };
+                let mut motion = Motion::new(self.path, anchor, bounds, Some(side), right);
+                if !clear(&zone, side, anchor, motion.at) {
+                    // Fitting the full envelope would cross the outline. Begin in free air
+                    // and let the same swept clearance constrain each step of the flight.
+                    motion.at = anchor;
+                }
+                let at = motion.at;
+                let distance = |p: Point| (at[0] - p[0]).hypot(at[1] - p[1]);
+                let short = (P1_GAP - distance(body))
+                    .max(last.map_or(0.0, |p| MIN_GAP - distance(p)))
+                    .max(0.0);
+                if short < penalty {
+                    (best, penalty) = (Some(motion), short);
+                }
+                if short == 0.0 {
+                    break;
+                }
+            }
+            if best.is_some() {
+                break;
+            }
+        }
+        let motion = best?;
+        let g = GRAVITY * speed * speed;
+        let room = motion.bounds[1][1] - motion.at[1];
+        let launch = (LAUNCH * speed).min((2.0 * g * room.max(0.0)).sqrt());
+        let vx = [DRIFT_SPEED, -DRIFT_SPEED][usize::from(first_right)] * speed;
+        (self.egg, self.age, self.fly, self.perch) = (Some(motion.at), 0, [launch, vx, g], true);
+        self.motion = Some(motion);
+        self.serial = self.serial.wrapping_add(1);
+        self.clock_started = true;
+        Some(())
+    }
+
+    fn advance_motion(&mut self, clear: &Clearance<'_>) {
+        let Some(mut motion) = self.motion else { return };
+        let at = motion.at;
+        let wanted = match motion.flight.as_mut() {
+            Some(flight) => {
+                let target = [self.p1[0] - at[0], self.p1[1] + BODY - at[1]];
+                let delta = flight.advance(self.rows[2], target);
+                core::array::from_fn(|axis| at[axis] + motion.scale * delta[axis])
+            }
+            None => self.bounce_at().unwrap_or(at),
+        };
+        let next = core::array::from_fn(|axis| wanted[axis].clamp(motion.bounds[0][axis], motion.bounds[1][axis]));
+        if self.zone.zip(motion.side).is_none_or(|(zone, side)| clear(&zone, side, at, next)) {
+            motion.at = next;
+        }
+        self.motion = Some(motion);
     }
 
     /// Diag only (Eden's `diag-egg.req`): the target at `at`: the disc at rest there; the CPU target placed afresh there and
@@ -543,6 +907,8 @@ impl Run {
     pub fn place(&mut self, at: [f32; 2]) {
         let speed = SPEEDS[usize::from(self.rows[2].min(FAST))];
         let v = LAUNCH * speed * f32::from(u8::from(self.rows[3] == CPU));
+        self.motion = None;
+        self.serial = self.serial.wrapping_add(1);
         (self.egg, self.age, self.fly, self.cpu, self.perch) = (Some(at), 0, [v, 0.0, GRAVITY * speed * speed], 0, false);
     }
 
@@ -554,7 +920,11 @@ impl Run {
 
     /// Where the target is now (the fighters' plane): up and back down in `2 v / g` ticks, one bounce at `BOUNCE` times the
     /// speed, then at rest on its spawn height.
-    pub fn egg_at(&self) -> Option<[f32; 2]> {
+    pub fn egg_at(&self) -> Option<Point> {
+        self.motion.map(|motion| motion.at).or_else(|| self.bounce_at())
+    }
+
+    fn bounce_at(&self) -> Option<Point> {
         let ([x, y], [v, vx, g], t) = (self.egg?, self.fly, self.age as f32);
         let up = 2.0 * v / g;
         let (v, t) = [(v * BOUNCE, (t - up).min(up * BOUNCE)), (v, t)][usize::from(t <= up)];
@@ -584,50 +954,92 @@ impl Run {
         tick: bool,
         y: f32,
         hits: &[Hit],
-        mut breaks: impl FnMut([f32; 2]) -> Option<Option<f32>>,
+        breaks: impl FnMut(Point) -> Option<Option<f32>>,
         air: bool,
         kind: i32,
+    ) -> (Option<u16>, Option<f32>) {
+        self.pass(Pass { tick, y, hits, air, kind }, breaks, NO_HULL)
+    }
+
+    pub fn pass(
+        &mut self,
+        Pass { tick, y, hits, air, kind }: Pass<'_>,
+        mut breaks: impl FnMut(Point) -> Option<Option<f32>>,
+        clear: &Clearance<'_>,
     ) -> (Option<u16>, Option<f32>) {
         // The break animations run on the clock's ticks (pause freezes them); an ended run only finishes them.
         let dt = u32::from(tick);
         age(&mut self.bursts, tick);
         self.air = air;
+        self.event = TargetEvent::None;
         // A run the CPU target's last hit ended still holds its target until this pass closes it.
         if self.ended() && self.egg.is_none() {
             return (None, None);
         }
-        if self.egg.is_none() {
-            self.ground = y;
-            self.spawn(None);
-        }
-        // The pass that closes a run the CPU target's last hit ended: the clock stopped on that hit's frame.
-        let dt = dt * u32::from(!self.ended());
         let mut depth = None;
-        if let Some(egg) = self.egg_at() {
-            let melee = if self.rows[3] == DISC { deepest(self.rows[1], air, hits, egg) } else { None };
-            let additional = if melee.is_none() && self.rows[3] == DISC { breaks(egg) } else { None };
-            if melee.is_some() || additional.is_some() {
-                (self.score, self.bursts, self.melee) = (self.score + 1, [Some((egg, 0)), self.bursts[0]], melee.is_some());
-                depth = melee.or_else(|| additional.flatten());
-                self.spawn(Some(egg));
+        let recovering = self.recovering();
+        if recovering {
+            if tick {
+                if let Some(last) = self.resolve_hit() {
+                    if !self.ended() {
+                        self.spawn(Some(last), clear);
+                    }
+                }
             }
-            // The flight holds while the CPU target is in a hit (its hitlag, then the placement): an uncounted hit puts it back
-            // where it was hit, and a counted one's next target flies from its start.
-            self.age += dt * u32::from(self.cpu < 3);
+        } else if self.egg.is_none() {
+            self.ground = y;
+            self.spawn(None, clear);
+        }
+
+        // The pass closing a CPU target's last hit still writes the end notice.
+        let dt = dt * u32::from(!self.ended() || self.event == TargetEvent::Recovered);
+        let clock_live = self.clock_started || recovering || self.egg.is_some();
+        if !recovering {
+            if let Some(egg) = self.egg_at() {
+                let disc = self.rows[3] == DISC;
+                let melee = if disc { deepest(self.rows[1], air, hits, egg) } else { None };
+                let additional = if melee.is_none() && disc { breaks(egg) } else { None };
+                if melee.is_some() || additional.is_some() {
+                    self.bursts = [Some((egg, 0)), self.bursts[0]];
+                    self.contact(egg, melee.is_some());
+                    depth = melee.or_else(|| additional.flatten());
+                    if self.event == TargetEvent::Hit {
+                        self.empty_target();
+                        self.spawn(Some(egg), clear);
+                    }
+                }
+                if self.egg.is_some() && self.cpu < 3 {
+                    self.age += dt;
+                    if dt != 0 {
+                        self.advance_motion(clear);
+                    }
+                }
+                if disc && self.event == TargetEvent::None && self.expired() {
+                    self.event = TargetEvent::Miss;
+                    self.empty_target();
+                    self.spawn(Some(egg), clear);
+                }
+            }
+        }
+        if clock_live {
             match self.rows[0] {
                 TIMED => self.frames -= dt,
                 _ => self.frames += dt * u32::from(self.goal() > 0),
             }
             if self.ended() {
+                if self.pending_hit.take().is_some() {
+                    self.event = TargetEvent::Miss;
+                }
                 let (k, m) = (kind as usize & 127, usize::from(self.rows[0] - TIMED));
                 self.best[k][m] = self.best[k][m].max(if m == 0 { self.score } else { !self.frames });
-                (self.best[128][m], self.egg) = (self.best[k][m], None);
+                self.best[128][m] = self.best[k][m];
+                self.empty_target();
                 return (Some(END_FRAMES), depth);
             }
         }
         // The 1-minute notice changes once a second, the N-target one every tick (hundredths).
         let time = [self.frames, self.frames.div_ceil(60)][usize::from(self.rows[0] == TIMED)];
-        let shown = (self.score, time);
+        let shown = (self.score, time, self.recovering());
         ((self.shown.replace(shown) != Some(shown)).then_some(u16::MAX), depth)
     }
 
@@ -644,18 +1056,35 @@ impl Run {
     /// breaks the target when the rule lets it count, and then the next spot comes once the hitlag is over (a hit that does
     /// not count puts the CPU back on its flight where it was hit). `cpu`: 0 place, 1 wait for 0%, 2 armed, 3 counted hit in
     /// hitlag, 4 uncounted.
-    pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<([f32; 2], Put)> {
+    pub fn cpu_pass(&mut self, damage: f32, stopped: bool) -> Option<(Point, Put)> {
+        self.cpu_pass_in(damage, stopped, NO_HULL)
+    }
+
+    pub fn cpu_pass_in(&mut self, damage: f32, stopped: bool, clear: &Clearance<'_>) -> Option<(Point, Put)> {
+        self.event = TargetEvent::None;
         self.egg.filter(|_| self.cpu_target() && !self.ended())?;
         let fresh = match (self.cpu, damage > 0.0) {
             (2, true) => {
                 let counts = counts(self.rows[1], self.air, damage);
-                (self.cpu, self.score) = (3 + u8::from(!counts), self.score + u32::from(counts));
+                self.cpu = 3 + u8::from(!counts);
+                if counts {
+                    self.contact(self.egg_at()?, false);
+                }
                 return None;
             }
             (3 | 4, _) if stopped => return None,
             (3, _) => {
                 // The next target, `MIN_GAP` from where this one was hit.
-                self.spawn(self.egg_at());
+                let last = self.egg_at();
+                self.empty_target();
+                self.spawn(last, clear);
+                true
+            }
+            _ if self.expired() => {
+                let last = self.egg_at();
+                self.event = TargetEvent::Miss;
+                self.empty_target();
+                self.spawn(last, clear);
                 true
             }
             (0 | 4, _) | (1, true) => true,
@@ -669,7 +1098,12 @@ impl Run {
             _ => Put::Hold,
         };
         self.aloft = aloft;
-        Some(([x, if aloft { y.max(ground + LIFT) } else { y }], put))
+        let foot = match self.motion {
+            Some(_) => y - RADIUS,
+            None if aloft => y.max(ground + LIFT),
+            None => y,
+        };
+        Some(([x, foot], put))
     }
 
     /// The notice (SPEC V2.4): `Eggs N   m:ss` (1 minute), `Eggs N/10   m:ss.cc` (10 or 20 targets), `Eggs N` (free
@@ -680,6 +1114,9 @@ impl Run {
         // m:ss.cc of a frame count.
         let clock = |f: u32| (f * 5 / 3 / 6000, f * 5 / 3 / 100 % 60, f * 5 / 3 % 100);
         let (m, s, c) = clock(self.frames);
+        if self.recovering() {
+            write!(out, "Recover!  ")?;
+        }
         match self.rows[0] {
             TIMED if self.ended() => write!(out, "Time! {score} eggs (best {})", best[0]),
             _ if self.ended() => {
@@ -840,3 +1277,7 @@ mod standing_notice_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "egg_lifecycle_tests.rs"]
+mod lifecycle_tests;

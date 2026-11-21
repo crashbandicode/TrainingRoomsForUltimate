@@ -96,7 +96,7 @@ fn a_game_row_opens_its_sub_screen_on_start() {
 /// Today's rows of each game, labels, controls and order, from `c212bc50`'s table: Start, then these.
 #[test]
 fn each_sub_screen_has_start_first_then_todays_rows() {
-    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Hit streak", "CPU during a game"];
+    let eggs = ["Start", "Eggs-ercise", "Breaks on", "Target", "Target speed", "Spawn area", "Off-stage zone…", "Moving paths", "Target expiry", "Hit streak", "CPU during a game"];
     let btt = ["Start", "Projectiles break targets", "Place targets", "Saved layouts", "Hit streak", "CPU during a game"];
     let tech = [
         "Start", "Tech practice", "Tech wizard", "Surface", "Tech point", "Damage", "Damage range", "Launch speed",
@@ -316,28 +316,103 @@ fn an_old_settings_file_loads_without_loss() {
 }
 
 #[test]
-fn spawn_area_round_trips() {
-    let mut settings = Settings::factory();
-    assert_eq!(settings.menu.get("eggsercise_area"), Some(&[1, 0][..]), "In view is the default");
-    settings.menu.set("eggsercise_area", &[0, 1]).unwrap();
-
-    let saved = settings::parse(&settings.to_json());
+fn legacy_spawn_area_preserves_menu_and_defaults() {
+    let old = settings::parse(r#"{"menu":{"eggsercise_area":[0,1]},"defaults_menu":{"eggsercise_area":[1,0]}}"#);
+    assert!(old.issues.is_empty(), "{:?}", old.issues);
+    let saved = settings::parse(&old.settings.to_json());
     assert!(saved.issues.is_empty(), "{:?}", saved.issues);
-    assert_eq!(saved.settings.menu.get("eggsercise_area"), Some(&[0, 1][..]));
-    let mut snapshot = crate::model::settings::Snapshot::factory();
-    snapshot.set("eggsercise_area", saved.settings.menu.get("eggsercise_area").unwrap()).unwrap();
-    assert_eq!(crate::model::eggs::choices(&snapshot)[4], crate::model::eggs::WHOLE);
+    assert_eq!(saved.settings.menu.get("eggsercise_area"), Some(&[0, 1, 0][..]));
+    assert_eq!(saved.settings.defaults.get("eggsercise_area"), Some(&[1, 0, 0][..]));
+    let absent = settings::parse(r#"{"menu":{"eggsercise":[1,0,0,0,0]}}"#);
+    assert!(absent.issues.is_empty(), "{:?}", absent.issues);
+    assert_eq!(absent.settings.menu.get("eggsercise_area"), Some(&[1, 0, 0][..]));
+}
 
-    let loaded = settings::parse(&saved.settings.to_json());
-    assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
-    assert_eq!(loaded.settings.menu.get("eggsercise_area"), Some(&[0, 1][..]));
+#[test]
+fn spawn_area_checklist_preserves_independent_bits() {
+    let mut m = opened(Game::Eggs);
+    let area = row("Spawn area", table::game_group(Game::Eggs));
+    m.activate(area);
+    assert_eq!(m.screen(), Some(&Screen::Checklist { row: area, cursor: 0 }));
+    assert_eq!(m.get("eggsercise_area"), &[1, 0, 0]);
+    for choice in 1..=2 {
+        m.press(Button::Down);
+        m.press(Button::A);
+        assert_eq!(m.get("eggsercise_area")[choice], 1);
+    }
+    assert_eq!(m.get("eggsercise_area"), &[1, 1, 1]);
+    m.press(Button::B);
+    let committed = m.commit();
+    let restored = settings::parse(&committed.to_json());
+    assert!(restored.issues.is_empty(), "{:?}", restored.issues);
+    assert_eq!(restored.settings.menu.get("eggsercise_area"), Some(&[1, 1, 1][..]));
+}
 
-    let missing = settings::parse(r#"{"menu":{"eggsercise":[1,0,0,0,0]}}"#);
-    assert!(missing.issues.is_empty(), "{:?}", missing.issues);
-    assert_eq!(missing.settings.menu.get("eggsercise_area"), Some(&[1, 0][..]));
-    let mut snapshot = crate::model::settings::Snapshot::factory();
-    snapshot.set("eggsercise_area", missing.settings.menu.get("eggsercise_area").unwrap()).unwrap();
-    assert_eq!(crate::model::eggs::choices(&snapshot)[4], crate::model::eggs::IN_VIEW);
+#[test]
+fn offstage_zone_is_a_menu_action_and_does_not_start_eggs() {
+    let mut m = opened(Game::Eggs);
+    let zone = row("Off-stage zone…", table::game_group(Game::Eggs));
+    m.activate(zone);
+    assert!(m.is_closed());
+    let outbox = m.take_outbox();
+    assert_eq!((outbox.egg_zone, outbox.start, outbox.stop, outbox.changed), (true, None, false, false));
+    assert!(!m.take_outbox().egg_zone, "the action is taken once");
+}
+
+#[test]
+fn moving_paths_checklist_and_expiry_options_save_independently() {
+    let mut m = opened(Game::Eggs);
+    let paths = row("Moving paths", table::game_group(Game::Eggs));
+    let expiry = row("Target expiry", table::game_group(Game::Eggs));
+    assert_eq!(m.get("eggsercise_paths"), &[0, 0, 0, 0]);
+    assert_eq!(m.value(expiry), RowValue::Choice(Some(0)));
+    assert_eq!(m.option_count(expiry), 11);
+    m.activate(paths);
+    assert_eq!(m.screen(), Some(&Screen::Checklist { row: paths, cursor: 0 }));
+    m.press(Button::A);
+    m.press(Button::Down);
+    m.press(Button::A);
+    m.press(Button::B);
+    m.cycle(expiry, false);
+    assert_eq!(m.value(expiry), RowValue::Choice(Some(10)));
+    let restored = settings::parse(&m.commit().to_json());
+    assert!(restored.issues.is_empty(), "{:?}", restored.issues);
+    assert_eq!(restored.settings.menu.get("eggsercise_paths"), Some(&[1, 1, 0, 0][..]));
+    assert_eq!(restored.settings.menu.get("eggsercise_expiry").and_then(|options| options.iter().position(|&v| v == 1)), Some(10));
+}
+
+#[test]
+fn egg_zone_overrides_keep_each_native_stage_form() {
+    use crate::engine::stages::lobby_stages::native_forms;
+
+    let [normal, omega, battlefield] = native_forms(95).map(|id| u16::try_from(id.unwrap()).unwrap());
+    let mut current = Settings::factory();
+    current.egg_zones.set(battlefield, [255, 10, 11, 12]);
+    current.egg_zones.set(omega, [13, 14, 15, 16]);
+    current.egg_zones.set(normal, [0; 4]);
+    current.egg_zones.set(omega, [u8::MAX; 4]);
+
+    let saved = settings::parse(&current.to_json());
+    assert!(saved.issues.is_empty(), "{:?}", saved.issues);
+    assert_eq!(saved.settings.egg_zones, current.egg_zones);
+    assert_eq!(saved.settings.egg_zones.get(normal), Some([0; 4]));
+    assert_eq!(saved.settings.egg_zones.get(omega), Some([u8::MAX; 4]));
+    assert_eq!(saved.settings.egg_zones.get(battlefield), Some([255, 10, 11, 12]));
+    assert_eq!(saved.settings.egg_zones.get(347), None);
+    assert_eq!(Menu::new(Settings::factory(), Env::default()).commit_onto(&current).egg_zones, current.egg_zones);
+}
+
+#[test]
+fn bad_egg_zone_entries_leave_other_stage_forms_intact() {
+    let loaded = settings::parse(r#"{"egg_zones":{"0":[1,2,3,4],"1":[5,6,7,256],"2":[1,2,3],"400":[1,2,3,4]}}"#);
+    assert_eq!(loaded.issues.len(), 3);
+    assert_eq!(loaded.settings.egg_zones.get(0), Some([1, 2, 3, 4]));
+    for stage in [1, 2, 400] {
+        assert_eq!(loaded.settings.egg_zones.get(stage), None);
+    }
+    let clean = settings::parse(&loaded.settings.to_json());
+    assert!(clean.issues.is_empty(), "{:?}", clean.issues);
+    assert_eq!(clean.settings.egg_zones, loaded.settings.egg_zones);
 }
 
 /// The Parry entry (slot 6): a used saved parry practice sets Parry's mode and asks for Parry's Start at the close (its
