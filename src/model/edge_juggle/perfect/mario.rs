@@ -9,11 +9,14 @@ const CAPE: i32 = 0x1dd;
 const MACRO_FRAMES: u32 = 42;
 const EARLIEST_PRESS_SPEED: f32 = -0.173;
 const LATEST_PRESS_SPEED: f32 = -0.175;
+const GRAVITY: f32 = 0.087;
+const TERMINAL_FALL: f32 = -1.5;
+const LEAD_IN: u32 = 30;
 
 // fusion-g4 g4/tables/mario-mcs.txt. M15F flew all four corner cells; M15B
 // and M15W confirmed the shared near geometry. 4-by-4 cells in the common ring.
 #[rustfmt::skip]
-const MARIO_CS_RING: [u32; 22] = [
+const MARIO_CS_REST_RING: [u32; 22] = [
     0, 0, 0,
     0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00,
     0x07ffff00, 0x07ffff00, 0x07ffff00,
@@ -21,12 +24,34 @@ const MARIO_CS_RING: [u32; 22] = [
     0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00,
 ];
 
+// M17 and M18 flew the terminal-speed entry on normal Final Destination.
+#[rustfmt::skip]
+const MARIO_CS_RING: [u32; 22] = [
+    0, 0, 0,
+    0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00, 0x07ffff00,
+    0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00,
+    0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00, 0x0001ff00,
+];
+
 pub const fn reference_stage(stage: (i32, u32)) -> bool {
     matches!(stage, (0 | 3 | 311, 0))
 }
 
-fn in_region(near: Point, position: Point) -> bool {
-    region::contains(&MARIO_CS_RING, near[0] - position[0], position[1] - near[1])
+fn in_region(table: &[u32], near: Point, position: Point) -> bool {
+    region::contains(table, near[0] - position[0], position[1] - near[1])
+}
+
+fn terminal_entry(near: Point, entry: CapeBeat) -> Option<u32> {
+    let [x, mut y] = entry.position;
+    let mut vy = entry.velocity[1];
+    // The release sample can follow zero, one or two native fall updates.
+    let elapsed = (-vy / GRAVITY).round() as u32;
+    let remaining = LEAD_IN - elapsed;
+    for _ in 0..remaining {
+        vy = (vy - GRAVITY).max(TERMINAL_FALL);
+        y += vy;
+    }
+    in_region(&MARIO_CS_RING, near, [x, y]).then_some(entry.frame + remaining)
 }
 
 #[derive(Clone, Copy)]
@@ -43,6 +68,7 @@ pub struct CapeBeat {
 
 pub struct CapeStall {
     near: Point,
+    terminal_press: Option<u32>,
     pressed: Option<u32>,
     observed: bool,
     latest: Option<(u32, Option<Correction>)>,
@@ -55,13 +81,22 @@ impl CapeStall {
             || !matches!(zone, Zone::Ledge | Zone::Hang)
             || draw >= 1 << 30
             || entry.frame > 1
-            || !Self::free_start(near, entry)
+            || !Self::fresh_fall(entry)
+            || !(LATEST_PRESS_SPEED..=0.0).contains(&entry.velocity[1])
             || !region::has_common_underside([near, far], facts.blast[3], facts.outline)
         {
             return None;
         }
+        let terminal_press = if in_region(&MARIO_CS_REST_RING, near, entry.position) {
+            None
+        } else if facts.stage == (3, 0) {
+            Some(terminal_entry(near, entry)?)
+        } else {
+            return None;
+        };
         Some(Self {
             near,
+            terminal_press,
             pressed: None,
             observed: false,
             latest: None,
@@ -97,13 +132,30 @@ impl CapeStall {
                 pad([0.0, 0.0], 0)
             });
         }
-        if beat.frame > 4 || !Self::free_start(self.near, beat) {
+        if !Self::fresh_fall(beat) {
             return None;
         }
-        if beat.velocity[1] > EARLIEST_PRESS_SPEED {
-            // The proof has two uncontested Fall updates before pressing. Wait for that
-            // live fall speed; the think may be called twice on a game frame.
-            return Some(pad([0.0, 0.0], 0));
+        if let Some(frame) = self.terminal_press {
+            if beat.frame < frame && (TERMINAL_FALL..=0.0).contains(&beat.velocity[1]) {
+                return Some(pad([0.0; 2], 0));
+            }
+            if beat.frame != frame
+                || beat.velocity[1] != TERMINAL_FALL
+                || !in_region(&MARIO_CS_RING, self.near, beat.position)
+            {
+                return None;
+            }
+        } else {
+            if beat.frame > 4
+                || !(LATEST_PRESS_SPEED..=0.0).contains(&beat.velocity[1])
+                || !in_region(&MARIO_CS_REST_RING, self.near, beat.position)
+            {
+                return None;
+            }
+            if beat.velocity[1] > EARLIEST_PRESS_SPEED {
+                // The at-rest proof has two uncontested Fall updates before pressing.
+                return Some(pad([0.0; 2], 0));
+            }
         }
         if !beat.can_cape {
             return None;
@@ -112,14 +164,13 @@ impl CapeStall {
         Some(pad([1.0, 0.0], SPECIAL))
     }
 
-    fn free_start(near: Point, beat: CapeBeat) -> bool {
+    fn fresh_fall(beat: CapeBeat) -> bool {
         beat.status == FALL
             && beat.facing == 1.0
             && beat.jumps == 1
             && beat.can_rise
             && beat.velocity[0] == 0.0
-            && (LATEST_PRESS_SPEED..=0.0).contains(&beat.velocity[1])
-            && in_region(near, beat.position)
+            && beat.position.into_iter().all(f32::is_finite)
     }
 }
 
@@ -172,7 +223,8 @@ lib_unit_tests! {
 
         #[test]
         fn mario_cape_admits_the_proven_corners_and_rejects_far_low_starts() {
-            assert_eq!(MARIO_CS_RING.iter().map(|word| word.count_ones()).sum::<u32>(), 261);
+            assert_eq!(MARIO_CS_REST_RING.iter().map(|word| word.count_ones()).sum::<u32>(), 261);
+            assert_eq!(MARIO_CS_RING.iter().map(|word| word.count_ones()).sum::<u32>(), 231);
             for stage in [(3, 0), (0, 0), (311, 0)] {
                 for (outside, height) in [(66.0, -46.0), (34.0, -46.0), (106.0, -6.0), (106.0, 26.0)] {
                     let position = [LEFT[0] - outside, height];
@@ -185,6 +237,38 @@ lib_unit_tests! {
                 let beat = CapeBeat { position, ..START };
                 assert!(CapeStall::start(&facts((3, 0), position), Zone::Ledge, 0, beat).is_none());
             }
+        }
+
+        #[test]
+        fn mario_cape_replays_the_terminal_entry_and_respects_its_far_low_boundary() {
+            // M18 mcs-tf-t: press after 30 neutral rows from (106 out, +38.81).
+            let outside = 106.0;
+            let position = [LEFT[0] - outside, 38.81];
+            let initial = CapeBeat { position, ..START };
+            let mut flight = CapeStall::start(&facts((3, 0), position), Zone::Ledge, 0, initial).unwrap();
+            let mut y = position[1];
+            let mut vy: f32 = 0.0;
+            for frame in 0..=30 {
+                let live = CapeBeat { frame, position: [position[0], y], velocity: [0.0, vy], ..initial };
+                let expected = if frame == 30 {
+                    Some(pad([1.0, 0.0], SPECIAL))
+                } else {
+                    Some(pad([0.0; 2], 0))
+                };
+                assert_eq!(flight.step(live), expected, "frame {frame}");
+                assert_eq!(flight.step(live), expected, "repeated think {frame}");
+                vy = (vy - 0.087).max(-1.5);
+                y += vy;
+            }
+            assert_eq!(flight.step(CapeBeat { frame: 31, status: CAPE, ..initial }), Some(pad([1.0, 0.0], SPECIAL)));
+            assert_eq!(flight.step(CapeBeat { frame: 32, status: CAPE, ..initial }), Some(pad([0.0; 2], 0)));
+            assert_eq!(flight.step(CapeBeat { frame: 72, status: CAPE, ..initial }), Some(Correction::default()));
+
+            // The rest table admits the at-rest corner below, while M17
+            // returned only once in five when pressing at terminal speed there.
+            let outside_press = CapeBeat { frame: 30, position: [position[0], -6.0], velocity: [0.0, -1.5], ..initial };
+            let mut drift = CapeStall::start(&facts((3, 0), position), Zone::Ledge, 0, initial).unwrap();
+            assert!(drift.step(outside_press).is_none());
         }
 
         #[test]
