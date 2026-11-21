@@ -518,6 +518,15 @@ impl Stage {
         clamp_point(point, self.camera)
     }
 
+    pub fn player_cursor(self, drill: Drill, point: [f32; 2]) -> Option<[f32; 2]> {
+        let [x, y] = self.camera_point(point)?;
+        let x = match drill {
+            Drill::GuardEdge => x.clamp(self.ledges[0][0], self.ledges[1][0]),
+            Drill::Juggler => x,
+        };
+        Some([x, y])
+    }
+
     pub fn default_juggle(self, p1: [f32; 2]) -> [f32; 2] {
         [p1[0], p1[1].midpoint(self.camera[2])]
     }
@@ -582,7 +591,7 @@ impl Wizard {
             setup: Setup {
                 area,
                 cpu,
-                p1: stage.camera_point(p1)?,
+                p1: stage.player_cursor(drill, p1)?,
                 percent: percent.min(300),
             },
         })
@@ -619,6 +628,29 @@ impl Wizard {
         } {
             self.setup.cpu = point;
         }
+    }
+
+    pub fn player_floor(
+        &self,
+        stage: Stage,
+        cursor: [f32; 2],
+        confirm: bool,
+        mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>,
+    ) -> Option<[f32; 2]> {
+        sample(cursor).or_else(|| {
+            let previous = self.setup.p1;
+            // A ray at a shared lip can hit the wall. Confirm the displayed
+            // floor point only after its own fresh sample succeeds.
+            if confirm
+                && self.drill == Drill::GuardEdge
+                && cursor[0] != previous[0]
+                && stage.ledges.iter().any(|ledge| cursor[0] == ledge[0])
+            {
+                sample(previous)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn change_percent(&mut self, delta: i16) {
@@ -766,6 +798,56 @@ mod tests {
             assert_eq!(stage.edge_start(area, start), Some(expected));
         }
         assert_eq!(stage.edge_start(Area::LowerLeft, [f32::NAN, 0.0]), None);
+    }
+
+    #[test]
+    fn edge_player_cursor_reverses_immediately_after_the_yoshi_story_lip() {
+        let stage = Stage::new(
+            [-180.0, 180.0, 120.0, -90.0],
+            [-160.0, 160.0, 118.0, -80.0],
+            [[-68.0, -4.25], [68.0, -4.25]],
+        ).unwrap();
+        for side in [-1.0, 1.0] {
+            let lip = [side * 68.0, -4.25];
+            let outside = [side * 130.0, -4.25];
+            let cursor = stage.player_cursor(Drill::GuardEdge, outside).unwrap();
+            assert_eq!(
+                stage.player_cursor(Drill::GuardEdge, [cursor[0] - side * 2.0, cursor[1]]),
+                Some([side * 66.0, -4.25]),
+            );
+            assert_eq!(cursor, lip);
+            assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
+        }
+    }
+
+    #[test]
+    fn edge_player_confirms_the_last_solid_floor_when_the_endpoint_is_a_wall() {
+        let stage = Stage::new(
+            [-180.0, 180.0, 120.0, -90.0],
+            [-160.0, 160.0, 118.0, -80.0],
+            [[-68.0, -4.25], [68.0, -4.25]],
+        ).unwrap();
+        let previous = [-66.140_594, -3.862];
+        let edge = Wizard::new(Drill::GuardEdge, stage, previous, 100, (0, 0), Some(0)).unwrap();
+        let lip = [-68.0, -3.862];
+        let mut queries = Vec::new();
+        assert_eq!(edge.player_floor(stage, lip, true, |point| {
+            queries.push(point);
+            (point == previous).then_some(previous)
+        }), Some(previous));
+        assert_eq!(queries, [lip, previous]);
+        assert!(edge.player_floor(stage, lip, false, |point| {
+            assert_eq!(point, lip, "only fresh confirmation revalidates the prior point");
+            None
+        }).is_none());
+        assert!(edge.player_floor(stage, lip, true, |_| None).is_none());
+        assert!(edge.player_floor(stage, [-60.0, 0.0], true, |point| {
+            (point == previous).then_some(previous)
+        }).is_none(), "a failed interior sample needs a new cursor location");
+        let juggler = Wizard::new(Drill::Juggler, stage, previous, 60, (0, 0), Some(0)).unwrap();
+        assert!(juggler.player_floor(stage, lip, true, |point| {
+            (point == previous).then_some(previous)
+        }).is_none(), "Juggler selects the current platform height");
     }
 
     #[test]

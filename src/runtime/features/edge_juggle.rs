@@ -1394,7 +1394,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         WizardStep::Cpu => wizard.move_cpu(run.stage, moved(wizard.setup.cpu, stick)),
         WizardStep::Percent => wizard.change_percent(horizontal + vertical * 10),
         WizardStep::Player => {
-            if let Some(cursor) = run.stage.camera_point(moved(run.cursor, stick)) {
+            if let Some(cursor) = run.stage.player_cursor(run.drill, moved(run.cursor, stick)) {
                 run.cursor = cursor;
             }
             run.confirm_player |= key_down(key::A);
@@ -1875,13 +1875,16 @@ pub unsafe fn frame(fighter: usize) {
     let key = (drill, kind, run.setup.area as u8, run.difficulty);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
-            if let Some(p1) = snap_player(p1, drill, run.stage, run.cursor) {
+            let confirm = std::mem::take(&mut run.confirm_player);
+            let placed = wizard.player_floor(run.stage, run.cursor, confirm, |point| {
+                snap_player(p1, drill, run.stage, point)
+            });
+            if let Some(p1) = placed {
                 wizard.setup.p1 = p1;
-                if run.confirm_player {
+                if confirm {
                     wizard.advance();
                 }
             }
-            run.confirm_player = false;
         }
         post_notice(run, best_time(bests, key), best_time(streaks, key));
         return;
