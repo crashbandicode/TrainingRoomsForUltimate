@@ -10,6 +10,7 @@ use crate::{
 };
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
+use perfect::olimar::{self, OlimarBeat, OlimarFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::sheik::{SheikBeat, SheikFlight};
@@ -29,6 +30,7 @@ enum MeasuredFlight {
     Puff(PuffFlight),
     Pichu(PichuFlight),
     PichuFakeOut(PichuFakeOut),
+    Olimar(OlimarFlight),
     Sheik(SheikFlight),
 }
 
@@ -161,6 +163,31 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == olimar::KIND {
+            let fall = konst(C::StatusFall);
+            if fall == UNRESOLVED || natives::status_kind(cpu) != fall {
+                return None;
+            }
+            let row = niche::measured_row(30, niche::CANDIDATE_ROWS)?;
+            let flight = OlimarFlight::start(facts, OlimarBeat {
+                frame: 0,
+                status: fall,
+                position: facts.position,
+                velocity: inputs.speed,
+                jumps: inputs.jumps,
+                pikmin: super::super::state_restore::olimar_pikmin_count(cpu),
+                can_jump: false,
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+                facing: natives::lr(cpu),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Olimar(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         let row_facts = Facts {
             fighter,
             corridor: None,
@@ -204,6 +231,7 @@ impl NicheGuide {
             // The FLY-L ring bake runs in at most 283 frames at the cell centers.
             Some(MeasuredFlight::Puff(_)) => Some(300),
             Some(MeasuredFlight::Pichu(_)) => Some(200),
+            Some(MeasuredFlight::Olimar(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
@@ -270,6 +298,22 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::Olimar(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let fall = konst(C::StatusFall);
+            let rise_status = [olimar::FALL, olimar::JUMP_AERIAL, olimar::FALL_AERIAL].contains(&status);
+            return flight.step(OlimarBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                jumps: remaining_jumps(cpu)?,
+                pikmin: super::super::state_restore::olimar_pikmin_count(cpu),
+                can_jump: status == fall && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: rise_status && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+                facing: natives::lr(cpu),
             });
         }
         if let Some(MeasuredFlight::Sheik(flight)) = &mut self.measured {

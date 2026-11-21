@@ -6,6 +6,8 @@ pub mod fly;
 pub mod game_watch;
 #[path = "perfect/niche.rs"]
 pub mod niche;
+#[path = "perfect/olimar.rs"]
+pub mod olimar;
 #[path = "perfect/pichu.rs"]
 pub mod pichu;
 #[path = "perfect/pikachu.rs"]

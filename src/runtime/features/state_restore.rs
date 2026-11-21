@@ -79,6 +79,21 @@ const TROOPS_HELD_COUNT: usize = 0x80;
 /// The battle object's id field (the `sv_battle_object` lookups take it).
 const BATTLE_OBJECT_ID_FIELD: usize = 0x8;
 
+/// Count the live troops for recovery physics. The same guarded WorkModule
+/// getter and count fields are used when reading a save state's Pikmin line.
+///
+/// # Safety
+/// `accessor` belongs to a live Olimar body.
+pub(super) unsafe fn olimar_pikmin_count(accessor: usize) -> Option<u8> {
+    let manager = usize::try_from(n::work_get_int64(accessor, TROOPS_MANAGER_ID)).ok()?;
+    if manager == 0 || !manager.is_multiple_of(std::mem::align_of::<u32>()) {
+        return None;
+    }
+    let following = (manager.checked_add(TROOPS_FOLLOW_COUNT)? as *const u32).read();
+    let held = (manager.checked_add(TROOPS_HELD_COUNT)? as *const u32).read();
+    u8::try_from(following.checked_add(held)?).ok().filter(|count| *count <= 3)
+}
+
 unsafe fn pikmin_colour(object_id: u32, ids: &Table) -> Option<i32> {
     if !n::object_is_active(object_id) {
         return None;
