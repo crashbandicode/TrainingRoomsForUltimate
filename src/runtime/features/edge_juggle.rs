@@ -1317,12 +1317,11 @@ unsafe fn recovery_pad(
         }
     }
     let hot = can_wait && ledge_hot(run, p1, ledge);
-    // In reserve the stock up special is the plan: only the jump is withheld.
-    let seen = if reserve { buttons & !perfect::SPECIAL } else { buttons };
+    // The delay applies only to the chosen resource.
     let frame = run.rounds.frames;
     let left = jumps.unwrap_or(0);
     let mut correction =
-        run.hold.step(HoldFacts { frame, buttons: seen, button, jumps: left, planned, can_wait, hot });
+        run.hold.step(HoldFacts { frame, buttons, button, jumps: left, planned, can_wait, hot });
     let inward = (ledge[0] - pos[0]).signum();
     if let Some(x) = wait_drift.filter(|_| correction.release != 0 || run.hold.waiting()) {
         // Level stick while the up special is withheld: no tap jump, no fast fall.

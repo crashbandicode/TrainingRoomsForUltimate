@@ -485,17 +485,30 @@ fn bowser_jr_held_jump_brakes_before_the_near_ledge() {
     assert_eq!(reach.hold_stick([87.9156, -59.3758], [-1.134, -1.65], [79.9856, ledge[1]]), Some(1.0));
 }
 
+
+#[test]
+fn bowser_jr_keeps_the_stock_up_special_while_delaying_the_jump() {
+    // Exact d1889000: attempts 88154/89842 died after R2 withheld 0x8802.
+    // At matched Level 9 release 102193 the same pad reached the ledge in 45f.
+    let mut hold = Ticking::default();
+    hold.step(held(JUMP, 20, true, 0x8000));
+    assert_eq!(hold.step(held(JUMP, 20, true, 0x8802)), Correction::default());
+    assert!(!hold.waiting(), "an up special never leaves a jump owed");
+    assert_eq!(hold.step(held(JUMP, 20, false, 0x8000)), Correction::default());
+}
+
+#[test]
+fn a_stock_up_special_settles_any_withheld_jump_on_that_frame() {
+    let mut hold = Ticking::default();
+    assert_eq!(hold.step(held(JUMP, 20, true, 0x8004)).release, JUMP);
+    assert!(hold.waiting());
+    assert_eq!(hold.step(held(JUMP, 20, false, 0x8802)), Correction::default());
+    assert!(!hold.waiting());
+    assert_eq!(hold.step(held(JUMP, 20, false, 0x8000)), Correction::default());
+}
+
 #[test]
 fn stock_up_special_is_held_until_the_sweet_spot_frame() {
-    let mut with_jump = Ticking::default();
-    with_jump.step(held(JUMP, 20, true, 0x8004));
-    let both = with_jump.step(held(JUMP, 20, true, 0x8002));
-    assert_eq!(
-        (both.press, both.release),
-        (0, SPECIAL),
-        "no up special while the jump is unspent"
-    );
-
     let mut hold = Ticking::default();
     for frame in 0..5 {
         let edit = hold.step(held(SPECIAL, 5, true, 0x8002));

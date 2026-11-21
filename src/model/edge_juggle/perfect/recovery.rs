@@ -405,6 +405,13 @@ impl Hold {
     }
 
     pub fn step(&mut self, facts: HoldFacts) -> Correction {
+        if facts.button == JUMP && facts.buttons & SPECIAL != 0 {
+            // The stock special is neither withheld nor reissued as a jump.
+            let out = Correction::default();
+            self.owed = None;
+            self.last = Some((facts.frame, out));
+            return out;
+        }
         if let Some((_, out)) = self.last.filter(|(frame, _)| *frame == facts.frame) {
             // Another think on the same game frame repeats the pad.
             return out;
@@ -418,8 +425,7 @@ impl Hold {
             // A stock defensive answer passes and keeps the resource.
             self.owed = None;
         } else if facts.can_wait && (age < u32::from(facts.planned) || facts.hot) {
-            // The up special never goes before a jump held in reserve.
-            out.release = facts.buttons & (facts.button | SPECIAL);
+            out.release = facts.buttons & facts.button;
             if out.release != 0 {
                 self.owed = Some(resource);
             }
