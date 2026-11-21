@@ -8,6 +8,7 @@ use crate::{
     model::{sites_pkg2, sites_pkg3},
     runtime::game,
 };
+use perfect::diddy::{self, BarrelFlight, BarrelSample};
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::kart::{KartFlight, KartState};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
@@ -37,6 +38,7 @@ enum MeasuredFlight {
     Sheik(SheikFlight),
     Sora(SoraFlight),
     Kart(KartFlight),
+    Diddy(BarrelFlight),
     PacMan(PacFlight),
 }
 
@@ -241,6 +243,28 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == diddy::KIND {
+            let fall = konst(C::StatusFall);
+            if fall != diddy::FALL || natives::status_kind(cpu) != fall {
+                return None;
+            }
+            let row = niche::measured_row(diddy::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = BarrelFlight::start(facts, BarrelSample {
+                frame: 0,
+                status: fall,
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Barrel, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Diddy(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == pacman::KIND {
             let fall = konst(C::StatusFall);
             if fall == UNRESOLVED
@@ -309,6 +333,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sora(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Kart(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
@@ -473,6 +498,18 @@ impl NicheGuide {
                 jumps: remaining_jumps(cpu)?,
                 side,
                 up,
+            });
+        }
+        if let Some(MeasuredFlight::Diddy(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            return flight.step(BarrelSample {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: natives::lr(cpu),
+                can_rise: status == diddy::FALL && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Barrel, available),
             });
         }
         if let Some(MeasuredFlight::PacMan(flight)) = &mut self.measured {

@@ -1,5 +1,7 @@
 //! Perfect-mode recovery and escape decisions. The runtime applies only pad inputs.
 
+#[path = "perfect/diddy.rs"]
+pub mod diddy;
 #[path = "perfect/fly.rs"]
 pub mod fly;
 #[path = "perfect/game_watch.rs"]

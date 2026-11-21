@@ -590,6 +590,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(perfect::kart::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([22.0, -42.0])
             }
+            (Drill::GuardEdge, Some(perfect::diddy::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([14.0, -30.0])
+            }
             (Drill::GuardEdge, Some(perfect::pacman::KIND)) if perfect::is_crossing_stage(stage_key) => {
                 Some([26.0, 14.0])
             }
@@ -963,6 +966,26 @@ mod tests {
         }
         assert_eq!(session.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
         assert_eq!((session.secured, session.attempts), (0, 0));
+    }
+
+    #[test]
+    fn diddy_lower_wizard_defaults_to_the_measured_rocketbarrel_release() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
+            assert_eq!(wizard.setup.cpu, [-94.0, -30.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [94.0, -30.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(0, 1), (89, 0)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
     }
 
     #[test]
