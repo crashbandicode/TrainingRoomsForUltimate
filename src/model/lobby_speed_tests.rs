@@ -588,7 +588,7 @@ fn every_reset_returns_the_lobby_to_x1_and_ends_the_hold() {
 /// The lobby half of the runtime never names the update-rate words: the files and functions it runs in the waiting room.
 fn the_lobby_path_never_writes_the_update_rate_words() {
     // Code only: comment lines may name the words they say the code doesn't touch.
-    let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
+    let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).map(|l| format!("{l}\n")).collect::<String>();
     let speed = code(include_str!("../runtime/features/game_speed.rs"));
     let body = |name: &str| {
         let at = speed.find(&format!("fn {name}(")).unwrap_or_else(|| panic!("fn {name}"));
