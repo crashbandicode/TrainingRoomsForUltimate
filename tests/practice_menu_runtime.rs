@@ -73,8 +73,8 @@ fn edge_juggle_holds_the_cpu_while_its_wizard_is_open() {
     let correction = item(&runtime, "pub(super) unsafe fn ai_correction(");
     let hold = correction.find("run.rounds.phase.held_pad(buttons)").expect("the shared placement hold");
     let wizard = correction.find("run.wizard.is_").expect("the wizard exclusion for live corrections");
-    let perfect = correction.find("run.difficulty != Difficulty::Perfect").expect("the Perfect rule boundary");
-    assert!(hold < wizard && hold < perfect, "the primary CPU must reach the placement hold while either wizard is open, before the live-only checks");
+    let mode = correction.find("match run.opponent.mode").expect("the opponent mode boundary");
+    assert!(hold < wizard && wizard < mode, "the primary CPU must reach the placement hold while either wizard is open, before the live-only checks");
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
