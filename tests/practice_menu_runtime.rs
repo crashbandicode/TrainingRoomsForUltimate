@@ -68,13 +68,13 @@ fn the_tech_camera_follows_the_running_session() {
 }
 
 #[test]
-fn edge_juggle_holds_the_cpu_while_its_wizard_is_open() {
+fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let correction = item(&runtime, "pub(super) unsafe fn ai_correction(");
     let hold = correction.find("run.rounds.phase.held_pad(buttons)").expect("the shared placement hold");
     let wizard = correction.find("run.wizard.is_").expect("the wizard exclusion for live corrections");
     let mode = correction.find("match run.opponent.mode").expect("the opponent mode boundary");
-    assert!(hold < wizard && wizard < mode, "the primary CPU must reach the placement hold while either wizard is open, before the live-only checks");
+    assert!(wizard < hold && hold < mode, "the shared editor owns the CPU before the drill's lead-in and live dispatch");
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
@@ -147,4 +147,27 @@ fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
     assert!(draw.contains("stroke_layers(width, color)"), "world marks draw the dark and colored layers");
     assert!(draw.contains("INSET_BACKING"), "every inset mark has a dark background");
     assert!(item(&zone, "fn prompt(").contains("notices::show_now("), "the built-in notice includes the dark label plate");
+}
+
+#[test]
+fn location_editors_use_one_camera_and_cpu_session() {
+    let camera = src("src/runtime/features/btt_camera.rs");
+    let frame = item(&camera, "pub unsafe fn frame(");
+    assert!(frame.contains("model::EGG_ZONE_OWNER, super::egg_zone::wizard_active()"));
+    assert!(frame.contains("model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active()"));
+    let btt = src("src/runtime/features/btt.rs");
+    assert!(item(&btt, "unsafe fn pass(").contains("btt::BTT_PLACEMENT_OWNER"));
+    let tech = src("src/runtime/features/tech.rs");
+    assert!(item(&tech, "pub unsafe fn frame(").contains("model::TECH_PLACEMENT_OWNER"));
+    let recorder = src("src/runtime/features/recorder.rs");
+    let ai = item(&recorder, "unsafe fn on_ai_frame(");
+    let controller = ai.find("ENTRY_CONTROLLER_FIELD").unwrap();
+    let placement = ai.find("btt_camera::placement_pad").expect("the shared Place hold");
+    let drill = ai.find("drill_owns_pad").unwrap();
+    assert!(controller < placement && placement < drill);
+    assert!(src("src/runtime/features/reset_hub.rs").contains("btt_camera::interrupt_placement()"));
+    assert!(src("src/runtime/ui/worker.rs").contains("btt_camera::interrupt_placement()"));
+    let cpu = src("src/runtime/features/cpu.rs");
+    assert!(item(&cpu, "fn role_of(").contains("btt_camera::placing()"));
+    assert!(item(&cpu, "unsafe fn fighter_frame(").contains("btt_camera::placing()"));
 }

@@ -75,6 +75,7 @@ pub(super) fn placement_pad(buttons: u32) -> Option<crate::model::edge_juggle::p
 /// Player 1's non-Nana game-thread callback; no plugin lock is held.
 pub unsafe fn frame() {
     OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
+    OWNERS.request(model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active());
     let want = OWNERS.camera_wanted(covered());
     if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
