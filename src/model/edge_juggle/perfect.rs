@@ -258,42 +258,6 @@ impl AirPhysics {
         .all(|value| value.is_finite() && value > 0.0)
     }
 
-    /// Coast through the collision corridor, then use a remaining jump on
-    /// the far side. A fighter must clear the lip before spending that jump.
-    pub fn crossing(self, from: Point, speed: Point, exit: Point, band: Point, jumps: u8) -> bool {
-        if jumps == 0
-            || !self.valid()
-            || !from
-                .into_iter()
-                .chain(speed)
-                .chain(exit)
-                .chain(band)
-                .all(f32::is_finite)
-        {
-            return false;
-        }
-        let [bottom, top] = band;
-        let direction = (exit[0] - from[0]).signum();
-        let mut distance = (exit[0] - from[0]).abs();
-        let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
-        let mut y = from[1];
-        for _ in 0..90 {
-            if y <= bottom || y >= top {
-                return false;
-            }
-            vx = (vx + self.horizontal_acceleration).min(self.horizontal_speed);
-            vy = (vy - self.gravity).max(-self.terminal_speed);
-            distance -= vx;
-            y += vy;
-            if distance <= 0.0 && bottom < y && y < top {
-                let apex_time = (self.jump_speed / self.gravity).floor().clamp(1.0, 90.0);
-                let gain = apex_time * (self.jump_speed - self.gravity * (apex_time + 1.0) * 0.5);
-                return y + gain >= exit[1];
-            }
-        }
-        false
-    }
-
     /// Take the high path only if the fighter will clear the lip while airborne.
     pub fn high_route_input(
         self,
@@ -596,7 +560,9 @@ impl RouteFacts<'_> {
     }
 }
 
-pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
+/// Normal ledge and stage routes. An Opposite candidate comes from a measured
+/// fighter guide after live stage and resource checks.
+pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 3] {
     let [left, right] = facts.ledges;
     let clearance = facts.body_clearance;
     let offset = facts.ledge_distance;
@@ -616,7 +582,7 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         || facts.reach.into_iter().any(|value| value <= 0.0)
         || facts.outline.is_empty()
     {
-        return [None; 4];
+        return [None; 3];
     }
     let (near, other, edge_dir) = if facts.position[0] <= left[0].midpoint(right[0]) {
         (left, right, -1.0)
@@ -624,7 +590,6 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         (right, left, 1.0)
     };
     let outside = near[0] + offset * edge_dir;
-    let exit = other[0] - offset * edge_dir;
     let low = near[1] - clearance;
     let high = near[1].max(other[1]) + clearance;
     let finish = [outside, near[1]];
@@ -639,29 +604,7 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         2,
     );
     let late_plan = facts.candidate(Route::LateLow, [[outside, low], finish, [0.0; 2]], 2);
-    let near_covered =
-        (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
-    let other_covered =
-        (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
-    // Pikachu and Jigglypuff use their measured flight regions in the native
-    // dispatcher. A failed region or resource check cannot bypass that model.
-    let opposite = if !matches!(facts.fighter, 0x8 | 0xc)
-        && recovery::can_estimate_crossing(facts.fighter)
-        && !other_covered
-        && (near_plan.is_none() || near_covered)
-    {
-        facts.crossing_band().and_then(|[bottom, top]| {
-            let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
-            facts.candidate(
-                Route::Opposite,
-                [[outside, crossing], [exit, crossing], [exit, other[1]]],
-                3,
-            )
-        })
-    } else {
-        None
-    };
-    [near_plan, high_plan, late_plan, opposite]
+    [near_plan, high_plan, late_plan]
 }
 
 /// Edits to the CPU controller after the stock AI has produced its pad.
@@ -1222,18 +1165,6 @@ mod tests {
     }
 
     #[test]
-    fn a_crossing_must_survive_to_the_exit_and_still_rise_to_the_ledge() {
-        let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
-            gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
-        let band = [-70., -8.];
-        assert!(air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 1));
-        assert!(!air.crossing([-15., -65.], [2., -2.], [15., 0.], band, 1));
-        assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1));
-        assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1));
-        assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0));
-    }
-
-    #[test]
     fn charged_smash_preserves_the_juggler_reaction_clock() {
         use crate::model::{cpu::ids::{C, Table}, hash40::hash40};
 
@@ -1349,34 +1280,12 @@ mod tests {
     }
 
     #[test]
-    fn a_reachable_opposite_ledge_is_considered_only_when_it_avoids_the_player() {
-        let ledges = [[-40., 0.], [40., 0.]];
-        let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
-        let mut facts = RouteFacts {
-            fighter: 0x1d,
-            stage: (0, 0),
-            position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
-            ledges, blast: [-130., 130., 100., -90.], outline: &lines,
-            body_clearance: 9., ledge_distance: 5., fall_budget: 12.,
-            reach: [120., 42.],
-        };
-        assert!(possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
-        facts.player = [0., 25.];
-        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
-        facts.player = [-41., 0.];
-        facts.reach[0] = 45.;
-        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
-    }
-
-    #[test]
-    fn an_optimistic_budget_cannot_bypass_hard_cases_or_measured_crossings() {
-        use crate::model::fighter_choices::CHOICES;
-
+    fn a_crossable_outline_without_a_measured_route_never_offers_opposite() {
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
             fighter: 0x1d,
-            stage: (3, 0),
+            stage: (0, 0),
             position: [-53., -22.],
             player: [-41., 0.],
             player_reach: 18.,
@@ -1388,18 +1297,13 @@ mod tests {
             fall_budget: 12.,
             reach: [120., 42.],
         };
-        assert!(possible_routes(&facts)[3].is_some(), "the geometry and budget permit crossing");
-        for (kind, name) in CHOICES.iter().copied().filter(|&(_, name)| {
-            matches!(name, "Little Mac" | "Incineroar" | "Luigi" | "Ness" | "Snake" | "Charizard" | "Link" | "Pikachu" | "Jigglypuff" | "Kirby")
-        }) {
-            facts.fighter = kind as i32;
-            for stage in [0, 3, 311] {
-                facts.stage = (stage, 0);
-                assert!(facts.crossing_band().is_some(), "{name} stage {stage}: geometry still available");
-                let [near, _, low, across] = possible_routes(&facts);
-                assert!(near.or(low).is_some(), "{name} stage {stage}: return remains available");
-                assert!(across.is_none(), "{name} stage {stage}: no generic crossing");
-            }
+        for stage in [0, 3, 311] {
+            facts.stage = (stage, 0);
+            assert!(facts.crossing_band().is_some(), "physical corridor is open");
+            let plans = possible_routes(&facts);
+            assert!(plans.iter().flatten().any(|plan| plan.route == Route::Near));
+            assert!(plans.iter().flatten().all(|plan| plan.route != Route::Opposite),
+                "stage {stage} requires a measured fighter route as well as geometry");
         }
     }
 
@@ -1417,7 +1321,7 @@ mod tests {
     }
 
     #[test]
-    fn only_the_three_approved_normal_stages_offer_an_opposite_crossing() {
+    fn only_the_three_approved_normal_stages_have_a_crossing_band() {
         use crate::engine::stages::catalog::STAGES;
         let ledges = [[-40., 0.], [40., 0.]];
         let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
@@ -1438,9 +1342,8 @@ mod tests {
         let approved = ["Waiting Room", "Battlefield", "Final Destination"];
         for &(id, label) in STAGES {
             facts.stage = (id as i32, 0);
-            let [near, high, low, opposite] = possible_routes(&facts);
+            let [near, high, low] = possible_routes(&facts);
             assert!([near, high, low].into_iter().any(|plan| plan.is_some()));
-            assert_eq!(opposite.is_some(), approved.contains(&label), "{label}");
             assert_eq!(facts.crossing_band().is_some(), approved.contains(&label), "{label}");
         }
         for stage in [(-1, 0), (0, 1), (3, 2), (89, 0), (311, 1)] {
@@ -1453,7 +1356,6 @@ mod tests {
         facts.stage = (3, 0);
         facts.outline = &low_floor;
         assert!(facts.crossing_band().is_none());
-        assert!(possible_routes(&facts)[3].is_none());
     }
 
     #[test]

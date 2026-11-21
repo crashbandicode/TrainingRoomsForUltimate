@@ -51,7 +51,8 @@ pub struct PuffFlight {
 
 impl PuffFlight {
     pub fn start(facts: &RouteFacts<'_>, state: FlyState) -> Option<Self> {
-        if state.remaining != 5
+        if facts.fighter != PUFF
+            || state.remaining != 5
             || !state.velocity.into_iter().all(f32::is_finite)
             || state.velocity[0].abs() > DRIFT
             || !(-FALL..=0.0).contains(&state.velocity[1])

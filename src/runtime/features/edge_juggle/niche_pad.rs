@@ -9,15 +9,14 @@ use crate::{
     runtime::game,
 };
 use perfect::fly::{puff_active_status, FlyState, PuffFlight};
-use perfect::niche::{self, Budget, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
+use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
-use perfect::{recovery, AirPhysics, Correction, Outline, Point, Route, RouteFacts, SpecialReach};
+use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
     sequence: Sequence,
     fighter: i32,
     ledge: Point,
-    across: Option<Crossing>,
     measured: Option<MeasuredFlight>,
     body_clearance: f32,
 }
@@ -26,15 +25,6 @@ enum MeasuredFlight {
     SkullBash(SkullBashFlight),
     FakeOut(FakeOutFlight),
     Puff(PuffFlight),
-}
-
-struct Crossing {
-    near: f32,
-    far: f32,
-    band: Point,
-    direction: f32,
-    exit: f32,
-    air: AirPhysics,
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -60,11 +50,7 @@ impl NicheGuide {
         let [left, right] = facts.ledges;
         let center = left[0].midpoint(right[0]);
         let [x, y] = facts.position;
-        let (near, far, direction) = if x < center {
-            (left, right, 1.0)
-        } else {
-            (right, left, -1.0)
-        };
+        let (near, direction) = if x < center { (left, 1.0) } else { (right, -1.0) };
         let outside = (near[0] - x) * direction;
         if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
@@ -94,7 +80,6 @@ impl NicheGuide {
                 sequence: Sequence::new(row),
                 fighter,
                 ledge: path.far,
-                across: None,
                 measured: Some(MeasuredFlight::SkullBash(SkullBashFlight::new(
                     path, outline, facts.blast[3],
                 ))),
@@ -115,21 +100,15 @@ impl NicheGuide {
                 sequence: Sequence::new(row),
                 fighter,
                 ledge: flight.exit_point(),
-                across: None,
                 measured: Some(MeasuredFlight::Puff(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
-        // A crossing starts below the near ledge. An extension row sees every height and
-        // applies its own rule (`climb`).
-        let band = band.filter(|_| y < near[1]);
-        let exit = far[0] + direction * facts.body_clearance;
         let row_facts = Facts {
             fighter,
-            corridor: band,
-            // The zone weights decide how often a feasible crossing is flown.
-            covered_ledge: true,
-            player_over_crossing: (facts.player[0] - center).abs() <= facts.player_reach,
+            corridor: None,
+            covered_ledge: false,
+            player_over_crossing: false,
             long_approach: outside > facts.body_clearance * 2.0,
             counter_contact: fighter == 0x34 && attack_reaches_core(p1, cpu) == Some(true),
             short: inputs.short,
@@ -142,48 +121,23 @@ impl NicheGuide {
                     <= facts.player_reach,
             }),
             climb: near[1] - y,
-            budget: band.map(|band| Budget {
-                air: inputs.air,
-                jumps: inputs.jumps,
-                special: inputs.special,
-                crossing: recovery::Crossing {
-                    span: (exit - x).abs(),
-                    band,
-                    foot: y,
-                    ledge: far[1],
-                },
-            }),
+            budget: None,
         };
-        let row = niche::select(row_facts, niche::CANDIDATE_ROWS)?;
+        let row = niche::select(row_facts, niche::EXTENSION_ROWS)?;
         let margin = row.margin(row_facts)?;
-        let across = if row.route == Route::Opposite {
-            Some(Crossing {
-                near: near[0],
-                far: far[0],
-                band: band?,
-                direction,
-                exit,
-                air: inputs.air,
-            })
-        } else {
-            None
-        };
         let guide = Self {
             sequence: Sequence::new(row),
             fighter,
-            ledge: if across.is_some() { far } else { near },
-            across,
+            ledge: near,
             measured: None,
             body_clearance: facts.body_clearance,
         };
         Some((guide, margin))
     }
 
-    /// Where a crossing leaves the stage: the far ledge plus one body.
+    /// The target of a measured flight.
     pub(super) fn exit_point(&self) -> Point {
-        self.across
-            .as_ref()
-            .map_or(self.ledge, |crossing| [crossing.exit, self.ledge[1]])
+        self.ledge
     }
 
     pub(super) fn crossing_frames(&self) -> Option<u16> {
@@ -284,61 +238,10 @@ impl NicheGuide {
             }, [x, y], vy, remaining_jumps(cpu)?);
         }
 
-        let (mut direction, mut aim, mut at_exit, mut can_enter) = (
-            (self.ledge[0] - x).signum(),
-            normalized_stick([self.ledge[0] - x, self.ledge[1] - y]),
-            true,
-            true,
-        );
-        let (mut low, mut hold_over) = (false, true);
+        let direction = (self.ledge[0] - x).signum();
+        let mut aim = normalized_stick([self.ledge[0] - x, self.ledge[1] - y]);
         let native_phase = (movement != Move::Bomb)
             .then(|| niche_motion_phase(cpu, self.fighter, movement, status));
-        if let Some(crossing) = self.across.as_ref() {
-            let entered = (x - crossing.near) * crossing.direction >= 0.0;
-            let beyond = (x - crossing.far) * crossing.direction > 0.0;
-            let [bottom, top] = crossing.band;
-            if !beyond && (y < bottom || entered && y > top) {
-                return None;
-            }
-            // Outside the near ledge the crossing can still be given up: read its budget again.
-            if !entered && native_phase == Some(Motion::Free) {
-                let budget = Budget {
-                    air: crossing.air,
-                    jumps: remaining_jumps(cpu)?,
-                    special: reach,
-                    crossing: recovery::Crossing {
-                        span: (crossing.exit - x).abs(),
-                        band: crossing.band,
-                        foot: y,
-                        ledge: self.ledge[1],
-                    },
-                };
-                if !self.sequence.still_crosses(budget) {
-                    return None;
-                }
-            }
-            at_exit = (x - crossing.exit) * crossing.direction >= 0.0;
-            let launch_clears = beyond || self.selected_niche_row().launch_clears(y, top);
-            can_enter = if movement == Move::Hover { launch_clears } else { beyond || y <= top };
-            if !at_exit {
-                direction = crossing.direction;
-                aim = [direction, 0.0];
-            }
-            hold_over = at_exit;
-            if movement == Move::Hold && !at_exit {
-                let air = crossing.air;
-                let rise = air.jump_speed.powi(2) / (2.0 * air.gravity);
-                // A jump from the hold line peaks at the band top; a taller jump waits for the exit.
-                low = air.valid() && rise <= top - bottom && y < top - rise;
-                // An aimed special starts where its level travel still leaves the climb to the ledge.
-                let remaining = (crossing.exit - x) * crossing.direction;
-                hold_over = launch_clears
-                    && self.selected_niche_row().aimed()
-                    && reach.is_some_and(|reach| {
-                        remaining <= recovery::level_run(reach, self.ledge[1] - y)
-                    });
-            }
-        }
         let (phase, actionable) = match native_phase {
             Some(phase) => (phase, phase == Motion::Free),
             None => link_bomb_phase(cpu, status, [x, y], direction, self.body_clearance)?,
@@ -350,7 +253,6 @@ impl NicheGuide {
             aim = bolt_input(cpu, self.fighter, [x, y], direction, aim)?;
         }
         if matches!(movement, Move::Rise | Move::SoraChain)
-            && at_exit
             && reach.is_none_or(|reach| !reach.reaches([x, y], self.ledge))
             && phase == Motion::Free
         {
@@ -361,10 +263,10 @@ impl NicheGuide {
             motion: phase,
             can_start: actionable && niche_start_enabled(cpu, movement, available),
             valid: true,
-            at_exit,
-            can_enter,
-            low,
-            hold_over,
+            at_exit: true,
+            can_enter: true,
+            low: false,
+            hold_over: true,
             direction,
             aim,
         })

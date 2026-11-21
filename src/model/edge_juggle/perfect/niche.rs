@@ -277,15 +277,23 @@ const ROWS: [Row; 40] = [
     Row::new(41, 0x8, Intent::FakeOut, &[Jump, QuickAttack]),
 ];
 
-pub const CANDIDATE_ROWS: u64 = {
+const fn row_mask(extensions_only: bool) -> u64 {
     let mut mask = 0;
     let mut index = 0;
     while index < ROWS.len() {
-        mask |= 1 << (ROWS[index].id - 1);
+        let row = &ROWS[index];
+        if !extensions_only || matches!(row.route, Route::Near) {
+            mask |= 1 << (row.id - 1);
+        }
         index += 1;
     }
     mask
-};
+}
+
+pub const CANDIDATE_ROWS: u64 = row_mask(false);
+
+/// Stock-status sequences for a near return. Opposite requires a live measured flight.
+pub const EXTENSION_ROWS: u64 = row_mask(true);
 
 pub fn measured_row(id: u8, enabled: u64) -> Option<&'static Row> {
     ROWS.iter().find(|row| row.id == id && enabled & (1 << (row.id - 1)) != 0)

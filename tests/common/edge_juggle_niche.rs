@@ -1,4 +1,7 @@
-use super::{select, Budget, Facts, Motion, Move, NearReach, Sample, Sequence, CANDIDATE_ROWS};
+use super::{
+    select, Budget, Facts, Motion, Move, NearReach, Sample, Sequence, CANDIDATE_ROWS, EXTENSION_ROWS,
+    ROWS,
+};
 use crate::model::edge_juggle::perfect::recovery::Crossing;
 use crate::model::edge_juggle::perfect::{self, AirPhysics, Route, SpecialReach};
 
@@ -990,4 +993,15 @@ fn the_rc15_candidate_does_not_admit_ness_from_the_wider_reference_list() {
     assert!(super::measured_row(14, CANDIDATE_ROWS).is_none());
     assert!(select(facts(0xa, "cross"), CANDIDATE_ROWS).is_none());
     assert_eq!(super::measured_row(28, CANDIDATE_ROWS).unwrap().fighter, 0x28);
+}
+
+
+#[test]
+fn live_sequence_rows_include_near_extensions_and_exclude_crossing_estimates() {
+    let cross = facts(0x2d, "cross");
+    assert_eq!(select(cross, CANDIDATE_ROWS).map(|row| row.id), Some(7));
+    assert!(select(cross, EXTENSION_ROWS).is_none());
+    assert_eq!(select(facts(0x34, "counter"), EXTENSION_ROWS).map(|row| row.id), Some(10));
+    assert!(ROWS.iter().filter(|row| EXTENSION_ROWS & (1 << (row.id - 1)) != 0)
+        .all(|row| row.route == Route::Near));
 }

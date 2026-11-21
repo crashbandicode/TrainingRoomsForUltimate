@@ -119,16 +119,9 @@ struct Run {
     notice: FixedPath<128>,
 }
 #[derive(Clone, Copy)]
-enum RecoveryGuide {
-    High {
-        lip: [f32; 2],
-        inward: f32,
-    },
-    Cross {
-        exit: [f32; 2],
-        dir: f32,
-        band: [f32; 2],
-    },
+struct RecoveryGuide {
+    lip: [f32; 2],
+    inward: f32,
 }
 
 /// Equality tokens from the current entry. Only a fresh body may be accessed.
@@ -882,7 +875,7 @@ unsafe fn route_guide(
             (jump_rise + special_rise + speed[1].max(0.0)).max(f32::EPSILON),
         ],
     };
-    let [near, high, low, opposite] = perfect::possible_routes(&facts);
+    let [near, high, low] = perfect::possible_routes(&facts);
     let (near_ledge, inward) = if pos[0] <= left[0].midpoint(right[0]) {
         (left, 1.0)
     } else {
@@ -918,12 +911,7 @@ unsafe fn route_guide(
         .as_ref()
         .filter(|_| !needed)
         .map(|(guide, margin)| recovery::niche_plan(Route::Opposite, *margin, guide.exit_point()));
-    let opposite = crossing.or_else(|| {
-        opposite.filter(|plan| {
-            band.is_some_and(|band| air.crossing(pos, speed, plan.waypoints[2], band, jumps))
-        })
-    });
-    let options = [near, high, low, opposite];
+    let options = [near, high, low, crossing];
     let last = run.route_history.previous();
     let plan = if needed {
         None
@@ -971,19 +959,7 @@ unsafe fn route_guide(
     planner_chose(route_code(plan.route), fighter as u32, crossable, 0);
     run.route_history.planned(plan.route);
     run.jump_delay = recovery::planned_delay(plan.route, zone, deadline, run.route_draw);
-    match plan.route {
-        Route::Opposite => {
-            let exit = plan.waypoints[2];
-            let dir = (exit[0] - pos[0]).signum();
-            Some(RecoveryGuide::Cross {
-                exit,
-                dir,
-                band: band?,
-            })
-        }
-        Route::High => Some(RecoveryGuide::High { lip, inward }),
-        Route::LateLow | Route::Near => None,
-    }
+    (plan.route == Route::High).then_some(RecoveryGuide { lip, inward })
 }
 
 /// Where P1 stands against the fighter's near ledge. `reach` is P1's sampled height.
@@ -1136,11 +1112,7 @@ unsafe fn recovery_pad(
     let guarder = (run.guide.is_some() || !run.plan_pending && run.player_reach > 0.0)
         .then(|| [natives::pos_x(p1), natives::pos_y(p1)]);
     let blocked = run.guide.zip(guarder).is_some_and(|(guide, player)| {
-        let target = match guide {
-            RecoveryGuide::High { lip, .. } => lip,
-            RecoveryGuide::Cross { exit, .. } => exit,
-        };
-        perfect::player_on_path(player, [pos, target], run.player_reach)
+        perfect::player_on_path(player, [pos, guide.lip], run.player_reach)
     });
     run.plan_pending |= run
         .route_watch
@@ -1182,62 +1154,29 @@ unsafe fn recovery_pad(
     }
     let attack = buttons & perfect::ATTACK != 0;
     let can_punish = attack && player_in_lag(p1);
-    if let Some(guide) = run.guide {
-        match guide {
-            RecoveryGuide::High { lip, inward } if !can_punish => {
-                if let Some(mut correction) = physics.high_route_input(
-                    pos,
-                    speed,
-                    lip,
-                    inward,
-                    run.stage.blast()[3],
-                    can_jump,
-                ) {
-                    let detour = perfect::avoid_detour(buttons, true, false, inward).release;
-                    if buttons & !(perfect::JUMP | perfect::FLICK_JUMP | detour) == 0 {
-                        stock.observe(correction, PerfectRule::Route, run, 0, 2);
-                        correction.release = detour;
-                        stock.observe(
-                            Correction { release: detour, ..Correction::default() },
-                            PerfectRule::Detour, run, 0, 0,
-                        );
-                        return correction;
-                    }
+    if let Some(RecoveryGuide { lip, inward }) = run.guide {
+        if !can_punish {
+            if let Some(mut correction) = physics.high_route_input(
+                pos,
+                speed,
+                lip,
+                inward,
+                run.stage.blast()[3],
+                can_jump,
+            ) {
+                let detour = perfect::avoid_detour(buttons, true, false, inward).release;
+                if buttons & !(perfect::JUMP | perfect::FLICK_JUMP | detour) == 0 {
+                    stock.observe(correction, PerfectRule::Route, run, 0, 2);
+                    correction.release = detour;
+                    stock.observe(
+                        Correction { release: detour, ..Correction::default() },
+                        PerfectRule::Detour, run, 0, 0,
+                    );
+                    return correction;
                 }
-                run.guide = None;
             }
-            RecoveryGuide::Cross { exit, dir, band }
-                if (exit[0] - pos[0]) * dir > 0.0
-                    && physics.crossing(pos, speed, exit, band, u8::from(can_jump)) =>
-            {
-                let detour = perfect::avoid_detour(buttons, true, can_punish, dir).release;
-                let mut edit = Correction {
-                    stick: Some([dir, 0.0]),
-                    release: buttons & perfect::JUMP,
-                    ..Correction::default()
-                };
-                stock.observe(edit, PerfectRule::Route, run, 0, 1);
-                stock.observe(
-                    Correction { release: detour, ..Correction::default() },
-                    PerfectRule::Detour, run, 0, 0,
-                );
-                edit.release |= detour;
-                return edit;
-            }
-            RecoveryGuide::Cross { exit, dir, .. }
-                if (exit[0] - pos[0]) * dir <= 0.0 && can_jump =>
-            {
-                run.guide = None;
-                // Continue to the far ledge from outside the stage.
-                let edit = Correction {
-                    stick: Some([-dir, 0.0]),
-                    press: perfect::JUMP,
-                    ..Correction::default()
-                };
-                return stock.observe(edit, PerfectRule::Route, run, 0, 1);
-            }
-            _ => run.guide = None,
         }
+        run.guide = None;
     }
     let ledge = if pos[0] < left[0] {
         left
