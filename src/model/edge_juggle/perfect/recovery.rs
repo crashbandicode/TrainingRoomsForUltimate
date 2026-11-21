@@ -388,9 +388,9 @@ pub fn stock_timing_reach(
     fighter: i32,
     special: Option<SpecialReach>,
 ) -> Option<SpecialReach> {
-    // After takeoff, R.O.B.'s climb depends on remaining fuel and later presses.
-    // The stock two-axis envelope cannot certify delaying the first burner press.
-    special.filter(|_| fighter != super::rob::KIND)
+    // Fuel presses and Clown Car ejection follow their own flight paths.
+    // A two-axis envelope cannot certify delaying those stock activations.
+    special.filter(|_| !matches!(fighter, super::rob::KIND | super::kart::KIND))
 }
 
 /// A stock jump or up special held back until its planned frame.

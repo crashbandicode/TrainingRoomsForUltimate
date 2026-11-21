@@ -341,6 +341,19 @@ fn robot_stock_burner_stays_available_at_the_first_press() {
     assert!(super::stock_timing_reach(0, None).is_none());
 }
 
+#[test]
+fn bowser_jr_preserves_the_first_stock_abandon_ship_press() {
+    use crate::model::edge_juggle::perfect::kart;
+
+    // The same stock press recovers at frame 44 outside the measured Kart Dash route.
+    let stock = 0x8802;
+    let timing = super::stock_timing_reach(kart::KIND, Some(UP));
+    let edit = timing.map_or_else(Correction::default, |_| {
+        Hold::default().step(held(SPECIAL, 38, true, stock))
+    });
+    assert_eq!(stock & !edit.release | edit.press, stock);
+}
+
 /// A hold stepped once per game frame.
 #[derive(Default)]
 struct Ticking(Hold, u32);
