@@ -149,7 +149,7 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     let (mid, limits) = perfect::outline_probe(camera, range)?;
     let ray = FloorRay::new(p1)?;
     let (ledges, _) = edge_juggle::stage_floor(&ray, camera)?;
-    let outline = tech_surfaces::training_outline(&ray, mid, limits)?;
+    let (outline, _) = tech_surfaces::training_outline(&ray, mid, limits)?;
     Stage::new(id, range, ledges, outline)
 }
 
