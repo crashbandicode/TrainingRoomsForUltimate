@@ -578,6 +578,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(0xc)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -28.0])
             }
+            (Drill::GuardEdge, Some(0xd | 0xe)) if perfect::is_crossing_stage(stage_key) => {
+                Some([40.0, 20.0])
+            }
             (Drill::GuardEdge, Some(0x1e | 0x1f)) if perfect::is_crossing_stage(stage_key) => {
                 Some([30.0, 6.0])
             }
@@ -1007,6 +1010,32 @@ mod tests {
                 wizard.change_area(stage, 2);
                 let expected = if key.1 == 0 { [-110.0, 6.0] } else { stage.area_default(Area::UpperLeft).unwrap() };
                 assert_eq!(wizard.setup.cpu, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn peach_and_daisy_wizard_offers_the_measured_parasol_start_on_both_sides() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for fighter in [0xd, 0xe] {
+            for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
+                let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+                wizard.change_area(stage, 2);
+                assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
+                    [-120.0, 20.0]
+                } else {
+                    stage.area_default(Area::UpperLeft).unwrap()
+                });
+                wizard.change_area(stage, 1);
+                assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
+                    [120.0, 20.0]
+                } else {
+                    stage.area_default(Area::UpperRight).unwrap()
+                });
             }
         }
     }

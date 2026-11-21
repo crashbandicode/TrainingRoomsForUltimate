@@ -14,6 +14,7 @@ use perfect::kart::{KartFlight, KartState};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::olimar::{self, OlimarBeat, OlimarFlight};
 use perfect::pacman::{self, PacBeat, PacFlight};
+use perfect::peach::{FloatBeat, FloatFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::sheik::{SheikBeat, SheikFlight};
@@ -33,6 +34,7 @@ enum MeasuredFlight {
     SkullBash(SkullBashFlight),
     FakeOut(FakeOutFlight),
     Puff(PuffFlight),
+    Parasol(FloatFlight),
     Wings(WingsFlight),
     Pichu(PichuFlight),
     PichuFakeOut(PichuFakeOut),
@@ -122,6 +124,27 @@ impl NicheGuide {
                 fighter,
                 ledge: flight.exit_point(),
                 measured: Some(MeasuredFlight::Puff(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if matches!(fighter, 0xd | 0xe) {
+            let row = niche::measured_row(if fighter == 0xd { 24 } else { 25 }, niche::CANDIDATE_ROWS)?;
+            let flight = FloatFlight::start(facts, FloatBeat {
+                frame: 0,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_float: peach_float_unspent(cpu),
+                can_jump: niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Parasol(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -352,6 +375,7 @@ impl NicheGuide {
             Some(MeasuredFlight::SkullBash(_)) => Some(158),
             // The FLY-L ring bake runs in at most 283 frames at the cell centers.
             Some(MeasuredFlight::Puff(_)) => Some(300),
+            Some(MeasuredFlight::Parasol(_)) => Some(400),
             Some(MeasuredFlight::Wings(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Pichu(_)) => Some(200),
             Some(MeasuredFlight::Olimar(flight)) => Some(flight.crossing_frames()),
@@ -426,6 +450,21 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::Parasol(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let airborne = airborne_recovery(cpu, status);
+            return flight.step(FloatBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing: natives::lr(cpu),
+                jumps: remaining_jumps(cpu)?,
+                can_float: flight.needs_float() && peach_float_unspent(cpu),
+                can_jump: airborne && niche_start_enabled(cpu, Move::Jump, true),
+                can_rise: airborne && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
             });
         }
         if let Some(MeasuredFlight::Wings(flight)) = &mut self.measured {
@@ -845,6 +884,12 @@ unsafe fn link_bomb_phase(
 pub(super) fn pyra_swapping(status: i32) -> bool {
     status != UNRESOLVED
         && (status == konst(C::StatusSpecialLw) || matches!(status, 0x1e1 | 0x1e2))
+}
+
+unsafe fn peach_float_unspent(cpu: usize) -> bool {
+    // Peach and Daisy set UNIQ_FLOAT as fuwafuwa_start begins. The native
+    // float decision admits the action only while the same flag is clear.
+    game::granted(sites_pkg2::WORK_IS_FLAG_OFFSET) && !natives::is_flag(cpu, 0x2000_00e1)
 }
 
 unsafe fn has_burner(cpu: usize) -> bool {
