@@ -59,7 +59,7 @@ fn launch_pad(elapsed: u32, status: i32, inward: f32, hit: bool) -> Option<Corre
     const DI: f32 = 85.0 / 120.0;
     match (elapsed, status, hit) {
         (70..=71, 0x1e5, false) | (72..=81, 0x49 | 0x4a, true) => Some(pad([DI * inward, -DI], 0)),
-        (82..=131, 0x49 | 0x4a | 0x4f, true) => Some(pad([inward, 0.0], 0)),
+        (82..=132, 0x49 | 0x4a | 0x4f | FALL, true) => Some(pad([inward, 0.0], 0)),
         _ => None,
     }
 }
@@ -87,16 +87,22 @@ const THROW_FRAME: u32 = 40;
 const DETONATE_FRAME: u32 = 60;
 const HIT_FRAME: u32 = 72;
 const JUMP_FRAME: u32 = HIT_FRAME + 51 + 9;
-const SPIN_FRAME: u32 = JUMP_FRAME + 28;
+const JUMP_TO_SPIN: u32 = 28;
 // g4/tables/link-lkx.txt, with trailing empty rows omitted.
 const CROSS_RING: [u32; 11] = [0x3e0; 11];
 
-pub fn in_region(stage: (i32, u32), ledge: Point, body: Point, damage: f32) -> bool {
-    // The left-side throw was flown. A right-side mirror still needs a trace.
-    let outside = ledge[0] - body[0];
-    let height = body[1] - ledge[1];
+fn ends([left, right]: [Point; 2], body: Point) -> [Point; 2] {
+    if body[0] > left[0].midpoint(right[0]) { [right, left] } else { [left, right] }
+}
+
+pub fn in_region(stage: (i32, u32), ledges: [Point; 2], body: Point, damage: f32) -> bool {
+    let [near, far] = ends(ledges, body);
+    let inward = (far[0] - near[0]).signum();
+    let outside = (near[0] - body[0]) * inward;
+    let height = body[1] - near[1];
     super::is_crossing_stage(stage)
-        && (95.0..=100.0).contains(&damage)
+        && (inward == 1.0 || stage == (3, 0))
+        && (95.0..=105.0).contains(&damage)
         && (20.0..40.0).contains(&outside)
         && (-4.0..=40.0).contains(&height)
         && region::contains(&CROSS_RING, outside, height)
@@ -135,7 +141,8 @@ pub struct LinkFlight {
 
 impl LinkFlight {
     pub fn start(facts: &RouteFacts<'_>, beat: LinkBeat) -> Option<Self> {
-        let [near, far] = facts.ledges;
+        let [near, far] = ends(facts.ledges, beat.position);
+        let inward = (far[0] - near[0]).signum();
         facts.crossing_band()?;
         let has_flat_underside = facts.outline.iter().any(|line| {
             line.iter().all(|&[_, y]| (y - near[1] + 40.1).abs() < 0.12)
@@ -144,14 +151,14 @@ impl LinkFlight {
         });
         if facts.fighter != KIND
             || facts.position != beat.position
-            || !in_region(facts.stage, near, beat.position, beat.damage)
-            || ((far[0] - near[0]) - 159.98).abs() > 0.12
+            || !in_region(facts.stage, facts.ledges, beat.position, beat.damage)
+            || ((far[0] - near[0]).abs() - 159.98).abs() > 0.12
             || (far[1] - near[1]).abs() > 0.12
             || (facts.blast[3] - near[1] + 140.0).abs() > 0.12
             || !has_flat_underside
             || beat.status != FALL
             || beat.velocity[0] != 0.0
-            || beat.facing != -1.0
+            || beat.facing != -inward
             || beat.jumps != 1
             || beat.bomb != Some(OwnedBomb::Absent)
             || !beat.can_pull
@@ -178,14 +185,20 @@ impl LinkFlight {
         self.pulled.is_none()
     }
 
+    fn jump_age(&self) -> u32 {
+        JUMP_FRAME + u32::from(self.damage > 100.0)
+    }
+
+    fn samples_edge(&self, frame: u32, age: u32) -> bool {
+        self.pulled.is_some_and(|pull| frame.wrapping_sub(pull).wrapping_sub(age) < 2)
+    }
+
     pub fn is_jump_frame(&self, frame: u32) -> bool {
-        self.pulled
-            .is_some_and(|pull| matches!(frame.wrapping_sub(pull), JUMP_FRAME | 133))
+        self.samples_edge(frame, self.jump_age())
     }
 
     pub fn is_spin_frame(&self, frame: u32) -> bool {
-        self.pulled
-            .is_some_and(|pull| matches!(frame.wrapping_sub(pull), SPIN_FRAME | 161))
+        self.samples_edge(frame, self.jump_age() + JUMP_TO_SPIN)
     }
 
     pub fn needs_bomb_sample(&self, frame: u32) -> bool {
@@ -195,6 +208,7 @@ impl LinkFlight {
 
     pub fn step(&mut self, beat: LinkBeat) -> Option<Correction> {
         let [x, y] = beat.position;
+        let inward = (self.exit[0] - self.from[0]).signum();
         if !x.is_finite()
             || !y.is_finite()
             || !beat.damage.is_finite()
@@ -206,7 +220,7 @@ impl LinkFlight {
             beat.frame.wrapping_sub(pulled)
         } else {
             if beat.status != FALL
-                || beat.facing != -1.0
+                || beat.facing != -inward
                 || (x - self.from[0]).abs() > 0.1
                 || beat.velocity[0] != 0.0
                 || beat.damage != self.damage
@@ -229,12 +243,12 @@ impl LinkFlight {
             if beat.jumps != 1
                 || beat.damage != self.damage
                 || (x - self.from[0]).abs() > 0.1
-                || beat.facing != -1.0
+                || beat.facing != -inward
             {
                 return None;
             }
             if age >= 70 {
-                return launch_pad(age, beat.status, 1.0, false);
+                return launch_pad(age, beat.status, inward, false);
             }
             let motion = match (age, beat.status, beat.bomb) {
                 (0, FALL | PULL, _) => Motion::Free,
@@ -260,39 +274,44 @@ impl LinkFlight {
             self.self_hit = Some(beat.position);
         }
         let hit = self.self_hit?;
-        match age {
-            HIT_FRAME..JUMP_FRAME => launch_pad(age, beat.status, 1.0, true),
-            JUMP_FRAME
-                if beat.can_jump
-                    && beat.jumps == 1
-                    && matches!(beat.status, 0x49 | 0x4a | 0x4f | FALL)
-                    && (135.0..=143.0).contains(&(x - hit[0])) =>
+        let jump_age = self.jump_age();
+        if age < jump_age {
+            return launch_pad(age, beat.status, inward, true);
+        }
+        // The 105% launch plus its later jump advances 7.26 units beyond the 100% trace.
+        let launch_gain = (self.damage - 100.0).max(0.0) * (7.26 / 5.0);
+        let stick = [inward, 0.0];
+        match age - jump_age {
+            0 if beat.can_jump
+                && beat.jumps == 1
+                && matches!(beat.status, 0x49 | 0x4a | 0x4f | FALL)
+                && (135.0..=143.0).contains(&((x - hit[0]) * inward - launch_gain)) =>
             {
                 self.jumped = true;
-                Some(pad([1.0, 0.0], JUMP))
+                Some(pad(stick, JUMP))
             }
-            133 if self.jumped && (beat.can_jump || beat.jumps == 0) => Some(pad([1.0, 0.0], JUMP)),
-            134..SPIN_FRAME
+            1 if self.jumped && (beat.can_jump || beat.jumps == 0) => Some(pad(stick, JUMP)),
+            2..JUMP_TO_SPIN
                 if self.jumped && beat.jumps == 0 && matches!(beat.status, 0xc | 0x6d | FALL) =>
             {
-                Some(pad([1.0, 0.0], 0))
+                Some(pad(stick, 0))
             }
-            SPIN_FRAME
+            JUMP_TO_SPIN
                 if self.jumped
                     && beat.jumps == 0
                     && beat.can_spin
                     && matches!(beat.status, 0xc | FALL)
-                    && (40.0..=76.0).contains(&(x - self.exit[0] + 79.99))
+                    && (40.0..=76.0).contains(&((x - self.exit[0]) * inward + 79.99 - launch_gain))
                     && (-66.0..=-39.0).contains(&(y - self.exit[1])) =>
             {
-                spin_pad(0, 1.0)
+                spin_pad(0, inward)
             }
-            161..=197
-                if self.jumped
-                    && (matches!(beat.status, SPIN | SPIN_END)
-                        || age == 161 && beat.can_spin && matches!(beat.status, 0xc | FALL)) =>
+            phase if phase > JUMP_TO_SPIN
+                && self.jumped
+                && (matches!(beat.status, SPIN | SPIN_END)
+                    || phase == JUMP_TO_SPIN + 1 && beat.can_spin && matches!(beat.status, 0xc | FALL)) =>
             {
-                spin_pad(age - SPIN_FRAME, 1.0)
+                spin_pad(phase - JUMP_TO_SPIN, inward)
             }
             _ => None,
         }
@@ -341,7 +360,7 @@ lib_unit_tests! {
             for bad in [
                 LinkBeat { facing: 1.0, ..live },
                 LinkBeat { jumps: 0, ..live },
-                LinkBeat { damage: 105.0, ..live },
+                LinkBeat { damage: 106.0, ..live },
                 LinkBeat { damage: 115.0, ..live },
                 LinkBeat { bomb: None, ..live },
                 LinkBeat { bomb: Some(OwnedBomb::Held), ..live },
@@ -379,6 +398,41 @@ lib_unit_tests! {
                 let correct = flight.step(LinkBeat { bomb: Some(wanted), ..clock }).unwrap();
                 assert_eq!(correct.press, if frame == 40 { ATTACK } else { SPECIAL });
             }
+        }
+
+
+        #[test]
+        fn link_uses_the_far_left_ledge_after_a_measured_right_side_release() {
+            let beat = LinkBeat { position: [117.99, 9.104], velocity: [0.0, -1.6], facing: 1.0,
+                damage: 105.0, ..release() };
+            let live = facts((3, 0), beat.position);
+            let mut flight = LinkFlight::start(&live, beat).unwrap();
+            assert_eq!(flight.exit_point(), LEDGES[0]);
+            assert!(flight.step(beat).is_some());
+            let left_blast = LinkBeat { frame: beat.frame + 70, status: DETONATE, ..beat };
+            assert_eq!(flight.step(left_blast), Some(pad([-85.0 / 120.0, -85.0 / 120.0], 0)));
+            for stage in [(0, 0), (311, 0), (3, 1)] {
+                assert!(LinkFlight::start(&facts(stage, beat.position), beat).is_none());
+            }
+        }
+
+        #[test]
+        fn link_keeps_the_105_percent_jump_and_spin_one_frame_later() {
+            // Exact fg4-m16l-xps, lkb-ca-d105-1. The two edges are at 133 and 161.
+            let entry = LinkBeat { position: [-101.99, -2.0], velocity: [0.0, 0.0],
+                damage: 105.0, ..release() };
+            let mut flight = LinkFlight::start(&facts((3, 0), entry.position), entry).unwrap();
+            let beat = LinkBeat { position: [-101.99, -4.304], velocity: [0.0, -0.192], ..entry };
+            assert_eq!(flight.step(beat).unwrap().press, SPECIAL);
+            let clock = |age, status, position, jumps| LinkBeat {
+                frame: beat.frame + age, status, position, jumps, damage: 113.4, ..beat
+            };
+            assert_eq!(flight.step(clock(72, 0x4a, [-101.99, -109.872], 1)).unwrap().press, 0);
+            assert_eq!(flight.step(clock(132, 0x4f, [45.737, -78.494], 1)).unwrap().press, 0);
+            assert_eq!(flight.step(clock(133, 0x4f, [46.841, -79.529], 1)).unwrap().press, JUMP);
+            assert_eq!(flight.step(clock(134, 0xc, [47.957, -80.600], 0)).unwrap().press, JUMP);
+            assert_eq!(flight.step(clock(160, 0xc, [76.003, -47.934], 0)).unwrap().press, 0);
+            assert_eq!(flight.step(clock(161, 0xc, [76.927, -48.118], 0)).unwrap().press, SPECIAL);
         }
 
         #[test]

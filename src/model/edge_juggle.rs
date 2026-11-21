@@ -553,22 +553,25 @@ pub struct Setup {
     pub percent: u16,
 }
 
-pub fn recovery_faces_away(
+pub fn recovery_away_facing(
     drill: Drill,
     stage_key: (i32, u32),
     stage: Stage,
     setup: Setup,
     fighter: Option<i32>,
-) -> bool {
+) -> Option<f32> {
     if drill != Drill::GuardEdge {
-        return false;
+        return None;
     }
-    let near = stage.ledges[0];
-    match fighter {
-        Some(perfect::link::KIND) => perfect::link::in_region(stage_key, near, setup.cpu, setup.percent.into()),
-        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, near, setup.cpu),
+    let [left, right] = stage.ledges;
+    let takes_bomb_route = match fighter {
+        Some(perfect::link::KIND) => {
+            perfect::link::in_region(stage_key, stage.ledges, setup.cpu, setup.percent.into())
+        }
+        Some(perfect::snake::KIND) => perfect::snake::in_region(stage_key, left, setup.cpu),
         _ => false,
-    }
+    };
+    takes_bomb_route.then_some(if setup.cpu[0] < left[0].midpoint(right[0]) { -1.0 } else { 1.0 })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1067,6 +1070,23 @@ mod tests {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }
+    }
+
+    #[test]
+    fn link_starts_facing_away_on_each_proven_side() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let left = Setup { cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
+        let right = Setup { cpu: [118.0, 38.0], percent: 105, ..left };
+        let facing = |drill, stage_key, start| {
+            recovery_away_facing(drill, stage_key, stage, start, Some(perfect::link::KIND))
+        };
+        assert_eq!(facing(Drill::GuardEdge, (3, 0), left), Some(-1.0));
+        assert_eq!(facing(Drill::GuardEdge, (3, 0), right), Some(1.0));
+        assert_eq!(facing(Drill::GuardEdge, (0, 0), right), None);
+        assert_eq!(facing(Drill::Juggler, (3, 0), right), None);
     }
 
     #[test]

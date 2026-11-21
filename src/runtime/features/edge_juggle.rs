@@ -1559,13 +1559,9 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
             z: 0.0,
         },
     );
-    let cpu_facing = if crate::model::edge_juggle::recovery_faces_away(
+    let cpu_facing = crate::model::edge_juggle::recovery_away_facing(
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
-    ) {
-        -1.0
-    } else {
-        -facing
-    };
+    ).unwrap_or(-facing);
     state::set_lr(bodies.cpu, cpu_facing);
     state::set_situation_kind(bodies.cpu, air);
     natives::set_int(bodies.cpu, drill.placed_jump_count(), jump_count);
