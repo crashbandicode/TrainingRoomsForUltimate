@@ -358,12 +358,12 @@ fn egg_clearance(zone: &Zone, side: Side, from: [f32; 2], to: [f32; 2]) -> bool 
 
 unsafe fn egg_recovery(primary: usize) -> Recovery {
     use crate::model::cpu::ids::{C, UNRESOLVED};
-    use crate::model::sites_pkg2::{SITUATION_KIND_OFFSET, STATUS_KIND_OFFSET};
+    use crate::model::sites_pkg2::{POS_X_OFFSET, POS_Y_OFFSET, SITUATION_KIND_OFFSET, STATUS_KIND_OFFSET};
     use crate::model::tech::surface::Kind;
     use super::cpu::konst;
 
     if !game::granted(STATUS_KIND_OFFSET) || !game::granted(SITUATION_KIND_OFFSET) {
-        return Recovery::Unchanged;
+        return Recovery::Unknown;
     }
     let matches_id = |id, kind| id != UNRESOLVED && id == konst(kind);
     let status = natives::status_kind(primary);
@@ -372,12 +372,18 @@ unsafe fn egg_recovery(primary: usize) -> Recovery {
         return Recovery::Lost;
     }
 
+    if !game::granted(POS_X_OFFSET) || !game::granted(POS_Y_OFFSET) {
+        return Recovery::Unknown;
+    }
     let player = [natives::pos_x(primary), natives::pos_y(primary)];
+    if !player.into_iter().all(f32::is_finite) {
+        return Recovery::Unknown;
+    }
     let terrain = super::egg_zone::with_stage(|stage| {
         let [left, right] = stage.main_span();
         (player[1] <= stage.bottom_blast(), player[0] < left || player[0] > right || stage.under_main(player))
     });
-    let Some((below_blast, away)) = terrain else { return Recovery::Unchanged };
+    let Some((below_blast, away)) = terrain else { return Recovery::Unknown };
     if below_blast {
         return Recovery::Lost;
     }
@@ -392,6 +398,8 @@ unsafe fn egg_recovery(primary: usize) -> Recovery {
                 return Recovery::Returned;
             }
         }
+        // A platform is on stage at contact but does not complete a pending return.
+        return Recovery::Unchanged;
     }
     if away { Recovery::Away } else { Recovery::Unchanged }
 }
@@ -470,7 +478,9 @@ unsafe fn eggs_cpu(
     {
         return Some(());
     } else {
-        run.cpu_pass_in(damage, stopped, &egg_clearance)
+        run.cpu_pass_in(damage, stopped, &egg_clearance, || {
+            natives::module_accessor(0).map_or(Recovery::Unknown, |p1| egg_recovery(p1))
+        })
     };
     let event = run.event();
     let before = streak.counts();
