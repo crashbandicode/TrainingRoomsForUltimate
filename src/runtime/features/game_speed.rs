@@ -50,18 +50,33 @@ static LOBBY_LIVE: AtomicBool = AtomicBool::new(false);
 /// x1.5's every-other-update cadence: the waiting area's update only (one game thread), `try_lock`.
 static CADENCE: hos_lock::Mutex<Cadence> = hos_lock::Mutex::new(Cadence::new());
 
+/// rc.15: 1 Frame's rows (`lobby_speed::FRAME_ROWS`) all passed at boot: the bind offers 1 Frame and the lobby's entry
+/// hold is installed only then.
+static ONE_FRAME: AtomicBool = AtomicBool::new(false);
+/// rc.15: 1 Frame's step input in the lobby (`lobby_rules::FrameStep` as bits): Player 1's poll counts, the entry hold
+/// uses a due step up.
+static FRAME_STEP: AtomicU32 = AtomicU32::new(0);
+
 /// The speed bind's rows all passed at boot (`lobby_speed` hooks only then).
 pub(crate) fn installed() -> bool {
     base().is_some()
 }
 
-/// Once from `lobby::init`: compare every row; the bind does nothing unless all passed.
+/// rc.15: 1 Frame is offered (its rows and the bind's passed at boot).
+pub(crate) fn one_frame() -> bool {
+    installed() && ONE_FRAME.load(Ordering::Acquire)
+}
+
+/// Once from `lobby::init`: compare every row; the bind does nothing unless all passed, and offers 1 Frame only when
+/// its own rows passed too.
 pub(crate) fn init() {
     let rows = crate::runtime::seams::seam_install::gate("game_speed", &rules::SEAM_ROWS, false);
     if rows {
         BASE.store(game::text_base(), Ordering::Release);
     }
-    crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] game_speed installed={rows}"));
+    let frame = crate::runtime::seams::seam_install::gate("speed_frame", &lobby_rules::FRAME_ROWS, false);
+    ONE_FRAME.store(frame, Ordering::Release);
+    crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] game_speed installed={rows} one_frame={frame}"));
 }
 
 /// Training's pause menu, or `None` while its chain is not readable.
@@ -136,11 +151,19 @@ pub(crate) fn on_hold(event: HoldEvent, style: u32) {
         }
         HoldEvent::Step(dir) => {
             let Some(current) = Speed::from_value(SHOWN.load(Ordering::Acquire)) else { return };
-            let next = rules::step(place.speeds(), current, dir);
+            let next = rules::step(place.offered(one_frame()), current, dir);
             SHOWN.store(next.value(), Ordering::Release);
             match place {
                 Place::Training => TRAINING_WANTED.store(next.value(), Ordering::Release),
-                Place::Lobby => LOBBY_WANTED.store(next.value(), Ordering::Release),
+                Place::Lobby => {
+                    LOBBY_WANTED.store(next.value(), Ordering::Release);
+                    if LobbyPlan::of(next) == LobbyPlan::Hold {
+                        // rc.15: the slot of the speed before goes now (Player 1's frame, which would free it, doesn't
+                        // run while the world is held); the hold starts once its slow period has ended.
+                        FRAME_STEP.store(0, Ordering::Release);
+                        release_lobby_slot();
+                    }
+                }
             }
             show(next, style);
             #[cfg(feature = "diag")]
@@ -353,6 +376,13 @@ unsafe fn apply_now(base: usize, wanted: u32) -> Result<(u32, u8, ModeApply), &'
     if done.dirty {
         slow.set(table::DIRTY_AT, 1);
     }
+    // rc.15: away from 1 Frame while Training's step pause holds the game, resume it as the mode object's own step does
+    // (`speed_frame.step_run`): request bit 2 is clear (the step clear above), and the pause sync copies it in.
+    if ONE_FRAME.load(Ordering::Acquire) && rules::resumes_the_step_pause(speed, field::read_unchecked::<u32>(base, native::PAUSED)) {
+        // SAFETY: `speed_frame.pause_sync` passed its guard: `FUN_00555da0()`, as `.1556b84` calls it on a game thread.
+        let sync: unsafe extern "C" fn() = std::mem::transmute(base + native::PAUSE_SYNC_FN);
+        sync();
+    }
     Ok((applied, slot, done))
 }
 
@@ -438,7 +468,7 @@ pub(crate) unsafe fn lobby_update() {
     match LobbyPlan::of(wanted) {
         LobbyPlan::TwoThirds => lobby_pace(base),
         LobbyPlan::ExtraPass => lobby_extra_step(base),
-        LobbyPlan::X1 | LobbyPlan::Slot(_) => {}
+        LobbyPlan::X1 | LobbyPlan::Slot(_) | LobbyPlan::Hold => {}
     }
 }
 
@@ -570,8 +600,78 @@ pub(crate) fn session_clear() {
     TRAINING_WANTED.store(0, Ordering::Release);
     MODE_PENDING.store(0, Ordering::Release);
     LOBBY_LIVE.store(false, Ordering::Release);
+    // rc.15: the hold ends here, before the native teardown, and a lobby 1 Frame goes back to x1 (tr-primary-2 14:12Z).
+    HOLD_CLASS.store(0, Ordering::Release);
+    FRAME_STEP.store(0, Ordering::Release);
+    let _ = LOBBY_WANTED.compare_exchange(Speed::OneFrame as u32, Speed::X1 as u32, Ordering::AcqRel, Ordering::Acquire);
     if let Some(mut cadence) = CADENCE.try_lock() {
         cadence.reset();
     }
     release_lobby_slot();
+}
+
+/// rc.15: the waiting area's battle task class address while 1 Frame's hold is armed (the practice live at 1 Frame, the
+/// scene the waiting room), 0 otherwise: the entry hold's one atomic read. `refresh_hold` keeps it every game frame; the
+/// session clear zeroes it.
+static HOLD_CLASS: AtomicUsize = AtomicUsize::new(0);
+
+/// rc.15, once per game frame (`lobby::update`, before the input processing): whether the hold is armed now.
+pub(crate) fn refresh_hold() {
+    let class = match base() {
+        Some(base) if ONE_FRAME.load(Ordering::Acquire) && scene::lobby_term() => {
+            let wanted = Speed::from_value(LOBBY_WANTED.load(Ordering::Acquire)).unwrap_or(Speed::X1);
+            if lobby_rules::armed(LOBBY_LIVE.load(Ordering::Acquire), wanted) {
+                base + lobby_rules::native::WAITING_AREA_VTABLE
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    };
+    HOLD_CLASS.store(class, Ordering::Release);
+}
+
+/// rc.15, P1's poll (`chords::on_poll`): 1 Frame's step input in the lobby, the native button by controller style
+/// (`lobby_rules::step_mask`). `hold_open`: the speed hold is open (it owns P1's buttons); `blocked`: an input owner.
+/// Only while the hold is armed; a step press outside it is nobody's.
+pub(crate) fn frame_step_poll(style: u32, current: u32, just_down: u32, hold_open: bool, blocked: bool) {
+    if HOLD_CLASS.load(Ordering::Acquire) == 0 {
+        return;
+    }
+    let mask = lobby_rules::step_mask(style);
+    let blocked = hold_open || blocked || crate::runtime::lobby::training::lobby::native_ui_busy();
+    const DUE: u32 = lobby_rules::FrameStep::DUE;
+    // The poll's own step (from a state with none due), then OR'd in: the entry hold only clears the due bit, so a
+    // step it used up meanwhile stays used up and one still due stays due.
+    let mut step = lobby_rules::FrameStep::from_bits(FRAME_STEP.load(Ordering::Acquire) & !DUE);
+    step.poll(just_down & current & mask != 0, current & mask != 0, blocked);
+    let bits = step.bits();
+    let _ = FRAME_STEP.fetch_update(Ordering::AcqRel, Ordering::Acquire, |now| Some(bits | (now & DUE)));
+}
+
+/// rc.15, the battle task entry (`lobby::lobby_speed`'s entry hold, `main+0x135ca38`): whether this entry runs paused.
+/// `this` is the entry's object (x20), `paused` the word it loaded into w22. One atomic read decides every other entry
+/// (a match's, Training's, the lobby at any other speed): the hold class is 0 or not this object's class. No lock.
+///
+/// # Safety
+/// The hook's moment: `this` is the live battle task object the entry runs.
+pub(crate) unsafe fn entry_hold(this: usize, paused: u32) -> bool {
+    let class = HOLD_CLASS.load(Ordering::Acquire);
+    if class == 0 || paused != 0 || !field::object(this) || (this as *const usize).read_volatile() != class {
+        return false;
+    }
+    let base = class - lobby_rules::native::WAITING_AREA_VTABLE;
+    let now = lobby_rules::EntryNow {
+        armed: true,
+        in_practice: true,
+        waiting_area: true,
+        paused,
+        current_n: slow_byte(base, lobby_rules::native::CURRENT_N_AT),
+        target_n: slow_byte(base, lobby_rules::native::TARGET_N_AT),
+    };
+    if !lobby_rules::entry_takes_step(now) {
+        return false;
+    }
+    let due = FRAME_STEP.fetch_and(!lobby_rules::FrameStep::DUE, Ordering::AcqRel) & lobby_rules::FrameStep::DUE != 0;
+    lobby_rules::entry_holds(now, due)
 }

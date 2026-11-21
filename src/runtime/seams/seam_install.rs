@@ -61,6 +61,8 @@ const AUTHORITATIVE: &[&str] = &[
     "edge_juggle",
     "hide_cpu",
     "game_speed",
+    // rc.15 1 Frame: the entry hold is installed and the Training resume calls the pause sync only when every row is stock.
+    "speed_frame",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",

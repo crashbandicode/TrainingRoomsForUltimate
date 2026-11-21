@@ -13,6 +13,11 @@ waiting-room practice.
 
 ![The five speeds, 1/4, 1/2, 2/3, x1 and x1.5, on one scale: D-pad Left steps slower, D-pad Right faster](../diagrams/game-speed-scale.png)
 
+The scale's slowest step is 1 Frame, one step left of 1/4: 1 Frame, 1/4, 1/2, 2/3, x1, x1.5. At 1 Frame the game
+holds still. Each press of ZL (L on a GameCube controller) moves it one frame. Hold the button and the game runs from
+the 18th frame on, until you let go. This is the same button Training uses for its 1 Frame. While you hold the speed
+chord, ZL doesn't step.
+
 While you hold the chord, D-pad Left and Right don't reach the game and no other chord fires, so ZL + D-pad Left can't
 cycle the CPU by accident. The chord doesn't work while a menu is open (this one or the game's pause menu).
 
@@ -24,16 +29,17 @@ chord you set works the same way: hold it, then D-pad Left or Right.
 The chord sets Training's own Speed, so the game's pause menu (Other Settings › Speed) shows the same value. Training's
 HUD shows a stopwatch with the speed whenever it isn't x1, and the stopwatch goes away at x1.
 
-Training's 1 Frame speed (pause and step) stays in the game's pause menu. If Training is on 1 Frame, the chord steps
-from x1.
+1 Frame is Training's own 1 Frame: the game pauses, ZL steps, and the stopwatch shows it. Training keeps its Speed the
+way the game does, so 1 Frame stays set after you reset the positions. A new Training starts at x1.
 
 ![The HUD stopwatch reads x1.5, then goes away back at x1](../media/rc8-speed-hud-fixed.gif)
 
 ## In the waiting rooms
 
 With Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On, the same chord and the same
-five speeds work in a waiting room. Only your practice changes speed: the room's own timers keep their normal pace.
-There is no stopwatch there; the pop-up shows the speed while you hold the chord.
+six speeds work in a waiting room. Only your practice changes speed: the room's own timers keep their normal pace.
+There is no stopwatch there; the pop-up shows the speed while you hold the chord. At 1 Frame your practice holds still
+and ZL steps it, as in Training; the room keeps running.
 
 Each new practice starts at x1. The speed ends with the practice, so a match always starts at x1.
 

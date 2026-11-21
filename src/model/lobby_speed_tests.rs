@@ -16,7 +16,7 @@ fn each_lobby_speed_has_its_plan_and_none_raises_the_update_rate() {
     assert_eq!(LobbyPlan::of(Speed::Quarter), LobbyPlan::Slot(4));
     assert_eq!(LobbyPlan::of(Speed::TwoThirds), LobbyPlan::TwoThirds);
     assert_eq!(LobbyPlan::of(Speed::OneAndHalf), LobbyPlan::ExtraPass);
-    assert_eq!(LobbyPlan::of(Speed::OneFrame), LobbyPlan::X1, "1 Frame is not a lobby speed");
+    assert_eq!(LobbyPlan::of(Speed::OneFrame), LobbyPlan::Hold, "rc.15: 1 Frame holds the world");
     assert_eq!(LobbyPlan::Slot(2).slot(), Some((2, false)));
     assert_eq!(LobbyPlan::TwoThirds.slot(), Some((1, true)), "2/3 starts with no slow; the pace asks for 2");
     assert_eq!(LobbyPlan::ExtraPass.slot(), None, "x1.5 holds no slot");
@@ -456,10 +456,178 @@ fn the_pass_stops_between_ticks_once_the_practice_is_no_longer_live() {
     assert_eq!((pass.ticked, pass.whole, calls), (0, false, 0));
 }
 
+// --- rc.15 1 Frame: the entry hold against the game's slow step -------------------------------------------------------
+
+const LOBBY_ENTRY: EntryNow =
+    EntryNow { armed: true, in_practice: true, waiting_area: true, paused: 0, current_n: 1, target_n: 1 };
+
+/// One update of the waiting area at 1 Frame: Player 1's poll (the step input), then the battle task entry, which runs
+/// the slow step unless it is held. Returns whether a logic frame was made.
+fn frame_update(slow: &mut Slow, step: &mut FrameStep, pressed: bool, held: bool, blocked: bool) -> bool {
+    step.poll(pressed, held, blocked);
+    let now = EntryNow { current_n: slow.current, target_n: slow.target, ..LOBBY_ENTRY };
+    let due = entry_takes_step(now) && step.take();
+    if entry_holds(now, due) {
+        return false;
+    }
+    let before = slow.frames;
+    slow.update();
+    slow.frames != before
+}
+
+fn one_frame_is_a_hold_with_no_slot_and_no_pass() {
+    assert_eq!(LobbyPlan::of(Speed::OneFrame), LobbyPlan::Hold);
+    assert_eq!(LobbyPlan::Hold.slot(), None, "no slot in the table");
+    // The slot keeper releases the slot of the speed before and takes none at 1 Frame.
+    let mut slow = Slow::new();
+    let mut keeper = LobbySlot::new();
+    assert!(matches!(keeper.step(Speed::Quarter, LIVE, Some(&mut slow.table)), LobbyStep::Taken(_)));
+    assert!(matches!(keeper.step(Speed::OneFrame, LIVE, Some(&mut slow.table)), LobbyStep::Freed(_)));
+    assert_eq!(keeper.step(Speed::OneFrame, LIVE, Some(&mut slow.table)), LobbyStep::Nothing);
+    assert_eq!(slow.table[table::SLOTS_AT..table::DIRTY_AT], fresh_table()[table::SLOTS_AT..table::DIRTY_AT]);
+    // No extra pass: the pass needs an unpaused update with no slow, which a held entry never is (it is paused).
+    assert!(!armed(true, Speed::OneAndHalf) && !armed(true, Speed::X1) && armed(true, Speed::OneFrame));
+}
+
+fn the_lobby_step_lets_exactly_one_entry_run_per_press() {
+    let (mut slow, mut step) = (Slow::new(), FrameStep::new());
+    // Held: 300 updates, no logic frame.
+    let made: usize = (0..300).map(|_| frame_update(&mut slow, &mut step, false, false, false) as usize).sum();
+    assert_eq!((made, slow.frames), (0, 0));
+    // Each press, then release: exactly one logic frame per press, at the press's update.
+    for press in 1..=40u32 {
+        assert!(frame_update(&mut slow, &mut step, true, true, false), "press {press}");
+        for _ in 0..5 {
+            assert!(!frame_update(&mut slow, &mut step, false, false, false));
+        }
+        assert_eq!(slow.frames, press);
+    }
+    // A press held a few polls (below the run count) is still one frame.
+    assert!(frame_update(&mut slow, &mut step, true, true, false));
+    for _ in 1..HOLD_RUN {
+        assert!(!frame_update(&mut slow, &mut step, false, true, false));
+    }
+    assert!(!frame_update(&mut slow, &mut step, false, false, false));
+    assert_eq!(slow.frames, 41);
+    // The step bits survive the atomic's round trip.
+    let mut s = FrameStep::new();
+    s.poll(true, true, false);
+    assert_eq!(FrameStep::from_bits(s.bits()), s);
+    assert_eq!(s.bits() & FrameStep::DUE, FrameStep::DUE);
+}
+
+fn holding_the_step_button_runs_from_the_eighteenth_poll() {
+    let (mut slow, mut step) = (Slow::new(), FrameStep::new());
+    assert!(frame_update(&mut slow, &mut step, true, true, false), "the press steps");
+    let held: Vec<bool> = (1..=30).map(|_| frame_update(&mut slow, &mut step, false, true, false)).collect();
+    let first_run = held.iter().position(|ran| *ran).map(|i| i + 1);
+    assert_eq!(first_run, Some(usize::from(HOLD_RUN)), "native: `cmp w8,#18; b.lo` on the held count");
+    assert!(held[usize::from(HOLD_RUN) - 1..].iter().all(|ran| *ran), "then every update runs while held");
+    // Let go: held again at once, and the count starts over.
+    assert!(!frame_update(&mut slow, &mut step, false, false, false));
+    assert!(!frame_update(&mut slow, &mut step, false, true, false), "held without a new press: counting again");
+}
+
+fn a_step_press_under_the_speed_hold_is_not_a_frame_step() {
+    let (mut slow, mut step) = (Slow::new(), FrameStep::new());
+    // The speed hold open (or an owner, or the busy UI): the button presses and holds, nothing runs.
+    for _ in 0..40 {
+        assert!(!frame_update(&mut slow, &mut step, true, true, true));
+    }
+    assert_eq!(slow.frames, 0);
+    // A press made while blocked does not leak into the first free poll either.
+    assert!(!frame_update(&mut slow, &mut step, false, true, false));
+    assert!(frame_update(&mut slow, &mut step, true, true, false));
+    // The step button is the native table, by controller style.
+    assert_eq!([step_mask(1), step_mask(5), step_mask(6)], [0x400; 3], "ZL");
+    assert_eq!([step_mask(3), step_mask(4), step_mask(7)], [0x100; 3], "raw L: the GameCube L trigger on 7");
+    assert_eq!([step_mask(0), step_mask(8)], [0, 0]);
+}
+
+fn the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice() {
+    assert!(entry_holds(LOBBY_ENTRY, false));
+    assert!(!entry_holds(LOBBY_ENTRY, true), "a due step runs the entry");
+    for now in [
+        EntryNow { armed: false, ..LOBBY_ENTRY },
+        EntryNow { in_practice: false, ..LOBBY_ENTRY },
+        EntryNow { waiting_area: false, ..LOBBY_ENTRY },
+        EntryNow { paused: 4, ..LOBBY_ENTRY },
+        EntryNow { current_n: 4, ..LOBBY_ENTRY },
+        EntryNow { target_n: 2, ..LOBBY_ENTRY },
+    ] {
+        assert!(!entry_holds(now, false) && !entry_takes_step(now), "{now:?}");
+    }
+    // From 1/4 to 1 Frame: the slot goes at once, the period it began runs out at 1/4, then the world holds.
+    let (mut slow, mut keeper, mut step) = (Slow::new(), LobbySlot::new(), FrameStep::new());
+    keeper.step(Speed::Quarter, LIVE, Some(&mut slow.table));
+    for _ in 0..6 {
+        slow.update();
+    }
+    keeper.release(TABLE, Some(&mut slow.table));
+    let ran = (0..8).filter(|_| frame_update(&mut slow, &mut step, false, false, false)).count();
+    assert_eq!((slow.current, slow.target), (1, 1));
+    assert!(ran <= 2, "only the rest of the 1/4 period ran ({ran} logic frames)");
+    let frames = slow.frames;
+    assert!((0..60).all(|_| !frame_update(&mut slow, &mut step, false, false, false)));
+    assert_eq!(slow.frames, frames, "then held");
+}
+
+fn every_reset_returns_the_lobby_to_x1_and_ends_the_hold() {
+    // The resets (`game_speed::practice_changed`, `session_clear`): the practice not live, a 1 Frame speed back to x1.
+    let after_reset = |wanted: Speed| if wanted == Speed::OneFrame { Speed::X1 } else { wanted };
+    for wanted in Speed::ALL {
+        assert!(!armed(false, wanted), "not live: {wanted:?}");
+        assert!(!armed(true, after_reset(wanted)), "x1 after the reset: {wanted:?}");
+    }
+    // A match: its battle task is another class, so even an armed hold is not this entry's.
+    let matched = EntryNow { waiting_area: false, ..LOBBY_ENTRY };
+    assert!(!entry_holds(matched, false));
+    assert_ne!(native::WAITING_AREA_VTABLE, 0x506_1460, "the online match's class (census qcf-spd05y)");
+}
+
+/// The lobby half of the runtime never names the update-rate words: the files and functions it runs in the waiting room.
+fn the_lobby_path_never_writes_the_update_rate_words() {
+    // Code only: comment lines may name the words they say the code doesn't touch.
+    let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
+    let speed = code(include_str!("../runtime/features/game_speed.rs"));
+    let body = |name: &str| {
+        let at = speed.find(&format!("fn {name}(")).unwrap_or_else(|| panic!("fn {name}"));
+        let end = speed[at..].find("\n}\n").map(|e| at + e).unwrap();
+        speed[at..end].to_owned()
+    };
+    let lobby = [
+        "lobby_frame", "lobby_update", "lobby_pace", "lobby_extra_step", "release_lobby_slot", "practice_changed",
+        "session_clear", "refresh_hold", "frame_step_poll", "entry_hold",
+    ];
+    let forbidden = ["RATE_CODE", "UPDATE_RATE", "0x593b444", "0x523d004", "apply_now", "mode_apply", "PAUSE_SYNC_FN"];
+    for name in lobby {
+        for word in forbidden {
+            assert!(!body(name).contains(word), "{name} names {word}");
+        }
+    }
+    let hook = code(include_str!("../runtime/lobby/lobby_speed.rs"));
+    for word in forbidden {
+        assert!(!hook.contains(word), "lobby_speed.rs names {word}");
+    }
+    // The entry hold writes only its context register: no write to game memory in its function or its hook.
+    let hold = body("entry_hold");
+    assert!(!hold.contains("write"), "entry_hold writes nothing");
+    let at = hook.find("unsafe fn entry_hold").unwrap();
+    let hook_body = &hook[at..at + hook[at..].find("\n}\n").unwrap()];
+    assert!(hook_body.contains("registers[22].set_x(1)") && !hook_body.contains("write"));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
     crate::test_table::run(&[
+        ("one_frame_is_a_hold_with_no_slot_and_no_pass", one_frame_is_a_hold_with_no_slot_and_no_pass as fn()),
+        ("the_lobby_step_lets_exactly_one_entry_run_per_press", the_lobby_step_lets_exactly_one_entry_run_per_press as fn()),
+        ("holding_the_step_button_runs_from_the_eighteenth_poll", holding_the_step_button_runs_from_the_eighteenth_poll as fn()),
+        ("a_step_press_under_the_speed_hold_is_not_a_frame_step", a_step_press_under_the_speed_hold_is_not_a_frame_step as fn()),
+        ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
+        ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
+        ("the_lobby_path_never_writes_the_update_rate_words", the_lobby_path_never_writes_the_update_rate_words as fn()),
         ("each_lobby_speed_has_its_plan_and_none_raises_the_update_rate", each_lobby_speed_has_its_plan_and_none_raises_the_update_rate as fn()),
         ("two_thirds_paces_periods_of_one_and_two_updates", two_thirds_paces_periods_of_one_and_two_updates as fn()),
         ("half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow", half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow as fn()),

@@ -32,6 +32,7 @@
 //! rc.15 Mash adds its separately frozen 17 approved reader rows in a 26th data file. The historical digests stay unchanged.
 //! rc.15 spacing grader adds the optional grader rows (five hit-pair stores, two hurt-shape radius stores, the hit-handler hook and its entry, the record contact): 272 site rows to 282.
 //! rc.15 Juggler adds seven optional stock attack forecast readers to the Edge/Juggler table: 17 to 24 rows.
+//! rc.15 1 Frame adds its 13 rows (`rows_speed_frame`) in a 30th data file. The historical digests stay unchanged.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -95,8 +96,9 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (29, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+    assert_eq!((files, rows), (30, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
         + crate::engine::seams::native_seams::rows_edge_zoom::ROWS.len()
+        + crate::engine::seams::native_seams::rows_speed_frame::ROWS.len()
         + crate::model::sites_mashout::SITES.len() + crate::model::sites_lockon::CALLEES.len()));
 }
 

@@ -48,6 +48,10 @@ mod table_digest_tests;
 #[cfg(test)]
 #[path = "../model/lobby_speed_rows_tests.rs"]
 mod lobby_speed_rows_tests;
+/// rc.15: 1 Frame's rows' guard words decoded against `model::lobby_speed` and `model::game_speed`.
+#[cfg(test)]
+#[path = "../model/speed_frame_rows_tests.rs"]
+mod speed_frame_rows_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;

@@ -44,8 +44,20 @@ unsafe fn class_update(_ctx: &mut InlineCtx) {
     crate::runtime::features::game_speed::lobby_update();
 }
 
+/// rc.15 1 Frame (`speed_frame.entry_hold`): the battle task entry `FUN_0135ca00`, two words after it loaded the paused
+/// word into w22, with its object in x20. For the waiting area's entry while the lobby is at 1 Frame and no step is due,
+/// w22 becomes 1 for this call only (the entry skips its slow step and runs the scheduler paused); every other call
+/// leaves the context as it was. It reads one atomic first and writes no memory.
+#[skyline::hook(offset = 0x135ca38, inline)]
+unsafe fn entry_hold(ctx: &mut InlineCtx) {
+    let _scope = HookScope::enter_hook(HookId::LobbyFrameHold);
+    if crate::runtime::features::game_speed::entry_hold(ctx.registers[20].x() as usize, ctx.registers[22].w()) {
+        ctx.registers[22].set_x(1);
+    }
+}
+
 /// Once from `lobby::init`, after `game_speed::init`: compare every row, then hook (only with the speed bind's own rows
-/// passed: the paced slot is its slot).
+/// passed: the paced slot is its slot). rc.15: the entry hold only with 1 Frame's rows passed too.
 pub(crate) fn init() {
     let speed = crate::runtime::features::game_speed::installed();
     let rows = crate::runtime::seams::seam_install::gate("lobby_speed", ROWS, speed);
@@ -53,8 +65,12 @@ pub(crate) fn init() {
         skyline::install_hooks!(class_update);
         INSTALLED.store(true, Ordering::Release);
     }
+    let frame = crate::runtime::features::game_speed::one_frame();
+    if frame {
+        skyline::install_hooks!(entry_hold);
+    }
     crate::engine::compat::logging::diagnostic(format_args!(
-        "[TrainingRooms] lobby_speed installed={} rows={rows} game_speed={speed}",
+        "[TrainingRooms] lobby_speed installed={} rows={rows} game_speed={speed} entry_hold={frame}",
         INSTALLED.load(Ordering::Acquire)
     ));
 }

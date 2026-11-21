@@ -120,6 +120,8 @@ hook_ids! {
     CpuLevel => "cpu_level",
     /// rc.8 R2: the waiting area's class update (the 2/3 slot's pace and x1.5's extra scheduler pass, `lobby_speed`).
     LobbySpeed => "lobby_speed",
+    /// rc.15: the battle task entry's 1 Frame hold (the waiting area's entry runs paused until a step, `speed_frame`).
+    LobbyFrameHold => "lobby_frame_hold",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",
