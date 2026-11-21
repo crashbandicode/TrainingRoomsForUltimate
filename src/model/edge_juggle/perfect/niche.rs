@@ -92,7 +92,7 @@ const MEASURED: &[(u8, Move, Measured)] = &[(3, Side, Measured { run: 134.0, ris
 
 pub struct Row {
     pub id: u8,
-    fighter: i32,
+    pub(crate) fighter: i32,
     intent: Intent,
     pub route: Route,
     pub moves: &'static [Move],
