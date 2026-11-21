@@ -572,7 +572,10 @@ impl Wizard {
             (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -55.0])
             }
-            (Drill::GuardEdge, Some(0xc)) if perfect::fly::puff_stage(stage_key) => {
+            (Drill::GuardEdge, Some(0xc)) if stage_key == (311, 0) => {
+                Some([40.0, 20.0])
+            }
+            (Drill::GuardEdge, Some(0xc)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, -28.0])
             }
             (Drill::GuardEdge, Some(0x10)) if perfect::is_crossing_stage(stage_key) => {
@@ -1032,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn puff_wizard_releases_inside_the_measured_fd_and_battlefield_ring() {
+    fn puff_wizard_releases_inside_the_measured_three_stage_ring() {
         let stage = Stage::new(
             [-240.0, 240.0, 160.0, -140.0],
             [-160.0, 160.0, 110.0, -105.0],
@@ -1048,7 +1051,14 @@ mod tests {
             wizard.change_area(stage, 1);
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
         }
-        for key in [(3, 1), (0, 1), (311, 0)] {
+        let mut waiting_room =
+            Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (311, 0), puff).unwrap();
+        assert_eq!(waiting_room.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        waiting_room.change_area(stage, 2);
+        assert_eq!(waiting_room.setup.cpu, [-120.0, 20.0]);
+        waiting_room.change_area(stage, 1);
+        assert_eq!(waiting_room.setup.cpu, [120.0, 20.0]);
+        for key in [(3, 1), (0, 1), (311, 1)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }

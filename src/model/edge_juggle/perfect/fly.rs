@@ -27,11 +27,6 @@ const RING_CELLS: [u32; 44] = [
     0x00000000, 0x00000000,
 ];
 
-/// The live shape must still match the measured profile.
-pub fn puff_stage(stage: (i32, u32)) -> bool {
-    matches!(stage, (0 | 3, 0))
-}
-
 fn falling(vy: f32) -> f32 {
     (vy - GRAVITY).max(-FALL)
 }
@@ -69,7 +64,7 @@ impl PuffFlight {
             || !state.velocity.into_iter().all(f32::is_finite)
             || state.velocity[0].abs() > DRIFT
             || !(-FALL..=0.0).contains(&state.velocity[1])
-            || !puff_stage(facts.stage)
+            || !super::is_crossing_stage(facts.stage)
             || !(facts.body_clearance > 0.0 && facts.body_clearance <= HEAD)
         {
             return None;
@@ -314,6 +309,19 @@ mod tests {
         assert!(PuffFlight::start(&facts(inside.position), inside).is_some());
         let old_low_cell = live([-93.986, -66.0], [0.0; 2]);
         assert!(PuffFlight::start(&facts(old_low_cell.position), old_low_cell).is_none());
+    }
+
+    #[test]
+    fn puff_admits_the_waiting_room_confirm_starts() {
+        for [outside, height] in [[40.0, 20.0], [90.0, 30.0]] {
+            for vy in [0.0, -0.265] {
+                let start = live([LEFT[0] - outside, height], [0.0, vy]);
+                assert!(PuffFlight::start(
+                    &RouteFacts { stage: (311, 0), ..facts(start.position) },
+                    start,
+                ).is_some());
+            }
+        }
     }
 
     #[test]
