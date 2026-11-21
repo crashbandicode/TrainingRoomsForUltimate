@@ -630,3 +630,40 @@ fn overlay_board_exposes_only_the_completed_simulation_frame() {
     assert!(board.is_frame(2));
     assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [current], "the removed object has no pane in frame 2");
 }
+
+#[test]
+fn paused_editor_polls_update_pictures_without_advancing_the_world_sample() {
+    use model::btt::{Btt, Pad};
+    use model::chords::logical::A;
+    use model::panes::EggPicture;
+
+    let mut board = Board::new();
+    board.begin_frame(7);
+    let orb = orbs::orb_of(
+        &sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 0.0, 2.0),
+        [4.0, 6.0, 0.0],
+    );
+    board.publish(10, [orb].into_iter());
+
+    let mut mode = Btt::IDLE;
+    mode.close_menu(true, true);
+    let before = mode.editor_pictures().unwrap();
+    let cursor = |pictures: [model::eggs::Look; model::btt::LOOKS]| {
+        pictures.into_iter().flatten().find_map(|(point, look)| {
+            (look.picture == EggPicture::Cursor).then_some(point)
+        })
+    };
+    assert!(mode.feed(Pad { stick: [1.0, 0.0], ..Pad::default() }));
+    let moved = mode.editor_pictures().unwrap();
+    assert!(cursor(moved).unwrap()[0] > cursor(before).unwrap()[0]);
+
+    let place = 1u16 << A;
+    assert!(mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+    let placed = mode.editor_pictures().unwrap();
+    assert!(placed.into_iter().flatten().any(|(point, look)| {
+        look.picture == EggPicture::Whole && Some(point) == cursor(moved)
+    }));
+    assert!(mode.simulation_pictures().iter().all(Option::is_none));
+    assert!(board.is_frame(7));
+    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [orb]);
+}

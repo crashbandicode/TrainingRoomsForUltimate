@@ -2265,7 +2265,7 @@ approved_by = "Operator 2026-11-21 17:09Z approved the integrated 8192 B NRO inc
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 187682
+ceiling = 187778
 date = "2026-11-21"
-reason = "Sample and publish all world-space overlay geometry from the stock simulation's phase-8 return. Exact normalized implementation count 187597 to 187682 (+85), with zero spare. The overlay-frame-sync release receipt measures NRO and aligned BSS against 3448686c."
+reason = "Sample the current world geometry and fighter anchors after the stock simulation. Render input-driven editor pictures from the current HUD tick. Exact normalized implementation count 187597 to 187778 (+181), with zero spare. The overlay-frame-sync release receipt measures NRO and aligned BSS against 3448686c."
 approved_by = "Operator through tr-primary-2 at 18:34Z added the shared overlay fix to the intermediate card under the existing measured LOC rule for memory-efficient changes."

@@ -169,20 +169,23 @@ pub unsafe fn poll(controller: usize, sample: Sample, keys: Option<(bool, bool)>
     hide
 }
 
-/// The layout tick supplies the camera at the original cadence for the placing box.
-pub fn see(active: bool, view: impl FnOnce() -> Option<View>) {
-    if active && running() {
-        let seen = view();
-        BTT.lock().see(seen);
+/// The layout tick supplies the camera and reads the input-driven editor in one pass.
+pub fn editor_pictures(active: bool, view: impl FnOnce() -> Option<View>) -> Option<[crate::model::eggs::Look; LOOKS]> {
+    if !active || !running() {
+        return None;
     }
+    let seen = view();
+    let mut mode = BTT.lock();
+    mode.see(seen);
+    mode.editor_pictures()
 }
 
-/// Sample the targets, break animations, and the placement cursor on the game thread.
-pub fn overlay_pictures() -> [Option<([f32; 2], EggLook)>; LOOKS] {
+/// Read active targets and break animations after the stock simulation step.
+pub fn overlay_pictures() -> [crate::model::eggs::Look; LOOKS] {
     if !running() {
         return [None; LOOKS];
     }
-    BTT.try_lock().map_or([None; LOOKS], |mode| mode.look())
+    BTT.try_lock().map_or([None; LOOKS], |mode| mode.simulation_pictures())
 }
 
 /// L+R+A or Change Stage initialised the fighters again (the reset hub, the game thread): a run starts over.

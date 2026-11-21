@@ -427,6 +427,20 @@ impl Btt {
         out
     }
 
+    /// Placement feedback follows controller polls, including the committed layout while it waits to start.
+    pub fn editor_pictures(&self) -> Option<[crate::model::eggs::Look; LOOKS]> {
+        matches!(self.phase, Phase::Placing | Phase::Ready).then(|| self.look())
+    }
+
+    /// Active targets and their break animation advance with the simulation.
+    pub fn simulation_pictures(&self) -> [crate::model::eggs::Look; LOOKS] {
+        if matches!(self.phase, Phase::Running | Phase::Done) {
+            self.look()
+        } else {
+            [None; LOOKS]
+        }
+    }
+
     pub fn five(&self) -> &Five {
         &self.five
     }

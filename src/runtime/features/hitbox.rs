@@ -675,24 +675,36 @@ static STORE: Mutex<Store> =
 // they drew over the effect spheres. Articles' hitboxes join them (`draw_articles`).
 
 type PracticePictures = ([eggs::Look; 3], [eggs::Look; btt::LOOKS]);
+type WorldAnchor = (u32, [f32; 3]);
 
 struct OverlaySample {
     board: Board,
+    scene: Option<Scene>,
     pictures: PracticePictures,
+    anchors: [Option<WorldAnchor>; hitbox::FIGHTER_SETS],
 }
 
 static BOARD: Mutex<OverlaySample> = Mutex::new(OverlaySample {
     board: Board::new(),
+    scene: None,
     pictures: ([None; 3], [None; btt::LOOKS]),
+    anchors: [None; hitbox::FIGHTER_SETS],
 });
 static SAMPLE: AtomicU32 = AtomicU32::new(0);
 static FIGHTERS: Mutex<[Option<(u32, usize)>; hitbox::FIGHTER_SETS]> =
     Mutex::new([None; hitbox::FIGHTER_SETS]);
 
 /// The renderer can hold its last board while projecting. A fighter frame never waits on it.
-fn clear_board(accessor: usize) {
-    if let Some(mut board) = BOARD.try_lock() {
-        board.board.clear(accessor);
+fn clear_board(accessor: usize, retired: Option<u32>) {
+    if let Some(mut sample) = BOARD.try_lock() {
+        sample.board.clear(accessor);
+        if let Some(id) = retired {
+            for anchor in &mut sample.anchors {
+                if anchor.is_some_and(|a| a.0 == id) {
+                    *anchor = None;
+                }
+            }
+        }
     }
 }
 
@@ -787,6 +799,57 @@ static ORB_PANES: Mutex<OrbPanes> = Mutex::new(OrbPanes {
     egg: ([0; crate::model::panes::EGG_PANES], [0; 3]),
 });
 
+/// An unavailable waiting-room menu must not be interpreted as a scene departure.
+fn overlay_layout_scene(name: &[u8]) -> Result<Option<Scene>, ()> {
+    match name {
+        b"info_training" => Ok(scene::current()),
+        b"info_waiting" => {
+            let requested = crate::runtime::lobby::training::lobby::try_requested().map_err(|_| ())?;
+            Ok(requested.then_some(Scene::Lobby).filter(|_| scene::current() == Some(Scene::Lobby)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn read_overlay_sample(scene: Scene) -> Option<hos_lock::MutexGuard<'static, OverlaySample>> {
+    BOARD.try_lock().filter(|sample| sample.scene == Some(scene) && sample.board.is_frame(SAMPLE.load(Ordering::Acquire)))
+}
+
+fn hud_half() -> Option<[f32; 2]> {
+    let words = unsafe { natives::screen_size_words()? };
+    Some(core::array::from_fn(|i| orbs::screen_half(words[i], orbs::SCREEN_HALF_DEFAULT[i])))
+}
+
+unsafe fn project_to_canvas(at: [f32; 3], half: [f32; 2]) -> Option<[f32; 2]> {
+    let canvas = orbs::to_canvas(natives::world_to_screen(&at)?, half);
+    canvas.into_iter().all(f32::is_finite).then_some(canvas)
+}
+
+/// The current pose's fighter origin and its position on the HUD.
+#[derive(Clone, Copy)]
+#[allow(dead_code, reason = "consumed by the stacked compact-strip branch")]
+pub(crate) struct FighterScreenAnchor {
+    pub(crate) object_id: u32,
+    pub(crate) world: [f32; 3],
+    pub(crate) canvas: [f32; 2],
+}
+
+/// Read the same scene/pose as the orb renderer, even with its legend toggled off.
+///
+/// # Safety
+/// Call on the HUD layout thread while the named layout is current.
+#[allow(dead_code, reason = "consumed by the stacked compact-strip branch")]
+pub(crate) unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScreenAnchor>; hitbox::FIGHTER_SETS]> {
+    let scene = overlay_layout_scene(name).ok()??;
+    let anchors = read_overlay_sample(scene)?.anchors;
+    let half = hud_half()?;
+    Some(anchors.map(|anchor| {
+        let (object_id, world) = anchor?;
+        let canvas = project_to_canvas(world, half)?;
+        Some(FighterScreenAnchor { object_id, world, canvas })
+    }))
+}
+
 /// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
 /// the camera, paused or not) and written into the plugin's panes as a pill; the rest hidden. A readiness boundary:
 /// nothing before boot installed the feature. Writes only the plugin's own panes.
@@ -799,21 +862,17 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     if !INSTALLED.load(Ordering::Acquire) {
         return;
     }
-    let waiting = name == b"info_waiting";
-    let active = if waiting {
-        // An unavailable menu is not a scene departure. Preserve the Eggs/BTT run
-        // and its panes for this tick; retry before touching either on the next.
-        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
-        active
-    } else { name == b"info_training" && scene::is_training() };
+    let Ok(scene) = overlay_layout_scene(name) else { return };
+    let active = scene.is_some();
     if layout.is_null() {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
     RUN.lock().run.see(active, || view());
-    btt::see(active, || view());
-    let board = BOARD.try_lock().filter(|s| s.board.is_frame(SAMPLE.load(Ordering::Acquire)));
-    let (eggs_orbs, marks) = board.as_ref().map_or(([None; 3], [None; btt::LOOKS]), |s| s.pictures);
+    let editor = btt::editor_pictures(active, || view());
+    let board = scene.and_then(read_overlay_sample);
+    let (eggs_orbs, targets_in_play) = board.as_ref().map_or(([None; 3], [None; btt::LOOKS]), |s| s.pictures);
+    let marks = editor.unwrap_or_else(|| if btt::running() { targets_in_play } else { [None; btt::LOOKS] });
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
     let zone_wizard = super::egg_zone::wizard_active();
@@ -828,6 +887,13 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
+    let marks = if edge_wizard {
+        super::edge_juggle::look(active)
+    } else if tech {
+        super::tech::look(active)
+    } else {
+        marks
+    };
     own[3..].copy_from_slice(&marks);
     if zone_wizard {
         own.fill(None);
@@ -875,10 +941,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     let mut used = orbs::PaneUse::default();
     let (mut over, mut looks) = (0u32, [None; 3 + btt::LOOKS]);
     if any {
-        let half = match natives::screen_size_words() {
-            Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
-            None => [0.0; 2],
-        };
+        let half = hud_half().unwrap_or_default();
         let plan = |orb: &Orb, color| {
             let end = |at| {
                 let [x, y] = orbs::edge_points(at, orb.radius);
@@ -968,9 +1031,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
 
 /// The camera this tick (`eggs::View`): two points of the fighters' plane projected on the canvas.
 unsafe fn view() -> Option<eggs::View> {
-    let words = natives::screen_size_words()?;
-    let half = [0, 1].map(|i| orbs::screen_half(words[i], orbs::SCREEN_HALF_DEFAULT[i]));
-    let canvas = |p: [f32; 3]| Some(orbs::to_canvas(natives::world_to_screen(&p)?, half));
+    let half = hud_half()?;
+    let canvas = |p| project_to_canvas(p, half);
     let (a, b) = (canvas([0.0; 3])?, canvas([10.0, 10.0, 0.0])?);
     let scale = [(b[0] - a[0]) / 10.0, (b[1] - a[1]) / 10.0];
     (scale[0] > 0.0 && scale[1] > 0.0).then(|| {
@@ -1060,12 +1122,17 @@ pub fn forget_fighter(fighter: usize) {
     }
     // SAFETY: a field read of the fighter object the game just initialised.
     let accessor = unsafe { natives::fighter_accessor(fighter) };
+    if accessor == 0 {
+        return;
+    }
     let mut store = STORE.lock();
     if let Some(i) = store.table.find(accessor) {
         store.table.sets[i].forget();
     }
     HELD.store(store.table.held_spheres(), Ordering::Relaxed);
-    clear_board(accessor);
+    // SAFETY: this accessor belongs to the fighter the game just initialized.
+    let id = unsafe { (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id };
+    clear_board(accessor, Some(id));
 }
 
 /// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
@@ -1292,26 +1359,35 @@ unsafe fn sample_overlay() {
     let Some(mut sample) = BOARD.try_lock() else { return };
     let Some(mut store) = STORE.try_lock() else { return };
     let Some(mut articles) = ARTICLES.try_lock() else { return };
-    let OverlaySample { board, pictures } = &mut *sample;
+    let OverlaySample { board, scene: sampled_scene, pictures, anchors } = &mut *sample;
     board.begin_frame(sample_id);
-    let active = scene::current().is_some();
+    *sampled_scene = scene::current();
+    let active = sampled_scene.is_some();
+    anchors.fill(None);
     let enabled = active && SETTING.load(Ordering::Acquire);
     if CLEAR_ARTICLES.swap(false, Ordering::AcqRel) {
         articles.forget_all(Some(board));
     }
     let mut owners = [0; hitbox::FIGHTER_SETS];
     let mut owner_count = 0;
-    for (id, accessor) in queued.into_iter().flatten() {
+    for (slot, object) in queued.into_iter().enumerate() {
+        let Some((id, accessor)) = object else { continue };
         if !state_natives::object_is_active(id)
             || smash::app::sv_battle_object::module_accessor(id) as usize != accessor
         {
             continue;
         }
+        let drawable = active && visualizes(accessor);
+        if drawable {
+            anchors[slot] = natives::joint_position(accessor, hash40("top"), &[0.0; 3])
+                .filter(|point| point.iter().all(|x| x.is_finite()))
+                .map(|world| (id, world));
+        }
         let held = store.table.find(accessor).filter(|&i| !store.table.sets[i].is_empty());
         if !enabled && held.is_none() {
             continue;
         }
-        if !visualizes(accessor) || !ensure_ready() {
+        if !drawable || !ensure_ready() {
             if let Some(i) = held {
                 clear_set(&mut store, board, i, accessor);
             }
@@ -1329,14 +1405,7 @@ unsafe fn sample_overlay() {
     HELD.store(store.table.held_spheres(), Ordering::Relaxed);
     *pictures = if active {
         let eggs = RUN.try_lock().map_or([None; 3], |state| state.run.pictures());
-        let marks = if super::edge_juggle::wizard_active() {
-            super::edge_juggle::look(true)
-        } else if super::tech::running() {
-            super::tech::look(true)
-        } else {
-            btt::overlay_pictures()
-        };
-        (eggs, marks)
+        (eggs, btt::overlay_pictures())
     } else {
         ([None; 3], [None; btt::LOOKS])
     };
@@ -1532,7 +1601,8 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
         let mut store = STORE.lock();
         if let Some(i) = store.table.find(accessor) {
-            let c = clear_set(&mut store, i, accessor);
+            clear_board(accessor, None);
+            let c = store.table.sets[i].clear(&mut OrbSink { status: i32::MIN });
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
             #[cfg(feature = "diag")]
             stats::rebound_cleared(c.killed);
