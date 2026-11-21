@@ -416,6 +416,24 @@ mod tests {
     }
 
     #[test]
+    fn puff_fly_l_baked_cell_edge_midpoints_keep_a_jump_in_reserve() {
+        for (row, mask) in RING_CELLS.into_iter().enumerate() {
+            for cell in 0..30 {
+                if mask & (1 << cell) == 0 {
+                    continue;
+                }
+                let center = [LEFT[0] - (4 * cell + 2) as f32, 38.0 - 4.0 * row as f32];
+                for [dx, dy] in [[-1.95, 0.0], [1.95, 0.0], [0.0, -1.95], [0.0, 1.95]] {
+                    let start = [center[0] + dx, center[1] + dy];
+                    for vy in [0.0, -0.49, -0.98] {
+                        verify_flight(start, RIGHT, 1.0, vy);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn puff_avoids_a_near_ledge_snap_during_descent() {
         let start = live([-106.0, 25.0], [0.0; 2]);
         let mut flight = PuffFlight::start(&facts(start.position), start).unwrap();
