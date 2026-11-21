@@ -122,8 +122,9 @@ static RUN: Mutex<EggState> = Mutex::new(EggState {
     run: eggs::Run::IDLE,
     streak: crate::model::hit_streak::Streak::EMPTY,
 });
-/// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
-static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
+/// The menu reads the round state without taking `RUN`.
+static EGG_ARMED: AtomicBool = AtomicBool::new(false);
+static EGG_FINISHED: AtomicBool = AtomicBool::new(false);
 static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
 
 fn lockon_key(score: u32) -> u64 {
@@ -157,7 +158,11 @@ pub fn practice_started() {
 
 /// An Eggs-ercise run is armed, or a Start is on its way to the next pass (the menu worker; atomics only).
 pub fn eggs_running() -> bool {
-    EGG_RUNNING.load(Ordering::Acquire) || EGG_START.load(Ordering::Acquire)
+    EGG_ARMED.load(Ordering::Acquire) || EGG_START.load(Ordering::Acquire)
+}
+
+pub fn eggs_finished() -> bool {
+    EGG_FINISHED.load(Ordering::Acquire) && !EGG_START.load(Ordering::Acquire)
 }
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
@@ -167,6 +172,7 @@ pub fn eggs_reset() {
     if state.streak.enabled() {
         state.streak.restart(true);
     }
+    EGG_FINISHED.store(false, Ordering::Release);
     EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
@@ -190,9 +196,10 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     }
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
-    let running = Run::running(run);
-    EGG_RUNNING.store(running, Ordering::Release);
-    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
+    let armed = run.armed();
+    EGG_ARMED.store(armed, Ordering::Release);
+    EGG_FINISHED.store(armed && !run.running(), Ordering::Release);
+    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), armed, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
         streak.restart(false);
         super::notices::clear(NOTICE_ID);

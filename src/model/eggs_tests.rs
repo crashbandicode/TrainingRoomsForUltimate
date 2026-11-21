@@ -559,8 +559,7 @@ fn target(run: &mut Run) -> Option<[f32; 2]> {
     run.look(false, || None)[0].map(|(at, _)| at)
 }
 
-/// V2.6: "a practice game is running" from the menu close that starts a mode until Off or the scene is left; the end
-/// notice and the wait for a restart count.
+/// V2.6: the CPU-hide request stays armed through the end notice and the wait for a restart.
 fn eggs_running() {
     let mut run = Run::IDLE;
     assert!(!run.running());
@@ -571,9 +570,9 @@ fn eggs_running() {
     for _ in 0..3700 {
         pass(&mut run, &[], false);
     }
-    assert!(run.ended() && run.running(), "Time! and the wait for a restart");
+    assert!(run.ended() && run.armed() && !run.running(), "Time! and the wait for a restart");
     run.plan([OFF, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING);
-    assert!(!run.running(), "Off");
+    assert!(!run.armed(), "Off");
     let mut run = started(FREE, ANY, 7);
     run.plan([FREE, ANY, NORMAL, DISC, IN_VIEW], None, 0, || MATCH);
     assert!(!run.running(), "the scene left");

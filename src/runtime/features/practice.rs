@@ -69,7 +69,7 @@ pub fn finish(game: Game) {
     let _ = ACTIVE.compare_exchange(game.code(), 0, Ordering::AcqRel, Ordering::Acquire);
 }
 
-/// The game the menu shows as running: the running game while its engine runs it or a start is still on its way.
+/// The game the menu can stop, including an Eggs-ercise result that can still be restarted.
 pub fn running() -> Option<Game> {
     let game = active()?;
     let live = match game {

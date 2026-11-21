@@ -2180,3 +2180,11 @@ ceiling = 173091
 date = "2026-11-20"
 reason = "Hit streak for Eggs-ercise and Break the Targets. tools/size_gate.py measured 173091 normalized lines on base 4e267994 plus this change, +390 over 172701."
 approved_by = "Primary e7ee8f1c (tr-primary-2), Hit streak work order 2026-11-20: one entry for the measured delta."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 173126
+date = "2026-11-21"
+reason = "Compose the approved +35 Finished-state fix from 49f8871f over the 173091 Hit streak baseline."
+approved_by = "Primary e7ee8f1c (tr-primary-2) approved +35 for the Finished-state fix as recorded in 49f8871f."

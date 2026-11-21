@@ -58,8 +58,9 @@ pub struct Env {
     pub btt_projectiles_ready: bool,
     /// rc.14: how many Stage Builder stages the save holds (extra tiles after the catalog on the stage grids).
     pub custom_stages: u16,
-    /// rc.15 practice menu: the practice game running when the menu opened (Stop clears it).
+    /// The practice game the menu can stop.
     pub running: Option<Game>,
+    pub eggs_finished: bool,
 }
 
 impl Default for Env {
@@ -79,6 +80,7 @@ impl Default for Env {
             btt_projectiles_ready: true,
             custom_stages: 0,
             running: None,
+            eggs_finished: false,
         }
     }
 }
@@ -874,9 +876,13 @@ impl Menu {
         }
     }
 
-    /// rc.15 practice menu: the practice game running now (when the menu opened, until a Stop).
+    /// The selected practice game that can be stopped from the menu.
     pub fn running(&self) -> Option<Game> {
         self.env.running
+    }
+
+    pub fn finished(&self, game: Game) -> bool {
+        game == Game::Eggs && self.env.eggs_finished && self.running() == Some(game)
     }
 
     /// The visible rows of sub group `group` (a game's sub-screen), in table order.
