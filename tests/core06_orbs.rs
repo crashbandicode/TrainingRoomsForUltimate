@@ -687,3 +687,93 @@ fn paused_editor_polls_update_pictures_without_advancing_the_world_sample() {
     assert!(sample.into_iter().flatten().all(|(_, look)| look.picture != EggPicture::Whole));
     assert!(mode.editor_pictures().is_none(), "the HUD uses the current simulation sample");
 }
+
+const RESET_ACCESSOR: usize = 0x1000;
+const RESET_ID: u32 = 0x0003_002a;
+
+#[test]
+fn delayed_worker_init_cannot_erase_a_fresh_overlay_sample() {
+    let generations = hitbox::FighterGenerations::new();
+    let old = generations.stamp(RESET_ID).unwrap();
+    // The worker's sole write is the reset. Phase 8 runs before the worker returns.
+    let resume = std::sync::Barrier::new(2);
+    let marked = std::sync::Barrier::new(2);
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            generations.retire(RESET_ID);
+            marked.wait();
+            resume.wait();
+        });
+        marked.wait();
+        let life = generations.stamp(RESET_ID).unwrap();
+        let anchor = (life, [2.0, 0.0, 0.0]);
+        let mut board = Board::new();
+        board.publish_fighter(RESET_ACCESSOR, life, [orb(2.0)].into_iter());
+        resume.wait();
+
+        assert!(!generations.is_current(old));
+        let slots = board.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+        assert_eq!(board.draw_slots_in_order(slots).map(|o| o.centre[0]).collect::<Vec<_>>(), [2.0]);
+        assert_eq!(generations.is_current(anchor.0).then_some(anchor.1), Some([2.0, 0.0, 0.0]));
+    });
+}
+
+#[test]
+fn retirement_during_a_busy_board_invalidates_only_the_old_fighter() {
+    let generations = hitbox::FighterGenerations::new();
+    let old = generations.stamp(RESET_ID).unwrap();
+    let other = generations.stamp(0x0004_002a).unwrap();
+    let board = hos_lock::Mutex::new(Board::new());
+    let mut in_flight = board.lock();
+
+    // The sample already captured its life. The worker completes while the sample owns BOARD.
+    std::thread::scope(|scope| {
+        scope.spawn(|| generations.retire(RESET_ID));
+    });
+    in_flight.publish_fighter(RESET_ACCESSOR, old, [orb(1.0)].into_iter());
+    in_flight.publish_fighter(0x2000, other, [orb(3.0)].into_iter());
+    in_flight.publish_article(0x3000, 0x1000_0011, None, [orb(4.0)].into_iter());
+    drop(in_flight);
+
+    let board = board.lock();
+    let slots = board.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+    assert_eq!(board.draw_slots_in_order(slots).map(|o| o.centre[0]).collect::<Vec<_>>(), [3.0, 4.0]);
+    assert!(!generations.is_current(old), "the layout must also reject the old anchor");
+    assert!(generations.is_current(other));
+}
+
+#[test]
+fn retirement_overlapping_first_bind_cannot_carry_an_old_grab_into_the_new_lifetime() {
+    let generations = hitbox::FighterGenerations::new();
+    let mut cache = hitbox::SetTable::new();
+
+    // The command gets through its current-life check. Init runs before it first binds the slot.
+    let old = generations.stamp(RESET_ID).unwrap();
+    assert!(generations.is_current(old));
+    generations.retire(RESET_ID);
+    let slot = cache.index_for(RESET_ACCESSOR, old);
+    let grab = sphere(hitbox::KIND_GRAB << 24, 1.0, 2.0);
+    assert!(cache.sets[slot].push_grab(grab, None));
+
+    let current = generations.stamp(RESET_ID).unwrap();
+    assert_eq!(cache.find_life(RESET_ACCESSOR, current), None);
+    let rebound = cache.index_for(RESET_ACCESSOR, current);
+    assert_eq!(rebound, slot);
+    assert!(cache.sets[slot].is_empty());
+    assert!(cache.sets[slot].push_grab(grab, None));
+    cache.forget_retired(&generations);
+    assert!(!cache.sets[slot].is_empty(), "the new lifetime's grab survives the retirement");
+}
+
+#[test]
+fn overlay_worker_retirement_reaches_both_hud_readers_without_a_board_write() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    let body = |name: &str| src.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    let init = body("fn forget_fighter(");
+    assert!(init.contains("FIGHTER_GENERATIONS.retire(id)"));
+    assert!(!init.contains("BOARD") && !init.contains("STORE") && !init.contains("clear_board"));
+    assert!(body("fn sample_overlay(").contains(".map(|world| (life, world))"));
+    assert!(body("fn publish_orbs(").contains("board.publish_fighter(accessor, life,"));
+    assert!(body("fn fighter_screen_anchors(").contains("FIGHTER_GENERATIONS.is_current(life)"));
+    assert!(body("fn draw_orbs(").contains("b.draw_slots(&hide, &FIGHTER_GENERATIONS)"));
+}

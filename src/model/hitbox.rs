@@ -20,6 +20,8 @@
 //! number from either (an integer converts with `scvtf`), a hash as the integer, and treats any other tag as 0. A nil
 //! argument has tag 0.
 
+use core::sync::atomic::{AtomicU32, Ordering};
+
 /// Eight attack slots per fighter (`AttackModule`).
 pub const SLOTS: i32 = 8;
 /// The sphere's scale per unit of hitbox size (`size x 19/200`).
@@ -943,47 +945,45 @@ impl HandleSet {
     }
 }
 
-/// Each cached fighter slot publishes its accessor so native init can retire it without taking the cache lock.
-/// Fighter accessors are pointer-aligned, leaving the low bit available for the retirement flag.
-pub struct SetRetirements([core::sync::atomic::AtomicUsize; FIGHTER_SETS]);
+/// The fighter allocator constructs 24 objects (13.0.5 main+0x14f48a8 and +0x14f4c98).
+const FIGHTER_OBJECTS: usize = 24;
 
-impl SetRetirements {
-    const RETIRED: usize = 1;
+/// Full native object ID and the initialization generation at the start of a read or command.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FighterLife {
+    pub id: u32,
+    generation: u32,
+}
 
+pub struct FighterGenerations([AtomicU32; FIGHTER_OBJECTS]);
+
+impl FighterGenerations {
     pub const fn new() -> Self {
-        Self([const { core::sync::atomic::AtomicUsize::new(0) }; FIGHTER_SETS])
+        Self([const { AtomicU32::new(0) }; FIGHTER_OBJECTS])
     }
 
-    /// Publish a replacement slot, whose prior records the cache already forgot.
-    pub fn bind(&self, slot: usize, accessor: usize) {
-        use core::sync::atomic::Ordering::Release;
-        debug_assert!(accessor != 0 && accessor & Self::RETIRED == 0);
-        self.0[slot].store(accessor, Release);
+    fn counter(&self, id: u32) -> Option<&AtomicU32> {
+        // Native object lookup at main+0x3ac580 uses category 0 and ID bits 16..27.
+        self.0.get((id >> 16) as usize)
     }
 
-    /// Mark the exact slot that still belongs to this accessor. Repeated init before a read coalesces.
-    pub fn retire(&self, accessor: usize) {
-        use core::sync::atomic::Ordering::{AcqRel, Acquire};
-        for slot in &self.0 {
-            if slot.load(Acquire) == accessor {
-                // A failed exchange means the cache replaced the slot or another init already retired it.
-                let _ = slot.compare_exchange(accessor, accessor | Self::RETIRED, AcqRel, Acquire);
-            }
+    pub fn stamp(&self, id: u32) -> Option<FighterLife> {
+        let generation = self.counter(id)?.load(Ordering::Acquire);
+        Some(FighterLife { id, generation })
+    }
+
+    pub fn retire(&self, id: u32) {
+        if let Some(counter) = self.counter(id) {
+            counter.fetch_add(1, Ordering::AcqRel);
         }
     }
 
-    /// The cache owns slot binding and consumption. A retirement arriving after this call stays pending.
-    pub fn take(&self, slot: usize) -> bool {
-        use core::sync::atomic::Ordering::{AcqRel, Acquire};
-        let slot = &self.0[slot];
-        if slot.load(Acquire) & Self::RETIRED == 0 {
-            return false;
-        }
-        slot.fetch_and(!Self::RETIRED, AcqRel) & Self::RETIRED != 0
+    pub fn is_current(&self, life: FighterLife) -> bool {
+        self.stamp(life.id) == Some(life)
     }
 }
 
-impl Default for SetRetirements {
+impl Default for FighterGenerations {
     fn default() -> Self {
         Self::new()
     }
@@ -993,6 +993,7 @@ impl Default for SetRetirements {
 #[derive(Clone, Copy, Debug)]
 pub struct SetTable {
     keys: [usize; FIGHTER_SETS],
+    lives: [Option<FighterLife>; FIGHTER_SETS],
     used: [u64; FIGHTER_SETS],
     clock: u64,
     pub sets: [HandleSet; FIGHTER_SETS],
@@ -1006,21 +1007,25 @@ impl Default for SetTable {
 
 impl SetTable {
     pub const fn new() -> SetTable {
-        SetTable { keys: [0; FIGHTER_SETS], used: [0; FIGHTER_SETS], clock: 0, sets: [HandleSet::new(); FIGHTER_SETS] }
+        SetTable { keys: [0; FIGHTER_SETS], lives: [None; FIGHTER_SETS], used: [0; FIGHTER_SETS], clock: 0, sets: [HandleSet::new(); FIGHTER_SETS] }
     }
 
     /// The set of `key` (an accessor address), taken over when new.
-    pub fn index_for(&mut self, key: usize) -> usize {
+    pub fn index_for(&mut self, key: usize, life: FighterLife) -> usize {
         self.clock += 1;
         let i = match self.keys.iter().position(|k| *k == key) {
             Some(i) => i,
             None => {
                 let i = (0..FIGHTER_SETS).min_by_key(|&i| (self.keys[i] != 0, self.used[i])).unwrap_or(0);
                 self.keys[i] = key;
-                self.sets[i].forget();
+                self.lives[i] = None;
                 i
             }
         };
+        if self.lives[i] != Some(life) {
+            self.sets[i].forget();
+            self.lives[i] = Some(life);
+        }
         self.used[i] = self.clock;
         i
     }
@@ -1028,6 +1033,19 @@ impl SetTable {
     /// The set of `key` if it has one.
     pub fn find(&self, key: usize) -> Option<usize> {
         self.keys.iter().position(|k| *k == key && key != 0)
+    }
+
+    pub fn find_life(&self, key: usize, life: FighterLife) -> Option<usize> {
+        self.find(key).filter(|&i| self.lives[i] == Some(life))
+    }
+
+    pub fn forget_retired(&mut self, generations: &FighterGenerations) {
+        for (set, life) in self.sets.iter_mut().zip(&mut self.lives) {
+            if life.is_some_and(|life| !generations.is_current(life)) {
+                set.forget();
+                *life = None;
+            }
+        }
     }
 
     /// Spheres held by every fighter (diagnostics: the plugin's share of the effect pool).

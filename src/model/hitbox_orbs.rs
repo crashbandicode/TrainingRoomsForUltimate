@@ -14,7 +14,7 @@
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
 use super::cpu::role::FighterKey;
-use super::hitbox::{want_hits, AttackReader, Effects, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
+use super::hitbox::{want_hits, AttackReader, Effects, FighterGenerations, FighterLife, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
@@ -119,6 +119,7 @@ impl DrawHide {
 /// The latest orbs of each object, keyed by its live accessor.
 pub struct Board {
     keys: [usize; FIGHTER_SETS],
+    fighter_lives: [Option<FighterLife>; FIGHTER_SETS],
     article_ids: [Option<u32>; FIGHTER_SETS],
     owners: [Option<u32>; FIGHTER_SETS],
     article_generation: Option<u32>,
@@ -137,7 +138,7 @@ impl Default for Board {
 
 impl Board {
     pub const fn new() -> Board {
-        Board { keys: [0; FIGHTER_SETS], article_ids: [None; FIGHTER_SETS], owners: [None; FIGHTER_SETS], article_generation: None, stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0, frame: None }
+        Board { keys: [0; FIGHTER_SETS], fighter_lives: [None; FIGHTER_SETS], article_ids: [None; FIGHTER_SETS], owners: [None; FIGHTER_SETS], article_generation: None, stamps: [0; FIGHTER_SETS], lens: [0; FIGHTER_SETS], orbs: [[Orb::NONE; BOARD_ORBS]; FIGHTER_SETS], clock: 0, frame: None }
     }
 
     /// Start a complete sample. Each producer must republish its visible geometry.
@@ -154,11 +155,16 @@ impl Board {
 
     /// Replace `key`'s orbs (at most `BOARD_ORBS`; a new key takes a free or the stalest slot). A capsule's second end
     /// (sphere 1 of its shape) becomes the tail of its first (sphere 0). Returns how many were kept.
+    #[cfg(test)]
     pub fn publish(&mut self, key: usize, orbs: impl Iterator<Item = Orb>) -> usize {
-        self.publish_object(key, None, None, orbs)
+        self.publish_object(key, None, None, None, orbs)
     }
 
-    fn publish_object(&mut self, key: usize, article: Option<u32>, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
+    pub fn publish_fighter(&mut self, key: usize, life: FighterLife, orbs: impl Iterator<Item = Orb>) -> usize {
+        self.publish_object(key, Some(life), None, None, orbs)
+    }
+
+    fn publish_object(&mut self, key: usize, fighter: Option<FighterLife>, article: Option<u32>, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
         if key == 0 {
             return 0;
         }
@@ -170,6 +176,7 @@ impl Board {
                 .unwrap_or(0),
         };
         self.keys[i] = key;
+        self.fighter_lives[i] = fighter;
         self.article_ids[i] = article;
         self.owners[i] = owner;
         self.stamps[i] = self.clock;
@@ -197,7 +204,7 @@ impl Board {
     }
 
     pub(crate) fn publish_article(&mut self, key: usize, id: u32, owner: Option<u32>, orbs: impl Iterator<Item = Orb>) -> usize {
-        self.publish_object(key, Some(id), owner, orbs)
+        self.publish_object(key, None, Some(id), owner, orbs)
     }
 
     /// Call after the complete article pass, under the same guard as its publications.
@@ -233,8 +240,15 @@ impl Board {
     }
 
     /// Resolve visibility once per frame. In the visible path none of the four passes scans IDs.
-    pub fn draw_slots(&self, hide: &DrawHide) -> u8 {
-        self.draw_slots_with(hide, |words, token| words.contains(&token))
+    pub fn draw_slots(&self, hide: &DrawHide, generations: &FighterGenerations) -> u8 {
+        let visible = self.draw_slots_with(hide, |words, token| words.contains(&token));
+        self.fighter_lives.iter().enumerate().fold(visible, |mask, (i, life)| {
+            if self.lens[i] != 0 && life.is_some_and(|life| !generations.is_current(life)) {
+                mask & !(1 << i)
+            } else {
+                mask
+            }
+        })
     }
 
     pub(crate) fn draw_slots_with(&self, hide: &DrawHide, mut contains: impl FnMut(&[u64], u64) -> bool) -> u8 {

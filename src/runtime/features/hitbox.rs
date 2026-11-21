@@ -35,7 +35,7 @@ use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetRetirements, SetTable, Sphere, StatusIds};
+use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FighterGenerations, FighterLife, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
 use crate::model::install_line::SiteReport;
@@ -666,26 +666,7 @@ struct Store {
     census: stats::CensusBook,
 }
 
-static RETIREMENTS: SetRetirements = SetRetirements::new();
-
-impl Store {
-    fn slot_for(&mut self, accessor: usize) -> usize {
-        let new = self.table.find(accessor).is_none();
-        let i = self.table.index_for(accessor);
-        if new {
-            RETIREMENTS.bind(i, accessor);
-        }
-        i
-    }
-
-    fn forget_retired(&mut self) {
-        for (i, set) in self.table.sets.iter_mut().enumerate() {
-            if RETIREMENTS.take(i) {
-                set.forget();
-            }
-        }
-    }
-}
+static FIGHTER_GENERATIONS: FighterGenerations = FighterGenerations::new();
 
 static STORE: Mutex<Store> = Mutex::new(Store {
     table: SetTable::new(),
@@ -707,7 +688,7 @@ static STORE: Mutex<Store> = Mutex::new(Store {
 // they drew over the effect spheres. Articles' hitboxes join them (`draw_articles`).
 
 type PracticePictures = ([eggs::Look; 3], [eggs::Look; btt::LOOKS]);
-type WorldAnchor = (u32, [f32; 3]);
+type WorldAnchor = (FighterLife, [f32; 3]);
 
 struct OverlaySample {
     board: Board,
@@ -727,16 +708,9 @@ static FIGHTERS: Mutex<[Option<(u32, usize)>; hitbox::FIGHTER_SETS]> =
     Mutex::new([None; hitbox::FIGHTER_SETS]);
 
 /// The renderer can hold its last board while projecting. A fighter frame never waits on it.
-fn clear_board(accessor: usize, retired: Option<u32>) {
+fn clear_board(accessor: usize) {
     if let Some(mut sample) = BOARD.try_lock() {
         sample.board.clear(accessor);
-        if let Some(id) = retired {
-            for anchor in &mut sample.anchors {
-                if anchor.is_some_and(|a| a.0 == id) {
-                    *anchor = None;
-                }
-            }
-        }
     }
 }
 
@@ -752,7 +726,7 @@ unsafe fn sphere_world_position(accessor: usize, sphere: &Sphere) -> Option<[f32
 
 /// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On
 /// and the fighter's wind `areas` (Windboxes ticked).
-unsafe fn publish_orbs(board: &mut Board, accessor: usize, set: &hitbox::HandleSet, areas: &[legend::WindArea]) -> usize {
+unsafe fn publish_orbs(board: &mut Board, accessor: usize, life: FighterLife, set: &hitbox::HandleSet, areas: &[legend::WindArea]) -> usize {
     let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
     let lr = shown(legend::ANGLES).then(|| natives::lr(accessor));
     let place = |s: &Sphere| sphere_world_position(accessor, s);
@@ -763,7 +737,7 @@ unsafe fn publish_orbs(board: &mut Board, accessor: usize, set: &hitbox::HandleS
             (placed[len], len) = (orb, len + 1);
         }
     }
-    board.publish(accessor, placed[..len].iter().copied())
+    board.publish_fighter(accessor, life, placed[..len].iter().copied())
 }
 
 /// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
@@ -874,9 +848,9 @@ pub unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScree
     let anchors = read_overlay_sample(scene)?.anchors;
     let half = hud_half()?;
     Some(anchors.map(|anchor| {
-        let (object_id, world) = anchor?;
+        let (life, world) = anchor?;
         let canvas = project_to_canvas(world, half)?;
-        Some(FighterScreenAnchor { object_id, world, canvas })
+        FIGHTER_GENERATIONS.is_current(life).then_some(FighterScreenAnchor { object_id: life.id, world, canvas })
     }))
 }
 
@@ -1024,7 +998,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         };
         for orb in combat
             .iter()
-            .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
+            .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide, &FIGHTER_GENERATIONS)))
             .filter(|o| legend::shows(bits, o.kind()))
         {
             if orb.kind() == legend::KIND_AREA && orb.key & 0xff == legend::AREA_BOX {
@@ -1157,10 +1131,9 @@ pub fn forget_fighter(fighter: usize) {
     if accessor == 0 {
         return;
     }
-    RETIREMENTS.retire(accessor);
     // SAFETY: this accessor belongs to the fighter the game just initialized.
     let id = unsafe { (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id };
-    clear_board(accessor, Some(id));
+    FIGHTER_GENERATIONS.retire(id);
 }
 
 /// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
@@ -1391,7 +1364,7 @@ unsafe fn sample_overlay() {
     let Some(mut sample) = BOARD.try_lock() else { return };
     let Some(mut store) = STORE.try_lock() else { return };
     let Some(mut articles) = ARTICLES.try_lock() else { return };
-    store.forget_retired();
+    store.table.forget_retired(&FIGHTER_GENERATIONS);
     let OverlaySample { board, scene: sampled_scene, pictures, anchors } = &mut *sample;
     board.begin_frame(sample_id);
     *sampled_scene = scene::current();
@@ -1405,6 +1378,7 @@ unsafe fn sample_overlay() {
     let mut owner_count = 0;
     for (slot, object) in queued.into_iter().enumerate() {
         let Some((id, accessor)) = object else { continue };
+        let Some(life) = FIGHTER_GENERATIONS.stamp(id) else { continue };
         if !state_natives::object_is_active(id)
             || smash::app::sv_battle_object::module_accessor(id) as usize != accessor
         {
@@ -1414,9 +1388,9 @@ unsafe fn sample_overlay() {
         if drawable {
             anchors[slot] = natives::joint_position(accessor, hash40("top"), &[0.0; 3])
                 .filter(|point| point.iter().all(|x| x.is_finite()))
-                .map(|world| (id, world));
+                .map(|world| (life, world));
         }
-        let held = store.table.find(accessor).filter(|&i| !store.table.sets[i].is_empty());
+        let held = store.table.find_life(accessor, life).filter(|&i| !store.table.sets[i].is_empty());
         if !enabled && held.is_none() {
             continue;
         }
@@ -1430,7 +1404,7 @@ unsafe fn sample_overlay() {
             owners[owner_count] = accessor;
             owner_count += 1;
         }
-        sample_fighter(&mut store, board, accessor, enabled);
+        sample_fighter(&mut store, board, accessor, life, enabled);
     }
     if owner_count != 0 {
         let _ = draw_articles(
@@ -1450,13 +1424,13 @@ unsafe fn sample_overlay() {
     };
 }
 
-unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, enabled: bool) {
+unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, life: FighterLife, enabled: bool) {
     let ids = status_ids();
     let status = if enabled { natives::status_kind(accessor) } else { 0 };
     #[cfg(feature = "diag")]
     stats::frame_begin();
     let facts = FrameFacts { visualizes: true, enabled, status, ids };
-    let i = store.slot_for(accessor);
+    let i = store.table.index_for(accessor, life);
     let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
     let mut counts = Counts::default();
     if store.seen_epoch[i] != epoch {
@@ -1476,7 +1450,7 @@ unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, 
     // Wind areas (Windboxes ticked): pushes that are not hitboxes, read from the fighter's AreaModule.
     let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
     let found = if enabled && shown(legend::WINDBOXES) { object_wind_areas(accessor, &mut areas) } else { 0 };
-    let placed = publish_orbs(board, accessor, set, &areas[..found]);
+    let placed = publish_orbs(board, accessor, life, set, &areas[..found]);
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
         let hits = wants[..len].iter().filter(|s| s.key >> 24 != hitbox::KIND_HURT).count() as u32;
@@ -1540,6 +1514,8 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     if fighter && !grab {
         return;
     }
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let life = fighter.then(|| FIGHTER_GENERATIONS.stamp(id)).flatten();
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
@@ -1548,12 +1524,14 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);
     let set = if fighter {
+        let Some(life) = life else { return };
         store = STORE.lock();
-        store.forget_retired();
-        let i = store.slot_for(accessor);
+        if !FIGHTER_GENERATIONS.is_current(life) {
+            return;
+        }
+        let i = store.table.index_for(accessor, life);
         &mut store.table.sets[i]
     } else {
-        let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
         articles = ARTICLES.lock();
         articles.track(id, accessor, None, true).unwrap().0
     };
@@ -1637,12 +1615,13 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     if rebound || accessor == 0 || !SETTING.load(Ordering::Acquire) || !ensure_ready() || !visualizes(accessor) {
         return;
     }
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let Some(life) = FIGHTER_GENERATIONS.stamp(id) else { return };
     let shielding = status_ids().shielding(natives::status_kind(accessor));
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
         let mut store = STORE.lock();
-        store.forget_retired();
-        if let Some(i) = store.table.find(accessor) {
-            clear_board(accessor, None);
+        if let Some(i) = store.table.find_life(accessor, life).filter(|_| FIGHTER_GENERATIONS.is_current(life)) {
+            clear_board(accessor);
             let c = store.table.sets[i].clear(&mut OrbSink { status: i32::MIN });
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
             #[cfg(feature = "diag")]

@@ -1637,7 +1637,7 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     assert!(adapter.contains("natives::module_accessor(0)"));
     assert!(src.contains("let player = attempt.player()"));
     assert!(src.contains("let enabled = active && SETTING.load(Ordering::Acquire);"));
-    assert!(src.contains("sample_fighter(&mut store, board, accessor, enabled);"));
+    assert!(src.contains("sample_fighter(&mut store, board, accessor, life, enabled);"));
     assert!(src.contains("let mut hurt = (enabled && shown(legend::HURTBOXES)).then(|| hitbox::GameHurt"));
     assert!(adapter.contains("&& run.plan_pending"));
     assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
@@ -1987,15 +1987,17 @@ fn core06_fighter_sets_and_keys() {
     assert!((out[0].scale - 0.19).abs() < 1e-6);
     // The table: one set per fighter; a new fighter takes a free set, then the least recently used one, forgotten.
     let mut table = SetTable::new();
-    let first = table.index_for(0x1000);
-    assert_eq!(table.index_for(0x1000), first);
+    let generations = hitbox::FighterGenerations::new();
+    let life = |slot| generations.stamp((slot as u32) << 16).unwrap();
+    let first = table.index_for(0x1000, life(0));
+    assert_eq!(table.index_for(0x1000, life(0)), first);
     for k in 1..FIGHTER_SETS {
-        table.index_for(0x1000 + k * 0x100);
+        table.index_for(0x1000 + k * 0x100, life(k));
     }
     table.sets[first].push_grab(hitbox::Sphere::NONE, None);
     assert!(!table.sets[first].is_empty());
-    table.index_for(0x1000 + 0x100); // used again: 0x1000 is now the oldest
-    let taken = table.index_for(0x9000);
+    table.index_for(0x1000 + 0x100, life(1)); // used again: 0x1000 is now the oldest
+    let taken = table.index_for(0x9000, life(FIGHTER_SETS));
     assert_eq!(taken, first, "the least recently used fighter's set is taken over");
     assert!(table.sets[taken].is_empty(), "and forgotten, without a game call");
     assert_eq!(table.find(0x1000), None);
@@ -2003,37 +2005,23 @@ fn core06_fighter_sets_and_keys() {
 }
 
 #[test]
-fn fighter_init_on_a_worker_retires_only_its_cached_set() {
-    let retirements = hitbox::SetRetirements::new();
-    let mut table = hitbox::SetTable::new();
-    for key in [0x1000, 0x2000] {
-        let slot = table.index_for(key);
-        retirements.bind(slot, key);
-        assert!(table.sets[slot].push_grab(hitbox::Sphere::NONE, None));
-    }
-    std::thread::scope(|scope| {
-        scope.spawn(|| {
-            retirements.retire(0x1000);
-            retirements.retire(0x1000);
-        });
-    });
-    for (i, set) in table.sets.iter_mut().enumerate() {
-        if retirements.take(i) {
-            set.forget();
-        }
-    }
-    let reset = table.find(0x1000).unwrap();
-    let other = table.find(0x2000).unwrap();
-    assert!(table.sets[reset].is_empty());
-    assert!(!table.sets[other].is_empty());
-    assert!(!retirements.take(reset));
-    assert!(table.sets[reset].push_grab(hitbox::Sphere::NONE, None));
-
-    // Eviction drops the retired cache. A late init for the old key cannot retire its replacement.
-    retirements.retire(0x1000);
-    retirements.bind(reset, 0x3000);
-    retirements.retire(0x1000);
-    assert!(!retirements.take(reset));
+fn core06_fighter_generations_use_the_stock_object_pool() {
+    let Some(main) = common::owned_main("core06_fighter_generations_use_the_stock_object_pool") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    // Pool capacity 24 and its publication as category 0.
+    assert_eq!(w(0x14f4c98), 0x321d07e9);
+    assert_eq!(w(0x14f4c9c), 0xb9000909);
+    assert_eq!(w(0x14f55e4), 0x9102834a);
+    assert_eq!(w(0x14f55f4), 0xa9002d2a);
+    // Category 0 lookup uses ID bits 16..27 as the pool index and checks the full ID.
+    assert_eq!(w(0x3ac58c), 0x53106c08);
+    assert_eq!(w(0x3ac590), 0xb940192a);
+    assert_eq!(w(0x3ac648), 0xb9400909);
+    assert_eq!(w(0x3ac64c), 0x6b00013f);
+    let generations = hitbox::FighterGenerations::new();
+    assert!(generations.stamp(0x0017_ffff).is_some());
+    assert!(generations.stamp(0x0018_0000).is_none());
+    assert!(generations.stamp(0x1000_0000).is_none());
 }
 
 #[test]
