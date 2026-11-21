@@ -557,7 +557,7 @@ pub enum WizardStep {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
-    lower_release: Option<[f32; 2]>,
+    area_offset: Option<[f32; 2]>,
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -568,37 +568,40 @@ impl Wizard {
         stage_key: (i32, u32), fighter: Option<i32>,
     ) -> Option<Self> {
         let area = Area::default();
-        let lower_release = match (drill, fighter) {
+        let area_offset = match (drill, fighter) {
             (Drill::GuardEdge, Some(0x8)) if perfect::is_crossing_stage(stage_key) => {
-                Some([20.0, 55.0])
+                Some([20.0, -55.0])
             }
             (Drill::GuardEdge, Some(0xc)) if perfect::fly::puff_stage(stage_key) => {
-                Some([20.0, 28.0])
+                Some([20.0, -28.0])
             }
             (Drill::GuardEdge, Some(0x10)) if perfect::is_crossing_stage(stage_key) => {
-                Some([18.0, 30.0])
+                Some([18.0, -30.0])
             }
             (Drill::GuardEdge, Some(0x13)) if perfect::is_crossing_stage(stage_key) => {
-                Some([20.0, 28.0])
+                Some([20.0, -28.0])
             }
             (Drill::GuardEdge, Some(perfect::sora_flight::KIND)) if perfect::is_crossing_stage(stage_key) => {
-                Some([10.0, 30.0])
+                Some([10.0, -30.0])
             }
             (Drill::GuardEdge, Some(perfect::olimar::KIND)) if perfect::is_crossing_stage(stage_key) => {
-                Some([26.0, 26.0])
+                Some([26.0, -26.0])
             }
             (Drill::GuardEdge, Some(perfect::kart::KIND)) if perfect::is_crossing_stage(stage_key) => {
-                Some([22.0, 42.0])
+                Some([22.0, -42.0])
+            }
+            (Drill::GuardEdge, Some(perfect::pacman::KIND)) if perfect::is_crossing_stage(stage_key) => {
+                Some([26.0, 14.0])
             }
             _ => None,
         };
         let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, lower_release)?),
+            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, area_offset)?),
             Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
         };
         Some(Self {
             drill,
-            lower_release,
+            area_offset,
             step,
             setup: Setup {
                 area,
@@ -609,17 +612,18 @@ impl Wizard {
         })
     }
 
-    fn area_release(stage: Stage, area: Area, lower_release: Option<[f32; 2]>) -> Option<[f32; 2]> {
-        if let Some([outside, below]) = lower_release {
-            let point = match area {
-                Area::LowerLeft => Some([stage.ledges[0][0] - outside, stage.ledges[0][1] - below]),
-                Area::LowerRight => Some([stage.ledges[1][0] + outside, stage.ledges[1][1] - below]),
-                Area::UpperLeft | Area::UpperRight => None,
-            };
-            // Each measured approach starts below the near cliff catch.
-            // Preserve the normal default if the stage bounds would change it.
-            if let Some(point) = point.filter(|&point| stage.edge_start(area, point) == Some(point)) {
-                return Some(point);
+    fn area_release(stage: Stage, area: Area, area_offset: Option<[f32; 2]>) -> Option<[f32; 2]> {
+        if let Some([outside, height]) = area_offset {
+            let lower = matches!(area, Area::LowerLeft | Area::LowerRight);
+            if lower == (height < 0.0) {
+                let left = matches!(area, Area::LowerLeft | Area::UpperLeft);
+                let ledge = stage.ledges[usize::from(!left)];
+                let x = if left { ledge[0] - outside } else { ledge[0] + outside };
+                let point = [x, ledge[1] + height];
+                // Preserve the ordinary default on stages that would clip this release.
+                if stage.edge_start(area, point) == Some(point) {
+                    return Some(point);
+                }
             }
         }
         stage.area_default(area)
@@ -627,7 +631,7 @@ impl Wizard {
 
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
-        if let Some(cpu) = Self::area_release(stage, area, self.lower_release) {
+        if let Some(cpu) = Self::area_release(stage, area, self.area_offset) {
             self.setup.area = area;
             self.setup.cpu = cpu;
         }
@@ -959,6 +963,27 @@ mod tests {
         }
         assert_eq!(session.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
         assert_eq!((session.secured, session.attempts), (0, 0));
+    }
+
+    #[test]
+    fn pacman_upper_wizard_defaults_to_the_measured_pellet_start() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0],
+            [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x37)).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            while wizard.setup.area != Area::UpperLeft {
+                wizard.change_area(stage, 1);
+            }
+            assert_eq!(wizard.setup.cpu, [-106.0, 14.0]);
+            while wizard.setup.area != Area::UpperRight {
+                wizard.change_area(stage, 1);
+            }
+            assert_eq!(wizard.setup.cpu, [106.0, 14.0]);
+        }
     }
 
     #[test]

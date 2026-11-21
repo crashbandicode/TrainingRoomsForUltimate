@@ -255,7 +255,7 @@ const ROWS: [Row; 43] = [
     Row::new(18, 0x1d, Intent::Across, &[Hold, Side]),
     Row::new(19, 0x1e, Intent::Across, &[Hold, Travel]),
     Row::new(20, 0x1f, Intent::Across, &[Hold, Travel]),
-    Row::new(21, 0x37, Intent::Across, &[Hold, Travel]),
+    Row::new(21, 0x37, Intent::Across, &[Side, Jump, Rise]),
     // One Witch Twist per jump: the second needs the double jump between.
     Row::new(22, 0x40, Intent::Across, &[Hold, Travel, Jump, Travel, Side]),
     Row::new(23, 0x29, Intent::Across, &[Side, Hold, Rise]),

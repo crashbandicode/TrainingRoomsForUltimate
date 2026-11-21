@@ -12,6 +12,7 @@ use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::kart::{KartFlight, KartState};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::olimar::{self, OlimarBeat, OlimarFlight};
+use perfect::pacman::{self, PacBeat, PacFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::sheik::{SheikBeat, SheikFlight};
@@ -36,6 +37,7 @@ enum MeasuredFlight {
     Sheik(SheikFlight),
     Sora(SoraFlight),
     Kart(KartFlight),
+    PacMan(PacFlight),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -239,6 +241,27 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == pacman::KIND {
+            let fall = konst(C::StatusFall);
+            if fall == UNRESOLVED
+                || natives::status_kind(cpu) != fall
+                || inputs.jumps != 1
+                || inputs.special.is_none()
+                || !niche_start_enabled(cpu, Move::Side, true)
+                || !niche_start_enabled(cpu, Move::Rise, true)
+            {
+                return None;
+            }
+            let row = niche::measured_row(21, niche::CANDIDATE_ROWS)?;
+            let flight = PacFlight::start(facts, inputs.speed, natives::lr(cpu))?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::PacMan(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         let row_facts = Facts {
             fighter,
             corridor: None,
@@ -286,6 +309,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sora(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Kart(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
     }
@@ -449,6 +473,20 @@ impl NicheGuide {
                 jumps: remaining_jumps(cpu)?,
                 side,
                 up,
+            });
+        }
+        if let Some(MeasuredFlight::PacMan(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let fall = konst(C::StatusFall);
+            let aerial = konst(C::StatusJumpAerial);
+            return flight.step(PacBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                jumps: remaining_jumps(cpu)?,
+                side: status == fall && niche_start_enabled(cpu, Move::Side, available),
+                up: status == aerial && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
             });
         }
         if let Some(MeasuredFlight::FakeOut(flight)) = &mut self.measured {

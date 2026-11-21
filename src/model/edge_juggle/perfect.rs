@@ -10,6 +10,8 @@ pub mod kart;
 pub mod niche;
 #[path = "perfect/olimar.rs"]
 pub mod olimar;
+#[path = "perfect/pacman.rs"]
+pub mod pacman;
 #[path = "perfect/pichu.rs"]
 pub mod pichu;
 #[path = "perfect/pikachu.rs"]

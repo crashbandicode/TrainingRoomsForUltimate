@@ -497,7 +497,7 @@ fn niche_dark_pit_power_of_flight_route_and_pad_sequence() {
 
 #[test]
 fn niche_pac_man_pac_jump_route_and_pad_sequence() {
-    verify(0x37, "cross", 21, &[Move::Hold, Move::Travel]);
+    verify(0x37, "cross", 21, &[Move::Side, Move::Jump, Move::Rise]);
 }
 
 #[test]
