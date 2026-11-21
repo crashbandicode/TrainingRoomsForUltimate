@@ -4,6 +4,8 @@
 pub mod fly;
 #[path = "perfect/niche.rs"]
 pub mod niche;
+#[path = "perfect/pichu.rs"]
+pub mod pichu;
 #[path = "perfect/pikachu.rs"]
 pub mod pikachu;
 #[path = "perfect/recovery.rs"]

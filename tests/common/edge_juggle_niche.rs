@@ -456,7 +456,7 @@ fn niche_steve_elytra_route_and_pad_sequence() {
 
 #[test]
 fn niche_pichu_quick_attack_route_and_pad_sequence() {
-    verify(0x13, "cross", 16, &[Move::Hold, Move::QuickAttack]);
+    verify(0x13, "cross", 16, &[Move::Side, Move::Jump, Move::QuickAttack]);
 }
 
 #[test]

@@ -566,6 +566,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(0xc)) if perfect::fly::puff_stage(stage_key) => {
                 Some([20.0, 28.0])
             }
+            (Drill::GuardEdge, Some(0x13)) if perfect::is_crossing_stage(stage_key) => {
+                Some([20.0, 28.0])
+            }
             _ => None,
         };
         let (step, cpu) = match drill {
@@ -862,6 +865,28 @@ mod tests {
         }
         assert_eq!(session.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
         assert_eq!((session.secured, session.attempts), (0, 0));
+    }
+
+    #[test]
+    fn pichu_lower_wizard_starts_in_its_measured_skull_bash_region() {
+        let stage = Stage::new(
+            [-240.0, 240.0, 160.0, -140.0],
+            [-160.0, 160.0, 110.0, -105.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let pichu = Some(0x13);
+        for key in [(3, 0), (0, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, [100.0, -28.0], "{key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(89, 0), (3, 1)] {
+            let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
     }
 
     #[test]
