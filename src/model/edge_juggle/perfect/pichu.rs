@@ -306,7 +306,7 @@ fn agility(
         let (stick2, zip2) = snapped_direction(angle as f32);
         let lead = between_zips(cosine);
         let drift = between_zips(zip2[0]);
-        for row in 1..=7 {
+        for row in 1_u8..=7 {
             let length = f32::from(row) * SECOND_SPEED;
             let dx = 8.85 - length * cosine - lead - x + FIRST_BRAKE;
             let dy = -14.6 - length * sine - y;
