@@ -132,7 +132,7 @@ pub unsafe fn prepare(p1: usize) {
     let Some((ledges, _)) = edge_juggle::stage_floor(&ray, camera) else {
         return;
     };
-    let Some(outline) = tech_surfaces::training_outline(&ray, mid, limits) else {
+    let Some((outline, _)) = tech_surfaces::training_outline(&ray, mid, limits) else {
         return;
     };
     let Some(stage) = Stage::new(id, range, ledges, outline) else {
