@@ -342,7 +342,7 @@ mod tests {
             }
             "forced_off" | "joker" | "mac_meter" | "wiifit" | "wing" | "fighter_se"
             | "pokemon_decide" | "kirby_copy" | "save_state_frame" | "p1_chords"
-            | "operator_input" | "developer_float" | "hitbox_draw" | "hud_draw"
+            | "operator_input" | "developer_float" | "hitbox_draw" | "hud_draw" | "egg_zone"
             | "character_items" | "kirby_hats" => training,
             other => panic!("no vanilla answer for {other}"),
         }
@@ -402,6 +402,9 @@ mod tests {
         }
         if text.contains("fn is_training_mode(") || text == "scene::is_training()" {
             return Some("forwarder");
+        }
+        if file.ends_with("egg_zone.rs") && text.contains("!scene::is_training()") {
+            return Some("egg_zone");
         }
         if file.ends_with("character_items.rs") {
             return Some("character_items");

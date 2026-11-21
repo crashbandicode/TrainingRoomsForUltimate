@@ -517,7 +517,6 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         unsafe { super::tech_adapter::frame(a0, receipt) };
         unsafe { crate::runtime::features::tech::frame(a0) };
         unsafe { super::edge_juggle::frame(a0) };
-        unsafe { super::egg_zone::frame(a0) };
         // S0 research only, after the ordinary hide and practice-game passes.
         #[cfg(feature = "diag")]
         unsafe {

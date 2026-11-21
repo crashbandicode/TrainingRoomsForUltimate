@@ -214,7 +214,7 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
     let armed = run.armed();
     EGG_ARMED.store(armed, Ordering::Release);
-    EGG_FINISHED.store(armed && !run.running(), Ordering::Release);
+    EGG_FINISHED.store(armed && !Run::running(run), Ordering::Release);
     super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), armed, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
         streak.restart(false);
@@ -1224,6 +1224,7 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+    super::egg_zone::frame(fighter);
     eggs_pass(fighter);
     #[cfg(feature = "diag")]
     stats::frame_begin();
