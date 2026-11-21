@@ -101,7 +101,6 @@ pub fn in_region(stage: (i32, u32), ledges: [Point; 2], body: Point, damage: f32
     let outside = (near[0] - body[0]) * inward;
     let height = body[1] - near[1];
     super::is_crossing_stage(stage)
-        && (inward == 1.0 || stage == (3, 0))
         && (95.0..=105.0).contains(&damage)
         && (20.0..40.0).contains(&outside)
         && (-4.0..=40.0).contains(&height)
@@ -405,13 +404,19 @@ lib_unit_tests! {
         fn link_uses_the_far_left_ledge_after_a_measured_right_side_release() {
             let beat = LinkBeat { position: [117.99, 9.104], velocity: [0.0, -1.6], facing: 1.0,
                 damage: 105.0, ..release() };
-            let live = facts((3, 0), beat.position);
-            let mut flight = LinkFlight::start(&live, beat).unwrap();
-            assert_eq!(flight.exit_point(), LEDGES[0]);
-            assert!(flight.step(beat).is_some());
-            let left_blast = LinkBeat { frame: beat.frame + 70, status: DETONATE, ..beat };
-            assert_eq!(flight.step(left_blast), Some(pad([-85.0 / 120.0, -85.0 / 120.0], 0)));
-            for stage in [(0, 0), (311, 0), (3, 1)] {
+            for stage in [(3, 0), (0, 0), (311, 0)] {
+                let live = facts(stage, beat.position);
+                let mut flight = LinkFlight::start(&live, beat).unwrap_or_else(|| panic!("{stage:?}"));
+                assert_eq!(flight.exit_point(), LEDGES[0]);
+                assert!(flight.step(beat).is_some());
+                let left_blast = LinkBeat { frame: beat.frame + 70, status: DETONATE, ..beat };
+                assert_eq!(flight.step(left_blast), Some(pad([-85.0 / 120.0, -85.0 / 120.0], 0)));
+                let too_low = LinkBeat { position: [101.99, -24.0], ..beat };
+                assert!(LinkFlight::start(&facts(stage, too_low.position), too_low).is_none());
+                let wrong_facing = LinkBeat { facing: -1.0, ..beat };
+                assert!(LinkFlight::start(&live, wrong_facing).is_none());
+            }
+            for stage in [(3, 1), (44, 0), (89, 0)] {
                 assert!(LinkFlight::start(&facts(stage, beat.position), beat).is_none());
             }
         }

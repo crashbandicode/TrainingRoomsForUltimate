@@ -598,7 +598,7 @@ impl Wizard {
         stage_key: (i32, u32), fighter: Option<i32>,
     ) -> Option<Self> {
         let area = Area::default();
-        let link_left_start = drill == Drill::GuardEdge
+        let link_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
             && perfect::link::in_region(stage_key, stage.ledges, [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
         let lucario_left_start = if drill == Drill::GuardEdge && fighter == Some(perfect::lucario::KIND) {
@@ -608,7 +608,7 @@ impl Wizard {
         };
         let left_start = if let Some(offset) = lucario_left_start {
             Some((Area::LowerLeft, offset))
-        } else if link_left_start {
+        } else if link_start {
             Some((Area::UpperLeft, [30.0, 18.0]))
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::greninja::KIND) {
             perfect::greninja::wizard_offset(stage_key).map(|offset| (Area::UpperLeft, offset))
@@ -631,6 +631,7 @@ impl Wizard {
             None
         };
         let area_offset = match (drill, fighter) {
+            (Drill::GuardEdge, Some(perfect::link::KIND)) if link_start => Some([38.0, 38.0]),
             (Drill::GuardEdge, Some(perfect::snake::KIND)) if stage_key == (3, 0) => {
                 Some([20.0, -4.0])
             }
@@ -1091,7 +1092,10 @@ mod tests {
         };
         assert_eq!(facing(Drill::GuardEdge, (3, 0), left), Some(-1.0));
         assert_eq!(facing(Drill::GuardEdge, (3, 0), right), Some(1.0));
-        assert_eq!(facing(Drill::GuardEdge, (0, 0), right), None);
+        for key in [(3, 0), (0, 0), (311, 0)] {
+            assert_eq!(facing(Drill::GuardEdge, key, right), Some(1.0), "{key:?}");
+        }
+        assert_eq!(facing(Drill::GuardEdge, (3, 1), right), None);
         assert_eq!(facing(Drill::Juggler, (3, 0), right), None);
     }
 
@@ -1209,7 +1213,7 @@ mod tests {
     }
 
     #[test]
-    fn link_wizard_places_the_proven_left_bomb_start_in_both_difficulties() {
+    fn link_wizard_places_the_proven_bomb_starts_in_both_difficulties() {
         let stage = Stage::new(
             [-240.0, 240.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
             [[-79.99, 0.0], [79.99, 0.0]],
@@ -1226,8 +1230,13 @@ mod tests {
                 assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
             }
             wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
-            assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), None);
+            if perfect::is_crossing_stage(key) {
+                assert_eq!(wizard.setup.cpu, [117.99, 38.0]);
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), Some(1.0));
+            } else {
+                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+                assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), None);
+            }
         }
     }
 
