@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 179441
+ceiling = 179858
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Source 89ba6e09 measures 179441, an exact 8415 normalized-line delta over 171026. Includes the guarded Juggler startup forecast, Diddy Rocketbarrel, Jigglypuff on Waiting Room and the measured Pit and Dark Pit routes."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Source b58d6a49 measures 179858, an exact 8832 normalized-line delta over 171026. Includes the measured float crossing for Peach and Daisy and five-jump crossing for Meta Knight."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
