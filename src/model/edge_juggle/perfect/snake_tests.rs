@@ -253,3 +253,36 @@ fn snake_reference_pads_drift_jump_arm_then_reverse_after_ride() {
         );
     }
 }
+
+#[test]
+fn snake_repeats_the_committed_press_on_duplicate_thinks() {
+    let facts = facts();
+    let first = initial(&facts);
+    let mut flight = CypherFlight::start(&facts, first).expect("reference start");
+    let jump = CypherSample {
+        frame: 76,
+        position: [-42.69603, -114.25009],
+        velocity: [0.987, -1.73],
+        ..first
+    };
+    assert_eq!(flight.step(jump), Some(pad(FORWARD, JUMP)));
+    assert_eq!(flight.step(jump), Some(pad(FORWARD, JUMP)));
+    assert_eq!(
+        flight.step(CypherSample { frame: 77, status: JUMP_AERIAL, jumps: 0, ..jump }),
+        Some(pad(FORWARD, JUMP))
+    );
+    let rise = CypherSample {
+        frame: 102,
+        status: JUMP_AERIAL,
+        position: [-17.118042, -82.61059],
+        velocity: [0.987, 0.37477875],
+        jumps: 0,
+        ..first
+    };
+    assert_eq!(flight.step(rise), Some(pad(UP, SPECIAL)));
+    assert_eq!(flight.step(rise), Some(pad(UP, SPECIAL)));
+    assert_eq!(
+        flight.step(CypherSample { frame: 103, status: CYPHER_START, ..rise }),
+        Some(pad(UP, SPECIAL))
+    );
+}

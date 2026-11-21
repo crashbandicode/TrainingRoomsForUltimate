@@ -77,6 +77,7 @@ pub(crate) struct CypherFlight {
     far: Point,
     bottom: f32,
     phase: Phase,
+    last_pad: Option<(u32, Correction)>,
 }
 
 impl CypherFlight {
@@ -101,6 +102,7 @@ impl CypherFlight {
             far,
             bottom: facts.blast[3],
             phase: Phase::Drift,
+            last_pad: None,
         })
     }
 
@@ -116,6 +118,9 @@ impl CypherFlight {
             || !sample.velocity.into_iter().all(f32::is_finite)
         {
             return None;
+        }
+        if let Some((_, correction)) = self.last_pad.filter(|&(frame, _)| frame == sample.frame) {
+            return Some(correction);
         }
         let inside = x - self.near[0];
         let height = y - self.near[1];
@@ -168,7 +173,9 @@ impl CypherFlight {
             _ => return None,
         };
         self.phase = next;
-        Some(pad(stick, buttons))
+        let correction = pad(stick, buttons);
+        self.last_pad = Some((sample.frame, correction));
+        Some(correction)
     }
 }
 
