@@ -1,6 +1,6 @@
 //! Measured left-to-right Cypher flight on the three common stage outlines.
 use super::{
-    line_height, niche::pad, ordered_x, region, Correction, Point, RouteFacts, JUMP, SPECIAL,
+    niche::pad, region, Correction, Point, RouteFacts, JUMP, SPECIAL,
 };
 
 pub(crate) const KIND: i32 = 0x22;
@@ -19,35 +19,6 @@ const REST_RING: [u32; 15] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 32, 48, 16, 16];
 pub(crate) fn in_region(stage: (i32, u32), near: Point, position: Point) -> bool {
     super::is_crossing_stage(stage)
         && region::contains(&REST_RING, near[0] - position[0], position[1] - near[1])
-}
-
-fn has_common_underside(facts: &RouteFacts<'_>) -> bool {
-    let [near, far] = facts.ledges;
-    ((far[0] - near[0]) - 159.975).abs() < 0.12
-        && (far[1] - near[1]).abs() < 0.12
-        && (facts.blast[3] - near[1] + 140.0).abs() < 0.12
-        && [
-            (1.0, -9.396),
-            (15.591, -25.111),
-            (38.590, -40.099),
-            (79.9875, -40.109),
-            (121.402, -40.118),
-            (144.373, -25.103),
-            (158.975, -9.395),
-        ]
-        .into_iter()
-        .all(|(offset, expected)| {
-            let x = near[0] + offset;
-            let lower = facts
-                .outline
-                .iter()
-                .filter_map(|&line| {
-                    let [start, end] = ordered_x(line);
-                    (start..=end).contains(&x).then(|| line_height(line, x)[0])
-                })
-                .reduce(f32::min);
-            lower.is_some_and(|y| (y - near[1] - expected).abs() < 0.12)
-        })
 }
 
 #[derive(Clone, Copy)]
@@ -87,7 +58,7 @@ impl CypherFlight {
         if facts.fighter != KIND
             || facts.position != sample.position
             || !in_region(facts.stage, near, sample.position)
-            || !has_common_underside(facts)
+            || !region::has_common_underside(facts.ledges, facts.blast[3], facts.outline)
             || sample.status != FALL
             || sample.velocity[0] != 0.0
             || !(-0.32..=0.0).contains(&sample.velocity[1])

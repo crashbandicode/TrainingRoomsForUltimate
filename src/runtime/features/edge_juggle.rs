@@ -1050,8 +1050,8 @@ unsafe fn niche_correction(
         }
         return Correction::default();
     }
-    let id = guide.selected_niche_row().id;
     if let Some(edit) = guide.correct_niche_pad(ai, cpu, p1, position, status, run.rounds.frames) {
+        let id = guide.correction_row();
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
     }
     run.niche = None;

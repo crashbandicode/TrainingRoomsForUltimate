@@ -234,7 +234,7 @@ use Move::*;
 // fall (SmashWiki "Helpless") is the row's last move; a jump is never burst at the entry.
 const ROWS: [Row; 44] = [
     Row::new(1, 0x8, Intent::Across, &[Hold, QuickAttack]),
-    Row::new(2, 0x8, Intent::ThunderOverhead, &[Side, Down, QuickAttack]),
+    Row::new(super::pikachu::thunder::ROW, 0x8, Intent::ThunderOverhead, &[Side, Jump, Down, QuickAttack]),
     Row::new(3, 0x8, Intent::LongApproach, &[Side, Jump, QuickAttack]),
     Row::new(4, 0x1c, Intent::Across, &[Hold, Rise]),
     Row::new(5, 0x27, Intent::Across, &[Hold, Barrel]),

@@ -172,6 +172,8 @@ pub struct SkullBashFlight {
     outline: Outline,
     bottom: f32,
     bash_committed: bool,
+    thunder_approach: bool,
+    pub(crate) thunder: Option<thunder::Thunder>,
     jump_accepted: bool,
     zips: Option<ZipPlan>,
 }
@@ -183,8 +185,25 @@ impl SkullBashFlight {
             outline,
             bottom,
             bash_committed: false,
+            thunder_approach: false,
+            thunder: None,
             jump_accepted: false,
             zips: None,
+        }
+    }
+
+    pub(crate) fn with_measured_thunder(mut self, ledges: [Point; 2], position: Point, speed: Point, facing: f32) -> Self {
+        self.thunder_approach = self.path.direction == 1.0
+            && facing == 1.0
+            && thunder::measured_approach(position, speed, ledges[0])
+            && super::region::has_common_underside(ledges, self.bottom, self.outline.segments());
+        self
+    }
+
+    pub(crate) fn observe_bash_pad(&mut self, press: thunder::Bash) {
+        if self.thunder_approach && self.thunder.is_none() {
+            let near = [self.path.near[0] + 1.7, self.path.near[1] + 9.9];
+            self.thunder = thunder::Thunder::from_bash(press, near);
         }
     }
 
@@ -215,6 +234,9 @@ impl SkullBashFlight {
                 || !super::region::contains(&SKULL_BASH_RING, outside, position[1] - ledge_y)
             {
                 return None;
+            }
+            if self.thunder_approach && thunder::above_bash_line(position[1], ledge_y) {
+                return Some(niche::pad([0.0; 2], 0));
             }
             if position[1] > path.launch_y {
                 // Release before the side-special frame. Before this point, the full fall is reversible.
@@ -479,6 +501,9 @@ impl FakeOutFlight {
         Some(pad([stick * inward, 0.0], 0))
     }
 }
+
+#[path = "pikachu_thunder.rs"]
+pub(crate) mod thunder;
 
 #[cfg(test)]
 lib_unit_tests! {

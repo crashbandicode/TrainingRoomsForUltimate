@@ -317,12 +317,12 @@ fn niche_quick_attack_aims_during_the_pause_before_the_second_warp() {
 }
 
 #[test]
-fn niche_pikachu_thunder_follows_skull_bash_and_awaits_its_measured_finish() {
+fn niche_pikachu_thunder_uses_a_separate_measured_finish() {
     let thunder = tested_row(2);
-    assert_eq!(thunder.moves, &[Move::Side, Move::Down, Move::QuickAttack]);
+    assert_eq!(thunder.moves, &[Move::Side, Move::Jump, Move::Down, Move::QuickAttack]);
     assert!(
         select(facts(0x8, "center"), CANDIDATE_ROWS).is_none(),
-        "The cancel, bolt hit and far ledge need a native witness"
+        "The generic selector leaves Thunder to the measured Skull Bash flight"
     );
 }
 
@@ -810,7 +810,7 @@ fn niche_requires_stock_transition_and_does_not_spend_an_unaccepted_input_twice(
 
 #[test]
 fn niche_thunder_releases_bash_before_the_down_special_press() {
-    // Synthetic transitions check button edges only. M9 measures the native cancel.
+    // Synthetic transitions check edges. The measured Thunder flight owns real timing.
     let mut sequence = Sequence::new(tested_row(2));
     let bash = sequence.step(sample(0, Motion::Free)).unwrap();
     assert_eq!((bash.stick, bash.press), (Some([1.0, 0.0]), perfect::SPECIAL));
@@ -820,9 +820,14 @@ fn niche_thunder_releases_bash_before_the_down_special_press() {
         assert_ne!(pad.release & perfect::SPECIAL, 0);
     }
     assert_eq!(sequence.step(sample(4, Motion::Free)).unwrap().press, 0);
-    let thunder = sequence.step(sample(5, Motion::Free)).unwrap();
+    let jump = sequence.step(sample(5, Motion::Free)).unwrap();
+    assert_eq!(jump.press, perfect::JUMP);
+    assert_ne!(jump.release & perfect::SPECIAL, 0);
+    sequence.step(sample(6, Motion::Travel)).unwrap();
+    assert_eq!(sequence.step(sample(7, Motion::Free)).unwrap().press, 0);
+    let thunder = sequence.step(sample(8, Motion::Free)).unwrap();
     assert_eq!((thunder.stick, thunder.press), (Some([0.0, -1.0]), perfect::SPECIAL));
-    let startup = sequence.step(sample(6, Motion::Starting)).unwrap();
+    let startup = sequence.step(sample(9, Motion::Starting)).unwrap();
     assert_eq!((startup.stick, startup.press), (Some([0.0, -1.0]), 0));
 }
 

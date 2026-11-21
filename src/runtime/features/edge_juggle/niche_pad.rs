@@ -107,7 +107,7 @@ impl NicheGuide {
                 ledge: path.far,
                 measured: Some(MeasuredFlight::SkullBash(SkullBashFlight::new(
                     path, outline, facts.blast[3],
-                ))),
+                ).with_measured_thunder(facts.ledges, facts.position, inputs.speed, natives::lr(cpu)))),
                 body_clearance: facts.body_clearance,
             };
             return Some((guide, 1.0));
@@ -492,6 +492,16 @@ impl NicheGuide {
         self.sequence.accepts_form(fighter)
     }
 
+    pub(super) fn correction_row(&self) -> u8 {
+        if matches!(&self.measured, Some(MeasuredFlight::SkullBash(flight))
+            if flight.thunder.as_ref().is_some_and(pikachu::thunder::Thunder::active))
+        {
+            pikachu::thunder::ROW
+        } else {
+            self.selected_niche_row().id
+        }
+    }
+
     pub(super) fn selected_niche_row(&self) -> &'static Row {
         self.sequence.row()
     }
@@ -753,9 +763,31 @@ impl NicheGuide {
             });
         }
         if let Some(MeasuredFlight::SkullBash(skull_bash)) = &mut self.measured {
-            let (_, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            use pikachu::thunder;
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let position = [x, y];
+            let velocity = [vx, vy];
+            let jumps = remaining_jumps(cpu)?;
+            if let Some(flight) = &mut skull_bash.thunder {
+                if flight.active() {
+                    let can_down = flight.cast_due(frame) && niche_start_enabled(cpu, Move::Down, true);
+                    return flight.step(frame, status, can_down, reach.is_some());
+                }
+                if flight.jump_due(frame) {
+                    let ground = konst(C::SituationGround);
+                    let wait = konst(C::StatusWait);
+                    let guarder = (ground != UNRESOLVED && wait != UNRESOLVED
+                        && natives::situation_kind(p1) == ground && natives::status_kind(p1) == wait)
+                        .then(|| [natives::pos_x(p1), natives::pos_y(p1)]);
+                    if let Some(pad) = flight.begin(thunder::Jump {
+                        frame, status, position, velocity, jumps, guarder, up_available: reach.is_some(),
+                    }) {
+                        return Some(pad);
+                    }
+                }
+            }
             let motion = niche_motion_phase(cpu, self.fighter, movement, status);
-            return skull_bash.step(&mut self.sequence, Sample {
+            let pad = skull_bash.step(&mut self.sequence, Sample {
                 frame,
                 motion,
                 can_start: motion == Motion::Free && niche_start_enabled(cpu, movement, available),
@@ -766,7 +798,11 @@ impl NicheGuide {
                 hold_over: false,
                 direction: 0.0,
                 aim: [0.0; 2],
-            }, [x, y], vy, remaining_jumps(cpu)?);
+            }, position, vy, jumps)?;
+            if movement == Move::Side && motion == Motion::Free && pad.press == perfect::SPECIAL {
+                skull_bash.observe_bash_pad(thunder::Bash { frame, position, velocity });
+            }
+            return Some(pad);
         }
 
         let direction = (self.ledge[0] - x).signum();

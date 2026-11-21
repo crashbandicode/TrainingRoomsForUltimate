@@ -1,5 +1,7 @@
 //! Reachability bitmaps baked by the per-fighter recovery model.
 
+use super::{line_height, ordered_x, Point, Segment};
+
 pub(super) fn contains(rows: &[u32], outside: f32, height: f32) -> bool {
     if !(0.0 < outside && outside < 120.0 && height.is_finite() && height <= 40.0) {
         return false;
@@ -7,6 +9,34 @@ pub(super) fn contains(rows: &[u32], outside: f32, height: f32) -> bool {
     let column = (outside / 4.0) as u32;
     let row = ((40.0 - height) / 4.0) as usize;
     rows.get(row).is_some_and(|&mask| mask & (1 << column) != 0)
+}
+
+/// Main-stage lower collision ring as measured on normal FD, Battlefield and Waiting Room.
+pub(super) fn has_common_underside([near, far]: [Point; 2], bottom: f32, outline: &[Segment]) -> bool {
+    ((far[0] - near[0]) - 159.975).abs() < 0.12
+        && (far[1] - near[1]).abs() < 0.12
+        && (bottom - near[1] + 140.0).abs() < 0.12
+        && [
+            (1.0, -9.396),
+            (15.591, -25.111),
+            (38.590, -40.099),
+            (79.9875, -40.109),
+            (121.402, -40.118),
+            (144.373, -25.103),
+            (158.975, -9.395),
+        ]
+        .into_iter()
+        .all(|(offset, expected)| {
+            let x = near[0] + offset;
+            let lower = outline
+                .iter()
+                .filter_map(|&line| {
+                    let [start, end] = ordered_x(line);
+                    (start..=end).contains(&x).then(|| line_height(line, x)[0])
+                })
+                .reduce(f32::min);
+            lower.is_some_and(|y| (y - near[1] - expected).abs() < 0.12)
+        })
 }
 
 #[cfg(test)]
