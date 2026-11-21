@@ -27,6 +27,7 @@ use perfect::rob::{self, BurnerFlight, BurnerState};
 use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::snake::{self, CypherFlight, CypherSample};
 use perfect::sora_flight::{self, SoraBeat, SoraFlight};
+use perfect::steve::{self, ElytraBeat, ElytraFlight};
 use perfect::wings::{self, WingsFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
@@ -58,6 +59,7 @@ enum MeasuredFlight {
     Hydro(HydroFlight),
     Diddy(BarrelFlight),
     PacMan(PacFlight),
+    Elytra(ElytraFlight),
     Whip(WhipReturn),
 }
 
@@ -109,6 +111,24 @@ impl NicheGuide {
                 fighter,
                 ledge: near,
                 measured: Some(MeasuredFlight::Cape(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if fighter == steve::KIND {
+            let row = niche::measured_row(steve::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = ElytraFlight::start(facts, ElytraBeat {
+                frame: inputs.frame,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                can_rise: inputs.special.is_some() && niche_start_enabled(cpu, Move::Glide, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Elytra(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -558,6 +578,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Hydro(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
+            Some(MeasuredFlight::Elytra(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
     }
@@ -622,6 +643,22 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(MeasuredFlight::Elytra(flight)) = &mut self.measured {
+            let waiting = flight.needs_enabled_special();
+            let ((vx, vy), facing) = if waiting {
+                (super::super::recording_host::fighter_speed(cpu)?, natives::lr(cpu))
+            } else {
+                ((0.0, 0.0), 0.0)
+            };
+            return flight.step(ElytraBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                facing,
+                can_rise: waiting && reach.is_some() && niche_start_enabled(cpu, Move::Glide, available),
+            });
+        }
         if let Some(MeasuredFlight::Whip(flight)) = &mut self.measured {
             let jump = flight.jump_frame(frame);
             let chop = flight.chop_frame(frame);

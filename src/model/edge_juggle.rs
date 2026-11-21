@@ -620,10 +620,12 @@ impl Wizard {
             && perfect::is_crossing_stage(stage_key)
         {
             Some((Area::LowerLeft, [20.0, -4.0]))
-        } else if drill == Drill::GuardEdge && fighter == Some(perfect::incineroar::KIND)
-            && perfect::is_crossing_stage(stage_key)
-        {
-            Some((Area::UpperLeft, [110.0, 10.0]))
+        } else if drill == Drill::GuardEdge && perfect::is_crossing_stage(stage_key) {
+            match fighter {
+                Some(perfect::steve::KIND) => Some((Area::UpperLeft, [18.0, 30.0])),
+                Some(perfect::incineroar::KIND) => Some((Area::UpperLeft, [110.0, 10.0])),
+                _ => None,
+            }
         } else {
             None
         };
@@ -1087,6 +1089,21 @@ mod tests {
         assert_eq!(facing(Drill::GuardEdge, (3, 0), right), Some(1.0));
         assert_eq!(facing(Drill::GuardEdge, (0, 0), right), None);
         assert_eq!(facing(Drill::Juggler, (3, 0), right), None);
+    }
+
+    #[test]
+    fn steve_wizard_places_the_left_elytra_release_in_a_flown_column() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        for key in [(0, 0), (3, 0), (311, 0)] {
+            let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x58)).unwrap();
+            wizard.change_area(stage, 2);
+            assert_eq!(wizard.setup.cpu, [-98.0, 30.0], "native stage {key:?}");
+            wizard.change_area(stage, 1);
+            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+        }
     }
 
     #[test]

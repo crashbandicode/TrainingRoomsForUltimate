@@ -251,7 +251,7 @@ const ROWS: [Row; 45] = [
     Row::new(super::greninja::ROW, super::greninja::KIND, Intent::Across, &[Hold, Jump, Travel]),
     // Ness PK Thunder needs a measured projectile route before runtime dispatch.
     Row::new(14, 0x0a, Intent::Across, &[Hold, Bolt]),
-    Row::new(15, 0x58, Intent::Across, &[Hold, Glide]),
+    Row::new(super::steve::ROW, super::steve::KIND, Intent::Across, &[Hold, Glide]),
     Row::new(16, 0x13, Intent::Across, &[Side, Jump, QuickAttack]),
     Row::new(17, 0xc, Intent::Across, &[Hold]),
     Row::new(18, 0x1d, Intent::Across, &[Hold, Rise]),
