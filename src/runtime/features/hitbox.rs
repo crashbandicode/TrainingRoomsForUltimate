@@ -718,7 +718,7 @@ impl legend::AreaReader for GameArea {
     }
 }
 
-/// An object's enabled wind areas (its AreaModule at accessor `+0xc0`, `legend::area`) with their angles from the game's wind
+/// An object's enabled gameplay wind areas (its AreaModule at accessor `+0xc0`, `legend::area`) with their angles from the game's wind
 /// manager: a fighter's, an article's or an item's (every AreaModule writes the same table: `legend_every_area_module_writes_the_table_the_reader_reads`).
 unsafe fn object_wind_areas(accessor: usize, out: &mut [legend::WindArea]) -> usize {
     use legend::AreaReader;
@@ -904,16 +904,16 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
             .filter(|o| legend::shows(bits, o.kind()))
         {
-            let Some(pill) = plan(orb, orb.color) else { continue };
             if orb.kind() == legend::KIND_AREA && orb.key & 0xff == legend::AREA_BOX {
-                // A wind area's box: its band alone, from its left edge to its right, as tall as the box.
+                let Some((centre, size)) = orbs::plan_wind_box(orb, half, |corner| natives::world_to_screen(&corner)) else { continue };
                 let Some(band) = used.take_band() else {
                     over += 1;
                     continue;
                 };
-                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+                write_pane(cache.panes[p::CAPS + band], centre, size, 0.0, orb.color);
                 continue;
             }
+            let Some(pill) = plan(orb, orb.color) else { continue };
             write_pill(pill, &mut used, &mut over, &cache.panes);
         }
         for target in &targets[..drawn] {

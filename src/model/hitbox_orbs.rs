@@ -562,6 +562,40 @@ pub fn plan_pill(ends: [[f32; 2]; 2], edges: [[[f32; 2]; 2]; 2], half: [f32; 2],
     })
 }
 
+/// The canvas bounds of a wind area's rectangle. Its endpoints are the midpoints of the vertical edges.
+pub fn plan_wind_box(
+    orb: &Orb,
+    half: [f32; 2],
+    project: impl Fn([f32; 3]) -> Option<[f32; 2]>,
+) -> Option<([f32; 2], [f32; 2])> {
+    if half[0] <= 0.0 || half[1] <= 0.0 {
+        return None;
+    }
+    let mut min = [f32::INFINITY; 2];
+    let mut max = [f32::NEG_INFINITY; 2];
+    for [x, y, z] in [orb.centre, orb.tail] {
+        for y in [y - orb.radius, y + orb.radius] {
+            let point = to_canvas(project([x, y, z])?, half);
+            if !point.iter().all(|value| value.is_finite()) {
+                return None;
+            }
+            for axis in 0..2 {
+                min[axis] = min[axis].min(point[axis]);
+                max[axis] = max[axis].max(point[axis]);
+            }
+        }
+    }
+    let (width, height) = (max[0] - min[0], max[1] - min[1]);
+    if !width.is_finite() || !height.is_finite() || height < 1.0 {
+        return None;
+    }
+    if (0..2).any(|axis| min[axis] > CANVAS_HALF[axis] || max[axis] < -CANVAS_HALF[axis]) {
+        return None;
+    }
+    let centre = [min[0] + width / 2.0, min[1] + height / 2.0];
+    Some((centre, [width, height.min(MAX_PANE)]))
+}
+
 /// The two world points one radius from `centre` that `plan_pill` takes an end's projected radius from.
 pub fn edge_points(centre: [f32; 3], radius: f32) -> [[f32; 3]; 2] {
     let [x, y, z] = centre;

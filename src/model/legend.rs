@@ -160,6 +160,9 @@ pub mod area {
     /// fighter's facing when it was set).
     pub const MANAGER_SLOT: usize = 0x52b_85e8;
     pub const ENTRY: usize = 0x28;
+    pub const ENTRY_KIND: usize = 0x4;
+    /// GIMMICK_AREA_KIND_WIND. Native movement skips WIND_SECONDARY_ONLY at main+0x3cbaf0.
+    pub const GIMMICK_WIND: u16 = 2;
     pub const ENTRY_ANGLE: usize = 0xc;
     /// Bounds: records read per fighter, entries searched, areas drawn per fighter.
     pub const MAX_RECORDS: usize = 32;
@@ -185,7 +188,7 @@ pub enum AreaShape {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WindArea {
     pub shape: AreaShape,
-    /// The wind's direction in degrees, counter-clockwise from screen right; `None` when the manager has no entry for it.
+    /// The wind's direction in degrees, counter-clockwise from screen right, when finite.
     pub angle: Option<f32>,
 }
 
@@ -197,14 +200,19 @@ fn pointer(at: usize) -> bool {
     at != 0 && at.is_multiple_of(8)
 }
 
-/// The enabled wind areas of the AreaModule at `module` into `out`, with each one's angle from the wind manager's entry vector
-/// (`entries`: the vector's address, `[begin, end]`; 0 when there is none). How many were written. A table or a pointer that
-/// does not look like one gives nothing; a shape that is not finite, or empty, is left out.
+/// Copy enabled AreaModule shapes registered as gameplay wind into `out`. The wind manager's vector
+/// (`entries`: the address of `[begin, end]`) supplies the type and direction for each live shape ID.
+/// Returns the number of finite, nonempty shapes written.
 pub fn wind_areas(reader: &mut impl AreaReader, module: usize, entries: usize, out: &mut [WindArea]) -> usize {
     use area::*;
-    if !pointer(module) {
+    if !pointer(module) || !pointer(entries) {
         return 0;
     }
+    let (begin, end) = (reader.area_usize(entries), reader.area_usize(entries + 8));
+    if !pointer(begin) || end < begin || (end - begin) / ENTRY > MAX_ENTRIES {
+        return 0;
+    }
+    let wind_entries = (0..(end - begin) / ENTRY).map(|index| begin + index * ENTRY);
     let table = reader.area_usize(module + TABLE);
     if !pointer(table) {
         return 0;
@@ -243,26 +251,17 @@ pub fn wind_areas(reader: &mut impl AreaReader, module: usize, entries: usize, o
             continue;
         }
         let id = reader.area_u32(shape + ID);
-        out[n] = WindArea { shape: area, angle: entry_angle(reader, entries, id) };
+        let Some(entry) = wind_entries.clone().find(|entry| reader.area_u32(*entry) == id) else {
+            continue;
+        };
+        if reader.area_u32(entry + ENTRY_KIND) as u16 != GIMMICK_WIND {
+            continue;
+        }
+        let angle = reader.area_f32(entry + ENTRY_ANGLE);
+        out[n] = WindArea { shape: area, angle: angle.is_finite().then_some(angle) };
         n += 1;
     }
     n
-}
-
-fn entry_angle(reader: &mut impl AreaReader, entries: usize, id: u32) -> Option<f32> {
-    use area::*;
-    if !pointer(entries) {
-        return None;
-    }
-    let (begin, end) = (reader.area_usize(entries), reader.area_usize(entries + 8));
-    if !pointer(begin) || end < begin || (end - begin) / ENTRY > MAX_ENTRIES {
-        return None;
-    }
-    (0..(end - begin) / ENTRY)
-        .map(|k| begin + k * ENTRY)
-        .find(|e| reader.area_u32(*e) == id)
-        .map(|e| reader.area_f32(e + ENTRY_ANGLE))
-        .filter(|a| a.is_finite())
 }
 
 /// The wind areas' orb kind (after `KIND_WIND`): shown by *Windboxes* only (an area is not a hitbox). Sphere numbers: a box's band
