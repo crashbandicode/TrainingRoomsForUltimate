@@ -18,6 +18,7 @@ use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
 use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::sora_flight::{self, SoraBeat, SoraFlight};
+use perfect::wings::{self, WingsFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
@@ -32,6 +33,7 @@ enum MeasuredFlight {
     SkullBash(SkullBashFlight),
     FakeOut(FakeOutFlight),
     Puff(PuffFlight),
+    Wings(WingsFlight),
     Pichu(PichuFlight),
     PichuFakeOut(PichuFakeOut),
     Olimar(OlimarFlight),
@@ -120,6 +122,28 @@ impl NicheGuide {
                 fighter,
                 ledge: flight.exit_point(),
                 measured: Some(MeasuredFlight::Puff(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
+        if matches!(fighter, 0x1e | 0x1f) {
+            let row = niche::measured_row(if fighter == 0x1e { 19 } else { 20 }, niche::CANDIDATE_ROWS)?;
+            let flight = WingsFlight::start(facts, wings::Sample {
+                entry: wings::Entry {
+                    frame: 0,
+                    position: facts.position,
+                    velocity: inputs.speed,
+                    remaining: inputs.jumps,
+                    facing: natives::lr(cpu),
+                    can_special: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+                },
+                status: natives::status_kind(cpu),
+                can_jump: false,
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Wings(flight)),
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
@@ -328,6 +352,7 @@ impl NicheGuide {
             Some(MeasuredFlight::SkullBash(_)) => Some(158),
             // The FLY-L ring bake runs in at most 283 frames at the cell centers.
             Some(MeasuredFlight::Puff(_)) => Some(300),
+            Some(MeasuredFlight::Wings(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Pichu(_)) => Some(200),
             Some(MeasuredFlight::Olimar(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
@@ -401,6 +426,22 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::Wings(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let free = matches!(status, 0xd..=0xf);
+            return flight.step(wings::Sample {
+                entry: wings::Entry {
+                    frame,
+                    position: [x, y],
+                    velocity: [vx, vy],
+                    remaining: if free { remaining_jumps(cpu)? } else { 0 },
+                    facing: natives::lr(cpu),
+                    can_special: free && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+                },
+                status,
+                can_jump: free && niche_start_enabled(cpu, Move::Jump, true),
             });
         }
         if let Some(MeasuredFlight::Sora(flight)) = &mut self.measured {

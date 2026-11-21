@@ -31,6 +31,8 @@ pub mod sheik;
 mod sora;
 #[path = "perfect/sora_flight.rs"]
 pub mod sora_flight;
+#[path = "perfect/wings.rs"]
+pub mod wings;
 
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];
