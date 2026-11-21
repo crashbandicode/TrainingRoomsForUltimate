@@ -2212,3 +2212,11 @@ ceiling = 187033
 date = "2026-11-21"
 reason = "merge_budget for partial Guard the Edge and Juggler: integrate gated niche 6395498b with card main a4ff59cb. Exact merged count is 187033, +12252 versus the measured main count of 174781 and +3690 versus niche's 183343. No spare. Main release NRO 4997120 B and niche release NRO 5058560 B; both have 1720320 B BSS. The combined gate remeasures release size and BSS."
 approved_by = "Operator 2026-11-21 12:20Z authorized the partial card build. Primary tr-primary-2 at 12:30Z directed measured merge_budget entries under the operator rule: LOC can grow when memory remains efficient and changes are not wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187160
+date = "2026-11-21"
+reason = "Eggsercise moving paths and Off-stage zone. Canonical size on ab5b7524 is 187160, +127 versus 187033 on the partial card base, with zero spare. Adds Pop up selection and legacy settings migration, per-side recovery geometry, and a fallback for stages with no usable Off stage zone."
+approved_by = "Primary tr-primary-2, 2026-11-21 14:29Z, approved 187160 for ab5b7524 in the primary handoff."
