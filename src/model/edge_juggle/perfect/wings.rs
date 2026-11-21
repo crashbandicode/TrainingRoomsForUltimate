@@ -503,7 +503,7 @@ lib_unit_tests! {
             // released at the same point and produced the same starting pads.
             let start = falling(-109.9856, 5.8902593, 5);
             let route = facts(0x1d, start.entry.position, (3, 0));
-            for (x, vx, expected) in [(-105.860603, 0.75, true), (-106.330620, 0.52, false)] {
+            for (x, vx, expected) in [(-105.860_6, 0.75, true), (-106.330_62, 0.52, false)] {
                 let mut flight = WingsFlight::start(&route, start).unwrap();
                 assert_eq!(flight.step(start), Some(pad([0.0, 0.0], 0)));
                 let mut first_drift = start;
