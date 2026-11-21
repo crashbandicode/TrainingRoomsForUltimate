@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 179091
+ceiling = 179094
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Source 36fd8430 measures 179091, an exact 8065 normalized-line delta over 171026. Includes the guarded Juggler startup forecast, neutral air-dodge timing, and measured Diddy Rocketbarrel controller."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Source 7b6ad951 measures 179094, an exact 8068 normalized-line delta over 171026. Includes the guarded Juggler startup forecast, neutral air-dodge timing, the measured Diddy Rocketbarrel controller, and Jigglypuff's confirmed Waiting Room release."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
