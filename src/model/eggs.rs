@@ -398,9 +398,7 @@ impl Run {
         [whole.map(|at| (at, EGG_WHOLE)), a, b]
     }
 
-    /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock, the first egg once the camera has held
-    /// still for `SETTLE` draws (a reset moves it, so the view from before is dropped, and the one right after is still on its
-    /// way).
+    /// A fresh run (the menu closed with the row on, or a reset): score 0, a full clock and no view from the previous run.
     pub fn start(&mut self, rows: [u8; 5], seed: u32) {
         let (rng, best) = ((self.rng ^ seed) | 1, self.best);
         *self = Run::IDLE;
@@ -458,18 +456,19 @@ impl Run {
     /// read), chosen by length and the selected spawn area. In view uses the screen bounds; Whole stage uses the full stage
     /// range and its vertical bounds when valid. It keeps `spacing` from `last` and `P1_GAP` from Player 1; when sixteen tries
     /// all fall short, it uses the try that falls least short (a random spot, never a fixed side).
-    /// None before the draw published the camera (a run's first one, with no `last`, waits for it to hold still).
+    /// A first target that uses the screen bounds waits for the camera to settle. Complete Whole stage bounds
+    /// are in world coordinates and remain usable while the camera moves.
     fn spawn(&mut self, last: Option<[f32; 2]>) -> Option<()> {
-        let ready = (last.is_some() || self.still >= SETTLE) && !self.pending;
-        let View(s, o, range, vertical) = self.view.filter(|_| ready)?;
+        let View(s, o, range, vertical) = self.view.filter(|_| !self.pending)?;
+        let whole = self.rows[4] == WHOLE;
+        (last.is_some() || self.still >= SETTLE || (whole && vertical.is_some())).then_some(())?;
         let edge = |i: usize, c: f32| (c * CANVAS_HALF[i] - o[i]) / s[i] - c * RADIUS;
-        let (sx0, sx1, top, bottom) = if self.rows[4] == WHOLE {
-            let [sx0, sx1] = [range[0] + RADIUS, range[1] - RADIUS];
+        let (sx0, sx1, top, bottom) = if whole {
             let (top, bottom) = match vertical {
                 Some([lo, hi]) => (hi - RADIUS, lo + RADIUS),
                 None => (edge(1, 1.0), edge(1, -1.0)),
             };
-            (sx0, sx1, top, bottom)
+            (range[0] + RADIUS, range[1] - RADIUS, top, bottom)
         } else {
             let [sx0, sx1] = range.map(|v| v.max(edge(0, -1.0)).min(edge(0, 1.0)));
             (sx0, sx1, edge(1, 1.0), edge(1, -1.0))
@@ -699,6 +698,23 @@ mod standing_notice_tests {
 
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
     const VIEW: View = View([14.0; 2], [0.0, -300.0], [-HALF_WIDTH, HALF_WIDTH], None);
+
+    #[test]
+    fn whole_stage_starts_with_moving_camera_after_floor_read() {
+        let mut run = Run::IDLE;
+        run.start([TIMED, ANY, FAST, DISC, WHOLE], 7);
+        run.want_floors();
+        for frame in 0..SETTLE {
+            run.look(true, || Some(View(VIEW.0, [frame as f32, VIEW.1[1]], VIEW.2, Some([-65.0, 115.0]))));
+            run.step(true, 0.0, &[], false, 0);
+            assert!(run.egg_at().is_none(), "floor discovery is still pending");
+        }
+        run.set_floors(&[[[-80.0, 0.0], [80.0, 0.0]]]);
+        run.look(true, || Some(View(VIEW.0, [SETTLE as f32, VIEW.1[1]], VIEW.2, Some([-65.0, 115.0]))));
+        run.step(true, 0.0, &[], false, 0);
+        assert!(run.egg_at().is_some(), "stage bounds suffice while the visible projection is changing");
+        assert_eq!(run.frames, RUN_FRAMES - 1);
+    }
 
     fn scored_cpu(score: u32) -> Run {
         let mut run = Run::IDLE;
