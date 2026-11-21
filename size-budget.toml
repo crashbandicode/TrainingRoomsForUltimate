@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 181083
+ceiling = 181467
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Product source fcf7a0de measures 181083, an exact 10057 normalized-line delta over 171026. Includes measured Link, Peach, Daisy, Meta Knight, R.O.B. and Snake routes, Pikachu Thunder, stock aerial jump reserve at Edge release and live fade-back braking."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Product source db3dfd54 measures 181467, an exact 10441 normalized-line delta over 171026. Includes the measured Mario Cape stall, Link, R.O.B., Snake and Pikachu Thunder routes, the five-point Cypher entry solver, native aerial-jump normalization and live fade-back braking."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
