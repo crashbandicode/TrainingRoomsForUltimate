@@ -512,11 +512,12 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
         // SPEC-core-06: the hitbox visualizer's pass (a readiness boundary: nothing until boot installed it), after the combo and
         // before the save states (SPEC-core-01 §5.2).
         unsafe { let _ = super::btt::frame(a0); }
+        // Open the live Edge plan before HB1 samples P1 for its first CPU think.
+        unsafe { super::edge_juggle::frame(a0) };
         unsafe { crate::runtime::features::hitbox::frame(a0) };
         // Product hold/restore uses the existing post-native seam and fresh lifetime receipt.
         unsafe { super::tech_adapter::frame(a0, receipt) };
         unsafe { crate::runtime::features::tech::frame(a0) };
-        unsafe { super::edge_juggle::frame(a0) };
         // S0 research only, after the ordinary hide and practice-game passes.
         #[cfg(feature = "diag")]
         unsafe {

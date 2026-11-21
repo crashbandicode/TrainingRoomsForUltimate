@@ -316,7 +316,12 @@ unsafe fn on_ai_frame(ai: usize) {
         let y_field = (controller + CTRL_STICK_Y) as *mut f32;
         let buttons = button_field.read();
         let y = y_field.read();
-        let correction = super::edge_juggle::ai_correction(ai, body.accessor, buttons, y);
+        let stock = super::edge_juggle::StockPad {
+            buttons,
+            stick: [x_field.read(), y],
+            clamped_x: ((controller + CTRL_CLAMPED_X) as *const f32).read(),
+        };
+        let correction = super::edge_juggle::ai_correction(ai, body.accessor, stock);
         if let Some([next_x, next_y]) = correction.stick {
             x_field.write(next_x);
             ((controller + CTRL_CLAMPED_X) as *mut f32).write(next_x);
@@ -455,10 +460,11 @@ unsafe fn write_controller(controller: usize, write: Inject) {
 }
 
 unsafe fn host_cpu(controller: usize) {
-    // CPU-role record stores the player poll (`cpu_role_poll`), not this controller. The word
-    // here after the AI epilogue is the idle baseline (0x8000) until the player's frame is injected.
-    let Some(frame) = recording_host::take_cpu_frame() else { return };
-    write_controller(controller, recording_host::playback_controller(frame));
+    // CPU-role recording captures the player poll; this controller receives CPU playback.
+    // The macro owns the pad through the start restore, including before its first queued frame.
+    if let Some(write) = crate::engine::rr_host::cpu_controller(recording_host::take_cpu_frame) {
+        write_controller(controller, write);
+    }
 }
 
 unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, facing: i8) {
@@ -755,7 +761,10 @@ pub fn on_load_request() {
 }
 
 /// The Training reset hub's step: the L+R+A reset stops the recorder (decision B8).
-pub use stop as on_reset;
+pub fn on_reset(cause: crate::model::input_delay::Clear) {
+    crate::engine::rr_host::clear_playback(cause);
+    stop();
+}
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {

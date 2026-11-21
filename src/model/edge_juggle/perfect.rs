@@ -1,5 +1,57 @@
 //! Perfect-mode recovery and escape decisions. The runtime applies only pad inputs.
 
+#[path = "perfect/diddy.rs"]
+pub mod diddy;
+#[path = "perfect/fly.rs"]
+pub mod fly;
+#[path = "perfect/game_watch.rs"]
+pub mod game_watch;
+#[path = "perfect/greninja.rs"]
+pub mod greninja;
+#[path = "perfect/incineroar.rs"]
+pub mod incineroar;
+#[path = "perfect/kart.rs"]
+pub mod kart;
+#[path = "perfect/peach.rs"]
+pub mod peach;
+#[path = "perfect/snake.rs"]
+pub mod snake;
+#[path = "perfect/link.rs"]
+pub mod link;
+#[path = "perfect/mario.rs"]
+pub mod mario;
+#[path = "perfect/lucario.rs"]
+pub mod lucario;
+#[path = "perfect/niche.rs"]
+pub mod niche;
+#[path = "perfect/olimar.rs"]
+pub mod olimar;
+#[path = "perfect/pacman.rs"]
+pub mod pacman;
+#[path = "perfect/pichu.rs"]
+pub mod pichu;
+#[path = "perfect/pikachu.rs"]
+pub mod pikachu;
+#[path = "perfect/recovery.rs"]
+pub mod recovery;
+#[path = "perfect/region.rs"]
+mod region;
+#[path = "perfect/rob.rs"]
+pub mod rob;
+#[path = "perfect/rule_counts.rs"]
+pub mod rule_counts;
+#[path = "perfect/sheik.rs"]
+pub mod sheik;
+#[cfg(test)]
+#[path = "perfect/sora.rs"]
+mod sora;
+#[path = "perfect/sora_flight.rs"]
+pub mod sora_flight;
+#[path = "perfect/steve.rs"]
+pub mod steve;
+#[path = "perfect/wings.rs"]
+pub mod wings;
+
 pub type Point = [f32; 2];
 pub type Segment = [Point; 2];
 
@@ -36,6 +88,25 @@ impl Default for Outline {
     }
 }
 
+/// Endpoints of the current connected solid floor, including its slope.
+pub fn floor_ledges(floors: impl IntoIterator<Item = Segment>) -> Option<[Point; 2]> {
+    let mut points = floors.into_iter().flatten();
+    let first = points.next()?;
+    let [mut left, mut right] = [first; 2];
+    for point in std::iter::once(first).chain(points) {
+        if !point.into_iter().all(f32::is_finite) {
+            return None;
+        }
+        if point[0] < left[0] {
+            left = point;
+        }
+        if point[0] > right[0] {
+            right = point;
+        }
+    }
+    (left[0] < right[0]).then_some([left, right])
+}
+
 /// Seed the solid outline walk at the stage center through the full blast zone.
 pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> {
     let [cam_left, cam_right, _, _] = camera;
@@ -50,7 +121,7 @@ pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> 
 
 /// The foot heights that leave enough room below a closed main-stage outline.
 /// The caller passes live segments from one walk in the current stage.
-pub fn corridor(
+fn corridor(
     outline: &[Segment],
     ledges: [Point; 2],
     blast_bottom: f32,
@@ -109,7 +180,109 @@ pub struct AirPhysics {
     pub jump_speed: f32,
 }
 
+/// The `fighter_param` fields the air model is built from, as the game stores them.
+#[derive(Clone, Copy)]
+pub struct NativeAir {
+    pub air_speed_x_stable: f32,
+    pub air_accel_x_add: f32,
+    pub air_accel_x_mul: f32,
+    pub air_accel_y: f32,
+    pub air_speed_y_stable: f32,
+    pub jump_aerial_y: f32,
+}
+
+/// Rejected input identifiers shared with the release planner trace.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanInput {
+    PlayerHeight = 1,
+    Snapshot = 2,
+    SpecialEnvelope = 3,
+    StageOutline = 4,
+    FighterGeometry = 5,
+    AirPhysics = 6,
+    Velocity = 7,
+}
+
+#[cfg(test)]
+mod fly_jump_tests {
+    lib_unit_tests! {
+    use super::{AirPhysics, NativeAir};
+
+    #[test]
+    fn fly_aerial_jump_uses_the_next_native_launch_entry() {
+        let puff = AirPhysics::from_params(NativeAir {
+            air_speed_x_stable: 1.332,
+            air_accel_x_add: 0.05,
+            air_accel_x_mul: 0.08,
+            air_accel_y: 0.053,
+            air_speed_y_stable: 0.98,
+            jump_aerial_y: 20.0,
+        });
+        for (fighter, gravity, table) in [
+            (0xc, 0.053, &[1.65, 1.59, 1.47, 1.36, 1.25][..]),
+            (0x1d, 0.110, &[2.2, 2.1, 2.0, 1.88, 1.75][..]),
+            (0x1e, 0.081, &[2.0, 1.8, 1.6][..]),
+            (0x1f, 0.081, &[2.0, 1.8, 1.6][..]),
+        ] {
+            let air = AirPhysics { gravity, ..puff };
+            for (i, speed) in table.iter().enumerate() {
+                let next = air.with_fly_jump(fighter, Some((table.len() - i) as u8));
+                assert!((next.jump_speed - (speed - gravity)).abs() < 0.001);
+            }
+            for left in [None, Some(0), Some(9)] {
+                assert_eq!(air.with_fly_jump(fighter, left).jump_speed, air.jump_speed);
+            }
+        }
+        assert_eq!(puff.with_fly_jump(0, Some(1)).jump_speed, puff.jump_speed);
+    }
+    }
+}
+
+/// Native 13.0.5 `vl.prc fly_data[0].speed_y_table`, verified against the aerial jump
+/// movement in edge-niche-cand-fd-4. Fighter kinds come from the choice catalog.
+fn fly_launch(fighter: i32, remaining: u8) -> Option<f32> {
+    let table: &[f32] = match fighter {
+        0xc => &[1.65, 1.59, 1.47, 1.36, 1.25],
+        0x1d => &[2.2, 2.1, 2.0, 1.88, 1.75],
+        0x1e | 0x1f => &[2.0, 1.8, 1.6],
+        _ => return None,
+    };
+    table.get(table.len().checked_sub(usize::from(remaining))?).copied()
+}
+
 impl AirPhysics {
+    pub fn with_fly_jump(mut self, fighter: i32, remaining: Option<u8>) -> Self {
+        if let Some(speed) = remaining.and_then(|left| fly_launch(fighter, left)) {
+            self.jump_speed = speed - self.gravity;
+        }
+        self
+    }
+
+    pub fn plan_velocity(self, velocity: Option<(f32, f32)>) -> Result<Point, PlanInput> {
+        if !self.valid() {
+            return Err(PlanInput::AirPhysics);
+        }
+        velocity
+            .map(|(x, y)| [x, y])
+            .filter(|v| v.iter().all(|component| component.is_finite()))
+            .ok_or(PlanInput::Velocity)
+    }
+
+    /// `jump_aerial_y` is the double jump's height. Its first frame moves
+    /// `sqrt(2 g h) - g / 2`, then loses `g` a frame (exact trace
+    /// edge-niche-cand-fd-3, six fighters). Full-stick drift gains `add + mul`.
+    pub fn from_params(native: NativeAir) -> Self {
+        let gravity = native.air_accel_y;
+        Self {
+            horizontal_speed: native.air_speed_x_stable,
+            horizontal_acceleration: native.air_accel_x_add + native.air_accel_x_mul,
+            gravity,
+            terminal_speed: native.air_speed_y_stable,
+            jump_speed: (2.0 * gravity * native.jump_aerial_y).sqrt() - gravity * 0.5,
+        }
+    }
+
     pub fn valid(self) -> bool {
         [
             self.horizontal_speed,
@@ -120,42 +293,6 @@ impl AirPhysics {
         ]
         .into_iter()
         .all(|value| value.is_finite() && value > 0.0)
-    }
-
-    /// Coast through the collision corridor, then use a remaining jump on
-    /// the far side. A fighter must clear the lip before spending that jump.
-    pub fn crossing(self, from: Point, speed: Point, exit: Point, band: Point, jumps: u8) -> bool {
-        if jumps == 0
-            || !self.valid()
-            || !from
-                .into_iter()
-                .chain(speed)
-                .chain(exit)
-                .chain(band)
-                .all(f32::is_finite)
-        {
-            return false;
-        }
-        let [bottom, top] = band;
-        let direction = (exit[0] - from[0]).signum();
-        let mut distance = (exit[0] - from[0]).abs();
-        let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
-        let mut y = from[1];
-        for _ in 0..90 {
-            if y <= bottom || y >= top {
-                return false;
-            }
-            vx = (vx + self.horizontal_acceleration).min(self.horizontal_speed);
-            vy = (vy - self.gravity).max(-self.terminal_speed);
-            distance -= vx;
-            y += vy;
-            if distance <= 0.0 && bottom < y && y < top {
-                let apex_time = (self.jump_speed / self.gravity).floor().clamp(1.0, 90.0);
-                let gain = apex_time * (self.jump_speed - self.gravity * (apex_time + 1.0) * 0.5);
-                return y + gain >= exit[1];
-            }
-        }
-        false
     }
 
     /// Take the high path only if the fighter will clear the lip while airborne.
@@ -255,6 +392,7 @@ pub struct Plan {
 pub struct PlanHeight {
     frame: Option<u32>,
     value: Option<Option<f32>>,
+    reported_unavailable: bool,
 }
 
 impl PlanHeight {
@@ -263,6 +401,7 @@ impl PlanHeight {
             return false;
         }
         self.frame = Some(frame);
+        self.reported_unavailable = false;
         // The request counts even when the native sample is unavailable.
         self.value = Some(None);
         true
@@ -272,6 +411,11 @@ impl PlanHeight {
         if self.frame == Some(frame) && self.value.is_some() {
             self.value = Some(height);
         }
+    }
+
+    // Keep the sample for a retry when kinetic data becomes readable.
+    pub fn report_unavailable(&mut self) -> bool {
+        self.value.is_some() && !std::mem::replace(&mut self.reported_unavailable, true)
     }
 
     pub fn take(&mut self) -> Option<Option<f32>> {
@@ -284,9 +428,35 @@ impl PlanHeight {
 pub struct RouteWatch {
     resources: Option<(u8, bool)>,
     blocked: bool,
+    guarder_zone: Option<recovery::Zone>,
+    next_zone: Option<recovery::Zone>,
+    zone_frame: Option<u32>,
 }
 
 impl RouteWatch {
+    pub fn set_guarder_zone(&mut self, zone: recovery::Zone) {
+        self.guarder_zone = Some(zone);
+        self.next_zone = None;
+    }
+
+    /// Require two distinct game frames in the new zone before requesting another plan.
+    pub fn observe_guarder(&mut self, zone: recovery::Zone, frame: u32) -> bool {
+        if self.zone_frame == Some(frame) {
+            return false;
+        }
+        self.zone_frame = Some(frame);
+        if self.guarder_zone.is_none() || self.guarder_zone == Some(zone) {
+            self.set_guarder_zone(zone);
+            return false;
+        }
+        if self.next_zone == Some(zone) {
+            self.set_guarder_zone(zone);
+            return true;
+        }
+        self.next_zone = Some(zone);
+        false
+    }
+
     pub fn observe(&mut self, resources: Option<(u8, bool)>, blocked: bool) -> bool {
         let spent = self.resources.zip(resources).is_some_and(
             |((previous_jumps, previous_special), (jumps, special))| {
@@ -316,6 +486,8 @@ pub fn player_on_path(player: Point, path: Segment, reach: f32) -> bool {
 }
 
 pub struct RouteFacts<'a> {
+    pub fighter: i32,
+    pub stage: (i32, u32),
     pub position: Point,
     pub player: Point,
     pub player_reach: f32,
@@ -360,7 +532,33 @@ fn blocked(path: Segment, line: Segment, height: f32) -> bool {
     delta[0][0].min(delta[1][0]) <= height && delta[0][1].max(delta[1][1]) >= 0.0
 }
 
+/// Check the foot-to-head interval across the center and both sides of an aerial path.
+fn aerial_clear(outline: &[Segment], path: Segment, min_y: f32, height: f32, half: f32) -> bool {
+    path.into_iter().all(|p| p[1] > min_y)
+        && [-half, 0.0, half].into_iter().all(|offset| {
+            let path = path.map(|p| [p[0] + offset, p[1]]);
+            !outline.iter().any(|&line| blocked(path, line, height))
+        })
+}
+
+pub(super) const fn is_crossing_stage(stage: (i32, u32)) -> bool {
+    // Normal-form IDs from the 13.0.5 catalog: Battlefield, Final Destination and Waiting Room.
+    matches!(stage, (0 | 3 | 311, 0))
+}
+
 impl RouteFacts<'_> {
+    pub fn crossing_band(&self) -> Option<Point> {
+        if !is_crossing_stage(self.stage) {
+            return None;
+        }
+        corridor(
+            self.outline,
+            self.ledges,
+            self.blast[3],
+            self.body_clearance,
+            self.fall_budget,
+        )
+    }
     fn candidate(&self, route: Route, waypoints: [Point; 3], count: usize) -> Option<Plan> {
         let [left, right, top, bottom] = self.blast;
         let mut from = self.position;
@@ -399,7 +597,9 @@ impl RouteFacts<'_> {
     }
 }
 
-pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
+/// Normal ledge and stage routes. An Opposite candidate comes from a measured
+/// fighter guide after live stage and resource checks.
+pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 3] {
     let [left, right] = facts.ledges;
     let clearance = facts.body_clearance;
     let offset = facts.ledge_distance;
@@ -419,7 +619,7 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         || facts.reach.into_iter().any(|value| value <= 0.0)
         || facts.outline.is_empty()
     {
-        return [None; 4];
+        return [None; 3];
     }
     let (near, other, edge_dir) = if facts.position[0] <= left[0].midpoint(right[0]) {
         (left, right, -1.0)
@@ -427,7 +627,6 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         (right, left, 1.0)
     };
     let outside = near[0] + offset * edge_dir;
-    let exit = other[0] - offset * edge_dir;
     let low = near[1] - clearance;
     let high = near[1].max(other[1]) + clearance;
     let finish = [outside, near[1]];
@@ -442,59 +641,7 @@ pub fn possible_routes(facts: &RouteFacts<'_>) -> [Option<Plan>; 4] {
         2,
     );
     let late_plan = facts.candidate(Route::LateLow, [[outside, low], finish, [0.0; 2]], 2);
-    let near_covered =
-        (facts.player[0] - near[0]).hypot(facts.player[1] - near[1]) <= facts.player_reach;
-    let other_covered =
-        (facts.player[0] - other[0]).hypot(facts.player[1] - other[1]) <= facts.player_reach;
-    let opposite = if !other_covered && (near_plan.is_none() || near_covered) {
-        corridor(
-            facts.outline,
-            facts.ledges,
-            facts.blast[3],
-            clearance,
-            facts.fall_budget,
-        )
-        .and_then(|[bottom, top]| {
-            let crossing = facts.position[1].clamp(bottom, top.next_down().max(bottom));
-            facts.candidate(
-                Route::Opposite,
-                [[outside, crossing], [exit, crossing], [exit, other[1]]],
-                3,
-            )
-        })
-    } else {
-        None
-    };
-    [near_plan, high_plan, late_plan, opposite]
-}
-
-/// Weighted selection among feasible options, reducing the weight of the last
-/// route. The draw comes from the plugin's own RNG.
-pub fn choose_route(options: [Option<Plan>; 4], last: Option<Route>, draw: u32) -> Option<Plan> {
-    let weight = |plan: Plan| {
-        if Some(plan.route) == last {
-            plan.weight.div_ceil(2)
-        } else {
-            plan.weight
-        }
-    };
-    let total: u32 = options
-        .iter()
-        .flatten()
-        .map(|&plan| u32::from(weight(plan)))
-        .sum();
-    if total == 0 {
-        return None;
-    }
-    let mut draw = ((u64::from(draw) * u64::from(total)) >> 32) as u32;
-    for plan in options.into_iter().flatten() {
-        let weight = u32::from(weight(plan));
-        if draw < weight {
-            return Some(plan);
-        }
-        draw -= weight;
-    }
-    None
+    [near_plan, high_plan, late_plan]
 }
 
 /// Edits to the CPU controller after the stock AI has produced its pad.
@@ -563,45 +710,6 @@ pub fn avoid_detour(
 
 pub const JUMP: u32 = 0x4;
 
-/// A stock jump held in reserve until its remaining delay fits the recovery budget.
-#[derive(Default)]
-pub struct JumpTiming {
-    pending: Option<u8>,
-}
-
-impl JumpTiming {
-    pub fn waiting(&self) -> bool {
-        self.pending.is_some()
-    }
-
-    pub fn step(
-        &mut self,
-        buttons: u32,
-        can_jump: bool,
-        delay: u8,
-        within_reach: impl FnOnce(u8) -> bool,
-    ) -> Correction {
-        if !can_jump || buttons & !(JUMP | FLICK_JUMP) != 0 {
-            self.pending = None;
-            return Correction::default();
-        }
-        let mut out = Correction::default();
-        if let Some(remaining) = self.pending.take() {
-            if remaining == 0 || !within_reach(remaining) {
-                out.press = JUMP;
-                return out;
-            }
-            self.pending = Some(remaining - 1);
-        } else if buttons & JUMP != 0 && delay != 0 && within_reach(delay) {
-            self.pending = Some(delay - 1);
-        }
-        if self.pending.is_some() {
-            out.release = buttons & JUMP;
-        }
-        out
-    }
-}
-
 pub const GUARD: u32 = 0x8;
 
 #[derive(Clone, Copy)]
@@ -636,6 +744,49 @@ pub fn distance_dodge(
     }
 }
 
+const ATTACK_INPUT: u64 = u64::MAX;
+
+pub fn attack_key(
+    status: i32,
+    input: u32,
+    native_motion: impl FnOnce() -> u64,
+    konst: impl Fn(crate::model::cpu::ids::C) -> i32,
+) -> Option<u64> {
+    use crate::model::{cpu::ids::{C, UNRESOLVED}, hash40::hash40};
+
+    // A smash can transition from startup to charge to release with different motions.
+    const SMASHES: [([C; 3], u64); 3] = [
+        ([C::StatusAttackHi4Start, C::StatusAttackHi4Hold, C::StatusAttackHi4], hash40("attack_hi4")),
+        ([C::StatusAttackLw4Start, C::StatusAttackLw4Hold, C::StatusAttackLw4], hash40("attack_lw4")),
+        ([C::StatusAttackS4Start, C::StatusAttackS4Hold, C::StatusAttackS4], hash40("attack_s4_s")),
+    ];
+    if status == UNRESOLVED {
+        return (input & 3 != 0).then_some(ATTACK_INPUT);
+    }
+    for (phases, key) in SMASHES {
+        if phases.map(&konst).contains(&status) {
+            return Some(key);
+        }
+    }
+
+    let attacks = [
+        C::StatusAttack,
+        C::StatusAttackDash,
+        C::StatusAttackS3,
+        C::StatusAttackHi3,
+        C::StatusAttackLw3,
+        C::StatusAttackAir,
+        C::StatusSpecialN,
+        C::StatusSpecialS,
+        C::StatusSpecialHi,
+        C::StatusSpecialLw,
+    ];
+    let motion = attacks.map(konst).contains(&status)
+        .then(native_motion)
+        .filter(|&motion| motion != 0);
+    motion.or_else(|| (input & 3 != 0).then_some(ATTACK_INPUT))
+}
+
 /// Earliest observable start of the current P1 attack on the attempt clock.
 #[derive(Default)]
 pub struct ThreatClock {
@@ -645,6 +796,10 @@ pub struct ThreatClock {
 }
 
 impl ThreatClock {
+    pub fn trigger_frame(&self) -> u32 {
+        self.since
+    }
+
     pub fn observe(
         &mut self,
         attack: Option<u64>,
@@ -656,7 +811,7 @@ impl ThreatClock {
     ) -> Correction {
         if self.attack != attack {
             // Input can precede the first attack-motion sample by one or more frames.
-            if self.attack != Some(u64::MAX) || attack.is_none() {
+            if self.attack != Some(ATTACK_INPUT) || attack.is_none() {
                 self.since = frame;
             }
             self.attack = attack;
@@ -669,6 +824,7 @@ impl ThreatClock {
             }
             self.dodged = true;
             return Correction {
+                stick: Some([0.0; 2]),
                 press: GUARD,
                 ..Correction::default()
             };
@@ -679,6 +835,10 @@ impl ThreatClock {
         }
     }
 }
+
+#[cfg(any(test, target_os = "switch"))]
+#[path = "perfect/startup_dodge.rs"]
+pub(crate) mod startup_dodge;
 
 #[derive(Clone, Copy)]
 pub struct Capsule {
@@ -724,23 +884,41 @@ impl Capsule {
     }
 }
 
+pub enum MeteorWindow {
+    Waiting,
+    Actionable,
+    Interrupted,
+}
+
 #[derive(Default)]
 pub struct MeteorBounce {
-    active: bool,
+    awaiting_dodge: bool,
 }
 
 impl MeteorBounce {
-    pub fn step(&mut self, bounced: bool, idle_player: bool, buttons: u32) -> Correction {
-        let first = bounced && !self.active;
-        self.active = bounced;
-        if first && idle_player {
-            Correction {
-                release: buttons & GUARD,
-                ..Correction::default()
+    pub fn awaiting_dodge(&self) -> bool {
+        self.awaiting_dodge
+    }
+
+    pub fn step(
+        &mut self,
+        bounce_started: bool,
+        window: MeteorWindow,
+        idle_player: bool,
+        buttons: u32,
+    ) -> Correction {
+        self.awaiting_dodge |= bounce_started;
+        let mut edit = Correction::default();
+        match window {
+            MeteorWindow::Waiting => {}
+            MeteorWindow::Interrupted => self.awaiting_dodge = false,
+            MeteorWindow::Actionable => {
+                if std::mem::take(&mut self.awaiting_dodge) && idle_player {
+                    edit.release = buttons & GUARD;
+                }
             }
-        } else {
-            Correction::default()
         }
+        edit
     }
 }
 
@@ -806,6 +984,7 @@ pub const FLICK_JUMP: u32 = 0x8000;
 
 #[derive(Clone, Copy, Default)]
 pub struct LandingOptions {
+    pub player_in_reach: bool,
     pub fast_fall: bool,
     pub jump: bool,
     pub platform_x: Option<f32>,
@@ -831,33 +1010,31 @@ pub fn landing_variant(facts: LandingFacts, options: LandingOptions, draw: u32) 
     {
         return Correction::default();
     }
+    let away = if cpu[0] != player[0] {
+        (cpu[0] - player[0]).signum()
+    } else if draw.is_multiple_of(2) {
+        -1.0
+    } else {
+        1.0
+    };
     let mut out = Correction::default();
-    let [x, y] = match draw {
-        0..=3 if cpu[0] != player[0] => [(cpu[0] - player[0]).signum(), stock_stick_y],
-        0 | 2 => [-1.0, stock_stick_y],
-        1 | 3 => [1.0, stock_stick_y],
-        4 => [0.0, stock_stick_y],
-        6 if options.fast_fall => [0.0, -1.0],
+    let planned = match draw {
+        0..=3 => Some([away, stock_stick_y]),
+        4 => Some([0.0, stock_stick_y]),
+        6 if options.fast_fall => Some([0.0, -1.0]),
         7 if options.jump => {
             out.press = JUMP;
-            [(cpu[0] - player[0]).signum(), stock_stick_y]
+            Some([if cpu[0] == player[0] { 0.0 } else { away }, stock_stick_y])
         }
-        8 => {
-            let Some(x) = options.platform_x.filter(|x| left < *x && *x < right) else {
-                return out;
-            };
-            [
-                if x == cpu[0] {
-                    0.0
-                } else {
-                    (x - cpu[0]).signum()
-                },
-                stock_stick_y,
-            ]
-        }
-        _ => return out,
+        8 => options
+            .platform_x
+            .filter(|x| left < *x && *x < right)
+            .map(|x| [if x == cpu[0] { 0.0 } else { (x - cpu[0]).signum() }, stock_stick_y]),
+        _ => None,
     };
-    out.stick = Some([x, y]);
+    // An unavailable option under P1's reach can still leave the threat column by drifting.
+    let retreat = options.player_in_reach && (6..=8).contains(&draw);
+    out.stick = planned.or(retreat.then_some([away, stock_stick_y]));
     out
 }
 
@@ -872,12 +1049,16 @@ mod tests {
         for frame in 10..20 {
             assert!(!height.request(frame, false), "damage or helpless frames need no sample");
         }
+        assert!(!height.report_unavailable(), "a plan without a sample has no rejection");
         assert!(height.request(20, true));
         height.record(20, Some(14.6));
+        assert!(height.report_unavailable());
+        assert!(!height.report_unavailable(), "one rejection is sufficient while a plan waits");
         assert!(!height.request(21, true), "keep the first sample until it is consumed");
         assert_eq!(height.take(), Some(Some(14.6)));
         assert!(!height.request(20, true), "no second read on one frame");
         assert!(height.request(21, true));
+        assert!(height.report_unavailable(), "a new plan has its own witness");
         assert_eq!(height.take(), Some(None), "failed or unavailable sample still counts");
         height.record(21, Some(14.6));
         assert_eq!(height.take(), None, "an in-flight sample cannot revive a consumed plan");
@@ -913,13 +1094,44 @@ mod tests {
     fn landing_variants_only_use_a_safe_and_legal_input() {
         let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
             stock_stick_y: -0.15, stock_buttons: 0x8000 };
-        let legal = LandingOptions { fast_fall: true, jump: true, platform_x: Some(-15.) };
+        let legal = LandingOptions { fast_fall: true, jump: true, platform_x: Some(-15.),
+            ..LandingOptions::default() };
         assert_eq!(landing_variant(facts, legal, 6).stick, Some([0., -1.]));
         assert_eq!(landing_variant(facts, legal, 7).press, JUMP);
         assert_eq!(landing_variant(facts, legal, 8).stick, Some([-1., -0.15]));
         assert_eq!(landing_variant(facts, LandingOptions::default(), 7), Correction::default());
         assert_eq!(landing_variant(LandingFacts { stock_buttons: 0x8008, ..facts }, legal, 8),
             Correction::default());
+    }
+
+    #[test]
+    fn recovery_planning_distinguishes_invalid_air_data_from_unavailable_velocity() {
+        let air = AirPhysics { horizontal_speed: 0.924, horizontal_acceleration: 0.05,
+            gravity: 0.125, terminal_speed: 1.75, jump_speed: 3.147 };
+        assert_eq!(air.plan_velocity(Some((0., -1.75))), Ok([0., -1.75]));
+        assert_eq!(air.plan_velocity(None), Err(PlanInput::Velocity));
+        assert_eq!(air.plan_velocity(Some((f32::NAN, -1.75))), Err(PlanInput::Velocity));
+        assert_eq!(air.plan_velocity(Some((0., f32::INFINITY))), Err(PlanInput::Velocity));
+        let invalid = AirPhysics { horizontal_acceleration: 0., ..air };
+        assert_eq!(invalid.plan_velocity(Some((0., -1.75))), Err(PlanInput::AirPhysics));
+    }
+
+    #[test]
+    fn landing_replans_an_unavailable_option_away_from_p1() {
+        let facts = LandingFacts { cpu: [5., 45.], player: [0., 5.], main_floor: [-70., 70.],
+            stock_stick_y: -0.15, stock_buttons: FLICK_JUMP };
+        let pressured = LandingOptions { player_in_reach: true, ..LandingOptions::default() };
+        for draw in 6..=8 {
+            for (x, expected) in [(-5., -1.), (5., 1.)] {
+                let facts = LandingFacts { cpu: [x, 45.], ..facts };
+                assert_eq!(landing_variant(facts, pressured, draw), Correction {
+                    stick: Some([expected, -0.15]), ..Correction::default()
+                }, "unavailable option {draw} at x={x}");
+            }
+        }
+        assert_eq!(landing_variant(facts, pressured, 5), Correction::default());
+        let defending = LandingFacts { stock_buttons: FLICK_JUMP | GUARD, ..facts };
+        assert_eq!(landing_variant(defending, pressured, 8), Correction::default());
     }
 
     #[test]
@@ -995,15 +1207,28 @@ mod tests {
     }
 
     #[test]
-    fn a_crossing_must_survive_to_the_exit_and_still_rise_to_the_ledge() {
-        let air = AirPhysics { horizontal_speed: 2., horizontal_acceleration: 0.2,
-            gravity: 0.1, terminal_speed: 2., jump_speed: 3. };
-        let band = [-70., -8.];
-        assert!(air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 1));
-        assert!(!air.crossing([-15., -65.], [2., -2.], [15., 0.], band, 1));
-        assert!(!air.crossing([-15., -15.], [2., 2.], [15., 0.], band, 1));
-        assert!(!air.crossing([-65., -40.], [2., 0.], [65., 0.], band, 1));
-        assert!(!air.crossing([-15., -15.], [2., 0.], [15., 0.], band, 0));
+    fn charged_smash_preserves_the_juggler_reaction_clock() {
+        use crate::model::{cpu::ids::{C, Table}, hash40::hash40};
+
+        // Native Mario P1 entered 0x33 -> 0x34 -> 0x35 at seq 26729/26742/26745
+        // in the exact 3a29e6af j-h2 command 010. A longer hold exposes both floors.
+        let ids = Table::with(&[
+            (C::StatusAttackHi4Start, 0x33),
+            (C::StatusAttackHi4Hold, 0x34),
+            (C::StatusAttackHi4, 0x35),
+        ]);
+        let key = |status, input, motion| attack_key(status, input, || hash40(motion), |c| ids.get(c));
+        let mut clocks = [ThreatClock::default(), ThreatClock::default()];
+        for clock in &mut clocks {
+            clock.observe(key(0, 1, "wait"), 100, 12, false, true, 0);
+            clock.observe(key(0x33, 1, "attack_hi4"), 101, 12, false, true, 0);
+            clock.observe(key(0x34, 1, "attack_hi4_hold"), 106, 12, false, true, 0);
+            assert_eq!(clock.trigger_frame(), 100, "charge belongs to the same attack");
+        }
+        let released = key(0x35, 0, "attack_hi4");
+        assert_eq!(clocks[0].observe(released, 111, 0, true, true, 0).press, GUARD);
+        assert_eq!(clocks[1].observe(released, 111, 12, true, true, 0).press, 0);
+        assert_eq!(clocks[1].observe(released, 112, 12, true, true, 0).press, GUARD);
     }
 
     #[test]
@@ -1045,28 +1270,37 @@ mod tests {
 
     #[test]
     fn meteor_bounce_keeps_the_dodge_unless_the_player_waits_on_entry() {
+        use MeteorWindow::Actionable;
+
         let mut bounce = MeteorBounce::default();
-        assert_eq!(bounce.step(false, true, 0x8008), Correction::default());
-        assert_eq!(bounce.step(true, true, 0x8008).release, 0x8);
-        assert_eq!(bounce.step(true, true, 0x8008), Correction::default());
-        bounce.step(false, true, 0x8008);
-        assert_eq!(bounce.step(true, false, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(true, Actionable, true, 0x8008).release, GUARD);
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(true, Actionable, false, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
     }
 
     #[test]
-    fn recovery_delays_a_stock_jump_then_spends_it_with_a_real_button() {
-        let mut timing = JumpTiming::default();
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
-        assert_eq!(timing.step(0x8000, true, 2, |_| true).press, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
+    fn meteor_bounce_waits_for_the_first_actionable_dodge() {
+        use MeteorWindow::{Actionable, Waiting};
 
-        assert_eq!(timing.step(0x8004, true, 2, |_| false), Correction::default());
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, true, 2, |_| false).press, 0x4);
-        assert_eq!(timing.step(0x8004, true, 2, |_| true).release, 0x4);
-        assert_eq!(timing.step(0x8000, false, 2, |_| true), Correction::default());
-        assert_eq!(timing.step(0x8000, true, 2, |_| true), Correction::default());
+        let mut bounce = MeteorBounce::default();
+        assert_eq!(bounce.step(true, Waiting, true, 0x8000), Correction::default());
+        assert_eq!(bounce.step(false, Waiting, true, 0x8008), Correction::default());
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008).release, GUARD);
+        assert_eq!(bounce.step(false, Actionable, true, 0x8008), Correction::default());
+    }
+
+    #[test]
+    fn meteor_bounce_drops_its_pending_answer_on_interruption() {
+        use MeteorWindow::{Actionable, Interrupted, Waiting};
+
+        let mut bounce = MeteorBounce::default();
+        bounce.step(true, Waiting, true, 0);
+        assert!(bounce.awaiting_dodge());
+        bounce.step(false, Interrupted, true, 0);
+        assert!(!bounce.awaiting_dodge());
+        assert_eq!(bounce.step(false, Actionable, true, GUARD), Correction::default());
     }
 
     #[test]
@@ -1088,21 +1322,98 @@ mod tests {
     }
 
     #[test]
-    fn a_reachable_opposite_ledge_is_considered_only_when_it_avoids_the_player() {
+    fn a_crossable_outline_without_a_measured_route_never_offers_opposite() {
         let ledges = [[-40., 0.], [40., 0.]];
-        let lines = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
+        let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
         let mut facts = RouteFacts {
-            position: [-53., -22.], player: [-41., 0.], player_reach: 18.,
-            ledges, blast: [-130., 130., 100., -90.], outline: &lines,
-            body_clearance: 9., ledge_distance: 5., fall_budget: 12.,
+            fighter: 0x1d,
+            stage: (0, 0),
+            position: [-53., -22.],
+            player: [-41., 0.],
+            player_reach: 18.,
+            ledges,
+            blast: [-130., 130., 100., -90.],
+            outline: &outline,
+            body_clearance: 9.,
+            ledge_distance: 5.,
+            fall_budget: 12.,
             reach: [120., 42.],
         };
-        assert!(possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
-        facts.player = [0., 25.];
-        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
-        facts.player = [-41., 0.];
-        facts.reach[0] = 45.;
-        assert!(!possible_routes(&facts).iter().flatten().any(|plan| plan.route == Route::Opposite));
+        for stage in [0, 3, 311] {
+            facts.stage = (stage, 0);
+            assert!(facts.crossing_band().is_some(), "physical corridor is open");
+            let plans = possible_routes(&facts);
+            assert!(plans.iter().flatten().any(|plan| plan.route == Route::Near));
+            assert!(plans.iter().flatten().all(|plan| plan.route != Route::Opposite),
+                "stage {stage} requires a measured fighter route as well as geometry");
+        }
+    }
+
+    #[test]
+    fn moving_stage_ledges_come_from_the_current_solid_floor() {
+        let tilted = [
+            [[-32.0, 1.0], [-80.0, -18.0]],
+            [[-32.0, 1.0], [32.0, 5.0]],
+            [[80.0, -2.0], [32.0, 5.0]],
+        ];
+        assert_eq!(floor_ledges(tilted), Some([[-80.0, -18.0], [80.0, -2.0]]));
+        assert_eq!(floor_ledges([]), None);
+        assert_eq!(floor_ledges([[[0.0, 0.0], [0.0, 2.0]]]), None);
+        assert_eq!(floor_ledges([[[f32::NAN, 0.0], [2.0, 2.0]]]), None);
+    }
+
+    #[test]
+    fn only_the_three_approved_normal_stages_have_a_crossing_band() {
+        use crate::engine::stages::catalog::STAGES;
+        let ledges = [[-40., 0.], [40., 0.]];
+        let outline = [[ledges[0], ledges[1]], [ledges[0], [0., -15.]], [[0., -15.], ledges[1]]];
+        let mut facts = RouteFacts {
+            fighter: 0x1d,
+            stage: (0, 0),
+            position: [-53., -22.],
+            player: [-41., 0.],
+            player_reach: 18.,
+            ledges,
+            blast: [-130., 130., 100., -90.],
+            outline: &outline,
+            body_clearance: 9.,
+            ledge_distance: 5.,
+            fall_budget: 12.,
+            reach: [120., 42.],
+        };
+        let approved = ["Waiting Room", "Battlefield", "Final Destination"];
+        for &(id, label) in STAGES {
+            facts.stage = (id as i32, 0);
+            let [near, high, low] = possible_routes(&facts);
+            assert!([near, high, low].into_iter().any(|plan| plan.is_some()));
+            assert_eq!(facts.crossing_band().is_some(), approved.contains(&label), "{label}");
+        }
+        for stage in [(-1, 0), (0, 1), (3, 2), (89, 0), (311, 1)] {
+            facts.stage = stage;
+            assert!(facts.crossing_band().is_none(), "{stage:?}");
+        }
+
+        // A fresh outline can close a corridor on an otherwise approved stage.
+        let low_floor = [[ledges[0], ledges[1]], [ledges[0], [0.0, -83.0]], [[0.0, -83.0], ledges[1]]];
+        facts.stage = (3, 0);
+        facts.outline = &low_floor;
+        assert!(facts.crossing_band().is_none());
+    }
+
+    #[test]
+    fn a_recovery_replans_once_when_the_guarder_moves_to_a_new_zone() {
+        use recovery::Zone::{Far, Hang, Ledge, OffHigh};
+        let mut watch = RouteWatch::default();
+        assert!(!watch.observe_guarder(Far, 11));
+        assert!(!watch.observe_guarder(Ledge, 12));
+        assert!(!watch.observe_guarder(Ledge, 12), "duplicate AI think");
+        assert!(watch.observe_guarder(Ledge, 13), "P1 is guarding the ledge now");
+        assert!(!watch.observe_guarder(Ledge, 14));
+        assert!(!watch.observe_guarder(OffHigh, 15));
+        assert!(!watch.observe_guarder(Ledge, 16), "one-frame change");
+        assert!(!watch.observe_guarder(Hang, 17));
+        assert!(watch.observe_guarder(Hang, 18), "P1 took the ledge");
+        assert!(!watch.observe_guarder(Hang, 19));
     }
 
     #[test]
