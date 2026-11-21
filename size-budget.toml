@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 184809
+ceiling = 185854
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Shared grounded placement, the Meta Knight drift check and the reviewed Ness v3 model at 45158353 measure 184809 normalized implementation lines, exactly 13783 over the approved 171026 base."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Measured Hero and Lucas recoveries, grounded Spin Dash admission, grounded placement, the Meta Knight drift check and the reviewed Ness v3 model at 4ba9205f measure 185854 normalized implementation lines, exactly 14828 over the approved 171026 base."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
