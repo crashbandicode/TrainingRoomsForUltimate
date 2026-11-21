@@ -761,7 +761,10 @@ pub fn on_load_request() {
 }
 
 /// The Training reset hub's step: the L+R+A reset stops the recorder (decision B8).
-pub use stop as on_reset;
+pub fn on_reset(cause: crate::model::input_delay::Clear) {
+    crate::engine::rr_host::clear_playback(cause);
+    stop();
+}
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {

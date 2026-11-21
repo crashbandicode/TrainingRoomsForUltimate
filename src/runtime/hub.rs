@@ -18,7 +18,7 @@ pub fn run(cause: Clear) {
         if step == HubStep::InputDelay {
             dropped = input_delay::clear(cause);
             // Decision B8 (SPEC-input-01 question 13): the reset stops the recorder.
-            recorder::on_reset();
+            recorder::on_reset(cause);
         }
     });
     report(cause, dropped);
