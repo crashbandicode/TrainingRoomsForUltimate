@@ -636,6 +636,10 @@ impl NicheGuide {
         self.ledge
     }
 
+    pub(super) fn checking_crossing_drift(&self) -> bool {
+        matches!(&self.measured, Some(MeasuredFlight::Wings(flight)) if flight.checking_drift())
+    }
+
     pub(super) fn crossing_frames(&self) -> Option<u16> {
         match &self.measured {
             // Measured from the Skull Bash press to the exit: 13+39+46+27+33.

@@ -46,7 +46,7 @@ impl Finisher {
                 // Only turn-jump-apex entries were measured at this height.
                 entry.facing == -inward
                     && (0.0..=0.11).contains(&entry.velocity[1])
-                    && (-77.68..=-75.0).contains(&height)
+                    && (LOOP_MIN_HEIGHT..=LOOP_MAX_HEIGHT).contains(&height)
             }
         };
         reaches.then_some(Self { movement, started: entry.frame })
@@ -117,12 +117,23 @@ const FLIGHT_CARRY: f32 = 8.9;
 const HALF: f32 = 2.0;
 const DRIFT: f32 = 0.075;
 const JUMP_DRIFT: f32 = 0.062;
+const META_DRIFT_CHECK_FRAMES: u32 = 8;
+const META_HALF_SPEED: f32 = 0.52;
+const LOOP_MIN_HEIGHT: f32 = -77.68;
+const LOOP_MAX_HEIGHT: f32 = -75.0;
+pub const META_KNIGHT: i32 = 0x1d;
 
 enum Phase {
     Descend,
     Bounce,
     Turned,
     Finish(Finisher),
+}
+
+enum DriftCheck {
+    Waiting,
+    SteeringSince(u32),
+    Ready,
 }
 
 pub struct WingsFlight {
@@ -136,12 +147,13 @@ pub struct WingsFlight {
     inward: f32,
     phase: Phase,
     jump: Option<(u32, f32)>,
+    drift_check: DriftCheck,
 }
 
 impl WingsFlight {
     pub fn start(facts: &RouteFacts<'_>, live: Sample) -> Option<Self> {
         let profile = match facts.fighter {
-            0x1d => &META,
+            META_KNIGHT => &META,
             0x1e | 0x1f => &PIT,
             _ => return None,
         };
@@ -181,7 +193,16 @@ impl WingsFlight {
         Some(Self {
             profile, fighter: facts.fighter, hull, near, far, bottom, flat, inward,
             phase: Phase::Descend, jump: None,
+            drift_check: if matches!(profile.movement, Move::ShuttleLoop) {
+                DriftCheck::Waiting
+            } else {
+                DriftCheck::Ready
+            },
         })
+    }
+
+    pub fn checking_drift(&self) -> bool {
+        !matches!(self.drift_check, DriftCheck::Ready)
     }
 
     pub fn exit_point(&self) -> Point {
@@ -302,8 +323,28 @@ impl WingsFlight {
             if self.near_catch(entry.position) {
                 return None;
             }
-            if y + self.fall(vy) > self.descent_target() {
-                let steer = if self.can_glide(entry.position, entry.velocity) { self.inward } else { 0.0 };
+            let descending = y + self.fall(vy) > self.descent_target();
+            let glide = descending && self.can_glide(entry.position, entry.velocity);
+            if self.checking_drift() {
+                // The same release and pads can yield either 0.52 or 1.04
+                // initial fall speed. Only the full-speed approach reaches the far lip.
+                if live.status != 0xe || entry.remaining != self.profile.jumps || !entry.can_special {
+                    return None;
+                }
+                if vx * self.inward >= META_HALF_SPEED + DRIFT * 0.5 {
+                    self.drift_check = DriftCheck::Ready;
+                } else {
+                    match self.drift_check {
+                        _ if !descending => return None,
+                        DriftCheck::SteeringSince(first)
+                            if entry.frame.saturating_sub(first) >= META_DRIFT_CHECK_FRAMES => return None,
+                        DriftCheck::Waiting if glide => self.drift_check = DriftCheck::SteeringSince(entry.frame),
+                        _ => {}
+                    }
+                }
+            }
+            if descending {
+                let steer = if glide { self.inward } else { 0.0 };
                 return Some(pad([steer, 0.0], 0));
             }
             self.phase = Phase::Bounce;
@@ -331,6 +372,10 @@ impl WingsFlight {
                 while speed > 0.0 {
                     rise += speed;
                     speed -= self.profile.gravity;
+                }
+                let apex = y + self.fall(vy) + rise - self.far[1];
+                if apex < LOOP_MIN_HEIGHT {
+                    return None;
                 }
                 if y + rise <= self.far[1] - 73.5 && self.jump_clears(entry, launch, -self.inward) {
                     self.phase = Phase::Turned;
@@ -449,6 +494,49 @@ lib_unit_tests! {
                     let wrong_height = falling(lip[0] + side * 30.0, -2.0, 5);
                     assert!(WingsFlight::start(&route, wrong_height).is_none());
                 }
+            }
+        }
+
+        #[test]
+        fn meta_knight_does_not_commit_with_halved_fall_drift() {
+            // Product FD attempts 14 (fg1-pp-fd-8) and 21 (fg1-pp-fd-10)
+            // released at the same point and produced the same starting pads.
+            let start = falling(-109.9856, 5.8902593, 5);
+            let route = facts(0x1d, start.entry.position, (3, 0));
+            for (x, vx, expected) in [(-107.2856, 0.6, true), (-107.3706, 0.52, false)] {
+                let mut flight = WingsFlight::start(&route, start).unwrap();
+                assert_eq!(flight.step(start), Some(pad([0.0, 0.0], 0)));
+                let mut first_drift = start;
+                first_drift.entry.position[1] = 2.0402594;
+                first_drift.entry.velocity[1] = -0.88;
+                first_drift.entry.frame = 8;
+                assert_eq!(flight.step(first_drift), Some(pad([1.0, 0.0], 0)));
+                assert!(flight.checking_drift(), "the initial drift alone cannot select a route");
+                let mut live = first_drift;
+                live.entry.position = [x, -8.859741];
+                live.entry.velocity = [vx, -1.66];
+                live.entry.frame = 16;
+                assert_eq!(flight.step(live).is_some(), expected, "live fall drift {vx}");
+                assert_eq!(flight.checking_drift(), !expected);
+            }
+        }
+
+        #[test]
+        fn meta_knight_only_spends_the_turn_jump_for_a_reachable_apex() {
+            let start = falling(-109.9856, 5.8902593, 5);
+            let route = facts(0x1d, start.entry.position, (3, 0));
+            for (position, vx, expected) in [
+                ([90.848, -87.2], 0.992, Some(pad([-1.0, 0.0], JUMP))),
+                ([86.237, -110.02], 1.04, None),
+            ] {
+                let mut flight = WingsFlight::start(&route, start).unwrap();
+                flight.phase = Phase::Bounce;
+                let mut live = start;
+                live.entry.position = position;
+                live.entry.velocity = [vx, -1.66];
+                live.entry.remaining = 1;
+                live.entry.frame = 223;
+                assert_eq!(flight.step(live), expected, "live turn from {position:?}");
             }
         }
 

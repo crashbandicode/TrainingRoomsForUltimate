@@ -986,8 +986,10 @@ unsafe fn route_guide(
     });
     if let Some(guide) = guide {
         let row = guide.selected_niche_row();
-        run.route_history.planned(row.route);
-        planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
+        if !guide.checking_crossing_drift() {
+            run.route_history.planned(row.route);
+            planner_chose(route_code(row.route), fighter as u32, crossable, row.id.into());
+        }
         run.niche = Some(guide);
         return None;
     }
@@ -1065,11 +1067,21 @@ unsafe fn niche_correction(
         }
         return Correction::default();
     }
+    let checking_drift = guide.checking_crossing_drift();
     if let Some(edit) = guide.correct_niche_pad(ai, cpu, p1, position, status, run.rounds.frames) {
+        if guide.checking_crossing_drift() {
+            return stock.observe(edit, PerfectRule::Route, run, 0, 3);
+        }
+        if checking_drift {
+            let row = guide.selected_niche_row();
+            run.route_history.planned(row.route);
+            planner_chose(route_code(row.route), perfect::wings::META_KNIGHT as u32, 1, row.id.into());
+        }
         let id = guide.correction_row();
         return stock.observe(edit, PerfectRule::Niche, run, 0, id.into());
     }
     run.niche = None;
+    run.plan_pending |= checking_drift;
     Correction::default()
 }
 
