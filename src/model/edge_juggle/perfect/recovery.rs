@@ -388,9 +388,10 @@ pub fn stock_timing_reach(
     fighter: i32,
     special: Option<SpecialReach>,
 ) -> Option<SpecialReach> {
-    // Fuel presses and Clown Car ejection follow their own flight paths.
-    // A two-axis envelope cannot certify delaying those stock activations.
-    special.filter(|_| !matches!(fighter, super::rob::KIND | super::kart::KIND))
+    const PICHU: i32 = 0x13;
+    // Fuel presses, Clown Car ejection and Pichu's two Agility bursts
+    // depend on stock timing outside the measured niche paths.
+    special.filter(|_| !matches!(fighter, super::rob::KIND | super::kart::KIND | PICHU))
 }
 
 /// A stock jump or up special held back until its planned frame.
