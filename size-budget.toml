@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 186020
+ceiling = 186037
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Recovery routes, grounded placement and the scoped Juggler forecast and ordinary recovery timing changes measure 186020 normalized implementation lines, exactly 14994 over the approved 171026 base."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Recovery routes, grounded placement and the scoped Juggler forecast and ordinary recovery timing changes measure 186037 normalized implementation lines, exactly 15011 over the approved 171026 base."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
