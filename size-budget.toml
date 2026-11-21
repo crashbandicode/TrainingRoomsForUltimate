@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 182115
+ceiling = 182341
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 44881b5e measures 182115, an exact 11089 normalized-line delta over 171026. Includes Lucario Extreme Speed, both measured entry speeds for Mario Cape, Link, R.O.B., Snake and Pikachu Thunder, native aerial-jump normalization and live fade-back braking."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 1988e650 measures 182341, an exact 11315 normalized-line delta over 171026. Adds the measured Incineroar Whip return and holds the drill CPU neutral in the wizard, after the Lucario and Mario ports."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
