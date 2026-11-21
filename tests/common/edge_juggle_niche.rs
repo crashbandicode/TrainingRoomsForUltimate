@@ -481,8 +481,8 @@ fn niche_jigglypuff_jumps_route_and_pad_sequence() {
 }
 
 #[test]
-fn niche_meta_knight_drill_rush_route_and_pad_sequence() {
-    verify(0x1d, "cross", 18, &[Move::Hold, Move::Side]);
+fn niche_meta_knight_shuttle_loop_route_and_pad_sequence() {
+    verify(0x1d, "cross", 18, &[Move::Hold, Move::Rise]);
 }
 
 #[test]
