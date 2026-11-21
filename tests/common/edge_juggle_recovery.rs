@@ -458,6 +458,34 @@ fn jump_is_held_in_reserve_while_the_special_alone_returns() {
 }
 
 #[test]
+fn bowser_jr_held_jump_brakes_before_the_near_ledge() {
+    // Exact de242a91 attempt 9, at the first R2 hold and two thinks later.
+    // Full inward drift took Jr. under FD before he could recover.
+    let air = AirPhysics {
+        horizontal_speed: 1.134,
+        horizontal_acceleration: 0.08,
+        gravity: 0.092,
+        terminal_speed: 1.65,
+        jump_speed: 2.47,
+    };
+    let reach = Reach {
+        air,
+        jump: true,
+        special: Some(SpecialReach { horizontal: 42.0, rise: 65.0 }),
+    };
+    let velocity = [1.134, -1.65];
+    let ledge = [-79.9856, 0.00026];
+    let initial = [-90.1836, -56.0758];
+    let brake = [-87.9156, -59.3758];
+    let past_braking_point = [-84.5136, -64.3258];
+    assert_eq!(reach.hold_stick(initial, velocity, ledge), Some(1.0));
+    assert_eq!(reach.hold_stick(brake, velocity, ledge), Some(-1.0));
+    assert_eq!(reach.hold_stick(past_braking_point, velocity, ledge), None);
+    assert!(!reach.returns(past_braking_point, velocity, ledge, 1, -145.0));
+    assert_eq!(reach.hold_stick([87.9156, -59.3758], [-1.134, -1.65], [79.9856, ledge[1]]), Some(1.0));
+}
+
+#[test]
 fn stock_up_special_is_held_until_the_sweet_spot_frame() {
     let mut with_jump = Ticking::default();
     with_jump.step(held(JUMP, 20, true, 0x8004));
@@ -735,14 +763,18 @@ fn edge_di_points_at_the_stage_unless_a_blast_zone_is_closer() {
 }
 
 #[test]
-fn reach_can_rise_to_the_ledge_after_reaching_its_column() {
+fn reach_can_rise_to_the_ledge_after_braking_outside_its_column() {
     let reach = Reach { air: AIR, jump: true, special: None };
-    let from = [LEDGE[0] - 1.0, -12.0];
+    let from = [LEDGE[0] - 4.0, -12.0];
     let speed = [1.0, 0.0];
+    assert_eq!(reach.hold_stick(from, speed, LEDGE), Some(-1.0));
     assert!(reach.returns(from, speed, LEDGE, 0, BOTTOM));
     assert!(reach.returns(from, speed, LEDGE, 3, BOTTOM));
     assert!(!short(reach, from, speed, LEDGE, BOTTOM));
     assert!(!Reach { jump: false, ..reach }.returns(from, speed, LEDGE, 0, BOTTOM));
+
+    // At 1.0 units out, the same speed takes 2.85 units to stop.
+    assert!(!reach.returns([LEDGE[0] - 1.0, from[1]], speed, LEDGE, 0, BOTTOM));
 }
 
 #[test]

@@ -225,6 +225,40 @@ const REACH_FRAMES: u8 = 90;
 const TRUST: f32 = 0.85;
 
 impl Reach {
+    /// A waiting fighter must still be able to brake on the outside of the ledge.
+    pub fn hold_stick(self, from: Point, speed: Point, ledge: Point) -> Option<f32> {
+        if !self.air.valid() || !from.into_iter().chain(speed).chain(ledge).all(f32::is_finite) {
+            return None;
+        }
+        let gap = ledge[0] - from[0];
+        let inward = gap.signum();
+        let next_y = from[1] + self.fall_speed(speed[1]);
+        if next_y >= ledge[1] {
+            return Some(inward);
+        }
+        self.low_drift(gap.abs(), speed[0] * inward).map(|stick| stick * inward)
+    }
+
+    fn fall_speed(self, speed: f32) -> f32 {
+        (speed - self.air.gravity).max(-self.air.terminal_speed)
+    }
+
+    fn low_drift(self, gap: f32, speed: f32) -> Option<f32> {
+        let acceleration = self.air.horizontal_acceleration;
+        let stopping_distance = |speed: f32| {
+            let last = (speed / acceleration).ceil() - 1.0;
+            let steps = last.max(0.0);
+            steps * (speed - acceleration * (steps + 1.0) * 0.5)
+        };
+        if gap == 0.0 && speed == 0.0 {
+            return Some(0.0);
+        }
+        if !(stopping_distance(speed) < gap) {
+            return None;
+        }
+        let inward = (speed + acceleration).min(self.air.horizontal_speed);
+        Some(if inward + stopping_distance(inward) < gap { 1.0 } else { -1.0 })
+    }
     pub fn trusted(air: AirPhysics, jump: bool, special: Option<SpecialReach>) -> Self {
         let special = special.map(|reach| SpecialReach {
             horizontal: reach.horizontal * TRUST,
@@ -247,8 +281,9 @@ impl Reach {
             return false;
         }
         let air = self.air;
-        let direction = (ledge[0] - from[0]).signum();
-        let mut dx = (ledge[0] - from[0]).abs();
+        let gap = ledge[0] - from[0];
+        let direction = gap.signum();
+        let mut dx = gap.abs();
         let mut y = from[1];
         let [mut vx, mut vy] = [speed[0] * direction, speed[1]];
         for frame in 0..=REACH_FRAMES {
@@ -262,21 +297,21 @@ impl Reach {
             vy = if frame == delay && self.jump {
                 air.jump_speed
             } else {
-                (vy - air.gravity).max(-air.terminal_speed)
+                self.fall_speed(vy)
             };
-            vx = (vx + air.horizontal_acceleration).min(air.horizontal_speed);
-            // Stay in the ledge column while the jump or up special gains height.
-            dx = (dx - vx).max(0.0);
+            let stick = if y + vy >= ledge[1] {
+                1.0
+            } else if let Some(stick) = self.low_drift(dx, vx) {
+                stick
+            } else {
+                return false;
+            };
+            vx = (vx + air.horizontal_acceleration * stick)
+                .clamp(-air.horizontal_speed, air.horizontal_speed);
+            dx -= vx;
             y += vy;
-            if dx == 0.0 {
-                if y >= ledge[1] {
-                    return true;
-                }
-                if vy <= 0.0 && (!self.jump || frame >= delay)
-                    && self.special.is_none_or(|special| y + special.rise < ledge[1])
-                {
-                    return false;
-                }
+            if dx <= 0.0 && y >= ledge[1] {
+                return true;
             }
         }
         false

@@ -1305,7 +1305,8 @@ unsafe fn recovery_pad(
         run.hold = Hold::default();
         return Correction::default();
     };
-    let can_wait = reach.returns(pos, speed, ledge, 1, bottom);
+    let wait_drift = reach.hold_stick(pos, speed, ledge);
+    let can_wait = wait_drift.is_some() && reach.returns(pos, speed, ledge, 1, bottom);
     if !can_wait && can_jump && !reserve && !run.hold.waiting() {
         let correction = reach.jump_at_horizontal_limit(pos, speed, ledge, bottom, buttons);
         if correction != Correction::default() {
@@ -1320,12 +1321,12 @@ unsafe fn recovery_pad(
     let mut correction =
         run.hold.step(HoldFacts { frame, buttons: seen, button, jumps: left, planned, can_wait, hot });
     let inward = (ledge[0] - pos[0]).signum();
-    if correction.release != 0 || run.hold.waiting() {
+    if let Some(x) = wait_drift.filter(|_| correction.release != 0 || run.hold.waiting()) {
         // Level stick while the up special is withheld: no tap jump, no fast fall.
         let y = if correction.release & perfect::SPECIAL != 0 { 0.0 } else { stock.stick[1] };
-        correction.stick = Some([inward, y]);
+        correction.stick = Some([x, y]);
     } else if correction.press == perfect::JUMP {
-        correction.stick = Some([inward, stock.stick[1]]);
+        correction.stick = Some([wait_drift.unwrap_or(-inward), stock.stick[1]]);
     } else if correction.press == perfect::SPECIAL && buttons & perfect::SPECIAL == 0 {
         correction.stick = Some([0.0, 1.0]);
     }
