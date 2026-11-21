@@ -45,6 +45,7 @@ fn snake_accepts_a_measured_left_release_on_all_three_normal_stages() {
         let flight =
             CypherFlight::start(&facts, initial(&facts)).expect("flown 20-out, 4-below start");
         assert_eq!(flight.exit_point(), facts.ledges[1]);
+        assert_eq!(flight.crossing_frames(), 209);
     }
 }
 
@@ -285,4 +286,80 @@ fn snake_repeats_the_committed_press_on_duplicate_thinks() {
         flight.step(CypherSample { frame: 103, status: CYPHER_START, ..rise }),
         Some(pad(UP, SPECIAL))
     );
+}
+
+
+#[test]
+fn snake_live_admission_matches_the_five_point_reference_on_a_grid() {
+    // g4_sim.py snake_route, intersecting each center with its four ±2-unit
+    // neighbours. Require the height on the row before pressing Cypher and
+    // a far-ledge catch during the measured release status.
+    let masks: [(f32, [u32; 23]); 7] = [
+        (
+            0.0,
+            [
+                1, 3, 7, 7, 15, 15, 31, 31, 63, 63, 127, 127,
+                254, 254, 508, 1020, 1016, 2040, 2032, 4064, 8160, 8128, 16320,
+            ],
+        ),
+        (
+            -0.3,
+            [
+                0, 0, 1, 3, 3, 7, 7, 15, 15, 31, 31, 63,
+                63, 127, 126, 254, 510, 508, 1020, 1016, 2032, 2032, 4064,
+            ],
+        ),
+        (
+            -0.6,
+            [
+                0, 0, 0, 0, 1, 1, 3, 7, 7, 15, 15, 31,
+                31, 31, 63, 127, 126, 254, 254, 508, 1020, 1016, 2040,
+            ],
+        ),
+        (
+            -0.9,
+            [
+                0, 0, 0, 0, 0, 0, 1, 1, 3, 7, 7, 15,
+                15, 31, 31, 63, 63, 127, 126, 254, 510, 508, 1020,
+            ],
+        ),
+        (
+            -1.2,
+            [
+                0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 7, 7,
+                15, 15, 31, 31, 31, 63, 127, 126, 254, 254, 508,
+            ],
+        ),
+        (
+            -1.5,
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 3, 7,
+                7, 15, 15, 31, 31, 63, 63, 127, 126, 254, 510,
+            ],
+        ),
+        (
+            -1.73,
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 3, 7,
+                7, 15, 15, 31, 31, 63, 63, 127, 126, 254, 510,
+            ],
+        ),
+    ];
+    for (vy, rows) in masks {
+        for (height_index, mask) in rows.into_iter().enumerate() {
+            let height = -36.0 + 2.0 * height_index as f32;
+            for column in 0..17 {
+                let outside = 14.0 + 2.0 * column as f32;
+                let base = facts();
+                let position = [base.ledges[0][0] - outside, height];
+                let facts = RouteFacts { position, ..base };
+                let sample = CypherSample { velocity: [0.0, vy], ..initial(&facts) };
+                assert_eq!(
+                    CypherFlight::start(&facts, sample).is_some(),
+                    mask & (1 << column) != 0,
+                    "outside {outside}, height {height}, entry vy {vy}",
+                );
+            }
+        }
+    }
 }

@@ -458,8 +458,7 @@ impl NicheGuide {
             Some(MeasuredFlight::Kart(flight)) => Some(flight.crossing_frames()),
             // 72 to the blast, 88 to Spin Attack, and up to 37 to catch; allow for the neutral wait.
             Some(MeasuredFlight::Link(_)) => Some(235),
-            // Near-rest Cypher reaches the far lip about 203 rows after release.
-            Some(MeasuredFlight::Cypher(_)) => Some(235),
+            Some(MeasuredFlight::Cypher(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::Diddy(flight)) => Some(flight.crossing_frames()),
             Some(MeasuredFlight::PacMan(flight)) => Some(flight.crossing_frames()),
             _ => None,

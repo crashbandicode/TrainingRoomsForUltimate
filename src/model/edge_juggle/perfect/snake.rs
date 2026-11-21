@@ -3,6 +3,9 @@ use super::{
     niche::pad, region, Correction, Point, RouteFacts, JUMP, SPECIAL,
 };
 
+#[path = "snake_envelope.rs"]
+mod envelope;
+
 pub(crate) const KIND: i32 = 0x22;
 pub(crate) const ROW: u8 = 26;
 pub(crate) const FALL: i32 = 0xe;
@@ -13,12 +16,16 @@ const CYPHER_RELEASE: i32 = 0x1f5;
 const FORWARD: Point = [1.0, 0.0];
 const BACK: Point = [-1.0, 0.0];
 const UP: Point = [0.0, 1.0];
-// g4/bake-snake-product.py. Only the flown near-rest band with neighbour margin.
-const REST_RING: [u32; 15] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 32, 48, 16, 16];
-
 pub(crate) fn in_region(stage: (i32, u32), near: Point, position: Point) -> bool {
-    super::is_crossing_stage(stage)
-        && region::contains(&REST_RING, near[0] - position[0], position[1] - near[1])
+    super::is_crossing_stage(stage) && flight_time(near, position, 0.0).is_some()
+}
+
+fn flight_time(near: Point, position: Point, vy: f32) -> Option<u16> {
+    envelope::guarded_time(
+        f64::from(near[0]) - f64::from(position[0]),
+        f64::from(position[1]) - f64::from(near[1]),
+        f64::from(vy),
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -47,6 +54,7 @@ pub(crate) struct CypherFlight {
     near: Point,
     far: Point,
     bottom: f32,
+    frames: u16,
     phase: Phase,
     last_pad: Option<(u32, Correction)>,
 }
@@ -57,11 +65,9 @@ impl CypherFlight {
         facts.crossing_band()?;
         if facts.fighter != KIND
             || facts.position != sample.position
-            || !in_region(facts.stage, near, sample.position)
             || !region::has_common_underside(facts.ledges, facts.blast[3], facts.outline)
             || sample.status != FALL
             || sample.velocity[0] != 0.0
-            || !(-0.32..=0.0).contains(&sample.velocity[1])
             || sample.facing != -1.0
             || sample.jumps != 1
             || !sample.can_rise
@@ -72,6 +78,7 @@ impl CypherFlight {
             near,
             far,
             bottom: facts.blast[3],
+            frames: flight_time(near, sample.position, sample.velocity[1])?,
             phase: Phase::Drift,
             last_pad: None,
         })
@@ -79,6 +86,10 @@ impl CypherFlight {
 
     pub(crate) fn exit_point(&self) -> Point {
         self.far
+    }
+
+    pub(crate) fn crossing_frames(&self) -> u16 {
+        self.frames
     }
 
     pub(crate) fn step(&mut self, sample: CypherSample) -> Option<Correction> {
@@ -93,11 +104,11 @@ impl CypherFlight {
         if let Some((_, correction)) = self.last_pad.filter(|&(frame, _)| frame == sample.frame) {
             return Some(correction);
         }
-        let inside = x - self.near[0];
-        let height = y - self.near[1];
+        let inside = f64::from(x) - f64::from(self.near[0]);
+        let height = f64::from(y) - f64::from(self.near[1]);
         let (next, stick, buttons) = match self.phase {
             Phase::Drift if sample.status == FALL && sample.jumps == 1 && sample.facing == -1.0 => {
-                if inside >= 37.1 || height <= -128.0 {
+                if inside >= envelope::JUMP_INSIDE || height <= envelope::JUMP_HEIGHT {
                     sample
                         .can_jump
                         .then_some((Phase::Jump(sample.frame), FORWARD, JUMP))?
@@ -115,8 +126,8 @@ impl CypherFlight {
             Phase::Ascent
                 if sample.status == JUMP_AERIAL && sample.jumps == 0 && sample.facing == -1.0 =>
             {
-                if inside >= 62.8 {
-                    (sample.can_rise && (-108.0..=-77.0).contains(&height)).then_some((
+                if inside >= envelope::CYPHER_INSIDE {
+                    (sample.can_rise && envelope::CYPHER_HEIGHT.contains(&height)).then_some((
                         Phase::Start(sample.frame),
                         UP,
                         SPECIAL,
