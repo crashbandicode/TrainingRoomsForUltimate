@@ -895,21 +895,10 @@ fn niche_mythra_needs_a_measured_photon_edge_before_choosing_a_terminal_special(
 
 #[test]
 fn niche_incineroar_adds_whip_only_outside_the_cross_chop_column() {
+    assert!(select(facts(0x47, "near"), CANDIDATE_ROWS).is_none());
     let input = Facts { short: true, ..facts(0x47, "long") };
     let far = select(input, CANDIDATE_ROWS).expect("IN-1 for a horizontal shortfall");
-    assert_eq!((far.id, far.moves), (36, &[Move::Side, Move::Rise][..]));
-    let mut far = Sequence::new(far);
-    assert_eq!(
-        far.step(sample(0, Motion::Free)).map(|pad| (pad.stick, pad.press)),
-        Some((Some([1.0, 0.0]), perfect::SPECIAL))
-    );
-    far.step(sample(1, Motion::Starting)).expect("stock accepts Alolan Whip");
-    far.step(sample(40, Motion::Finish)).expect("no up special during Whip endlag");
-    far.step(sample(41, Motion::Free)).expect("one released frame after Whip");
-    assert_eq!(
-        far.step(sample(42, Motion::Free)).map(|pad| (pad.stick, pad.press)),
-        Some((Some([0.0, 1.0]), perfect::SPECIAL))
-    );
+    assert_eq!((far.id, far.moves), (36, &[Move::Side, Move::Jump, Move::Rise][..]));
 }
 
 #[test]

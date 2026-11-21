@@ -273,7 +273,7 @@ mod tests {
         let actual = WhipBeat {
             frame: 83,
             status: JUMP_AERIAL,
-            position: [-43.049782, 32.827892],
+            position: [-43.049_78, 32.827892],
             velocity: [0.880001, -0.212006],
             jumps: 0,
             ..release
