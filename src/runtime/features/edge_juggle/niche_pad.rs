@@ -23,6 +23,7 @@ use perfect::pacman::{self, PacBeat, PacFlight};
 use perfect::peach::{FloatBeat, FloatFlight};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
+use perfect::pyra::{self, Beat as PyraBeat, SwapReturn};
 use perfect::rob::{self, BurnerFlight, BurnerState};
 use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::snake::{self, CypherFlight, CypherSample};
@@ -61,6 +62,7 @@ enum MeasuredFlight {
     PacMan(PacFlight),
     Elytra(ElytraFlight),
     Whip(WhipReturn),
+    Swap(SwapReturn),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -93,6 +95,28 @@ impl NicheGuide {
         let outside = (near[0] - x) * direction;
         if !(outside > 0.0 && facts.player.into_iter().all(f32::is_finite)) {
             return None;
+        }
+        if fighter == pyra::PYRA {
+            let row = niche::measured_row(pyra::ROW, niche::CANDIDATE_ROWS)?;
+            let flight = SwapReturn::start(facts, PyraBeat {
+                frame: inputs.frame,
+                fighter,
+                status: natives::status_kind(cpu),
+                position: facts.position,
+                velocity: inputs.speed,
+                facing: natives::lr(cpu),
+                jumps: inputs.jumps,
+                can_jump: niche_start_enabled(cpu, Move::Jump, true),
+                can_swap: inputs.special.is_some() && niche_start_enabled(cpu, Move::Swap, true),
+                can_ray: false,
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: near,
+                measured: Some(MeasuredFlight::Swap(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
         }
         if fighter == mario::KIND {
             let row = niche::measured_row(mario::ROW, niche::CANDIDATE_ROWS)?;
@@ -609,6 +633,20 @@ impl NicheGuide {
         self.sequence.accepts_form(fighter)
     }
 
+    pub(super) fn waiting_for_form(&self, frame: u32) -> bool {
+        match &self.measured {
+            Some(MeasuredFlight::Swap(flight)) => flight.waiting_for_mythra(frame),
+            _ => self.accepts_form(None),
+        }
+    }
+
+    pub(super) fn follow_measured_form(&mut self, frame: u32, fighter: i32, status: i32) -> bool {
+        match &mut self.measured {
+            Some(MeasuredFlight::Swap(flight)) => flight.follow(frame, fighter, status),
+            _ => false,
+        }
+    }
+
     pub(super) fn correction_row(&self) -> u8 {
         if matches!(&self.measured, Some(MeasuredFlight::SkullBash(flight))
             if flight.thunder.as_ref().is_some_and(pikachu::thunder::Thunder::active))
@@ -643,6 +681,23 @@ impl NicheGuide {
         }
         let (snapshot, available) = recovery_snapshot(ai)?;
         let reach = if available { Some(special_reach(ai, snapshot)?) } else { None };
+        if let Some(MeasuredFlight::Swap(flight)) = &mut self.measured {
+            let fighter = natives::fighter_kind(cpu)?;
+            let needs_jump = flight.needs_jump(frame);
+            return flight.step(PyraBeat {
+                frame,
+                fighter,
+                status,
+                position: [x, y],
+                velocity: [0.0; 2],
+                facing: 0.0,
+                jumps: if needs_jump { remaining_jumps(cpu)? } else { 0 },
+                can_jump: needs_jump && niche_start_enabled(cpu, Move::Jump, true),
+                can_swap: flight.needs_swap(frame) && niche_start_enabled(cpu, Move::Swap, true),
+                can_ray: flight.needs_ray(frame) && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Rise, available),
+            });
+        }
         if let Some(MeasuredFlight::Elytra(flight)) = &mut self.measured {
             let waiting = flight.needs_enabled_special();
             let ((vx, vy), facing) = if waiting {

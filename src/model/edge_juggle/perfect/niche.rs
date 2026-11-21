@@ -276,7 +276,7 @@ const ROWS: [Row; 45] = [
     Row::new(35, 0x26, Intent::Across, &[Hold, Rise]),
     Row::new(super::incineroar::ROW, super::incineroar::KIND, Intent::WhipGap, &[Side, Jump, Rise]),
     Row::new(37, 0x47, Intent::GenericUp, &[Rise]),
-    Row::new(38, 0x5a, Intent::SwapGap, &[Swap]),
+    Row::new(super::pyra::ROW, super::pyra::PYRA, Intent::SwapGap, &[Swap]),
     Row::new(39, 0x5b, Intent::PhotonGap, &[Side]),
     Row::new(40, 0x5b, Intent::GenericUp, &[Jump, Rise]),
     Row::new(41, 0x8, Intent::FakeOut, &[Jump, QuickAttack]),

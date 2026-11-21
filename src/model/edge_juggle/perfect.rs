@@ -32,6 +32,8 @@ pub mod pacman;
 pub mod pichu;
 #[path = "perfect/pikachu.rs"]
 pub mod pikachu;
+#[path = "perfect/pyra.rs"]
+pub mod pyra;
 #[path = "perfect/recovery.rs"]
 pub mod recovery;
 #[path = "perfect/region.rs"]

@@ -1729,7 +1729,7 @@ pub unsafe fn frame(fighter: usize) {
     {
         if let Some(run) = engine.run.as_mut().filter(|run| {
             run.rounds.phase == Phase::Live
-                && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(None))
+                && run.niche.as_ref().is_some_and(|guide| guide.waiting_for_form(run.rounds.frames))
         }) {
             if owns_setup() {
                 // The native swap can leave entry 1 between objects for a frame.
@@ -1854,11 +1854,19 @@ pub unsafe fn frame(fighter: usize) {
     let Some(kind) = natives::fighter_kind(cpu) else {
         return;
     };
-    let followed_swap = run.rounds.phase == Phase::Live
+    let measured_swap = run.rounds.phase == Phase::Live
+        && kind == perfect::pyra::MYTHRA
+        && game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
+        && run.niche.as_mut().is_some_and(|guide| {
+            guide.follow_measured_form(run.rounds.frames, kind, natives::status_kind(cpu))
+        });
+    let legacy_swap = run.rounds.phase == Phase::Live
         && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(Some(kind)));
-    if followed_swap {
+    if measured_swap || legacy_swap {
         run.body = body;
-        run.niche = None;
+        if legacy_swap {
+            run.niche = None;
+        }
         run.guide = None;
         run.previous_damage = None;
         run.damage_stop = false;
