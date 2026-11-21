@@ -544,6 +544,51 @@ fn a_step_press_under_the_speed_hold_is_not_a_frame_step() {
     assert_eq!([step_mask(0), step_mask(8)], [0, 0]);
 }
 
+/// One poll of the lobby's step input as `chords::on_poll` composes it (the detector, then the step button without the
+/// buttons a chord keeps); whether a frame is due after it.
+fn step_poll(detector: &mut crate::model::chords::Detector, step: &mut FrameStep, style: u32, current: u32, just_down: u32) -> bool {
+    use crate::model::chords::{physical_mask, ChordSet, Sample};
+    detector.poll(&ChordSet::factory(), Sample::of(style, current, just_down), false);
+    let chord_bits = physical_mask(style, detector.hidden());
+    let (pressed, held) = step_input(style, current, just_down, step_hide(style, false, false, chord_bits), chord_bits);
+    step.poll(pressed, held, false);
+    step.take()
+}
+
+fn a_plain_step_press_steps_the_lobby_once() {
+    use crate::model::chords::{bit, Detector};
+    // ZL on a Pro Controller, the L trigger on a GameCube pad: nobody's chord, one frame per press.
+    for (style, button) in [(5, bit::ZL), (7, bit::L)] {
+        let (mut detector, mut step) = (Detector::new(), FrameStep::new());
+        assert!(step_poll(&mut detector, &mut step, style, button, button), "style {style}: the press steps");
+        assert_eq!(detector.hidden(), 0);
+        assert!(!step_poll(&mut detector, &mut step, style, button, 0), "style {style}: held, one frame");
+        assert!(!step_poll(&mut detector, &mut step, style, 0, 0));
+        assert!(step_poll(&mut detector, &mut step, style, button, button), "style {style}: the next press");
+    }
+}
+
+fn the_save_state_chord_never_steps_the_lobby() {
+    use crate::model::chords::{bit, Detector, Request};
+    let (style, both) = (5, bit::DPAD_DOWN | bit::ZL);
+    let (mut detector, mut step) = (Detector::new(), FrameStep::new());
+    assert!(!step_poll(&mut detector, &mut step, style, bit::DPAD_DOWN, bit::DPAD_DOWN));
+    // The reviewer's replay of 985c79c6 (the save raised and a frame due together): Down held, ZL pressed.
+    assert!(!step_poll(&mut detector, &mut step, style, both, bit::ZL), "the Save State chord must not queue a frame");
+    assert!(detector.consume(Request::SaveState));
+    assert_eq!(step_input(style, both, bit::ZL, StepHide::default(), 0), (true, true), "as 985c79c6 read it: a press");
+    // Kept held past the run count: the chord keeps its ZL, so nothing counts.
+    for poll in 0..30 {
+        assert!(!step_poll(&mut detector, &mut step, style, both, 0), "held poll {poll}");
+    }
+    // ZL again with Down still held: Save State again, no step. All let go: a plain ZL steps.
+    assert!(!step_poll(&mut detector, &mut step, style, bit::DPAD_DOWN, 0));
+    assert!(!step_poll(&mut detector, &mut step, style, both, bit::ZL));
+    assert!(detector.consume(Request::SaveState));
+    assert!(!step_poll(&mut detector, &mut step, style, 0, 0));
+    assert!(step_poll(&mut detector, &mut step, style, bit::ZL, bit::ZL));
+}
+
 fn the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice() {
     assert!(entry_holds(LOBBY_ENTRY, false));
     assert!(!entry_holds(LOBBY_ENTRY, true), "a due step runs the entry");
@@ -625,6 +670,8 @@ fn case_table() {
         ("the_lobby_step_lets_exactly_one_entry_run_per_press", the_lobby_step_lets_exactly_one_entry_run_per_press as fn()),
         ("holding_the_step_button_runs_from_the_eighteenth_poll", holding_the_step_button_runs_from_the_eighteenth_poll as fn()),
         ("a_step_press_under_the_speed_hold_is_not_a_frame_step", a_step_press_under_the_speed_hold_is_not_a_frame_step as fn()),
+        ("a_plain_step_press_steps_the_lobby_once", a_plain_step_press_steps_the_lobby_once as fn()),
+        ("the_save_state_chord_never_steps_the_lobby", the_save_state_chord_never_steps_the_lobby as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
         ("the_lobby_path_never_writes_the_update_rate_words", the_lobby_path_never_writes_the_update_rate_words as fn()),

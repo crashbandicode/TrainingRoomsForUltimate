@@ -17,6 +17,7 @@ use crate::model::chords::{self, field, ChordSet, Detector, Request, Sample};
 use crate::model::game_speed::HoldEvent;
 use crate::model::ini_files;
 use crate::model::input_delay::Owners;
+use crate::model::lobby_speed;
 use crate::model::menu::chord::Chord;
 use crate::model::menu_shortcuts::{self, MenuShortcuts};
 use crate::model::storage::FixedPath;
@@ -65,7 +66,8 @@ pub unsafe fn on_poll(controller: usize) {
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
-    let sample = Sample::of(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN))
+    let (current, just_down) = (read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
+    let sample = Sample::of(style, current, just_down)
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let wizard = super::tech::wizard_active() || super::edge_juggle::wizard_active() || super::egg_zone::wizard_active();
@@ -116,11 +118,23 @@ pub unsafe fn on_poll(controller: usize) {
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();
-    // rc.15: the lobby's 1 Frame step, on the raw controller (the native button; never while the speed hold is open).
+    // rc.15: the lobby's 1 Frame step, on the controller as this poll found it (the native button; never while the
+    // speed hold is open, never a button a chord keeps: Save State's ZL saved and stepped in 985c79c6).
     let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
-    crate::runtime::features::game_speed::frame_step_poll(style, read(field::CURRENT_BUTTONS), read(field::JUST_DOWN), hold_open, block);
+    let step_hide = lobby_speed::step_hide(style, hold_open, hold == HoldEvent::Closed, chord_bits);
+    let (pressed, held) = lobby_speed::step_input(style, current, just_down, step_hide, chord_bits);
+    crate::runtime::features::game_speed::frame_step_poll(pressed, held, hold_open || block);
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
+    }
+    // The game reads the step button from the controller itself after the mapping call (Training's 1 Frame), so what
+    // `step_hide` takes is not put back: all four sets while the speed hold is open, the edges for a chord's button.
+    for (i, offset) in field::BUTTONS.into_iter().enumerate() {
+        let gone = if i < 2 { step_hide.sets } else { step_hide.edges };
+        if gone != 0 {
+            let at = (controller + offset) as *mut u32;
+            at.write_volatile(at.read_volatile() & !gone);
+        }
     }
     for &offset in chords::persistent_plus_fields(modal, accepted, chord_bits) {
         let at = (controller + offset) as *mut u32;

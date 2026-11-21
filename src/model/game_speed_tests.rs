@@ -159,6 +159,76 @@ fn hold_stands_down_while_deluxe_has_the_buttons() {
     assert_eq!(hold.poll(R_UP, sample(&[R, RIGHT], &[RIGHT]), false), HoldEvent::Step(Dir::Right));
 }
 
+/// P1's controller as Training's 1 Frame sees it: the game's refresh of the four button sets (current, previous, just
+/// down, just released, each edge made from the current set), P1's poll as `chords::on_poll` composes it (the detector,
+/// then the step button taken out of the sets for good), then the mode object's two reads of the step button
+/// (`.1556a78` newly pressed, `.1556ae0` held).
+#[derive(Default)]
+struct Pad {
+    sets: [u32; 4],
+    detector: crate::model::chords::Detector,
+}
+
+impl Pad {
+    fn update(&mut self, hw: u32) -> (HoldEvent, bool, bool) {
+        use crate::model::chords::{physical_mask, ChordSet};
+        use crate::model::lobby_speed::{step_hide, step_input, StepHide};
+        let was = self.sets[0];
+        self.sets = [hw, was, hw & !was, !hw & was];
+        self.detector.poll(&ChordSet::factory(), Sample::of(PRO, hw, self.sets[2]), false);
+        let event = self.detector.hold_event();
+        let open = matches!(event, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
+        let hide = step_hide(PRO, open, event == HoldEvent::Closed, physical_mask(PRO, self.detector.hidden()));
+        for (i, set) in self.sets.iter_mut().enumerate() {
+            *set &= !if i < 2 { hide.sets } else { hide.edges };
+        }
+        let (pressed, held) = step_input(PRO, self.sets[0], self.sets[2], StepHide::default(), 0);
+        (event, pressed, held)
+    }
+}
+
+/// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame in Training either.
+#[test]
+fn holding_the_speed_chord_never_steps_training() {
+    use crate::model::chords::bit::{DPAD_RIGHT as RIGHT, DPAD_UP as UP, R, ZL};
+    let mut pad = Pad::default();
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    // R kept held: three ZL presses, then ZL held past the run count. The mode object reads no press and no hold.
+    for hw in [R | ZL, R, R | ZL, R, R | ZL, R].into_iter().chain([R | ZL; 30]) {
+        assert_eq!(pad.update(hw), (HoldEvent::Held, false, false));
+    }
+    assert_eq!(pad.update(R | ZL | RIGHT), (HoldEvent::Step(Dir::Right), false, false), "the hold still steps the speed");
+    // The chord let go with ZL still held: no press (the edge the clear made is taken), then the game's held ZL.
+    assert_eq!(pad.update(ZL), (HoldEvent::Closed, false, true));
+    assert_eq!(pad.update(ZL), (HoldEvent::Idle, false, true));
+    // Opened with ZL already held: hidden from the poll the hold opens on.
+    pad.update(0);
+    assert_eq!(pad.update(R | ZL), (HoldEvent::Idle, true, true), "outside the hold ZL is the game's");
+    assert_eq!(pad.update(R | ZL | UP), (HoldEvent::Opened, false, false));
+}
+
+/// A chord's ZL (Save State: D-pad Down + ZL) is not a step press in Training; a plain ZL is the game's.
+#[test]
+fn a_chords_step_press_never_steps_training() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::default();
+    assert_eq!(pad.update(ZL), (HoldEvent::Idle, true, true), "a plain press steps");
+    assert_eq!(pad.update(ZL), (HoldEvent::Idle, false, true), "held: the game's own count to 18");
+    pad.update(0);
+    pad.update(DOWN);
+    assert_eq!(pad.update(DOWN | ZL), (HoldEvent::Idle, false, true), "the chord's press is no step press");
+    assert!(pad.detector.consume(Request::SaveState));
+    // The current set keeps the chord's ZL (6e226733: clearing it would make a new press at the next refresh), so the
+    // chord fires once and the game reads a hold: kept held 18 updates, Training runs as with any held ZL.
+    for _ in 0..30 {
+        assert_eq!(pad.update(DOWN | ZL), (HoldEvent::Idle, false, true));
+        assert_ne!(pad.sets[0] & ZL, 0);
+    }
+    assert!(!pad.detector.consume(Request::SaveState), "one save");
+}
+
 #[test]
 fn the_hold_hides_its_chord_and_the_step_buttons_while_open() {
     let mut hold = Hold::new();

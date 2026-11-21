@@ -632,19 +632,18 @@ pub(crate) fn refresh_hold() {
 }
 
 /// rc.15, P1's poll (`chords::on_poll`): 1 Frame's step input in the lobby, the native button by controller style
-/// (`lobby_rules::step_mask`). `hold_open`: the speed hold is open (it owns P1's buttons); `blocked`: an input owner.
-/// Only while the hold is armed; a step press outside it is nobody's.
-pub(crate) fn frame_step_poll(style: u32, current: u32, just_down: u32, hold_open: bool, blocked: bool) {
+/// without the buttons a chord keeps (`lobby_rules::step_input`). `blocked`: the speed hold is open (it owns P1's
+/// buttons) or an input owner. Only while the hold is armed; a step press outside it is nobody's.
+pub(crate) fn frame_step_poll(pressed: bool, held: bool, blocked: bool) {
     if HOLD_CLASS.load(Ordering::Acquire) == 0 {
         return;
     }
-    let mask = lobby_rules::step_mask(style);
-    let blocked = hold_open || blocked || crate::runtime::lobby::training::lobby::native_ui_busy();
+    let blocked = blocked || crate::runtime::lobby::training::lobby::native_ui_busy();
     const DUE: u32 = lobby_rules::FrameStep::DUE;
     // The poll's own step (from a state with none due), then OR'd in: the entry hold only clears the due bit, so a
     // step it used up meanwhile stays used up and one still due stays due.
     let mut step = lobby_rules::FrameStep::from_bits(FRAME_STEP.load(Ordering::Acquire) & !DUE);
-    step.poll(just_down & current & mask != 0, current & mask != 0, blocked);
+    step.poll(pressed, held, blocked);
     let bits = step.bits();
     let _ = FRAME_STEP.fetch_update(Ordering::AcqRel, Ordering::Acquire, |now| Some(bits | (now & DUE)));
 }

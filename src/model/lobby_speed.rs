@@ -83,6 +83,37 @@ pub const fn step_mask(style: u32) -> u32 {
     }
 }
 
+/// The step button's raw bits Player 1's poll takes out of the controller itself and does not put back after the
+/// mapping call: `sets` from all four button sets, `edges` from the two edge sets only. The game's own reader
+/// (`FUN_0177e8f0`: Training's step at `.1556a78`/`.1556ae0`) runs after the mapping call, as its pause check does
+/// (`.1558e20`), which the chord stage keeps from Plus the same way.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StepHide {
+    pub sets: u32,
+    pub edges: u32,
+}
+
+/// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, so while the hold is
+/// open the step button leaves all four sets. The game then rebuilds a press from the cleared current set at every
+/// refresh (6e226733), so the poll the hold closes on takes that edge once more: a button still held is a hold, not a
+/// press. A chord's own step button (`chord_bits`: Save State's ZL) loses its edges only: the detector needs its
+/// current set to keep the chord.
+pub const fn step_hide(style: u32, hold_open: bool, hold_closed: bool, chord_bits: u32) -> StepHide {
+    let step = step_mask(style);
+    StepHide {
+        sets: if hold_open { step } else { 0 },
+        edges: if hold_open || hold_closed { step } else { step & chord_bits },
+    }
+}
+
+/// The lobby's step input by the native reader's rules (`.177ec20`: newly pressed is `just_down & current`, held is
+/// `current`), on the sets as the poll found them, without what `hide` and the chord stage (`chord_bits`, the raw
+/// buttons it keeps from the game on this poll) take: a chord's step button is neither a press nor a hold.
+pub const fn step_input(style: u32, current: u32, just_down: u32, hide: StepHide, chord_bits: u32) -> (bool, bool) {
+    let mask = step_mask(style);
+    (just_down & current & mask & !hide.edges != 0, current & mask & !(hide.sets | chord_bits) != 0)
+}
+
 /// rc.15: every row 1 Frame relies on (group `speed_frame`, plus the `lobby_speed` entry rows the hold reads): all must
 /// pass at boot or the bind offers no 1 Frame and the hold is not installed.
 pub const FRAME_ROWS: [&str; 16] = [

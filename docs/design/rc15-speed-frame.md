@@ -37,6 +37,20 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
      request bit 2 and call `FUN_00555da0`. New rows: `game_speed.pause_sync` (called) and `game_speed.step_run`.
    - **Inferred, Eden (a):** P1's poll (the input mapping, called from the scene update `FUN_0135f570` at `.1360ad4`,
      outside the scheduler) runs while paused, so the chord can step out of 1 Frame.
+   - **ZL and the chords (review of `985c79c6`, tr-primary-2 2026-11-21 16:55Z):** the mode object reads the step button
+     from the controller itself (`.1556a78` newly pressed: `just_down & current`; `.1556ae0` held: `current`), after the
+     mapping call, so the chord stage's hide for the mapping call doesn't reach it. P1's poll therefore takes the step
+     button out of the controller and doesn't put it back (`lobby_speed::step_hide`), as it does for Plus against the
+     pause check, which is the same reader with mask `0x40000` (`.1558e20`):
+     - **While the speed hold is open:** out of all four button sets. Holding the speed chord never steps a frame, and
+       ZL doesn't reach the fighter either. The game rebuilds a press from the cleared current set at every refresh
+       (6e226733), so the poll the hold closes on takes that edge once more: a ZL still held then is a hold (the game's
+       count to 18), never a press.
+     - **A chord's own ZL (Save State and the other ZL chords):** out of the two edge sets only, so its press is no
+       step. The current set stays, because the detector keeps the chord from it (6e226733). The game therefore reads
+       a hold: a chord's ZL kept down for 18 updates runs Training as any held ZL does.
+     - **Inferred, Eden:** P1's poll comes before the mode object's read in an update, as it does for Plus on the card.
+       Rows: ZL x3 while the chord is held at 1 Frame (no step); D-pad Down + ZL at 1 Frame (saves, no step).
 3. **Lobby: a held world through the battle task entry, no global write.**
    - **Why not a slot:** the slow step clamps the target to 100 (`.135cae4`–`.135caec`) and writes the rate `1/N` every
      update (`.135cbb8`–`.135cc00`); the world keeps moving at least 1/100 frame per update, so a slot can't hold still.
@@ -56,11 +70,34 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
      native table (`0x45434f0`, guarded as a data row). A new press lets exactly one entry run unheld: one slow step
      (one logic frame) and one full scheduler pass. Held from the 18th poll on, every entry runs while it is held.
      No step while the speed hold is open (its buttons are hidden and it owns P1's D-pad), while an input owner blocks,
-     or while the waiting-room UI is busy. ZL itself still reaches the fighter, as natively.
+     or while the waiting-room UI is busy. Outside the hold ZL itself still reaches the fighter, as natively.
+   - **A chord's ZL never steps (review of `985c79c6`):** the step reads the controller as the poll found it, without
+     the buttons the chord stage keeps from the game on that poll (`lobby_speed::step_input`): a chord that passed, and
+     its buttons until each is released. D-pad Down + ZL saves and doesn't step, pressed or held (`985c79c6` read the
+     raw sets and did both).
    - **Inferred, Eden (b):** the input mapping sees the paused word 0 and N 1 during the hold (`.1753598`), so a button
      pressed between steps counts only if it is still held on the step's update (native 1 Frame holds it).
    - **The online match is never touched:** another class (`0x5061460`), checked per call, and the hook acts only while
      the practice's live flag is armed.
+3b. **Reuse check (operator 2026-11-21 16:37Z: "it should be reusing the code we wrote that we showed was desync safe
+   right? That plus basically the zl trigger").** Re-read against the entry's code (`.135ca00`–`.135cc80`).
+   - **Reused unchanged:** the bind and its pop-up, the lobby's wanted speed and `LobbyPlan` dispatch, the live flag armed
+     by Player 1's frame, the slot release, both resets (`practice_changed`, `session_clear`), and the rule that the lobby
+     never writes the rate words.
+   - **The ZL step is the game's own x1 update:** on a step the hook returns without touching anything; the entry runs one
+     slow step, one scheduler pass, the walker once. No plugin code steps the world.
+   - **The hold can't be made from the proven seams:**
+     - **The slot (1/4, 1/2, 2/3):** the slow step clamps the divisor to 1..100 (`.135cae4`–`.135caf4`), takes a new
+       divisor only at a period's end (`.135cb3c`, `.135cbb0`), and every period's end counts a logic frame (`.135cb48`,
+       `.135cbb4`). The slowest a slot goes is one frame every 100 updates (1.67 s), by itself; ZL can't end a period
+       early, because nothing the proven code writes reaches the sub-counter `main+0x52c518a`.
+     - **The waiting-area hook `.151b170`** is called at `.135cc2c`, after this update's slow step and scheduler pass
+       (`.135cc18`). It can add a world step (x1.5), not take one away.
+     - **The game's own pause:** the global word and `FUN_00555da0`'s side effects (above).
+   - **So the hold stays the one new hook** (`.135ca38`, w22 for that call only, no game memory written). Entering 1 Frame
+     also frees the slot of the speed before, through the rc.8 release path.
+   - **Only Eden can show:** the paused pass skips the tasks not marked run-while-paused; if one feeds the LDN session the
+     guest would see the host stall. The pair run holds the host 60 s without a step for that.
 4. **HUD:** Training's stopwatch as natively (2.); the lobby has no stopwatch, and the pop-up shows `1 Frame` while the
    chord is held.
 5. **Resets to x1:**
@@ -88,7 +125,7 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
 
 | Operator clause | Design | Test |
 | --- | --- | --- |
-| "we should have the single frame option for the speed toggle" | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_step_button_is_the_native_table` |
+| "we should have the single frame option for the speed toggle" | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_training_step_is_the_mode_objects_and_its_button_is_zl`, `a_plain_step_press_steps_the_lobby_once`, `the_save_state_chord_never_steps_the_lobby`, `holding_the_speed_chord_never_steps_training`, `a_chords_step_press_never_steps_training` |
 | "you'll need to test that one doesn't desync against vanilla" | §2.3: a held entry, no global or room write; Eden (b) | `the_lobby_path_never_writes_the_update_rate_words`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice`, `a_step_press_under_the_speed_hold_is_not_a_frame_step` |
 | "and doesn't stay enabled into a match" | §2.5; Eden (c) | `every_reset_returns_the_lobby_to_x1_and_ends_the_hold`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice` |
 
