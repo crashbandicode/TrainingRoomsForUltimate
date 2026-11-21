@@ -384,14 +384,24 @@ pub struct HoldFacts {
     pub hot: bool,
 }
 
+const PICHU: i32 = 0x13;
+
 pub fn stock_timing_reach(
     fighter: i32,
     special: Option<SpecialReach>,
 ) -> Option<SpecialReach> {
-    const PICHU: i32 = 0x13;
     // Fuel presses, Clown Car ejection and Pichu's two Agility bursts
     // depend on stock timing outside the measured niche paths.
     special.filter(|_| !matches!(fighter, super::rob::KIND | super::kart::KIND | PICHU))
+}
+
+pub fn generic_timing_allowed(
+    fighter: i32,
+    special: Option<SpecialReach>,
+    native_special_unavailable: bool,
+) -> bool {
+    // The ordinary jump-only path also defers to stock for Agility.
+    fighter != PICHU && (special.is_some() || native_special_unavailable)
 }
 
 /// A stock jump or up special held back until its planned frame.

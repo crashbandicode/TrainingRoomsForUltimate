@@ -1331,8 +1331,7 @@ unsafe fn recovery_pad(
     // still returns one frame later. Each frame re-checks from the live position.
     let bottom = run.stage.blast()[3];
     let term = konst(C::TermContSpecialHi);
-    // Time an available special only when its model supplies a reach sample.
-    if special.is_none() && !matches!(recovery, Some((_, false))) {
+    if !recovery::generic_timing_allowed(kind, special, matches!(recovery, Some((_, false)))) {
         return Correction::default();
     }
     let alone = Reach::trusted(physics, false, special);

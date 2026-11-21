@@ -355,15 +355,26 @@ fn bowser_jr_preserves_the_first_stock_abandon_ship_press() {
 }
 
 #[test]
+fn pichu_ordinary_jump_timing_declines_when_agility_is_unavailable() {
+    const PICHU: i32 = 0x13;
+    let timing = super::stock_timing_reach(PICHU, None);
+    assert!(!super::generic_timing_allowed(PICHU, timing, true));
+    assert!(super::generic_timing_allowed(0, None, true));
+    assert!(!super::generic_timing_allowed(0, None, false));
+}
+
+#[test]
 fn pichu_ordinary_return_preserves_stock_jump_and_agility_timing() {
     const PICHU: i32 = 0x13;
     const PIKACHU: i32 = 0x08;
     let timing = super::stock_timing_reach(PICHU, Some(UP));
     for (button, planned, stock) in [(JUMP, 46, 0x4), (SPECIAL, 7, 0x802)] {
         // Exact 133979fc trace f13-pichu-6, input sequences 14977 and 15168.
-        let edit = timing.map_or_else(Correction::default, |_| {
+        let edit = if super::generic_timing_allowed(PICHU, timing, false) {
             Hold::default().step(held(button, planned, true, stock))
-        });
+        } else {
+            Correction::default()
+        };
         assert_eq!(stock & !edit.release | edit.press, stock, "{button:#x}");
     }
     assert!(timing.is_none(), "the generic projection cannot aim both bursts");
