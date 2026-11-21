@@ -76,7 +76,7 @@ fn ness_offers_the_proven_near_side_programs_with_both_native_resources() {
             };
             assert!(ThunderReturn::start(&facts, away, true).is_none());
             facts.player = [NEAR[0] - 2.0, 0.0];
-            assert_eq!(ThunderReturn::start(&facts, release, true).is_some(), deep_stock_loss(facts.stage, out, below));
+            assert_eq!(ThunderReturn::start(&facts, release, true).is_some(), deep_stock_loss_program(facts.stage, out, below).is_some());
         }
         for (out, below) in [(20.0, 56.0), (36.0, 24.0), (36.0, 28.0), (84.0, 52.0), (56.0, 72.0), (120.2, 108.2)] {
             let (facts, release) = fixture(stage, out, below);
@@ -262,7 +262,7 @@ fn ness_v3_uses_the_reviewed_program_at_the_live_start() {
         (84.0, 56.0, 12, 2),
         (84.0, 60.0, 12, 2),
     ] {
-        let selected = program((3, 0), out + 1.0, below + 1.0).unwrap();
+        let selected = program(out + 1.0, below + 1.0).unwrap();
         assert_eq!((selected.jump_rows, selected.loop_kind), (jump_rows, loop_kind));
     }
 
@@ -278,8 +278,34 @@ fn ness_standing_window_has_a_lip_minimum_and_no_far_cap() {
     facts.player = [NEAR[0] + 16.0, 0.01];
     assert!(ThunderReturn::start(&facts, release, true).is_some());
     assert!(ThunderReturn::start(&facts, release, false).is_none());
-    facts.player[0] = NEAR[0] + 4.98;
+    // The saved P1 x=-75.0 is only 4.9856 units inside the native FD lip.
+    facts.player = [-75.0, 0.010259508];
     assert!(ThunderReturn::start(&facts, release, true).is_none());
+    facts.player[0] = -74.99;
+    assert!(ThunderReturn::start(&facts, release, true).is_some());
+}
+
+#[test]
+fn ness_moving_guarder_exception_stays_on_the_flown_corner_program() {
+    for (out, below) in [
+        (108.0, 108.0),
+        (108.01, 108.01),
+        (107.99, 108.01),
+        (108.01, 107.99),
+        (107.99, 107.99),
+    ] {
+        let (mut facts, release) = fixture(3, out, below);
+        facts.player = [-125.0, -42.0];
+        let selected = ThunderReturn::start(&facts, release, false)
+            .expect("measured deep rescue within its existing placement bound")
+            .program;
+        assert_eq!((selected.jump_rows, selected.loop_kind), (48, 1), "{out}, {below}");
+    }
+    for (out, below) in [(107.96, 108.0), (108.0, 107.96)] {
+        let (mut facts, release) = fixture(3, out, below);
+        facts.player = [-125.0, -42.0];
+        assert!(ThunderReturn::start(&facts, release, false).is_none());
+    }
 }
 
 #[test]

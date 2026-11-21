@@ -65,29 +65,35 @@ fn at_flown_start(out: f32, below: f32, [ref_out, ref_below]: Point) -> bool {
     (out - ref_out).abs() <= 0.03 && (below - ref_below).abs() <= 0.03
 }
 
-fn deep_stock_loss(stage: (i32, u32), out: f32, below: f32) -> bool {
-    // Each reference is a measured Final Destination save with zero stock returns.
-    stage == (3, 0)
-        && [[108.0, 108.0], [110.0, 110.0], [114.0, 110.0], [120.0, 108.0]]
-            .into_iter()
-            .any(|start| at_flown_start(out, below, start))
+fn deep_stock_loss_program(stage: (i32, u32), out: f32, below: f32) -> Option<Program> {
+    if stage != (3, 0) {
+        return None;
+    }
+    // Final Destination saves with zero stock returns. The placement bound
+    // can straddle table cells, so keep the program flown at each save.
+    [
+        ([108.0, 108.0], 48, 1),
+        ([110.0, 110.0], 48, 1),
+        ([114.0, 110.0], 49, 1),
+        ([120.0, 108.0], 51, 2),
+    ]
+    .into_iter()
+    .find(|&(start, _, _)| at_flown_start(out, below, start))
+    .map(|(_, jump_rows, loop_kind)| Program {
+        jump_rows,
+        loop_kind,
+    })
 }
 
-fn program(stage: (i32, u32), out: f32, below: f32) -> Option<Program> {
+fn program(out: f32, below: f32) -> Option<Program> {
     if !(16.0..=156.0).contains(&out) || !(0.0..120.0).contains(&below) {
         return None;
     }
     let key = (out / 4.0) as u16 * 30 + (below / 4.0) as u16;
-    let code = if stage == (3, 0) && at_flown_start(out, below, [120.0, 108.0]) {
-        // Independent deep sweep: the centre completed 5/5 against five
-        // stock KOs. The nearby points were not certified by the cell bake.
-        51 * 4 + 2
-    } else {
-        let slot = data::CELLS
-            .binary_search_by_key(&key, |&(cell, _)| cell)
-            .ok()?;
-        data::CELLS[slot].1
-    };
+    let slot = data::CELLS
+        .binary_search_by_key(&key, |&(cell, _)| cell)
+        .ok()?;
+    let code = data::CELLS[slot].1;
     Some(Program {
         jump_rows: u32::from(code / 4),
         loop_kind: usize::from(code % 4),
@@ -244,14 +250,15 @@ impl ThunderReturn {
         let start = add(beat.position, [0.0, drop(lead_elapsed)]);
         let out = ledge[0] - start[0];
         let below = below - drop(lead_elapsed);
-        let deep_rescue = deep_stock_loss(facts.stage, out, below);
+        let deep_program = deep_stock_loss_program(facts.stage, out, below);
+        let deep_rescue = deep_program.is_some();
         if !deep_rescue
             && (!guarder_wait || facts.player[0] - ledge[0] < 4.99
                 || (facts.player[1] - ledge[1]).abs() > 0.12)
         {
             return None;
         }
-        let program = program(facts.stage, out, below)?;
+        let program = deep_program.or_else(|| program(out, below))?;
         let launch = if program.jump_rows == 0 {
             add(start, [0.0, -7.581])
         } else {
