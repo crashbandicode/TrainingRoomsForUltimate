@@ -65,8 +65,10 @@ pub unsafe fn on_poll(controller: usize) {
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
+    // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
+    let step_keep = lobby_speed::StepKeep(STEP_KEPT.load(Ordering::Relaxed));
+    let (current, just_down) = step_keep.seen(read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
-    let (current, just_down) = (read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
     let sample = Sample::of(style, current, just_down)
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
@@ -105,6 +107,10 @@ pub unsafe fn on_poll(controller: usize) {
         (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block, recorder_refused)
     };
     let (accepted, chord_bits, hold, display, refused, keys, block, recorder_refused) = accepted;
+    // rc.15: the step button never steps while the speed hold is open or while a chord that passed keeps it (Save
+    // State's ZL saved and stepped in 985c79c6; held on, Training ran from its 18th update).
+    let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
+    let step_take = lobby_speed::step_take(style, hold_open, chord_bits);
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
     let hide = !block && unsafe { super::egg_zone::poll(controller, sample) || super::tech::poll(controller, sample) || super::edge_juggle::poll(controller, sample) || btt::poll(controller, sample, keys) };
@@ -118,22 +124,20 @@ pub unsafe fn on_poll(controller: usize) {
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();
-    // rc.15: the lobby's 1 Frame step, on the controller as this poll found it (the native button; never while the
-    // speed hold is open, never a button a chord keeps: Save State's ZL saved and stepped in 985c79c6).
-    let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
-    let step_hide = lobby_speed::step_hide(style, hold_open, hold == HoldEvent::Closed, chord_bits);
-    let (pressed, held) = lobby_speed::step_input(style, current, just_down, step_hide, chord_bits);
+    // rc.15: the lobby's 1 Frame step, the native button without what this poll keeps from the game.
+    let (pressed, held) = lobby_speed::step_input(style, current, just_down, step_take | chord_bits);
     crate::runtime::features::game_speed::frame_step_poll(pressed, held, hold_open || block);
     if display {
         crate::runtime::ui::worker::request_input_display_toggle();
     }
     // The game reads the step button from the controller itself after the mapping call (Training's 1 Frame), so what
-    // `step_hide` takes is not put back: all four sets while the speed hold is open, the edges for a chord's button.
-    for (i, offset) in field::BUTTONS.into_iter().enumerate() {
-        let gone = if i < 2 { step_hide.sets } else { step_hide.edges };
-        if gone != 0 {
-            let at = (controller + offset) as *mut u32;
-            at.write_volatile(at.read_volatile() & !gone);
+    // `step_take` takes is not put back (`StepKeep::keep`).
+    let found = field::BUTTONS.map(read);
+    let (step_keep, left) = step_keep.keep(found, step_take);
+    STEP_KEPT.store(step_keep.0, Ordering::Relaxed);
+    for (offset, (was, now)) in field::BUTTONS.into_iter().zip(found.into_iter().zip(left)) {
+        if was != now {
+            ((controller + offset) as *mut u32).write_volatile(now);
         }
     }
     for &offset in chords::persistent_plus_fields(modal, accepted, chord_bits) {
@@ -143,6 +147,8 @@ pub unsafe fn on_poll(controller: usize) {
     // A chord's buttons do not reach the game while they are held (the Play chord's ZR was a 10-frame shield): they are
     // cleared for this mapping call only and put back when it returns (`after_mapping`), so the controller's own
     // held-state bookkeeping, which the menu and the next poll read, stays intact for retained chords.
+    // The step button taken above goes the same way: the mapping call sees none of its bits.
+    let chord_bits = chord_bits | step_take;
     if chord_bits != 0 {
         let kept = HIDDEN_FIELDS.map(|offset| ((controller + offset) as *const u32).read_volatile());
         for (i, (offset, value)) in HIDDEN_FIELDS.into_iter().zip(kept).enumerate() {
@@ -161,6 +167,9 @@ pub unsafe fn on_poll(controller: usize) {
         }
     }
 }
+
+/// rc.15: the step bits the last poll kept out of the current set (`lobby_speed::StepKeep`; P1's poll only).
+static STEP_KEPT: AtomicU32 = AtomicU32::new(0);
 
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
 static HIDDEN: Mutex<Option<(usize, [u32; 8])>> = Mutex::new(None);

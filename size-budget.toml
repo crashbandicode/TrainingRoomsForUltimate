@@ -2224,7 +2224,7 @@ approved_by = "Primary e7ee8f1c (tr-primary-2), 2026-11-21 15:40Z: approved one 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 187300
+ceiling = 187299
 date = "2026-11-21"
-reason = "1 Frame review fixes (review-games-astra FAIL on 985c79c6): a chords ZL never steps the lobby, and the speed hold takes the step button out of the controller. tools/size_gate.py measured 187300 normalized lines, +32 over 187268. No spare. Release NRO and BSS are remeasured by the gate of this commit; 985c79c6 measured NRO 5128192 B, BSS 1720320 B."
-approved_by = "Primary e7ee8f1c (tr-primary-2), 2026-11-21 15:40Z: record the exact measured count for 1 Frame under the operator rule (LOC can grow when memory remains efficient and changes are not wasteful); 16:55Z directed these three fixes."
+reason = "1 Frame review fixes (review-games-astra FAIL on 985c79c6, review-games-astra-2 on 2bd5445d): a chord's ZL never steps, pressed or held, and the speed hold takes the step button out of the controller. tools/size_gate.py measured 187299 normalized lines, +31 over 187268 (2bd5445d alone measured 187300). No spare. Release NRO and BSS are remeasured by the gate of this commit; 985c79c6 measured NRO 5128192 B, BSS 1720320 B."
+approved_by = "Primary e7ee8f1c (tr-primary-2), 2026-11-21 15:40Z: record the exact measured count for 1 Frame under the operator rule (LOC can grow when memory remains efficient and changes are not wasteful); 16:55Z and 17:38Z directed these fixes."
