@@ -398,6 +398,7 @@ impl NicheGuide {
                 can_spindash: niche_start_enabled(cpu, Move::Side, true),
                 can_jump: niche_start_enabled(cpu, Move::Jump, true),
                 can_spring: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+                spring_reach_valid: inputs.special.is_some(),
             })?;
             return Some((Self {
                 sequence: Sequence::new(row),
@@ -1017,6 +1018,8 @@ impl NicheGuide {
             {
                 return None;
             }
+            let jump = flight.jump_press(frame);
+            let spring = flight.spring_press(frame);
             return flight.step(SonicBeat {
                 frame,
                 status,
@@ -1024,9 +1027,9 @@ impl NicheGuide {
                 facing: natives::lr(cpu),
                 jumps: remaining_jumps(cpu)?,
                 can_spindash: press && niche_start_enabled(cpu, Move::Side, true),
-                can_jump: flight.jump_press(frame) && niche_start_enabled(cpu, Move::Jump, true),
-                can_spring: flight.spring_press(frame) && reach.is_some()
-                    && niche_start_enabled(cpu, Move::Rise, available),
+                can_jump: jump && niche_start_enabled(cpu, Move::Jump, true),
+                can_spring: spring && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
+                spring_reach_valid: reach.is_some(),
             });
         }
         if let Some(MeasuredFlight::Cypher(flight)) = &mut self.measured {

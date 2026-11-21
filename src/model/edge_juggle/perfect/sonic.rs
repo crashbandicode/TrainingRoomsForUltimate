@@ -26,6 +26,7 @@ const PREPARE: u16 = 17;
 const FLOOR: f64 = -134.0;
 const MIN_CORNER: f64 = 5.8;
 const MIN_SPARE: f64 = 3.0;
+const FULL_SPIN_STEP: Pose = [2.0, -2.4];
 
 const REGION: [u32; 44] = [
     0, 0xfc0, 0xfc0, 0x7c0, 0x3c0, 0x1c0, 0xc0, 0x40, 0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -105,6 +106,7 @@ pub struct SonicBeat {
     pub can_spindash: bool,
     pub can_jump: bool,
     pub can_spring: bool,
+    pub spring_reach_valid: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -140,6 +142,7 @@ pub struct SonicFlight {
     plan: Plan,
     origin: Option<u32>,
     last_pad: Option<(u32, Correction)>,
+    last_spin: Option<(u32, Pose, bool)>,
 }
 
 fn add([a, b]: Pose, [x, y]: Pose) -> Pose {
@@ -294,6 +297,50 @@ fn choose(release: Pose, out: f64, downward: f64) -> Option<Plan> {
     best
 }
 
+fn below_underside([x, y]: Pose) -> bool {
+    y >= FLOOR && underside(x + 1.5).is_none_or(|bottom| bottom - y >= MIN_CORNER)
+}
+
+fn resume_spin(plan: &Plan, age: u16, mut jump: Pose) -> Option<Plan> {
+    let old = plan.timing;
+    let mut best = None;
+    let mut best_spare = f64::NEG_INFINITY;
+    // Resume only the measured full-speed dash and jump profiles. The prior
+    // dash horizon bounds the search and the blast floor ends it early.
+    for spin in 0..old.dash {
+        jump = add(jump, FULL_SPIN_STEP);
+        if !below_underside(jump) {
+            break;
+        }
+        let mut spring = jump;
+        for aerial in 1..=44 {
+            spring = add(spring, jump_delta(aerial));
+            if !below_underside(spring) {
+                break;
+            }
+            if aerial < 41 {
+                continue;
+            }
+            let Some((flight, spare)) = simulate_spring(spring) else {
+                continue;
+            };
+            if spare > best_spare {
+                let dash = age.checked_add(spin)?.checked_sub(old.side + PREPARE - 1)?;
+                let timing = Timing { dash, aerial, ..old };
+                best_spare = spare;
+                best = Some(Plan {
+                    timing,
+                    arrival: timing.spring() + 1 + flight,
+                    spin: plan.spin,
+                    jump,
+                    spring,
+                });
+            }
+        }
+    }
+    best
+}
+
 fn relative(near: Point, p: Point) -> Pose {
     [
         LEFT_X + f64::from(p[0]) - f64::from(near[0]),
@@ -345,6 +392,7 @@ impl SonicFlight {
             plan: choose(release, f64::from(out), downward)?,
             origin: None,
             last_pad: None,
+            last_spin: None,
         })
     }
 
@@ -376,6 +424,20 @@ impl SonicFlight {
         self.age(frame) == u32::from(self.plan.timing.spring())
     }
 
+    fn steady_spin(&mut self, beat: SonicBeat, actual: Pose) -> bool {
+        if beat.status != SPIN {
+            self.last_spin = None;
+            return false;
+        }
+        let last = self.last_spin;
+        let on_step = last.is_some_and(|(frame, position, _)| {
+            beat.frame == frame.wrapping_add(1)
+                && on_line(actual, add(position, FULL_SPIN_STEP))
+        });
+        self.last_spin = Some((beat.frame, actual, on_step));
+        on_step && last.is_some_and(|(_, _, was_on_step)| was_on_step)
+    }
+
     pub fn step(&mut self, beat: SonicBeat) -> Option<Correction> {
         let actual = relative(self.near, beat.position);
         if !actual.into_iter().all(f64::is_finite) || actual[1] <= FLOOR {
@@ -385,6 +447,21 @@ impl SonicFlight {
             return Some(correction);
         }
         let age = u16::try_from(self.age(beat.frame)).ok()?;
+        let timing = self.plan.timing;
+        let steady_spin = age <= timing.jump() && self.steady_spin(beat, actual);
+        if age == timing.jump()
+            && !on_line(add(actual, spin_delta(timing.dash)), self.plan.jump)
+        {
+            if !steady_spin
+                || beat.facing != 1.0
+                || beat.jumps != 1
+                || !beat.can_jump
+                || !beat.spring_reach_valid
+            {
+                return None;
+            }
+            self.plan = resume_spin(&self.plan, age, actual)?;
+        }
         let timing = self.plan.timing;
         let (side, jump, spring) = (timing.side, timing.jump(), timing.spring());
         let correction = if age <= side {

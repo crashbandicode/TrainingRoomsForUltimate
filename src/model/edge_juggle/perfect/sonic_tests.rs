@@ -36,6 +36,7 @@ fn release(position: Point) -> SonicBeat {
         can_spindash: true,
         can_jump: true,
         can_spring: true,
+        spring_reach_valid: true,
     }
 }
 
@@ -143,4 +144,91 @@ fn sonic_declines_the_crossing_when_the_near_ledge_guarder_can_drop_into_spin_da
     assert!(SonicFlight::start(&ring, [0.0, -0.09], sample).is_some());
     ring.player = [-81.7, -10.7];
     assert!(SonicFlight::start(&ring, [0.0, -0.09], sample).is_none());
+}
+
+#[test]
+fn sonic_retimes_jump_and_spring_after_the_traced_spin_dash_hitstop() {
+    let position = [-105.985_6, 33.910_26];
+    let mut beat = release(position);
+    let mut flight = SonicFlight::start(&facts((3, 0), position), [0.0, -0.09], beat).unwrap();
+    assert_eq!(flight.step(beat).unwrap().press, 0);
+
+    // 90b51e2a seqs 28339/28342/28345. The last sample coincides with
+    // the old jump time even though the hit pause cost 12 motion steps.
+    let old_jump = u32::from(flight.plan.timing.jump());
+    beat.status = SPIN;
+    let traced = [
+        (2, [-40.005_486, -65.990_005]),
+        (1, [-38.005_486, -68.390_01]),
+        (0, [-36.005_486, -70.790_01]),
+    ];
+    for (offset, measured) in traced {
+        beat.frame = old_jump - offset;
+        beat.position = measured;
+        assert_eq!(flight.step(beat).expect("the mature dash can still reach").press, 0);
+    }
+
+    let timing = flight.plan.timing;
+    let jump = u32::from(timing.jump());
+    assert!(jump > old_jump);
+    for frame in (old_jump + 1)..=jump {
+        beat.frame = frame;
+        beat.position = [
+            -36.005_486 + 2.0 * (frame - old_jump) as f32,
+            -70.790_01 - 2.4 * (frame - old_jump) as f32,
+        ];
+        let edit = flight.step(beat).unwrap();
+        assert_eq!(edit.stick, Some(FORWARD));
+        assert_eq!(edit.press, if frame == jump { JUMP } else { 0 });
+    }
+
+    let spring_catch = simulate_spring(flight.plan.spring).unwrap();
+    assert!(spring_catch.1 >= MIN_SPARE);
+    beat.status = AERIAL_JUMP;
+    beat.jumps = 0;
+    beat.frame += 1;
+    beat.position = flight.plan.jump.map(|coord| coord as f32);
+    assert_eq!(flight.step(beat).unwrap().press, JUMP);
+
+    beat.frame = u32::from(timing.spring());
+    beat.status = FALL_AERIAL;
+    beat.position = add(
+        flight.plan.spring,
+        jump_delta(timing.aerial).map(|coord| -coord),
+    )
+    .map(|coord| coord as f32);
+    assert_eq!(flight.step(beat).unwrap().stick, Some(UP_BACK));
+}
+
+#[test]
+fn sonic_checks_the_live_dash_before_restarting_its_jump_plan() {
+    let position = [-105.985_6, 33.910_26];
+    let ready = release(position);
+    for sample in [
+        SonicBeat { status: FALL, ..ready },
+        SonicBeat { status: SPIN, facing: -1.0, ..ready },
+        SonicBeat { status: SPIN, jumps: 0, ..ready },
+        SonicBeat { status: SPIN, can_jump: false, ..ready },
+        SonicBeat { status: SPIN, spring_reach_valid: false, ..ready },
+        SonicBeat { status: SPIN, position: [0.0, -74.0], ..ready },
+    ] {
+        let mut flight =
+            SonicFlight::start(&facts((3, 0), position), [0.0, -0.09], ready).unwrap();
+        assert!(flight.step(ready).is_some());
+        let frame = u32::from(flight.plan.timing.jump());
+        for (offset, position) in [(2, [-40.005_486, -65.990_005]), (1, [-38.005_486, -68.390_01])] {
+            assert!(flight.step(SonicBeat {
+                status: SPIN,
+                frame: frame - offset,
+                position,
+                ..ready
+            }).is_some());
+        }
+        let position = if sample.position == ready.position {
+            [-36.005_486, -70.790_01]
+        } else {
+            sample.position
+        };
+        assert!(flight.step(SonicBeat { frame, position, ..sample }).is_none());
+    }
 }
