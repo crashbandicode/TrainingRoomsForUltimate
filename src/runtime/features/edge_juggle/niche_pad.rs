@@ -12,6 +12,7 @@ use perfect::fly::{puff_active_status, FlyState, PuffFlight};
 use perfect::niche::{self, Facts, Motion, Move, NearReach, Row, Sample, Sequence};
 use perfect::pichu::{PichuBeat, PichuFakeOut, PichuFlight};
 use perfect::pikachu::{self, FakeOutFlight, FakeOutSample, SkullBashFlight};
+use perfect::sheik::{SheikBeat, SheikFlight};
 use perfect::{AirPhysics, Correction, Outline, Point, RouteFacts, SpecialReach};
 
 pub(super) struct NicheGuide {
@@ -28,6 +29,7 @@ enum MeasuredFlight {
     Puff(PuffFlight),
     Pichu(PichuFlight),
     PichuFakeOut(PichuFakeOut),
+    Sheik(SheikFlight),
 }
 
 /// What the plan already read for the row's need and its crossing budget.
@@ -111,6 +113,30 @@ impl NicheGuide {
                 body_clearance: facts.body_clearance,
             }, 1.0));
         }
+        if fighter == 0x10 {
+            let fall = konst(C::StatusFall);
+            if fall == UNRESOLVED || natives::status_kind(cpu) != fall || natives::lr(cpu) != direction {
+                return None;
+            }
+            let row = niche::measured_row(12, niche::CANDIDATE_ROWS)?;
+            let flight = SheikFlight::start(facts, SheikBeat {
+                frame: 0,
+                status: fall,
+                position: facts.position,
+                velocity: inputs.speed,
+                jumps: inputs.jumps,
+                can_jump: false,
+                down: niche_start_enabled(cpu, Move::Down, true),
+                up: inputs.special.is_some() && niche_start_enabled(cpu, Move::Rise, true),
+            })?;
+            return Some((Self {
+                sequence: Sequence::new(row),
+                fighter,
+                ledge: flight.exit_point(),
+                measured: Some(MeasuredFlight::Sheik(flight)),
+                body_clearance: facts.body_clearance,
+            }, 1.0));
+        }
         if fighter == 0x13 {
             let fall = konst(C::StatusFall);
             if fall == UNRESOLVED || natives::status_kind(cpu) != fall || natives::lr(cpu) != direction {
@@ -178,6 +204,7 @@ impl NicheGuide {
             // The FLY-L ring bake runs in at most 283 frames at the cell centers.
             Some(MeasuredFlight::Puff(_)) => Some(300),
             Some(MeasuredFlight::Pichu(_)) => Some(200),
+            Some(MeasuredFlight::Sheik(flight)) => Some(flight.crossing_frames()),
             _ => None,
         }
     }
@@ -243,6 +270,23 @@ impl NicheGuide {
                 remaining: remaining_jumps(cpu)?,
                 can_jump: jump != UNRESOLVED && natives::is_enable_transition_term(cpu, jump),
                 frame,
+            });
+        }
+        if let Some(MeasuredFlight::Sheik(flight)) = &mut self.measured {
+            let (vx, vy) = super::super::recording_host::fighter_speed(cpu)?;
+            let fall = konst(C::StatusFall);
+            let aerial = konst(C::StatusJumpAerial);
+            return flight.step(SheikBeat {
+                frame,
+                status,
+                position: [x, y],
+                velocity: [vx, vy],
+                jumps: remaining_jumps(cpu)?,
+                can_jump: status == perfect::sheik::FISH_END
+                    && niche_start_enabled(cpu, Move::Jump, true),
+                down: status == fall && niche_start_enabled(cpu, Move::Down, true),
+                up: (status == fall || status == aerial) && reach.is_some()
+                    && niche_start_enabled(cpu, Move::Rise, available),
             });
         }
         if let Some(MeasuredFlight::Pichu(flight)) = &mut self.measured {

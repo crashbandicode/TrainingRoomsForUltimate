@@ -438,7 +438,7 @@ fn niche_sheik_bouncing_fish_route_and_pad_sequence() {
 
 #[test]
 fn niche_sheik_vanish_route_and_pad_sequence() {
-    verify(0x10, "cross", 12, &[Move::Hold, Move::Travel]);
+    verify(0x10, "cross", 12, &[Move::Down, Move::Jump, Move::Travel]);
 }
 
 #[test]

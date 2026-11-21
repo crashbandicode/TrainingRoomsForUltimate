@@ -245,7 +245,7 @@ const ROWS: [Row; 43] = [
     Row::new(9, 0x34, Intent::HaymakerGap, &[Side, Rise]),
     Row::new(10, 0x34, Intent::CounterContact, &[Counter, Rise]),
     Row::new(11, 0x10, Intent::Near, &[Down, Rise]),
-    Row::new(12, 0x10, Intent::Across, &[Hold, Travel]),
+    Row::new(12, 0x10, Intent::Across, &[Down, Jump, Travel]),
     Row::new(13, 0x35, Intent::Across, &[ChargedSide, Hold, Travel]),
     // Ness PK Thunder needs a measured projectile route before runtime dispatch.
     Row::new(14, 0x0a, Intent::Across, &[Hold, Bolt]),

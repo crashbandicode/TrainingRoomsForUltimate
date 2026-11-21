@@ -575,6 +575,9 @@ impl Wizard {
             (Drill::GuardEdge, Some(0xc)) if perfect::fly::puff_stage(stage_key) => {
                 Some([20.0, 28.0])
             }
+            (Drill::GuardEdge, Some(0x10)) if perfect::is_crossing_stage(stage_key) => {
+                Some([18.0, 30.0])
+            }
             (Drill::GuardEdge, Some(0x13)) if perfect::is_crossing_stage(stage_key) => {
                 Some([20.0, 28.0])
             }
@@ -991,6 +994,28 @@ mod tests {
         for key in [(3, 1), (0, 1), (311, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
             assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+        }
+    }
+
+    #[test]
+    fn sheik_lower_wizard_release_remains_in_the_proven_fish_region() {
+        let stage = Stage::new(
+            [-200.0, 200.0, 180.0, -140.0],
+            [-160.0, 160.0, 120.0, -100.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let sheik = Some(0x10);
+        for id in [0, 3, 311] {
+            let mut wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, (id, 0), sheik).unwrap();
+            assert_eq!(wiz.setup.cpu, [-98.0, -30.0]);
+            wiz.change_area(stage, 1);
+            assert_eq!(wiz.setup.cpu, [98.0, -30.0]);
+            wiz.change_area(stage, 1);
+            assert_eq!(wiz.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+        }
+        for key in [(89, 0), (0, 1)] {
+            let wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, sheik).unwrap();
+            assert_eq!(wiz.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
         }
     }
 

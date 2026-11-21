@@ -16,6 +16,8 @@ pub mod recovery;
 mod region;
 #[path = "perfect/rule_counts.rs"]
 pub mod rule_counts;
+#[path = "perfect/sheik.rs"]
+pub mod sheik;
 #[path = "perfect/sora.rs"]
 pub mod sora;
 
