@@ -2188,3 +2188,11 @@ ceiling = 173126
 date = "2026-11-21"
 reason = "Compose the approved +35 Finished-state fix from 49f8871f over the 173091 Hit streak baseline."
 approved_by = "Primary e7ee8f1c (tr-primary-2) approved +35 for the Finished-state fix as recorded in 49f8871f."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 174886
+date = "2026-11-21"
+reason = "merge_budget for Eggsercise Off stage on d3062d1c over composed baseline 7c440dca. Measured implementation 173125 to 174886 (+1761). Raise the existing 173126 ceiling by 1760, with zero spare. Native witness NRO 4993024 B (+24576 B), BSS 1720320 B (unchanged)."
+approved_by = "Primary e7ee8f1c (tr-primary-2), 2026-11-21 02:18Z: approved the measured ceiling only. The operator allows LOC growth when memory stays efficient and no work is wasteful. The measured NRO and BSS witness qualifies."
