@@ -102,12 +102,12 @@ ROWS = [
      "Hit-pair D stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51f270..0x51f284`)."),
     ("hit_pair_contact_e", 0x51F904, RELIED,
      "Hit-pair E stores contact and penetration at `+0x60` and `+0x70` into both x20 and x19 shapes (`main+0x51f904..0x51f924`)."),
-    ("overlay_process_end", 0x3ade50, HOOK,
-     "BattleObjectManager::process_end, simulation phase 8. The stock callback updates the current object's model via vtable +0x398/+0x3a0 and returns after the entire object walk. The replacement invokes the original before publishing the overlay sample."),
     ("spacing_hit_handler", 0x402d14, INLINE_MID_HOOK,
      "Inline spacing-grader capture at the DamageModule hit handler (`main+0x402cc0`): x19 is the receiver DamageModule and x20 is the collision entry; five displaced words are not PC-relative and no branch targets them."),
     ("spacing_hit_entry", 0x402cf0, RELIED,
      "Relied hit-handler entry setup (`ldp x25, x20, [x1, #0x10]`): the guarded 64-byte window includes `mov x21, x1` and `mov x19, x0`; supplies the receiver and collision entry to the spacing hit hook."),
+    ("overlay_process_end", 0x3ade50, HOOK,
+     "BattleObjectManager::process_end, simulation phase 8. The stock callback updates the current object's model via vtable +0x398/+0x3a0 and returns after the entire object walk. The replacement invokes the original before publishing the overlay sample."),
 ]
 
 

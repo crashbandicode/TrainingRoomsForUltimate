@@ -1349,7 +1349,7 @@ fn hitbox_board_never_blocks_a_game_hook() {
     };
     let waits = check(&graph);
     assert!(waits.is_empty(), "game entry waits on the orb board: {waits:?}");
-    for (key, hook) in [("hitbox::draw_articles", "cpu::on_frame"), ("hitbox::wind_command", "hitbox::hitbox_area_wind_hook")] {
+    for (key, hook) in [("hitbox::draw_articles", "hitbox::overlay_process_end_hook"), ("hitbox::sample_fighter", "hitbox::overlay_process_end_hook"), ("hitbox::wind_command", "hitbox::hitbox_area_wind_hook")] {
         let found = graph.find(key);
         assert_eq!(found.len(), 1, "{key}");
         let f = found[0];
@@ -1915,14 +1915,16 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
         ("features/hitbox.rs", "hitbox::eggs_pass"),
         ("features/btt.rs", "btt::poll"),
         ("features/btt.rs", "btt::pass"),
-        ("features/btt.rs", "btt::look"),
+        ("features/btt.rs", "btt::editor_pictures"),
+        ("features/hitbox.rs", "hitbox::fighter_screen_anchors"),
     ] {
         assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
     }
     for (file, key) in roots {
         assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
         let body = &graph.funcs[one(&graph, file, key)].body;
-        let read = body.iter().position(|t| *t == Tok::Ident("try_requested".into())).expect("fallible request");
+        let request = if key == "hitbox::draw_orbs" { "overlay_layout_scene" } else { "try_requested" };
+        let read = body.iter().position(|t| *t == Tok::Ident(request.into())).expect("fallible request");
         let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
         for mutation in match key {
             "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
@@ -1962,11 +1964,12 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
     graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
     for (file, key) in roots {
         let root = one(&graph, file, key);
-        let at = graph.funcs[root].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
-        graph.funcs[root].body[at] = Tok::Ident("requested".into());
+        let request = if key == "hitbox::draw_orbs" { one(&graph, file, "hitbox::overlay_layout_scene") } else { root };
+        let at = graph.funcs[request].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
+        graph.funcs[request].body[at] = Tok::Ident("requested".into());
         let witness = menu_edit_wait_path(&graph, root).expect("original card requested edge must FAIL");
         assert_eq!(witness.last().unwrap(), "menu::current_menu");
-        graph.funcs[root].body[at] = Tok::Ident("try_requested".into());
+        graph.funcs[request].body[at] = Tok::Ident("try_requested".into());
     }
 }
 

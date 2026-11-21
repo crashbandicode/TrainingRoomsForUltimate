@@ -39,6 +39,8 @@ mod lobby_flag_tests;
 
 #[cfg(target_os = "switch")]
 mod runtime;
+#[cfg(target_os = "switch")]
+pub use runtime::{fighter_screen_anchors, FighterScreenAnchor};
 
 #[cfg(test)]
 mod grid_matches_catalog {

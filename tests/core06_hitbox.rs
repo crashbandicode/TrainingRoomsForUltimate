@@ -1571,7 +1571,7 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     let refs = |name: &str| -> Vec<usize> {
         toks.iter().enumerate().filter(|(_, t)| matches!(t, callgraph::Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
     };
-    // The two spans the reader may live in: the diag-gated `stats` module and the per-frame pass.
+    // The visualizer reads in sample_fighter. The Perfect probe and diagnostic census keep their own entry points.
     let mut stats_span = None;
     for i in 0..toks.len() - 2 {
         if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "mod")
@@ -1602,10 +1602,10 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
         "the stats module is diag-gated"
     );
     let inside_stats = |i: usize| i > stats_open && i < stats_close;
-    let mut frame_span = None;
+    let mut sample_span = None;
     for i in 0..toks.len() - 2 {
         if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "fn")
-            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "frame")
+            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "sample_fighter")
             && matches!(&toks[i + 2], callgraph::Tok::Punct('('))
         {
             let mut depth = 0i32;
@@ -1637,12 +1637,12 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
                     _ => false,
                 })
                 .expect("the frame body closes");
-            frame_span = Some((body_open, close));
+            sample_span = Some((body_open, close));
             break;
         }
     }
-    let (frame_open, frame_close) = frame_span.expect("one `fn frame`");
-    let inside_frame = |i: usize| i > frame_open && i < frame_close;
+    let (sample_open, sample_close) = sample_span.expect("one `fn sample_fighter`");
+    let inside_sample = |i: usize| i > sample_open && i < sample_close;
     let perfect_start = toks.windows(3).position(|w| {
         matches!(&w[0], callgraph::Tok::Ident(s) if s == "fn")
             && matches!(&w[1], callgraph::Tok::Ident(s) if s == "perfect_player_height")
@@ -1667,10 +1667,10 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
     assert!(adapter.contains("run.wizard.is_none()"));
     assert!(adapter.contains("natives::module_accessor(0)"));
     assert!(src.contains("let player = attempt.player()"));
-    assert!(src.contains("let show_hurt = enabled && shown(legend::HURTBOXES);"));
-    assert!(src.contains("let perfect = if show_hurt {
-        perfect
-    } else {"));
+    assert!(src.contains("let enabled = active && SETTING.load(Ordering::Acquire);"));
+    assert!(src.contains("sample_fighter(&mut store, board, accessor, enabled);"));
+    assert!(src.contains("let mut hurt = (enabled && shown(legend::HURTBOXES)).then(|| hitbox::GameHurt"));
+    assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_sample(i)).count(), 1);
     assert!(adapter.contains("&& run.plan_pending"));
     assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
     assert!(adapter.contains("run.player_height.request(frame, actionable)"));
@@ -1682,16 +1682,7 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
         for &i in &found {
             let definition = toks[..i].iter().rev().take(3).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "fn"));
-            assert!(definition || inside_frame(i) || inside_perfect(i) || inside_stats(i), "{name} at token {i} is outside the two release callers and diag census");
-        }
-    }
-    // The construction is behind the setting: `enabled` names itself within the few tokens before `GameHurt`.
-    for &i in &refs("GameHurt") {
-        if inside_frame(i) {
-            assert!(
-                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled" || s == "show_hurt")),
-                "the pass's reader at token {i} is not gated on `enabled`"
-            );
+            assert!(definition || inside_sample(i) || inside_perfect(i) || inside_stats(i), "{name} at token {i} is outside the two release callers and diag census");
         }
     }
     // The census stays diag-only: its walk and its window type are named only inside the gated module.

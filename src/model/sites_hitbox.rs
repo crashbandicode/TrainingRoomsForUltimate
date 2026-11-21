@@ -112,7 +112,7 @@ pub const OVERLAY_PROCESS_END_OFFSET: usize = 0x3a_de50;
 
 /// Hook rows in installation order, with the optional grader last.
 pub const HOOK_ROWS: [&str; 9] =
-    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "overlay_process_end", "spacing_hit_handler"];
+    ["hitbox_attack", "hitbox_catch", "hitbox_set_rebound", "hitbox_area_wind", "hitbox_area_wind_arg10", "hitbox_area_wind_rad", "hitbox_area_wind_rad_arg9", "spacing_hit_handler", "overlay_process_end"];
 pub const SPACING_HIT_HANDLER_OFFSET: usize = 0x402_d14;
 
 pub static SITES: [Site; 47] = include!(concat!(env!("OUT_DIR"), "/tables/sites_hitbox.SITES.rs"));

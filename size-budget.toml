@@ -2273,7 +2273,7 @@ approved_by = "Operator through tr-primary-2 at 18:34Z added the shared overlay 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 187791
+ceiling = 187792
 date = "2026-11-21"
-reason = "Keep the committed BTT layout visible while a held run waits for its first phase-8 sample. Exact normalized delta +13 over 187778, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
+reason = "Keep the committed BTT layout visible while a held run waits for its first phase-8 sample. Export the anchor reader for the stacked strip without suppressing lints. Exact normalized delta +14 over 187778, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
 approved_by = "Operator through tr-primary-2 at 19:07Z requested the held editor correction under the measured LOC rule for memory-efficient changes."

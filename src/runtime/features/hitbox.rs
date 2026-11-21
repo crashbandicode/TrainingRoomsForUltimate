@@ -827,19 +827,17 @@ unsafe fn project_to_canvas(at: [f32; 3], half: [f32; 2]) -> Option<[f32; 2]> {
 
 /// The current pose's fighter origin and its position on the HUD.
 #[derive(Clone, Copy)]
-#[allow(dead_code, reason = "consumed by the stacked compact-strip branch")]
-pub(crate) struct FighterScreenAnchor {
-    pub(crate) object_id: u32,
-    pub(crate) world: [f32; 3],
-    pub(crate) canvas: [f32; 2],
+pub struct FighterScreenAnchor {
+    pub object_id: u32,
+    pub world: [f32; 3],
+    pub canvas: [f32; 2],
 }
 
 /// Read the same scene/pose as the orb renderer, even with its legend toggled off.
 ///
 /// # Safety
 /// Call on the HUD layout thread while the named layout is current.
-#[allow(dead_code, reason = "consumed by the stacked compact-strip branch")]
-pub(crate) unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScreenAnchor>; hitbox::FIGHTER_SETS]> {
+pub unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScreenAnchor>; hitbox::FIGHTER_SETS]> {
     let scene = overlay_layout_scene(name).ok()??;
     let anchors = read_overlay_sample(scene)?.anchors;
     let half = hud_half()?;
