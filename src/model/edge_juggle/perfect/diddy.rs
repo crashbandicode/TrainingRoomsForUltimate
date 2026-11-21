@@ -374,7 +374,7 @@ impl BarrelFlight {
             return None;
         }
         let depths = DEPTHS.get(outside.round() as usize - 8)?;
-        for depth in depths.into_iter().copied().take_while(|&depth| depth != 0) {
+        for depth in depths.iter().copied().take_while(|&depth| depth != 0) {
             let press_height = -f32::from(depth);
             if press_height > height {
                 continue;
