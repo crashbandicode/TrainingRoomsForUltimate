@@ -118,9 +118,6 @@ static OPERATOR_BUTTONS: AtomicU64 = AtomicU64::new(0);
 // The first ready body of this native entry supplies its character-select kind.
 // Reloads retain the entry, so a practice replacement must not overwrite this.
 static ORIGINAL_KINDS: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
-/// The kind each role's observed entry was loaded as: the first kind of its native descriptor (entry + 0x18).
-/// The entry's own form change (Pyra to Mythra) keeps it. u32::MAX while no entry is observed.
-static LOADED_AS: [AtomicU32; 2] = [AtomicU32::new(u32::MAX), AtomicU32::new(u32::MAX)];
 static SOLO_ACTIVE: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 /// Set by `allow_portrait` when native reset rebuilt a role's Mii publication. Value-only:
 /// that role's next service callback revalidates the receipt and body, then republishes.
@@ -908,12 +905,6 @@ pub fn cpu_kind() -> Option<u32> {
     state_for(Role::Cpu).lock().observed.map(|(_, kind)| kind)
 }
 
-/// The kind the CPU entry was loaded as (see LOADED_AS); None while the roster has not observed an entry.
-pub fn cpu_loaded_kind() -> Option<u32> {
-    let kind = LOADED_AS[Role::Cpu as usize].load(Ordering::Acquire);
-    (kind != u32::MAX).then_some(kind)
-}
-
 /// Ask the existing loader to change Player 1 to `kind` (a combo's recorded
 /// fighter, SPEC-input-07 §4a): the Direct request a Player Character pick makes,
 /// as one explicit load the user chose, so Player Swapping Off does not refuse it
@@ -1034,7 +1025,6 @@ pub fn scene_changed(mode: game_mode::Mode) {
         state.cursor = None;
         state.loaded = None;
         state.observed = None;
-        LOADED_AS[role as usize].store(u32::MAX, Ordering::Release);
         state.presented.retire();
         REBUILT[role as usize].store(false, Ordering::Release);
         if let Some(active) = state.active.as_mut() {
@@ -1279,7 +1269,6 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             state.active = None;
             state.loaded = Some((entry as usize, owner, active.target.kind()));
             state.observed = Some((entry as usize, active.target.kind()));
-            LOADED_AS[role as usize].store(active.target.kind(), Ordering::Release);
             state.cursor = active.slot.map(|old| {
                 if state.revision == active.revision { old }
                 else { locate(&setting(&MENU), role, active.target.kind()).unwrap_or(old) }
@@ -1376,7 +1365,6 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         Ordering::Acquire,
                     );
                     state.observed = Some((entry as usize, kind));
-                    LOADED_AS[role as usize].store(forms.kinds[0], Ordering::Release);
                     if state.loaded.is_some_and(|(identity, loaded_owner, _)| {
                         identity == entry as usize && loaded_owner == owner
                     }) {
@@ -1634,7 +1622,6 @@ pub unsafe fn on_destroy(entry: *const u8) {
             entry as usize
         );
         state.observed = None;
-        LOADED_AS[role as usize].store(u32::MAX, Ordering::Release);
         // Mii adapters publish a cursor without setting the ordinary loader's
         // `loaded` receipt. Retire it with the observed entry as well: Training
         // -> CSS -> Training can keep the same mode tuple, and a new CSS fighter
@@ -1702,7 +1689,6 @@ unsafe fn publish_mii_presentation(
         return;
     }
     state.observed = Some((entry as usize, kind));
-    LOADED_AS[role as usize].store(kind, Ordering::Release);
     // Never `loaded`: that receipt gates saved-CPU idleness. Native reset admits
     // this publication through the presentation-only receipt instead.
     state.presented.publish(entry as usize, owner, kind);

@@ -140,31 +140,22 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
 }
 
 #[test]
-fn edge_juggle_selects_the_cpu_by_the_kind_its_entry_was_loaded_as() {
+fn edge_juggle_keeps_a_settled_selection_through_its_own_form_change() {
     let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
-    assert!(service.contains("roster::cpu_loaded_kind"));
-    assert!(service.contains("picker::service("));
-    assert!(!service.contains("roster::cpu_kind"));
+    assert!(service.contains("picker::service(selected, target, observed, "));
+    assert!(service.contains("static SETTLED"));
+    assert!(service.matches("see(None, None)").count() >= 2);
     assert!(!service.contains("observed != target"));
+    assert!(!service.contains("cpu_loaded_kind"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
-    assert!(frame.contains("picker::is_selected(wanted, "));
-    assert!(frame.contains("cpu_loaded_kind()"));
+    assert!(frame.contains("practice_cpu::answers(wanted, kind as u32)"));
     assert!(!frame.contains("wanted != kind as u32"));
     assert!(!frame.contains("followed_swap"));
     assert!(!frame.contains("run.opponent.fighter = Some(kind as u32)"));
+    assert!(!frame.contains("cpu_loaded_kind"));
     let roster = src("src/runtime/roster/character_roster.rs");
-    let lines: Vec<_> = roster.lines().collect();
-    let mut assignments = 0;
-    for (index, line) in lines.iter().enumerate() {
-        if line.contains("state.observed = ") {
-            assignments += 1;
-            assert!(lines.get(index + 1).is_some_and(|next| next.contains("LOADED_AS[role as usize].store(")),
-                "missing loaded-as publication after line {}", index + 1);
-        }
-    }
-    assert!(assignments >= 5);
-    assert!(item(&roster, "pub fn cpu_loaded_kind(").contains("LOADED_AS[Role::Cpu as usize]"));
+    assert!(!roster.contains("LOADED_AS"));
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its

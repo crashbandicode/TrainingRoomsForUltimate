@@ -1921,11 +1921,7 @@ pub unsafe fn frame(fighter: usize) {
     }
     let active_run = engine.run.as_ref().filter(|run| start == 0 && run.drill == drill);
     let opponent = active_run.map_or_else(|| OPPONENT.read(), |run| run.opponent);
-    if practice_cpu::switching()
-        || opponent.fighter.is_some_and(|wanted| {
-            !picker::is_selected(wanted, crate::runtime::roster::character_roster::cpu_loaded_kind(), kind as u32)
-        })
-    {
+    if practice_cpu::switching() || opponent.fighter.is_some_and(|wanted| !practice_cpu::answers(wanted, kind as u32)) {
         engine.wake_cpu(Some(body));
         return;
     }

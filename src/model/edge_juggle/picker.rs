@@ -1,15 +1,42 @@
 //! Fighter, behavior and settings shared by the two practice games.
 use core::fmt::{self, Write};
 
-use crate::model::{fighter_choices::CHOICES, settings::Snapshot, tech_settings::selected};
+use crate::model::{fighter_choices::CHOICES, fighter_forms::Forms, settings::Snapshot, tech_settings::selected};
 
 use super::Drill;
 
-/// Whether the CPU entry is the drill's selection: it was loaded as the selected fighter. The kind an entry was
-/// loaded as does not change with its form, so Pyra's own swap to Mythra keeps a Pyra selection, and choosing Mythra
-/// while a Pyra entry is in the slot is another selection. `live` stands in until the roster has seen the entry.
-pub fn is_selected(selected: u32, loaded_as: Option<u32>, live: u32) -> bool {
-    selected == loaded_as.unwrap_or(live)
+/// The selection that has been live in the CPU slot since it became the selection.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Settled(Option<u32>);
+
+impl Settled {
+    pub const fn new(kind: Option<u32>) -> Self {
+        Self(kind)
+    }
+
+    pub const fn kind(self) -> Option<u32> {
+        self.0
+    }
+
+    /// One look at the slot. `target`: the kind wanted now, if any; `live`: the kind in the slot, when known. The
+    /// target settles when it is seen live and stays settled while it stays the target.
+    pub fn see(self, target: Option<u32>, live: Option<u32>) -> Self {
+        match target {
+            Some(target) if live == Some(target) || self.0 == Some(target) => Self(Some(target)),
+            _ => Self(None),
+        }
+    }
+
+    pub fn is(self, selected: u32) -> bool {
+        self.0 == Some(selected)
+    }
+}
+
+/// Whether the CPU in the slot answers the drill's selection. The selected fighter itself always does. Another of
+/// its forms does only once the selection has been in the slot (`settled`): then the change was the fighter's own
+/// (Pyra's swap to Mythra), not a pick of the other form.
+pub fn answers(selected: u32, live: u32, settled: bool) -> bool {
+    live == selected || settled && Forms::starting(selected).same_group(live)
 }
 
 /// One roster tick of the selection service.
@@ -21,10 +48,10 @@ pub struct Service {
     pub request: bool,
 }
 
-/// `selected`: the drill's choice, if any; `target`: that choice or the original to restore; `loaded_as`: the kind
-/// the CPU entry was loaded as, when the roster is ready for a request.
-pub fn service(selected: Option<u32>, target: u32, loaded_as: Option<u32>) -> Service {
-    let satisfied = loaded_as.map(|kind| kind == target);
+/// `selected`: the drill's choice, if any; `target`: that choice or the original to restore; `observed`: the CPU
+/// kind the roster sees when it is ready for a request; `settled`: the target has been live since it became the target.
+pub fn service(selected: Option<u32>, target: u32, observed: Option<u32>, settled: bool) -> Service {
+    let satisfied = observed.map(|kind| answers(target, kind, settled));
     Service { switching: selected.is_none() && satisfied != Some(true), request: satisfied == Some(false) }
 }
 
@@ -160,30 +187,63 @@ mod tests {
     use super::*;
 
     #[test]
-    fn selection_is_the_kind_the_entry_was_loaded_as() {
-        use crate::engine::swap::character_forms::EntryState;
-        let entry = EntryState {
-            count: 2, kinds: [0x5a, 0x5b, u32::MAX], actor_count: 1, installed: 2,
-            index: 1, previous_or_next: 0xff, pending: 0xff, flags: 0x64,
-            outer: 6, loader: 14, changing: 0, guard: 0,
-        };
-        let (forms, live) = entry.ready().expect("ready swapped Pyra entry");
-        assert_eq!(live, 0x5b);
-        let loaded = forms.kinds[0];
-        assert_eq!(loaded, 0x5a);
+    fn a_form_change_answers_only_a_settled_selection() {
+        assert!(answers(0x5a, 0x5a, false));
+        assert!(!answers(0x5a, 0x5b, false));
+        assert!(answers(0x5a, 0x5b, true));
+        assert!(answers(0x5b, 0x5a, true));
+        assert!(!answers(0x5b, 0x5a, false));
+        assert!(answers(0x24, 0x26, true));
+        assert!(!answers(0x24, 0x26, false));
+        assert!(!answers(0x5a, 0x00, true));
+        assert!(answers(0x00, 0x00, false));
+    }
+
+    #[test]
+    fn the_selection_settles_when_it_is_live_and_unsettles_when_it_changes() {
+        const PYRA: u32 = 0x5a;
+        const MYTHRA: u32 = 0x5b;
+        const MARIO: u32 = 0x00;
+        let mut settled = Settled::default().see(Some(PYRA), Some(MARIO));
+        assert!(!settled.is(PYRA));
+        settled = settled.see(Some(PYRA), None);
+        assert!(!settled.is(PYRA));
+        settled = settled.see(Some(PYRA), Some(PYRA));
+        assert!(settled.is(PYRA));
+        settled = settled.see(Some(PYRA), Some(MYTHRA));
+        assert!(settled.is(PYRA));
+        settled = settled.see(Some(PYRA), None);
+        assert!(settled.is(PYRA));
+        settled = settled.see(Some(MYTHRA), Some(MYTHRA));
+        assert!(settled.is(MYTHRA));
+        assert!(!settled.is(PYRA));
+        settled = settled.see(Some(PYRA), Some(MYTHRA));
+        assert!(!settled.is(PYRA));
+        settled = settled.see(None, None);
+        assert_eq!(settled.kind(), None);
+        settled = settled.see(Some(PYRA), Some(PYRA));
+        assert!(settled.is(PYRA));
+        settled = settled.see(Some(MARIO), Some(MYTHRA));
+        assert_eq!(settled.kind(), None);
+        settled = settled.see(Some(PYRA), Some(MYTHRA));
+        assert!(!settled.is(PYRA));
+    }
+
+    #[test]
+    fn selection_service_requests_a_picked_form_and_not_an_own_swap() {
         let no_request = Service { switching: false, request: false };
         let request = Service { switching: false, request: true };
-        assert_eq!(service(Some(0x5a), 0x5a, Some(loaded)), no_request);
-        assert!(is_selected(0x5a, Some(loaded), live));
-        assert_eq!(service(Some(0x5b), 0x5b, Some(loaded)), request);
-        assert!(!is_selected(0x5b, Some(loaded), live));
-        assert_eq!(service(Some(0x5a), 0x5a, Some(0x00)), request);
-        assert_eq!(service(None, 0x00, Some(loaded)), Service { switching: true, request: true });
-        assert_eq!(service(None, 0x5a, Some(loaded)), no_request);
-        assert_eq!(service(None, 0x00, None), Service { switching: true, request: false });
-        assert_eq!(service(Some(0x5a), 0x5a, None), no_request);
-        assert!(is_selected(0x5a, None, 0x5a));
-        assert!(!is_selected(0x5a, None, 0x5b));
+        let live = |s: Settled, target, observed| service(Some(target), target, observed, s.see(Some(target), observed).is(target));
+        let pyra = Settled::default().see(Some(0x5a), Some(0x5a));
+        assert_eq!(live(pyra, 0x5a, Some(0x5b)), no_request);
+        assert_eq!(live(pyra, 0x5b, Some(0x5a)), request);
+        assert_eq!(live(Settled::default(), 0x5a, Some(0x5b)), request);
+        assert_eq!(live(pyra, 0x5a, Some(0x00)), request);
+        assert_eq!(live(Settled::default(), 0x5a, Some(0x00)), request);
+        assert_eq!(live(pyra, 0x5a, None), no_request);
+        assert_eq!(service(None, 0x00, Some(0x5b), false), Service { switching: true, request: true });
+        assert_eq!(service(None, 0x00, None, false), Service { switching: true, request: false });
+        assert_eq!(service(None, 0x00, Some(0x00), false), no_request);
     }
     }
 }
