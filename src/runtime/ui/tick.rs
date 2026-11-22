@@ -15,7 +15,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::{chips, thumbs, hud, pane, registry};
-use crate::runtime::ui::view::Panes;
+use crate::runtime::ui::view::{CropSaved, Panes};
 use crate::runtime::game;
 
 const INFO_TRAINING: &[u8] = b"info_training";
@@ -28,6 +28,8 @@ struct Resolved {
     status_r: *mut Pane,
     drawn_seq: u32,
     shown: bool,
+    /// The zone editor's crop window is up: the menu panes it hid.
+    crop: Option<CropSaved>,
 }
 
 // SAFETY: the pointers are only used on the UI job thread inside the tick.
@@ -39,6 +41,7 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
     status_r: core::ptr::null_mut(),
     drawn_seq: 0,
     shown: false,
+    crop: None,
 });
 
 /// Set by the registration tick: the layout object is new, so its panes must be resolved again.
@@ -109,7 +112,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         resolve(&mut r, layout, waiting);
     }
     let r = &mut *r;
-    let Resolved { panes, status_r, drawn_seq, shown, .. } = r;
+    let Resolved { panes, status_r, drawn_seq, shown, crop, .. } = r;
     let Some(panes) = panes.as_ref() else {
         // The injected archive was refused or the panes are absent: no renderer, so the menu cannot own input (R2-2).
         renderer_lost("panes unresolved");
@@ -139,9 +142,24 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     }
     let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire);
     MENU_SHOWN.store(visible, Ordering::Release);
-    pane::set_visible(panes.container, visible);
-    if visible {
-        pane::set_alpha(panes.container, alpha);
+    // The zone editor's crop window (design 3) is drawn on the menu's own rectangles while the menu is closed.
+    let editing = !visible && !PAUSE_ACTIVE.load(Ordering::Acquire) && crate::runtime::features::egg_zone::wizard_active();
+    if !editing {
+        if let Some(saved) = crop.take() {
+            panes.crop_leave(&saved);
+        }
+    } else {
+        if crop.is_none() {
+            *crop = Some(panes.crop_enter());
+        }
+        // A tick that cannot read the editor keeps the rectangles of the tick before.
+        if let Some(rects) = crate::runtime::features::egg_zone::crop() {
+            panes.crop_draw(&rects);
+        }
+    }
+    pane::set_visible(panes.container, visible || editing);
+    if visible || editing {
+        pane::set_alpha(panes.container, if visible { alpha } else { 255 });
     }
     if !status_r.is_null() && visible != *shown {
         pane::set_visible(*status_r, !visible);
@@ -213,6 +231,7 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     r.status_r = core::ptr::null_mut();
     r.drawn_seq = 0;
     r.shown = false;
+    r.crop = None;
     let layout_name = if waiting { "info_waiting" } else { "info_training" };
     let root = (*layout).root_pane;
     let total = pane::count(root);

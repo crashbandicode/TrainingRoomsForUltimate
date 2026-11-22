@@ -1049,7 +1049,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
 }
 
 /// The camera this tick (`eggs::View`): two points of the fighters' plane projected on the canvas.
-unsafe fn view() -> Option<eggs::View> {
+pub(super) unsafe fn view() -> Option<eggs::View> {
     let half = hud_half()?;
     let canvas = |p| project_to_canvas(p, half);
     let (a, b) = (canvas([0.0; 3])?, canvas([10.0, 10.0, 0.0])?);

@@ -120,6 +120,15 @@ pub unsafe fn set_visible(pane: *mut Pane, visible: bool) {
     (*pane).set_visible(visible);
 }
 
+/// The pane's own visible flag (bit 0, the binding's `PaneFlag::Visible`), whatever its parents show.
+/// # Safety
+/// `pane` must be a non-null, aligned live `Pane` of the pinned binding,
+/// readable for the whole call on the UI job thread without concurrent mutation
+/// or destruction.
+pub unsafe fn visible(pane: *const Pane) -> bool {
+    (*pane).flags & 1 != 0
+}
+
 /// # Safety
 /// `pane` must be a non-null, aligned live `Pane` of the pinned binding, with
 /// exclusive access to its alpha field on the UI job thread for the call.

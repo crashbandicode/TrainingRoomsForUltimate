@@ -310,6 +310,63 @@ pub fn stroke_layers(width: f32, color: [u8; 4]) -> [(f32, [u8; 4]); 2] {
     [(width + 5.0, [10, 15, 27, 235]), (width, color)]
 }
 
+/// One flat rectangle of the crop window, in canvas units (1920 x 1080, origin at the centre, y up): centre and size.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CropRect { pub x: f32, pub y: f32, pub w: f32, pub h: f32, pub color: [u8; 4] }
+
+/// The most rectangles one crop window draws: five dims and four edges a side.
+pub const CROP_RECTS: usize = 13;
+
+const CROP_X: [f32; 2] = [-960.0, 960.0];
+const CROP_Y: [f32; 2] = [-540.0, 540.0];
+const CROP_DIM: [u8; 4] = [10, 15, 27, 140];
+const CROP_BLUE: [u8; 4] = [66, 142, 255, 255];
+const CROP_YELLOW: [u8; 4] = [255, 221, 77, 255];
+const CROP_PURPLE: [u8; 4] = [206, 132, 255, 255];
+const CROP_THIN: f32 = 3.0;
+const CROP_ACTIVE: f32 = 7.0;
+
+/// The crop window (design 3): everything outside the two zones dimmed, and each zone's four boundaries as thin
+/// opaque rectangles just outside it. All inputs are canvas units: `vertical` is [bottom, top], `sides[Side as usize]`
+/// that side's [left, right]. The rectangles come back to front, the unused entries last.
+pub fn crop_window(vertical: [f32; 2], sides: [Option<[f32; 2]>; 2], step: Step) -> [Option<CropRect>; CROP_RECTS] {
+    let mut rects = [None; CROP_RECTS];
+    let mut count = 0;
+    let mut push = |[left, right]: [f32; 2], [bottom, top]: [f32; 2], color| {
+        let (w, h) = (right - left, top - bottom);
+        if w > 0.0 && h > 0.0 {
+            rects[count] = Some(CropRect { x: left.midpoint(right), y: bottom.midpoint(top), w, h, color });
+            count += 1;
+        }
+    };
+    let [bottom, top] = vertical;
+    let [low, high] = vertical.map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
+    push(CROP_X, [high, CROP_Y[1]], CROP_DIM);
+    push(CROP_X, [CROP_Y[0], low], CROP_DIM);
+    let mut cursor = CROP_X[0];
+    for [left, right] in sides.into_iter().flatten() {
+        let [left, right] = [left, right].map(|x| x.clamp(CROP_X[0], CROP_X[1]));
+        push([cursor, left], [low, high], CROP_DIM);
+        cursor = cursor.max(right);
+    }
+    push([cursor, CROP_X[1]], [low, high], CROP_DIM);
+    let width = |edge| if step == edge || step == Step::Preview { CROP_ACTIVE } else { CROP_THIN };
+    for (i, side) in sides.into_iter().enumerate() {
+        let Some([left, right]) = side else { continue };
+        let (t, b, inner, outer) = (width(Step::Top), width(Step::Bottom), width(Step::Inner), width(Step::Outer));
+        push([left - CROP_THIN, right + CROP_THIN], [top, top + t], CROP_BLUE);
+        push([left - CROP_THIN, right + CROP_THIN], [bottom - b, bottom], CROP_BLUE);
+        let (in_x, out_x) = if i == Side::Left as usize {
+            ([right, right + inner], [left - outer, left])
+        } else {
+            ([left - inner, left], [right, right + outer])
+        };
+        push(in_x, [bottom - CROP_THIN, top + CROP_THIN], CROP_YELLOW);
+        push(out_x, [bottom - CROP_THIN, top + CROP_THIN], CROP_PURPLE);
+    }
+    rects
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Top,

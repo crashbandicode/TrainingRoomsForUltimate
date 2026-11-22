@@ -8,7 +8,7 @@ use hos_lock::Mutex;
 
 use crate::model::chords::{field, Sample};
 use crate::model::edge_juggle::perfect::{self, Outline, Point, Segment};
-use crate::model::egg_zone::{blast_rect, stroke_layers, Outcome, Side, Stage, Step, Wizard, Zone};
+use crate::model::egg_zone::{blast_rect, crop_window, stroke_layers, CropRect, Outcome, Side, Stage, Step, Wizard, Zone, CROP_RECTS};
 use crate::model::eggs::View;
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
@@ -46,6 +46,24 @@ fn epoch() -> u32 {
 
 pub fn wizard_active() -> bool {
     LIVE.load(Ordering::Acquire) == epoch()
+}
+
+/// The crop window's rectangles this tick; `None` when the editor is closed or cannot be read now.
+pub unsafe fn crop() -> Option<[Option<CropRect>; CROP_RECTS]> {
+    if !wizard_active() {
+        return None;
+    }
+    let View(scale, origin, ..) = super::hitbox::view()?;
+    let state = STATE.try_lock()?;
+    if state.epoch != epoch() || !wizard_active() {
+        return None;
+    }
+    let (stage, wizard) = (state.stage.as_ref()?, state.wizard?);
+    let zone = wizard.zone(stage);
+    let x = |x: f32| x * scale[0] + origin[0];
+    let vertical = zone.vertical().map(|y| y * scale[1] + origin[1]);
+    let sides = Side::BOTH.map(|side| zone.horizontal(side).map(|span| span.map(x)));
+    Some(crop_window(vertical, sides, wizard.step()))
 }
 
 pub fn take_menu_request() -> bool {

@@ -4,6 +4,8 @@
 use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
+#[cfg(target_os = "switch")]
+use crate::model::egg_zone::{CropRect, CROP_RECTS};
 use crate::model::frame::{Frame, Tone, View, POP_PAD};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
@@ -17,6 +19,15 @@ const PLAYER: [u8; 4] = [255, 83, 92, 255];
 const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
 use crate::model::frame::Text;
+
+/// Which menu panes were visible when the crop window hid them: one bit per pane of `Panes::all`.
+#[cfg(target_os = "switch")]
+pub type CropSaved = [u64; MENU_COUNT.div_ceil(64)];
+/// The crop window's rectangles: the roster grid's stripes, flat rectangles that never take a texture.
+#[cfg(target_os = "switch")]
+const IDX_CROP: usize = IDX_TILE_STRIPE;
+#[cfg(target_os = "switch")]
+const _: () = assert!(CROP_RECTS <= 2 * TILES);
 
 /// The resolved panes of the menu in the layout now showing.
 pub struct Panes {
@@ -33,6 +44,46 @@ fn tone_color(tone: Tone) -> [u8; 4] {
         Tone::Dim => TEXT_DIM,
         Tone::On => TEXT_ON,
         Tone::Off => TEXT_OFF,
+    }
+}
+
+#[cfg(target_os = "switch")]
+impl Panes {
+    /// The zone editor is up with the menu closed: remember which menu panes are visible and hide them all, so the
+    /// shown container draws only what `crop_draw` places.
+    pub unsafe fn crop_enter(&self) -> CropSaved {
+        let mut saved = [0; MENU_COUNT.div_ceil(64)];
+        for i in 1..MENU_COUNT {
+            let pane = self.all[i];
+            if !pane.is_null() && pane::visible(pane) {
+                saved[i / 64] |= 1 << (i % 64);
+                pane::set_visible(pane, false);
+            }
+        }
+        saved
+    }
+
+    /// The editor closed or the menu shows again: hide the rectangles, then show what `crop_enter` hid.
+    pub unsafe fn crop_leave(&self, saved: &CropSaved) {
+        for i in IDX_CROP..IDX_CROP + CROP_RECTS {
+            self.hide(i);
+        }
+        for i in 1..MENU_COUNT {
+            if saved[i / 64] & (1 << (i % 64)) != 0 {
+                self.show(i, true);
+            }
+        }
+    }
+
+    /// This tick's rectangles, back to front; an unused entry hides its pane.
+    pub unsafe fn crop_draw(&self, rects: &[Option<CropRect>; CROP_RECTS]) {
+        for (i, rect) in rects.iter().enumerate() {
+            if let Some(CropRect { x, y, w, h, color }) = *rect {
+                self.rect_at(IDX_CROP + i, x, y, w, h, color);
+            } else {
+                self.hide(IDX_CROP + i);
+            }
+        }
     }
 }
 

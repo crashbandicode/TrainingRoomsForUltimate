@@ -1,6 +1,6 @@
 use super::chords::logical as key;
 use super::edge_juggle::perfect::Outline;
-use super::egg_zone::{stroke_layers, Outcome, Side, Stage, Step, Wizard};
+use super::egg_zone::{crop_window, stroke_layers, CropRect, Outcome, Side, Stage, Step, Wizard};
 
 fn stage(blast: [f32; 4], points: &[[f32; 2]]) -> Stage {
     let mut outline = Outline::new();
@@ -142,4 +142,85 @@ fn zone_overlay_paints_a_dark_outline_behind_each_stroke() {
             assert_eq!(foreground, (width, color));
         }
     }
+}
+
+fn crop_rect(x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) -> Option<CropRect> {
+    Some(CropRect { x, y, w, h, color })
+}
+
+fn crop_overlaps(r: CropRect, [left, right]: [f32; 2], [bottom, top]: [f32; 2]) -> bool {
+    r.x - r.w / 2.0 < right && r.x + r.w / 2.0 > left
+        && r.y - r.h / 2.0 < top && r.y + r.h / 2.0 > bottom
+}
+
+#[test]
+fn crop_window_dims_everything_outside_both_zones() {
+    let vertical = [-100.0, 200.0];
+    let sides = [[-700.0, -400.0], [400.0, 700.0]];
+    let rects = crop_window(vertical, sides.map(Some), Step::Top);
+    let dim = [10, 15, 27, 140];
+    assert_eq!(rects[..5], [
+        crop_rect(0.0, 370.0, 1920.0, 340.0, dim),
+        crop_rect(0.0, -320.0, 1920.0, 440.0, dim),
+        crop_rect(-830.0, 50.0, 260.0, 300.0, dim),
+        crop_rect(0.0, 50.0, 800.0, 300.0, dim),
+        crop_rect(830.0, 50.0, 260.0, 300.0, dim),
+    ]);
+    let area: f32 = rects[..5].iter().flatten().map(|r| r.w * r.h).sum();
+    assert_eq!(area + 2.0 * 300.0 * 300.0, 1920.0 * 1080.0);
+    for rect in rects[..5].iter().flatten() {
+        for side in sides {
+            assert!(!crop_overlaps(*rect, side, vertical));
+        }
+    }
+}
+
+#[test]
+fn crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker() {
+    let vertical = [-100.0, 200.0];
+    let sides = [[-700.0, -400.0], [400.0, 700.0]];
+    let rects = crop_window(vertical, sides.map(Some), Step::Top);
+    let blue = [66, 142, 255, 255];
+    let yellow = [255, 221, 77, 255];
+    let purple = [206, 132, 255, 255];
+    assert_eq!(rects[5..], [
+        crop_rect(-550.0, 203.5, 306.0, 7.0, blue),
+        crop_rect(-550.0, -101.5, 306.0, 3.0, blue),
+        crop_rect(-398.5, 50.0, 3.0, 306.0, yellow),
+        crop_rect(-701.5, 50.0, 3.0, 306.0, purple),
+        crop_rect(550.0, 203.5, 306.0, 7.0, blue),
+        crop_rect(550.0, -101.5, 306.0, 3.0, blue),
+        crop_rect(398.5, 50.0, 3.0, 306.0, yellow),
+        crop_rect(701.5, 50.0, 3.0, 306.0, purple),
+    ]);
+    for rect in rects[5..].iter().flatten() {
+        for side in sides {
+            assert!(!crop_overlaps(*rect, side, vertical));
+        }
+    }
+    let inner = crop_window(vertical, sides.map(Some), Step::Inner);
+    assert_eq!(inner[7], crop_rect(-396.5, 50.0, 7.0, 306.0, yellow));
+    assert_eq!(inner[5], crop_rect(-550.0, 201.5, 306.0, 3.0, blue));
+    let preview = crop_window(vertical, sides.map(Some), Step::Preview);
+    for (i, rect) in preview[5..].iter().enumerate() {
+        let rect = rect.unwrap();
+        assert_eq!(if i % 4 < 2 { rect.h } else { rect.w }, 7.0);
+    }
+}
+
+#[test]
+fn crop_window_with_one_side_or_a_zone_off_the_screen() {
+    let dim = [10, 15, 27, 140];
+    let one = crop_window([-100.0, 200.0], [Some([-1200.0, -800.0]), None], Step::Top);
+    assert_eq!(one[..3], [
+        crop_rect(0.0, 370.0, 1920.0, 340.0, dim),
+        crop_rect(0.0, -320.0, 1920.0, 440.0, dim),
+        crop_rect(80.0, 50.0, 1760.0, 300.0, dim),
+    ]);
+    assert!(one[3..7].iter().all(Option::is_some));
+    assert_eq!(one[7..], [None; 6]);
+    let below = crop_window([-700.0, -600.0], [Some([-700.0, -400.0]), Some([400.0, 700.0])], Step::Top);
+    assert_eq!(below[0], crop_rect(0.0, 0.0, 1920.0, 1080.0, dim));
+    assert!(below[1..9].iter().all(Option::is_some));
+    assert_eq!(below[9..], [None; 4]);
 }
