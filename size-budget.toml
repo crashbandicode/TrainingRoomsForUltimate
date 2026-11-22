@@ -2353,7 +2353,7 @@ approved_by = "tr-primary-2, 2026-11-22 07:34Z, 08:07:11Z, 08:44:17Z, 09:18:12Z 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 188817
+ceiling = 191654
 date = "2026-11-22"
-reason = "Gate Training reset effects on one atomic word for passed reset checks and destroyed fighter entries. Measured normalized implementation 188817, 53 above the integration ceiling 188764, with zero spare. The release gate measures NRO and BSS."
-approved_by = "tr-primary-2 2026-11-22 08:22:35Z (HANDOFF-PRIMARY-tr-primary-2.md line 993): 188,664 (+53) approved under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate; after the rebase onto eb9c7722 the measured difference is +53"
+reason = "Gate Training reset effects on one atomic word for passed reset checks and destroyed fighter entries. Measured normalized implementation 191654, 53 above the integration ceiling 191601, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2 2026-11-22 08:22:35Z (HANDOFF-PRIMARY-tr-primary-2.md line 993): 188,664 (+53) approved under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate; after the rebase onto 04959678 the measured difference is +53"
