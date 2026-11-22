@@ -3,18 +3,11 @@
 //! role rule, the per-body state, the frame counters and the mash queue. Test names are the specs'
 //! §9 rows where one exists.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 #[path = "../src/runtime/features/cpu_role_adapter.rs"]
 #[allow(dead_code)]
 mod role_adapter;
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
 use model::cpu::counter::{CounterId, Counters};
@@ -39,24 +32,10 @@ thread_local! {
     static ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
 }
 
-struct Counting;
-
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let _ = ALLOCATIONS.try_with(|c| c.set(c.get() + 1));
-        System.alloc(layout)
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        let _ = ALLOCATIONS.try_with(|c| c.set(c.get() + 1));
-        System.realloc(ptr, layout, new_size)
-    }
+pub(super) fn count_allocation() {
+    let _ = ALLOCATIONS.try_with(|count| count.set(count.get() + 1));
 }
 
-#[global_allocator]
-static ALLOCATOR: Counting = Counting;
 
 fn allocations() -> usize {
     ALLOCATIONS.with(Cell::get)

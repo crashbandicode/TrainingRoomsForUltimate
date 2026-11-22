@@ -379,7 +379,7 @@
       "dest": "src/model/seams/native_seams/mod.rs",
       "crate": "consts",
       "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-      "dest_sha256": "608b9ba25f2ec2cbe19d88e05e1003ac5298f3ec4c138cd9ddf7fd2bf2265c6f",
+      "dest_sha256": "219399a87a0bab99761fbe2dfaed6ae12cfb1f3b869a2f5e0c08f56117133c9a",
       "edits": [
         {
           "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -634,6 +634,36 @@
           "old": "rows_cpu_level::ROWS, rows_res_unload::ROWS,",
           "new": "rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_res_unload::ROWS,",
           "reason": "Guard the Edge and Juggler register their own guarded Training-only capability with the existing installer. Existing rows and guard comparisons are unchanged."
+        },
+        {
+          "old": "pub(crate) mod rows_edge_juggle;\n",
+          "new": "pub(crate) mod rows_edge_juggle;\npub(crate) mod rows_edge_zoom;\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
+        },
+        {
+          "old": "const TABLES: [&[Seam]; 16] = [\n",
+          "new": "const TABLES: [&[Seam]; 17] = [\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
+        },
+        {
+          "old": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_res_unload::ROWS,\n",
+          "new": "    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_edge_zoom::ROWS, rows_res_unload::ROWS,\n",
+          "reason": "rc.15 drill picker: register Hero Zoom guard rows"
+        },
+        {
+          "old": "pub mod rows_lobby_speed;\n",
+          "new": "pub mod rows_lobby_speed;\n/// rc.15: 1 Frame on the game speed bind, the battle task entry it holds in the waiting room and Training's own step and\n/// pause sync it copies (`src/runtime/lobby/lobby_speed.rs`, `src/runtime/features/game_speed.rs`).\npub mod rows_speed_frame;\n",
+          "reason": "rc.15 1 Frame on the game speed bind: register the speed_frame guard rows (docs/design/rc15-speed-frame.md)"
+        },
+        {
+          "old": "const TABLES: [&[Seam]; 17] = [\n",
+          "new": "const TABLES: [&[Seam]; 18] = [\n",
+          "reason": "rc.15 1 Frame on the game speed bind: register the speed_frame guard rows (docs/design/rc15-speed-frame.md)"
+        },
+        {
+          "old": "    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS,\n",
+          "new": "    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS, rows_speed_frame::ROWS,\n",
+          "reason": "rc.15 1 Frame on the game speed bind: register the speed_frame guard rows (docs/design/rc15-speed-frame.md)"
         }
       ]
     },
@@ -8027,7 +8057,7 @@
       "dest": "tests/mii_helper147_headgear.rs",
       "crate": "mii",
       "src_sha256": "0deda79e22972927e655373b79f29baea059ce0eb964e5089999b351529981b6",
-      "dest_sha256": "a934fb590348453dc2ad21564d17e4cad927fe57a61e11de9b084c4829d03990",
+      "dest_sha256": "052542b9b42c8ba0dc44257278f73aa53f7d49973c6fc11805cb79ccab346983",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8053,6 +8083,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! slots 2/3. Waiting uses slots 5/6. Synthetic hat ids only; no native fixture.\n\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::ordinary_cpu as cpu};\n",
+          "new": "//! slots 2/3. Waiting uses slots 5/6. Synthetic hat ids only; no native fixture.\n\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::ordinary_cpu as cpu};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8061,7 +8096,7 @@
       "dest": "tests/mii_ldn_handshake.rs",
       "crate": "mii",
       "src_sha256": "958bfb6b45fa72514d23ffb3f477df5332d7d6b30b8c68a40ac59f0a3eb485f3",
-      "dest_sha256": "6a9d2ba5f89d36df72cfc01479c43fee261eb0a7742311bc127225b19e18b2b7",
+      "dest_sha256": "6378baf40c86b5e015303546aae9563ae0d19ee2c6c27500c3eb0ab111df8d3c",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8119,6 +8154,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! owned the scene (ack 0,1,1 / resolved 0,1,1, deque unchanged) and the\n//! audited native consumer predicate. Addresses are identity tokens only.\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse crate::engine::mii::ldn_handshake::{\n",
+          "new": "//! owned the scene (ack 0,1,1 / resolved 0,1,1, deque unchanged) and the\n//! audited native consumer predicate. Addresses are identity tokens only.\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse crate::engine::mii::ldn_handshake::{\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8127,7 +8167,7 @@
       "dest": "tests/mii_bank_groups.rs",
       "crate": "mii",
       "src_sha256": "101fa5ca3b74af22a7c58eaa9f1aeb873f09a83c419f1224b0f2784e81aab057",
-      "dest_sha256": "23f5940063846ccf23eb987be44d896579ccd664597aaf9016be0efe4570751d",
+      "dest_sha256": "08ae3a2565af97e8da87a8548122144f57f078940b23378a616a6216612f67b6",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8153,6 +8193,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Value rules of the Mii one-member group switch (MII-GROUPS-DESIGN §5): the\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Value rules of the Mii one-member group switch (MII-GROUPS-DESIGN §5): the\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8161,7 +8206,7 @@
       "dest": "tests/mii_bank_publication.rs",
       "crate": "mii",
       "src_sha256": "e52d41ffa711a1d75f345676a03c17f1e5c9c5b90ef8b3257fa0d0ec6dd1a7da",
-      "dest_sha256": "8d246b4449ace4e810e696b028c3569de8055ad2374e80f67edecfee801e7490",
+      "dest_sha256": "42dcdbea0397c67314c37911a4e14adf5d1cee7187ce694bc1fde84262186ceb",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8192,6 +8237,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// MII-PHASEB part 2: the switch-time publication of a Mii group switch is part of the\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// MII-PHASEB part 2: the switch-time publication of a Mii group switch is part of the\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8200,7 +8250,7 @@
       "dest": "tests/mii_setup_preflight.rs",
       "crate": "mii",
       "src_sha256": "ed0cbedbfa6380329e52a254458f16dc7e7b856cf4453836cfa4e1e9d4dbc0c9",
-      "dest_sha256": "ed550683d0d012ed66d9b1486ecc1cafef055f82d406a8216c7d171700dda14e",
+      "dest_sha256": "1cd274611539a709a407dce378a90c329ac60122b8893c171677ece1f70cca9b",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8241,6 +8291,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Value rules of the native Mii-setup adapter (WP-M2 step 2): the preflight that must\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Value rules of the native Mii-setup adapter (WP-M2 step 2): the preflight that must\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8249,7 +8304,7 @@
       "dest": "tests/mii_player146_headgear_ownership.rs",
       "crate": "mii",
       "src_sha256": "67c0fb189b4fefec4f57f0271ca8c0bdf49b1f5100fe51b13027c02abf2cec9b",
-      "dest_sha256": "522747785b0d1aaff80dbbd18ec46c741e95c77bba3e5b67e3390c4da8270bb0",
+      "dest_sha256": "331693b74c1f0dc0c2919d74158ef700736bcc765780b54d1972f1714c946792",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8287,6 +8342,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! record, not a copy of CPU index 1.\n\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};\n",
+          "new": "//! record, not a copy of CPU index 1.\n\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::{MiiClass, CHARINFO_LEN}, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{RowIds, RECORD_LEN}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner}};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -8295,7 +8355,7 @@
       "dest": "tests/mii_role_adapter.rs",
       "crate": "mii",
       "src_sha256": "c0afddd51f968b3bc5e7db8f72abde8bb9b8439cdfb3ba5b310ac0af7cd58b58",
-      "dest_sha256": "a450251c2ff22d1fc1375fe7153bc55727af1237ecfc39f6b787c943ea622a8d",
+      "dest_sha256": "fad11992e093747e28212143fae55e0e92625f9cf44b3395e250de70f539f81c",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -8331,6 +8391,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n// Copied CPU01 configuration/token/association evidence. Epoch7 is a TEST generation:\n",
+          "new": "// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\n// Copied CPU01 configuration/token/association evidence. Epoch7 is a TEST generation:\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },
@@ -11115,7 +11180,7 @@
       "dest": "src/runtime/seams/seam_install.rs",
       "crate": "root",
       "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-      "dest_sha256": "28b9027d9006d09f682d803b2ff7c032ebeafe491109ba557079ee1853e66cc9",
+      "dest_sha256": "5b068ff78b6d122171e206b38be4b643ca6ba53ef9c3966dc7f704a74949b9f9",
       "edits": [
         {
           "old": "use crate::model;\n",
@@ -11241,6 +11306,16 @@
           "old": "fn count(code: u8) -> usize {\n    native_seams::SITES\n        .iter()\n        .enumerate()\n        .filter(|(index, _)| OUTCOMES[*index].load(Ordering::Relaxed) & CODE_MASK == code)\n        .count()\n}\n\n/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        let rows = native_seams::COUNT;\n        let checked = rows - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { keep: listed_as_other, with_code: other_with_code },\n            Labels { keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n",
           "new": "/// The seam fields of the plugin's one install line (recorded clean-room change: the fork wrote a second line of its own here,\n/// `[TrainingModpack] result=installed ...`; package 1's `InstallLine` takes these as its `seams` group). From the moment the\n/// fields are formatted a new or changed outcome is reported late, so a row another thread checks while the line is written\n/// appears in both rather than in neither. The line carries counts and the rows that fail; the authoritative group lists and the\n/// unchecked image labels (static configuration, and image rows that load later) stay out of it: the late report names them (the\n/// first Eden boot showed the full lists cut the one line before `result=`).\npub(crate) struct InstallFields;\n\nimpl fmt::Display for InstallFields {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        BOOTED.store(true, Ordering::Release);\n        // Every list sees the same outcome for each row, including late updates during boot.\n        let outcomes = OUTCOMES.each_ref().map(|slot| slot.load(Ordering::Relaxed));\n        let count = |code| outcomes.iter().filter(|&&bits| bits & CODE_MASK == code).count();\n        let checked = native_seams::COUNT - count(UNCHECKED);\n        write!(\n            f,\n            \"seams={} seams_stock={} seams_other={} seams_skipped={} seams_shadow_diff={} seams_missing={} seams_external={} seams_unchecked={} seams_images_unchecked={}{}\",\n            checked,\n            count(STOCK),\n            Labels { outcomes: &outcomes, keep: listed_as_other, with_code: other_with_code },\n            Labels { outcomes: &outcomes, keep: |b| b & SKIPPED != 0, with_code: |_| true },\n            Labels { outcomes: &outcomes, keep: |b| b & SHADOW_DIFF != 0, with_code: |_| true },\n            Missing,\n            Labels { outcomes: &outcomes, keep: |b| b & CODE_MASK == EXTERNAL, with_code: |_| false },\n            count(UNCHECKED),\n            IMAGE_OUTCOMES.iter().filter(|slot| slot.load(Ordering::Relaxed) & CODE_MASK == UNCHECKED).count(),\n            DrillFields,\n        )\n    }\n}\n",
           "reason": "Use the same seam outcome for the counts and the exclusive report lists."
+        },
+        {
+          "old": "    \"custom_stages\",\n",
+          "new": "    \"custom_stages\",\n    \"edge_zoom\",\n",
+          "reason": "rc.15 drill picker: publish the Hero Zoom guard group through the existing seam gate"
+        },
+        {
+          "old": "    \"game_speed\",\n",
+          "new": "    \"game_speed\",\n    // rc.15 1 Frame: the entry hold is installed and the Training resume calls the pause sync only when every row is stock.\n    \"speed_frame\",\n",
+          "reason": "rc.15 1 Frame on the game speed bind: publish the speed_frame guard group through the existing seam gate as authoritative"
         }
       ]
     },
@@ -12638,7 +12713,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "03ff6f9555bd3d60baa239ead108c7aba03ca636a20e9605f54613251fecd958",
+      "dest_sha256": "ef7492e1b1eb2568929e5227ebaed9da779a8c5354123e99e0d203afe88c199c",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14271,6 +14346,16 @@
           "old": "    let excluded = match role {\n",
           "new": "    let excluded = cycle_excluded(m, role);\n    // P-CYCLE: the one cycle list (`cycle_members`), with no Mii class: this loader cannot load a Mii, and while it\n    // serves the cycle no Mii owner does, so the menu's published admission is none too.\n    let roster = match role {\n        Role::Player => m.player_roster,\n        Role::Cpu => m.cpu_roster,\n    };\n    crate::engine::swap::cycle_members::cycle_members_excluding(roster, crate::engine::swap::cycle_members::NO_MII, excluded)\n}\n\n/// Ready Fighters shortfall: the role's live fighter and cycle cursor, as the walkers step from them.\nfn cycle_slot(role: Role) -> Option<(u32, Option<usize>)> {\n    let s = state_for(role).lock();\n    s.observed.map(|(_, kind)| (kind, s.cursor))\n}\n\n/// The fighter group slot 0 takes out of the numbered cycle (`roster_grid::cycle_exclusion`).\nfn cycle_excluded(m: &TrainingModpackMenu, role: Role) -> Option<u32> {\n    match role {\n",
           "reason": "rc15 ready-fighters-shortfall (operator 2026-11-20 ~01:22Z: 'yes add the ready fighters fix to this build'; review-menu-astra 03:35Z, 04:44Z, 06:07Z): body_bank::cycle_demand counts what the cycles need and which fighters (picks; a pair is one) stay cold by the planner's own placement over the admitted whole numbered order (by slot) of each role that cycles, beside the groups it keeps, from a snapshot recomputed only when it changes; the Fighters notice says 'Ready Fighters 8/9: 1 stays cold' and is raised again when R, N or cold changes."
+        },
+        {
+          "old": "    if role == Role::Cpu && crate::runtime::features::mashout::temporary_cpu_selection(kind) {\n",
+          "new": "    if role == Role::Cpu && (crate::runtime::features::mashout::temporary_cpu_selection(kind)\n        || crate::runtime::features::edge_juggle::practice_cpu::temporary(kind))\n    {\n",
+          "reason": "rc.15 drill picker: reuse Practice ownership and provide the CPU kind to the game-frame roster service"
+        },
+        {
+          "old": "    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)\n",
+          "new": "    state_for(Role::Player).lock().observed.map(|(_, kind)| kind)\n}\n\npub fn cpu_kind() -> Option<u32> {\n    state_for(Role::Cpu).lock().observed.map(|(_, kind)| kind)\n",
+          "reason": "rc.15 drill picker: reuse Practice ownership and provide the CPU kind to the game-frame roster service"
         }
       ]
     },
@@ -30163,7 +30248,7 @@
       "dest": "tests/mii_replay185_headgear.rs",
       "crate": "mii",
       "src_sha256": "dc1217eeec20f201115dee096c09af7b3fc3b66afd8961353e56d481539109dd",
-      "dest_sha256": "cb96c59775822f865b78a95445ba3e374e1798764bd90a4a396930f9e332aa2c",
+      "dest_sha256": "14687ff221a486408fb1ad30c0c01c57a27cb80b3251cb7390aea2f9da4402bf",
       "prepend": "#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\n",
       "edits": [
         {
@@ -30226,6 +30311,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "//! CharInfo's noncanonical create-id/name prefix is redacted. Hat7 is explicitly\n//! a synthetic variation; its resource presence is not claimed.\n// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.\nmacro_rules! lib_unit_tests {\n    ($($body:tt)*) => {};\n}\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n#[path = \"../src/test_table.rs\"]\nmod test_table;\n#[allow(dead_code, unused_imports)]\n#[path = \"../src/model/mii/mod.rs\"]\npub mod mii;\n#[allow(unused_imports)]\nmod engine {\n    pub use super::mii;\n}\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};\n",
+          "new": "//! CharInfo's noncanonical create-id/name prefix is redacted. Hat7 is explicitly\n//! a synthetic variation; its resource presence is not claimed.\n// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).\n\nuse {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};\n",
+          "reason": "Share the Mii model and test-table runner in the consolidated integration harness."
         }
       ]
     },

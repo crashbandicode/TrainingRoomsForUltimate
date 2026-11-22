@@ -2,15 +2,9 @@
 //! Test names are the spec's §9 rows. The version guard's own carried tests are in
 //! `tests/carried_model_facade.rs`; the 64-byte rule's are in `tests/carried_guard.rs`.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::guard::{GuardOutcome, HookForm, Placement, SeamKind, GUARD_BYTES};
 use model::install_line::{DeveloperReport, FeatureReport, InstallLine, SettingsReport, SiteReport, Written};

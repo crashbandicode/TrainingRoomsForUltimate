@@ -11,22 +11,14 @@
 //! - names the threads that reach each edge: game-thread hooks (`#[skyline::hook]`) and every plugin thread's entry
 //!   (`model::thread_stacks::THREADS`, as `hook_locks.rs` derives them, plus the publishing path).
 //!
-//! `cargo test --test lock_order -- --nocapture` prints the lock table and the edges. The test fails on a cycle in the
+//! `cargo test --test all -- lock_order:: --nocapture` prints the lock table and the edges. The test fails on a cycle in the
 //! order graph (two locks taken in both orders), and on a lock retaken while held. Limits are `hook_locks.rs`'s: calls
 //! through `dyn`, trait methods and stored closures are not seen; native locks (the game's own) are not seen.
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
-#[path = "common/tech_callbacks.rs"]
-mod tech_callbacks;
+use crate::callgraph;
+use crate::tech_callbacks;
 
-#[path = "../src/model/thread_stacks.rs"]
-#[allow(dead_code)]
-mod thread_stacks;
+use crate::model::thread_stacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -114,11 +106,13 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("press", &["editor", "list", "m"], PANELS),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
+    ("target", &["GRADER"], "Grader::target is a lock-free model ring enqueue"),
     (
         "poll",
-        &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "t"],
+        &["JOBS", "adapter", "clock", "gate", "guard", "model", "queue", "replies", "step", "t"],
         "inline_keyboard::Keyboard is held only as `keyboard`, mii_catalog_request's private Broker only as `broker` \
-         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters",
+         (RECEIVER_MODULES); these are engine exchanges and queues, input adapters; `step` is the model's \
+         lobby_speed::FrameStep in game_speed::frame_step_poll, a plain counter with no lock (rc.15 1 Frame)",
     ),
 ];
 const PANELS: &str = "combos::Ui and setups::Ui live only in the worker's state (`s.combos`, `s.setups`, `setups` in worker::close); \
@@ -1347,7 +1341,7 @@ fn hitbox_board_never_blocks_a_game_hook() {
     };
     let waits = check(&graph);
     assert!(waits.is_empty(), "game entry waits on the orb board: {waits:?}");
-    for (key, hook) in [("hitbox::draw_articles", "cpu::on_frame"), ("hitbox::wind_command", "hitbox::hitbox_area_wind_hook")] {
+    for (key, hook) in [("hitbox::draw_articles", "hitbox::overlay_process_end_hook"), ("hitbox::sample_fighter", "hitbox::overlay_process_end_hook"), ("hitbox::wind_command", "hitbox::hitbox_area_wind_hook")] {
         let found = graph.find(key);
         assert_eq!(found.len(), 1, "{key}");
         let f = found[0];
@@ -1358,10 +1352,39 @@ fn hitbox_board_never_blocks_a_game_hook() {
     }
 }
 
+/// The phase-8 sampler and the separate early Perfect measurement never acquire a blocking lock.
+#[test]
+fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let locks = static_locks(&runtime);
+    let store = locks.iter().position(|(file, name)| file == "features/hitbox.rs" && name == "STORE").unwrap();
+    let callbacks = [
+        ("hitbox::sample_overlay", "hitbox::overlay_process_end_hook", "hitbox::sample_fighter"),
+        ("hitbox::perfect_visualizer_height", "cpu::on_frame", "hitbox::perfect_visualizer_height"),
+        ("hitbox::forget_fighter", "reset_hub::on_init", "hitbox::forget_fighter"),
+    ];
+    for (entry, hook, seed) in callbacks {
+        let at = graph.find(entry);
+        let seed = graph.find(seed);
+        assert_eq!(at.len(), 1, "{entry}");
+        assert_eq!(seed.len(), 1, "{entry} seed");
+        let (_, scan) = scan_with_locks(&graph, locks.clone(), false);
+        assert!(scan.reach[at[0]].is_empty(), "{entry} can wait on {:?}", scan.reach[at[0]]);
+        let original = graph.funcs[seed[0]].body.clone();
+        graph.funcs[seed[0]].body.extend(callgraph::lex("STORE.lock();"));
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        assert!(scan.reach[at[0]].contains(&store), "{entry} missed the seeded lock");
+        let witness = format!("{} (hook {hook})", graph.funcs[seed[0]].key());
+        assert!(shared_locks(&ctx, &scan).game_waits[&store].contains(&witness), "{witness}");
+        graph.funcs[seed[0]].body = original;
+    }
+}
+
 /// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
 /// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
 #[test]
-fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
+fn btt_camera_is_lock_free_and_owning_hooks_reach_seeded_waits() {
     let mut graph = runtime_graph();
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let mut locks = static_locks(&runtime);
@@ -1370,28 +1393,35 @@ fn btt_camera_is_lock_free_and_cpu_frame_reaches_seeded_camera_waits() {
         locks.push(camera.clone());
     }
     let camera_lock = locks.iter().position(|lock| lock == &camera).unwrap();
-    let callbacks: Vec<usize> = ["btt_camera::apply", "btt_camera::request", "btt_camera::frame"].iter().map(|entry| {
+    let callbacks = [
+        ("btt_camera::request", "cpu::on_frame"),
+        ("btt_camera::interrupt_placement", "cpu::on_frame"),
+        ("btt_camera::placing", "cpu::on_frame"),
+        ("btt_camera::placement_pad", "recorder::ai_epilogue"),
+        ("btt_camera::update_placement", "cpu::on_frame"),
+        ("btt_camera::frame", "cpu::on_frame"),
+    ].map(|(entry, hook)| {
         let found = graph.find(entry);
         assert_eq!(found.len(), 1, "camera callback {entry}");
-        found[0]
-    }).collect();
+        (found[0], hook)
+    });
     {
         let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
-        for &at in &callbacks {
+        for &(at, _) in &callbacks {
             let reached: Vec<String> = scan.reach[at].iter().map(|&lock| lock_name(&ctx, lock)).collect();
             assert!(reached.is_empty(), "{} reaches blocking locks: {reached:?}", graph.funcs[at].key());
         }
     }
-    for at in callbacks {
+    for (at, hook) in callbacks {
         let original = graph.funcs[at].body.clone();
         graph.funcs[at].body.extend(callgraph::lex("CAMERA.lock();"));
         {
             let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
             assert!(scan.reach[at].contains(&camera_lock), "camera lock seed was not parsed");
             let shared = shared_locks(&ctx, &scan);
-            let want = format!("{} (hook cpu::on_frame)", graph.funcs[at].key());
+            let want = format!("{} (hook {hook})", graph.funcs[at].key());
             assert!(shared.game_waits.get(&camera_lock).is_some_and(|waits| waits.contains(&want)),
-                    "CPU frame did not reach the camera seed: {want}");
+                    "the owning hook did not reach the camera seed: {want}");
         }
         graph.funcs[at].body = original;
     }
@@ -1906,14 +1936,16 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
         ("features/hitbox.rs", "hitbox::eggs_pass"),
         ("features/btt.rs", "btt::poll"),
         ("features/btt.rs", "btt::pass"),
-        ("features/btt.rs", "btt::look"),
+        ("features/btt.rs", "btt::editor_pictures"),
+        ("features/hitbox.rs", "hitbox::fighter_screen_anchors"),
     ] {
         assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
     }
     for (file, key) in roots {
         assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
         let body = &graph.funcs[one(&graph, file, key)].body;
-        let read = body.iter().position(|t| *t == Tok::Ident("try_requested".into())).expect("fallible request");
+        let request = if key == "hitbox::draw_orbs" { "overlay_layout_scene" } else { "try_requested" };
+        let read = body.iter().position(|t| *t == Tok::Ident(request.into())).expect("fallible request");
         let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
         for mutation in match key {
             "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
@@ -1953,11 +1985,12 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
     graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
     for (file, key) in roots {
         let root = one(&graph, file, key);
-        let at = graph.funcs[root].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
-        graph.funcs[root].body[at] = Tok::Ident("requested".into());
+        let request = if key == "hitbox::draw_orbs" { one(&graph, file, "hitbox::overlay_layout_scene") } else { root };
+        let at = graph.funcs[request].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
+        graph.funcs[request].body[at] = Tok::Ident("requested".into());
         let witness = menu_edit_wait_path(&graph, root).expect("original card requested edge must FAIL");
         assert_eq!(witness.last().unwrap(), "menu::current_menu");
-        graph.funcs[root].body[at] = Tok::Ident("try_requested".into());
+        graph.funcs[request].body[at] = Tok::Ident("try_requested".into());
     }
 }
 
@@ -2288,4 +2321,36 @@ fn no_engine_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     // and START_SPEED) predate the parry change and are reported to the primary for a ruling (2026-11-18 PARRY READY).
     let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES") || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")).collect();
     assert!(queues.is_empty(), "a game entry waits on a playback frame queue the menu worker fills:\n{}", queues.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
+}
+
+#[test]
+fn strip_frame_step_never_blocks() {
+    fn block_after<'a>(source: &'a str, marker: &str) -> &'a str {
+        let start = source.find(marker).expect("gated strip side-effect block");
+        let open = start + source[start..].find('{').expect("opening brace");
+        let mut depth = 0;
+        for (offset, byte) in source.as_bytes()[open..].iter().enumerate() {
+            match *byte {
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return &source[open + 1..open + offset];
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("unclosed block after {marker}");
+    }
+
+    let source = include_str!("../src/runtime/features/input_display.rs");
+    let start = source.find("pub unsafe fn sample_frame").expect("sample_frame");
+    let end = source[start..].find("\npub fn session_clear").expect("end of sample_frame") + start;
+    let frame = &source[start..end];
+    assert!(frame.contains("TRACKER.try_lock()"), "the frame step must use try_lock");
+    assert!(!frame.contains("TRACKER.lock()"), "the frame step must not block");
+    let gated = block_after(frame, "\n    if shown || input_drill {");
+    assert!(gated.contains("rr_host::observe_input"));
+    assert!(gated.contains("combo::after_strip"));
 }

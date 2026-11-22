@@ -301,7 +301,7 @@ fn run_inner() {
     let cpu_mash_on = cpu_core_on && install_cpu_mash(&usable, &mut mark);
     // SPEC-core-06: the hitbox visualizer rides on the CPU core's per-fighter frame wrapper; its closure (own rows, the Training
     // predicate, the shared natives' rows) must have passed as a whole.
-    let (hitbox_on, hb_written) = hitbox::install(&hb_found, cpu_core_on && capabilities::unit_usable(Feature::Hitbox, &usable));
+    let hitbox_on = hitbox::install(cpu_core_on && capabilities::unit_usable(Feature::Hitbox, &usable));
     crate::runtime::features::btt::set_usable(hitbox_on);
     let btt_projectiles_on = hitbox_on && capabilities::unit_usable(Feature::BttProjectiles, &usable);
     crate::runtime::features::btt_projectiles::set_ready(btt_projectiles_on);
@@ -328,6 +328,8 @@ fn run_inner() {
     // The input display's reads in the input-delay hook have their own flag, so Input Delay does not depend on them.
     let display_on = capabilities::unit_usable(Feature::InputDisplay, &usable);
     input_display::set_enabled(display_on);
+    let spacing_installed = input_display::set_grader_read(display_on && sites_hitbox::grader_usable(&usable));
+    input_display::set_owner_read(display_on && capabilities::unit_usable(Feature::Hitbox, &usable));
     // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
     // combo shows no margin and the rest of the strip draws.
     input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));
@@ -423,7 +425,7 @@ fn run_inner() {
         .collect();
     reports.extend(ui::reports(&ui_install));
     reports.extend(p1::reports(&found6, &written6));
-    reports.extend(hitbox::reports(&hb_found, &hb_written));
+    reports.extend(hitbox::reports(&hb_found, hitbox_on, spacing_installed));
     reports.extend(lockon_sites.iter().zip(lockon_found).map(|(site, found)| SiteReport {
         site: site.name, found, written: if found.usable() { Written::Checked } else { Written::Skipped },
     }));

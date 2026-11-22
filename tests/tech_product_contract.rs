@@ -1,11 +1,7 @@
-#[allow(dead_code)]
-#[path = "../src/model/tech_launch.rs"]
-mod launch;
+use crate::model::tech_launch as launch;
 use launch::{Attempt, AttemptState, ContactReceipt, HitHeight, Launch, Surface, Vec2};
-#[path = "common/mod.rs"]
-mod common;
-#[path = "../src/runtime/features/tech_decision_guards.rs"]
-mod decision_guards;
+use crate::common;
+use crate::model::sites_tech_launch::decision as decision_guards;
 fn request() -> Launch {
     Launch {
         start: Vec2 { x: -30.0, y: 20.0 },

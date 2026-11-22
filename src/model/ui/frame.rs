@@ -564,7 +564,17 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                     }
                     out.write_str("  >")
                 }
-                Control::Game(game) | Control::Start(game) if menu.running() == Some(game) => out.write_str("Running  >"),
+                Control::Editor(Editor::PracticeCpu(game)) => {
+                    let pick = menu.practice_cpu_pick(game);
+                    let fighter = pick.fighter.and_then(|k| crate::model::fighter_choices::CHOICES.iter()
+                        .find(|&&(kind, _)| kind == k).map(|&(_, name)| name)).unwrap_or("Current CPU");
+                    let _ = write!(out, "{fighter} · ");
+                    let _ = pick.mode().write(out);
+                    out.write_str("  >")
+                }
+                Control::Game(game) | Control::Start(game) if menu.running() == Some(game) => {
+                    out.write_str(if menu.finished(game) { "Finished  >" } else { "Running  >" })
+                }
                 _ => out.write_str(">"),
             };
         }
@@ -582,7 +592,7 @@ fn value_tone(menu: &Menu, row: usize) -> Tone {
         (RowValue::Toggle(true), _) => Tone::On,
         (RowValue::Toggle(false), _) => Tone::Off,
         // rc.15 practice menu: "Running" in green.
-        (_, Control::Game(game) | Control::Start(game)) if menu.running() == Some(game) => Tone::On,
+        (_, Control::Game(game) | Control::Start(game)) if menu.running() == Some(game) && !menu.finished(game) => Tone::On,
         _ => Tone::Normal,
     }
 }
@@ -601,6 +611,11 @@ fn write_help(menu: &Menu, row: usize, help: &mut [Text<160>; 2]) {
     help.iter_mut().for_each(Text::clear);
     let r = &ROWS[row];
     let _ = match r.control {
+        Control::Game(game) | Control::Start(game) if menu.finished(game) => {
+            let action = if matches!(r.control, Control::Start(_)) { "A stops it." } else { "A opens it." };
+            write!(help[0], "Eggs-ercise finished. {action}")
+                .and_then(|()| help[1].write_str("Close the menu and press L+R+A to restart."))
+        }
         Control::Game(game) if menu.running() == Some(game) => {
             write!(help[0], "{} is running. A opens it to stop it or change it.", game.title())
                 .and_then(|()| help[1].write_str("Closing the menu (B) leaves it running."))

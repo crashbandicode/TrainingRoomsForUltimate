@@ -16,6 +16,10 @@ timing of your follow-up. It sits at the top of the screen in Training and in wa
 
 An older settings file that still says Smash Inputs, Raw Inputs or Status Only becomes Frame strip. Off stays Off.
 
+**Display & Controls → Link history** defaults to On. Turn it off to hide the LAST row and make the strip shorter.
+The **LINK** readout then shows the newest move pair with its verdict, such as **TRUE · Jab > Jab**. During a drill,
+the link cells use the LAST row's space. The strip and the drill card fade together when a fighter moves behind them.
+
 ## What is on it
 
 The newest frame is on the right. Player 1 and the CPU each have a lane, and Player 1's button presses are chips above

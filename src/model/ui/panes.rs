@@ -473,18 +473,17 @@ pub mod cb {
     pub const CELLS: usize = 4;
     pub const PILLS: usize = 8;
     /// A drilled sequence's combos shown at once, and the arrows between them.
-    pub const CHIPS: usize = 4;
-    pub const ARROWS: usize = CHIPS - 1;
+    pub const CHIPS: usize = 3;
 
     pub mod at {
-        use super::{ARROWS, CELLS, CHIPS, PILLS};
+        use super::{CELLS, CHIPS, PILLS};
         pub const CONTAINER: usize = 0;
         pub const BACKDROP: usize = 1;
         pub const HEADER: usize = 2;
         pub const STREAK: usize = 3;
-        pub const RESULT: usize = 4;
-        pub const REASON: usize = 5;
-        pub const PILL: usize = 6;
+        pub const RESULT: usize = SEQ_BACKDROP + 1;
+        pub const REASON: usize = RESULT + 1;
+        pub const PILL: usize = STREAK + 1;
         /// Per cell, one block of `CELLS` each: backdrop, title, verdict, offset, ruler, window, recorded and your press.
         pub const CELL: usize = PILL + PILLS;
         pub const TITLE: usize = CELL + CELLS;
@@ -499,90 +498,48 @@ pub mod cb {
         pub const SEQ_BACKDROP: usize = YOURS + CELLS;
         /// The header: the SEQUENCE pill and its word, the name, "combo k of n ·", the combo, "· N links",
         /// "· tolerance ±1f", and on the right "streak N" and "· best M".
-        pub const SEQ_PILL: usize = SEQ_BACKDROP + 1;
+        pub const SEQ_PILL: usize = REASON + 1;
         pub const SEQ_PILL_TEXT: usize = SEQ_PILL + 1;
         pub const SEQ_NAME: usize = SEQ_PILL_TEXT + 1;
         pub const SEQ_STEP: usize = SEQ_NAME + 1;
-        pub const SEQ_COMBO: usize = SEQ_STEP + 1;
-        pub const SEQ_LINKS: usize = SEQ_COMBO + 1;
+        pub const SEQ_LINKS: usize = SEQ_STEP + 1;
         pub const SEQ_TOLERANCE: usize = SEQ_LINKS + 1;
         pub const SEQ_STREAK: usize = SEQ_TOLERANCE + 1;
         pub const SEQ_BEST: usize = SEQ_STREAK + 1;
         /// The footer's start: "Ryu BnB landed ·", and the current combo's name before the helper's own result.
         pub const SEQ_LANDED: usize = SEQ_BEST + 1;
-        pub const SEQ_CURRENT: usize = SEQ_LANDED + 1;
         /// Per combo chip, one block of `CHIPS` each: outline, fill, text, and the two strokes of the check mark
         /// (the game's fonts have no ✓).
-        pub const SEQ_CHIP_EDGE: usize = SEQ_CURRENT + 1;
+        pub const SEQ_CHIP_EDGE: usize = SEQ_LANDED + 1;
         pub const SEQ_CHIP_FILL: usize = SEQ_CHIP_EDGE + CHIPS;
         pub const SEQ_CHIP_TEXT: usize = SEQ_CHIP_FILL + CHIPS;
         pub const SEQ_CHECK_SHORT: usize = SEQ_CHIP_TEXT + CHIPS;
         pub const SEQ_CHECK_LONG: usize = SEQ_CHECK_SHORT + CHIPS;
         /// The arrows between the chips.
-        pub const SEQ_ARROW: usize = SEQ_CHECK_LONG + CHIPS;
-        pub const COUNT: usize = SEQ_ARROW + ARROWS;
+        pub const COUNT: usize = SEQ_CHECK_LONG + CHIPS;
     }
 
     pub const COUNT: usize = at::COUNT;
 
     /// Sequence mode (mockup `r8-sequence-bar`): the bar is as wide as the strip, with a band above the combo bar's
     /// rows. The container moves down by the band, so the bar's top stays under the strip.
-    pub const SEQ_W: f32 = super::iv::STRIP_W;
-    pub const SEQ_EXTRA: f32 = 56.0;
-    pub const SEQ_BAR_Y: f32 = BAR_Y - SEQ_EXTRA;
-    pub const SEQ_LEFT: f32 = -SEQ_W / 2.0 + 18.0;
-    pub const SEQ_RIGHT: f32 = SEQ_W / 2.0 - 18.0;
-    pub const SEQ_BAND_Y: f32 = BAR_H / 2.0 + SEQ_EXTRA / 2.0;
-    pub const SEQ_HEADER_Y: f32 = BAR_H / 2.0 + SEQ_EXTRA - 20.0;
-    pub const SEQ_CHIP_Y: f32 = 56.0;
-    pub const SEQ_CHIP_H: f32 = 32.0;
-    pub const SEQ_PILL_W: f32 = 156.0;
-    pub const SEQ_PILL_H: f32 = 28.0;
-    /// The link cells spread over the wider bar: four cells, 8 units apart.
-    pub const SEQ_CELL_PITCH: f32 = (SEQ_W - 36.0 + 8.0) / CELLS as f32;
-    pub const SEQ_CELL_W: f32 = SEQ_CELL_PITCH - 8.0;
-    pub const SEQ_CELL_X0: f32 = SEQ_LEFT + SEQ_CELL_W / 2.0;
-    /// Text box widths of the sequence texts (a left-aligned box's text starts at its left edge).
-    pub const SEQ_NAME_BOX: f32 = 280.0;
-    pub const SEQ_TAG_BOX: f32 = 220.0;
-    pub const SEQ_SUB_BOX: f32 = 300.0;
-    pub const SEQ_CHIP_TEXT_BOX: f32 = 240.0;
     pub const SEQ_PILL_COLOR: [u8; 4] = [236, 108, 176, 255];
     pub const SEQ_PILL_TEXT_COLOR: [u8; 4] = [24, 18, 30, 255];
     pub const SEQ_CHIP_COLOR: [u8; 4] = [32, 38, 52, 255];
 
     /// The bar's centre below the strip's, and its size (the mockup's 864 × 132).
-    pub const BAR_Y: f32 = -184.0;
-    pub const BAR_W: f32 = 864.0;
-    pub const BAR_H: f32 = 132.0;
-    pub const LEFT: f32 = -414.0;
-    pub const HEADER_Y: f32 = 48.0;
-    pub const FOOTER_Y: f32 = -48.0;
-    pub const CELL_Y: f32 = 2.0;
-    pub const CELL_W: f32 = 200.0;
-    pub const CELL_H: f32 = 64.0;
-    pub const CELL_PITCH: f32 = 208.0;
-    pub const CELL_X0: f32 = -312.0;
-    pub const TITLE_DY: f32 = 18.0;
-    pub const VERDICT_DY: f32 = -2.0;
-    pub const RULER_DY: f32 = -22.0;
-    /// The ruler: frames from A₁, `RULER_FROM ..= RULER_FROM + RULER_FRAMES`, `PER_FRAME` units each.
-    pub const RULER_FROM: i32 = -10;
-    pub const RULER_FRAMES: i32 = 30;
-    pub const PER_FRAME: f32 = 6.0;
-    pub const RULER_W: f32 = RULER_FRAMES as f32 * PER_FRAME;
-    pub const PILL_SIZE: f32 = 14.0;
-    pub const PILL_X0: f32 = 166.0;
-    pub const PILL_PITCH: f32 = 20.0;
-    pub const STREAK_X: f32 = 370.0;
-    pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
+    pub const BACKDROP_COLOR: [u8; 4] = super::iv::BACKDROP_COLOR;
     pub const CELL_COLOR: [u8; 4] = [30, 36, 48, 255];
     pub const TEXT_UNITS: u16 = 24;
 }
 
+#[path = "strip_layout/mod.rs"]
+pub mod strip_layout;
+
 /// The frame strip's pane indices and geometry (canvas units, the container's centre is the origin).
 pub mod iv {
     /// Frames on screen, links in the LAST row, lane runs and run lengths per lane, chips.
+    pub const TAGS: usize = 8;
     pub const WINDOW: usize = 60;
     pub const HISTORY: usize = 4;
     pub const RUNS: usize = 16;
@@ -591,7 +548,7 @@ pub mod iv {
 
     /// The strip's pane indices (local: `IDX_IV + at::…` in the table).
     pub mod at {
-        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS, WINDOW};
+        use super::{CHIPS, HISTORY, RUNS, RUN_LABELS, TAGS, WINDOW};
         pub const CONTAINER: usize = 0;
         pub const BACKDROP: usize = 1;
         /// IN, P1, CPU.
@@ -623,47 +580,14 @@ pub mod iv {
         pub const MOVE_TEXT: usize = PILL_TEXT + HISTORY;
         /// One mark per frame of the stick row, under P1's lane (oldest at `STICK`).
         pub const STICK: usize = MOVE_TEXT + HISTORY;
-        pub const COUNT: usize = STICK + WINDOW;
+        pub const TAG_BOX: usize = STICK + WINDOW;
+        pub const TAG_TEXT: usize = TAG_BOX + TAGS;
+        pub const COUNT: usize = TAG_TEXT + TAGS;
     }
 
     pub const COUNT: usize = at::COUNT;
 
-    pub const STRIP_Y: f32 = 420.0;
-    pub const STRIP_W: f32 = 1296.0;
-    pub const STRIP_H: f32 = 216.0;
-    /// The left edge of the oldest frame's cell, the distance between frames and a cell's width.
-    pub const FIRST_X: f32 = -564.0;
-    pub const PITCH: f32 = 13.5;
-    pub const CELL_W: f32 = 12.0;
-    pub const NOW_X: f32 = FIRST_X + WINDOW as f32 * PITCH + 3.0;
-    pub const LABEL_X: f32 = -606.0;
-    pub const IN_Y: f32 = 73.5;
-    /// P1 sits just under the input ticks. The lane is shorter than it was so a stick row fits between it and the CPU
-    /// lane without moving the brackets, the LAST row or the combo bar.
-    pub const P1_Y: f32 = 27.0;
-    pub const CPU_Y: f32 = -21.0;
-    pub const LANE_H: f32 = 16.0;
-    /// Centre of the stick row, in the gap between the two lanes.
-    pub const STICK_Y: f32 = 3.0;
-    pub const CHIP: f32 = 30.0;
-    pub const TICK_Y: f32 = 47.25;
-    pub const TICK_H: f32 = 22.5;
-    pub const WINDOW_Y: f32 = 44.25;
-    pub const WINDOW_H: f32 = 7.5;
-    pub const LEG_Y: f32 = -39.0;
-    pub const LEG_H: f32 = 9.0;
-    pub const BAR_Y: f32 = -43.5;
-    pub const BRACKET_TEXT_Y: f32 = -57.0;
-    pub const READ_X: f32 = 276.0;
-    pub const READ_LABEL_Y: [f32; 3] = [90.0, 34.5, -21.0];
-    pub const READ_VALUE_Y: [f32; 3] = [64.5, 9.0, -46.5];
-    pub const READ_SUB_X: f32 = READ_X + 75.0;
-    pub const DIVIDER_X: f32 = 262.5;
-    pub const RULE_Y: f32 = -70.5;
-    pub const LAST_Y: f32 = -87.0;
-    pub const PILL_W: f32 = 96.0;
-    pub const PILL_STRIDE: f32 = 300.0;
-    pub const PILL_X0: f32 = FIRST_X + PILL_W / 2.0;
+    pub use super::strip_layout::strip::*;
     pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
     /// The text boxes' capacity in UTF-16 units.
     pub const TEXT_UNITS: u16 = 24;
@@ -707,58 +631,11 @@ const fn iv_name(local: usize) -> Name {
         i if i < PILL_TEXT => Name::indexed("TrIvPill", i - PILL),
         i if i < MOVE_TEXT => Name::indexed("TrIvPillT", i - PILL_TEXT),
         i if i < STICK => Name::indexed("TrIvMove", i - MOVE_TEXT),
-        i if i < COUNT => Name::indexed("TrIvSk", i - STICK),
+        i if i < TAG_BOX => Name::indexed("TrIvSk", i - STICK),
+        i if i < TAG_TEXT => Name::indexed("TrIvTagB", i - TAG_BOX),
+        i if i < COUNT => Name::indexed("TrIvTagT", i - TAG_TEXT),
         _ => {
             let _ = (RUNS, RUN_LABELS, WINDOW);
-            panic!("no such frame strip pane")
-        }
-    }
-}
-
-/// A hidden text box of the frame strip.
-const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
-    hidden(under(text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT), Name::new("TrIv")))
-}
-
-/// The frame strip's panes: kind, place and size, all hidden until the input package draws them.
-const fn iv_spec(local: usize, name: Name) -> Spec {
-    use iv::at::*;
-    use iv::{
-        BACKDROP_COLOR, BAR_Y, BRACKET_TEXT_Y, CELL_W, CHIP, DIVIDER_X, FONT_SUB, FONT_TAG, FONT_VALUE, IN_Y, LABEL_X,
-        LANE_H, LAST_Y, LEG_H, LEG_Y, NOW_X, PILL_W, READ_SUB_X, READ_X, RULE_Y, STICK_Y, STRIP_H, STRIP_W, STRIP_Y,
-        TEXT_UNITS, TICK_H, TICK_Y, WINDOW_H, WINDOW_Y,
-    };
-    let parent = Name::new("TrIv");
-    match local {
-        CONTAINER => container(name, ROOT_PANE, [0.0, STRIP_Y, STRIP_W, STRIP_H]),
-        BACKDROP => under(rect(name, [0.0, 0.0, STRIP_W, STRIP_H], BACKDROP_COLOR, true), parent),
-        i if i < SEPARATOR => iv_text(name, [LABEL_X, 0.0, 60.0], Align::Center, FONT_TAG),
-        SEPARATOR => under(rect(name, [DIVIDER_X, 19.5, 1.5, 147.0], RULE, false), parent),
-        i if i < RUN => under(rect(name, [0.0, RULE_Y, STRIP_W - 36.0, 1.5], RULE, false), parent),
-        i if i < RUN_LABEL => under(rect(name, [0.0, 0.0, CELL_W, LANE_H], TEXT, false), parent),
-        i if i < CHIP_BOX => iv_text(name, [0.0, 0.0, 60.0], Align::Center, FONT_TAG),
-        i if i < CHIP_GLYPH => under(rect(name, [0.0, IN_Y, CHIP, CHIP], TEXT, false), parent),
-        i if i < CHIP_SHAFT => hidden(under(text(name, [0.0, IN_Y, CHIP, CHIP], Align::Center, FONT_SUB, 2, TEXT), parent)),
-        i if i < CHIP_HEAD => under(rect(name, [0.0, IN_Y, 4.5, 14.0], TEXT, false), parent),
-        i if i < CHIP_TICK => under(rect(name, [0.0, IN_Y, 9.0, 9.0], TEXT, false), parent),
-        i if i < WINDOW_BAR => under(rect(name, [0.0, TICK_Y, 1.5, TICK_H], TEXT, false), parent),
-        WINDOW_BAR => under(rect(name, [0.0, WINDOW_Y, 1.5, WINDOW_H], TEXT, false), parent),
-        WINDOW_TEXT => iv_text(name, [0.0, WINDOW_Y, 120.0], Align::Center, FONT_TAG),
-        i if i < BRACKET_TEXT && (i - BRACKET) % 3 == 1 => under(rect(name, [0.0, BAR_Y, 3.0, 3.0], TEXT, false), parent),
-        i if i < BRACKET_TEXT => under(rect(name, [0.0, LEG_Y, 3.0, LEG_H], TEXT, false), parent),
-        i if i < NOW => iv_text(name, [0.0, BRACKET_TEXT_Y, 120.0], Align::Center, FONT_TAG),
-        NOW => under(rect(name, [NOW_X, 32.25, 1.5, 121.5], TEXT, false), parent),
-        NOW_TEXT => iv_text(name, [NOW_X - 24.0, 84.0, 48.0], Align::Center, FONT_TAG),
-        i if i < READ_VALUE => iv_text(name, [READ_X + 60.0, 0.0, 120.0], Align::Left, FONT_TAG),
-        i if i < READ_SUB => hidden(under(text(name, [READ_X + 30.0, 0.0, 60.0, 40.0], Align::Left, FONT_VALUE, TEXT_UNITS, TEXT), parent)),
-        i if i < LAST_TEXT => iv_text(name, [READ_SUB_X + 90.0, 0.0, 180.0], Align::Left, FONT_SUB),
-        LAST_TEXT => iv_text(name, [LABEL_X, LAST_Y, 60.0], Align::Center, FONT_TAG),
-        i if i < PILL_TEXT => under(rect(name, [0.0, LAST_Y, PILL_W, 24.0], TEXT, false), parent),
-        i if i < MOVE_TEXT => iv_text(name, [0.0, LAST_Y, PILL_W], Align::Center, FONT_TAG),
-        i if i < STICK => iv_text(name, [0.0, LAST_Y, 200.0], Align::Left, FONT_TAG),
-        i if i < COUNT => hidden(under(text(name, [0.0, STICK_Y, 16.0, 18.0], Align::Center, FONT_TAG, 2, TEXT), parent)),
-        _ => {
-            let _ = TEXT_UNITS;
             panic!("no such frame strip pane")
         }
     }
@@ -781,14 +658,12 @@ const fn cb_name(local: usize) -> Name {
         SEQ_PILL_TEXT => Name::new("TrCbSqKind"),
         SEQ_NAME => Name::new("TrCbSqName"),
         SEQ_STEP => Name::new("TrCbSqStep"),
-        SEQ_COMBO => Name::new("TrCbSqCombo"),
         SEQ_LINKS => Name::new("TrCbSqLinks"),
         SEQ_TOLERANCE => Name::new("TrCbSqTol"),
         SEQ_STREAK => Name::new("TrCbSqStrk"),
         SEQ_BEST => Name::new("TrCbSqBest"),
         SEQ_LANDED => Name::new("TrCbSqDone"),
-        SEQ_CURRENT => Name::new("TrCbSqNow"),
-        i if i >= SEQ_CHIP_EDGE && i < SEQ_ARROW => {
+        i if i >= SEQ_CHIP_EDGE && i < COUNT => {
             let n = (i - SEQ_CHIP_EDGE) % cb::CHIPS;
             match (i - SEQ_CHIP_EDGE) / cb::CHIPS {
                 0 => Name::indexed("TrCbSqEdge", n),
@@ -798,7 +673,6 @@ const fn cb_name(local: usize) -> Name {
                 _ => Name::indexed("TrCbSqCheck", n),
             }
         }
-        i if i >= SEQ_ARROW && i < COUNT => Name::indexed("TrCbSqArrow", i - SEQ_ARROW),
         i if i < SEQ_BACKDROP => {
             let n = (i - CELL) % CELLS;
             match (i - CELL) / CELLS {
@@ -817,53 +691,37 @@ const fn cb_name(local: usize) -> Name {
 }
 
 /// A hidden text box of the combo bar; `x` is the box's centre.
-const fn cb_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
-    hidden(under(text(name, [x, y, w, 26.0], align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
+const fn cb_text(name: Name, size: [f32; 4], align: Align, font: (f32, f32)) -> Spec {
+    hidden(under(text(name, size, align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
 }
 
 /// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
-const fn cb_spec(local: usize, name: Name) -> Spec {
+const fn cb_spec(layout: &strip_layout::LayoutSpec, local: usize, name: Name) -> Spec {
     use cb::at::*;
-    use cb::{
-        BAR_H, BAR_W, BAR_Y, CELLS, CELL_COLOR, CELL_H, CELL_W, CELL_Y, FOOTER_Y, HEADER_Y, LEFT, PILL_SIZE, RULER_DY,
-        RULER_W, SEQ_BAND_Y, SEQ_CHIP_COLOR, SEQ_CHIP_H, SEQ_CHIP_TEXT_BOX, SEQ_CHIP_Y, SEQ_EXTRA, SEQ_HEADER_Y, SEQ_LEFT,
-        SEQ_NAME_BOX, SEQ_PILL_COLOR, SEQ_PILL_H, SEQ_PILL_TEXT_COLOR, SEQ_PILL_W, SEQ_SUB_BOX, SEQ_TAG_BOX, SEQ_W,
-        STREAK_X, TITLE_DY, VERDICT_DY,
-    };
+    use cb::{CELL_COLOR, SEQ_CHIP_COLOR, SEQ_PILL_COLOR, SEQ_PILL_TEXT_COLOR};
     use iv::{FONT_SUB, FONT_TAG};
     let parent = Name::new("TrCb");
+    let (place, h) = layout.card.at_rest(local, &layout.strip);
+    let size = [place.x, place.y, place.w, h];
     match local {
-        CONTAINER => container(name, Name::new("TrIv"), [0.0, BAR_Y, BAR_W, BAR_H]),
-        BACKDROP => hidden(under(rect(name, [0.0, 0.0, BAR_W, BAR_H], cb::BACKDROP_COLOR, true), parent)),
-        HEADER => cb_text(name, [LEFT + 180.0, HEADER_Y, 360.0], Align::Left, FONT_SUB),
-        STREAK => cb_text(name, [STREAK_X, HEADER_Y, 120.0], Align::Center, FONT_TAG),
-        RESULT => cb_text(name, [LEFT + 120.0, FOOTER_Y, 240.0], Align::Left, FONT_SUB),
-        REASON => cb_text(name, [LEFT + 260.0 + 200.0, FOOTER_Y, 400.0], Align::Left, FONT_SUB),
-        i if i < CELL => under(rect(name, [0.0, HEADER_Y, PILL_SIZE, PILL_SIZE], TEXT, false), parent),
-        i if i < TITLE => under(rect(name, [0.0, CELL_Y, CELL_W, CELL_H], CELL_COLOR, false), parent),
-        i if i < VERDICT => cb_text(name, [0.0, CELL_Y + TITLE_DY, CELL_W - 8.0], Align::Center, FONT_TAG),
-        i if i < OFFSET => cb_text(name, [0.0, CELL_Y + VERDICT_DY, 96.0], Align::Center, FONT_TAG),
-        i if i < RULER => cb_text(name, [0.0, CELL_Y + VERDICT_DY, 100.0], Align::Center, FONT_TAG),
-        i if i < WINDOW => under(rect(name, [0.0, CELL_Y + RULER_DY, RULER_W, 3.0], RULE, false), parent),
-        i if i < RECORDED => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 9.0], TEXT, false), parent),
-        i if i < YOURS => under(rect(name, [0.0, CELL_Y + RULER_DY, 4.0, 16.0], TEXT, false), parent),
-        i if i < SEQ_BACKDROP => under(rect(name, [0.0, CELL_Y + RULER_DY, 6.0, 12.0], TEXT, false), parent),
-        SEQ_BACKDROP => under(rect(name, [0.0, SEQ_BAND_Y, SEQ_W, SEQ_EXTRA], cb::BACKDROP_COLOR, false), parent),
-        SEQ_PILL => under(rect(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, SEQ_PILL_H], SEQ_PILL_COLOR, false), parent),
-        SEQ_PILL_TEXT => hidden(under(text(name, [SEQ_LEFT + SEQ_PILL_W / 2.0, SEQ_HEADER_Y, SEQ_PILL_W, 26.0], Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
-        SEQ_NAME => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_NAME_BOX], Align::Left, FONT_SUB),
-        SEQ_STEP | SEQ_COMBO | SEQ_LINKS | SEQ_TOLERANCE => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Left, FONT_TAG),
-        SEQ_STREAK | SEQ_BEST => cb_text(name, [0.0, SEQ_HEADER_Y, SEQ_TAG_BOX], Align::Right, FONT_SUB),
-        SEQ_LANDED | SEQ_CURRENT => cb_text(name, [0.0, FOOTER_Y, SEQ_SUB_BOX], Align::Left, FONT_SUB),
-        i if i < SEQ_CHIP_FILL => under(rect(name, [0.0, SEQ_CHIP_Y, 120.0, SEQ_CHIP_H], TEXT, false), parent),
-        i if i < SEQ_CHIP_TEXT => under(rect(name, [0.0, SEQ_CHIP_Y, 116.0, SEQ_CHIP_H - 4.0], SEQ_CHIP_COLOR, false), parent),
-        i if i < SEQ_CHECK_SHORT => cb_text(name, [0.0, SEQ_CHIP_Y, SEQ_CHIP_TEXT_BOX], Align::Left, FONT_SUB),
-        i if i < SEQ_ARROW => under(rect(name, [0.0, SEQ_CHIP_Y, 10.0, 3.0], TEXT, false), parent),
-        i if i < COUNT => cb_text(name, [0.0, SEQ_CHIP_Y, 40.0], Align::Center, FONT_SUB),
-        _ => {
-            let _ = CELLS;
-            panic!("no such combo bar pane")
-        }
+        CONTAINER => container(name, Name::new("TrIv"), size),
+        BACKDROP | SEQ_BACKDROP => hidden(under(rect(name, size, cb::BACKDROP_COLOR, true), parent)),
+        HEADER | RESULT | REASON | SEQ_NAME | SEQ_LANDED =>
+            cb_text(name, size, Align::Left, FONT_SUB),
+        STREAK | SEQ_STEP | SEQ_TOLERANCE => cb_text(name, size, Align::Right, FONT_TAG),
+        SEQ_LINKS => cb_text(name, size, Align::Left, FONT_TAG),
+        SEQ_STREAK | SEQ_BEST => cb_text(name, size, Align::Left, FONT_SUB),
+        SEQ_PILL => under(rect(name, size, SEQ_PILL_COLOR, false), parent),
+        SEQ_PILL_TEXT => hidden(under(text(name, size, Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
+        i if i < CELL => under(rect(name, size, TEXT, false), parent),
+        i if i < TITLE => under(rect(name, size, CELL_COLOR, false), parent),
+        i if i < RULER => cb_text(name, size, Align::Center, FONT_TAG),
+        i if i < WINDOW => under(rect(name, size, RULE, false), parent),
+        i if i < SEQ_BACKDROP || (SEQ_CHIP_EDGE <= i && i < SEQ_CHIP_FILL)
+            || (SEQ_CHECK_SHORT <= i && i < COUNT) => under(rect(name, size, TEXT, false), parent),
+        i if i < SEQ_CHIP_TEXT => under(rect(name, size, SEQ_CHIP_COLOR, false), parent),
+        i if i < SEQ_CHECK_SHORT => cb_text(name, size, Align::Left, FONT_SUB),
+        _ => panic!("no such combo bar pane"),
     }
 }
 
@@ -1013,7 +871,7 @@ pub const NOTICE_MAX_W: f32 = -iv::STRIP_W / 2.0 - 12.0 - NOTICE_LEFT;
 /// Lobby practice (`Scene::Lobby`, the Local Wireless waiting room): the native "Leave Battle" panel (top left) and the
 /// "Waiting…" / "L+R Start" pill (top right) reach down to y ≈ 447, so the frame strip, the BTT chip and the notice
 /// anchor move down by this there and end 15 units under them (2026-11-17). Training is unchanged.
-pub const LOBBY_DROP: f32 = 96.0;
+pub const LOBBY_DROP: f32 = strip_layout::C.lobby_drop;
 pub const NOTICE_HEADER_FONT: (f32, f32) = (15.0, 24.0);
 pub const NOTICE_BODY_FONT: (f32, f32) = (17.0, 26.0);
 /// Where the notice panes start, before the HUD draw sizes them to the notice.
@@ -1047,9 +905,24 @@ const fn hidden(spec: Spec) -> Spec {
 pub fn btt_hud_box(body: &str, strip: bool, bar: bool) -> [f32; 4] {
     let wide = body.chars().count() > 18;
     let width = if wide { (body.chars().count() as f32 * 13.0 + 64.0).clamp(600.0, 1000.0) } else { 276.0 };
-    let y = if wide && bar { iv::STRIP_Y + cb::SEQ_BAR_Y - cb::BAR_H / 2.0 - 32.0 }
-        else if wide && strip { iv::STRIP_Y - iv::STRIP_H / 2.0 - 32.0 } else { 504.0 };
+    let y = if wide && strip {
+        let spec = &strip_layout::C.strip;
+        let [_, y, _, h] = spec.bounds(true, bar);
+        spec.origin_y + y - h / 2.0 - 32.0
+    } else {
+        504.0
+    };
     [-936.0, y, width, 48.0]
+}
+
+/// Archive placement for a strip or card pane, using the same spec as the live HUD.
+pub const fn strip_pane_spec(layout: &strip_layout::LayoutSpec, index: usize) -> Spec {
+    let name = name_of(index);
+    if index < IDX_CB {
+        strip_layout::strip::iv_spec(&layout.strip, index - IDX_IV, name)
+    } else {
+        cb_spec(layout, index - IDX_CB, name)
+    }
 }
 
 /// Pane `index`'s kind and place.
@@ -1073,8 +946,7 @@ pub const fn spec(index: usize) -> Spec {
         IDX_NOTICE_LONG_PLATE => under(rect(name, NOTICE_BOX, NOTICE_PLATE, false), name_of(IDX_NOTICE)),
         IDX_NOTICE_LONG => under(hidden(text(name, NOTICE_BOX, Align::Left, NOTICE_BODY_FONT, NOTICE_LONG_UNITS, TEXT)), name_of(IDX_NOTICE)),
         IDX_BG => rect(name, [0.0, 0.0, PANEL_W, PANEL_H], PANEL, true),
-        i if i >= IDX_IV && i < IDX_CB => iv_spec(i - IDX_IV, name),
-        i if i >= IDX_CB && i < IDX_ORBS => cb_spec(i - IDX_CB, name),
+        i if i >= IDX_IV && i < IDX_ORBS => strip_pane_spec(&strip_layout::C, i),
         IDX_CHIP_HI => rect(name, [0.0, 0.0, CHIP_SIZE + 16.0, CHIP_SIZE + 16.0], ACCENT, false),
         IDX_TILE_HI => rect(name, [0.0, 0.0, 100.0, 60.0], ACCENT, false),
         i if i >= IDX_CHIP && i < IDX_CHIP + CHIPS => rect(name, [0.0, 0.0, CHIP_SIZE, CHIP_SIZE], HIGHLIGHT, false),

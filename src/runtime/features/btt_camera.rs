@@ -1,4 +1,4 @@
-//! Break the Targets' camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
+//! Shared practice placement camera (rc.14, `artifacts/rc14-eggsercise/SPEC.md` §V2.5 `camera`), the runtime half of
 //! `model::btt_camera`: the game's own Training Fixed camera (mode 4) shows the whole stage while the mode is Placing, and the camera the game was in comes back on every placement exit. The switch is the game's own `change_active_camera`
 //! (`game::natives::change_active_camera`), asked from Player 1's pass on the game thread with no lock held (the camera hooks
 //! take the CPU lock). The row is the camera unit's: a rejected guard turns off this camera and nothing else (boundaries in
@@ -11,7 +11,7 @@ use std::cell::Cell;
 use crate::model::btt::{self as model, Camera, CameraRequests};
 use crate::model::sites_pkg2;
 use crate::runtime::game::{self, natives};
-use crate::runtime::scene;
+use crate::runtime::{published, scene};
 
 /// The camera unit's rows passed their guards (boot sets it); nothing here asks the game before.
 static USABLE: AtomicBool = AtomicBool::new(false);
@@ -46,35 +46,44 @@ unsafe fn manager() -> usize {
     }
 }
 
-/// One pass of Player 1 (the game thread, no lock held): ask for the Fixed camera while `want`, give the game's own back when not,
-/// by state (`model::btt_camera::Camera::step`), so a reset, a state load, a stage change or the game's Training Camera option that
-/// took the camera is answered within `RETRY` frames. Nothing happens outside a practice scene or without a camera manager.
-///
-/// # Safety
-/// The game thread, in a battle scene.
-pub unsafe fn apply(want: bool) {
-    if !USABLE.load(Ordering::Acquire) { return; }
-    request(1, want);
+/// Editors publish their game-thread placement state. Tech may also own the camera during a run.
+pub(super) fn request(owner_bit: u8, want: bool) {
+    OWNERS.request(owner_bit, want);
 }
 
-/// Shared placing camera: BTT bit 1, Tech bit 2. The last owner restores the first native mode.
-/// # Safety
-/// Callers release their bit on every placing exit. The game thread applies requests in frame().
-pub unsafe fn request(owner_bit: u8, want: bool) {
-    if !USABLE.load(Ordering::Acquire) {
-        return;
-    }
-    OWNERS.request(owner_bit, want);
+/// End the borrowed session even if a feature opens a fresh editor in the same P1 pass.
+pub(crate) fn interrupt_placement() {
+    OWNERS.interrupt();
+}
+
+/// Both CPU dispatch paths use the same session as the camera. This is an
+/// atomic read, independent of whether the native camera rows were admitted.
+pub(super) fn placing() -> bool {
+    OWNERS.placement(covered())
+}
+
+fn covered() -> bool {
+    published::input_owners().covers_strip() || super::states::is_loading()
+}
+
+pub(super) fn placement_pad(buttons: u32) -> Option<crate::model::edge_juggle::perfect::Correction> {
+    if placing() { crate::model::edge_juggle::Phase::Place.held_pad(buttons) } else { None }
+}
+
+/// Finalize both holds after the primary player's editor passes.
+pub(super) fn update_placement() -> bool {
+    OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
+    OWNERS.request(model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active());
+    OWNERS.camera_wanted(covered())
 }
 
 /// Step once per game frame, after placing owners publish their requests.
 /// # Safety
 /// Player 1's non-Nana game-thread callback; no plugin lock is held.
-pub unsafe fn frame() {
+pub unsafe fn frame(want: bool) {
     if !USABLE.load(Ordering::Acquire) { return; }
     let manager = manager();
     let mode = (manager != 0 && scene::current().is_some()).then(|| ((manager + sites_pkg2::CAMERA_MODE_FIELD) as *const i32).read_volatile());
-    let want = OWNERS.wanted();
     let mut camera = CAMERA.0.get();
     let act = camera.step(want, mode);
     HOLD.store(camera.holding(), Ordering::Release);

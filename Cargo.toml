@@ -5,12 +5,26 @@ edition = "2021"
 license = "MIT"
 description = "Training Rooms for Ultimate: practice tools for Super Smash Bros. Ultimate 13.0.5 (Skyline plugin)"
 publish = false
+autotests = false
 
 # cdylib only: an rlib next to it makes Cargo skip LTO for the crate and leaves
 # unused code in the resident image (playbook, docs/CHECKLIST.md "Implementation").
 # Tests include the pure `model` by path (see tests/).
 [lib]
 crate-type = ["cdylib"]
+
+[[test]]
+name = "all"
+path = "tests/all/main.rs"
+
+# These probes compile production runtime files against crate-root native shims.
+[[test]]
+name = "parry_start_fresh_set"
+path = "tests/parry_start_fresh_set.rs"
+
+[[test]]
+name = "native_ui"
+path = "tests/ui_view_indices.rs"
 
 [dependencies]
 # JSON for settings.json and the migration receipt. `serde` without derive: the

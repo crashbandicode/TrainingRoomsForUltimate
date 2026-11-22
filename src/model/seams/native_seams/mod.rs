@@ -32,6 +32,7 @@ pub mod rows_lobby_persist;
 /// (`src/runtime/features/cpu_level.rs`).
 pub mod rows_cpu_level;
 pub(crate) mod rows_edge_juggle;
+pub(crate) mod rows_edge_zoom;
 /// rc.6, operator option C: the release watch's read of the game's resource unload (`src/runtime/roster/res_unload.rs`).
 pub mod rows_res_unload;
 /// rc.13, (a′) proper: a kept group's fighter module pinned across its owner's Reload (src/runtime/roster/module_pins.rs).
@@ -45,6 +46,9 @@ pub mod rows_game_speed;
 /// rc.8 R2: the waiting-room practice's 2/3 and x1.5, the class update it hooks and the slow step and battle scheduler it
 /// relies on (`src/runtime/lobby/lobby_speed.rs`).
 pub mod rows_lobby_speed;
+/// rc.15: 1 Frame on the game speed bind, the battle task entry it holds in the waiting room and Training's own step and
+/// pause sync it copies (`src/runtime/lobby/lobby_speed.rs`, `src/runtime/features/game_speed.rs`).
+pub mod rows_speed_frame;
 /// The installer's outcome-slot bits and its late report (`[TrainingSeams] late …`, R-A0b).
 pub mod report;
 /// The hook-sharing drill's setting and sites (the diagnostic build's stand-ins).
@@ -202,10 +206,10 @@ impl Site {
 
 /// Every row file, in table order: the one list a new row file joins (`COUNT`, `SITES`, and the host
 /// tests' `all()` read it).
-const TABLES: [&[Seam]; 16] = [
+const TABLES: [&[Seam]; 18] = [
     rows_a1::ROWS, rows_a2::ROWS, rows_a3::ROWS, rows_a4::ROWS, rows_a5::ROWS, rows_identity::ROWS, rows_q15::ROWS,
-    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_res_unload::ROWS,
-    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS,
+    rows_lobby_items::ROWS, rows_lobby_persist::ROWS, rows_cpu_level::ROWS, rows_edge_juggle::ROWS, rows_edge_zoom::ROWS, rows_res_unload::ROWS,
+    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS, rows_speed_frame::ROWS,
 ];
 
 const fn total(tables: &[&[Seam]]) -> usize {

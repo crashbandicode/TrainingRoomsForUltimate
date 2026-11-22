@@ -1,12 +1,6 @@
 //! Exercises the exact Switch counter storage adapter with a checked native
 //! boundary stub. Counter attribution itself is exercised by hook_alloc.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 #[path = "../src/runtime/hook_tls.rs"]
 mod adapter;
 use std::cell::Cell;
@@ -17,15 +11,10 @@ thread_local! {
     static METER: Cell<bool> = const { Cell::new(false) };
 }
 static ALLOCS: AtomicUsize = AtomicUsize::new(0);
-struct Allocator;
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
-unsafe impl std::alloc::GlobalAlloc for Allocator {
-    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
-        if METER.try_with(Cell::get).unwrap_or(false) { ALLOCS.fetch_add(1, Relaxed); }
-        std::alloc::System.alloc(layout)
+pub(super) fn count_allocation() {
+    if METER.try_with(Cell::get).unwrap_or(false) {
+        ALLOCS.fetch_add(1, Relaxed);
     }
-    unsafe fn dealloc(&self, p: *mut u8, layout: std::alloc::Layout) { std::alloc::System.dealloc(p, layout); }
 }
 const KEYS: [u32; 4] = [9, 0, 15, 2];
 static RESERVED: AtomicUsize = AtomicUsize::new(0);

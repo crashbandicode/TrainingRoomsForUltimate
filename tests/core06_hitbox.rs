@@ -2,26 +2,15 @@
 //! owned 13.0.5 ELF, and the facts the plugin relies on for the `AttackData` layout and the Lua stack, each shown by the
 //! instruction that does the access in the game's own code (`docs/test-provenance/core-06.md` names the derivation).
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
+use crate::callgraph;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::capabilities;
 use model::guard::SeamKind;
-use model::hitbox::{self, Cell, Indices, StatusIds, FrameFacts, FramePlan, SleepBook, TAG_FLOAT, TAG_INT};
+use model::hitbox::{self, Cell, Indices, StatusIds, FrameFacts, TAG_FLOAT, TAG_INT};
 use model::sites::Feature;
 use model::sites_hitbox::{self, SITES};
 
@@ -307,66 +296,28 @@ fn core06_command_param_indices() {
 
 fn ids() -> StatusIds {
     // Ordered as the game orders them: GUARD_ON..=GUARD_DAMAGE, DOWN, then CATCH.. CATCH_TURN .. THROW/CAPTURE .. TREAD_FALL.
-    StatusIds { guard_on: 30, guard_damage: 33, down: 40, catch: 62, catch_turn: 70, tread_fall: 80 }
+    StatusIds { guard_on: 30, guard_damage: 33, catch: 62, catch_turn: 70 }
 }
 
-fn facts(visualizes: bool, enabled: bool, slept: bool, status: i32) -> FrameFacts {
-    FrameFacts { visualizes, enabled, slept, status, ids: ids() }
+fn facts(visualizes: bool, enabled: bool, status: i32) -> FrameFacts {
+    FrameFacts { visualizes, enabled, status, ids: ids() }
+}
+
+#[test]
+fn preview_visual_core06_visualizer_does_not_sleep_native_effects() {
+    let visualizer = include_str!("../src/runtime/features/hitbox.rs");
+    assert!(!visualizer.contains("natives::set_sleep_effect("));
 }
 
 #[test]
 fn core06_frame_rules_table() {
     let ids = ids();
-    // (status, restore, sleep, redraw) with the setting On, in Training.
-    let on = [
-        (0, true, true, true),   // an ordinary status: restore, sleep, kill and draw
-        (29, true, true, true),
-        (30, true, false, false), // GUARD_ON: shielding stops the pass after the restore
-        (31, true, false, false),
-        (33, true, false, false), // GUARD_DAMAGE
-        (34, true, true, true),
-        (40, true, false, true), // DOWN: effects stay awake, spheres still drawn
-        (62, true, false, false), // CATCH: grab range stops after the restore
-        (66, true, false, false),
-        (70, true, false, false), // CATCH_TURN
-        (71, true, false, true), // past the grab range, up to TREAD_FALL: awake, drawn
-        (79, true, false, true),
-        (80, true, false, true), // TREAD_FALL
-        (81, true, true, true),
-    ];
-    for (status, restore, sleep, redraw) in on {
-        let p = hitbox::plan(facts(true, true, false, status));
-        assert_eq!(p, FramePlan { restore, sleep, redraw }, "status {status}");
-    }
-    // The plan equals the spec's step order written out independently, for every status and every state.
     for status in -2..200 {
-        for slept in [false, true] {
-            let mut calls = Vec::new();
-            // (1) set_sleep_effect(false) at the start of every pass (while On); (2) Off: stop.
-            let p = hitbox::plan(facts(true, true, slept, status));
-            calls.push("restore");
-            let stop = (ids.catch..=ids.catch_turn).contains(&status) || (ids.guard_on..=ids.guard_damage).contains(&status);
-            if !stop {
-                if !((ids.catch..=ids.tread_fall).contains(&status) || status == ids.down) {
-                    calls.push("sleep");
-                }
-                calls.push("redraw");
-            }
-            let mut got = vec!["restore"];
-            if p.sleep {
-                got.push("sleep");
-            }
-            if p.redraw {
-                got.push("redraw");
-            }
-            assert!(p.restore);
-            assert_eq!(got, calls, "status {status}");
-        }
+        let expected = !(ids.catch..=ids.catch_turn).contains(&status)
+            && !(ids.guard_on..=ids.guard_damage).contains(&status);
+        assert_eq!(facts(true, true, status).draws_attacks(), expected, "status {status}");
+        assert!(!facts(true, false, status).draws_attacks(), "display off, status {status}");
     }
-    // Off: one restore when the plugin had put the fighter to sleep, otherwise no call at all (Q4).
-    assert_eq!(hitbox::plan(facts(true, false, true, 0)), FramePlan { restore: true, sleep: false, redraw: false });
-    assert_eq!(hitbox::plan(facts(true, false, false, 0)), FramePlan::NONE);
-    assert!(!FramePlan::NONE.calls());
 }
 
 #[test]
@@ -390,50 +341,13 @@ fn core06_rebound_rule() {
 
 #[test]
 fn core06_training_gate() {
-    // A scene that is not practice (online, a hot swap, any other mode): no call, whatever the setting, the fighter or the
-    // sleep record: the plugin never touches another scene's effect flag (`077a8e43`'s early return, before step 1).
     for enabled in [false, true] {
-        for slept in [false, true] {
-            for status in [0, 31, 40, 62, 75] {
-                let facts = facts(false, enabled, slept, status);
-                let plan = hitbox::plan(facts);
-                assert_eq!(plan, FramePlan::NONE);
-                assert_eq!(hitbox::slept_after(facts, plan), slept, "the record is left as it was");
-            }
+        for status in [0, 31, 40, 62, 75] {
+            assert!(!facts(false, enabled, status).draws_attacks());
         }
     }
-    // Which objects a scene visualizes: native Training every object; the waiting room's practice only Player 1 (entry 0) and the
-    // practice CPU (package 2's lobby entry), never another member of the room nor an object whose entry is unknown (an article);
-    // no practice scene, nothing.
-    use model::scene::Scene;
-    let lobby_cpu = model::cpu::role::LOBBY_CPU_ENTRY;
-    for entry in [None, Some(0), Some(1), Some(2), Some(3), Some(lobby_cpu), Some(7)] {
-        assert!(hitbox::visualizes_entry(Some(Scene::Training), entry));
-        assert!(!hitbox::visualizes_entry(None, entry));
-        assert_eq!(hitbox::visualizes_entry(Some(Scene::Lobby), entry), entry == Some(0) || entry == Some(lobby_cpu), "{entry:?}");
-    }
-    assert_eq!(hitbox::ENTRY_ID_NAME, "FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID");
-    // The command hooks draw only with the setting On in a practice scene.
-    for enabled in [false, true] {
-        for visualizes in [false, true] {
-            assert_eq!(hitbox::draw_on_command(enabled, visualizes), enabled && visualizes);
-        }
-    }
-    // The setting (rc.14): a checklist, nothing ticked by default; the visualizer runs while a ticked item draws.
-    let mut snapshot = model::settings::Snapshot::factory();
-    assert!(!model::legend::draws(hitbox::shown(&snapshot)));
-    snapshot.set("hitbox_vis", &[1, 1, 1, 0, 0, 0]).unwrap();
-    assert!(model::legend::draws(hitbox::shown(&snapshot)));
-    snapshot.set("hitbox_vis", &[0, 0, 0, 1, 0, 0]).unwrap();
-    assert!(!model::legend::draws(hitbox::shown(&snapshot)));
 }
 
-/// The waiting room resolves its own entry gate (tr-p23-rc5-1, 2026-11-05: Hitbox Visualization On, a boot whose first
-/// practice was the waiting room, 691 orb ticks with nothing drawn). The Lobby scene judges a fighter by its entry, read
-/// with the work id `ensure_ready` gets from the constant table. Before the fix only three callers asked: Training's pass
-/// (whose scene needs no entry), the ATTACK/CATCH command hook and the rebound hook; the pass asked
-/// `!visualizes || !ensure_ready()`, so in the Lobby it never asked (visualizes needed the id first). The Lobby's own
-/// path, `visualizes`, must ask itself, through the model's `practice_entry`.
 #[test]
 fn core06_lobby_resolves_its_entry_gate() {
     let g = callgraph::Graph::scan(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
@@ -469,68 +383,49 @@ fn core06_lobby_resolves_its_entry_gate() {
     }
 }
 
-#[test]
-fn core06_off_restores() {
-    // Replay the pass over frames with the sleep record the runtime keeps (one entry per fighter accessor).
-    let mut book = SleepBook::new();
-    let (a, b) = (0x1000usize, 0x2000usize);
-    let mut calls: Vec<(usize, &str)> = Vec::new();
-    fn pass(book: &mut SleepBook, calls: &mut Vec<(usize, &'static str)>, enabled: bool, key: usize, status: i32) {
-        let facts = facts(true, enabled, book.slept(key), status);
-        let plan = hitbox::plan(facts);
-        if plan.restore {
-            calls.push((key, "restore"));
-        }
-        if plan.sleep {
-            calls.push((key, "sleep"));
-        }
-        book.set(key, hitbox::slept_after(facts, plan));
-    }
-    // On: two fighters, one in a normal status, one shielding.
-    for _ in 0..3 {
-        pass(&mut book, &mut calls, true, a, 0);
-        pass(&mut book, &mut calls, true, b, 31);
-    }
-    assert!(book.slept(a) && !book.slept(b));
-    calls.clear();
-    // The setting goes Off: the next pass restores the sleeping fighter, exactly once; the other makes no call.
-    for _ in 0..5 {
-        pass(&mut book, &mut calls, false, a, 0);
-        pass(&mut book, &mut calls, false, b, 31);
-    }
-    assert_eq!(calls, vec![(a, "restore")]);
-    assert!(!book.slept(a));
-    // Back On: it sleeps again, then Off again restores again.
-    calls.clear();
-    pass(&mut book, &mut calls, true, a, 0);
-    pass(&mut book, &mut calls, false, a, 0);
-    assert_eq!(calls, vec![(a, "restore"), (a, "sleep"), (a, "restore")]);
-
-    // The record: fixed storage, a restored fighter frees its entry, a full record replaces its oldest.
-    let mut book = SleepBook::new();
-    for key in 1..=hitbox::BOOK_SLOTS {
-        book.set(key * 8, true);
-    }
-    assert!((1..=hitbox::BOOK_SLOTS).all(|k| book.slept(k * 8)));
-    book.set(0x9990, true);
-    assert!(book.slept(0x9990) && !book.slept(8), "the oldest entry made room");
-    book.set(0x9990, false);
-    assert!(!book.slept(0x9990));
-    assert!(!book.slept(0), "address 0 is never recorded");
-    book.set(0, true);
-    assert!(!book.slept(0));
-}
-
 // ---- the site rows --------------------------------------------------------------------------------------------------
 
 #[test]
+fn grader_rows_resolve_in_the_hitbox_table() {
+    assert!(sites_hitbox::grader_usable(|_| true));
+    assert!(!sites_hitbox::grader_usable(|site| site.name != "spacing_hit_handler"));
+    assert!(sites_hitbox::GRADER_ROWS.iter().all(|(name, offset)| {
+        SITES.iter().any(|site| site.name == *name && site.offset == *offset)
+    }));
+}
+
+#[test]
+fn core06_install_report_distinguishes_visualizer_and_spacing_writes() {
+    use model::guard::GuardOutcome;
+    use model::install_line::Written;
+
+    let site = |name| SITES.iter().find(|site| site.name == name).unwrap();
+    let written = sites_hitbox::reported_write;
+    let usable = GuardOutcome::Stock;
+    let phase_end = site("overlay_process_end");
+    let spacing = site("spacing_hit_handler");
+    assert_eq!(written(phase_end, usable, true, false), Written::Far);
+    assert_eq!(written(phase_end, usable, false, true), Written::Checked);
+    assert_eq!(written(spacing, usable, false, true), Written::Near);
+    assert_eq!(written(spacing, usable, true, false), Written::Checked);
+    assert_eq!(written(spacing, GuardOutcome::Foreign { first_diff: 0 }, true, false), Written::Skipped);
+    for (visualizer, grader, far, near) in [(true, true, 8, 1), (true, false, 8, 0), (false, true, 0, 1), (false, false, 0, 0)] {
+        let count = |kind| SITES.iter().filter(|site| written(site, usable, visualizer, grader) == kind).count();
+        assert_eq!((count(Written::Far), count(Written::Near)), (far, near));
+    }
+    let boot = include_str!("../src/runtime/boot.rs");
+    assert!(boot.contains("let spacing_installed = input_display::set_grader_read("));
+    assert!(boot.contains("hitbox::reports(&hb_found, hitbox_on, spacing_installed)"));
+}
+
+#[test]
 fn core06_site_guards() {
-    // The sixteen called natives include the indexed article lookup and TeamModule ownership.
-    // Fourteen relied windows cover layout, camera, damage and hitbox data reads.
+    // The fifteen called natives include indexed article lookup and TeamModule ownership.
+    // Fourteen main relied windows cover layout, camera, damage and hitbox reads; spacing-grader rows are optional.
     let hooks: Vec<&str> = SITES.iter().filter(|s| matches!(s.kind, SeamKind::Hook { .. })).map(|s| s.name).collect();
     assert_eq!(hooks, sites_hitbox::HOOK_ROWS);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 16);
-    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 14);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Called)).count(), 15);
+    assert_eq!(SITES.iter().filter(|s| matches!(s.kind, SeamKind::Relied)).count(), 23);
     for site in SITES.iter() {
         assert_eq!(site.guard.len(), 64, "{}: a 64-byte guard", site.name);
         assert_eq!(site.feature, Feature::Hitbox);
@@ -542,7 +437,11 @@ fn core06_site_guards() {
         for other in capabilities::all_sites() {
             // Only a write changes what another row's check reads, so two rows that are both only called or relied on may share bytes.
             let writes = |s: &model::sites::Site| matches!(s.kind, SeamKind::Hook { .. });
-            if other.name == site.name || other.offset == site.offset || !(writes(site) || writes(other)) {
+            let spacing_entry = matches!(
+                (site.name, other.name),
+                ("spacing_hit_handler", "spacing_hit_entry") | ("spacing_hit_entry", "spacing_hit_handler")
+            );
+            if other.name == site.name || other.offset == site.offset || spacing_entry || !(writes(site) || writes(other)) {
                 continue;
             }
             assert!(!site.overlaps(other), "{} overlaps {}", site.name, other.name);
@@ -552,7 +451,11 @@ fn core06_site_guards() {
     // Every one of our own rows, rejected alone, blocks the unit and names itself (an own row is a capability).
     for site in SITES.iter() {
         let usable = |row: &model::sites::Site| row.name != site.name;
-        assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(site.name), "{}", site.name);
+        if sites_hitbox::GRADER_ROWS.iter().any(|(name, _)| *name == site.name) {
+            assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "optional row {} blocked Hitbox", site.name);
+        } else {
+            assert_eq!(capabilities::blocked_by(Feature::Hitbox, &usable), Some(site.name), "{}", site.name);
+        }
     }
     // The natives it shares with other packages are in its closure too: rejecting any of them blocks the feature.
     for shared in capabilities::CROSS_NEEDS.iter().find(|(u, _)| *u == Feature::Hitbox).map(|(_, n)| *n).unwrap_or(&[]) {
@@ -586,7 +489,6 @@ fn core06_site_guards() {
         (sites_hitbox::HITBOX_IS_EXIST_OFFSET, "sphere_effect_is_exist"),
         (sites_hitbox::HITBOX_RGB_LAST_OFFSET, "effect_set_rgb_partial_last"),
         (sites_hitbox::HITBOX_RATE_LAST_OFFSET, "effect_set_rate_last"),
-        (sites_hitbox::HITBOX_SLEEP_EFFECT_OFFSET, "motion_animcmd_set_sleep_effect"),
         (sites_hitbox::HITBOX_ACCESSOR_OFFSET, "sv_battle_object_module_accessor"),
         (sites_hitbox::HITBOX_ARTICLE_FROM_NO_OFFSET, "article_get_from_no"),
         (sites_hitbox::HITBOX_ATTACK_STACK_OFFSET, "hitbox_attack_stack"),
@@ -601,8 +503,21 @@ fn core06_site_guards() {
         (sites_hitbox::AREA_WIND_ARG10_OFFSET, "hitbox_area_wind_arg10"),
         (sites_hitbox::AREA_WIND_RAD_OFFSET, "hitbox_area_wind_rad"),
         (sites_hitbox::AREA_WIND_RAD_ARG9_OFFSET, "hitbox_area_wind_rad_arg9"),
+        (sites_hitbox::OVERLAY_PROCESS_END_OFFSET, "overlay_process_end"),
     ] {
         assert_eq!(model::sites_hitbox::SITES.iter().find(|s| s.name == name).map(|s| s.offset), Some(offset), "{name}");
+    }
+    for (name, offset) in sites_hitbox::GRADER_ROWS {
+        let row = model::sites_hitbox::SITES.iter().find(|s| s.name == name).unwrap();
+        assert_eq!(row.offset, offset, "{name}");
+        if name == "spacing_hit_handler" {
+            assert!(matches!(
+                row.kind,
+                SeamKind::Hook { form: model::guard::HookForm::Inline, placement: model::guard::Placement::Mid }
+            ));
+        } else {
+            assert!(matches!(row.kind, SeamKind::Relied), "{name}");
+        }
     }
 }
 
@@ -626,7 +541,6 @@ fn core06_rows_match_the_owned_elf() {
         ("sphere_effect_is_exist", "_ZN3app8lua_bind34EffectModule__is_exist_effect_implEPNS_26BattleObjectModuleAccessorEj"),
         ("effect_set_rgb_partial_last", "_ZN3app8lua_bind39EffectModule__set_rgb_partial_last_implEPNS_26BattleObjectModuleAccessorEfff"),
         ("effect_set_rate_last", "_ZN3app8lua_bind32EffectModule__set_rate_last_implEPNS_26BattleObjectModuleAccessorEf"),
-        ("motion_animcmd_set_sleep_effect", "_ZN3app8lua_bind42MotionAnimcmdModule__set_sleep_effect_implEPNS_26BattleObjectModuleAccessorEb"),
         ("sv_battle_object_module_accessor", "_ZN3app9sv_system29battle_object_module_accessorEP9lua_State"),
         ("article_get_from_no", "_ZN3app8lua_bind39ArticleModule__get_article_from_no_implEPNS_26BattleObjectModuleAccessorEii"),
         ("stop_set_hit_stop_frame", "_ZN3app8lua_bind35StopModule__set_hit_stop_frame_implEPNS_26BattleObjectModuleAccessorEib"),
@@ -1293,7 +1207,7 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
     let mut fx = RequestSpy::new();
     let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
     // First pass with one active hit slot and two hurt parts: 1 + 2x2 spheres.
-    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
     assert_eq!((counts.spawned, counts.dropped), (5, 0));
     assert_eq!(len, 5);
     let keys: Vec<_> = fx.requests.iter().map(|s| s.key).collect();
@@ -1301,23 +1215,23 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
     assert_eq!(keys[1], hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
     assert_eq!(*keys.last().unwrap(), hitbox::sphere_key(hitbox::KIND_HURT, 1, 1));
     // Unchanged frame: everything kept, no request.
-    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
     assert_eq!((counts.kept, counts.spawned, counts.killed, len), (5, 0, 0, 5));
     // The hit goes away: only the hit sphere is killed, by its own handle.
     let hit_handle = *fx.fx.live.first().unwrap();
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.kept, counts.spawned), (1, 4, 0));
     assert!(!fx.fx.live.contains(&hit_handle));
     // A hurt part moves: its two spheres are killed and requested again; the rest kept.
     let before = fx.requests.len();
     hurt.records[0] = part(0, [3.6, 0.0, 0.0], [5.4, 0.0, 0.0], 2.4, 0x51a3_6341);
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.spawned, counts.kept), (2, 2, 2));
     assert_eq!(fx.requests.len(), before + 2);
     assert_eq!(fx.requests[before].key, hitbox::sphere_key(hitbox::KIND_HURT, 0, 0));
     // A part is switched off: its spheres go, by their own handles.
     hurt.records[0] = part(hitbox::HIT_STATUS_OFF, [0.0; 3], [1.0; 3], 1.0, 7);
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.kept, counts.spawned), (2, 2, 0));
     // Shielding clears the whole set (hurt spheres included), like the hit spheres; the game's own shield bubble is never
     // owned. Off clears too (facts the plan already covers).
@@ -1326,10 +1240,10 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
         let mut fx = RequestSpy::new();
         let mut hurt = hurt_spy(vec![part(0, [2.0, 1.0, 0.5], [2.0, 1.0, 0.5], 1.0, 7)], 0, 1); // a point part: one sphere
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+        hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
         assert_eq!(set.len(), 1);
         fx.fx.live.push(900); // the game's own shield bubble: never owned
-        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, enabled, false, status), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, enabled, status), &mut wants, &mut OneHit(false), Some(&mut hurt), &mut fx);
         assert_eq!((counts.killed, len), (1, 0));
         assert!(fx.fx.live.contains(&900));
         assert!(set.is_empty());
@@ -1341,9 +1255,9 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
         let mut fx = RequestSpy::new();
         let mut hurt = hurt_spy(vec![part(0, [2.0, 1.0, 0.5], [2.0, 1.0, 0.5], 1.0, 7)], 0, 1);
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+        hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
         assert_eq!(set.len(), 2);
-        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, status), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, status), &mut wants, &mut OneHit(true), Some(&mut hurt), &mut fx);
         assert_eq!((counts.kept, counts.killed, counts.spawned, len), (1, 1, 0, 1), "status {status}");
         assert!(set.spheres().all(|s| s.key >> 24 == hitbox::KIND_HURT), "status {status}");
     }
@@ -1352,7 +1266,7 @@ fn core06_hurtbox_dispatch_equivalence_with_the_hitbox_rules() {
     let mut set = hitbox::HandleSet::new();
     let mut fx = RequestSpy::new();
     let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut OneHit(true), None, &mut fx);
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut OneHit(true), None, &mut fx);
     assert_eq!((counts.spawned, len), (1, 1), "the hit sphere only");
     assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HIT));
 }
@@ -1368,7 +1282,7 @@ fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
     let mut fx = RequestSpy::new();
     let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
     // Off: the set is cleared and the HitModule is not read at all.
-    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, false, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
     assert_eq!((counts.killed, counts.spawned, len), (0, 0, 0));
     assert_eq!((hurt.module_calls, hurt.parts_read.len(), fx.requests.len()), (0, 0, 0));
     // Shielding (the stop path the dispatch takes before the reader): no HitModule read either.
@@ -1376,7 +1290,7 @@ fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
         let mut set = hitbox::HandleSet::new();
         let mut fx = RequestSpy::new();
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, ids().guard_on), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, ids().guard_on), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
         assert_eq!((counts.spawned, len), (0, 0));
         assert_eq!(hurt.module_calls, 0, "shielding: no HitModule read on a stop path");
     }
@@ -1386,12 +1300,12 @@ fn core06_dispatch_reads_the_hit_module_only_while_the_setting_is_on() {
         let mut fx = RequestSpy::new();
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
         let mut hurt = hurt_spy(vec![part(0, [0.0, 1.0, 0.0], [0.0, 5.0, 0.0], 2.0, 0x51a3_6341)], 0, 1);
-        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, ids().catch), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+        let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, ids().catch), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
         assert_eq!((counts.spawned, len), (2, 2));
         assert!(hurt.module_calls >= 1, "a grab status: the HitModule is read");
     }
     // On, ordinary status: the module is read and the part's capsule drawn (one part: its two ends, one pill).
-    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
+    let (counts, len) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut fx);
     assert_eq!((counts.spawned, len), (2, 2));
     assert!(hurt.module_calls >= 1, "On: the HitModule is read");
     assert!(fx.requests.iter().all(|s| s.key >> 24 == hitbox::KIND_HURT && s.tint == hitbox::HURTBOX_TINT));
@@ -1412,15 +1326,15 @@ fn core06_ridley_first_pass_completes_in_the_model() {
     // The set holds the first pass: every sphere requested, none dropped, and the next pass keeps them all.
     let mut set = hitbox::HandleSet::new();
     let mut big = FakeFx::new(10_000);
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
     assert_eq!((counts.spawned, counts.failed, counts.dropped), (55, 0, 0));
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut big);
     assert_eq!((counts.kept, counts.spawned, counts.killed), (55, 0, 0));
     // And with the pool two short, as hb-04 saw it: 53 asked, 2 refused, and once the game's own effects end and the pool
     // gets room, the refused two are asked again and spawn (`failed=0` afterwards, as hb-04 recorded).
     let mut set = hitbox::HandleSet::new();
     let mut short = FakeFx::new(53);
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
     assert_eq!((counts.spawned, counts.failed, counts.dropped), (53, 2, 0));
     // No retry in a loop: a refused want is attempted exactly once per pass (two refused requests in the log,
     // no third), and the refusals are counted, not silently dropped.
@@ -1429,7 +1343,7 @@ fn core06_ridley_first_pass_completes_in_the_model() {
     assert_eq!(counts.failed, 2);
     short.pool = 55; // the game's own effects end; the pool gets room
     let before = short.log.len();
-    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
+    let (counts, _) = hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut NoHit, Some(&mut hurt), &mut short);
     assert_eq!((counts.kept, counts.spawned, counts.failed), (53, 2, 0), "the two refused spheres are asked again");
     assert_eq!(short.log[before..].iter().filter(|l| l.starts_with("refused ")).count(), 0, "recovered: no refusal stays");
 }
@@ -1663,113 +1577,57 @@ fn core06_hurt_census_window_and_line_format() {
 
 #[test]
 fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect() {
-    // Keep the original visualizer admission and diagnostic census boundaries. The only second release caller is
-    // a live Perfect attempt sampling the current primary P1 for a recovery plan.
-    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/hitbox.rs")).unwrap();
-    let toks = callgraph::lex(&src);
+    // Fighter and article visuals sample at phase 8. Perfect recovery keeps its early gameplay measurement.
+    use callgraph::Tok;
+
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    let toks = callgraph::lex(src);
     let refs = |name: &str| -> Vec<usize> {
-        toks.iter().enumerate().filter(|(_, t)| matches!(t, callgraph::Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
+        toks.iter().enumerate().filter(|(_, t)| matches!(t, Tok::Ident(s) if s == name)).map(|(i, _)| i).collect()
     };
-    // The two spans the reader may live in: the diag-gated `stats` module and the per-frame pass.
-    let mut stats_span = None;
-    for i in 0..toks.len() - 2 {
-        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "mod")
-            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "stats")
-            && matches!(&toks[i + 2], callgraph::Tok::Punct('{'))
-        {
-            let mut depth = 0i32;
-            let close = (i + 2..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('{') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct('}') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .expect("the stats module closes");
-            stats_span = Some((i, close));
-            break;
-        }
-    }
-    let (stats_open, stats_close) = stats_span.expect("one diag `mod stats` block");
+    let span = |kind: &str, name: &str| {
+        let start = toks.windows(2).position(|w| {
+            matches!(&w[0], Tok::Ident(s) if s == kind) && matches!(&w[1], Tok::Ident(s) if s == name)
+        }).unwrap_or_else(|| panic!("missing {kind} {name}"));
+        let open = (start + 2..toks.len()).find(|&i| matches!(toks[i], Tok::Punct('{'))).unwrap();
+        let mut depth = 0;
+        let close = (open..toks.len()).find(|&i| match toks[i] {
+            Tok::Punct('{') => { depth += 1; false }
+            Tok::Punct('}') => { depth -= 1; depth == 0 }
+            _ => false,
+        }).expect("the body closes");
+        start..close
+    };
+    let stats = span("mod", "stats");
     assert!(
-        toks[..stats_open].iter().rev().take(10).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+        toks[..stats.start].iter().rev().take(10).any(|t| matches!(t, Tok::Ident(s) if s == "cfg")),
         "the stats module is diag-gated"
     );
-    let inside_stats = |i: usize| i > stats_open && i < stats_close;
-    let mut frame_span = None;
-    for i in 0..toks.len() - 2 {
-        if matches!(&toks[i], callgraph::Tok::Ident(s) if s == "fn")
-            && matches!(&toks[i + 1], callgraph::Tok::Ident(s) if s == "frame")
-            && matches!(&toks[i + 2], callgraph::Tok::Punct('('))
-        {
-            let mut depth = 0i32;
-            let body_open = (i + 2..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('(') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct(')') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .and_then(|close| (close..toks.len()).find(|&k| matches!(&toks[k], callgraph::Tok::Punct('{'))))
-                .expect("the frame body opens");
-            let mut depth = 0i32;
-            let close = (body_open..toks.len())
-                .find(|&k| match &toks[k] {
-                    callgraph::Tok::Punct('{') => {
-                        depth += 1;
-                        false
-                    }
-                    callgraph::Tok::Punct('}') => {
-                        depth -= 1;
-                        depth == 0
-                    }
-                    _ => false,
-                })
-                .expect("the frame body closes");
-            frame_span = Some((body_open, close));
-            break;
-        }
+    let sample = span("fn", "sample_fighter");
+    let articles = span("fn", "draw_articles");
+    let perfect = span("fn", "perfect_player_height");
+    let perfect_visual = span("fn", "perfect_visualizer_height");
+    let constructors = refs("GameHurt");
+    for (reader, expected) in [(&sample, 1), (&articles, 2), (&perfect, 1), (&perfect_visual, 1)] {
+        assert_eq!(constructors.iter().filter(|i| reader.contains(i)).count(), expected);
     }
-    let (frame_open, frame_close) = frame_span.expect("one `fn frame`");
-    let inside_frame = |i: usize| i > frame_open && i < frame_close;
-    let perfect_start = toks.windows(3).position(|w| {
-        matches!(&w[0], callgraph::Tok::Ident(s) if s == "fn")
-            && matches!(&w[1], callgraph::Tok::Ident(s) if s == "perfect_player_height")
-            && matches!(&w[2], callgraph::Tok::Punct('('))
-    }).expect("the second release reader belongs to the live Perfect player snapshot");
-    let perfect_open = (perfect_start + 3..toks.len())
-        .find(|&i| matches!(toks[i], callgraph::Tok::Punct('{')))
-        .expect("the Perfect reader body opens");
-    let mut depth = 0;
-    let perfect_close = (perfect_open..toks.len()).find(|&i| match toks[i] {
-        callgraph::Tok::Punct('{') => { depth += 1; false }
-        callgraph::Tok::Punct('}') => { depth -= 1; depth == 0 }
-        _ => false,
-    }).expect("the Perfect reader body closes");
-    let inside_perfect = |i: usize| i > perfect_open && i < perfect_close;
-    assert_eq!(refs("GameHurt").into_iter().filter(|&i| inside_perfect(i)).count(), 1);
+    assert!(src.contains("let hurt = shown(legend::ARTICLE_HURTBOXES) && matches!(scene::current(), Some(Scene::Training));"));
+    assert!(src.contains("if hurt && !articles.tracked"));
+    assert!(src.contains("if hurt {"));
+    assert!(src.contains("if let Some(attempt) = super::edge_juggle::player_height_request(accessor)"));
+    assert!(src.contains("if SETTING.load(Ordering::Acquire) && shown(legend::HURTBOXES) {\n            perfect_visualizer_height(attempt.player())"));
+    assert_eq!(src.matches("perfect_visualizer_height(attempt.player())").count(), 1);
     let adapter = include_str!("../src/runtime/features/edge_juggle.rs");
     assert_eq!(src.matches("perfect_player_height(&attempt)").count(), 1);
     assert!(adapter.contains("wanted() == Some(run.drill)"));
-    assert!(adapter.contains("run.difficulty == Difficulty::Perfect"));
+    assert!(adapter.contains("run.opponent.mode == Mode::Perfect"));
     assert!(adapter.contains("run.rounds.phase == Phase::Live"));
     assert!(adapter.contains("run.wizard.is_none()"));
     assert!(adapter.contains("natives::module_accessor(0)"));
     assert!(src.contains("let player = attempt.player()"));
-    assert!(src.contains("let show_hurt = enabled && shown(legend::HURTBOXES);"));
-    assert!(src.contains("let perfect = if show_hurt {
-        perfect
-    } else {"));
+    assert!(src.contains("let enabled = active && SETTING.load(Ordering::Acquire);"));
+    assert!(src.contains("sample_fighter(&mut store, board, accessor, life, enabled);"));
+    assert!(src.contains("let mut hurt = (enabled && shown(legend::HURTBOXES)).then(|| hitbox::GameHurt"));
     assert!(adapter.contains("&& run.plan_pending"));
     assert!(adapter.contains("airborne_recovery(cpu, natives::status_kind(cpu))"));
     assert!(adapter.contains("run.player_height.request(frame, actionable)"));
@@ -1781,28 +1639,19 @@ fn core06_release_reads_the_hit_module_only_for_the_visualizer_or_live_perfect()
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
         for &i in &found {
             let definition = toks[..i].iter().rev().take(3).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "fn"));
-            assert!(definition || inside_frame(i) || inside_perfect(i) || inside_stats(i), "{name} at token {i} is outside the two release callers and diag census");
-        }
-    }
-    // The construction is behind the setting: `enabled` names itself within the few tokens before `GameHurt`.
-    for &i in &refs("GameHurt") {
-        if inside_frame(i) {
-            assert!(
-                toks[i.saturating_sub(10)..i].iter().any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "enabled" || s == "show_hurt")),
-                "the pass's reader at token {i} is not gated on `enabled`"
-            );
+            assert!(definition || [&sample, &articles, &perfect, &perfect_visual, &stats].iter().any(|span| span.contains(&i)), "{name} at token {i} is outside the admitted overlay and Perfect readers and diag census");
         }
     }
     // The census stays diag-only: its walk and its window type are named only inside the gated module.
     for name in ["hurt_parts", "HurtCensus"] {
         let found = refs(name);
         assert!(!found.is_empty(), "{name} must appear in the runtime file");
-        assert!(found.iter().all(|&i| inside_stats(i) || name == "hurt_parts" && inside_perfect(i)), "{name} is outside its allowed readers");
+        assert!(found.iter().all(|&i| stats.contains(&i) || name == "hurt_parts" && perfect.contains(&i)), "{name} is outside its allowed readers");
     }
     // The per-frame census call: cfg-gated wherever it sits.
     for i in refs("hurt_census") {
         assert!(
-            inside_stats(i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
+            stats.contains(&i) || toks[..i].iter().rev().take(24).any(|t| matches!(t, callgraph::Tok::Ident(s) if s == "cfg")),
             "the census call at token {i} is cfg-gated"
         );
     }
@@ -1965,7 +1814,7 @@ fn core06_rc_dispatch_reads_only_attacks_and_requests_hits_and_grabs() {
     let mut wants = [poison; hitbox::MAX_HELD];
     let mut reads = AttackSpy::default();
     let mut fx = RequestSpy::new();
-    let facts = facts(true, model::legend::draws(hitbox::shown(&snapshot)), false, 0);
+    let facts = facts(true, model::legend::draws(hitbox::shown(&snapshot)), 0);
     let (counts, hits) = hitbox::reconcile_frame(&mut set, facts, &mut wants, &mut reads, None, &mut fx);
     assert_eq!((counts.spawned, counts.failed, counts.dropped, hits), (4, 0, 0, 3));
     assert_eq!(reads.active, (0..8).chain(0..8).collect::<Vec<_>>());
@@ -1998,10 +1847,10 @@ fn core06_rc_dispatch_preserves_grab_shield_off_and_retirement_cleanup() {
         let grab = sphere(hitbox::sphere_key(hitbox::KIND_GRAB, 2, 0), 4.0);
         set.push_grab(grab, None);
         let mut wants = [hitbox::Sphere::NONE; hitbox::MAX_HELD];
-        hitbox::reconcile_frame(&mut set, facts(true, true, false, 0), &mut wants, &mut AttackSpy::default(), None, &mut fx);
+        hitbox::reconcile_frame(&mut set, facts(true, true, 0), &mut wants, &mut AttackSpy::default(), None, &mut fx);
         let mut reads = AttackSpy::default();
         let requests = fx.requests.len();
-        let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, false, status), &mut wants, &mut reads, None, &mut fx);
+        let (counts, hits) = hitbox::reconcile_frame(&mut set, facts(visualizes, enabled, status), &mut wants, &mut reads, None, &mut fx);
         assert_eq!((reads.active.len(), reads.data.len(), reads.reads.len(), hits), (0, 0, 0, 0));
         assert_eq!(fx.requests.len(), requests, "no attack/HB1/ordinary shield request on stop path");
         assert_eq!((counts.killed, counts.kept), if keep_grab { (3, 1) } else { (4, 0) });
@@ -2127,19 +1976,41 @@ fn core06_fighter_sets_and_keys() {
     assert!((out[0].scale - 0.19).abs() < 1e-6);
     // The table: one set per fighter; a new fighter takes a free set, then the least recently used one, forgotten.
     let mut table = SetTable::new();
-    let first = table.index_for(0x1000);
-    assert_eq!(table.index_for(0x1000), first);
+    let generations = hitbox::FighterGenerations::new();
+    let life = |slot| generations.stamp((slot as u32) << 16).unwrap();
+    let first = table.index_for(0x1000, life(0));
+    assert_eq!(table.index_for(0x1000, life(0)), first);
     for k in 1..FIGHTER_SETS {
-        table.index_for(0x1000 + k * 0x100);
+        table.index_for(0x1000 + k * 0x100, life(k));
     }
     table.sets[first].push_grab(hitbox::Sphere::NONE, None);
     assert!(!table.sets[first].is_empty());
-    table.index_for(0x1000 + 0x100); // used again: 0x1000 is now the oldest
-    let taken = table.index_for(0x9000);
+    table.index_for(0x1000 + 0x100, life(1)); // used again: 0x1000 is now the oldest
+    let taken = table.index_for(0x9000, life(FIGHTER_SETS));
     assert_eq!(taken, first, "the least recently used fighter's set is taken over");
     assert!(table.sets[taken].is_empty(), "and forgotten, without a game call");
     assert_eq!(table.find(0x1000), None);
     assert_eq!(table.find(0), None);
+}
+
+#[test]
+fn core06_fighter_generations_use_the_stock_object_pool() {
+    let Some(main) = common::owned_main("core06_fighter_generations_use_the_stock_object_pool") else { return };
+    let w = |offset: usize| word_at(&main, offset);
+    // Pool capacity 24 and its publication as category 0.
+    assert_eq!(w(0x14f4c98), 0x321d07e9);
+    assert_eq!(w(0x14f4c9c), 0xb9000909);
+    assert_eq!(w(0x14f55e4), 0x9102834a);
+    assert_eq!(w(0x14f55f4), 0xa9002d2a);
+    // Category 0 lookup uses ID bits 16..27 as the pool index and checks the full ID.
+    assert_eq!(w(0x3ac58c), 0x53106c08);
+    assert_eq!(w(0x3ac590), 0xb940192a);
+    assert_eq!(w(0x3ac648), 0xb9400909);
+    assert_eq!(w(0x3ac64c), 0x6b00013f);
+    let generations = hitbox::FighterGenerations::new();
+    assert!(generations.stamp(0x0017_ffff).is_some());
+    assert!(generations.stamp(0x0018_0000).is_none());
+    assert!(generations.stamp(0x1000_0000).is_none());
 }
 
 #[test]

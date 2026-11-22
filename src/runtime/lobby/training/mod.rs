@@ -60,6 +60,7 @@ pub(crate) fn clear_session_state() {
     crate::runtime::features::cpu::scene_departed();
     crate::runtime::features::states::clear_session();
     crate::runtime::features::recorder::session_clear();
+    crate::runtime::features::egg_zone::reset();
 }
 
 /// A recording or a playback is running (package 4's recorder).

@@ -243,15 +243,52 @@ pub fn list_footer(rows: &[(String, Layout)], cursor: usize, skipped: usize) -> 
     format!("{first}\nA open   B back{note}")
 }
 
+/// How `projectile_breaks` searches: not at all, until the first qualifying overlap (a break only), or for the deepest (a grade).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Search {
+    Off,
+    First,
+    Deepest,
+}
+
 /// Only P1's owned pool and ArticleModule supply objects; Off performs no discovery or hit reads. An article's hit counts as
 /// `Breaks on` (`rule`, with `aerial` Player 1's own status) allows that hit (rc.15, both practice games: docs/DECISIONS.md).
 pub fn projectile_breaks(
-    enabled: bool, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
+    read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
+) -> Option<f32> {
+    projectile_contact(search, rule, aerial, spot, pool, get, read).map(|(_, depth)| depth)
+}
+
+/// The same overlap, with the winning article for attributing the scored hit.
+pub fn projectile_contact(
+    search: Search, rule: u8, aerial: bool, spot: [f32; 2], pool: impl IntoIterator<Item = usize>, get: impl Fn(i32, i32) -> usize + Copy,
     mut read: impl FnMut(usize) -> Option<([eggs::Hit; super::hitbox::SLOTS as usize], usize)>,
-) -> bool {
-    enabled && pool.into_iter().chain(super::hitbox::article_instances(true, get)).filter(|a| pointer_ok(*a)).any(|article| {
-        read(article).is_some_and(|(hits, n)| hits[..n].iter().any(|h| h.3 > 0.0 && eggs::breaks(rule, aerial, h, spot)))
-    })
+) -> Option<(usize, f32)> {
+    if search == Search::Off {
+        return None;
+    }
+    let mut best = None;
+    for article in pool.into_iter().chain(super::hitbox::article_instances(true, get)) {
+        if !pointer_ok(article) {
+            continue;
+        }
+        let Some((hits, n)) = read(article) else { continue };
+        for hit in &hits[..n] {
+            if hit.3 <= 0.0 || !eggs::counts(rule, aerial, hit.3) {
+                continue;
+            }
+            if let Some(depth) = eggs::depth(hit, spot) {
+                match search {
+                    Search::Off => return None,
+                    Search::First => return Some((article, depth)),
+                    Search::Deepest if best.is_none_or(|(_, previous)| depth > previous) => best = Some((article, depth)),
+                    Search::Deepest => {}
+                }
+            }
+        }
+    }
+    best
 }
 
 /// Shared placing controls, without stage bounds or projection.
@@ -286,6 +323,7 @@ pub struct Btt {
     n: usize,
     broken: u16,
     bursts: Bursts,
+    layout_pending: bool,
     cursor: [f32; 2],
     /// The clock in game frames, and the frames left of Done.
     frames: u32,
@@ -316,6 +354,7 @@ pub struct Btt {
     /// The session's best per layout (its key, frames), and the one of the run just done.
     best: [Option<(u64, u32)>; BESTS],
     top: u32,
+    pub(crate) streak: super::hit_streak::Streak,
     shown: FixedPath<96>,
     /// The clock keeper (`keeper`) and its rivals' passes since its last.
     owner: (usize, u8),
@@ -328,6 +367,7 @@ impl Btt {
         n: 0,
         broken: 0,
         bursts: [None; 2],
+        layout_pending: false,
         cursor: [0.0; 2],
         frames: 0,
         left: 0,
@@ -349,6 +389,7 @@ impl Btt {
         kept: [(i32::MIN, [[0.0; 2]; MAX], 0); KEPT],
         best: [None; BESTS],
         top: 0,
+        streak: super::hit_streak::Streak::EMPTY,
         shown: FixedPath::new(),
         owner: (0, 2),
     };
@@ -386,6 +427,32 @@ impl Btt {
             *slot = Some(pic);
         }
         out
+    }
+
+    /// Input can start a run before the game advances. Its committed layout remains
+    /// visible until the first active-target sample, when the world board takes over.
+    pub fn editor_pictures(&self) -> Option<[eggs::Look; LOOKS]> {
+        match self.phase {
+            Phase::Placing | Phase::Ready => Some(self.look()),
+            Phase::Running | Phase::Done if self.layout_pending => {
+                let mut pictures = [None; LOOKS];
+                for (slot, &at) in pictures.iter_mut().zip(self.layout()) {
+                    *slot = Some((at, EGG_WHOLE));
+                }
+                Some(pictures)
+            }
+            _ => None,
+        }
+    }
+
+    /// Active targets and their break animation advance with the simulation.
+    pub fn sample_simulation_pictures(&mut self) -> [eggs::Look; LOOKS] {
+        if matches!(self.phase, Phase::Running | Phase::Done) {
+            self.layout_pending = false;
+            self.look()
+        } else {
+            [None; LOOKS]
+        }
     }
 
     pub fn five(&self) -> &Five {
@@ -455,6 +522,9 @@ impl Btt {
     }
 
     fn ready(&mut self) {
+        if self.streak.enabled() {
+            self.streak.restart(true);
+        }
         (self.phase, self.broken, self.bursts) = (Phase::Ready, 0, [None; 2]);
         (self.frames, self.left, self.still) = (0, 0, false);
     }
@@ -510,7 +580,7 @@ impl Btt {
                 let tilt = p.stick.iter().any(|v| v.abs() >= DEAD);
                 self.still |= !tilt;
                 if p.pressed != 0 || tilt && self.still {
-                    self.phase = Phase::Running;
+                    (self.phase, self.layout_pending) = (Phase::Running, true);
                 }
             }
             _ => {}
@@ -692,11 +762,15 @@ impl Btt {
                     Some((i, h)) => write!(out, "{i}/{} {}: {}", self.count(), h.name.as_str(), h.n),
                 }
             }
-            Phase::Ready | Phase::Running => write!(out, "{got}/{n} {m}:{s:02}.{c:02}"),
+            Phase::Ready | Phase::Running => {
+                write!(out, "{got}/{n} {m}:{s:02}.{c:02}")?;
+                self.streak.write(out)
+            }
             Phase::Done => {
                 let (bm, bs, bc) = clock(self.top);
                 write!(out, "Done! {n} in {m}:{s:02}.{c:02} ")?;
-                write!(out, "(best {bm}:{bs:02}.{bc:02})")
+                write!(out, "(best {bm}:{bs:02}.{bc:02})")?;
+                self.streak.write(out)
             }
         }
     }
@@ -724,9 +798,14 @@ pub const fn pointer_ok(p: usize) -> bool {
     p >= 0x1_0000 && p & 7 == 0
 }
 
-/// The camera's state (`runtime::features::btt_camera`: the stage is shown by the game's own Training Fixed camera, mode 4, in
-/// Placing): the mode the game was in when this mode first took the camera (`saved`, while it holds it) and
-/// the frames left before it may ask again.
+pub const BTT_PLACEMENT_OWNER: u8 = 1;
+pub const TECH_CAMERA_OWNER: u8 = 2;
+pub const EGG_ZONE_OWNER: u8 = 4;
+pub const EDGE_JUGGLE_OWNER: u8 = 8;
+pub const TECH_PLACEMENT_OWNER: u8 = 16;
+const INTERRUPTED: u8 = 32;
+const PLACEMENT_OWNERS: u8 = BTT_PLACEMENT_OWNER | EGG_ZONE_OWNER | EDGE_JUGGLE_OWNER | TECH_PLACEMENT_OWNER;
+
 /// Lock-free owner requests; the game thread alone steps the camera state.
 pub struct CameraRequests(std::sync::atomic::AtomicU8);
 impl CameraRequests {
@@ -736,9 +815,29 @@ impl CameraRequests {
         if want { self.0.fetch_or(owner, Ordering::AcqRel); }
         else { self.0.fetch_and(!owner, Ordering::AcqRel); }
     }
-    pub fn wanted(&self) -> bool { self.0.load(std::sync::atomic::Ordering::Acquire) != 0 }
+    pub fn interrupt(&self) {
+        self.request(INTERRUPTED, true);
+    }
+
+    pub fn placement(&self, covered: bool) -> bool {
+        let owners = self.0.load(std::sync::atomic::Ordering::Acquire);
+        !covered && placement_wanted(owners)
+    }
+
+    pub fn camera_wanted(&self, covered: bool) -> bool {
+        use std::sync::atomic::Ordering;
+        let owners = self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire, |owners| {
+            (owners & INTERRUPTED != 0).then_some(owners & TECH_CAMERA_OWNER)
+        }).unwrap_or_else(|owners| owners);
+        !covered && (owners & TECH_CAMERA_OWNER != 0 || placement_wanted(owners))
+    }
 }
 
+fn placement_wanted(owners: u8) -> bool {
+    owners & INTERRUPTED == 0 && owners & PLACEMENT_OWNERS != 0
+}
+
+/// The game-thread camera state keeps the native mode seen before taking Fixed.
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
     saved: Option<i32>,

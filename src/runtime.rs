@@ -18,6 +18,7 @@ mod deluxe_row;
 pub(crate) mod export;
 pub(crate) mod bridge_state;
 mod features;
+pub use features::hitbox::{fighter_screen_anchors, FighterScreenAnchor};
 mod game;
 mod hub;
 mod import;

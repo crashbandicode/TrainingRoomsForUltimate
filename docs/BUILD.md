@@ -8,6 +8,12 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 - **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
   use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
+- **Focused integration tests** use `cargo test --test all -- module_name::`. To select a single
+  test, pass its full name and `--exact`, for example `cargo test --test all -- capabilities::print_cross_needs --exact --ignored`.
+  Register new integration modules in `tests/all/main.rs`. The `native_ui` target supplies the
+  Skyline UI shim and uses the system allocator so the direct hook heap-meter test can measure
+  exact byte deltas. The `parry_start_fresh_set` target substitutes the practice runtime's engine
+  and diagnostic services at the crate root.
 - **Vendored crates' own tests** (2026-11-02): the root package has no workspace, so `cargo test` does not run
   `crates/*/tests`. Each gate run adds one call per crate: `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
@@ -84,7 +90,9 @@ any builder change that alters the recipes for the same table.
 longer compiles. The flag reaches no dependency; 2026-11-13 the builder reproduced the committed `f96bdcfc…` and
 `f988800a…` byte for byte from the rc.13 (a′) tree (`30ddd8f5`).
 
-Current recipes (rebuilt 2026-11-13 for rc.13's DI chips, E1 x1: three more needle blocks of `CHIPS`, 33 panes, so each
+Current recipes (rebuilt for rc.15's spacing-grader tag panes; layout-builder 0.1.4; the stocks are unchanged.)
+
+Earlier recipes (rebuilt 2026-11-13 for rc.13's DI chips, E1 x1: three more needle blocks of `CHIPS`, 33 panes, so each
 chip carries `P_CmnVector`'s four layers; every layer pane but Neutral's square binds the builder's `tr_chip_add`
 material, the rect template's with the stock cursor highlights' additive blend (Add, source alpha, one). layout-builder 0.1.3; the
 stocks are unchanged.)
@@ -93,9 +101,9 @@ Earlier recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
-| `assets/info_training.tra1` | `2073dd408dc95057e4ba7efb925e60676f615773ca3b2ef2047a9fdcdf827bc6` (rc.13; before: `f96bdcfc…`, 374,907 B) | 377,467 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 947,092 B, fnv `333215837fa78289` |
-| `assets/info_waiting.tra1` | `fba2e919221a6effa4678443abb85d598b9ed9b99409e1653c8bbe1019e07ac7` (rc.13; before: `f988800a…`, 378,963 B) | 381,476 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,779,588 B, fnv `bfe25b4c2365c606` |
-| `assets/panes-recipe.sha256` | `703657a1a2db5d2dd6c9fcd8e3af464741156bddde89cb0a7d859a2229e875b4` (the digest, rc.13) | | |
+| `assets/info_training.tra1` | `645de1c083283e42bf8208a4cb1002feba3b45a6c4d33d5c46058f1a5f4dc5ef` (rc.15; before: dcf0f43d's, 426,633 B) | 427,187 | `info_training.arc` 451,604 B, SHA-256 `90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c`, FNV-1a `8833748e9518a461` (`runtime/ui/probe.rs:91`); target 1,004,436 B, fnv `45acc7ee1d167001` |
+| `assets/info_waiting.tra1` | `8f2e45adaf2bfcb015e018c49e1544af3ef49c0661ad8b31d293ab7605be952c` (rc.15; before: dcf0f43d's, 430,566 B) | 431,167 | `info_waiting.arc` 1,284,116 B, SHA-256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`, fnv `f3d2cb3ec6a9f0de`; target 1,836,932 B, fnv `c344d50f3c4ae895` |
+| `assets/panes-recipe.sha256` | `33a75c25bcdd5737ea2623913468d4b1e2ffeccdddbcddbfb22122aef84a21a2` (the digest, rc.15; file SHA-256 `497a710115e435ed6b6e9ca38b4be8b41a8900181a710b374405c1e090a20d48`) | 65 | |
 
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).

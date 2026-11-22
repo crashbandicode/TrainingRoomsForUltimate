@@ -4,11 +4,7 @@
 //! ours-new); see CARRY-OVER.md.
 
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model/diag_ring.rs"]
-#[allow(dead_code)]
-mod diag_ring;
+use crate::model::diag_ring;
 
 use diag_ring::{ByteRing, Push, StackLine, CUT_MARKER, STACK_LINE};
 

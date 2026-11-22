@@ -1,8 +1,5 @@
 //! Core retained receipt -> owner-supplied production UI grading/session boundary.
-macro_rules! lib_unit_tests { ($($body:tt)*) => {}; }
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 use model::tech::{controller::{Controller, Event, Setup}, session::{self, Direction, Grade, Length, NativeOutcome, Phase}};
 use model::tech_launch::{Attempt, ContactReceipt, DecisionDelivery, DecisionSnapshot, HitHeight, Launch, Launcher, Surface, Vec2};
 struct Fake { attempt: Attempt, placements: u64 }

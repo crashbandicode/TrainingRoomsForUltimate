@@ -32,7 +32,7 @@ pub struct How {
 /// Start `game` (the menu worker, at the close): it becomes the running game before its start trigger, so the game thread
 /// that takes the trigger reads it on. Any other game stops on its next frame.
 pub fn start(game: Game, how: How) {
-    if matches!(game, Game::GuardEdge | Game::Juggler) && !super::edge_juggle::allowed() {
+    if crate::model::edge_juggle::Drill::from_game(game).is_some_and(|drill| !super::edge_juggle::allowed(drill)) {
         return;
     }
     // A running game's settings apply at its next Start: each game latches its own here or when the Start reaches it.
@@ -69,7 +69,7 @@ pub fn finish(game: Game) {
     let _ = ACTIVE.compare_exchange(game.code(), 0, Ordering::AcqRel, Ordering::Acquire);
 }
 
-/// The game the menu shows as running: the running game while its engine runs it or a start is still on its way.
+/// The game the menu can stop, including an Eggs-ercise result that can still be restarted.
 pub fn running() -> Option<Game> {
     let game = active()?;
     let live = match game {

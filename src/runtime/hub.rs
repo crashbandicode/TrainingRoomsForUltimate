@@ -8,6 +8,9 @@ use crate::model::lra_reset::{self, HubStep};
 use crate::runtime::features::{cpu, input_delay, recorder};
 
 pub fn run(cause: Clear) {
+    if cause == Clear::SaveStateLoad {
+        crate::runtime::features::hitbox::egg_state_loaded();
+    }
     // How many queued input-delay records the hub dropped.
     let mut dropped = 0;
     lra_reset::run_hub(|step| {

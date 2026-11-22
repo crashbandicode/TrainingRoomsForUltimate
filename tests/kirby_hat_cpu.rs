@@ -5,8 +5,6 @@
 //! body; TrainingRooms now does the same from `state_kirby_opff_hook` on the same site.
 
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
 fn source(path: &str) -> String {
     std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).expect(path)
 }

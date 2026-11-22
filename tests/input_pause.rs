@@ -5,13 +5,7 @@
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::input_adapter::{owners, InputAdapter, PauseReport};
 use model::input_delay::{Clear, MappedInputs, Owners};

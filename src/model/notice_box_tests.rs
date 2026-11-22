@@ -4,7 +4,7 @@
 lib_unit_tests! {
 use super::*;
 use crate::model::notify::{Body, Queue, BODY_MAX, DEFAULT_COLOR};
-use crate::model::panes::{self as p, cb, iv};
+use crate::model::panes::{self as p, iv};
 
 fn units(text: &str) -> Vec<u16> {
     text.encode_utf16().collect()
@@ -201,8 +201,6 @@ fn notice_box_anchors_top_left_clear_of_hud() {
     assert_eq!(p::btt_hud_box("10/10 0:07.12", false, false)[0], p::NOTICE_LEFT, "the chip's left edge");
     const RIGHT: f32 = p::NOTICE_LEFT + p::NOTICE_MAX_W;
     const { assert!(RIGHT <= -iv::STRIP_W / 2.0 - 12.0, "8 px left of the frame strip") };
-    const { assert!(RIGHT <= -cb::BAR_W / 2.0, "left of the combo bar") };
-    const { assert!(RIGHT <= -cb::SEQ_W / 2.0, "left of the sequence bar") };
     const { assert!(RIGHT < 0.0, "Total Damage, Combo and Damage are on the right") };
 }
 
@@ -284,8 +282,14 @@ fn lobby_drop_clears_native_waiting_hud() {
     let damage_panels = [685.0, 12.0, 925.0, 331.0];
     let (compact, wide) = ("10/10 0:07.12", "3/10   A place  B undo  X start");
     for (drop, native) in [(p::LOBBY_DROP, vec![leave_battle, waiting_pill, right_column]), (0.0, vec![damage_panels])] {
-        let strip = edges([0.0, iv::STRIP_Y - drop, iv::STRIP_W, iv::STRIP_H]);
+        use p::strip_layout::C;
+        let [x, y, w, h] = C.strip.bounds(true, true);
+        let strip = edges([x, C.strip.origin_y + y - drop, w, h]);
         let mut boxes = vec![("strip", strip)];
+        for sequence in [false, true] {
+            let [x, y, w, h] = C.card.bounds(sequence);
+            boxes.push(("helper card", edges([x, C.strip.origin_y + y - drop, w, h])));
+        }
         for (header, body) in NOTICES {
             let (b, _, _) = boxed(header, body);
             let plate = edges(b.plate);

@@ -2,13 +2,7 @@
 //! staging rule, interrupted and failed copies, a second boot). The plan's own row-level rules were `tests/migration.rs`, removed in the rc.9 test cut
 //! (docs/TEST-CUT-LEDGER-rc9.md); these tests still drive the plan end to end.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -235,7 +229,7 @@ fn migration_cpu_item_selection_keeps_never_saved_player_absent() {
 
 #[test]
 fn migration_cpu_item_selection_survives_fresh_process() {
-    const NAME: &str = "migration_cpu_item_selection_survives_fresh_process";
+    const NAME: &str = "migration_run::migration_cpu_item_selection_survives_fresh_process";
     const ROOT: &str = "TR_N6_PROCESS_ROOT";
     const PHASE: &str = "TR_N6_PROCESS_PHASE";
     let stamp = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos().to_string();

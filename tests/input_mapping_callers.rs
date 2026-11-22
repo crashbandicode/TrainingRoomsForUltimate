@@ -16,15 +16,9 @@
 //! - none of our four sites, nor its 64-byte guard window, is within 0x40 of a site of the CPU pilot
 //!   (list copied from its `src/model.rs`, commit 0162eed) or overlaps the function itself.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::sites;
 

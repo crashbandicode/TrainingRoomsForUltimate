@@ -535,6 +535,16 @@ impl Detector {
         self.pending != 0
     }
 
+    /// P1's poll follows a gap (a poll the runtime skipped) or comes from another Controller: the buttons this stage
+    /// kept from the game are no longer its own and the speed hold is closed. Whether the hold was open (the runtime
+    /// then takes its pop-up down). Requests already pending stay (review-games-astra-3 2026-11-22 00:50Z, 02:01Z).
+    pub fn reenter(&mut self) -> bool {
+        (self.swallow, self.hidden) = (0, 0);
+        let open = self.hold.is_open();
+        self.hold.clear();
+        open
+    }
+
     /// Session clear: scene departure, hot swap, the waiting-room UI becoming busy. The speed hold closes too (the
     /// runtime takes the pop-up down).
     pub fn clear_session(&mut self) {

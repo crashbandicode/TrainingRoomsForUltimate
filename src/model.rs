@@ -127,6 +127,8 @@ pub mod tech_settings;
 pub mod settings_file;
 #[path = "model/sha256.rs"]
 pub mod sha256;
+#[path = "model/hit_streak.rs"]
+pub mod hit_streak;
 #[path = "model/hitbox.rs"]
 pub mod hitbox;
 #[path = "model/hitbox_orbs.rs"]
@@ -139,6 +141,10 @@ pub mod spots;
 pub mod legend;
 #[path = "model/eggs.rs"]
 pub mod eggs;
+#[path = "model/egg_paths.rs"]
+pub mod egg_paths;
+#[path = "model/spacing.rs"]
+pub mod spacing;
 #[path = "model/btt.rs"]
 pub mod btt;
 #[path = "model/lockon.rs"]
@@ -287,3 +293,12 @@ pub mod tech_hitlag;
 
 #[path = "model/sites_tech_hitlag.rs"]
 pub mod sites_tech_hitlag;
+
+#[cfg(test)]
+lib_unit_tests! {
+    #[path = "model/egg_zone_tests.rs"]
+    mod egg_zone_tests;
+}
+
+#[path = "model/egg_zone.rs"]
+pub mod egg_zone;

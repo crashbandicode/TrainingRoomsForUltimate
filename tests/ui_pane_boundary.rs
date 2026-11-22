@@ -2,35 +2,8 @@
 //! The shim supplies fields only; native ABI qualification remains a separate gate.
 //! `name` matches pinned nnsdk 0.6.2: [libc_nnsdk::c_char; 25], where
 //! libc-nnsdk 0.5.0 defines c_char = u8 (including the Switch target).
-extern crate self as skyline;
-// rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-// The current integration pane writer references this unrelated text bound.
-// These tests exercise traversal only, never the text writer or native ABI.
-pub mod model { pub mod notify { pub const BODY_MAX: usize = 320; } }
-pub mod nn {
-    pub mod ui2d {
-        #[repr(C)]
-        pub struct PaneNode { pub prev: *mut PaneNode, pub next: *mut PaneNode }
-        #[repr(C)]
-        pub struct Pane {
-            pub link: PaneNode, pub children_list: PaneNode, pub name: [u8; 25],
-            pub alpha: u8, pub flags: u8, pub pos_x: f32, pub pos_y: f32,
-            pub size_x: f32, pub size_y: f32, pub rot_z: f32,
-        }
-        impl Pane { pub fn set_visible(&mut self, visible: bool) { self.flags = u8::from(visible); } }
-        pub enum PaneFlag { IsGlobalMatrixDirty = 1 }
-        #[repr(C)]
-        pub struct Picture { pub pane: Pane, pub vertex_colors: [[u8; 4]; 4] }
-        #[repr(C)]
-        pub struct TextBox { pub pane: Pane, pub text_buf_len: u16, pub text_len: u16, pub text_buf: *mut u16 }
-        impl TextBox { pub fn set_color(&mut self, _: u8, _: u8, _: u8, _: u8) {} }
-    }
-}
-#[path = "../src/runtime/ui/pane.rs"]
-pub mod pane;
-use nn::ui2d::Pane;
+use crate::nn::ui2d::Pane;
+use crate::pane;
 
 // Allocate the complete arena before linking, so no pointer can move.
 fn tree(rows: &[(usize, &str)]) -> Vec<Pane> {

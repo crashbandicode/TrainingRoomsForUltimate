@@ -6,22 +6,10 @@
 //! for each poisoned row, the natives an installed entry point may call are computed from the code and every
 //! one must be allowed by the `Granted` set the boot would hand the native-call layer.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-// rc.9 test cut: the call-graph scanner's own tests run once, in `tests/hook_locks.rs`.
-macro_rules! callgraph_self_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "common/callgraph.rs"]
-mod callgraph;
-#[path = "common/tech_callbacks.rs"]
-mod tech_callbacks;
+use crate::callgraph;
+use crate::tech_callbacks;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -70,6 +58,9 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "edge_juggle::controls_cpu", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::ai_correction", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::player_height_request", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    // Zoom alone requires Hero's menu rows and the damage/capture readers.
+    Boundary { function: "zoom::zoom_pad", owner: None, gate: Gate::Flag("installed") },
+    Boundary { function: "zoom::observe_zoom", owner: None, gate: Gate::Flag("installed") },
     // Steering PK Thunder needs the existing article grants. If any are missing,
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
@@ -111,6 +102,8 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "hitbox::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The own orbs' layout-tick draw (decision HB-OWN-ORBS).
     Boundary { function: "hitbox::draw_orbs", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
+    // The compact strip's fade reads the overlay's fighter anchors on the layout tick: none until boot installs the overlay.
+    Boundary { function: "hitbox::fighter_screen_anchors", owner: Some(Feature::Hitbox), gate: Gate::Flag("INSTALLED") },
     // The input display's reads in the input-delay hook: dormant until boot enables the display.
     Boundary { function: "input_display::on_p1_poll", owner: Some(Feature::InputDisplay), gate: Gate::Flag("ENABLED") },
     // SPEC-input-06: the frame strip's frame, from the CPU core's player-entry frame: dormant until boot enables the display.
@@ -120,6 +113,10 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
+    // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
+    Boundary { function: "input_display::spacing_hit", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADER_LIVE") },
+    Boundary { function: "input_display::attacker_owner", owner: Some(Feature::Hitbox), gate: Gate::Flag("OWNER_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -127,7 +124,6 @@ const BOUNDARIES: &[Boundary] = &[
     // rc.14 Break the Targets' camera: the fixed-camera switch, called from the P1 pass. It needs the
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.
-    Boundary { function: "btt_camera::apply", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "lockon::update_practice_items", owner: Some(Feature::Lockon), gate: Gate::Flag("USABLE") },
     Boundary { function: "lockon::hit", owner: Some(Feature::Lockon), gate: Gate::Flag("USABLE") },
     // Mash's native-touching call-ins share the final boot admission, independent of CPU Defence.
@@ -138,10 +134,10 @@ const BOUNDARIES: &[Boundary] = &[
     // Row 121's status-change seam from cpu_common (mashout-ganon-tech).
     Boundary { function: "mashout::tech_contact", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
     Boundary { function: "mashout::tech_confirm", owner: Some(Feature::Mashout), gate: Gate::Flag("READY") },
-    Boundary { function: "btt_camera::request", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_camera::frame", owner: Some(Feature::CpuCamera), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt::frame", owner: Some(Feature::Hitbox), gate: Gate::Flag("USABLE") },
     Boundary { function: "btt_projectiles::hit", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
+    Boundary { function: "btt_projectiles::observe_articles", owner: Some(Feature::BttProjectiles), gate: Gate::Flag("READY") },
 ];
 
 /// Every entry point that is not a `#[skyline::hook]` function, with its install unit.
@@ -173,6 +169,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
     }
     match f.module.as_str() {
         "input_delay" => Some(Feature::InputDelay),
+        "input_display" => Some(Feature::InputDisplay),
         "hitbox" => Some(Feature::Hitbox),
         "lra_reset" => Some(Feature::LraReset),
         "stage_hazards" => Some(Feature::StageHazards),
@@ -325,7 +322,8 @@ fn declared() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     capabilities::CROSS_NEEDS.iter().map(|(unit, names)| (unit.name(), names.iter().copied().collect())).collect()
 }
 
-/// Prints `CROSS_NEEDS` as Rust source: `cargo test --test capabilities print_cross_needs -- --ignored --nocapture`.
+/// Prints `CROSS_NEEDS` as Rust source with
+/// `cargo test --test all -- capabilities::print_cross_needs --exact --ignored --nocapture`.
 #[test]
 #[ignore]
 fn print_cross_needs() {
@@ -912,6 +910,29 @@ fn the_input_display_degrades_apart_from_input_delay() {
     // The CPU core's role test is the core's own: its two reset-hub rows stay in its closure.
     let usable = |s: &model::sites::Site| s.name != "is_operation_cpu";
     assert_eq!(capabilities::blocked_by(Feature::CpuCore, &usable), Some("is_operation_cpu"));
+}
+
+#[test]
+fn optional_grader_rows_disable_only_grading() {
+    let boot = include_str!("../src/runtime/boot.rs");
+    assert!(boot.contains(
+        "input_display::set_grader_read(display_on && sites_hitbox::grader_usable(&usable));"
+    ));
+    for (name, offset) in model::sites_hitbox::GRADER_ROWS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled Input Display");
+        assert!(capabilities::unit_usable(Feature::Hitbox, &usable), "{name} disabled Hitbox");
+        assert!(!Granted::from_usable(&usable).allows(offset), "{name} remained granted");
+    }
+}
+
+#[test]
+fn grader_hook_needs_the_hurt_layout_rows() {
+    for name in model::sites_hitbox::GRADER_NEEDS {
+        let usable = |site: &model::sites::Site| site.name != name;
+        assert!(!model::sites_hitbox::grader_usable(usable), "{name} left the fighter hook enabled");
+        assert!(capabilities::unit_usable(Feature::InputDisplay, &usable), "{name} disabled the strip");
+    }
 }
 
 /// The seam installer sizes its own-write records with `WRITING_SITES` (`runtime::seams::seam_install::prime`).

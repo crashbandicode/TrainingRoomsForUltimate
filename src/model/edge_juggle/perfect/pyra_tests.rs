@@ -56,7 +56,7 @@ fn a_replacement_without_a_status_is_not_restarted_on_or_placed() {
     for early in ["START.compare_exchange", "RESTART.swap", "engine.run = Some(Run", "Wizard::new", "restart_drill"] {
         assert!(!before.contains(early), "{early} runs before the object is classified");
     }
-    let (arrival, later) = after.split_once("let id = natives::stage_id();").unwrap();
+    let (arrival, later) = after.split_once("let active_run =").unwrap();
     assert!(arrival.contains("run.rounds.advance_attempt(Observation::default())"));
     assert_eq!(arrival.matches("return;").count(), 1, "the arriving object leaves the frame");
     for native in ["state::", "reset_recovery_resources", "run.body = body", "run.placement", "START", "RESTART"] {

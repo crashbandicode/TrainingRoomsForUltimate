@@ -2,15 +2,9 @@
 //! specs' §9 rows. `state07_scan_matches_pinned` re-runs the instruction scans on the owned 13.0.5
 //! `.text`.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::lra_reset::{self, FrameCounter, FrameCounterType, HubStep};
 use model::sites;

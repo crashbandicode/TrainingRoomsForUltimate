@@ -1,26 +1,9 @@
 //! Native callbacks and host probes share engine::mii::inline_keyboard.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
-#[allow(dead_code)]
-#[path = "../src/model/hook_stats.rs"]
-mod hook_stats;
+use crate::engine::mii;
+use crate::model::hook_stats;
 
 use mii::inline_keyboard::{Decision, Limit, Signals, Text};
-
-#[global_allocator]
-static ALLOCATOR: hook_stats::CountingAllocator = hook_stats::CountingAllocator;
 
 fn keyboard_minimum_is_explicit_in_both_transports() {
     use mii::inline_keyboard::{minimum_length, write_name_lengths};
@@ -62,13 +45,15 @@ fn keyboard_validation_does_not_allocate_on_first_or_repeated_use() {
     const CHILD: &str = "TRAININGROOMS_INLINE_KEYBOARD_ALLOC_CHILD";
     if std::env::var_os(CHILD).is_none() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "keyboard_validation_does_not_allocate_on_first_or_repeated_use",
+            .args(["--exact", "inline_keyboard::keyboard_validation_does_not_allocate_on_first_or_repeated_use",
                    "--test-threads=1", "--nocapture"])
             .env(CHILD, "1")
             .output().unwrap();
         assert!(output.status.success(), "{}{}", String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr));
-        print!("{}", String::from_utf8_lossy(&output.stdout));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("running 1 test"), "allocation probe did not run: {stdout}");
+        print!("{stdout}");
         return;
     }
     fn measure(repeats: usize) -> u64 {

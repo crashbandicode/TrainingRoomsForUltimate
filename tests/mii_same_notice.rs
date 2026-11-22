@@ -2,16 +2,8 @@
 //! (docs/MII.md rows 4 and 12: that saved Mii is used, nothing is stored), and it is no longer silent: it posts
 //! "Same as ‹saved name›, nothing new saved" with the matched saved Mii's own name. A new save posts nothing.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::notify::save_notice;
 

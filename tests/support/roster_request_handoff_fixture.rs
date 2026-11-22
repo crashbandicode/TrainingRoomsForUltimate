@@ -220,6 +220,11 @@ mod sources {
 
 mod runtime {
     pub mod features {
+        pub mod edge_juggle {
+            pub mod practice_cpu {
+                pub fn temporary(_: u32) -> bool { false }
+            }
+        }
         pub mod mashout {
             pub fn temporary_cpu_selection(kind: u32) -> bool {
                 crate::PRACTICE_KIND.load(crate::Ordering::Relaxed) == kind

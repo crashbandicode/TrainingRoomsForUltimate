@@ -2152,7 +2152,176 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 186044
+ceiling = 171833
+date = "2026-11-20"
+reason = "rc.15 Spacing grader (review-visualizer-astra 07:46Z fixes: hurt-layout prerequisites, published lane identities, owner at capture, projectile+helper grading, recorded-column target tags; review-visualizer-astra 12:50Z B1 frame-side lane reads), rebased on 79cc06f1. Measured 171833 at 91cbb9b0 (tools/size_gate.py; main 79cc06f1 measured 171026), +807. Raises main's 171026 ceiling by the measured delta only."
+approved_by = "Primary c07b3449 (2026-11-20): explicit budget approval in the lead handoff; measured delta only."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 171914
+date = "2026-11-20"
+reason = "Merge CPU THINK STOP fix (rc15/cpu-think-burst 04616215) onto main 5a1fac9e. Branch size gate 3d24ee93-20261120T1443Z measured an exact +81 over its 171026 base; main ceiling 171833 + 81 = 171914. Combined gate on the merge re-measures."
+approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: approves the measured +81 delta only, for the operator-requested preview build."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 172701
+date = "2026-11-20"
+reason = "Merge Guard the Edge/Juggler CPU picker + Hero Zoom drill (rc15/drill-picker 14d4cf9a) onto main 53c8fa13. Branch gate measured 172620 = its 171833 base + 787; main ceiling 171914 + 787 = 172701. Combined gate on the merge re-measures."
+approved_by = "Primary e7ee8f1c (tr-primary-2) 2026-11-20: measured delta only; operator-ordered feature (CPU picker + Hero Zoom), REVIEW PASS review-games-astra 14:44 EST."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 173091
+date = "2026-11-20"
+reason = "Hit streak for Eggs-ercise and Break the Targets. tools/size_gate.py measured 173091 normalized lines on base 4e267994 plus this change, +390 over 172701."
+approved_by = "Primary e7ee8f1c (tr-primary-2), Hit streak work order 2026-11-20: one entry for the measured delta."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 173126
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Recovery routes, grounded placement and the scoped Juggler forecast and ordinary recovery timing changes measure 186044 normalized implementation lines, exactly 15018 over the approved 171026 base. The last 54 lines are the Pyra replacement-body fix (8fce8d0e, +34) and the operator rulings of 2026-11-22 for Sonic, Lucas and Hero (fb44f2fa, +20)."
+reason = "Compose the approved +35 Finished-state fix from 49f8871f over the 173091 Hit streak baseline."
+approved_by = "Primary e7ee8f1c (tr-primary-2) approved +35 for the Finished-state fix as recorded in 49f8871f."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 174886
+date = "2026-11-21"
+reason = "merge_budget for Eggsercise Off stage on d3062d1c over composed baseline 7c440dca. Measured implementation 173125 to 174886 (+1761). Raise the existing 173126 ceiling by 1760, with zero spare. Native witness NRO 4993024 B (+24576 B), BSS 1720320 B (unchanged)."
+approved_by = "Primary e7ee8f1c (tr-primary-2), 2026-11-21 02:18Z: approved the measured ceiling only. The operator allows LOC growth when memory stays efficient and no work is wasteful. The measured NRO and BSS witness qualifies."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 183343
+date = "2026-11-21"
+reason = "rc.15 niche recovery candidate on 79cc06f1. Product source 42745d30 measures 183343, an exact 12317 normalized-line delta over 171026. Adds Greninja Hydro Pump, Link's reviewed bomb flight and Steve Elytra. Preserves Bowser Jr.'s stock up special when delaying a jump."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187033
+date = "2026-11-21"
+reason = "merge_budget for partial Guard the Edge and Juggler: integrate gated niche 6395498b with card main a4ff59cb. Exact merged count is 187033, +12252 versus the measured main count of 174781 and +3690 versus niche's 183343. No spare. Main release NRO 4997120 B and niche release NRO 5058560 B; both have 1720320 B BSS. The combined gate remeasures release size and BSS."
+approved_by = "Operator 2026-11-21 12:20Z authorized the partial card build. Primary tr-primary-2 at 12:30Z directed measured merge_budget entries under the operator rule: LOC can grow when memory remains efficient and changes are not wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187066
+date = "2026-11-21"
+reason = "Windboxes gameplay-area classification and projected rectangle bounds. Measured normalized implementation 187033 to 187066 (+33). Relative to the clean build prerequisite tree 5fb35633, release NRO 5124096 B to 5124096 B and BSS 1720320 B to 1720320 B. The installed a4ff59cb release is 4997120 B with 1720320 B BSS."
+approved_by = "Operator rc.15 windbox work order 2026-11-21 13:10Z via tr-primary-2 allows measured LOC growth when memory stays efficient. This entry is the measured delta with zero spare."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187171
+date = "2026-11-21"
+reason = "Shared practice placement camera and CPU session, bright-stage contrast, and on-stage off-stage-target scoring. Exact normalized line count 187033 to 187171 (+138). The buildable partial baseline 5fb35633 and measured implementation f113b778 each have 5124096 B NRO and 1720320 B BSS. The exact final pin is rechecked in the binary-size receipt."
+approved_by = "Operator through tr-primary-2 at 13:06Z authorized one measured entry: as long as memory stays efficient I don't mind as much about loc as long as we aren't wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187160
+date = "2026-11-21"
+reason = "Eggsercise moving paths and Off-stage zone. Canonical size on ab5b7524 is 187160, +127 versus 187033 on the partial card base, with zero spare. Adds Pop up selection and legacy settings migration, per-side recovery geometry, and a fallback for stages with no usable Off stage zone."
+approved_by = "Primary tr-primary-2, 2026-11-21 14:29Z, approved 187160 for ab5b7524 in the primary handoff."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187331
+date = "2026-11-21"
+reason = "merge_budget for the intermediate card: measured 187331 normalized implementation lines at d6074747, +298 over the gated partial base 5fb35633 and zero spare. Includes reviewed Windboxes 8a5435c4 (+33), placement wizard and immediate on-stage credit 7bc239e2 (+138), and Eggsercise paths and per-side zone a7e4802f (+127). The partial base and all three shipping lane witnesses independently measured NRO 5124096 B and BSS 1720320 B. The exact combined gate remeasures both."
+approved_by = "Operator via tr-primary-2, 2026-11-21 15:09Z, authorized measured merge budgets under the operator's LOC rule: memory stays efficient and nothing is wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187566
+date = "2026-11-21"
+reason = "merge_budget for 1 Frame 985c79c6 on the intermediate card d6074747. Measured normalized implementation 187566, +235 over the intermediate ceiling 187331, with zero spare. Intermediate release NRO 5124096 B and BSS 1720320 B. Standalone 1 Frame release NRO 5128192 B and BSS 1720320 B. The exact integrated release receipt records the combined NRO and BSS against the intermediate baseline."
+approved_by = "Operator via tr-primary-2 at 16:47Z authorized the exact merge budget under the rule that line count may grow when memory remains efficient and nothing is wasteful."
+
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187597
+date = "2026-11-21"
+reason = "merge_budget for the independently reviewed 1 Frame input-mask correction c07abb77 (including 2bd5445d) on ca42bf71. Exact normalized implementation delta +31 over 187566; zero spare. Paired integrated baseline NRO 5132288 B and BSS 1720320 B. The release-first exact gate and its retained ELF/NRO receipt remeasure both values for this merge."
+approved_by = "Operator 2026-11-21 17:09Z approved the integrated 8192 B NRO increase and authorized this follow-up. Primary tr-primary-2 directs a measured entry under the operator's rule that LOC may grow when memory stays efficient and the changes are not wasteful."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187778
+date = "2026-11-21"
+reason = "Sample the current world geometry and fighter anchors after the stock simulation. Render input-driven editor pictures from the current HUD tick. Exact normalized implementation count 187597 to 187778 (+181), with zero spare. The overlay-frame-sync release receipt measures NRO and aligned BSS against 3448686c."
+approved_by = "Operator through tr-primary-2 at 18:34Z added the shared overlay fix to the intermediate card under the existing measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187797
+date = "2026-11-21"
+reason = "Keep the committed BTT layout visible while a held run waits for its first phase-8 sample. Export the anchor reader for the stacked strip without suppressing lints and check the install report against the hook owner. Exact normalized delta +19 over 187778, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
+approved_by = "Operator through tr-primary-2 at 19:07Z requested the held editor correction under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187805
+date = "2026-11-21"
+reason = "Report the visualizer and spacing hook writes from their independent boot outcomes. Exact normalized delta +8 over 187797, no spare. Baseline 3448686c release NRO 5132288 B and aligned BSS 1720320 B. The exact release receipt records the candidate NRO and BSS."
+approved_by = "Operator through tr-primary-2 on 2026-11-21 requested completion through source review under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187815
+date = "2026-11-21"
+reason = "Keep Perfect recovery's unchanged early pose sampling in invocation-local scratch and distinguish inline from replace writes in the shared install line. Exact normalized delta +10 over 187805, no spare. The exact release receipt measures NRO and BSS against 3448686c."
+approved_by = "Operator through tr-primary-2 on 2026-11-21 requested completion through source review under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187823
+date = "2026-11-21"
+reason = "Keep diagnostic article signatures and the fighter hurt census in the already-acquired sampler store. The normalized delta is +8 over 187815, with zero spare. The exact release receipt measures NRO and BSS against 3448686c."
+approved_by = "Operator through tr-primary-2 on 2026-11-21 requested that the new hook not block, under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 187908
+date = "2026-11-21"
+reason = "Version the fighter overlay cache, board records and HUD anchors by the native fighter slot's init generation. The three changed Rust implementation files add exactly 85 normalized lines over 6312a68c. The 24-slot atomic table follows the stock pool capacity. The combined release gate measures NRO and BSS against 3448686c."
+approved_by = "Operator through tr-primary-2, 21:08Z, requested the lossless worker reset ordering correction under the intermediate build's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188607
+date = "2026-11-21"
+reason = "Compact frame strip layout C. One strip_layout spec (strip.rs, card.rs, mod.rs: +924) places the strip, the corner card and the link cells for both the archived pane recipes and the live HUD, replacing 328 lines of fixed geometry in panes.rs and combo_plan.rs. Link history gets its On/Off setting with the fold into LINK, and the panel fades over the overlay's fighter anchors. The exact normalized delta is +699 over 187908, with zero spare. No new native site. The combined release gate measures NRO and BSS against 3448686c."
+approved_by = "Operator through tr-primary-2, 2026-11-21 18:58Z, ordered compact strip C with the Link history switch and its layout abstracted from its functionality into the intermediate build, under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188611
+date = "2026-11-22"
+reason = "raise: 1 Frame Save hold (the kept step bit marked in previous, Controller identity, re-entry with the speed-hold close under the poll's one lock, the skipped-poll branch); 188611 measured on c2fc22f2, 4 over 188607"
+approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; folded into one entry by its 06:53:42Z order (line 909); NRO and BSS reported at the gate"

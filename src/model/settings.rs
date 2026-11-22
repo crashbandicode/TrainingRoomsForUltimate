@@ -107,6 +107,8 @@ pub enum Reason {
     BadSliderLength,
     /// A slider's `lower` is above its `upper`.
     BadSliderRange,
+    /// A stage id or its array of four normalized Off-stage zone coordinates.
+    BadEggZone,
     /// `Snapshot::set` was given an id this build has no row for.
     UnknownId,
 }
@@ -123,6 +125,7 @@ impl fmt::Display for Reason {
             Reason::ElementAboveMax => f.write_str("element above the row's largest value"),
             Reason::BadSliderLength => f.write_str("slider needs exactly two elements"),
             Reason::BadSliderRange => f.write_str("slider range is not lower <= upper"),
+            Reason::BadEggZone => f.write_str("expected a native stage id and four byte coordinates"),
             Reason::UnknownId => f.write_str("no such setting"),
         }
     }
@@ -159,11 +162,17 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         }
         return Ok(elements);
     }
+    // Two-slot Spawn area was a dropdown. Three slots are independent checklist bits.
+    let legacy_area = def.id == "eggsercise_area" && elements.len() == 2;
+    // The original four unchecked paths used Pop up. Preserve that choice in old saves.
+    if def.id == super::eggs::ROW_PATHS && elements.as_slice() == [0; 4] {
+        elements.push(1);
+    }
     elements.resize(def.len, 0);
     // Single rows use the first selected option, as the menu displays them. Old files may
     // contain several; normalize at both file load and Snapshot::set so defaults/writeback
     // cannot preserve a displayed On whose typed value also contains Off. Keep None intact.
-    if def.kind == Kind::Single {
+    if def.kind == Kind::Single || legacy_area {
         if let Some(first) = elements.iter().position(|v| *v != 0) {
             elements[first + 1..].fill(0);
         }
@@ -259,18 +268,63 @@ impl Snapshot {
     }
 }
 
+/// The sparse, cold overrides. Native IDs already distinguish each stage form.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EggZones(Vec<(u16, [u8; 4])>);
+
+impl EggZones {
+    pub const KEY: &str = "egg_zones";
+
+    pub fn get(&self, stage: u16) -> Option<[u8; 4]> {
+        self.0.binary_search_by_key(&stage, |entry| entry.0).ok().map(|index| self.0[index].1)
+    }
+
+    pub fn set(&mut self, stage: u16, zone: [u8; 4]) {
+        match self.0.binary_search_by_key(&stage, |entry| entry.0) {
+            Ok(index) => self.0[index].1 = zone,
+            Err(index) => self.0.insert(index, (stage, zone)),
+        }
+    }
+
+    fn to_value(&self) -> Option<Value> {
+        (!self.0.is_empty()).then(|| Value::Object(self.0.iter().map(|(id, zone)| {
+            (id.to_string(), Value::Array(zone.iter().map(|&bin| Value::from(bin)).collect()))
+        }).collect()))
+    }
+
+    fn parse(value: Value, issues: &mut Vec<Issue>) -> Self {
+        let mut saved = Self::default();
+        if let Value::Object(stages) = value {
+            for (key, bins) in stages {
+                let entry = key.parse::<u16>().ok().filter(|&id| {
+                    i32::from(id) < super::cpu::tech::stage::STAGE_COUNT && key == id.to_string()
+                }).zip(serde_json::from_value::<[u8; 4]>(bins).ok());
+                if let Some((stage, zone)) = entry {
+                    saved.set(stage, zone);
+                } else {
+                    issues.push(Issue { at: format!("{}.{key}", Self::KEY), reason: Reason::BadEggZone });
+                }
+            }
+        } else {
+            issues.push(Issue { at: Self::KEY.to_owned(), reason: Reason::BadEggZone });
+        }
+        saved
+    }
+}
+
 /// The whole file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub menu: Snapshot,
     pub defaults: Snapshot,
+    pub egg_zones: EggZones,
     /// Other top-level keys, kept verbatim (the fork's `mii_preferences`, `stage_preferences`).
     pub extra: Map<String, Value>,
 }
 
 impl Settings {
     pub fn factory() -> Self {
-        Self { menu: Snapshot::factory(), defaults: Snapshot::factory(), extra: Map::new() }
+        Self { menu: Snapshot::factory(), defaults: Snapshot::factory(), egg_zones: EggZones::default(), extra: Map::new() }
     }
 
     /// The page the menu was last left on (`last_page`, SPEC-core-04 §3.1): a top-level string, kept
@@ -325,6 +379,9 @@ impl Settings {
         let mut object = self.extra.clone();
         object.insert("menu".to_owned(), self.menu.to_value());
         object.insert("defaults_menu".to_owned(), self.defaults.to_value());
+        if let Some(zones) = self.egg_zones.to_value() {
+            object.insert(EggZones::KEY.to_owned(), zones);
+        }
         serde_json::to_string_pretty(&Value::Object(object)).unwrap_or_default()
     }
 }
@@ -567,12 +624,15 @@ pub fn parse(text: &str) -> Loaded {
     let menu = snapshot_from("menu", top.menu, &mut issues);
     let defaults = snapshot_from("defaults_menu", top.defaults, &mut issues);
     let mut extra = Map::new();
+    let mut egg_zones = EggZones::default();
     for (key, value) in top.others.items {
-        if !RETIRED.contains(&key.as_str()) {
+        if key == EggZones::KEY {
+            egg_zones = EggZones::parse(value, &mut issues);
+        } else if !RETIRED.contains(&key.as_str()) {
             extra.insert(key, value);
         }
     }
-    Loaded { settings: Settings { menu, defaults, extra }, issues }
+    Loaded { settings: Settings { menu, defaults, egg_zones, extra }, issues }
 }
 
 /// `parse` for the bytes of a file: text that is not UTF-8 is a corrupt file like any other.
@@ -650,6 +710,30 @@ mod tests {
         assert_eq!(parse(&factory.to_json()).settings, factory);
     }
 
+    fn hit_streak_defaults_to_off_in_new_and_old_settings() {
+        let old = parse(r#"{"menu":{"eggsercise":[0,1,0,0,0]},"defaults_menu":{"btt":[0,1]}}"#);
+        assert!(old.issues.is_empty(), "{:?}", old.issues);
+        for settings in [Settings::factory(), old.settings] {
+            for id in ["eggsercise_hit_streak", "btt_hit_streak"] {
+                assert_eq!(settings.menu.get(id), Some(&[1, 0][..]), "{id} menu");
+                assert_eq!(settings.defaults.get(id), Some(&[1, 0][..]), "{id} defaults");
+            }
+        }
+    }
+
+    fn hit_streak_choices_round_trip_independently() {
+        let mut settings = Settings::factory();
+        settings.menu.set("eggsercise_hit_streak", &[0, 1]).unwrap();
+        settings.defaults.set("btt_hit_streak", &[0, 1]).unwrap();
+
+        let loaded = parse(&settings.to_json());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.menu.get("eggsercise_hit_streak"), Some(&[0, 1][..]));
+        assert_eq!(loaded.settings.menu.get("btt_hit_streak"), Some(&[1, 0][..]));
+        assert_eq!(loaded.settings.defaults.get("eggsercise_hit_streak"), Some(&[1, 0][..]));
+        assert_eq!(loaded.settings.defaults.get("btt_hit_streak"), Some(&[0, 1][..]));
+    }
+
     fn a_bad_row_defaults_and_is_reported() {
         let loaded = parse(r#"{"menu":{"lra_reset":"x","stage_hazards":[1,0]}}"#);
         assert_eq!(loaded.issues.len(), 1);
@@ -687,6 +771,8 @@ mod tests {
             ("factory_round_trips", factory_round_trips as fn()),
             ("retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips", retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips as fn()),
             ("a_bad_row_defaults_and_is_reported", a_bad_row_defaults_and_is_reported as fn()),
+            ("hit_streak_defaults_to_off_in_new_and_old_settings", hit_streak_defaults_to_off_in_new_and_old_settings as fn()),
+            ("hit_streak_choices_round_trip_independently", hit_streak_choices_round_trip_independently as fn()),
         ]);
     }
     }

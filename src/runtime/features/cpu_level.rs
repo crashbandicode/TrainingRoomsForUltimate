@@ -302,8 +302,8 @@ pub(crate) unsafe fn frame() {
     if crate::runtime::roster::character_roster::busy() {
         return;
     }
-    let drill_rank = drill && drill_applied();
-    let pause_rank = (drill && !drill_rank) || (!drill && state.drill_behavior.held());
+    let drill_rank = drill_applied().then(super::edge_juggle::stock_level).flatten();
+    let pause_rank = (drill && drill_rank.is_none()) || (!drill && state.drill_behavior.held());
     let table = field::read_unchecked::<[i32; 8]>(base, RANK_TABLE);
     let entries = if place == Where::Lobby { rules::LOBBY_ENTRIES } else { 1..=7 };
     for entry in entries {
@@ -372,8 +372,8 @@ pub(super) fn poll_drill(quiet: bool) -> bool {
         DRILL_APPLIED.store(false, Ordering::Release);
         return false;
     }
-    let running = super::edge_juggle::running();
-    if !running && !state.drill_behavior.held() && state.drill_pause == BehaviorPause::Idle {
+    let level = super::edge_juggle::stock_level();
+    if level.is_none() && !state.drill_behavior.held() && state.drill_pause == BehaviorPause::Idle {
         return false;
     }
     let owners = crate::runtime::published::input_owners();
@@ -385,10 +385,10 @@ pub(super) fn poll_drill(quiet: bool) -> bool {
         return false;
     }
     // SAFETY: the P1 controller poll in native Training owns the live panel and entry.
-    unsafe { step_drill_panel(base, &mut state, running, owners.contains(Owners::VANILLA_PAUSE), quiet) }
+    unsafe { step_drill_panel(base, &mut state, level, owners.contains(Owners::VANILLA_PAUSE), quiet) }
 }
 
-unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused: bool, quiet: bool) -> bool {
+unsafe fn step_drill_panel(base: usize, state: &mut State, level: Option<u8>, paused: bool, quiet: bool) -> bool {
     let resolved = field::read::<usize>(base, TRAINING_ROOT)
         .and_then(|root| field::chain(root, &PANEL_CHAIN[..HUD_DEPTH]))
         .and_then(|hud| {
@@ -422,7 +422,7 @@ unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused
         field::read_unchecked(ai, AI_BEHAVIOR),
         game::natives::is_operation_cpu(1),
     );
-    let desired = state.drill_behavior.step(running, panel, current, applied);
+    let desired = state.drill_behavior.step(level, panel, current, applied);
     let needs_stock = desired.is_some_and(|desired| !applied || desired.menu != current.menu);
     if let Some(desired) = desired.filter(|_| menu == BehaviorMenu::Open || menu == BehaviorMenu::Closed && !needs_stock) {
         if desired != current {
@@ -430,6 +430,6 @@ unsafe fn step_drill_panel(base: usize, state: &mut State, running: bool, paused
             field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu);
         }
     }
-    DRILL_APPLIED.store(running && menu == BehaviorMenu::Closed && !needs_stock, Ordering::Release);
+    DRILL_APPLIED.store(level.is_some() && menu == BehaviorMenu::Closed && !needs_stock, Ordering::Release);
     state.drill_pause.pulse(needs_stock, menu, quiet)
 }

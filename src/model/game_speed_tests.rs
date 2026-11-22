@@ -32,37 +32,65 @@ fn speeds_are_the_native_values_and_labels() {
     }
 }
 
+/// rc.15: 1 Frame is the slowest step of the scale (it reverses `rc8-binds.md` §3.5), and both ends stop.
 #[test]
-fn training_steps_walk_the_speeds_and_stop_at_the_ends() {
+fn the_scale_has_one_frame_slowest_and_stops_at_both_ends() {
     let list = Place::Training.speeds();
-    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
-    assert!(!list.contains(&Speed::OneFrame), "1 Frame stays with the native menu");
+    assert_eq!(list, &[Speed::OneFrame, Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
     let mut speed = Speed::X1;
-    for expected in [Speed::TwoThirds, Speed::Half, Speed::Quarter, Speed::Quarter] {
+    for expected in [Speed::TwoThirds, Speed::Half, Speed::Quarter, Speed::OneFrame, Speed::OneFrame] {
         speed = step(list, speed, Dir::Left);
         assert_eq!(speed, expected);
     }
-    for expected in [Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf, Speed::OneAndHalf] {
+    for expected in [Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf, Speed::OneAndHalf] {
         speed = step(list, speed, Dir::Right);
         assert_eq!(speed, expected);
     }
-    // Training on 1 Frame: the first step starts from x1's place.
-    assert_eq!(step(list, Speed::OneFrame, Dir::Left), Speed::TwoThirds);
-    assert_eq!(step(list, Speed::OneFrame, Dir::Right), Speed::OneAndHalf);
     assert_eq!(step(&[], Speed::Half, Dir::Right), Speed::Half);
+    // Without 1 Frame's rows the bind offers the five others, and a native 1 Frame steps from x1's place.
+    let five = Place::Training.offered(false);
+    assert_eq!(five, &[Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
+    assert_eq!(step(five, Speed::Quarter, Dir::Left), Speed::Quarter);
+    assert_eq!(step(five, Speed::OneFrame, Dir::Left), Speed::TwoThirds);
+    assert_eq!(Place::Lobby.offered(true), Place::Lobby.speeds());
 }
 
-/// rc.8 R2: the lobby offers Training's five speeds, in the same order (2/3 and x1.5 through `model::lobby_speed`, never
-/// through the update rate).
+/// rc.8 R2, rc.15: the lobby offers Training's six speeds, in the same order (2/3, x1.5 and 1 Frame through
+/// `model::lobby_speed`, never through the update rate).
 #[test]
 fn lobby_offers_the_training_speeds() {
     let list = Place::Lobby.speeds();
     assert_eq!(list, Place::Training.speeds());
-    assert_eq!(list, &[Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf]);
     assert_eq!(step(list, Speed::X1, Dir::Right), Speed::OneAndHalf);
     assert_eq!(step(list, Speed::X1, Dir::Left), Speed::TwoThirds);
     assert_eq!(step(list, Speed::TwoThirds, Dir::Left), Speed::Half);
     assert_eq!(step(list, Speed::Half, Dir::Left), Speed::Quarter);
+    assert_eq!(step(list, Speed::Quarter, Dir::Left), Speed::OneFrame);
+}
+
+#[test]
+fn one_frame_pop_up_reads_one_frame() {
+    assert_eq!(popup_body(Speed::OneFrame, PRO).as_str(), "\u{E07B} 1 Frame \u{E07C}");
+    assert_eq!(Speed::OneFrame.label(), "1 Frame");
+    // The native apply for 1 Frame: no slot, the rate words at x1's (code 0, 60 updates).
+    let mut slow = fresh_table();
+    let done = mode_apply(Speed::OneFrame, Speed::X1.value(), mode::NO_SLOT, &mut slow).unwrap();
+    assert_eq!((done.slot, done.code, done.updates, done.dirty), (mode::NO_SLOT, 0, 60, false));
+    assert_eq!(slow, fresh_table());
+}
+
+/// rc.15: leaving 1 Frame by the bind resumes Training's step pause the way the mode object's step does: only while the
+/// paused word holds request bit 2, and never for 1 Frame itself.
+#[test]
+fn leaving_one_frame_resumes_the_training_pause() {
+    for speed in Speed::ALL {
+        let paused = mode::STEP_BIT;
+        assert_eq!(resumes_the_step_pause(speed, paused), speed != Speed::OneFrame, "{speed:?}");
+        assert!(!resumes_the_step_pause(speed, 0), "not paused: {speed:?}");
+        assert!(!resumes_the_step_pause(speed, 0x8 | 0x2), "another requester's pause: {speed:?}");
+    }
+    assert!(resumes_the_step_pause(Speed::X1, 0x8 | mode::STEP_BIT));
+    assert_eq!((native::PAUSED, native::PAUSE_SYNC_FN, native::STEP_BITS), (0x52b92e8, 0x555da0, 0x52b92ec));
 }
 
 #[test]

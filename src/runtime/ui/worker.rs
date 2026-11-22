@@ -3,7 +3,7 @@
 //! publishes each new frame for the layout tick to draw. The model allocates on input events, so that
 //! work lives here and never in a hook (R5: hooks allocate nothing).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use hos_lock::Mutex;
 
@@ -15,7 +15,7 @@ use crate::model::flow::{self, Phase, Seen, Step};
 use crate::model::menu::input::Button;
 use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};
-use crate::model::settings::Settings;
+use crate::model::settings::{EggZones, Settings};
 use crate::model::ui_events::{Event, Packet, Ring};
 use crate::model::screens::{fighter_question_frame, frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
@@ -93,7 +93,7 @@ fn toggle_input_display(presses: u32) {
         }
         on = now_on;
         published::publish(&settings.menu, 0, [None; 2]);
-        *SETTINGS.lock() = Some(settings);
+        replace_menu_settings(settings);
         writer::request_settings();
     }
     notices::post("Input display", if on { "On" } else { "Off" }, 120, DEFAULT_COLOR);
@@ -111,7 +111,87 @@ static SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
 /// Keep the boot settings for the writer even when the menu thread does not start.
 pub fn remember(settings: Settings) {
-    *SETTINGS.lock() = Some(settings);
+    let mut guard = SETTINGS.lock();
+    publish_egg_zones(&settings.egg_zones);
+    *guard = Some(settings);
+}
+
+/// The menu commit and bind toggles preserve a zone queued while they were merging settings.
+fn replace_menu_settings(mut settings: Settings) {
+    let mut guard = SETTINGS.lock();
+    if let Some(current) = guard.as_mut() {
+        settings.egg_zones = core::mem::take(&mut current.egg_zones);
+    }
+    *guard = Some(settings);
+}
+
+const STAGE_ZONES: usize = crate::model::cpu::tech::stage::STAGE_COUNT as usize;
+// Each native stage id resolves one form. Four bytes per id, with a separate presence bit.
+static EGG_ZONES: [AtomicU32; STAGE_ZONES] = [const { AtomicU32::new(0) }; STAGE_ZONES];
+static EGG_ZONE_PRESENT: [AtomicU64; STAGE_ZONES.div_ceil(64)] =
+    [const { AtomicU64::new(0) }; STAGE_ZONES.div_ceil(64)];
+// The high word is stage id plus 1, the low word is the four fractions.
+static EGG_ZONE_WRITE: AtomicU64 = AtomicU64::new(0);
+
+fn egg_zone_index(stage: i32) -> Option<usize> {
+    usize::try_from(stage).ok().filter(|&index| index < STAGE_ZONES)
+}
+
+fn publish_egg_zone(stage: usize, zone: Option<[u8; 4]>) {
+    let flags = &EGG_ZONE_PRESENT[stage / 64];
+    let bit = 1 << (stage % 64);
+    if let Some(zone) = zone {
+        EGG_ZONES[stage].store(u32::from_le_bytes(zone), Ordering::Release);
+        flags.fetch_or(bit, Ordering::Release);
+    } else {
+        flags.fetch_and(!bit, Ordering::Release);
+    }
+}
+
+fn publish_egg_zones(zones: &EggZones) {
+    for stage in 0..STAGE_ZONES {
+        publish_egg_zone(stage, zones.get(stage as u16));
+    }
+}
+
+/// Read the active stage's override without locks, allocation, or file access.
+pub fn egg_zone(stage: i32) -> Option<[u8; 4]> {
+    let stage = egg_zone_index(stage)?;
+    let pending = EGG_ZONE_WRITE.load(Ordering::Acquire);
+    if pending >> 32 == stage as u64 + 1 {
+        return Some((pending as u32).to_le_bytes());
+    }
+    let present = EGG_ZONE_PRESENT[stage / 64].load(Ordering::Acquire) & (1 << (stage % 64)) != 0;
+    present.then(|| EGG_ZONES[stage].load(Ordering::Acquire).to_le_bytes())
+}
+
+/// Keep the preview open if the worker has not accepted the last apply yet.
+/// The game hook hands over only the stage id and the four normalized bytes.
+pub fn request_egg_zone(stage: i32, bins: [u8; 4]) -> bool {
+    let Some(stage) = egg_zone_index(stage) else { return false };
+    let pending = ((stage as u64 + 1) << 32) | u64::from(u32::from_le_bytes(bins));
+    if EGG_ZONE_WRITE.compare_exchange(0, pending, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return false;
+    }
+    wake();
+    true
+}
+
+fn flush_egg_zone() {
+    let pending = EGG_ZONE_WRITE.load(Ordering::Acquire);
+    if pending == 0 {
+        return;
+    }
+    let stage = ((pending >> 32) - 1) as u16;
+    let zone = (pending as u32).to_le_bytes();
+    let mut guard = SETTINGS.lock();
+    let Some(settings) = guard.as_mut() else { return };
+    if settings.egg_zones.get(stage) != Some(zone) {
+        settings.egg_zones.set(stage, zone);
+        publish_egg_zone(usize::from(stage), Some(zone));
+        writer::request_settings();
+    }
+    EGG_ZONE_WRITE.store(0, Ordering::Release);
 }
 
 /// The text the writer thread stores. When `mark_intro` is set, the intro flag is recorded first; a `pair` is the waiting
@@ -164,6 +244,7 @@ fn env() -> Env {
         custom_stages: crate::runtime::lobby::custom_stages::published()
             .map_or(0, |p| u16::try_from(p.customs.len()).unwrap_or(u16::MAX)),
         running: crate::runtime::features::practice::running(),
+        eggs_finished: crate::runtime::features::hitbox::eggs_finished(),
         ..Env::default()
     }
 }
@@ -276,7 +357,9 @@ fn run() {
     loop {
         // Retire departing layer state before accepting a new scene's panel input.
         crate::runtime::macros::port::worker_events();
-        // Drain first: the work behind a wake that came before this pass is already here.
+        // An accepted wizard Apply precedes inputs for the next menu opening.
+        flush_egg_zone();
+        // Drain the work behind a wake that came before this pass.
         sync_input_generation(&mut session);
         while let Some((generation, event)) = INPUT.pop() {
             sync_input_generation(&mut session);
@@ -341,6 +424,7 @@ fn run() {
 
 /// The `tr.menu/1` snapshot for the optional test bridge (`model::bridge_state`); one relaxed load when it is off.
 fn publish_bridge_state(s: &mut Session) {
+    use crate::model::menu::grid::{GridKind, RosterUse};
     if !crate::runtime::bridge_state::enabled() {
         return;
     }
@@ -351,14 +435,25 @@ fn publish_bridge_state(s: &mut Session) {
         let m = menu.as_ref();
         let row = m.and_then(|m| m.help_row());
         let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
-        let editor = panel.map(|e| format!("{e:?}"));
+        let practice_picker = m.and_then(|m| {
+            let Some(Screen::Grid { layout, .. }) = m.screen() else { return None };
+            let GridKind::Roster(RosterUse::PracticeCpu(game)) = layout.kind else { return None };
+            Some((game, m.practice_cpu_popup().map(|_| m.practice_cpu_pick(game))))
+        });
+        let editor = practice_picker.map(|(game, _)| format!("PracticeCpu({game:?})"))
+            .or_else(|| panel.map(|e| format!("{e:?}")));
+        let practice_pick = practice_picker.and_then(|(_, pick)| pick);
+        let mut editor_sel_key = String::new();
+        if let Some(pick) = practice_pick {
+            let _ = pick.mode().write(&mut editor_sel_key);
+        }
         // The selection inside the screen showing: the Mash out popup's line first, else the screen's own cursor/cell.
-        let editor_sel = m.and_then(|m| m.mashout_popup().or(match m.screen() {
+        let editor_sel = practice_pick.map(|pick| pick.choice).or_else(|| m.and_then(|m| m.mashout_popup().or(match m.screen() {
             Some(Screen::List { cursor, .. } | Screen::Checklist { cursor, .. } | Screen::Delay { cursor, .. }
                 | Screen::SwapGroups { cursor } | Screen::Overrides { cursor, .. } | Screen::Chords { cursor }) => Some(*cursor),
             Some(Screen::Grid { cell, .. }) => Some(*cell),
             _ => None,
-        })).map(|i| i as i64);
+        }))).map(|i| i as i64);
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
@@ -373,9 +468,12 @@ fn publish_bridge_state(s: &mut Session) {
             action: &action,
             editor: editor.as_deref(),
             editor_sel,
+            editor_sel_key: &editor_sel_key,
             keyboard,
             game: active.map(|g| g.title()),
-            game_running: crate::runtime::features::practice::running().is_some(),
+            game_running: crate::runtime::features::practice::running().is_some_and(|game| {
+                game != crate::model::practice_games::Game::Eggs || !crate::runtime::features::hitbox::eggs_finished()
+            }),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),
@@ -434,9 +532,11 @@ fn handle(event: Event, s: &mut Session) {
             s.phase = Phase::Menu;
         }
         CLOSING.store(false, Ordering::Release);
+        crate::runtime::features::btt_camera::interrupt_placement();
         crate::runtime::features::btt::menu_opened();
         crate::runtime::features::tech::menu_opened();
         crate::runtime::features::edge_juggle::menu_opened();
+        crate::runtime::features::egg_zone::menu_opened();
         crate::runtime::ui::menu_app::note_open();
         { s.opening = crate::runtime::ui::menu_app::sequence(); }
         // The kept catalog before the first frame (menu speed): no card read, so the opening is drawn at once.
@@ -1194,20 +1294,23 @@ fn publish_frame(s: &Session) {
                     editor.decorate(&mut next, focused);
                 }
             }
-            if layout.kind == GridKind::Roster(crate::model::menu::grid::RosterUse::Mashout) {
-                let editor = s.roster.filter(|e| e.use_() == crate::model::menu::grid::RosterUse::Mashout)
-                    .unwrap_or_else(|| crate::editors::roster::RosterEditor::new(crate::model::menu::grid::RosterUse::Mashout));
-                editor.decorate_mashout(&mut next, menu);
-            } else if let crate::model::menu::grid::GridKind::Roster(use_) = layout.kind {
+            if let GridKind::Roster(use_) = layout.kind {
+                use crate::model::menu::grid::RosterUse;
                 let mut editor = s.roster.filter(|e| e.use_() == use_).unwrap_or_else(|| crate::editors::roster::RosterEditor::new(use_));
-                editor.set_mii(mii_tiles(&s.mii));
-                let values = editor.values(menu.kept(editor.key()));
-                editor.decorate(&mut next, &values);
-                let numbers = editor.decorate_badges(&mut next, menu);
-                if editor.use_() == crate::model::menu::grid::RosterUse::Cycles {
-                    for (role, n) in numbers.iter().enumerate() {
-                        let slot_zero = n.slot_zero.map_or(0, |kind| (kind & 0xff) + 1);
-                        tr_cycle_badges_v1(n.mask[0], n.mask[1], n.mask[2], role as u32 | u32::from(n.count) << 8 | slot_zero << 16);
+                if use_ != RosterUse::Mashout {
+                    editor.set_mii(mii_tiles(&s.mii));
+                }
+                if matches!(use_, RosterUse::Mashout | RosterUse::PracticeCpu(_)) {
+                    editor.decorate_mashout(&mut next, menu);
+                } else {
+                    let values = editor.values(menu.kept(editor.key()));
+                    editor.decorate(&mut next, &values);
+                    let numbers = editor.decorate_badges(&mut next, menu);
+                    if use_ == RosterUse::Cycles {
+                        for (role, n) in numbers.iter().enumerate() {
+                            let slot_zero = n.slot_zero.map_or(0, |kind| (kind & 0xff) + 1);
+                            tr_cycle_badges_v1(n.mask[0], n.mask[1], n.mask[2], role as u32 | u32::from(n.count) << 8 | slot_zero << 16);
+                        }
                     }
                 }
             }
@@ -1283,9 +1386,11 @@ pub fn committed_menu() -> Option<crate::model::settings::Snapshot> {
 
 pub fn adopt_published(settings: &Settings) {
     let mut guard = SETTINGS.lock();
+    publish_egg_zones(&settings.egg_zones);
     if let Some(current) = guard.as_mut() {
         current.menu = settings.menu.clone();
         current.extra = settings.extra.clone();
+        current.egg_zones = settings.egg_zones.clone();
     } else {
         *guard = Some(settings.clone());
     }
@@ -1381,7 +1486,7 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     crate::runtime::stall_watch::worker_step(10);
     // The carried engines read the typed view of the committed settings (decision D1).
     crate::runtime::compat::menu::apply_kept(&settings);
-    *SETTINGS.lock() = Some(settings);
+    replace_menu_settings(settings);
     // Every file write goes through the writer thread (`features::writer`): this only hands over the requests.
     // The writer serializes the live settings, including an intro flag stored on that object.
     if outbox.changed {
@@ -1405,6 +1510,9 @@ fn close(menu: &mut Menu, setups: &mut super::setups::Ui) {
     OPEN.store(false, Ordering::Release);
     crate::runtime::ui::menu_app::note_open();
     FRAME_SEQ.fetch_add(1, Ordering::Release);
+    if outbox.egg_zone {
+        crate::runtime::features::egg_zone::request();
+    }
     diagnostic(format_args!("[Ui] menu closed changed={} rerolls={:#x}", outbox.changed, outbox.rerolls));
     #[cfg(feature = "diag")]
     crate::runtime::stall_watch::worker_step(8);

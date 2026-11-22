@@ -1,6 +1,5 @@
 //! Exact card regression: unavailable menu edits defer hooks, never invent eligibility.
-#[path = "../src/model/menu_read.rs"]
-mod menu_read;
+use crate::model::menu_read;
 
 use menu_read::{try_current, MenuBusy};
 

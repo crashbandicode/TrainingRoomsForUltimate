@@ -3,16 +3,8 @@
 //! specs' §9 rows where a row exists; rows that the new page layout replaced (the 8 x 4 submenu grid
 //! of upstream) are covered by the test of the same name on the new structure, as noted on each.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::menu::chord::Chord;
 use model::menu::delay::{DelayRange, DelaySpec};
@@ -127,6 +119,44 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
+fn link_history_choices_persist() {
+    let mut m = menu();
+    let row = goto(&mut m, "link_history");
+    assert_eq!(m.page(), Page::DisplayControls);
+    assert_eq!(ROWS[row].title, "Link history");
+    assert!(matches!(ROWS[row].control, Control::Dropdown(labels) if labels == ["On", "Off"]));
+
+    for expected in [[1, 0], [0, 1], [1, 0]] {
+        let loaded = settings::parse(&m.settings().to_json());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.menu.get("link_history"), Some(expected.as_slice()));
+        assert_eq!(model::frame_strip::Settings::from_snapshot(&loaded.settings.menu).link_history, expected[0] == 1);
+        assert_eq!(loaded.settings.defaults.get("link_history"), Some(&[1, 0][..]));
+        m.press(Button::Right);
+    }
+}
+
+fn legacy_settings_default_link_history_to_on() {
+    let old = settings::parse(r#"{"menu":{"input_display_strip":[1,0]},"defaults_menu":{"spots_strip":[0,1]}}"#);
+    assert!(old.issues.is_empty(), "{:?}", old.issues);
+    for snapshot in [&old.settings.menu, &old.settings.defaults] {
+        assert_eq!(snapshot.get("link_history"), Some(&[1, 0][..]));
+        assert!(model::frame_strip::Settings::from_snapshot(snapshot).link_history);
+    }
+}
+
+fn spacing_grader_row_after_hitbox_visualization() {
+    let hitbox = ROWS.iter().position(|row| row.id == "hitbox_vis").expect("Hitbox Visualization row");
+    let row = &ROWS[hitbox + 1];
+    assert_eq!((row.id, row.title), ("spacing_grader", "Spacing grader"));
+    assert!(matches!(row.control, Control::Toggle));
+    assert_eq!(row.group, ROWS[hitbox].group);
+    assert_eq!(
+        row.help,
+        "On: each hit P1 or P2 lands is graded by depth: Excellent at the\nhurtbox edge, Good slightly inside, OK at the centre."
+    );
+}
+
 /// rc.15: six visible items retain seven stored slots; the colour-mode slot is retired.
 fn legend_hitbox_visualization_is_one_checklist() {
     let row = ROWS.iter().find(|r| r.id == "hitbox_vis").expect("the row");
@@ -192,16 +222,19 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's three rows are one picker row: 72 → 70.
     // Eggs spawn area adds the "Spawn area" setting row to Eggs-ercise: 70 → 71.
     // Guard the Edge and Juggler add their list entries and eleven sub-screen rows.
-    assert_eq!(counts(false), [34, 11, 13, 84, 12, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 84, 12, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 154);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 153);
+    // Spacing grader adds one Display & Controls row (12 → 13).
+    // Off-stage zone, Moving paths and Target expiry add three Eggs-ercise rows.
+    // rc.15 compact strip: Display & Controls gained Link history (the operator's order via the primary, 2026-11-21 18:48Z; 13 → 14).
+    assert_eq!(counts(false), [34, 11, 13, 91, 14, 3]);
+    assert_eq!(counts(true), [33, 11, 13, 91, 14, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 163);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 162);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
     assert_eq!(n(&|c| matches!(c, Control::MultiSelectRange { .. })), 7);
     // Randomize slots, Button slots and Save-state slots left the menu (revision 8.2).
-    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 12, "the checklists that stayed, Hitbox Visualization (rc.14) and Swap groups");
+    assert_eq!(n(&|c| matches!(c, Control::MultiSelect(_) | Control::SwapGroups)), 14, "includes Spawn area and Moving paths");
     assert_eq!(n(&|c| matches!(c, Control::Slider)), 9);
     // Nothing is deferred any more (operator 2026-11-05): every editor has its row, and every group has rows.
     // (104: Lobby Items, Phase 2 N11; 105: Ready Hats, P-HOT; rc.6: CPU Level; rc.13: Aerial Drift, Taunts; rc.14: Hide CPU and the
@@ -213,7 +246,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Parry's three controls (rc.15 Parry, 141 → 144), then its list row and Start as the fifth game (144 → 146).
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
-    assert_eq!(ROWS.len(), 158);
+    // Spacing grader adds one Display & Controls row (145 → 146).
+    assert_eq!(ROWS.len(), 167);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
@@ -1222,6 +1256,9 @@ fn case_table() {
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
+        ("link_history_choices_persist", link_history_choices_persist as fn()),
+        ("legacy_settings_default_link_history_to_on", legacy_settings_default_link_history_to_on as fn()),
+        ("spacing_grader_row_after_hitbox_visualization", spacing_grader_row_after_hitbox_visualization as fn()),
         ("legend_hitbox_visualization_is_one_checklist", legend_hitbox_visualization_is_one_checklist as fn()),
         ("hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six", hitbox_visible_options_keep_their_storage_bits_and_zl_toggles_all_six as fn()),
         ("core02_table_carriage_return", core02_table_carriage_return as fn()),

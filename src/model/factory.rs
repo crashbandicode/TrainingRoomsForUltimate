@@ -29,8 +29,8 @@ const fn ones<const N: usize>(at: &[usize]) -> [u8; N] {
 }
 
 macro_rules! row {
-    ($id:literal, $kind:ident, $len:literal, $at:expr) => {
-        Def { id: $id, kind: Kind::$kind, len: $len, default: &ones::<$len>(&$at) }
+    ($id:literal, $kind:ident, $len:expr, $at:expr) => {
+        Def { id: $id, kind: Kind::$kind, len: $len, default: &ones::<{ $len }>(&$at) }
     };
 }
 
@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 163;
+pub const COUNT: usize = 175;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -217,10 +217,12 @@ pub static DEFS: [Def; COUNT] = [
     row!("practice_cpu", Single, 2, [0]),
     // V2.1: Disc / CPU.
     row!("eggsercise_target", Single, 2, [0]),
-    // rc.15 Spawn area: In view / Whole stage.
-    row!("eggsercise_area", Single, 2, [0]),
+    // rc.15 Spawn area: independent In view, Whole stage and Off stage selections.
+    row!("eggsercise_area", Multiple, 3, [0]),
     // §V2.5 Break the Targets: Off / On.
     row!("btt", Single, 2, [0]),
+    row!("eggsercise_paths", Multiple, 5, [4]),
+    row!("eggsercise_expiry", Single, 11, [0]),
     // rc.14 sweet/sour spots (SP1 to SP5): the strip's spot labels and the combo's match, both Off by default ([On, Off], stored [0, 1]);
     // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
@@ -259,10 +261,16 @@ pub static DEFS: [Def; COUNT] = [
     Def { id: "tech_delay_range", kind: Kind::Slider { max: 150 }, len: 2, default: &[20, 20] },
     row!("tech_camera", Single, 2, [0]),
     row!("tech_wizard_skip", Single, 2, [1]),
-    row!("edge_difficulty", Single, 2, [0]),
+    row!("edge_difficulty", Single, super::edge_juggle::picker::MODE_CHOICES, [0]),
+    row!("edge_cpu_fighter", Single, super::edge_juggle::picker::FIGHTER_CHOICES, [0]),
+    row!("edge_cpu_level", Single, 9, [8]),
+    row!("edge_zoom_window", Single, 30, [9]),
     row!("edge_reaction", Single, 3, [1]),
     row!("edge_reaction_frames", Single, 30, [11]),
-    row!("juggle_difficulty", Single, 2, [0]),
+    row!("juggle_difficulty", Single, super::edge_juggle::picker::MODE_CHOICES, [0]),
+    row!("juggle_cpu_fighter", Single, super::edge_juggle::picker::FIGHTER_CHOICES, [0]),
+    row!("juggle_cpu_level", Single, 9, [8]),
+    row!("juggle_zoom_window", Single, 30, [9]),
     row!("juggle_reaction", Single, 3, [1]),
     row!("juggle_reaction_frames", Single, 30, [11]),
     row!("edge_cpu_percent", Single, 301, [100]),
@@ -270,4 +278,10 @@ pub static DEFS: [Def; COUNT] = [
     row!("juggle_attempts", Single, 3, [0]),
 
     row!("btt_projectiles", Single, 2, [1]),
+    row!("spacing_grader", Single, 2, [1]),
+
+    // rc.15 per-game Hit streak: Off / On.
+    row!("eggsercise_hit_streak", Single, 2, [0]),
+    row!("btt_hit_streak", Single, 2, [0]),
+    row!("link_history", Single, 2, [0]),
 ];

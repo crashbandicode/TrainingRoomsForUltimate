@@ -6,6 +6,10 @@
 use core::fmt::Write as _;
 
 use super::frame_strip::{Cell, Link, Tracker, Verdict, WINDOW};
+use super::panes::strip_layout::{LayoutSpec, Place, strip::StripSpec};
+#[cfg(test)]
+use super::panes::strip_layout::C;
+use super::spacing::Grade;
 
 pub use super::panes::iv::{at, COUNT};
 use super::panes::iv::*;
@@ -66,6 +70,37 @@ impl core::fmt::Write for Text {
     }
 }
 
+/// The LINK sub-line has a dedicated native text box. Keep its extra capacity out of the pane cache.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LinkLine {
+    units: [u16; LINK_UNITS as usize],
+    len: usize,
+}
+
+impl LinkLine {
+    fn from_units(units: impl IntoIterator<Item = u16>) -> Self {
+        let mut line = Self { units: [0; LINK_UNITS as usize], len: 0 };
+        for (out, unit) in line.units.iter_mut().zip(units) {
+            *out = unit;
+            line.len += 1;
+        }
+        line
+    }
+
+    pub fn units(&self) -> &[u16] {
+        &self.units[..self.len]
+    }
+}
+
+pub fn folded_link(link: &Link) -> LinkLine {
+    let verdict = if matches!(link.verdict, Verdict::True(_)) { "TRUE" } else { "DROP" };
+    LinkLine::from_units(
+        [verdict, " · ", link.from.name(), " > ", link.to.name()]
+            .into_iter()
+            .flat_map(str::encode_utf16),
+    )
+}
+
 /// What one pane shows.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Look {
@@ -81,6 +116,18 @@ pub struct Look {
 
 impl Look {
     pub(crate) const HIDDEN: Look = Look { visible: false, x: 0.0, y: 0.0, w: 0.0, rot: 0.0, color: [0; 4], text: Text::EMPTY };
+
+    pub(crate) const fn at(self, place: Place) -> Self {
+        Self { x: place.x, y: place.y, w: place.w, rot: place.rot, ..self }
+    }
+
+    fn paint(place: Place, color: [u8; 4]) -> Self {
+        Self::rect(0.0, 0.0, 0.0, color).at(place)
+    }
+
+    fn label(place: Place, text: Text, color: [u8; 4]) -> Self {
+        Self::text(0.0, 0.0, text, color).at(place)
+    }
 
     pub(crate) const fn rect(x: f32, y: f32, w: f32, color: [u8; 4]) -> Look {
         Look { visible: true, x, y, w, rot: 0.0, color, text: Text::EMPTY }
@@ -134,7 +181,10 @@ struct Run {
 }
 
 /// The tracker laid out once per tick: runs, the frames on screen and their slots.
-struct Layout<'a> {
+struct Content<'a> {
+    spec: &'a StripSpec,
+    history: bool,
+    cells: bool,
     tracker: &'a Tracker,
     frames: [u32; WINDOW],
     /// Left-stick bin in each slot, `None` for a neutral frame or a slot with no column.
@@ -147,8 +197,15 @@ struct Layout<'a> {
     parry: Option<&'a super::parry::View>,
 }
 
-impl<'a> Layout<'a> {
-    fn new(tracker: &'a Tracker, spots: bool, parry: Option<&'a super::parry::View>) -> Self {
+impl<'a> Content<'a> {
+    fn new(
+        tracker: &'a Tracker,
+        spots: bool,
+        parry: Option<&'a super::parry::View>,
+        spec: &'a StripSpec,
+        history: bool,
+        cells: bool,
+    ) -> Self {
         let mut frames = [0u32; WINDOW];
         let mut sticks = [None; WINDOW];
         let first_slot = WINDOW - tracker.len();
@@ -193,7 +250,7 @@ impl<'a> Layout<'a> {
                 }
             }
         }
-        Self { tracker, frames, sticks, first_slot, runs, spots, parry }
+        Self { spec, history, cells, tracker, frames, sticks, first_slot, runs, spots, parry }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -205,36 +262,32 @@ impl<'a> Layout<'a> {
         (self.first_slot..WINDOW).find(|s| self.frames[*s] == frame).map(|s| s as f32)
     }
 
-    fn centre(slot: f32) -> f32 {
-        FIRST_X + slot * PITCH + CELL_W / 2.0
-    }
-
     fn look(&self, i: usize) -> Look {
         use at::*;
         match i {
-            CONTAINER => Look { visible: true, y: STRIP_Y, ..Look::HIDDEN },
-            BACKDROP => Look::rect(0.0, 0.0, STRIP_W, BACKDROP_COLOR),
-            i if (LANE_LABEL..LANE_LABEL + 3).contains(&i) => {
-                let (name, y, color) = [("IN", IN_Y, MUTED), ("P1", P1_Y, P1_TAG), ("CPU", CPU_Y, CPU_TAG)][i - LANE_LABEL];
-                Look::text(LABEL_X, y, Text::new(name), color)
+            CONTAINER => Look { visible: true, ..Look::HIDDEN }.at(self.spec.container()),
+            BACKDROP => {
+                let [x, y, w, _] = self.spec.bounds(self.history, self.cells);
+                Look::paint(Place::new(x, y, w), BACKDROP_COLOR)
             }
-            SEPARATOR => Look::rect(DIVIDER_X, 19.5, 1.5, RULE),
-            i if i == SEPARATOR + 1 => Look::rect(0.0, RULE_Y, STRIP_W - 36.0, RULE),
+            i if (LANE_LABEL..LANE_LABEL + 3).contains(&i) => {
+                let lane = i - LANE_LABEL;
+                let (name, color) = [("IN", MUTED), ("P1", P1_TAG), ("CPU", CPU_TAG)][lane];
+                Look::label(self.spec.lane_label(lane), Text::new(name), color)
+            }
+            SEPARATOR => Look::paint(self.spec.rule(0), RULE),
+            i if i == SEPARATOR + 1 && self.history => Look::paint(self.spec.rule(1), RULE),
             i if (RUN..RUN + 2 * RUNS).contains(&i) => {
                 let (lane, n) = ((i - RUN) / RUNS, (i - RUN) % RUNS);
                 match self.runs[lane][n] {
-                    Some(run) => {
-                        let x = FIRST_X + run.slot as f32 * PITCH + (run.len as f32 * PITCH - (PITCH - CELL_W)) / 2.0;
-                        let w = run.len as f32 * PITCH - (PITCH - CELL_W);
-                        Look::rect(x, if lane == 0 { P1_Y } else { CPU_Y }, w, run.cell.color())
-                    }
+                    Some(run) => Look::paint(self.spec.lane_run(lane, run.slot, run.len, false), run.cell.color()),
                     None => Look::HIDDEN,
                 }
             }
             i if (RUN_LABEL..RUN_LABEL + 2 * RUN_LABELS).contains(&i) => {
                 let (lane, n) = ((i - RUN_LABEL) / RUN_LABELS, (i - RUN_LABEL) % RUN_LABELS);
-                match self.runs[lane].iter().flatten().filter_map(|run| self.run_label(lane, run)).nth(n) {
-                    Some((x, text, color)) => Look::text(x, if lane == 0 { P1_Y } else { CPU_Y }, text, color),
+                match self.runs[lane].iter().flatten().filter_map(|run| self.run_label(lane, run).map(|label| (run, label))).nth(n) {
+                    Some((run, (text, color))) => Look::label(self.spec.lane_run(lane, run.slot, run.len, true), text, color),
                     None => Look::HIDDEN,
                 }
             }
@@ -242,40 +295,53 @@ impl<'a> Layout<'a> {
             WINDOW_BAR | WINDOW_TEXT => self.window(i == WINDOW_TEXT),
             i if (BRACKET..BRACKET + 6).contains(&i) => self.bracket((i - BRACKET) / 3, Some((i - BRACKET) % 3)),
             i if (BRACKET_TEXT..BRACKET_TEXT + 2).contains(&i) => self.bracket(i - BRACKET_TEXT, None),
-            NOW => Look::rect(NOW_X, 32.25, 1.5, MUTED),
-            NOW_TEXT => Look::text(NOW_X - 24.0, 84.0, Text::new("now"), MUTED),
+            NOW => Look::paint(self.spec.now(0), MUTED),
+            NOW_TEXT => Look::label(self.spec.now(1), Text::new("now"), MUTED),
             i if (READ_LABEL..READ_LABEL + 3).contains(&i) => {
                 let n = i - READ_LABEL;
                 let names = if self.parry.is_some() { ["ADVANTAGE", "PARRY", "SET"] } else { ["ADVANTAGE", "LINK", "INPUT"] };
-                Look::text(READ_X + 60.0, READ_LABEL_Y[n], Text::new(names[n]), MUTED)
+                Look::label(self.spec.readout(n, 0), Text::new(names[n]), MUTED)
             }
             i if (READ_VALUE..READ_SUB + 3).contains(&i) => self.readout((i - READ_VALUE) % 3, i >= READ_SUB),
-            LAST_TEXT => Look::text(LABEL_X, LAST_Y, Text::new("LAST"), MUTED),
-            i if (PILL..PILL + 3 * HISTORY).contains(&i) => self.last((i - PILL) / HISTORY, (i - PILL) % HISTORY),
+            LAST_TEXT if self.history => Look::label(self.spec.last_label(), Text::new("LAST"), MUTED),
+            i if self.history && (PILL..PILL + 3 * HISTORY).contains(&i) => self.last((i - PILL) / HISTORY, (i - PILL) % HISTORY),
             i if (STICK..STICK + WINDOW).contains(&i) => self.stick_mark(i - STICK),
+            i if (TAG_BOX..TAG_TEXT).contains(&i) => self.tag(i - TAG_BOX, false),
+            i if (TAG_TEXT..COUNT).contains(&i) => self.tag(i - TAG_TEXT, true),
             _ => Look::HIDDEN,
         }
     }
 
     /// A run's label, centred on it: its length (a long hitstun, recovery or shieldstun) or, with the spot labels on, the spot of the hit that
     /// began a hitlag block of this lane (rc.14, SP3): the lane of the fighter that was hit.
-    fn run_label(&self, lane: usize, run: &Run) -> Option<(f32, Text, [u8; 4])> {
-        let x = FIRST_X + (run.slot as f32 + run.len as f32 / 2.0) * PITCH;
+    fn run_label(&self, lane: usize, run: &Run) -> Option<(Text, [u8; 4])> {
         if run.cell.counted() && run.len >= 7 {
             let mut text = Text::EMPTY;
             let _ = write!(text, "{}", run.len);
-            return Some((x, text, TEXT));
+            return Some((text, TEXT));
         }
         let frames = self.frames[run.slot]..=self.frames[run.slot + run.len - 1];
         let mark = self.tracker.marks().find(|m| usize::from(m.lane) == lane && frames.contains(&m.frame));
-        mark.filter(|_| self.spots && run.cell == Cell::Hitlag).map(|m| (x, Text::new(m.spot.name()), INK))
+        mark.filter(|_| self.spots && run.cell == Cell::Hitlag).map(|m| (Text::new(m.spot.name()), INK))
     }
 
     /// One `>` for this slot, rotated so rot 0 points right and each bin is 45 degrees counter-clockwise.
     /// A neutral frame is hidden. One pane, not a shaft and a head: `>` is already in the font and is not symmetric.
     fn stick_mark(&self, slot: usize) -> Look {
         let Some(dir) = self.sticks[slot] else { return Look::HIDDEN };
-        Look { rot: f32::from(dir) * 45.0, ..Look::text(Self::centre(slot as f32), STICK_Y, Text::new(">"), TEXT) }
+        Look::label(self.spec.stick(slot, dir), Text::new(">"), TEXT)
+    }
+
+    fn tag(&self, n: usize, text: bool) -> Look {
+        let Some(tag) = self.tracker.tags().nth(n) else { return Look::HIDDEN };
+        let Some(slot) = self.slot(tag.frame).filter(|slot| *slot < WINDOW as f32) else { return Look::HIDDEN };
+        let grade = match tag.grade { Grade::Excellent => 0, Grade::Good => 1, Grade::Ok => 2 };
+        let place = self.spec.tag(slot, usize::from(tag.lane != 0), grade);
+        if text {
+            Look::label(place, Text::new(tag.grade.name()), INK)
+        } else {
+            Look::paint(place, tag.grade.color())
+        }
     }
 
     /// Chip part `part` (box, glyph, shaft, head, tick) of the `n`th newest press on screen.
@@ -285,19 +351,12 @@ impl<'a> Layout<'a> {
         else {
             return Look::HIDDEN;
         };
-        let x = Self::centre(slot);
-        let arrow = press.stick.is_some();
-        let glyph_x = if arrow { x + CHIP * 0.45 } else { x };
-        let dir = press.stick.unwrap_or(0);
-        let rot = f32::from(dir) * 45.0 - 90.0;
-        let (c, s) = DIRECTION[usize::from(dir) % 8];
-        let arrow_x = x - CHIP * 0.45;
+        let place = self.spec.chip(slot, press.stick, part);
         match part {
-            0 => Look::rect(x, IN_Y, if arrow { CHIP * 1.9 } else { CHIP }, CHIP_BACK),
-            1 => Look::text(glyph_x, IN_Y, Text::glyph(press.button.glyph()), press.button.color()),
-            2 if arrow => Look { rot, ..Look::rect(arrow_x - 2.0 * c, IN_Y - 2.0 * s, 4.5, TEXT) },
-            3 if arrow => Look { rot: rot + 45.0, ..Look::rect(arrow_x + 5.0 * c, IN_Y + 5.0 * s, 9.0, TEXT) },
-            4 => Look::rect(x, TICK_Y, 1.5, [255, 255, 255, 170]),
+            0 => Look::paint(place, CHIP_BACK),
+            1 => Look::label(place, Text::glyph(press.button.glyph()), press.button.color()),
+            2 | 3 if press.stick.is_some() => Look::paint(place, TEXT),
+            4 => Look::paint(place, [255, 255, 255, 170]),
             _ => Look::HIDDEN,
         }
     }
@@ -313,14 +372,13 @@ impl<'a> Layout<'a> {
         if b < a {
             return Look::HIDDEN;
         }
-        let left = FIRST_X + a * PITCH;
-        let right = FIRST_X + b * PITCH + CELL_W;
+        let place = self.spec.window(a, b, text);
         if text {
             let mut t = Text::EMPTY;
             let _ = write!(t, "window {}f", to - from + 1);
-            return Look::text(right + 60.0, WINDOW_Y, t, GOOD);
+            return Look::label(place, t, GOOD);
         }
-        Look::rect((left + right) / 2.0, WINDOW_Y, right - left, GOOD)
+        Look::paint(place, GOOD)
     }
 
     /// Bracket `which` (0 link, 1 advantage): its part (left leg, bottom, right leg) or its text (`None`).
@@ -347,13 +405,8 @@ impl<'a> Layout<'a> {
         let Some((from, to, color, text)) = ends else { return Look::HIDDEN };
         let (Some(a), Some(b)) = (self.slot(from), self.slot(to)) else { return Look::HIDDEN };
         let b = b.min(WINDOW as f32);
-        let (left, right) = (FIRST_X + a * PITCH, FIRST_X + b * PITCH);
-        match part {
-            Some(0) => Look::rect(left, LEG_Y, 3.0, color),
-            Some(1) => Look::rect((left + right) / 2.0, BAR_Y, (right - left).max(3.0), color),
-            Some(_) => Look::rect(right, LEG_Y, 3.0, color),
-            None => Look::text((left + right) / 2.0, BRACKET_TEXT_Y, text, color),
-        }
+        let place = self.spec.bracket(a, b, part);
+        if part.is_some() { Look::paint(place, color) } else { Look::label(place, text, color) }
     }
 
     /// Readout `n` (ADVANTAGE, LINK, INPUT): its value or its sub-line.
@@ -384,15 +437,15 @@ impl<'a> Layout<'a> {
             },
         } };
         if sub {
-            Look::text(READ_SUB_X + 90.0, READ_VALUE_Y[n] - 1.5, line, TEXT)
+            Look::label(self.spec.readout(n, 2), line, TEXT)
         } else {
-            Look::text(READ_X + 30.0, READ_VALUE_Y[n], value, color)
+            Look::label(self.spec.readout(n, 1), value, color)
         }
     }
 
     /// LAST row part (pill, pill text, moves) of the `n`th newest link.
     fn last(&self, part: usize, n: usize) -> Look {
-        let x = PILL_X0 + n as f32 * PILL_STRIDE;
+        let place = self.spec.last(part, n);
         let (color, label, link) = if let Some(p) = self.parry {
             let Some(a) = p.last[n] else { return Look::HIDDEN };
             let (_, label, color) = graded(a.grade);
@@ -406,29 +459,17 @@ impl<'a> Layout<'a> {
             }
         };
         match (part, link) {
-            (0, _) => Look::rect(x, LAST_Y, PILL_W, color),
-            (1, _) => Look::text(x, LAST_Y, label, [10, 14, 20, 255]),
+            (0, _) => Look::paint(place, color),
+            (1, _) => Look::label(place, label, INK),
             (_, None) => Look::HIDDEN,
             (_, Some(link)) => {
                 let mut t = Text::EMPTY;
                 let _ = write!(t, "{} > {}", link.from.name(), link.to.name());
-                Look::text(x + PILL_W / 2.0 + 100.0, LAST_Y, t, TEXT)
+                Look::label(place, t, TEXT)
             }
         }
     }
 }
-
-/// `cos` and `sin` of the eight stick directions (a table: the float library's would link the math library).
-const DIRECTION: [(f32, f32); 8] = [
-    (1.0, 0.0),
-    (0.707_106_77, 0.707_106_77),
-    (0.0, 1.0),
-    (-0.707_106_77, 0.707_106_77),
-    (-1.0, 0.0),
-    (-0.707_106_77, -0.707_106_77),
-    (0.0, -1.0),
-    (0.707_106_77, -0.707_106_77),
-];
 
 /// A parry attempt's readout (rc.15): the frames off (0 inside the window, - before it, + after the hit), Tech's own words for the
 /// grade (`Grade::write`), and its colour.
@@ -519,28 +560,62 @@ impl<const N: usize> Panes<N> {
     }
 }
 
+/// What one strip draw shows around the tracker, and the layout that places it.
+#[derive(Clone, Copy)]
+pub struct StripDraw<'a> {
+    pub shown: bool,
+    pub spots: bool,
+    pub parry: Option<&'a super::parry::View>,
+    pub history_enabled: bool,
+    pub cells: bool,
+    pub spec: &'a LayoutSpec,
+}
+
 /// What was last written to each of the strip's panes.
 pub type Renderer = Panes<COUNT>;
 
 impl Renderer {
     /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
     /// changed, with what changed. Returns how many panes were written.
+    #[cfg(test)]
     pub fn draw(&mut self, tracker: &Tracker, shown: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         self.draw_spots(tracker, shown, false, apply)
     }
 
     /// `draw`, with the spot labels on the hit blocks when `spots` (rc.14, SP3).
+    #[cfg(test)]
     pub fn draw_spots(&mut self, tracker: &Tracker, shown: bool, spots: bool, apply: impl FnMut(usize, &Look, Changed)) -> usize {
         self.draw_parry(tracker, shown, spots, None, apply)
     }
 
     /// `draw_spots`, with Parry practice's readouts, window and pills when `parry` (rc.15).
+    #[cfg(test)]
     pub fn draw_parry(&mut self, tracker: &Tracker, shown: bool, spots: bool, parry: Option<&super::parry::View>, apply: impl FnMut(usize, &Look, Changed)) -> usize {
+        self.draw_with_spec(tracker, StripDraw { shown, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
+    }
+
+    /// The wide LINK line travels separately from the cached panes.
+    pub fn draw_with_spec(
+        &mut self,
+        tracker: &Tracker,
+        draw: StripDraw<'_>,
+        apply: impl FnMut(usize, &Look, Changed),
+    ) -> (usize, Option<LinkLine>, bool) {
+        let StripDraw { shown, spots, parry, history_enabled, cells, spec } = draw;
+        let history = spec.history_row(history_enabled, parry.is_some(), cells);
         if !shown {
-            return self.hide(at::CONTAINER, Look { visible: false, ..Look::HIDDEN }, apply);
+            return (self.hide(at::CONTAINER, Look::HIDDEN, apply), None, history);
         }
-        let layout = Layout::new(tracker, spots, parry);
-        self.show(|i| layout.look(i), apply)
+        let content = Content::new(tracker, spots, parry, &spec.strip, history, cells);
+        let line = if !history_enabled && parry.is_none() {
+            tracker.latest_link().as_ref().map(folded_link)
+        } else {
+            None
+        }.unwrap_or_else(|| {
+            let look = content.readout(1, true);
+            LinkLine::from_units(look.text.units().iter().copied())
+        });
+        (self.show(|i| content.look(i), apply), Some(line), history)
     }
 }
 

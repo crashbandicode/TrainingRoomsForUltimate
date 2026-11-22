@@ -96,15 +96,17 @@ fn btt_camera_manager_pointer_is_checked_before_it_is_read() {
 fn btt_camera_owners_preserve_mode_through_handover() {
     fn call(owners: &CameraRequests, cam: &mut Camera, mode: &mut i32, owner: u8, want: bool) -> Option<i32> {
         owners.request(owner, want);
-        let act = cam.step(owners.wanted(), Some(*mode));
+        let act = cam.step(owners.camera_wanted(false), Some(*mode));
         if let Some(to) = act { *mode = to; }
         act
     }
+    let bits = [BTT_PLACEMENT_OWNER, TECH_CAMERA_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER, TECH_PLACEMENT_OWNER];
     for before in [NORMAL, ZOOM, FIXED] {
-        // BTT only, Tech only: stable requests never acquire a second time.
-        for owner in [1, 2] {
+        for owner in bits {
             let owners = CameraRequests::idle();
             let (mut cam, mut mode) = (Camera::IDLE, before);
+            assert_eq!(call(&owners, &mut cam, &mut mode, owner, false), None);
+            assert!(!owners.camera_wanted(false));
             assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), (before != FIXED).then_some(FIXED));
             for _ in 0..60 { assert_eq!(call(&owners, &mut cam, &mut mode, owner, true), None); }
             call(&owners, &mut cam, &mut mode, owner, false);
@@ -112,7 +114,9 @@ fn btt_camera_owners_preserve_mode_through_handover() {
             assert!(!cam.holding());
         }
         // Both, then each direction of handover: the remaining owner keeps Fixed and the first saved mode.
-        for (first, second) in [(1, 2), (2, 1)] {
+        for (first, second) in bits.into_iter().flat_map(|first| {
+            bits.into_iter().filter(move |&second| first != second).map(move |second| (first, second))
+        }) {
             let owners = CameraRequests::idle();
             let (mut cam, mut mode) = (Camera::IDLE, before);
             call(&owners, &mut cam, &mut mode, first, true);
@@ -134,6 +138,50 @@ fn btt_camera_owners_preserve_mode_through_handover() {
     assert_eq!(call(&owners, &mut cam, &mut mode, 1, false), Some(FIXED), "an original Fixed mode is preserved too");
 }
 
+fn each_placement_owner_holds_the_cpu_and_releases_the_previous_view() {
+    let editors = [BTT_PLACEMENT_OWNER, TECH_PLACEMENT_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER];
+    for owner in editors {
+        for (closed, covered, invalidated, mode) in [
+            (true, false, false, Some(FIXED)), // Apply, Back
+            (false, true, false, Some(FIXED)), // Menu interruption
+            (false, false, true, Some(FIXED)), // Stage change and native reset
+            (true, false, false, None), // Scene departure retires the manager
+        ] {
+            let owners = CameraRequests::idle();
+            let mut camera = Camera::IDLE;
+            assert!(!owners.placement(false));
+            assert_eq!(camera.step(owners.camera_wanted(false), Some(ZOOM)), None);
+
+            owners.request(owner, true);
+            assert!(owners.placement(false));
+            assert_eq!(camera.step(owners.camera_wanted(false), Some(ZOOM)), Some(FIXED));
+            assert!(camera.holding());
+
+            if closed { owners.request(owner, false); }
+            if invalidated {
+                owners.interrupt();
+                assert!(!owners.placement(false));
+            }
+            assert_eq!(camera.step(owners.camera_wanted(covered), mode), mode.map(|_| ZOOM));
+            assert!(!camera.holding());
+            assert!(!owners.placement(covered));
+            assert_eq!(camera.step(false, Some(ZOOM)), None);
+        }
+    }
+}
+
+fn running_tech_camera_does_not_hold_the_cpu() {
+    let owners = CameraRequests::idle();
+    owners.request(TECH_CAMERA_OWNER, true);
+    assert!(owners.camera_wanted(false));
+    assert!(!owners.placement(false));
+    owners.request(TECH_PLACEMENT_OWNER, true);
+    assert!(owners.placement(false));
+    owners.interrupt();
+    assert!(owners.camera_wanted(false));
+    assert!(!owners.placement(false));
+}
+
 /// The cases of this module in one table.
 #[test]
 fn case_table() {
@@ -144,6 +192,8 @@ fn case_table() {
         ("btt_camera_stands_down_without_a_manager", btt_camera_stands_down_without_a_manager as fn()),
         ("btt_camera_restores_each_placement_exit", btt_camera_restores_each_placement_exit as fn()),
         ("btt_camera_owners_preserve_mode_through_handover", btt_camera_owners_preserve_mode_through_handover as fn()),
+        ("each_placement_owner_holds_the_cpu_and_releases_the_previous_view", each_placement_owner_holds_the_cpu_and_releases_the_previous_view as fn()),
+        ("running_tech_camera_does_not_hold_the_cpu", running_tech_camera_does_not_hold_the_cpu as fn()),
         ("btt_camera_manager_pointer_is_checked_before_it_is_read", btt_camera_manager_pointer_is_checked_before_it_is_read as fn()),
     ]);
 }

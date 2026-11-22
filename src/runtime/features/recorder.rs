@@ -307,6 +307,11 @@ unsafe fn on_ai_frame(ai: usize) {
     if ((body.entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() != controller {
         return;
     }
+    let buttons = ((controller + CTRL_BUTTONS) as *const u32).read();
+    if let Some(hold) = super::btt_camera::placement_pad(buttons) {
+        write_controller(controller, Inject { buttons: (buttons & !hold.release) | hold.press, ..Inject::NEUTRAL });
+        return;
+    }
     if crate::model::edge_juggle::drill_owns_pad(
         super::edge_juggle::controls_cpu(body.accessor),
         busy_for_drill(),

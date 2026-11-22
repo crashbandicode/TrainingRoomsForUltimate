@@ -16,9 +16,9 @@ use skyline::nn::ui2d::{Layout, Pane};
 use crate::model::frame_strip_plan::{Changed, Look};
 use crate::model::notice_box;
 use crate::model::notify::TickOut;
-use crate::model::panes::{self as p, cb, iv};
+use crate::model::panes::{self as p, cb, iv, strip_layout::C};
 use crate::runtime::diag_log::diagnostic;
-use crate::runtime::features::{input_display, notices};
+use crate::runtime::features::{combo, input_display, notices, parry};
 use crate::runtime::ui::{pane, tick};
 use crate::runtime::{published, scene};
 
@@ -111,30 +111,53 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let owners = published::input_owners();
     let menu_open = owners.covers_hud();
     let strip_shown = !menu_open && input_display::sampling();
-    let btt = crate::runtime::features::btt::hud();
-    let chip = (!menu_open && !btt.as_str().is_empty())
-        .then(|| p::btt_hud_box(btt.as_str(), strip_shown, crate::runtime::features::combo::bar_shown()));
-    // Lobby practice: the native top panels hold the top band, so the strip, the chip and the notice move down there.
-    let drop = if crate::runtime::scene::current() == Some(crate::model::scene::Scene::Lobby) { p::LOBBY_DROP } else { 0.0 };
-    #[cfg(feature = "diag")]
-    {
-        static LAST_DROP: AtomicU32 = AtomicU32::new(u32::MAX);
-        if LAST_DROP.swap(drop.to_bits(), Ordering::AcqRel) != drop.to_bits() {
-            diagnostic(format_args!("[FrameStrip] top_offset drop={drop} strip_y={} waiting_layout={waiting}", iv::STRIP_Y - drop));
-        }
-    }
-    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip, drop);
-    write_btt(root, btt.as_str(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
-    if strip[iv::at::CONTAINER] != 0 {
-        input_display::hud_tick(menu_open, |local, look, changed| {
-            write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
-        });
-        pane::set_pos(strip[iv::at::CONTAINER] as *mut Pane, 0.0, iv::STRIP_Y - drop);
-    }
-    if bar[cb::at::CONTAINER] != 0 {
-        crate::runtime::features::combo::hud_tick(strip_shown, |local, look, changed| {
+    // Lobby practice reserves the top band for the native panels.
+    let drop = C.scene_drop(scene::current() == Some(crate::model::scene::Scene::Lobby));
+    let draw_settings = input_display::settings();
+    let parry = strip_shown.then(parry::view).flatten();
+    let card = if bar[cb::at::CONTAINER] != 0 {
+        let mut drawn = None;
+        combo::hud_tick(strip_shown, draw_settings.link_history, parry.is_some(), &mut drawn, |local, look, changed| {
             write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
         });
+        // This draw's own card; only a contended tick falls back to the last one drawn.
+        drawn.unwrap_or_else(|| combo::card(strip_shown))
+    } else {
+        None
+    };
+    let btt = crate::runtime::features::btt::hud();
+    let chip = (!menu_open && !btt.as_str().is_empty())
+        .then(|| p::btt_hud_box(btt.as_str(), strip_shown, card.is_some()));
+    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip, drop);
+    write_btt(root, btt.as_str(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
+
+    let container = strip[iv::at::CONTAINER] as *mut Pane;
+    if !container.is_null() {
+        let (line, history) = input_display::hud_tick(
+            strip_shown, draw_settings, parry.as_ref(), card.is_some(), |local, look, mut changed| {
+                // The dedicated 32-unit LINK box is written from the same tracker snapshot below.
+                if local == iv::at::READ_SUB + 1 {
+                    changed.text = false;
+                }
+                write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
+            },
+        );
+        if let Some(line) = line {
+            let link = strip[iv::at::READ_SUB + 1] as *mut Pane;
+            if !link.is_null() {
+                pane::set_text(link, line.units());
+            }
+        }
+        let backdrop = strip[iv::at::BACKDROP] as *mut Pane;
+        if !backdrop.is_null() {
+            pane::set_height(backdrop, C.strip.bounds(history, card.is_some())[3]);
+        }
+        pane::set_pos(container, C.strip.origin_x, C.strip.origin_y - drop);
+        if strip_shown {
+            let anchors = super::hitbox::fighter_screen_anchors(name);
+            let alpha = C.opacity(drop, history, card, anchors.into_iter().flatten().flatten().map(|anchor| anchor.canvas));
+            pane::set_alpha(container, alpha);
+        }
     }
 }
 

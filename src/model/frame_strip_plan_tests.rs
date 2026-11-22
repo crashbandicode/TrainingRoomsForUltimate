@@ -45,6 +45,103 @@ fn true_combo() -> Tracker {
     t
 }
 
+#[test]
+fn runtime_and_archive_share_the_strip_layout() {
+    use crate::model::panes::{IDX_IV, strip_pane_spec};
+    let tracker = true_combo();
+    let mut alternate = C;
+    alternate.strip.origin_y -= 300.0;
+    alternate.strip.width -= 40.0;
+    alternate.strip.base_height += 20.0;
+    let collect = |spec: &LayoutSpec| {
+        let mut looks = [Look::HIDDEN; COUNT];
+        let (_, line, history) = Renderer::new().draw_with_spec(
+            &tracker, StripDraw { shown: true, spots: true, parry: None, history_enabled: true, cells: false, spec },
+            |i, look, _| looks[i] = *look,
+        );
+        let root = strip_pane_spec(spec, IDX_IV + at::CONTAINER);
+        assert_eq!((root.x, root.y), (looks[at::CONTAINER].x, looks[at::CONTAINER].y));
+        for i in [at::BACKDROP, at::SEPARATOR + 1, at::READ_LABEL + 1, at::READ_SUB + 1] {
+            let pane = strip_pane_spec(spec, IDX_IV + i);
+            let look = looks[i];
+            assert_eq!((pane.x, pane.y, pane.w), (look.x, look.y, look.w));
+        }
+        let rule = looks[at::SEPARATOR + 1];
+        assert!(rule.visible && rule.x.abs() + rule.w / 2.0 <= spec.strip.width / 2.0);
+        (looks, line, history)
+    };
+    let (compact, line, history) = collect(&C);
+    let (other, other_line, other_history) = collect(&alternate);
+    assert_ne!((compact[0].y, compact[1].w), (other[0].y, other[1].w));
+    assert_ne!(compact[at::READ_SUB + 1].x, other[at::READ_SUB + 1].x);
+    assert_eq!(compact.map(|l| (l.visible, l.color, l.text)), other.map(|l| (l.visible, l.color, l.text)));
+    assert_eq!((line, history), (other_line, other_history));
+}
+
+#[test]
+fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
+    let tracker = true_combo();
+    let mut renderer = Renderer::new();
+    let mut draw = |on| {
+        let (_, line, history) = renderer.draw_with_spec(
+            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C }, |_, _, _| {},
+        );
+        let last = renderer.written(at::LAST_TEXT).unwrap().visible;
+        let pill = renderer.written(at::PILL).unwrap().visible;
+        assert_eq!((history, last, pill), (on, on, on));
+        String::from_utf16(line.unwrap().units()).unwrap()
+    };
+    assert_eq!(draw(true), "TRUE combo");
+    assert_eq!(draw(false), "TRUE · Jab > Up tilt");
+    assert_eq!(draw(true), "TRUE combo");
+}
+
+#[test]
+fn last_row_moves_keep_a_gap_from_their_pill() {
+    use crate::model::panes::{iv, IDX_IV, strip_pane_spec};
+    for n in 0..iv::HISTORY {
+        let pill = C.strip.last(0, n);
+        let moves = C.strip.last(2, n);
+        let (left, right) = (moves.x - moves.w / 2.0, moves.x + moves.w / 2.0);
+        assert_eq!((left - (pill.x + pill.w / 2.0), moves.w), (8.0, 192.0));
+        let (bound, clear) = if n + 1 < iv::HISTORY {
+            let next = C.strip.last(0, n + 1);
+            (next.x - next.w / 2.0, 4.0)
+        } else {
+            (C.strip.width / 2.0, 16.0)
+        };
+        assert_eq!(bound - right, clear);
+        let pane = strip_pane_spec(&C, IDX_IV + at::MOVE_TEXT + n);
+        assert_eq!((pane.x, pane.w), (moves.x, moves.w));
+    }
+}
+
+#[test]
+fn compact_bounds_and_fade_follow_the_scene_and_visible_rows() {
+    assert_eq!(C.strip.bounds(true, false), [0.0, 23.0, 1296.0, 170.0]);
+    assert_eq!(C.strip.bounds(false, false), [0.0, 39.0, 1296.0, 138.0]);
+    assert_eq!(C.strip.bounds(false, true), [0.0, 7.0, 1296.0, 202.0]);
+    let seen = C.opacity(0.0, false, Some(true), [[0.0, 535.0]]);
+    assert_eq!(seen, u8::MAX);
+    assert_eq!(
+        C.opacity(0.0, false, Some(true), [[0.0, 500.0]]),
+        C.covered_alpha
+    );
+    assert_eq!(
+        C.opacity(0.0, false, Some(true), [[804.0, 400.0]]),
+        C.covered_alpha
+    );
+    assert_eq!(C.opacity(0.0, false, None, [[804.0, 400.0]]), u8::MAX);
+    assert_eq!(
+        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 500.0]]),
+        u8::MAX
+    );
+    assert_eq!(
+        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 400.0]]),
+        C.covered_alpha
+    );
+}
+
 fn draw_all(r: &mut Renderer, t: &Tracker, shown: bool) -> (usize, Vec<(usize, Look, Changed)>) {
     let mut seen = Vec::new();
     let n = r.draw(t, shown, |i, look, changed| seen.push((i, *look, changed)));
@@ -91,7 +188,7 @@ fn clip_editor_hides_and_restores_both_hud_renderers() {
                 strip.draw(&tracker, shown, |i, look, _| {
                     if i == at::CONTAINER { visible[0] = look.visible; }
                 });
-                bar.draw(&helper, &Text::new("Target"), None, shown, |i, look, _| {
+                bar.draw(&helper, &Text::new("Target"), None, shown, (&C, false), |i, look, _| {
                     if i == combo_plan::at::CONTAINER { visible[1] = look.visible; }
                 });
                 visible
@@ -133,6 +230,36 @@ fn look_at(seen: &[(usize, Look, Changed)], i: usize) -> Look {
 
 fn held(x: i8, y: i8) -> MappedInputs {
     MappedInputs { lstick_x: x, lstick_y: y, ..NONE }
+}
+
+fn grade_tag_text_and_colour() {
+    use crate::model::spacing::{Grade, Grader};
+
+    let grader = Grader::new();
+    let mut tracker = Tracker::new();
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+    grader.target(Grade::Good);
+    tracker.step_graded(idle(), idle(), NONE, grader.take());
+    grader.finish(true);
+
+    let tag_box = at::STICK + WINDOW;
+    let tag_text = tag_box + crate::model::frame_strip::TAGS;
+    let mut renderer = Renderer::new();
+    let (_, seen) = draw_all(&mut renderer, &tracker, true);
+    let box_look = look_at(&seen, tag_box);
+    let text_look = look_at(&seen, tag_text);
+    let x = FIRST_X + (WINDOW - 2) as f32 * PITCH + CELL_W / 2.0;
+    assert_eq!((box_look.x, box_look.y, box_look.w, box_look.color), (x, P1_Y, 54.0, Grade::Good.color()));
+    assert_eq!((text_look.x, text_look.y, text_look.color), (x, P1_Y, INK));
+    assert_eq!(String::from_utf16(text_look.text.units()).unwrap(), "Good");
+
+    for frame in 0..WINDOW {
+        tracker.step(idle(), idle(), if frame % 2 == 0 { held(100, 0) } else { held(0, 100) });
+    }
+    let (_, offscreen) = draw_all(&mut renderer, &tracker, true);
+    assert!(!look_at(&offscreen, tag_box).visible);
+    assert!(!look_at(&offscreen, tag_text).visible);
 }
 
 fn the_stick_row_scrolls_and_freezes_with_the_strip() {
@@ -299,6 +426,7 @@ fn case_table() {
         ("deferred_cached_looks_match_direct_visible_writes", deferred_cached_looks_match_direct_visible_writes as fn()),
         ("parry_strip_readouts_show_grade_and_counter", parry_strip_readouts_show_grade_and_counter as fn()),
         ("parry_window_uses_the_strip_frames", parry_window_uses_the_strip_frames as fn()),
+        ("grade_tag_text_and_colour", grade_tag_text_and_colour as fn()),
     ]);
 }
 }

@@ -1,44 +1,21 @@
 //! SPEC-input-03 (Input Delay). Test paths are the spec's §9 rows (`delay::…`).
 
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-/// Counts the allocations the current thread makes while `COUNTING` is set.
-struct Counting;
-
+// Counts the allocations the current thread makes while `COUNTING` is set.
 thread_local! {
     static COUNTING: Cell<bool> = const { Cell::new(false) };
     static ALLOCATIONS: Cell<u64> = const { Cell::new(0) };
 }
 
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.with(Cell::get) {
-            ALLOCATIONS.with(|n| n.set(n.get() + 1));
-        }
-        System.alloc(layout)
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        System.dealloc(ptr, layout)
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        if COUNTING.with(Cell::get) {
-            ALLOCATIONS.with(|n| n.set(n.get() + 1));
-        }
-        System.realloc(ptr, layout, new_size)
+pub(super) fn count_allocation() {
+    if COUNTING.try_with(Cell::get).unwrap_or(false) {
+        let _ = ALLOCATIONS.try_with(|count| count.set(count.get() + 1));
     }
 }
 
-#[global_allocator]
-static ALLOC: Counting = Counting;
 
 mod delay {
     use super::model::input_delay::{applies, Clear, DelayQueue, MappedInputs, Owners, PollStage, MAX_DELAY, POLL_ORDER};

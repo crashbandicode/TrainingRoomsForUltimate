@@ -20,10 +20,16 @@ use crate::model::edge_juggle::perfect::{
     self, AirPhysics, Correction, LandingFacts, LandingOptions, MeteorBounce, MeteorWindow,
     PlanHeight, PlanInput, Route, RouteFacts, ThreatClock,
 };
+use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
 use crate::model::edge_juggle::{
-    CpuObject, Difficulty, Drill, Observation, Outcome, Phase, Placement, PlacementAction,
-    PlacementFrame, Reaction, Session, Setup, Stage, Wizard, WizardStep,
+    CpuObject, Drill, Observation, Outcome, Phase, Placement, PlacementAction, PlacementFrame,
+    Reaction, Session, Setup, Stage, Wizard, WizardStep,
 };
+
+#[path = "edge_juggle/zoom.rs"]
+mod zoom;
+#[path = "edge_juggle/practice_cpu.rs"]
+pub(in crate::runtime) mod practice_cpu;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
 use crate::model::settings::Snapshot;
@@ -41,21 +47,38 @@ mod startup_dodge;
 const NOTICE: u8 = 0x34;
 const JUGGLE_PERCENT: u16 = 60;
 type StageKey = (i32, u32);
-type BestKey = (Drill, i32, u8, Difficulty);
+type BestKey = (Drill, i32, u8, Mode);
+
+#[derive(Clone, Copy)]
+struct Opponent {
+    fighter: Option<u32>,
+    mode: Mode,
+    window: u8,
+}
+
+impl Opponent {
+    const DEFAULT: Self = Self {
+        fighter: Picker::DEFAULT.fighter,
+        mode: Mode::Cpu(Picker::DEFAULT.level),
+        window: picker::DEFAULT_WINDOW,
+    };
+}
+
+static OPPONENT: Published<Opponent> = Published::new(Opponent::DEFAULT);
 
 #[derive(Clone, Copy)]
 struct Config {
     edge_percent: u16,
     edge_limit: Option<u16>,
     juggle_limit: Option<u16>,
-    difficulty: [Difficulty; 2],
+    opponent: [Opponent; 2],
     reaction: [Reaction; 2],
 }
 static CONFIG: Published<Config> = Published::new(Config {
     edge_percent: 100,
     edge_limit: Some(10),
     juggle_limit: Some(10),
-    difficulty: [Difficulty::LevelNine; 2],
+    opponent: [Opponent::DEFAULT; 2],
     reaction: [Reaction::Human; 2],
 });
 static INSTALLED: AtomicBool = AtomicBool::new(false);
@@ -86,7 +109,8 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
 
 struct Run {
     drill: Drill,
-    difficulty: Difficulty,
+    opponent: Opponent,
+    zoom: zoom::NativeAttempt,
     reaction: Reaction,
     threat: ThreatClock,
     stage_key: StageKey,
@@ -181,6 +205,9 @@ pub fn install(dependencies: bool) -> bool {
         );
     startup_dodge::install(installed);
     SPECIAL_TABLE.store(special_table, Ordering::Release);
+    if installed {
+        zoom::install();
+    }
     INSTALLED.store(installed, Ordering::Release);
     installed
 }
@@ -201,8 +228,14 @@ pub fn publish(snapshot: &Snapshot) {
         edge_percent: select("edge_cpu_percent").min(300) as u16,
         edge_limit: limit("edge_attempts"),
         juggle_limit: limit("juggle_attempts"),
-        difficulty: [Drill::GuardEdge, Drill::Juggler]
-            .map(|drill| Difficulty::from_option(select(drill.difficulty_rows().difficulty))),
+        opponent: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
+            let picker = Picker::read(snapshot, drill);
+            Opponent {
+                fighter: picker.fighter,
+                mode: picker.mode(),
+                window: (select(picker::rows(drill).window).min(29) + 1) as u8,
+            }
+        }),
         reaction: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
             let rows = drill.difficulty_rows();
             Reaction::from_settings(select(rows.reaction), select(rows.frames))
@@ -211,6 +244,9 @@ pub fn publish(snapshot: &Snapshot) {
 }
 
 pub fn start(edit: bool) {
+    if let Some(drill) = wanted() {
+        OPPONENT.publish(CONFIG.read().opponent[drill as usize]);
+    }
     super::cpu_level::drill_started();
     P1_BUTTONS.store(0, Ordering::Release);
     RESTART.store(false, Ordering::Release);
@@ -240,7 +276,11 @@ pub fn wizard_active() -> bool {
     WIZARD.load(Ordering::Acquire) && wanted().is_some()
 }
 
-pub fn allowed() -> bool {
+pub(super) fn placement_active() -> bool {
+    !OPEN.load(Ordering::Acquire) && wizard_active()
+}
+
+pub fn allowed(drill: Drill) -> bool {
     if !INSTALLED.load(Ordering::Acquire) || !scene::is_native_training() {
         return false;
     }
@@ -248,7 +288,8 @@ pub fn allowed() -> bool {
         notices::refuse("Stop CPU playback before starting this drill"); // restriction: edge-juggle-cpu-playback-busy
         return false;
     }
-    true
+    !matches!(CONFIG.read().opponent[drill as usize].mode, Mode::Drill(DrillId::Zoom))
+        || zoom::installed()
 }
 
 fn wanted() -> Option<Drill> {
@@ -259,6 +300,22 @@ fn wanted() -> Option<Drill> {
 
 pub(super) fn running() -> bool {
     wanted().is_some()
+}
+
+pub(super) fn stock_level() -> Option<u8> {
+    running().then(|| OPPONENT.read().mode.stock_level())
+}
+
+pub(super) fn cpu_selection() -> Option<u32> {
+    let drill = wanted()?;
+    if START.load(Ordering::Acquire) == 0 {
+        if let Some(engine) = ENGINE.try_lock() {
+            if let Some(run) = engine.run.as_ref().filter(|run| run.drill == drill) {
+                return run.opponent.fighter;
+            }
+        }
+    }
+    OPPONENT.read().fighter
 }
 
 pub unsafe fn controls_cpu(accessor: usize) -> bool {
@@ -323,7 +380,7 @@ pub(super) unsafe fn player_height_request(player: usize) -> Option<LivePerfect>
     let mut engine = ENGINE.try_lock()?;
     let run = engine.run.as_mut().filter(|run| {
         wanted() == Some(run.drill)
-            && run.difficulty == Difficulty::Perfect
+            && run.opponent.mode == Mode::Perfect
             && run.rounds.phase == Phase::Live
             && run.wizard.is_none()
             && run.plan_pending
@@ -411,7 +468,7 @@ unsafe fn trace_attempt(
     let meta = u64::from(ordinal)
         | (u64::from(event) << 16)
         | (u64::from(run.drill == Drill::Juggler) << 24)
-        | (u64::from(run.difficulty == Difficulty::Perfect) << 25)
+        | (u64::from(run.opponent.mode == Mode::Perfect) << 25)
         | (u64::from(run.stage_key.1 & 0xf) << 28)
         | (u64::from(kind as u16) << 32)
         | (u64::from(run.stage_key.0 as u16) << 48);
@@ -451,6 +508,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
         || OPEN.load(Ordering::Acquire)
         || published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         || states::is_loading()
+        || START.load(Ordering::Acquire) != 0
     {
         return Correction::default();
     }
@@ -473,13 +531,20 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     {
         return Correction::default();
     }
-    // The wizard is in Place. Its stock CPU must also stay neutral so it
-    // cannot move or hit P1 before the selected start is applied.
+    // A live editor gets its neutral pad from the shared placement session.
+    if run.wizard.is_some() {
+        return Correction::default();
+    }
     if let Some(hold) = run.rounds.phase.held_pad(buttons) {
         return hold;
     }
-    if run.wizard.is_some() || run.difficulty != Difficulty::Perfect || run.rounds.phase != Phase::Live {
+    if run.rounds.phase != Phase::Live {
         return Correction::default();
+    }
+    match run.opponent.mode {
+        Mode::Drill(DrillId::Zoom) => return run.zoom.zoom_pad(accessor, buttons),
+        Mode::Cpu(_) => return Correction::default(),
+        Mode::Perfect => {}
     }
     let status = natives::status_kind(accessor);
     let Some(p1) = natives::module_accessor(0) else {
@@ -1489,22 +1554,26 @@ unsafe fn ledge(
     None
 }
 
-unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
-    let bounds @ [left, right, top, bottom] = natives::camera_limit_range()?;
+pub(super) unsafe fn stage_floor(
+    ray: &FloorRay,
+    [left, right, top, bottom]: [f32; 4],
+) -> Option<(perfect::Segment, perfect::Point)> {
     let x = left.midpoint(right);
-    let ray = FloorRay::new(p1)?;
     let limits = [top, bottom];
     let floor = ray.floor(x, limits, false)?;
+    let ledges = [
+        ledge(ray, floor, false, limits)?,
+        ledge(ray, floor, true, limits)?,
+    ];
+    Some((ledges, [x, floor.height(x)?]))
+}
+
+unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
+    let bounds = natives::camera_limit_range()?;
+    let ray = FloorRay::new(p1)?;
+    let (ledges, start) = stage_floor(&ray, bounds)?;
     let blast = super::tech_surfaces::training_blast_bounds()?;
-    let stage = Stage::new(
-        blast,
-        bounds,
-        [
-            ledge(&ray, floor, false, limits)?,
-            ledge(&ray, floor, true, limits)?,
-        ],
-    )?;
-    Some((stage, [x, floor.height(x)?]))
+    Some((Stage::new(blast, bounds, ledges)?, start))
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {
@@ -1638,6 +1707,8 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
     let best_streak = best_streak.unwrap_or(0);
     let outcome = match phase {
         Phase::Result(result, _) => match result {
+            Outcome::ZoomWin => "Win",
+            Outcome::ZoomMiss => "Miss",
             Outcome::Secured => "Secured",
             Outcome::RecoveredAtLedge => "Recovered at the ledge",
             Outcome::RecoveredOnStage => "Recovered on stage",
@@ -1694,6 +1765,8 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
             "Ready · {}",
             left.div_ceil(run.drill.ready_frames() / 3)
         );
+    } else if matches!(run.opponent.mode, Mode::Drill(DrillId::Zoom)) {
+        let _ = write!(text, "{outcome}  Zoom wins {secured}/{attempts} · 8 MP minimum before cast");
     } else if run.drill == Drill::GuardEdge {
         let _ = write!(
             text,
@@ -1803,9 +1876,12 @@ pub unsafe fn frame(fighter: usize) {
         }
         return;
     }
-    let kind = natives::fighter_kind(cpu);
+    let start = START.load(Ordering::Acquire);
+    let Some(kind) = natives::fighter_kind(cpu) else {
+        return;
+    };
     let owned = engine.run.as_ref().is_some_and(|run| run.body == body);
-    if kind.is_some_and(|kind| CpuObject::sighted(owned, kind, natives::status_kind(cpu)) == CpuObject::Arriving) {
+    if CpuObject::sighted(owned, kind, natives::status_kind(cpu)) == CpuObject::Arriving {
         // The swap makes the replacement active before its first status. No run binds it, no
         // request is consumed for it and nothing is asked of it. A live measured swap keeps
         // its clock, as for the empty slot.
@@ -1817,12 +1893,29 @@ pub unsafe fn frame(fighter: usize) {
         }
         return;
     }
+    let active_run = engine.run.as_ref().filter(|run| start == 0 && run.drill == drill);
+    let followed_swap = active_run.is_some_and(|run| {
+        run.rounds.phase == Phase::Live
+            && run.niche.as_ref().is_some_and(|guide| {
+                guide.accepts_form(Some(kind))
+                    || kind == perfect::pyra::MYTHRA && guide.waiting_for_form(run.rounds.frames)
+            })
+    });
+    let opponent = active_run.map_or_else(|| OPPONENT.read(), |run| run.opponent);
+    if practice_cpu::switching()
+        || (!followed_swap && opponent.fighter.is_some_and(|wanted| wanted != kind as u32))
+    {
+        engine.wake_cpu(Some(body));
+        return;
+    }
     let id = natives::stage_id();
     let Some(form) = natives::stage_form(id) else {
         return;
     };
     let stage_key = (id, form);
-    let start = START.load(Ordering::Acquire);
+    if engine.run.as_ref().is_some_and(|run| run.wizard.is_some() && run.stage_key != stage_key) {
+        super::btt_camera::interrupt_placement();
+    }
     if start != 0
         || engine
             .run
@@ -1851,7 +1944,8 @@ pub unsafe fn frame(fighter: usize) {
         }
         engine.run = Some(Run {
             drill,
-            difficulty: config.difficulty[drill as usize],
+            opponent,
+            zoom: zoom::NativeAttempt::default(),
             reaction: config.reaction[drill as usize],
             threat: ThreatClock::default(),
             stage,
@@ -1910,9 +2004,6 @@ pub unsafe fn frame(fighter: usize) {
     else {
         return;
     };
-    let Some(kind) = kind else {
-        return;
-    };
     let measured_swap = run.rounds.phase == Phase::Live
         && kind == perfect::pyra::MYTHRA
         && game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
@@ -1920,9 +2011,14 @@ pub unsafe fn frame(fighter: usize) {
             guide.follow_measured_form(run.rounds.frames, kind, natives::status_kind(cpu))
         });
     let legacy_swap = run.rounds.phase == Phase::Live
+        && run.body != body
         && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(Some(kind)));
     if measured_swap || legacy_swap {
         run.body = body;
+        if run.opponent.fighter.is_some() {
+            // Keep the selected CPU through a swap accepted from its niche guide.
+            run.opponent.fighter = Some(kind as u32);
+        }
         if legacy_swap {
             run.niche = None;
         }
@@ -1949,7 +2045,7 @@ pub unsafe fn frame(fighter: usize) {
         run.damage_stop = false;
         run.player_ledge = None;
     }
-    let key = (drill, kind, run.setup.area as u8, run.difficulty);
+    let key = (drill, kind, run.setup.area as u8, run.opponent.mode);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             let confirm = std::mem::take(&mut run.confirm_player);
@@ -2042,6 +2138,7 @@ pub unsafe fn frame(fighter: usize) {
                 hold_cpu(cpu, run.setup.cpu);
                 *held_cpu = Some(body);
                 run.rounds.placed();
+                run.zoom = zoom::NativeAttempt::default();
                 run.placement = Placement::ResetResources;
             }
         }
@@ -2050,14 +2147,22 @@ pub unsafe fn frame(fighter: usize) {
         if matches!(before, Phase::Ready(_)) && *held_cpu == Some(body) {
             hold_cpu(cpu, run.setup.cpu);
         }
-        run.rounds.advance_attempt(obs);
-        trace_attempt(run, before, Bodies { p1, cpu }, kind, damage);
+        let zoom = matches!(run.opponent.mode, Mode::Drill(DrillId::Zoom));
+        if before == Phase::Live && zoom {
+            let read = run.zoom.observe_zoom(p1, cpu, status, obs);
+            run.rounds.advance_zoom(&mut run.zoom.attempt, obs, read, run.opponent.window);
+        } else {
+            run.rounds.advance_attempt(obs);
+        }
+        if !zoom {
+            trace_attempt(run, before, Bodies { p1, cpu }, kind, damage);
+        }
         if before == Phase::Live && matches!(run.rounds.phase, Phase::Result(..)) {
             run.route_history.complete();
         }
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.route_history.start();
-            if kind == game_watch::KIND && drill == Drill::GuardEdge && run.difficulty == Difficulty::Perfect {
+            if kind == game_watch::KIND && drill == Drill::GuardEdge && run.opponent.mode == Mode::Perfect {
                 run.oil_stall.next_attempt();
                 run.oil_draw = [rng.next_u32(), rng.next_u32()];
             }

@@ -2,16 +2,8 @@
 //! `HandleSet` the visualizer uses (never refused, concluded with the status like route B's effects), the board the layout
 //! tick reads, and the projection's pill plan (decision HB-PILLS: a capsule is one pill, two half-disc caps and a band).
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::hitbox::{self, HandleSet, Sphere, FIGHTER_SETS, MAX_HELD};
 use model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
@@ -489,6 +481,18 @@ fn projected_orbs_map_onto_the_layout_canvas() {
     assert_eq!(orbs::edge_points([1.0, 2.0, 3.0], 0.5), [[1.5, 2.0, 3.0], [1.0, 2.5, 3.0]]);
 }
 
+#[test]
+fn wind_box_projection_uses_its_corners() {
+    use model::legend::{area_orbs, AreaShape, WindArea};
+
+    let area = WindArea { shape: AreaShape::Box { min: [-16.0, 8.0], max: [32.0, 24.0] }, angle: Some(170.0) };
+    let orb = area_orbs(&area, 0, 0.0, [255; 4])[0].unwrap();
+    let project = |[x, y, _]: [f32; 3]| Some([512.0 + 2.0 * x, 512.0 - y]);
+    let (centre, size) = orbs::plan_wind_box(&orb, [512.0; 2], project).unwrap();
+    assert_eq!(centre, [30.0, 16.875]);
+    assert_eq!(size, [180.0, 16.875]);
+}
+
 /// rc.15 target-hurtbox-size: the game's hurt radius is the part's size at its bone's world scale (Eden
 /// target-hurtbox-d6393cb0-yoga-4: the 0.6-posed lock-on Sandbag's size-5 parts touch at 3.45, its world scale 0.69;
 /// Mario's size-1.2 parts at 1.14). A hurtbox orb is drawn at that radius; a hitbox orb keeps its size.
@@ -597,4 +601,189 @@ fn visible_frame_native_reads_are_lazy() {
     assert!(!runtime.contains("Some(natives::battle_object_id(accessor))"), "every visible fighter reads its object ID");
     assert!(cpu.contains("body.object_id = (body.away && BASE.load"), "the CPU's object ID read requires an admitted hide");
     assert!(runtime.contains("owner: hide.owner(|| article_owner(id, key))"), "the live caller must use the tested conditional owner read");
+}
+
+#[test]
+fn overlay_board_exposes_only_the_completed_simulation_frame() {
+    let fighter = orbs::orb_of(&sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 0.0, 2.0), [1.0, 0.0, 0.0]);
+    let article = orbs::orb_of(&sphere(hitbox::sphere_key(hitbox::KIND_HIT, 0, 0), 0.0, 2.0), [3.0, 0.0, 0.0]);
+    let mut board = Board::new();
+    assert!(!board.is_frame(0));
+
+    board.begin_frame(1);
+    board.publish(10, [fighter].into_iter());
+    board.publish(20, [article].into_iter());
+    assert!(board.is_frame(1));
+    assert!(!board.is_frame(2), "a skipped publication must not reuse the old pose");
+
+    board.begin_frame(2);
+    let current = Orb { centre: [2.0, 0.0, 0.0], tail: [2.0, 0.0, 0.0], ..fighter };
+    board.publish(10, [current].into_iter());
+    assert!(board.is_frame(2));
+    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [current], "the removed object has no pane in frame 2");
+}
+
+#[test]
+fn paused_editor_polls_update_pictures_without_advancing_the_world_sample() {
+    use model::btt::{Btt, Pad, Phase};
+    use model::chords::logical::{A, X};
+    use model::panes::EggPicture;
+
+    let mut board = Board::new();
+    board.begin_frame(7);
+    let orb = orbs::orb_of(
+        &sphere(hitbox::sphere_key(hitbox::KIND_HURT, 0, 0), 0.0, 2.0),
+        [4.0, 6.0, 0.0],
+    );
+    board.publish(10, [orb].into_iter());
+
+    let mut mode = Btt::IDLE;
+    mode.close_menu(true, true);
+    let before = mode.editor_pictures().unwrap();
+    let cursor = |pictures: [model::eggs::Look; model::btt::LOOKS]| {
+        pictures.into_iter().flatten().find_map(|(point, look)| {
+            (look.picture == EggPicture::Cursor).then_some(point)
+        })
+    };
+    assert!(mode.feed(Pad { stick: [1.0, 0.0], ..Pad::default() }));
+    let moved = mode.editor_pictures().unwrap();
+    assert!(cursor(moved).unwrap()[0] > cursor(before).unwrap()[0]);
+
+    let place = 1u16 << A;
+    assert!(mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+    let placed = mode.editor_pictures().unwrap();
+    assert!(placed.into_iter().flatten().any(|(point, look)| {
+        look.picture == EggPicture::Whole && Some(point) == cursor(moved)
+    }));
+    assert!(mode.sample_simulation_pictures().iter().all(Option::is_none));
+
+    let confirm = 1u16 << X;
+    assert!(mode.feed(Pad { held: confirm, pressed: confirm, ..Pad::default() }));
+    assert_eq!(mode.phase(), Phase::Ready);
+    assert!(!mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+    assert_eq!(mode.phase(), Phase::Running);
+    for _ in 0..3 {
+        let still_visible = mode.editor_pictures()
+            .expect("a held run keeps its committed layout visible before the first sample");
+        assert!(still_visible.into_iter().flatten().any(|(point, look)| {
+            look.picture == EggPicture::Whole && Some(point) == cursor(moved)
+        }));
+    }
+    assert!(board.is_frame(7));
+    assert_eq!(board.in_draw_order().copied().collect::<Vec<_>>(), [orb]);
+
+    assert_eq!(mode.pass_indexed(true, |_, _| true), 1);
+    assert_eq!(mode.phase(), Phase::Done);
+    let sample = mode.sample_simulation_pictures();
+    assert!(sample.into_iter().flatten().any(|(point, _)| Some(point) == cursor(moved)));
+    assert!(sample.into_iter().flatten().all(|(_, look)| look.picture != EggPicture::Whole));
+    assert!(mode.editor_pictures().is_none(), "the HUD uses the current simulation sample");
+}
+
+const RESET_ACCESSOR: usize = 0x1000;
+const RESET_ID: u32 = 0x0003_002a;
+
+#[test]
+fn delayed_worker_init_cannot_erase_a_fresh_overlay_sample() {
+    let generations = hitbox::FighterGenerations::new();
+    let old = generations.stamp(RESET_ID).unwrap();
+    // The worker's sole write is the reset. Phase 8 runs before the worker returns.
+    let resume = std::sync::Barrier::new(2);
+    let marked = std::sync::Barrier::new(2);
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            generations.retire(RESET_ID);
+            marked.wait();
+            resume.wait();
+        });
+        marked.wait();
+        let life = generations.stamp(RESET_ID).unwrap();
+        let anchor = (life, [2.0, 0.0, 0.0]);
+        let mut board = Board::new();
+        board.publish_fighter(RESET_ACCESSOR, life, [orb(2.0)].into_iter());
+        resume.wait();
+
+        assert!(!generations.is_current(old));
+        let slots = board.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+        assert_eq!(board.draw_slots_in_order(slots).map(|o| o.centre[0]).collect::<Vec<_>>(), [2.0]);
+        assert_eq!(generations.is_current(anchor.0).then_some(anchor.1), Some([2.0, 0.0, 0.0]));
+    });
+}
+
+#[test]
+fn retirement_during_a_busy_board_invalidates_only_the_old_fighter() {
+    let generations = hitbox::FighterGenerations::new();
+    let old = generations.stamp(RESET_ID).unwrap();
+    let other = generations.stamp(0x0004_002a).unwrap();
+    let board = hos_lock::Mutex::new(Board::new());
+    let mut in_flight = board.lock();
+
+    // The sample already captured its life. The worker completes while the sample owns BOARD.
+    std::thread::scope(|scope| {
+        scope.spawn(|| generations.retire(RESET_ID));
+    });
+    in_flight.publish_fighter(RESET_ACCESSOR, old, [orb(1.0)].into_iter());
+    in_flight.publish_fighter(0x2000, other, [orb(3.0)].into_iter());
+    in_flight.publish_article(0x3000, 0x1000_0011, None, [orb(4.0)].into_iter());
+    drop(in_flight);
+
+    let board = board.lock();
+    let slots = board.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+    assert_eq!(board.draw_slots_in_order(slots).map(|o| o.centre[0]).collect::<Vec<_>>(), [3.0, 4.0]);
+    assert!(!generations.is_current(old), "the layout must also reject the old anchor");
+    assert!(generations.is_current(other));
+}
+
+#[test]
+fn retirement_overlapping_first_bind_cannot_carry_an_old_grab_into_the_new_lifetime() {
+    let generations = hitbox::FighterGenerations::new();
+    let mut cache = hitbox::SetTable::new();
+
+    // The command gets through its current-life check. Init runs before it first binds the slot.
+    let old = generations.stamp(RESET_ID).unwrap();
+    assert!(generations.is_current(old));
+    generations.retire(RESET_ID);
+    let slot = cache.index_for(RESET_ACCESSOR, old);
+    let grab = sphere(hitbox::KIND_GRAB << 24, 1.0, 2.0);
+    assert!(cache.sets[slot].push_grab(grab, None));
+
+    let current = generations.stamp(RESET_ID).unwrap();
+    assert_eq!(cache.find_life(RESET_ACCESSOR, current), None);
+    let rebound = cache.index_for(RESET_ACCESSOR, current);
+    assert_eq!(rebound, slot);
+    assert!(cache.sets[slot].is_empty());
+    assert!(cache.sets[slot].push_grab(grab, None));
+    cache.forget_retired(&generations);
+    assert!(!cache.sets[slot].is_empty(), "the new lifetime's grab survives the retirement");
+}
+
+#[test]
+fn overlay_worker_retirement_reaches_both_hud_readers_without_a_board_write() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    let body = |name: &str| src.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    let init = body("fn forget_fighter(");
+    assert!(init.contains("FIGHTER_GENERATIONS.retire(id)"));
+    assert!(!init.contains("BOARD") && !init.contains("STORE") && !init.contains("clear_board"));
+    assert!(body("fn sample_overlay(").contains(".map(|world| (life, world))"));
+    assert!(body("fn publish_orbs(").contains("board.publish_fighter(accessor, life,"));
+    assert!(body("fn fighter_screen_anchors(").contains("FIGHTER_GENERATIONS.is_current(life)"));
+    assert!(body("fn draw_orbs(").contains("b.draw_slots(&hide, &FIGHTER_GENERATIONS)"));
+}
+
+/// The overlay board is all zero bytes, so it stays in `.bss`, and that pattern is never drawn: the one read path
+/// requires the board's first completed frame.
+#[test]
+fn the_overlay_board_starts_as_zero_bytes_that_no_reader_accepts() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    assert!(src.contains("static BOARD: Mutex<OverlaySample> = Mutex::new(unsafe { core::mem::zeroed() });"));
+    let body = |name: &str| src.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    assert!(body("fn read_overlay_sample(").contains("sample.board.is_frame(SAMPLE.load(Ordering::Acquire))"));
+    assert_eq!(src.matches("BOARD.try_lock()").count(), 3, "clear_board, read_overlay_sample and sample_overlay");
+    assert_eq!(src.matches("BOARD.lock()").count(), 0);
+    // SAFETY: zero is a valid value of every field of the board.
+    let zero: Board = unsafe { std::mem::zeroed() };
+    let generations = hitbox::FighterGenerations::new();
+    assert!(!zero.is_frame(0) && !Board::new().is_frame(0));
+    let slots = zero.draw_slots(&orbs::DrawHide::VISIBLE, &generations);
+    assert_eq!(zero.draw_slots_in_order(slots).count(), 0);
 }

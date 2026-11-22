@@ -1,17 +1,4 @@
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
 
 // Value rules of the native Mii-setup adapter (WP-M2 step 2): the preflight that must
 // pass before `0x67e7d0`/`0x67ead0` run for a bank-built Mii group, the outcome

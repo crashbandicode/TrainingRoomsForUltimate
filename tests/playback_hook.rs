@@ -1,22 +1,11 @@
 //! The playback machine allocates nothing inside a hook. This crate installs the plugin's counting allocator.
 #![allow(unused)]
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-#[path = "support/playback_engine.rs"]
-#[allow(dead_code)]
-pub mod engine;
+use crate::engine;
 
-use model::hook_stats::{hook_allocations, CountingAllocator, HookId, HookScope};
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
+use model::hook_stats::{hook_allocations, HookId, HookScope};
 
 #[test]
 fn playback_makes_no_hook_allocations() {
@@ -39,6 +28,7 @@ fn playback_makes_no_hook_allocations() {
     let settings = StateSettings { autoload: true, ..StateSettings::default() };
     let mut machine = Playback::new();
 
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::RecorderPoll);
@@ -86,6 +76,7 @@ fn cpu_role_record_and_playback_frames_allocate_nothing() {
     let mut drive = CpuRoleDrive::idle();
     drive.begin(1);
     let ctx = ControlCtx { facing: 1, shulk_dial: false };
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _poll = HookScope::enter_hook(HookId::RecorderPoll);
@@ -119,6 +110,7 @@ fn the_cpu_role_drive_lock_allocates_nothing_in_recorder_ai() {
     use engine::library::Role;
     use model::recording::ControlCtx;
 
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::RecorderAi);

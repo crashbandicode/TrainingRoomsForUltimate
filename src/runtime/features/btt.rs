@@ -31,6 +31,8 @@ static BTT: Mutex<Btt> = Mutex::new(Btt::IDLE);
 /// Projectiles break targets (every settings publish), a Start since the last pass, and whether it was Place targets. Whether
 /// the mode is on is the running game (`practice::is`, rc.15 practice menu), no longer the `btt` row.
 static PROJECTILES: AtomicBool = AtomicBool::new(true);
+static STREAK_SETTING: AtomicBool = AtomicBool::new(false);
+static STREAK_RUN: AtomicBool = AtomicBool::new(false);
 /// The projectiles rule of the run: latched by Start (rc.15 practice menu: a running game's settings apply at its next
 /// Start), read by the hit path.
 static PROJECTILES_RUN: AtomicBool = AtomicBool::new(true);
@@ -82,6 +84,7 @@ pub fn stage_label(stage: i32) -> String {
 
 /// Every settings publish: whether projectiles break targets.
 pub fn publish(snapshot: &Snapshot) {
+    STREAK_SETTING.store(eggs::choice(snapshot, "btt_hit_streak") == 1, Ordering::Release);
     PROJECTILES.store(snapshot.get("btt_projectiles").is_none_or(|r| r.get(1) == Some(&1)), Ordering::Release);
 }
 
@@ -107,6 +110,7 @@ pub fn menu_closed() {
 /// Start (the menu worker, `practice::start`; atomics only): `place`, it was Place targets. With no targets placed the
 /// placing view opens, else Ready with every target back.
 pub fn start(place: bool) {
+    STREAK_RUN.store(STREAK_SETTING.load(Ordering::Acquire), Ordering::Release);
     PROJECTILES_RUN.store(PROJECTILES.load(Ordering::Acquire), Ordering::Release);
     PLACE.store(place, Ordering::Release);
     START.store(true, Ordering::Release);
@@ -165,16 +169,23 @@ pub unsafe fn poll(controller: usize, sample: Sample, keys: Option<(bool, bool)>
     hide
 }
 
-/// The layout tick (`hitbox::draw_orbs`): the pictures of the targets, their break animations and the cursor (Eggs-ercise's
-/// panes). The camera's map (`view`, read only while the mode is on) is kept for the placing box.
-pub fn look(active: bool, view: impl FnOnce() -> Option<View>) -> [Option<([f32; 2], EggLook)>; LOOKS] {
+/// The layout tick supplies the camera and reads the input-driven editor in one pass.
+pub fn editor_pictures(active: bool, view: impl FnOnce() -> Option<View>) -> Option<[crate::model::eggs::Look; LOOKS]> {
     if !active || !running() {
-        return [None; LOOKS];
+        return None;
     }
     let seen = view();
     let mut mode = BTT.lock();
     mode.see(seen);
-    mode.look()
+    mode.editor_pictures()
+}
+
+/// Read active targets and break animations after the stock simulation step.
+pub fn overlay_pictures() -> [crate::model::eggs::Look; LOOKS] {
+    if !running() {
+        return [None; LOOKS];
+    }
+    BTT.try_lock().map_or([None; LOOKS], |mut mode| mode.sample_simulation_pictures())
 }
 
 /// L+R+A or Change Stage initialised the fighters again (the reset hub, the game thread): a run starts over.
@@ -188,10 +199,10 @@ pub fn reset() {
 ///
 /// # Safety
 /// `at` is a live fighter's accessor.
-pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut(usize, [f32; 2]) -> bool) -> u8 {
+unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut(usize, [f32; 2]) -> Option<u32>) -> u8 {
     let facts = scene::facts();
     if facts.busy {
-        btt_camera::apply(false);
+        btt_camera::request(btt::BTT_PLACEMENT_OWNER, false);
         return 0;
     }
     let on = on();
@@ -206,10 +217,18 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut(usize, [f32; 2]) ->
     let stage = if live { natives::stage_id() } else { -1 };
     let (mut broken, mut mode) = (0, BTT.lock());
     mode.sense(range, top[1]);
+    if start {
+        mode.streak.restart(STREAK_RUN.load(Ordering::Acquire));
+    }
     if !live {
+        if mode.streak.enabled() {
+            mode.streak.restart(false);
+        }
         mode.close_menu(false, false);
     } else {
+        let was_placing = mode.phase() == Phase::Placing;
         if stage >= 0 && mode.enter(stage) {
+            if was_placing { btt_camera::interrupt_placement(); }
             STAGE.store(stage, Ordering::Release);
             READ.store(true, Ordering::Release);
         }
@@ -230,7 +249,25 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut(usize, [f32; 2]) ->
         });
         if on {
             let tick = mode.keeper(at) && !owners.covers_strip();
-            broken = mode.pass_indexed(tick, hit);
+            let owner = if mode.phase() == Phase::Running && !owners.covers_strip() {
+                super::btt_projectiles::sample(&mut mode.streak, at, hits.iter().any(|h| h.3 > 0.0))
+            } else {
+                None
+            };
+            let mut sources = [None; btt::MAX];
+            broken = mode.pass_indexed(tick, |slot, spot| {
+                let source = hit(slot, spot);
+                if owner.is_some() {
+                    sources[slot] = source;
+                }
+                source.is_some()
+            });
+            if let Some((owner, body)) = owner {
+                for source in sources.into_iter().flatten() {
+                    mode.streak.hit(owner, source);
+                }
+                mode.streak.end(body);
+            }
         }
         if let Some(ask) = mode.take_ask().filter(|ask| !ASKS.post(*ask)) {
             diagnostic(format_args!("[Btt] layout ask dropped {ask:?}: the writer is behind"));
@@ -249,7 +286,7 @@ pub unsafe fn pass(at: usize, top: [f32; 3], hit: impl FnMut(usize, [f32; 2]) ->
     }
     drop(mode);
     // Placement alone owns Fixed; X start, Off and UI/scene ownership restore the saved native mode.
-    btt_camera::apply(btt::wants_camera(phase, owners.covers_strip(), facts));
+    btt_camera::request(btt::BTT_PLACEMENT_OWNER, btt::wants_camera(phase, owners.covers_strip(), facts));
     broken
 }
 
@@ -301,11 +338,33 @@ pub unsafe fn frame(fighter: usize) -> Option<()> {
     let (top, hits, n, aerial, _) = reading().then(|| super::hitbox::p1_read(at)).unwrap_or_default();
     let rule = super::hitbox::egg_rule();
     let mut melee = false;
-    let broke = pass(at, top, |slot, spot| {
-        let hit = hits[..n].iter().any(|h| eggs::breaks(rule, aerial, h, spot));
-        melee |= hit;
-        hit || super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles()).is_some()
-            || super::btt_projectiles::hit(at, spot, rule, aerial, projectiles())
+    let grader = super::input_display::grader_live();
+    let fighter_id = (*(at as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let broke = pass(at, top, &hits[..n], |slot, spot| {
+        if let Some(depth) = eggs::deepest(rule, aerial, &hits[..n], spot) {
+            melee = true;
+            super::input_display::target_grade(depth);
+            Some(fighter_id)
+        } else {
+            let helper = super::lockon::hit(at, slot + 1, lockon_key(spot), rule, aerial, projectiles());
+            let mut source = helper;
+            let depth = eggs::other_break(grader, helper.is_some(), |deepest| {
+                let (projectile, depth) = super::btt_projectiles::hit(
+                    at,
+                    spot,
+                    rule,
+                    aerial,
+                    projectiles(),
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )?;
+                source = helper.or(Some(projectile));
+                Some(depth)
+            })?;
+            if let Some(depth) = depth {
+                super::input_display::target_grade(depth);
+            }
+            source
+        }
     });
     // V2.1: the fighter whose attack broke a target freezes, as on a hit.
     let frames = (broke > 0 && melee).then(scene::facts).and_then(eggs::hitlag)?;

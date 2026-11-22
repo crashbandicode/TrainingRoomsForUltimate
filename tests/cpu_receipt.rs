@@ -1,23 +1,4 @@
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
-#[allow(dead_code)]
-mod panes {
-    pub const TEXT: [u8; 4] = [236, 238, 242, 255]; // src/model/ui/panes.rs TEXT
-}
-#[allow(dead_code)]
-#[path = "../src/model/notify.rs"]
-mod notify;
+use crate::model::notify;
 
 // The CPU Character receipt follows who asked for the CPU change (ordinary_player::cpu_receipt): a practice game's
 // own temporary fighter (Mash out's attacker and its restore) gets none, so nothing waits behind Mash out's standing
@@ -25,7 +6,7 @@ mod notify;
 // queue cases below drew "CPU fighter applied", triage/RED-run.log). The persisted choice follows the same owner.
 use crate::engine::mii::ordinary_cpu::Request;
 use crate::engine::mii::ordinary_player::{bank_notice, cpu_receipt, persists_selection, Requester};
-use crate::notify::{Body, Queue, DEFAULT_COLOR};
+use notify::{Body, Queue, DEFAULT_COLOR};
 
 const MASH: u8 = 1; // Mash out worker NOTICE_ID (standing, u16::MAX)
 const CPU: u8 = 2; // "CPU Character" standing slot (character_roster.rs notify, 180 frames)

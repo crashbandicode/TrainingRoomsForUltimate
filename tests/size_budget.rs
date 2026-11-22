@@ -12,7 +12,16 @@ use std::process::Command;
 
 fn python(script: &str) {
     let path = format!("{}/tools/{script}", env!("CARGO_MANIFEST_DIR"));
-    let output = Command::new("/usr/bin/python3")
+    let mut command = if let Some(lock) = std::env::var_os("TR_GATE_FREEZE_LOCK") {
+        // The remote gate may pause the rest of the suite for an Eden load.
+        // A size scan uses a hard wall-clock timeout and must finish first.
+        let mut command = Command::new("/usr/bin/flock");
+        command.arg("--shared").arg(lock).arg("/usr/bin/python3");
+        command
+    } else {
+        Command::new("/usr/bin/python3")
+    };
+    let output = command
         .args(["-I", &path])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()

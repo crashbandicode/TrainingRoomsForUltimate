@@ -1,6 +1,4 @@
-#[allow(dead_code)]
-#[path = "../src/model/tech_launch.rs"]
-mod tech_launch;
+use crate::model::tech_launch;
 use tech_launch::*;
 
 fn params() -> FlightParams {

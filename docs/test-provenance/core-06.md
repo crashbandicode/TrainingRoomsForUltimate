@@ -34,12 +34,12 @@ Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-
 | Sphere count and spacing for capsules; single sphere for a point hitbox | `core06_capsule_sampling` | hb-E1 extended hitbox | `eden/runs/hb-*` |
 | A grab box set the frame it connects shows that pass, not through the pull | `core06_orbs` `a_grab_box_set_in_the_frame_it_connects_shows_once_not_through_the_pull` | Eden `gbx-samus-t1` (rc.13: tether orbs in 56/58 only) | |
 | Colour table by `id mod 8`; grab boxes magenta, a colour no hitbox uses | `core06_colour_table`, `every_grab_box_is_magenta_a_colour_no_hitbox_uses` | hb-E2 multi-hitbox move | |
-| Per-frame step order and status exemptions (grab range, shield, tread, DOWN) | `core06_frame_rules_table` | hb-E3 grab, shield, missed tech | |
+| Fighter overlay gating (practice, setting, grab range and shield) | `core06_frame_rules_table` | hb-E3 grab and shield | |
 | First-frame draw from the `ATTACK` / `CATCH` parameters (indices as spec section 3) | `core06_command_param_indices` | hb-E4 first active frame | |
 | Rebound cleared kills the spheres unless shielding | `core06_rebound_rule` | hb-E5 | |
 | Training-only gate incl. `077a8e43`'s early return; no effect-sleep calls elsewhere | `core06_training_gate` | hb-E6 Quickplay with the setting On | |
 | Three sites guarded (64 B) and installed independently; neighbouring thunk windows compared first | `core06_site_guards`, `core06_rows_match_the_owned_elf`, `tests/core01.rs` `BOOT_PHASES` | hb-E7 install line | |
-| Off restores effects next frame (Q4: once, on the transition) | `core06_off_restores` | hb-E8 | |
+| Native effects continue with Hurtboxes on (supersedes the historical Q4 restore test) | `preview_visual_core06_visualizer_does_not_sleep_native_effects` | Palutena up smash with Hurtboxes on and off | |
 | `AttackData` and Lua stack layouts the plugin reads | `core06_attack_data_layout_matches_the_owned_elf`, `core06_lua_stack_layout_matches_the_owned_elf` | (all rows) | below |
 | Every native the feature calls is a granted capability; its closure is computed from the code | `tests/capabilities.rs` (`cross_needs_match_the_call_graph`, `a_poisoned_row_disables_...`, `the_native_call_layer_checks_the_grant`) | hb-E9 poisoned row | `CROSS_NEEDS[Hitbox]` |
 | No heap allocation in the hooks and the pass | `HookScope` counters (`HookId::Hitbox*`), `tests/hook_alloc.rs` | hb-E10 `hook_stats` delta 0 | |

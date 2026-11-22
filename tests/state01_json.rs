@@ -4,13 +4,7 @@
 //! ours-new; CARRY-OVER.md) ported to this crate's hand-written reader and writer: the same files,
 //! the same assertions, the same byte-for-byte round trip.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -77,7 +71,7 @@ fn state01_mii_writer_survives_fresh_process_continuation() {
     for phase in ["save", "continue"] {
         let started = std::time::SystemTime::now();
         let child = std::process::Command::new(&exe)
-            .args(["--exact", "state01_mii_writer_survives_fresh_process_continuation", "--nocapture"])
+            .args(["--exact", "state01_json::state01_mii_writer_survives_fresh_process_continuation", "--nocapture"])
             .env(PHASE, phase)
             .env(ROOT, &root.0)
             .stdout(std::process::Stdio::piped())

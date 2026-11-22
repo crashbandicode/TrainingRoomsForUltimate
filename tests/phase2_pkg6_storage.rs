@@ -1,14 +1,6 @@
 //! Original Q7 persisted-choice boundaries; no native capture acceptance claim.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::capture_settings::CaptureSettings;
 
@@ -47,7 +39,7 @@ fn q7_repair_keeps_foreign_sections_and_every_owned_comment() {
 #[test]
 fn q7_persisted_explicit_choice_continues_in_a_fresh_process() {
     const KEY: &str = "TR_PKG6_Q7_CONTINUATION";
-    const TEST: &str = "q7_persisted_explicit_choice_continues_in_a_fresh_process";
+    const TEST: &str = "phase2_pkg6_storage::q7_persisted_explicit_choice_continues_in_a_fresh_process";
     let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     if let Some(root) = std::env::var_os(KEY) {
         let root = std::path::PathBuf::from(root);
@@ -86,7 +78,9 @@ fn q7_persisted_explicit_choice_continues_in_a_fresh_process() {
             let output = std::process::Command::new(std::env::current_exe().unwrap())
                 .args(["--exact", TEST, "--nocapture"])
                 .env(KEY, &root).env("TR_PKG6_Q7_MODE", mode).output().unwrap();
-            println!("{}", String::from_utf8_lossy(&output.stdout));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(stdout.contains("running 1 test"), "{mode} did not execute the child test: {stdout}");
+            println!("{stdout}");
             println!("Q7 exited={mode} at={} success={}", now(), output.status.success());
             assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         }

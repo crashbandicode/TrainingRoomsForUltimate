@@ -1,13 +1,7 @@
 //! Hide CPU (rc.14, SPEC-eggsercise V2.6): the rule, the restore, the edges and the waiting-room gate. The model decides
 //! once per body frame (`Cpu::frame` -> `FrameOut::vanish`); `runtime::features::hide_cpu` applies it (Eden rows `hide-E34`..).
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::cpu::defence::Defence;
 use model::cpu::facts::{FrameFacts, FrameOut};

@@ -379,14 +379,13 @@ impl AreaReader for Mem {
     }
 }
 
-/// An AreaModule at `BASE` with six records: not wind; a wind box (id 7, 30 degrees); a wind circle (id 9, 200 degrees); a wind box
-/// switched off; a wind box with no manager entry (id 13); a wind record whose wind is not set. The manager's vector at `BASE+0x1000`.
+/// An AreaModule with primary wind, inactive and unregistered wind, non-wind, and Palutena's secondary-only idle box.
 fn areas_memory() -> Mem {
     use area::*;
     let mut m = Mem(vec![0; 0x2000]);
     let (table, records, entries) = (BASE + 0x100, BASE + 0x200, BASE + 0x1000);
     m.put(BASE + TABLE, &(table as u64).to_le_bytes());
-    m.put(table + COUNT, &6u64.to_le_bytes());
+    m.put(table + COUNT, &7u64.to_le_bytes());
     m.put(table + RECORDS, &(records as u64).to_le_bytes());
     let boxed = |m: &mut Mem, shape: usize, min: [f32; 2], max: [f32; 2]| {
         for (k, v) in [min[0], min[1]].iter().enumerate() {
@@ -397,7 +396,15 @@ fn areas_memory() -> Mem {
         }
     };
     // (kind, shape type, enabled, wind set, id)
-    for (i, (kind, ty, on, set, id)) in [(5u8, 0u8, 1u8, 1u8, 5u32), (WIND, 0, 1, 1, 7), (WIND, 1, 1, 1, 9), (WIND, 0, 0, 1, 11), (WIND, 0, 1, 1, 13), (WIND, 0, 1, 0, 15)].into_iter().enumerate() {
+    for (i, (kind, ty, on, set, id)) in [
+        (5u8, 0u8, 1u8, 1u8, 5u32),
+        (WIND, 0, 1, 1, 7),
+        (WIND, 1, 1, 1, 9),
+        (WIND, 0, 0, 1, 11),
+        (WIND, 0, 1, 1, 13),
+        (WIND, 0, 1, 0, 15),
+        (WIND, 0, 1, 1, 0x235),
+    ].into_iter().enumerate() {
         let (rec, shape) = (records + i * STRIDE, BASE + 0x800 + i * 0x100);
         m.put(rec + KIND, &[kind]);
         m.put(rec + SHAPE_TYPE, &[ty, on, 0, set]);
@@ -405,16 +412,21 @@ fn areas_memory() -> Mem {
         m.put(shape + ID, &id.to_le_bytes());
         boxed(&mut m, shape, [-10.0, 2.0], [10.0, 12.0]);
     }
+    let idle = BASE + 0x800 + 6 * 0x100;
+    boxed(&mut m, idle, [-40.0, 0.01], [-20.0, 20.01]);
     let circle = BASE + 0x800 + 2 * 0x100;
     m.put(circle + CENTRE, &5.0f32.to_le_bytes());
     m.put(circle + CENTRE + 4, &8.0f32.to_le_bytes());
     m.put(circle + RADIUS, &6.0f32.to_le_bytes());
     let begin = BASE + 0x1100;
     m.put(entries, &(begin as u64).to_le_bytes());
-    m.put(entries + 8, &((begin + 3 * ENTRY) as u64).to_le_bytes());
-    for (k, (id, angle)) in [(9u32, 200.0f32), (7, 30.0), (11, 90.0)].into_iter().enumerate() {
-        m.put(begin + k * ENTRY, &id.to_le_bytes());
-        m.put(begin + k * ENTRY + ENTRY_ANGLE, &angle.to_le_bytes());
+    let winds = [(9u32, 2u16, 200.0f32), (7, 2, 30.0), (11, 2, 90.0), (0x235, 3, 170.0), (5, 2, 0.0)];
+    m.put(entries + 8, &((begin + winds.len() * ENTRY) as u64).to_le_bytes());
+    for (k, (id, kind, angle)) in winds.into_iter().enumerate() {
+        let entry = begin + k * ENTRY;
+        m.put(entry, &id.to_le_bytes());
+        m.put(entry + 4, &kind.to_le_bytes());
+        m.put(entry + ENTRY_ANGLE, &angle.to_le_bytes());
     }
     m
 }
@@ -427,11 +439,8 @@ fn legend_wind_areas_read_the_area_table() {
     assert_eq!(&out[..n], &[
         WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: Some(30.0) },
         WindArea { shape: AreaShape::Circle { centre: [5.0, 8.0], radius: 6.0 }, angle: Some(200.0) },
-        WindArea { shape: AreaShape::Box { min: [-10.0, 2.0], max: [10.0, 12.0] }, angle: None },
-    ], "not wind, switched off and not set are left out; no manager entry: no angle");
-    // No manager: the shapes without angles; a module, table or record pointer that is not one: nothing.
-    let bare = wind_areas(&mut m, BASE, 0, &mut out);
-    assert!(bare == 3 && out[..bare].iter().all(|a| a.angle.is_none()));
+    ], "only enabled, registered gameplay wind is drawn");
+    assert_eq!(wind_areas(&mut m, BASE, 0, &mut out), 0, "no registration means no gameplay wind");
     assert_eq!(wind_areas(&mut m, 0, BASE + 0x1000, &mut out), 0);
     assert_eq!(wind_areas(&mut m, BASE + 4, BASE + 0x1000, &mut out), 0);
     let mut one = [WindArea::NONE; 1];

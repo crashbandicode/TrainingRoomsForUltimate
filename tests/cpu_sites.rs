@@ -3,15 +3,9 @@
 //! jump without touching the next function, no site or guard window is near a site of the CPU pilot
 //! plugin, and the per-frame slot holds the original it replaces.
 
-mod common;
+use crate::common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::guard::{HookForm, Placement, SeamKind};
 use model::sites::{self, Feature, Site};

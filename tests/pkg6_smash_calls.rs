@@ -3,15 +3,8 @@
 //! to a row of a site table that carries its 64-byte guard. The list of calls is generated from the sources at test time, so a
 //! re-sync that adds a call fails here until the call is mapped to a guarded row (a new row in `sites_pkg6.rs` or an existing one).
 
-mod common;
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use std::collections::BTreeSet;
 use std::path::Path;

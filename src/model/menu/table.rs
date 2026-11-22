@@ -197,11 +197,14 @@ pub enum Editor {
     /// Stage tech: close into the guided exercise draft.
     TechWizard,
     EdgeJuggleSetup(Game),
+    /// Eggs-ercise: close into the stage spawn-zone editor.
+    EggZone,
     /// Parry practice: the saved practices (a file each, the hot five first), and saving the current wiring as one.
     ParrySaved,
     ParrySave,
     /// Mash out: the portrait grid of fighters, a popup of each fighter's moves over its chip.
     MashoutPicker,
+    PracticeCpu(super::super::edge_juggle::Drill),
 }
 
 /// A read-only row.
@@ -282,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 158] = [
+pub static ROWS: [Row; 167] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -463,12 +466,16 @@ pub static ROWS: [Row; 158] = [
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", Control::MultiSelect(&o::HITBOX_ITEMS),
       "Tick what to draw. Article hurtboxes: hittable objects.\nWindboxes: pushes without hitstun. Angles: where hits send."),
+    r(SCREEN, "Spacing grader", "spacing_grader", TOGGLE,
+      "On: each hit P1 or P2 lands is graded by depth: Excellent at the\nhurtbox edge, Good slightly inside, OK at the centre."),
     r(SCREEN, "Frame Advantage", "frame_advantage", TOGGLE,
       "On: the frame advantage after each exchange is shown."),
     r(SCREEN, "Input Display", "input_display_strip", Control::Dropdown(&o::INPUT_DISPLAY),
       "Frame strip: the last second of P1 and CPU frames,\nhow each follow-up linked and the frame advantage."),
     r(SCREEN, "Spot labels", "spots_strip", TOGGLE,
       "On: each hit on the frame strip says Sweet, Sour or Late.\nOff: no labels."),
+    r(SCREEN, "Link history", "link_history", Control::Dropdown(&["On", "Off"]),
+      "Show the last four follow-ups beneath the frame strip."),
     r(SCREEN, "Input Delay", "input_delay", Control::Number { first: 0, step: 1 },
       "Frames Player 1's inputs are held back, 0 to 30.\nChords are not delayed."),
     // Display & Controls > Controls
@@ -524,8 +531,16 @@ pub static ROWS: [Row; 158] = [
       "Disc: a target appears. CPU: the CPU is the target.\nThe CPU flies like the disc and is reset after each hit."),
     r(EGGS, "Target speed", "eggsercise_speed", Control::Dropdown(&o::EGGS_SPEED),
       "How fast targets fly. Normal is Melee's Eggs-ercise speed.\nSlow: half speed. Fast: one and a half times as fast."),
-    r(EGGS, "Spawn area", "eggsercise_area", Control::Dropdown(&o::EGGS_AREA),
-      "In view: targets appear on screen, with your camera.\nWhole stage: any stage floor, even off screen. From the next Start."),
+    r(EGGS, "Spawn area", "eggsercise_area", Control::MultiSelect(&o::EGGS_AREA),
+      "Each checked area has the same chance on each spawn.\nIn view is used when none are checked. Applies at the next Start."),
+    r(EGGS, "Off-stage zone…", "eggsercise_zone", Control::Editor(Editor::EggZone),
+      "Set top, bottom, inner and outer edges for this stage.\nPress A to edit. Applies to Eggs-ercise at the next Start."),
+    r(EGGS, "Moving paths", "eggsercise_paths", Control::MultiSelect(&o::EGGS_PATHS),
+      "Each checked flight path has the same chance on a spawn.\nIf none are checked, Pop up is used. Applies at the next Start."),
+    r(EGGS, "Target expiry", "eggsercise_expiry", Control::Dropdown(&o::EGGS_EXPIRY),
+      "Replace an unhit target after this many seconds of play.\nExpiry resets the current hit streak. Applies at the next Start."),
+    r(EGGS, "Hit streak", "eggsercise_hit_streak", Control::Dropdown(&o::BTT),
+      "Show your current hit streak and session best.\nA whiff resets the streak. Applies at the next Start."),
     r(EGGS, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
     // Practice games > Break the Targets. Its Off / On row is Start / Stop now; the `btt` key stays in the file.
@@ -537,6 +552,8 @@ pub static ROWS: [Row; 158] = [
       "Close the menu into the placing view, stage zoomed out.\nStick moves, A places, B removes the last, X starts."),
     r(BTT, "Saved layouts", "btt_layouts", Control::Editor(Editor::Layouts),
       "This stage's saved layouts, the five used last first.\nPlacing: ZL + Left/Right picks, ZL + Down saves, ZL + Up loads."),
+    r(BTT, "Hit streak", "btt_hit_streak", Control::Dropdown(&o::BTT),
+      "Show your current hit streak and session best.\nA whiff resets the streak. Applies at the next Start."),
     // The same setting as in Eggs-ercise (Q3): one key, two rows.
     r(BTT, "CPU during a game", "practice_cpu", Control::Dropdown(&o::PRACTICE_CPU),
       "Hide: the CPU is hidden while a practice game runs.\nAfterwards it's as Hide CPU says. Show: it stays."),
@@ -606,8 +623,9 @@ pub static ROWS: [Row; 158] = [
       "Saves the CPU's active macro and Loop as a practice.\nIts start save is the macro's own."),
     r(EDGE, "Start", "", Control::Start(Game::GuardEdge),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
-    r(EDGE, "Difficulty", "edge_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
-      "Level 9 uses the stock CPU. Perfect adds recovery corrections."),
+    r(EDGE, "CPU fighter and mode", "edge_difficulty",
+      Control::Editor(Editor::PracticeCpu(crate::model::edge_juggle::Drill::GuardEdge)),
+      "Pick the CPU fighter and its recovery behavior. X changes the CPU level in the fighter popup."),
     r(EDGE, "Reaction", "edge_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
@@ -616,16 +634,21 @@ pub static ROWS: [Row; 158] = [
       "CPU damage at the start of each attempt.\nThe CPU starts in free fall."),
     r(EDGE, "Attempts", "edge_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
+    r(EDGE, "Zoom landing window", "edge_zoom_window", Control::Number { first: 1, step: 1 },
+      "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
     r(JUGGLE, "Start", "", Control::Start(Game::Juggler),
       "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
-    r(JUGGLE, "Difficulty", "juggle_difficulty", Control::Dropdown(&["Level 9", "Perfect"]),
-      "Level 9 uses the stock CPU. Perfect adds escape corrections."),
+    r(JUGGLE, "CPU fighter and mode", "juggle_difficulty",
+      Control::Editor(Editor::PracticeCpu(crate::model::edge_juggle::Drill::Juggler)),
+      "Pick the CPU fighter and its escape behavior. X changes the CPU level in the fighter popup."),
     r(JUGGLE, "Reaction", "juggle_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(JUGGLE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::Juggler)),
       "Choose the CPU's height, position and percent, then your point.\nPreview both positions before starting."),
     r(JUGGLE, "Attempts", "juggle_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Finish a set of 10 or 20 attempts, or practise freely.\nThe clock starts at release."),
+    r(JUGGLE, "Zoom landing window", "juggle_zoom_window", Control::Number { first: 1, step: 1 },
+      "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

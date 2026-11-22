@@ -1,16 +1,8 @@
 //! SPEC-state-04 (as the fork's item engine does it): the item of a snapshot's choice, the source fighter
 //! it needs, the turnip face override and the timers rule.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::state::held_item::HeldItem;
 use model::state::ids::{Table, C};

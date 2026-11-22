@@ -47,7 +47,14 @@ pub static EGGSERCISE: [&str; 4] = ["1 minute", "10 targets", "20 targets", FREE
 pub static EGGS_BREAK: [&str; 3] = ["Any attack", "Aerials", "Hits of 12%+"];
 pub static EGGS_SPEED: [&str; 3] = ["Normal", "Slow", "Fast"];
 pub static EGGS_TARGET: [&str; 2] = ["Disc", "CPU"];
-pub static EGGS_AREA: [&str; 2] = ["In view", "Whole stage"];
+pub static EGGS_AREA: [&str; 3] = ["In view", "Whole stage", "Off stage"];
+pub static EGGS_PATHS: [&str; 5] = [
+    "Richter's Axe", "Pac-Man's Galaxian", "Link's Boomerang", "Samus's Homing Missile", "Pop up",
+];
+pub static EGGS_EXPIRY: [&str; 11] = [
+    "Off", "1 second", "2 seconds", "3 seconds", "4 seconds", "5 seconds",
+    "6 seconds", "7 seconds", "8 seconds", "9 seconds", "10 seconds",
+];
 pub static PRACTICE_CPU: [&str; 2] = ["Hide", "Show"];
 pub static BTT: [&str; 2] = ["Off", "On"];
 pub static CYCLE_SLOTS: [&str; 6] = ["Off", "1", "2", "3", "4", "5"];

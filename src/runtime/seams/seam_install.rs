@@ -61,6 +61,8 @@ const AUTHORITATIVE: &[&str] = &[
     "edge_juggle",
     "hide_cpu",
     "game_speed",
+    // rc.15 1 Frame: the entry hold is installed and the Training resume calls the pause sync only when every row is stock.
+    "speed_frame",
     "native_body_bank",
     "character_roster",
     "character_lifecycle",
@@ -87,6 +89,7 @@ const AUTHORITATIVE: &[&str] = &[
     "training_stage_rotation",
     // rc.14 custom stages: the loader is called only when every row is stock (approved fail-safe guard).
     "custom_stages",
+    "edge_zoom",
     "hazard_manager",
     "game_mode",
     "character_sources",

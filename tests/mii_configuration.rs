@@ -1,30 +1,12 @@
 //! Persisted identity and native value ownership survive representation changes.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
-#[allow(dead_code)]
-#[path = "../src/model/hook_stats.rs"]
-mod hook_stats;
+use crate::engine::mii;
 
 use mii::inventory::MiiClass;
 use mii::native_values::RowIds;
 use mii::{editor_row as value, inventory};
 #[path = "../src/runtime/mii/mii_editor_bridge/draft.rs"]
 mod draft;
-
-#[global_allocator]
-static ALLOCATOR: hook_stats::CountingAllocator = hook_stats::CountingAllocator;
 
 const ROWS: RowIds = RowIds { outfit: 0x1300070102030405, hat: 0x5a0009060708090a };
 

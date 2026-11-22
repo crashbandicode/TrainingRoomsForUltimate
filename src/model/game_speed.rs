@@ -90,12 +90,13 @@ impl Speed {
     }
 }
 
-/// Training's speeds the bind offers, slowest first. 1 Frame stays with the native menu: it is a pause-and-step mode.
-pub const TRAINING_SPEEDS: [Speed; 5] = [Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf];
-/// The waiting-room practice's speeds: Training's five (rc.8 R2). 1/2 and 1/4 are a slot alone; 2/3 and x1.5 never raise
-/// the update rate, which the room's own timers count: 2/3 is a paced slot and x1.5 an extra world step
-/// (`model::lobby_speed`).
-pub const LOBBY_SPEEDS: [Speed; 5] = TRAINING_SPEEDS;
+/// Training's speeds the bind offers, slowest first. rc.15: 1 Frame is the slowest (it reverses `rc8-binds.md` §3.5,
+/// which left it to the pause menu): Training's own pause-and-step mode, stepped with the native button.
+pub const TRAINING_SPEEDS: [Speed; 6] = [Speed::OneFrame, Speed::Quarter, Speed::Half, Speed::TwoThirds, Speed::X1, Speed::OneAndHalf];
+/// The waiting-room practice's speeds: Training's six (rc.8 R2, rc.15). 1/2 and 1/4 are a slot alone; 2/3, x1.5 and 1 Frame
+/// never raise the update rate, which the room's own timers count: 2/3 is a paced slot, x1.5 an extra world step and 1 Frame
+/// a held world that steps one update per press (`model::lobby_speed`).
+pub const LOBBY_SPEEDS: [Speed; 6] = TRAINING_SPEEDS;
 
 /// Where the bind runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,6 +112,17 @@ impl Place {
             Place::Lobby => &LOBBY_SPEEDS,
         }
     }
+
+    /// The speeds the bind steps through now: without 1 Frame while its rows (`speed_frame`) did not pass at boot, so
+    /// the bind never reaches a 1 Frame it could not leave or step.
+    pub fn offered(self, one_frame: bool) -> &'static [Speed] {
+        let all = self.speeds();
+        if one_frame {
+            all
+        } else {
+            &all[1..]
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,7 +132,7 @@ pub enum Dir {
 }
 
 /// One step from `current` in `list`: Left is the slower neighbour, Right the faster one; the ends stop. A speed the
-/// list does not hold (Training's 1 Frame) steps from x1's place.
+/// list does not hold steps from x1's place.
 pub fn step(list: &[Speed], current: Speed, dir: Dir) -> Speed {
     let Some(last) = list.len().checked_sub(1) else { return current };
     let at = list.iter().position(|s| *s == current).or_else(|| list.iter().position(|s| *s == Speed::X1)).unwrap_or(0);
@@ -272,6 +284,20 @@ pub mod native {
     /// `main+0x53398d8`: the object whose `[+8]` byte the apply clears on a change away from 1 Frame
     /// (`game_speed.step_clear`).
     pub const STEP_FLAG: usize = 0x53398d8;
+    /// rc.15 `main+0x52b92e8`: the paused word, which `FUN_00555da0` sets equal to the pause requests at `STEP_BITS`
+    /// (`speed_frame.step_run`).
+    pub const PAUSED: usize = 0x52b92e8;
+    /// rc.15 `main+0x555da0()`: the pause sync the Training mode object calls after it changes its request bit
+    /// (`speed_frame.pause_sync`).
+    pub const PAUSE_SYNC_FN: usize = 0x555da0;
+}
+
+/// rc.15: after an apply away from 1 Frame (its step clear dropped request bit 2), whether the game must be resumed the
+/// way the Training mode object's own step resumes it (`.1556b64`–`.1556b84`): the paused word still holds bit 2, so the
+/// request goes and `FUN_00555da0` syncs the paused word. Without it the closed-menu game would stay paused (nothing else
+/// syncs it while the value is not 1 Frame).
+pub const fn resumes_the_step_pause(new: Speed, paused: u32) -> bool {
+    !matches!(new, Speed::OneFrame) && paused & mode::STEP_BIT != 0
 }
 
 /// The HUD's speed indicator (the stopwatch: `info_training`'s `in_speed`/`out_speed`, text `set_txt_speed`), as the game's

@@ -1,5 +1,4 @@
-#[path = "../src/model/tech_hitlag.rs"]
-mod hitlag;
+use crate::model::tech_hitlag as hitlag;
 use hitlag::{frames, Parameters};
 fn parameters(k: f32) -> Parameters {
     Parameters { maximum: 30.0, multiplier: 0.65, add: 6.0, threshold: 10,
@@ -111,10 +110,8 @@ fn launch_resolves_after_owned_hold_without_owning_mutex() {
     assert!(place.contains("hold(accessor, owned)"));
 }
 
-#[path = "common/mod.rs"]
-mod common;
-#[path = "../src/runtime/features/tech_hitlag_guards.rs"]
-mod guards;
+use crate::common;
+use crate::model::sites_tech_hitlag::guards;
 #[test]
 fn hitlag_guards_match_owned_64_byte_windows() {
     let Some(owned)=common::owned_main("hitlag_guards_match_owned_64_byte_windows") else {return};

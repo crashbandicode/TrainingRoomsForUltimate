@@ -5,43 +5,40 @@
 //! discs for all"), a capsule as one pill (decision HB-PILLS, 2026-11-14), placed on its bone and projected with the game's
 //! camera every layout tick. An article's hitboxes
 //! are own orbs too (rc.13, `draw_articles`): the game's effect sphere on a projectile lived its whole flight but never
-//! showed. The fighter's other animation-command effects are put to sleep meanwhile, except in the grab, tread and
-//! knockdown statuses.
+//! showed. The overlay leaves native animation-command effects to the game.
 //!
 //! The spheres are kept, not respawned (lead ruling 2026-11-02 on Q3): each fighter's pass works out the spheres it wants and
 //! `model::hitbox::HandleSet` holds them through `OrbSink` (never refused, ended at a status change), keeps the unchanged ones
 //! and drops the ones that changed or went away. The pass publishes the held spheres' world positions; `draw_orbs` draws them.
 //!
-//! Seven hooks (`sites_hitbox`: the `ATTACK` and `CATCH` animation commands, `GrabModule::set_rebound` and the four
-//! `AREA_WIND_2ND*` commands, rc.14 wind-articles) and one per-frame
-//! pass, `frame`, which the CPU core's on-frame wrapper calls for every fighter after the game's own frame (SPEC-core-01 §5.2:
-//! after combo, before the save states). The pass is a readiness boundary of the capability model (`INSTALLED`): until boot
-//! says the feature's whole closure passed its guards it makes no call and reads no native. Every native goes through
-//! `game::natives`, whose grant check refuses a row boot rejected.
+//! The animation hooks keep track of live shapes and grabs. The CPU frame wrapper queues the fighter identities
+//! and runs practice gameplay. The phase-8 `process_end` hook samples world geometry after the stock model updates.
+//! All entry points are behind the install gates and the phase-8 sampling uses bounded lock acquisitions.
 //!
 //! The hurt spheres (decision HB1) come from the `HitModule` reader (`GameHurt`, over the three relied `hurtbox_*` guard
 //! rows in `sites_hitbox`), planned into the same wants as the hit spheres. The game's shared effect pool refused part of a
 //! large fighter's spheres every pass (two Ridleys: 22 of 55, Eden run tr-p23-hitbox-ab4); own orbs are never refused.
 //! The visualizer's Off and stop paths read no HitModule. A live Perfect recovery plan may sample the current P1's
-//! hurtbox height through the same guarded reader. If fighter hurtboxes are displayed, the planner reuses that pass.
+//! hurtbox height at its original phase through the same guarded reader.
 //! The diag build additionally runs the reader once per
 //! fighter per frame as the hurt census (`[Hitbox] hurt census`: the parts, the first pass and the read cost).
 //! No allocation: the spheres and the handle sets are fixed storage, the Lua stack and attack data are read in place, and
-//! every entry point counts under a `HookScope`. The pass and the hooks run on the game thread.
+//! every entry point counts under a `HookScope`. Fighter initialization can run on a stock worker.
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::cpu::role::LOBBY_CPU_ENTRY;
-use crate::model::eggs::{self, HEADER, NOTICE_ID};
+use crate::model::eggs::{self, Recovery, Run, TargetEvent, HEADER, NOTICE_ID};
+use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::guard::GuardOutcome;
-use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FrameFacts, Indices, SetTable, SleepBook, Sphere, StatusIds};
+use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FighterGenerations, FighterLife, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
-use crate::model::install_line::{SiteReport, Written};
+use crate::model::install_line::SiteReport;
 use crate::model::legend;
 use crate::model::practice_games::{self, Game};
 use crate::model::scene::Scene;
@@ -52,7 +49,7 @@ use crate::runtime::game::{self, natives};
 use crate::runtime::{scene, state_natives};
 
 /// Boot: the feature's closure (its rows, the Training predicate and the rows of the natives it shares) passed its guards and its
-/// seven hooks are installed. The per-frame pass does nothing before.
+/// hooks are installed. The two frame entry points do nothing before.
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 /// `hitbox_vis` draws something (`legend::draws`).
 static SETTING: AtomicBool = AtomicBool::new(false);
@@ -65,15 +62,12 @@ fn shown(bit: u8) -> bool {
 }
 /// The game's status ids were resolved through its constant table.
 static READY: AtomicBool = AtomicBool::new(false);
-static IDS: [AtomicI32; 6] = [const { AtomicI32::new(0) }; 6];
+static IDS: [AtomicI32; hitbox::STATUS_NAMES.len()] = [const { AtomicI32::new(0) }; hitbox::STATUS_NAMES.len()];
 /// The work id of a fighter's entry (`hitbox::ENTRY_ID_NAME`), for the lobby gate; resolved with the status ids.
 static ENTRY_WORK: AtomicI32 = AtomicI32::new(0);
 static ENTRY_WORK_READY: AtomicBool = AtomicBool::new(false);
 /// Calls of `ensure_ready` since boot: the table is asked again every 30th call until it answers.
 static TRIES: AtomicU32 = AtomicU32::new(0);
-/// Fighters whose effects the plugin put to sleep (by accessor address), and how many.
-static BOOK: Mutex<SleepBook> = Mutex::new(SleepBook::new());
-static SLEPT: AtomicUsize = AtomicUsize::new(0);
 
 /// Boot: the feature installed (or not).
 pub fn set_installed(on: bool) {
@@ -84,9 +78,16 @@ pub fn set_installed(on: bool) {
 pub fn publish(snapshot: &Snapshot) {
     let shown = hitbox::shown(snapshot);
     SHOWN.store(shown, Ordering::Release);
-    SETTING.store(legend::draws(shown), Ordering::Release);
+    let draws = legend::draws(shown);
+    if SETTING.swap(draws, Ordering::AcqRel) && !draws {
+        CLEAR_ARTICLES.store(true, Ordering::Release);
+    }
     let mut row_bytes = [0; 8];
     row_bytes[..5].copy_from_slice(&eggs::choices(snapshot));
+    row_bytes[4] = eggs::checklist(snapshot, eggs::ROW_AREA);
+    row_bytes[5] = eggs::choice(snapshot, "eggsercise_hit_streak");
+    row_bytes[6] = eggs::checklist(snapshot, eggs::ROW_PATHS);
+    row_bytes[7] = eggs::choice(snapshot, eggs::ROW_EXPIRY);
     let rows = u64::from_le_bytes(row_bytes);
     EGG_ROWS.store(rows, Ordering::Release);
     let hide = eggs::choice(snapshot, eggs::ROW_PRACTICE_CPU) == 0;
@@ -113,19 +114,36 @@ static PRACTICE_HIDE: AtomicBool = AtomicBool::new(true);
 static PRACTICE_HIDE_RUN: AtomicBool = AtomicBool::new(true);
 /// Start (rc.15 practice menu; D9 (c) is reversed: a close no longer restarts it): the next pass starts a run.
 static EGG_START: AtomicBool = AtomicBool::new(false);
-static RUN: Mutex<eggs::Run> = Mutex::new(eggs::Run::IDLE);
-/// The run is armed (`Run::running`), for the menu worker, which never takes `RUN`.
-static EGG_RUNNING: AtomicBool = AtomicBool::new(false);
+// Save-state placement cannot complete an off-stage recovery.
+static EGG_STATE_LOAD: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn egg_state_loaded() {
+    EGG_STATE_LOAD.store(true, Ordering::Release);
+}
+struct EggState {
+    run: eggs::Run,
+    streak: crate::model::hit_streak::Streak,
+    cpu_streak_dirty: bool,
+}
+static RUN: Mutex<EggState> = Mutex::new(EggState {
+    run: eggs::Run::IDLE,
+    streak: crate::model::hit_streak::Streak::EMPTY,
+    cpu_streak_dirty: false,
+});
+/// The menu reads the round state without taking `RUN`.
+static EGG_ARMED: AtomicBool = AtomicBool::new(false);
+static EGG_FINISHED: AtomicBool = AtomicBool::new(false);
 static EGG_GENERATION: AtomicU32 = AtomicU32::new(0);
 
-fn lockon_key(score: u32) -> u64 {
-    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(score)
+fn lockon_key(serial: u32) -> u64 {
+    (u64::from(EGG_GENERATION.load(Ordering::Relaxed)) << 32) | u64::from(serial)
 }
 
 pub(crate) fn lockon_egg() -> Option<Option<crate::model::lockon::Target>> {
-    let run = RUN.try_lock()?;
-    let key = lockon_key(run.score);
-    let egg = run.egg_at().filter(|_| run.running() && !run.cpu_target());
+    let state = RUN.try_lock()?;
+    let run = &state.run;
+    let key = lockon_key(run.target_id());
+    let egg = run.egg_at().filter(|_| Run::running(run) && !run.cpu_target());
     Some(egg.map(|at| crate::model::lockon::Target { key, at }))
 }
 
@@ -148,13 +166,22 @@ pub fn practice_started() {
 
 /// An Eggs-ercise run is armed, or a Start is on its way to the next pass (the menu worker; atomics only).
 pub fn eggs_running() -> bool {
-    EGG_RUNNING.load(Ordering::Acquire) || EGG_START.load(Ordering::Acquire)
+    EGG_ARMED.load(Ordering::Acquire) || EGG_START.load(Ordering::Acquire)
+}
+
+pub fn eggs_finished() -> bool {
+    EGG_FINISHED.load(Ordering::Acquire) && !EGG_START.load(Ordering::Acquire)
 }
 
 /// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
 pub fn eggs_reset() {
-    let mut run = RUN.lock();
-    run.reset(seed());
+    let mut state = RUN.lock();
+    state.run.reset(seed());
+    state.cpu_streak_dirty = false;
+    if state.streak.enabled() {
+        state.streak.restart(true);
+    }
+    EGG_FINISHED.store(false, Ordering::Release);
     EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
@@ -164,36 +191,40 @@ pub fn eggs_reset() {
 unsafe fn eggs_pass(fighter: usize) -> Option<()> {
     let seed = EGG_START.swap(false, Ordering::AcqRel).then(seed);
     let bytes = EGG_LIVE.load(Ordering::Acquire).to_le_bytes();
-    let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]];
+    let mut rows = [bytes[0], bytes[1], bytes[2], bytes[3], eggs::IN_VIEW];
     // rc.15 practice menu: the mode while Eggs-ercise is the running game, Off otherwise.
     rows[0] = practice_games::effective(Game::Eggs, rows[0], super::practice::active());
     // The fighter object's own entry field, as the reset hub reads it: not a game call.
     let entry = ((fighter + crate::model::lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-    let mut run = RUN.lock();
+    let mut state = RUN.lock();
+    let EggState { run, streak, cpu_streak_dirty } = &mut *state;
     let plan = run.plan(rows, seed, entry, scene::facts);
     if seed.is_some() {
+        run.set_areas(bytes[4]);
+        run.configure(bytes[6], bytes[7]);
+        *cpu_streak_dirty = false;
+        streak.restart(bytes[5] == 1 && Run::running(run));
         EGG_GENERATION.fetch_add(1, Ordering::Relaxed);
     }
     // V2.6: the CPU is hidden while a practice game runs and `CPU during a game` says Hide, unless it is the target
     // (`eggs::hides_cpu`). The CPU's body, its tag and its panel follow this one request (`cpu::hide::step`).
-    let running = run.running();
-    EGG_RUNNING.store(running, Ordering::Release);
-    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), running, run.cpu_target(), btt::running()));
+    let armed = run.armed();
+    EGG_ARMED.store(armed, Ordering::Release);
+    EGG_FINISHED.store(armed && !Run::running(run), Ordering::Release);
+    super::hide_cpu::hide(super::tech::running() || eggs::hides_cpu(PRACTICE_HIDE_RUN.load(Ordering::Acquire), armed, run.cpu_target(), btt::running()));
     if plan == eggs::Plan::Clear {
+        streak.restart(false);
         super::notices::clear(NOTICE_ID);
     }
     if entry != 0 {
-        return eggs_cpu(&mut run, fighter, entry);
+        return eggs_cpu(run, streak, cpu_streak_dirty, fighter, entry);
     }
     // Any menu over the game holds the clock: the plugin's, the game's own pause menu (the fighters' frames run on under
     // it: Eden wa-eggs-07bae4c1-1, E11) and the waiting room's busy native UI.
     let owners = crate::runtime::published::input_owners();
-    let held = owners.covers_strip();
+    let held = owners.covers_strip() || super::egg_zone::wizard_active() || super::states::is_loading();
     (plan == eggs::Plan::Read).then_some(())?;
     let at = Some(natives::fighter_accessor(fighter)).filter(|at| *at != 0)?;
-    if run.floors_wanted() {
-        eggs_floors(&mut run, at);
-    }
     let tick = run.keeper(at) && !held;
     #[cfg(feature = "diag")]
     {
@@ -203,14 +234,22 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         }
     }
     let (top, hits, n, aerial, kind) = p1_read(at);
-    let hits = &hits[..n];
-    let score = run.score;
+    let hits = &hits[..if held { 0 } else { n }];
+    let before = streak.counts();
+    let owner = if !held && !run.ended() {
+        super::btt_projectiles::sample(streak, at, hits.iter().any(|h| h.3 > 0.0))
+    } else {
+        None
+    };
+    let target = lockon_key(run.target_id());
+    let mut source = None;
     #[cfg(feature = "diag")]
     if let Some([dx, dy]) = crate::runtime::diag_reload::take_egg_request() {
         run.place([top[0] + dx, top[1] + dy]);
     }
     #[cfg(feature = "diag")]
     if n != 0 {
+        let score = run.score;
         let egg = run.egg_at();
         let breaks = |e| hits.iter().any(|h| eggs::breaks(eggs::ANY, true, h, e));
         let overlap = egg.is_some_and(breaks);
@@ -218,21 +257,98 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
             "[Eggs] pass at={at:#x} p1={top:?} egg={egg:?} overlap={overlap} air={aerial} score={score} hits={hits:?}"
         ));
     }
-    run.sense([top[0], top[1]]);
+    let primary = if run.uses_paths() || run.needs_recovery() || run.wants_zone() {
+        natives::module_accessor(0).unwrap_or(at)
+    } else {
+        at
+    };
+    if run.wants_zone() && primary == at && !held {
+        use super::egg_zone::{self, Geometry};
+        let id = natives::stage_id();
+        let preferences = (id >= 0)
+            .then(|| run.zone_preferences(id, || crate::runtime::ui::worker::egg_zone(id)))
+            .flatten();
+        match egg_zone::prepare(at) {
+            Geometry::Ready => {
+                if let Some(zone) = egg_zone::with_stage(|stage| {
+                    (stage.id() == id).then(|| stage.resolve(preferences))
+                })
+                .flatten()
+                {
+                    run.set_zone(zone);
+                }
+            }
+            Geometry::Unavailable => {
+                if let Some(reason) = run.disable_offstage() {
+                    let _ = super::notices::post_required(HEADER, reason, 120, DEFAULT_COLOR);
+                }
+            }
+            Geometry::Pending => {}
+        }
+    }
+    if run.floors_wanted() {
+        eggs_floors(run, at);
+    }
+    if run.wants_blast() && !held {
+        if let Some(blast) = super::egg_zone::blast() {
+            run.set_blast(blast);
+        }
+    }
+    let state_loaded = tick && EGG_STATE_LOAD.swap(false, Ordering::AcqRel);
+    if !held && run.needs_recovery() {
+        let recovery = if state_loaded && run.recovering() { Recovery::Lost } else { egg_recovery(primary) };
+        run.observe_recovery(recovery);
+    }
+    let player = if primary == at { [top[0], top[1]] } else { [natives::pos_x(primary), natives::pos_y(primary)] };
+    run.sense(player);
     // rc.15: Player 1's articles break the target too, as `Breaks on` allows (docs/DECISIONS.md).
     let rule = run.rule();
-    let length = run.step_with(tick, top[1], hits, |egg| {
-        super::lockon::hit(at, 0, lockon_key(score), rule, aerial, true).is_some()
-            || super::btt_projectiles::hit(at, egg, rule, aerial, true)
-    }, aerial, kind);
-    // V2.1: the fighter whose attack broke it (Ice Climbers: that climber) freezes, as on a hit; an article's break does not.
-    let broke = run.score > score && run.melee();
+    let grader = super::input_display::grader_live();
+    let (length, depth) = run.pass(
+        eggs::Pass { tick, y: top[1], hits, air: aerial, kind },
+        |egg| {
+            if held {
+                return None;
+            }
+            let helper = super::lockon::hit(at, 0, target, rule, aerial, true);
+            source = helper;
+            eggs::other_break(grader, helper.is_some(), |deepest| {
+                let (projectile, depth) = super::btt_projectiles::hit(
+                    at,
+                    egg,
+                    rule,
+                    aerial,
+                    true,
+                    if deepest { crate::model::btt::Search::Deepest } else { crate::model::btt::Search::First },
+                )?;
+                source = helper.or(Some(projectile));
+                Some(depth)
+            })
+        },
+        &egg_clearance,
+    );
+    if let Some(depth) = depth {
+        super::input_display::target_grade(depth);
+    }
+    let event = run.event();
+    let contact = matches!(event, TargetEvent::Hit | TargetEvent::Pending);
+    let credit = owner.and_then(|(owner, _)| {
+        if run.melee() { Some((owner, owner)) } else { source.map(|source| (owner, source)) }
+    });
+    egg_streak(streak, event, credit);
+    if let Some((_, body)) = owner {
+        streak.end(body);
+    }
+    // The fighter whose attack broke the egg freezes on contact, including a pending break.
+    let broke = contact && run.melee();
     if let Some(frames) = broke.then(scene::facts).and_then(eggs::hitlag) {
         let _ = natives::set_hit_stop_frame(at, frames, false);
     }
-    let length = length?;
-    let mut text = crate::model::storage::FixedPath::<48>::new();
+    let streak_changed = core::mem::take(cpu_streak_dirty) || streak.counts() != before;
+    let length = length.or_else(|| streak_changed.then_some(u16::MAX))?;
+    let mut text = crate::model::storage::FixedPath::<96>::new();
     let _ = run.write_notice(&mut text);
+    let _ = streak.write(&mut text);
     super::notices::upsert(NOTICE_ID, HEADER, text.as_str(), length, DEFAULT_COLOR);
     #[cfg(feature = "diag")]
     crate::runtime::diag_log::diagnostic(format_args!(
@@ -243,6 +359,72 @@ unsafe fn eggs_pass(fighter: usize) -> Option<()> {
         run.view
     ));
     Some(())
+}
+
+fn egg_clearance(zone: &Zone, side: Side, from: [f32; 2], to: [f32; 2]) -> bool {
+    super::egg_zone::with_stage(|stage| stage.allows_move(zone, side, from, to)) == Some(true)
+}
+
+unsafe fn egg_recovery(primary: usize) -> Recovery {
+    use crate::model::cpu::ids::{C, UNRESOLVED};
+    use crate::model::sites_pkg2::{POS_X_OFFSET, POS_Y_OFFSET, SITUATION_KIND_OFFSET, STATUS_KIND_OFFSET};
+    use crate::model::tech::surface::Kind;
+    use super::cpu::konst;
+
+    if !game::granted(STATUS_KIND_OFFSET) || !game::granted(SITUATION_KIND_OFFSET) {
+        return Recovery::Unknown;
+    }
+    let matches_id = |id, kind| id != UNRESOLVED && id == konst(kind);
+    let status = natives::status_kind(primary);
+    let situation = natives::situation_kind(primary);
+    if matches_id(status, C::StatusDead) || matches_id(status, C::StatusRebirth) {
+        return Recovery::Lost;
+    }
+
+    if !game::granted(POS_X_OFFSET) || !game::granted(POS_Y_OFFSET) {
+        return Recovery::Unknown;
+    }
+    let player = [natives::pos_x(primary), natives::pos_y(primary)];
+    if !player.into_iter().all(f32::is_finite) {
+        return Recovery::Unknown;
+    }
+    let terrain = super::egg_zone::with_stage(|stage| {
+        let [left, right] = stage.main_span();
+        (player[1] <= stage.bottom_blast(), player[0] < left || player[0] > right || stage.under_main(player))
+    });
+    let Some((below_blast, away)) = terrain else { return Recovery::Unknown };
+    if below_blast {
+        return Recovery::Lost;
+    }
+    if matches_id(status, C::StatusCliffCatch) || matches_id(status, C::StatusCliffWait) {
+        return Recovery::Returned;
+    }
+    if matches_id(situation, C::SituationGround) {
+        if let Some(line) = super::tech_surfaces::NativeSource::new(primary).and_then(|mut source| source.touched()) {
+            if !line.passable && line.kind() == Some(Kind::Floor)
+                && super::egg_zone::with_stage(|stage| stage.supports(line.ends.map(|p| [p.x, p.y]))) == Some(true)
+            {
+                return Recovery::Returned;
+            }
+        }
+        // A platform is on stage at contact but does not complete a pending return.
+        return Recovery::Unchanged;
+    }
+    if away { Recovery::Away } else { Recovery::Unchanged }
+}
+
+fn egg_streak(
+    streak: &mut crate::model::hit_streak::Streak,
+    event: TargetEvent,
+    credit: Option<(u32, u32)>,
+) {
+    match (event, credit) {
+        (TargetEvent::Hit, Some((owner, source))) => streak.hit(owner, source),
+        (TargetEvent::Pending, Some((owner, source))) => streak.defer(owner, source),
+        (TargetEvent::Recovered, _) => streak.recover(),
+        (TargetEvent::Miss, _) => streak.miss(),
+        _ => {}
+    }
 }
 
 /// Native rays of the floor read a pass (`eggs_floors`): Training's stage, the widest, takes about a hundred.
@@ -286,7 +468,13 @@ unsafe fn eggs_floors(run: &mut eggs::Run, at: usize) {
 /// The CPU target's pass (V2.1; the practice CPU's own frame, only while a run has it as the target): put it where the run
 /// asks, on the target's flight (the operator, 11-15), its speed cleared; afresh, at 0% and in the game's own fall (in the
 /// air) or standing (at rest), as a save state's load places a fighter; and standing once the flight comes to rest.
-unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()> {
+unsafe fn eggs_cpu(
+    run: &mut eggs::Run,
+    streak: &mut crate::model::hit_streak::Streak,
+    streak_dirty: &mut bool,
+    fighter: usize,
+    entry: i32,
+) -> Option<()> {
     run.cpu_target().then_some(())?;
     let primary = [1, LOBBY_CPU_ENTRY][usize::from(scene::current()? == Scene::Lobby)];
     (entry == primary).then_some(())?;
@@ -294,7 +482,26 @@ unsafe fn eggs_cpu(run: &mut eggs::Run, fighter: usize, entry: i32) -> Option<()
     let (damage, stopped) = (natives::damage(at, 0), natives::is_stop(at));
     #[cfg(feature = "diag")]
     let score = run.score;
-    let moved = run.cpu_pass(damage, stopped);
+    let moved = if crate::runtime::published::input_owners().covers_strip()
+        || super::egg_zone::wizard_active() || super::states::is_loading()
+    {
+        return Some(());
+    } else {
+        run.cpu_pass_in(damage, stopped, &egg_clearance, || {
+            natives::module_accessor(0).map_or(Recovery::Unknown, |p1| egg_recovery(p1))
+        })
+    };
+    let event = run.event();
+    let before = streak.counts();
+    let source = if streak.enabled() && matches!(event, TargetEvent::Hit | TargetEvent::Pending)
+        && super::lockon::damage_source_ready()
+    {
+        super::lockon::damage_source(at)
+    } else {
+        None
+    };
+    egg_streak(streak, event, source);
+    *streak_dirty |= before != streak.counts();
     #[cfg(feature = "diag")]
     eggs_cpu_diag(run, score, at, damage, stopped, moved);
     // The game turns the placed CPU's tag flag off in the air: while TR owns the placement and the body is shown, the CPU frame
@@ -396,7 +603,7 @@ unsafe fn drawn_player_height(player: usize, wants: &[Sphere]) -> Option<f32> {
         .reduce(f32::max)
 }
 
-/// The status ids and effect attributes, resolved once through the game's constant table (`None` until it answers; it may not be
+/// The status ids, resolved once through the game's constant table (`None` until it answers; it may not be
 /// built at boot). Asked again every 30th call.
 fn ensure_ready() -> bool {
     if READY.load(Ordering::Acquire) {
@@ -405,7 +612,7 @@ fn ensure_ready() -> bool {
     if TRIES.fetch_add(1, Ordering::Relaxed) % 30 != 0 {
         return false;
     }
-    let mut ids = [0i32; 6];
+    let mut ids = [0; hitbox::STATUS_NAMES.len()];
     for (slot, name) in ids.iter_mut().zip(hitbox::STATUS_NAMES) {
         // SAFETY: the constant lookup is a guarded called site (`lua_const` checks its grant).
         let Some(value) = (unsafe { game::lua_const(lua_bind_hash(name)) }) else { return false };
@@ -446,22 +653,6 @@ unsafe fn visualizes(accessor: usize) -> bool {
     hitbox::visualizes_entry(scene, entry)
 }
 
-fn book_set(accessor: usize, slept: bool) {
-    let mut book = BOOK.lock();
-    let before = book.slept(accessor);
-    book.set(accessor, slept);
-    match (before, slept) {
-        (false, true) => {
-            SLEPT.fetch_add(1, Ordering::Relaxed);
-        }
-        (true, false) => {
-            SLEPT.fetch_sub(1, Ordering::Relaxed);
-        }
-        _ => {}
-    }
-}
-
-
 // ---- the spheres the plugin keeps (lead ruling 2026-11-02 on Q3) ------------------------------------------------------
 
 /// Every fighter's held spheres, the scratch list of the spheres a pass wants, and the save-state epoch each set last saw.
@@ -469,10 +660,23 @@ struct Store {
     table: SetTable,
     seen_epoch: [u32; hitbox::FIGHTER_SETS],
     wants: [Sphere; hitbox::WANT_SCRATCH],
+    #[cfg(feature = "diag")]
+    article_signatures: [(u32, u64); 8],
+    #[cfg(feature = "diag")]
+    census: stats::CensusBook,
 }
 
-static STORE: Mutex<Store> =
-    Mutex::new(Store { table: SetTable::new(), seen_epoch: [0; hitbox::FIGHTER_SETS], wants: [Sphere::NONE; hitbox::WANT_SCRATCH] });
+static FIGHTER_GENERATIONS: FighterGenerations = FighterGenerations::new();
+
+static STORE: Mutex<Store> = Mutex::new(Store {
+    table: SetTable::new(),
+    seen_epoch: [0; hitbox::FIGHTER_SETS],
+    wants: [Sphere::NONE; hitbox::WANT_SCRATCH],
+    #[cfg(feature = "diag")]
+    article_signatures: [(0, 0); 8],
+    #[cfg(feature = "diag")]
+    census: stats::CensusBook::new(),
+});
 
 // ---- own orbs (decision HB-OWN-ORBS, option 1; `model::hitbox_orbs`) -------------------------------------------------
 //
@@ -483,27 +687,46 @@ static STORE: Mutex<Store> =
 // two half-disc caps and the band between them; the panes' container is RootPane's first child, so the HUD, the pause menu and the plugin's menu draw over them as
 // they drew over the effect spheres. Articles' hitboxes join them (`draw_articles`).
 
-static BOARD: Mutex<Board> = Mutex::new(Board::new());
+type PracticePictures = ([eggs::Look; 3], [eggs::Look; btt::LOOKS]);
+type WorldAnchor = (FighterLife, [f32; 3]);
+
+struct OverlaySample {
+    board: Board,
+    scene: Option<Scene>,
+    pictures: PracticePictures,
+    anchors: [Option<WorldAnchor>; hitbox::FIGHTER_SETS],
+}
+
+// All zero bytes, which keeps the board in `.bss`. No reader accepts a sample before the board's first frame.
+// SAFETY: zero is a valid value of every field; the compiler rejects this initializer otherwise.
+static BOARD: Mutex<OverlaySample> = Mutex::new(unsafe { core::mem::zeroed() });
+static SAMPLE: AtomicU32 = AtomicU32::new(0);
+static FIGHTERS: Mutex<[Option<(u32, usize)>; hitbox::FIGHTER_SETS]> =
+    Mutex::new([None; hitbox::FIGHTER_SETS]);
 
 /// The renderer can hold its last board while projecting. A fighter frame never waits on it.
 fn clear_board(accessor: usize) {
-    if let Some(mut board) = BOARD.try_lock() {
-        board.clear(accessor);
+    if let Some(mut sample) = BOARD.try_lock() {
+        sample.board.clear(accessor);
     }
 }
 
 /// Clear set `i`; its orbs go too. Nothing is asked of the game.
-fn clear_set(store: &mut Store, i: usize, accessor: usize) -> Counts {
-    clear_board(accessor);
+fn clear_set(store: &mut Store, board: &mut Board, i: usize, accessor: usize) -> Counts {
+    board.clear(accessor);
     store.table.sets[i].clear(&mut OrbSink { status: i32::MIN })
+}
+
+unsafe fn sphere_world_position(accessor: usize, sphere: &Sphere) -> Option<[f32; 3]> {
+    natives::joint_position(accessor, sphere.joint, &sphere.pos)
 }
 
 /// Place every sphere `set` holds on its bone and publish them as `accessor`'s orbs, with the launch-angle marks while that row is On
 /// and the fighter's wind `areas` (Windboxes ticked).
-unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend::WindArea]) -> usize {
+unsafe fn publish_orbs(board: &mut Board, accessor: usize, life: FighterLife, set: &hitbox::HandleSet, areas: &[legend::WindArea]) -> usize {
     let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
     let lr = shown(legend::ANGLES).then(|| natives::lr(accessor));
-    let place = |s: &Sphere| natives::joint_position(accessor, s.joint, &s.pos);
+    let place = |s: &Sphere| sphere_world_position(accessor, s);
     let mut len = orbs::place_orbs(set, place, lr, |slot| orbs::slot_angle(&mut GameAttacks(accessor), slot), &mut placed);
     let colour = legend::area_colour();
     for orb in areas.iter().enumerate().flat_map(|(k, area)| legend::area_orbs(area, k, 0.0, colour)).flatten() {
@@ -511,7 +734,7 @@ unsafe fn publish_orbs(accessor: usize, set: &hitbox::HandleSet, areas: &[legend
             (placed[len], len) = (orb, len + 1);
         }
     }
-    BOARD.try_lock().map_or(0, |mut board| board.publish(accessor, placed[..len].iter().copied()))
+    board.publish_fighter(accessor, life, placed[..len].iter().copied())
 }
 
 /// One raw game-memory read for `GameArea`, the wind-area reader: the pass (`frame`) runs it only behind `enabled` with Windboxes
@@ -546,7 +769,7 @@ impl legend::AreaReader for GameArea {
     }
 }
 
-/// An object's enabled wind areas (its AreaModule at accessor `+0xc0`, `legend::area`) with their angles from the game's wind
+/// An object's enabled gameplay wind areas (its AreaModule at accessor `+0xc0`, `legend::area`) with their angles from the game's wind
 /// manager: a fighter's, an article's or an item's (every AreaModule writes the same table: `legend_every_area_module_writes_the_table_the_reader_reads`).
 unsafe fn object_wind_areas(accessor: usize, out: &mut [legend::WindArea]) -> usize {
     use legend::AreaReader;
@@ -579,6 +802,59 @@ static ORB_PANES: Mutex<OrbPanes> = Mutex::new(OrbPanes {
     egg: ([0; crate::model::panes::EGG_PANES], [0; 3]),
 });
 
+/// An unavailable waiting-room menu must not be interpreted as a scene departure.
+fn overlay_layout_scene(name: &[u8]) -> Result<Option<Scene>, ()> {
+    match name {
+        b"info_training" => Ok(scene::current()),
+        b"info_waiting" => {
+            let requested = crate::runtime::lobby::training::lobby::try_requested().map_err(|_| ())?;
+            Ok(requested.then_some(Scene::Lobby).filter(|_| scene::current() == Some(Scene::Lobby)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn read_overlay_sample(scene: Scene) -> Option<hos_lock::MutexGuard<'static, OverlaySample>> {
+    BOARD.try_lock().filter(|sample| sample.scene == Some(scene) && sample.board.is_frame(SAMPLE.load(Ordering::Acquire)))
+}
+
+fn hud_half() -> Option<[f32; 2]> {
+    let words = unsafe { natives::screen_size_words()? };
+    Some(core::array::from_fn(|i| orbs::screen_half(words[i], orbs::SCREEN_HALF_DEFAULT[i])))
+}
+
+unsafe fn project_to_canvas(at: [f32; 3], half: [f32; 2]) -> Option<[f32; 2]> {
+    let canvas = orbs::to_canvas(natives::world_to_screen(&at)?, half);
+    canvas.into_iter().all(f32::is_finite).then_some(canvas)
+}
+
+/// The current pose's fighter origin and its position on the HUD.
+#[derive(Clone, Copy)]
+pub struct FighterScreenAnchor {
+    pub object_id: u32,
+    pub world: [f32; 3],
+    pub canvas: [f32; 2],
+}
+
+/// Read the same scene/pose as the orb renderer, even with its legend toggled off. A readiness boundary: no anchors
+/// before boot installed the overlay.
+///
+/// # Safety
+/// Call on the HUD layout thread while the named layout is current.
+pub unsafe fn fighter_screen_anchors(name: &[u8]) -> Option<[Option<FighterScreenAnchor>; hitbox::FIGHTER_SETS]> {
+    if !INSTALLED.load(Ordering::Acquire) {
+        return None;
+    }
+    let scene = overlay_layout_scene(name).ok()??;
+    let anchors = read_overlay_sample(scene)?.anchors;
+    let half = hud_half()?;
+    Some(anchors.map(|anchor| {
+        let (life, world) = anchor?;
+        let canvas = project_to_canvas(world, half)?;
+        FIGHTER_GENERATIONS.is_current(life).then_some(FighterScreenAnchor { object_id: life.id, world, canvas })
+    }))
+}
+
 /// The layout tick's draw (`ui::hud`): every live orb projected with the game's own `world_to_screen` (so the orbs follow
 /// the camera, paused or not) and written into the plugin's panes as a pill; the rest hidden. A readiness boundary:
 /// nothing before boot installed the feature. Writes only the plugin's own panes.
@@ -591,28 +867,30 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     if !INSTALLED.load(Ordering::Acquire) {
         return;
     }
-    let waiting = name == b"info_waiting";
-    let active = if waiting {
-        // An unavailable menu is not a scene departure. Preserve the Eggs/BTT run
-        // and its panes for this tick; retry before touching either on the next.
-        let Ok(active) = crate::runtime::lobby::training::lobby::try_requested() else { return; };
-        active
-    } else { name == b"info_training" && scene::is_training() };
+    let Ok(scene) = overlay_layout_scene(name) else { return };
+    let active = scene.is_some();
     if layout.is_null() {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxOrbs);
-    let (eggs_orbs, marks) = (RUN.lock().look(active, || view()), btt::look(active, || view()));
+    RUN.lock().run.see(active, || view());
+    let board = scene.and_then(read_overlay_sample);
+    let (eggs_orbs, targets_in_play) = board.as_ref().map_or(([None; 3], [None; btt::LOOKS]), |s| s.pictures);
+    // Resolve the editor handoff while this sample is held, so the first Running
+    // sample and its updated target pictures become visible together.
+    let editor = btt::editor_pictures(active, || view());
+    let marks = editor.unwrap_or_else(|| if btt::running() { targets_in_play } else { [None; btt::LOOKS] });
     let mut own = [None; 3 + btt::LOOKS];
     own[..3].copy_from_slice(&eggs_orbs);
+    let zone_wizard = super::egg_zone::wizard_active();
     let edge_wizard = super::edge_juggle::wizard_active();
     let tech = super::tech::running();
-    // rc.15 target-hurtbox-display: the live targets' break volumes (the picture discs), drawn as hurtboxes below. Spacing
-    // grader hook: its rings take these discs (`orbs::target_hurt_orbs`) rather than drawing a second one.
+    let grader = super::input_display::grader_live();
+    // The break volume supplies the geometry for both the hurt disc and the grade zones.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if hurt_on && !tech && !edge_wizard {
+    if (hurt_on || grader) && !tech && !edge_wizard && !zone_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
@@ -624,6 +902,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         marks
     };
     own[3..].copy_from_slice(&marks);
+    if zone_wizard {
+        own.fill(None);
+    }
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
     if !active {
@@ -637,8 +918,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         }
         return;
     }
-    let on = SETTING.load(Ordering::Acquire);
-    let any = on || own.iter().any(Option::is_some);
+    let on = SETTING.load(Ordering::Acquire) && !zone_wizard;
+    let any = on || zone_wizard || own.iter().any(Option::is_some);
     if !any && cache.shown == [0; 2] && cache.egg.1 == [0; 3] && cache.layout == layout as usize {
         return;
     }
@@ -665,13 +946,9 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         return;
     }
     let mut used = orbs::PaneUse::default();
-    let mut keep_panes = false;
-    let (mut over, mut looks) = (0, [None; 3 + btt::LOOKS]);
+    let (mut over, mut looks) = (0u32, [None; 3 + btt::LOOKS]);
     if any {
-        let half = match natives::screen_size_words() {
-            Some([w, h]) => [orbs::screen_half(w, orbs::SCREEN_HALF_DEFAULT[0]), orbs::screen_half(h, orbs::SCREEN_HALF_DEFAULT[1])],
-            None => [0.0; 2],
-        };
+        let half = hud_half().unwrap_or_default();
         let plan = |orb: &Orb, color| {
             let end = |at| {
                 let [x, y] = orbs::edge_points(at, orb.radius);
@@ -690,46 +967,63 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             Some((plan(&dot, [255; 4])?, look))
         });
         let hide = super::hide_cpu::draw_hide();
-        let board = if on { BOARD.try_lock() } else { None };
-        // A normal busy tick can keep the existing panes. While Hide is in effect, stale panes may include the CPU.
-        keep_panes = on && board.is_none() && hide.is_visible();
+        let combat = board.as_ref().filter(|_| on).map(|sample| &sample.board);
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
-        // A busy board keeps the last frame's panes: no target cap may overwrite a fighter's retained one.
-        let target_hurts = targets[..orbs::targets_drawn(board.is_some(), hurt_on, n_targets)].iter();
-        for orb in board
+        if zone_wizard {
+            if let Some(view) = view() {
+                super::egg_zone::draw(view, |[a, b], width, color| {
+                    let [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+                    let length = dx.hypot(dy);
+                    if length > 0.0 && length.is_finite() {
+                        if let Some(band) = used.take_band() {
+                            let center = [a[0].midpoint(b[0]), a[1].midpoint(b[1])];
+                            write_pane(cache.panes[p::CAPS + band], center, [length, width], dy.atan2(dx).to_degrees(), color);
+                        }
+                    }
+                });
+            }
+        }
+        let drawn = orbs::targets_drawn(combat.is_some() || !on, hurt_on || grader, n_targets);
+        let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {
+            let Some((cap, band)) = used.take(pill.length > 0.0) else {
+                *over += 1;
+                return;
+            };
+            for (k, at) in pill.caps.into_iter().enumerate() {
+                unsafe { write_pane(panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color) };
+            }
+            if let Some(band) = band {
+                unsafe { write_pane(panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color) };
+            }
+        };
+        for orb in combat
             .iter()
-            .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide)))
-            .chain(target_hurts)
+            .flat_map(|b| b.draw_slots_in_order(b.draw_slots(&hide, &FIGHTER_GENERATIONS)))
             .filter(|o| legend::shows(bits, o.kind()))
         {
-            let Some(pill) = plan(orb, orb.color) else { continue };
             if orb.kind() == legend::KIND_AREA && orb.key & 0xff == legend::AREA_BOX {
-                // A wind area's box: its band alone, from its left edge to its right, as tall as the box.
+                let Some((centre, size)) = orbs::plan_wind_box(orb, half, |corner| natives::world_to_screen(&corner)) else { continue };
                 let Some(band) = used.take_band() else {
                     over += 1;
                     continue;
                 };
-                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+                write_pane(cache.panes[p::CAPS + band], centre, size, 0.0, orb.color);
                 continue;
             }
-            let Some((cap, band)) = used.take(pill.length > 0.0) else {
-                over += 1;
-                continue;
-            };
-            for (k, at) in pill.caps.into_iter().enumerate() {
-                write_pane(cache.panes[cap + k], at, [pill.size / 2.0, pill.size], pill.rot + 180.0 * k as f32, pill.color);
-            }
-            if let Some(band) = band {
-                write_pane(cache.panes[p::CAPS + band], pill.band, [pill.length, pill.size], pill.rot, pill.color);
+            let Some(pill) = plan(orb, orb.color) else { continue };
+            write_pill(pill, &mut used, &mut over, &cache.panes);
+        }
+        for target in &targets[..drawn] {
+            for layer in crate::model::spacing::target_layers(target, hurt_on, grader).into_iter().flatten() {
+                let Some(pill) = plan(&layer, layer.color) else { continue };
+                write_pill(pill, &mut used, &mut over, &cache.panes);
             }
         }
     }
     let n = used.caps / 2;
     let shown = cache.shown;
-    if !keep_panes {
-        write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
-    }
+    write_tick(&mut cache, [orbs::pane_tick(used.caps, shown[0]), orbs::pane_tick(used.bands, shown[1])]);
     write_eggs(&mut cache, &looks);
     // Release builds say it too, once: more orbs than panes means a fighter's spheres were cut (review HB-2).
     static OVER_SAID: AtomicBool = AtomicBool::new(false);
@@ -744,9 +1038,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
 
 /// The camera this tick (`eggs::View`): two points of the fighters' plane projected on the canvas.
 unsafe fn view() -> Option<eggs::View> {
-    let words = natives::screen_size_words()?;
-    let half = [0, 1].map(|i| orbs::screen_half(words[i], orbs::SCREEN_HALF_DEFAULT[i]));
-    let canvas = |p: [f32; 3]| Some(orbs::to_canvas(natives::world_to_screen(&p)?, half));
+    let half = hud_half()?;
+    let canvas = |p| project_to_canvas(p, half);
     let (a, b) = (canvas([0.0; 3])?, canvas([10.0, 10.0, 0.0])?);
     let scale = [(b[0] - a[0]) / 10.0, (b[1] - a[1]) / 10.0];
     (scale[0] > 0.0 && scale[1] > 0.0).then(|| {
@@ -836,12 +1129,12 @@ pub fn forget_fighter(fighter: usize) {
     }
     // SAFETY: a field read of the fighter object the game just initialised.
     let accessor = unsafe { natives::fighter_accessor(fighter) };
-    let mut store = STORE.lock();
-    if let Some(i) = store.table.find(accessor) {
-        store.table.sets[i].forget();
+    if accessor == 0 {
+        return;
     }
-    HELD.store(store.table.held_spheres(), Ordering::Relaxed);
-    clear_board(accessor);
+    // SAFETY: this accessor belongs to the fighter the game just initialized.
+    let id = unsafe { (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id };
+    FIGHTER_GENERATIONS.retire(id);
 }
 
 /// One raw game-memory read for `hitbox::GameHurt` (the per-frame pass's hurt reader, route B; the diag census uses the
@@ -883,17 +1176,21 @@ impl hitbox::AttackReader for GameAttacks {
     }
 }
 
-/// The articles whose `ATTACK`, `CATCH` or wind-area command ran and the items with a live attack slot or a wind area, drawn by
-/// every fighter pass (rc.13; wind areas rc.14 wind-articles). Locked before `BOARD`.
+/// Articles tracked by animation commands and active items. The post-update overlay pass samples their world shapes.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
+/// An Off transition clears tracked articles even when no fighter orbs are held.
+static CLEAR_ARTICLES: AtomicBool = AtomicBool::new(false);
 
 /// Each tracked article's live attack slots as its own orbs, placed on its bones, and with *Windboxes* ticked its wind areas; an
 /// article that is gone (its id inactive or now another object's), or whose attack, grab and wind ended, is forgotten.
 /// `sv_battle_object` as `cpu_pilot` uses it.
-unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader: impl FnMut(usize) -> Option<R>) -> u32 {
-    let mut articles = ARTICLES.lock();
-    let Some(mut board) = BOARD.try_lock() else { return 0; };
-    articles.clear_evicted(&mut board);
+unsafe fn draw_articles(
+    board: &mut Board,
+    articles: &mut orbs::Articles,
+    owners: &[usize],
+    #[cfg(feature = "diag")] article_signatures: &mut [(u32, u64); 8],
+) -> u32 {
+    articles.clear_evicted(board);
     let hide = super::hide_cpu::draw_hide();
     let wind = shown(legend::WINDBOXES);
     let hurt = shown(legend::ARTICLE_HURTBOXES) && matches!(scene::current(), Some(Scene::Training));
@@ -909,7 +1206,9 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         m => state_natives::item_active_count(m).min(16),
     };
     let items = (0..count).map(|i| state_natives::item_active(manager, i)).filter(|&item| item != 0).map(|item| state_natives::item_object_id(item));
-    let instances = hitbox::article_instances(hurt, |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal)).map(|article| state_natives::article_object_id(article));
+    let instances = owners.iter().flat_map(|&owner| {
+        hitbox::article_instances(hurt, move |kind, ordinal| state_natives::article_get_from_no(owner, kind, ordinal))
+    }).map(|article| state_natives::article_object_id(article));
     // The lock-on helpers are never drawn: a target's hurtbox is its picture disc (`orbs::target_hurt_orbs`).
     for id in items.chain(instances).filter(|&id| state_natives::object_is_active(id) && !super::lockon::is_helper(id)) {
         let key = smash::app::sv_battle_object::module_accessor(id) as usize;
@@ -920,31 +1219,31 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
         let found = if wind && !live_slot { object_wind_areas(key, &mut areas) } else { 0 };
         if legend::tracks_item(live_slot, found) {
             #[cfg(feature = "diag")]
-            stats::item(&articles, id, key);
-            let _ = articles.track(id, key, Some(&mut board), true);
+            stats::item(articles, id, key);
+            let _ = articles.track(id, key, Some(board), true);
         }
         if hurt && !articles.tracked().contains(&(id, key)) {
             let (mut len, mut cap) = (0, hurts.len());
-            if let Some(mut reader) = hurt_reader(key) {
-                let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, false, &mut cap);
-                #[cfg(feature = "diag")]
-                stats::article_hurt(id, key, len, cut);
-                if len != 0 && articles.track(id, key, Some(&mut board), false).is_none() { dropped += cut + len as u32; }
-            }
+            let mut reader = hitbox::GameHurt { accessor: key, load: mem_load };
+            let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, false, &mut cap);
+            #[cfg(feature = "diag")]
+            stats::article_hurt(id, key, len, cut);
+            if len != 0 && articles.track(id, key, Some(board), false).is_none() { dropped += cut + len as u32; }
         }
     }
     for (id, key) in articles.tracked().into_iter().filter(|t| t.0 != 0) {
         let live = smash::app::sv_battle_object::is_active(id) && smash::app::sv_battle_object::module_accessor(id) as usize == key;
         // `key` is the live article's accessor (checked above); the natives check their own grants. Tracked: its set.
-        let Some((set, attacking)) = articles.track(id, key, Some(&mut board), false) else { continue };
-        let place = |s: &Sphere| natives::joint_position(key, s.joint, &s.pos);
+        let Some((set, attacking)) = articles.track(id, key, Some(board), false) else { continue };
+        let place = |s: &Sphere| sphere_world_position(key, s);
         // Only a live article is read: its areas, its facing and its status (`legend::keeps_article` inside the pass).
         let kept = live && {
             let found = if wind { object_wind_areas(key, &mut areas) } else { 0 };
             #[cfg(feature = "diag")]
-            stats::object(id, key, &areas[..found]);
+            stats::object(article_signatures, id, key, &areas[..found]);
             let mut len = 0;
-            if let Some(mut reader) = hurt.then(|| hurt_reader(key)).flatten() {
+            if hurt {
+                let mut reader = hitbox::GameHurt { accessor: key, load: mem_load };
                 let cut = hitbox::want_article_hurt(&mut reader, &mut hurts, &mut len, true, &mut budget);
                 dropped += cut;
                 #[cfg(feature = "diag")]
@@ -956,12 +1255,12 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
                 hurt: &hurts[..len],
                 owner: hide.owner(|| article_owner(id, key)),
             };
-            let kept = orbs::article_pass(&mut board, set, (id, key), natives::status_kind(key), &mut GameAttacks(key), place, extras);
+            let kept = orbs::article_pass(board, set, (id, key), natives::status_kind(key), &mut GameAttacks(key), place, extras);
             *attacking = found != 0 || set.spheres().any(|s| s.key >> 24 != hitbox::KIND_ARTICLE_HURT);
             kept
         };
         if !kept {
-            articles.forget(id, &mut board);
+            articles.forget(id, board);
         }
     }
     board.finish_articles(hide.generation());
@@ -969,7 +1268,7 @@ unsafe fn draw_articles<R: hitbox::HurtboxReader>(owner: usize, mut hurt_reader:
 }
 
 /// The combat owner of a validated live item or weapon, when it is still a live fighter.
-unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
+pub(crate) unsafe fn article_owner(id: u32, key: usize) -> Option<u32> {
     if !matches!(id >> 28, 1 | 4) {
         return None;
     }
@@ -993,8 +1292,7 @@ unsafe fn fighter_launch(accessor: usize) -> crate::model::spots::Launch {
 
 // ---- the per-frame pass ---------------------------------------------------------------------------------------------
 
-/// One fighter's pass (SPEC-core-06 §5), after the game's frame for it. A readiness boundary: nothing happens before boot
-/// installed the feature. With the setting Off, nothing held and nothing to restore it makes no game call at all (Q4).
+/// The early fighter pass retains the gameplay work. Only the live object identity crosses into the overlay sample.
 ///
 /// # Safety
 /// `fighter` is the fighter object the game just ran a frame of.
@@ -1003,85 +1301,157 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+    super::egg_zone::frame(fighter);
     eggs_pass(fighter);
-    #[cfg(feature = "diag")]
-    stats::frame_begin();
-    let enabled = SETTING.load(Ordering::Acquire);
-    let perfect = if super::edge_juggle::may_request_player_height() {
-        super::edge_juggle::player_height_request(natives::fighter_accessor(fighter))
-    } else {
-        None
-    };
-    let show_hurt = enabled && shown(legend::HURTBOXES);
-    let perfect = if show_hurt {
-        perfect
-    } else {
-        if let Some(attempt) = perfect {
-            let height = perfect_player_height(&attempt);
-            attempt.record_height(height);
-        }
-        None
-    };
-    if !enabled && SLEPT.load(Ordering::Relaxed) == 0 && HELD.load(Ordering::Relaxed) == 0 {
-        return;
-    }
     let accessor = natives::fighter_accessor(fighter);
     if accessor == 0 {
         return;
     }
-    let slept = BOOK.lock().slept(accessor);
-    let mut store = STORE.lock();
-    let held = store.table.find(accessor).is_some_and(|i| !store.table.sets[i].is_empty());
-    // Off with nothing of this fighter's to restore or kill: no game call at all.
-    if !enabled && !slept && !held {
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    if let Some(mut fighters) = FIGHTERS.try_lock() {
+        let object = Some((id, accessor));
+        if !fighters.contains(&object) {
+            if let Some(slot) = fighters.iter_mut().find(|slot| slot.is_none()) {
+                *slot = object;
+            }
+        }
+    }
+    if !super::edge_juggle::may_request_player_height() {
         return;
     }
-    let visualizes = visualizes(accessor);
-    if !visualizes || !ensure_ready() {
-        // Not (or no longer) a practice fighter: its own spheres go, its effect flag is never touched.
-        if let Some(i) = store.table.find(accessor) {
-            clear_set(&mut store, i, accessor);
-            HELD.store(store.table.held_spheres(), Ordering::Relaxed);
-        }
-        drop(store);
-        if let Some(attempt) = perfect {
-            attempt.record_height(None);
-        }
+    if let Some(attempt) = super::edge_juggle::player_height_request(accessor) {
+        let height = if SETTING.load(Ordering::Acquire) && shown(legend::HURTBOXES) {
+            perfect_visualizer_height(attempt.player())
+        } else {
+            perfect_player_height(&attempt)
+        };
+        attempt.record_height(height);
+    }
+}
+
+/// Keep the Perfect recovery measurement on its original fighter phase, including the visualizer's shape policy.
+unsafe fn perfect_visualizer_height(player: usize) -> Option<f32> {
+    if !visualizes(player) || !ensure_ready() {
+        return None;
+    }
+    let status = natives::status_kind(player);
+    let facts = FrameFacts { visualizes: true, enabled: true, status, ids: status_ids() };
+    if facts.ids.shielding(status) {
+        return None;
+    }
+    let mut wants = [Sphere::NONE; hitbox::WANT_SCRATCH];
+    let mut len = 0;
+    if facts.draws_attacks() {
+        hitbox::want_hits(&mut GameAttacks(player), &mut wants, &mut len, true);
+    }
+    hitbox::want_hurt(&mut hitbox::GameHurt { accessor: player, load: mem_load }, &mut wants, &mut len, true, hitbox::KIND_HURT);
+    drawn_player_height(player, &wants[..len])
+}
+
+/// The one game-thread sampling point for combat geometry and the practice discs.
+/// The HUD projects the completed sample with the current camera.
+unsafe fn sample_overlay() {
+    if !INSTALLED.load(Ordering::Acquire) {
         return;
     }
+    let Some(mut fighters) = FIGHTERS.try_lock() else { return };
+    if fighters[0].is_none() {
+        // A paused simulation has no new fighter pose to publish.
+        return;
+    }
+    let queued = std::mem::take(&mut *fighters);
+    drop(fighters);
+    let sample_id = SAMPLE.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+    let Some(mut sample) = BOARD.try_lock() else { return };
+    let Some(mut store) = STORE.try_lock() else { return };
+    let Some(mut articles) = ARTICLES.try_lock() else { return };
+    store.table.forget_retired(&FIGHTER_GENERATIONS);
+    let OverlaySample { board, scene: sampled_scene, pictures, anchors } = &mut *sample;
+    board.begin_frame(sample_id);
+    *sampled_scene = scene::current();
+    let active = sampled_scene.is_some();
+    anchors.fill(None);
+    let enabled = active && SETTING.load(Ordering::Acquire);
+    if CLEAR_ARTICLES.swap(false, Ordering::AcqRel) {
+        articles.forget_all(Some(board));
+    }
+    let mut owners = [0; hitbox::FIGHTER_SETS];
+    let mut owner_count = 0;
+    for (slot, object) in queued.into_iter().enumerate() {
+        let Some((id, accessor)) = object else { continue };
+        let Some(life) = FIGHTER_GENERATIONS.stamp(id) else { continue };
+        if !state_natives::object_is_active(id)
+            || smash::app::sv_battle_object::module_accessor(id) as usize != accessor
+        {
+            continue;
+        }
+        let drawable = active && visualizes(accessor);
+        if drawable {
+            anchors[slot] = natives::joint_position(accessor, hash40("top"), &[0.0; 3])
+                .filter(|point| point.iter().all(|x| x.is_finite()))
+                .map(|world| (life, world));
+        }
+        let held = store.table.find_life(accessor, life).filter(|&i| !store.table.sets[i].is_empty());
+        if !enabled && held.is_none() {
+            continue;
+        }
+        if !drawable || !ensure_ready() {
+            if let Some(i) = held {
+                clear_set(&mut store, board, i, accessor);
+            }
+            continue;
+        }
+        if enabled {
+            owners[owner_count] = accessor;
+            owner_count += 1;
+        }
+        sample_fighter(&mut store, board, accessor, life, enabled);
+    }
+    if owner_count != 0 {
+        let _ = draw_articles(
+            board,
+            &mut articles,
+            &owners[..owner_count],
+            #[cfg(feature = "diag")]
+            &mut store.article_signatures,
+        );
+    }
+    HELD.store(store.table.held_spheres(), Ordering::Relaxed);
+    *pictures = if active {
+        let eggs = RUN.try_lock().map_or([None; 3], |state| state.run.pictures());
+        (eggs, btt::overlay_pictures())
+    } else {
+        ([None; 3], [None; btt::LOOKS])
+    };
+}
+
+unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, life: FighterLife, enabled: bool) {
     let ids = status_ids();
     let status = if enabled { natives::status_kind(accessor) } else { 0 };
-    let facts = FrameFacts { visualizes: true, enabled, slept, status, ids };
-    let plan = hitbox::plan(facts);
-    if plan.restore {
-        natives::set_sleep_effect(accessor, false);
-    }
-    if plan.sleep {
-        natives::set_sleep_effect(accessor, true);
-    }
-    let i = store.table.index_for(accessor);
+    #[cfg(feature = "diag")]
+    stats::frame_begin();
+    let facts = FrameFacts { visualizes: true, enabled, status, ids };
+    let i = store.table.index_for(accessor, life);
     let epoch = RESTORE_EPOCH.load(Ordering::Acquire);
     let mut counts = Counts::default();
     if store.seen_epoch[i] != epoch {
         // A save state was loaded since this fighter's last pass: its spheres go and come back from the restored state.
         store.seen_epoch[i] = epoch;
-        counts = clear_set(&mut store, i, accessor);
+        counts = clear_set(store, board, i, accessor);
     }
-    let Store { table, wants, .. } = &mut *store;
+    let Store { table, wants, .. } = store;
     let set = &mut table.sets[i];
     if enabled {
         set.launch = fighter_launch(accessor);
     }
-    // Own orbs (decision HB-OWN-ORBS): while the setting is On the pass reads the HitModule (the relied `hurtbox_*` rows) and
-    // plans the enabled parts' hurt spheres into the same wants as the hit spheres; `OrbSink` holds every one (never
-    // refused). Sample the setting once so this pass and a Perfect plan cannot both read the fighter's HitModule.
-    let mut hurt = show_hurt.then(|| hitbox::GameHurt { accessor, load: mem_load });
+    // The current pose is available to every shape through the same joint transform.
+    let mut hurt = (enabled && shown(legend::HURTBOXES)).then(|| hitbox::GameHurt { accessor, load: mem_load });
     let hurt: Option<&mut dyn hitbox::HurtboxReader> = hurt.as_mut().map(|h| h as _);
     let (c, len) = hitbox::reconcile_frame(set, facts, wants, &mut GameAttacks(accessor), hurt, &mut OrbSink { status });
     // Wind areas (Windboxes ticked): pushes that are not hitboxes, read from the fighter's AreaModule.
     let mut areas = [legend::WindArea::NONE; legend::area::MAX_AREAS];
     let found = if enabled && shown(legend::WINDBOXES) { object_wind_areas(accessor, &mut areas) } else { 0 };
-    let placed = publish_orbs(accessor, set, &areas[..found]);
+    let placed = publish_orbs(board, accessor, life, set, &areas[..found]);
     #[cfg(feature = "diag")]
     let (hits, hurts) = {
         let hits = wants[..len].iter().filter(|s| s.key >> 24 != hitbox::KIND_HURT).count() as u32;
@@ -1091,19 +1461,7 @@ pub unsafe fn frame(fighter: usize) {
     let grabs = set.spheres().filter(|s| s.key >> 24 == hitbox::KIND_GRAB).count() as u32;
     #[cfg(feature = "diag")]
     stats::wanted(hits, hurts);
-    let height = perfect.as_ref().and_then(|attempt| drawn_player_height(attempt.player(), &wants[..len]));
     let held_now = set.len();
-    HELD.store(table.held_spheres(), Ordering::Relaxed);
-    drop(store);
-    if let Some(attempt) = perfect {
-        attempt.record_height(height);
-    }
-    // Off: the pass that clears the fighters' orbs forgets the articles too.
-    if enabled {
-        counts.dropped += draw_articles(accessor, |key| enabled.then(|| hitbox::GameHurt { accessor: key, load: mem_load }));
-    } else {
-        ARTICLES.lock().forget_all(BOARD.try_lock().as_deref_mut());
-    }
     counts.kept += c.kept;
     counts.spawned += c.spawned;
     counts.killed += c.killed;
@@ -1118,17 +1476,13 @@ pub unsafe fn frame(fighter: usize) {
     // for the census line's parts/first-pass/cost fields; no sphere is requested by the census itself, and the
     // shipped build has no census at all (the module notes).
     #[cfg(feature = "diag")]
-    if enabled && visualizes {
-        stats::hurt_census(accessor);
-    }
-    let slept_now = hitbox::slept_after(facts, plan);
-    if slept_now != facts.slept {
-        book_set(accessor, slept_now);
+    if enabled {
+        stats::hurt_census(&mut store.census, accessor);
     }
     #[cfg(feature = "diag")]
-    stats::frame_end(plan, counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
+    stats::frame_end(facts.draws_attacks(), counts, held_now as u32, HELD.load(Ordering::Relaxed) as u32);
     #[cfg(not(feature = "diag"))]
-    let _ = (counts, held_now);
+    let _ = (counts, held_now, len);
 }
 
 // ---- the hooks --------------------------------------------------------------------------------------------------------
@@ -1144,10 +1498,8 @@ unsafe fn lua_cell(lua: usize, index: usize) -> Cell {
     hitbox::stack_cell(base, top, index, |slot| Cell { raw: (slot as *const u64).read(), tag: ((slot + layout::TAG_FIELD) as *const u32).read() })
 }
 
-/// The plugin part of an animation command. A fighter's hitbox is drawn by its pass in the same frame (the pass runs after the
-/// game's frame, which ran this command), so nothing is requested here; a fighter's grab box is queued for that pass (the
-/// command runs inside the animation script, where the fighter's effects may be asleep); an article is tracked by its
-/// battle-object id, and every pass draws its attack slots (`draw_articles`).
+/// Fighter attacks are read from active slots in the post-update pass. A grab is queued with its command status,
+/// and an article is tracked by its battle-object id.
 unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let _scope = HookScope::enter_hook(if grab { HookId::HitboxCatch } else { HookId::HitboxAttack });
     if lua == 0 || !SETTING.load(Ordering::Acquire) || !ensure_ready() {
@@ -1163,6 +1515,8 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     if fighter && !grab {
         return;
     }
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let life = fighter.then(|| FIGHTER_GENERATIONS.stamp(id)).flatten();
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
     let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
     let mut len = 0;
@@ -1171,11 +1525,14 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let status = Some(natives::status_kind(accessor));
     let (mut store, mut articles);
     let set = if fighter {
+        let Some(life) = life else { return };
         store = STORE.lock();
-        let i = store.table.index_for(accessor);
+        if !FIGHTER_GENERATIONS.is_current(life) {
+            return;
+        }
+        let i = store.table.index_for(accessor, life);
         &mut store.table.sets[i]
     } else {
-        let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
         articles = ARTICLES.lock();
         articles.track(id, accessor, None, true).unwrap().0
     };
@@ -1259,11 +1616,14 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     if rebound || accessor == 0 || !SETTING.load(Ordering::Acquire) || !ensure_ready() || !visualizes(accessor) {
         return;
     }
+    let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
+    let Some(life) = FIGHTER_GENERATIONS.stamp(id) else { return };
     let shielding = status_ids().shielding(natives::status_kind(accessor));
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
         let mut store = STORE.lock();
-        if let Some(i) = store.table.find(accessor) {
-            let c = clear_set(&mut store, i, accessor);
+        if let Some(i) = store.table.find_life(accessor, life).filter(|_| FIGHTER_GENERATIONS.is_current(life)) {
+            clear_board(accessor);
+            let c = store.table.sets[i].clear(&mut OrbSink { status: i32::MIN });
             HELD.store(store.table.held_spheres(), Ordering::Relaxed);
             #[cfg(feature = "diag")]
             stats::rebound_cleared(c.killed);
@@ -1271,6 +1631,14 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
             let _ = c;
         }
     }
+}
+
+/// BattleObjectManager's last simulation phase updates the live object models before sampling.
+#[skyline::hook(offset = sites_hitbox::OVERLAY_PROCESS_END_OFFSET)]
+unsafe fn overlay_process_end_hook(context: usize) {
+    call_original!(context);
+    let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+    sample_overlay();
 }
 
 /// Number of rows of `sites_hitbox`.
@@ -1289,16 +1657,8 @@ pub fn check(poisoned: &dyn Fn(&str) -> bool) -> [GuardOutcome; N] {
     })
 }
 
-/// Boot: install the seven hooks and switch the per-frame pass on when the feature's whole closure passed its guards (`closure`:
-/// its own rows, the Training predicate and the rows of the natives it shares, `model::capabilities`; and the CPU core whose
-/// frame wrapper carries the pass). Returns whether it is installed and the per-row state for the install line.
-pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N]) {
-    let mut written = [Written::Skipped; N];
-    for (slot, outcome) in written.iter_mut().zip(found) {
-        if outcome.usable() {
-            *slot = Written::Checked;
-        }
-    }
+/// Install the overlay hooks after its full closure and the CPU frame wrapper pass their guards.
+pub fn install(closure: bool) -> bool {
     if closure {
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
@@ -1307,19 +1667,18 @@ pub fn install(found: &[GuardOutcome; N], closure: bool) -> (bool, [Written; N])
         skyline::install_hook!(hitbox_area_wind_arg10_hook);
         skyline::install_hook!(hitbox_area_wind_rad_hook);
         skyline::install_hook!(hitbox_area_wind_rad_arg9_hook);
-        for (slot, site) in written.iter_mut().zip(&sites_hitbox::SITES) {
-            if sites_hitbox::HOOK_ROWS.contains(&site.name) {
-                *slot = Written::Far;
-            }
-        }
+        skyline::install_hook!(overlay_process_end_hook);
     }
     set_installed(closure);
-    (closure, written)
+    closure
 }
 
-/// The rows of `sites_hitbox` for the install line.
-pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport; N] {
-    std::array::from_fn(|i| SiteReport { site: sites_hitbox::SITES[i].name, found: found[i], written: written[i] })
+/// Record the visualizer and the separately installed spacing hook in the same install line.
+pub fn reports(found: &[GuardOutcome; N], visualizer: bool, spacing: bool) -> [SiteReport; N] {
+    std::array::from_fn(|i| {
+        let site = &sites_hitbox::SITES[i];
+        SiteReport { site: site.name, found: found[i], written: sites_hitbox::reported_write(site, found[i], visualizer, spacing) }
+    })
 }
 
 // ---- diag: the cost of the pass and the plugin's share of the effect pool -------------------------------------------------
@@ -1331,9 +1690,8 @@ pub fn reports(found: &[GuardOutcome; N], written: &[Written; N]) -> [SiteReport
 mod stats {
     use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-    use crate::model::hitbox::{self, Counts, FramePlan};
+    use crate::model::hitbox::{self, Counts};
     use crate::runtime::diag_log::diagnostic;
-    use hos_lock::Mutex;
 
     static PASSES: AtomicU32 = AtomicU32::new(0);
     static WORK: AtomicU32 = AtomicU32::new(0);
@@ -1345,8 +1703,6 @@ mod stats {
     static ENDED: AtomicU32 = AtomicU32::new(0);
     static FAILED: AtomicU32 = AtomicU32::new(0);
     static DROPPED: AtomicU32 = AtomicU32::new(0);
-    static SLEEPS: AtomicU32 = AtomicU32::new(0);
-    static RESTORES: AtomicU32 = AtomicU32::new(0);
     static COMMANDS: AtomicU32 = AtomicU32::new(0);
     static MAX_HELD: AtomicU32 = AtomicU32::new(0);
     static TICKS: AtomicU64 = AtomicU64::new(0);
@@ -1384,7 +1740,7 @@ mod stats {
         WANT_HURT.fetch_add(hurts, Ordering::Relaxed);
     }
 
-    pub fn frame_end(plan: FramePlan, c: Counts, held: u32, held_total: u32) {
+    pub fn frame_end(redraw: bool, c: Counts, held: u32, held_total: u32) {
         let ticks = now().wrapping_sub(START.load(Ordering::Relaxed));
         TICKS.fetch_add(ticks, Ordering::Relaxed);
         MAX_TICKS.fetch_max(ticks, Ordering::Relaxed);
@@ -1396,18 +1752,12 @@ mod stats {
         FAILED.fetch_add(c.failed, Ordering::Relaxed);
         DROPPED.fetch_add(c.dropped, Ordering::Relaxed);
         MAX_HELD.fetch_max(held_total, Ordering::Relaxed);
-        if plan.sleep {
-            SLEEPS.fetch_add(1, Ordering::Relaxed);
-        }
-        if plan.restore {
-            RESTORES.fetch_add(1, Ordering::Relaxed);
-        }
         // One line whenever this fighter's set changed (a sphere was requested, killed, ended or refused).
         let change = (u64::from(held) << 32) | u64::from(c.spawned + c.killed + c.ended + c.failed);
         if (c.spawned | c.killed | c.ended | c.failed) != 0 && LAST.swap(change, Ordering::Relaxed) != change {
             diagnostic(format_args!(
-                "[Hitbox] pass held={held} held_total={held_total} kept={} spawned={} killed={} ended={} failed={} dropped={} sleep={} redraw={}",
-                c.kept, c.spawned, c.killed, c.ended, c.failed, c.dropped, plan.sleep, plan.redraw
+                "[Hitbox] pass held={held} held_total={held_total} kept={} spawned={} killed={} ended={} failed={} dropped={} sleep=false redraw={redraw}",
+                c.kept, c.spawned, c.killed, c.ended, c.failed, c.dropped
             ));
         }
         let passes = PASSES.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1415,7 +1765,7 @@ mod stats {
             let take = |c: &AtomicU32| c.swap(0, Ordering::Relaxed);
             let passes = take(&PASSES).max(1);
             diagnostic(format_args!(
-                "[Hitbox] stats passes={passes} with_work={} want_hit={} want_hurt={} kept={} spawned={} killed={} ended={} failed={} dropped={} held_max={} held_now={held_total} sleeps={} restores={} commands={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
+                "[Hitbox] stats passes={passes} with_work={} want_hit={} want_hurt={} kept={} spawned={} killed={} ended={} failed={} dropped={} held_max={} held_now={held_total} sleeps=0 restores=0 commands={} pass_ticks_avg={} pass_ticks_max={} heap_allocations={}",
                 take(&WORK),
                 take(&WANT_HIT),
                 take(&WANT_HURT),
@@ -1426,8 +1776,6 @@ mod stats {
                 take(&FAILED),
                 take(&DROPPED),
                 take(&MAX_HELD),
-                take(&SLEEPS),
-                take(&RESTORES),
                 take(&COMMANDS),
                 TICKS.swap(0, Ordering::Relaxed) / u64::from(passes),
                 MAX_TICKS.swap(0, Ordering::Relaxed),
@@ -1456,13 +1804,10 @@ mod stats {
         diagnostic(format_args!("[Hitbox] item tracked id={id:#x} slot={slot} size={size:.2}"));
     }
 
-    /// The last line group's signature per tracked object (by battle-object id), so the probe writes only on a change.
-    static LAST_OBJECT: Mutex<[(u32, u64); 8]> = Mutex::new([(0, 0); 8]);
-
     /// rc.14 wind-articles probe (diag only): a tracked article's or item's live attack slots (the no-reaction byte, the knockback
     /// words, the damage) and its wind areas (shape, angle), one group of `[Legend] object` lines whenever they change. The Eden
     /// settle rows read them (Sheik's Burst Grenade, R.O.B.'s Gyro, items).
-    pub fn object(id: u32, key: usize, areas: &[crate::model::legend::WindArea]) {
+    pub(super) fn object(last: &mut [(u32, u64); 8], id: u32, key: usize, areas: &[crate::model::legend::WindArea]) {
         use crate::model::legend::{self, AreaShape};
         use hitbox::AttackReader;
         let fnv = |h: u64, v: u64| (h ^ v).wrapping_mul(0x0000_0100_0000_01b3);
@@ -1490,14 +1835,11 @@ mod stats {
             };
             sig = words.iter().chain(area.angle.iter()).fold(sig, |h, v| fnv(h, (*v as i32) as u32 as u64));
         }
-        {
-            let mut last = LAST_OBJECT.lock();
-            let i = last.iter().position(|e| e.0 == id).or_else(|| last.iter().position(|e| e.0 == 0)).unwrap_or(id as usize % 8);
-            if last[i] == (id, sig) {
-                return;
-            }
-            last[i] = (id, sig);
+        let i = last.iter().position(|e| e.0 == id).or_else(|| last.iter().position(|e| e.0 == 0)).unwrap_or(id as usize % 8);
+        if last[i] == (id, sig) {
+            return;
         }
+        last[i] = (id, sig);
         // SAFETY: `key` is the live tracked object's accessor (draw_articles checked it this pass).
         let status = unsafe { super::natives::status_kind(key) };
         diagnostic(format_args!("[Legend] object id={id:#x} status={status} slots={live} areas={}", areas.len()));
@@ -1558,9 +1900,9 @@ mod stats {
     /// recently used slot).
     const CENSUS_KINDS: usize = 8;
 
-    /// One slot per fighter kind: the kind's open census window and its LRU clock. Game-thread state (the
-    /// per-frame pass), one uncontended lock like `BOOK`.
-    struct CensusBook {
+    /// One slot per fighter kind: the kind's open census window and its LRU clock.
+    /// The sampler owns this state for the duration of the phase-8 pass.
+    pub(super) struct CensusBook {
         kinds: [i32; CENSUS_KINDS],
         used: [u64; CENSUS_KINDS],
         clock: u64,
@@ -1568,7 +1910,7 @@ mod stats {
     }
 
     impl CensusBook {
-        const fn new() -> CensusBook {
+        pub(super) const fn new() -> CensusBook {
             CensusBook { kinds: [i32::MIN; CENSUS_KINDS], used: [0; CENSUS_KINDS], clock: 0, states: [hitbox::HurtCensus::EMPTY; CENSUS_KINDS] }
         }
 
@@ -1588,15 +1930,12 @@ mod stats {
         }
     }
 
-    static CENSUS: Mutex<CensusBook> = Mutex::new(CensusBook::new());
-
     /// The census read of one fighter's pass: the enabled parts and the spheres they want, the read's cost in
     /// ticks, one bounded line per fighter kind per `REPORT_EVERY` frames. No sphere is requested, nothing drawn.
-    pub fn hurt_census(accessor: usize) {
+    pub(super) fn hurt_census(book: &mut CensusBook, accessor: usize) {
         // SAFETY: the current fighter's pass, after the feature's closure passed; the native checks its own grant.
         let kind = unsafe { crate::runtime::game::natives::fighter_kind(accessor) }.unwrap_or(-1);
         let window = {
-            let mut book = CENSUS.lock();
             let slot = book.slot_for(kind);
             let mut reader = hitbox::GameHurt { accessor, load: super::mem_load };
             let start = now();

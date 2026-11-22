@@ -89,6 +89,10 @@ pub const fn unit_of(feature: Feature) -> Feature {
     }
 }
 
+fn optional_row(site: &Site) -> bool {
+    super::sites_hitbox::GRADER_ROWS.iter().any(|(name, _)| *name == site.name)
+}
+
 const fn is_cpu_unit(unit: Feature) -> bool {
     matches!(unit, Feature::CpuDefence | Feature::CpuLedge | Feature::CpuTech | Feature::CpuShield | Feature::CpuMash | Feature::CpuCommon | Feature::CpuShieldDamage | Feature::CpuCamera)
 }
@@ -174,7 +178,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 15] = [
             "work_is_flag",
         ],
     ),
-    (Feature::Hitbox, &["damage_of", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "stage_id_call", "state_article_object_id", "state_clear_speed_all", "state_heal", "state_item_active_count", "state_item_active_item", "state_item_object_id", "state_lr", "state_object_is_active", "state_set_pos", "state_status_request", "status_kind", "stop_is_stop", "utility_get_category", "utility_get_kind", "work_get_int", "work_get_param_float"]),
+    (Feature::Hitbox, &["damage_of", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "motion_kind", "pos_x", "pos_y", "situation_kind", "stage_id_call", "state_article_object_id", "state_clear_speed_all", "state_heal", "state_item_active_count", "state_item_active_item", "state_item_object_id", "state_lr", "state_object_is_active", "state_set_pos", "state_status_request", "status_kind", "stop_is_stop", "utility_get_category", "utility_get_kind", "work_get_int", "work_get_param_float"]),
     (Feature::InputDisplay, &["attack_data", "attack_is_attack", "attack_power_mul_status", "cancel_is_enable", "damage_of", "damage_reaction", "damage_record_dealt", "damage_record_hit_ids", "damage_record_layout", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "prev_status_kind", "situation_kind", "state_lr", "status_kind", "stop_is_stop", "transition_term_hook", "work_get_int", "work_get_param_float", "work_is_flag"]),
     (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),
     (
@@ -233,6 +237,7 @@ fn cross_needs(unit: Feature) -> &'static [&'static str] {
 pub fn blocked_by(unit: Feature, usable: &dyn Fn(&Site) -> bool) -> Option<&'static str> {
     let own = all_sites().find(|s| {
         unit_of_row(s) == unit
+            && !optional_row(s)
             && !super::sites_mashout::move_specific(s)
             && !super::sites_tech_surfaces::SPEED_NOTICE_SITES.iter().any(|row| row.name == s.name)
             && !usable(s)

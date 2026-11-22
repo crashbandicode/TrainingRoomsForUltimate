@@ -1,12 +1,7 @@
 //! SOL-R23 (kh2-repro-xps-1): a Kirby hat request whose native hat pair was released must wait, not copy.
 
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 
-#[path = "../src/model/kirby_copy_pair.rs"]
-#[allow(dead_code)]
-mod kirby_copy_pair;
+use crate::model::kirby_copy_pair;
 
 use kirby_copy_pair::copy_ready;
 

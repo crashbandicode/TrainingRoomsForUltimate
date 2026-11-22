@@ -160,7 +160,8 @@ The name is typed on Eden's keyboard, a window that isn't in the frame.*
 
 ### How a combo is graded
 
-With a combo or sequence as the drill, the combo helper's bar under the frame strip grades each attempt link by link.
+The link cells under the frame strip grade each attempt. The card in the top-right corner shows what you are drilling,
+the result, and your streak and best.
 A link **counts** when the recorded input events come, of the same kind and the same facing-relative direction, in
 order and within the [On-time tolerance](../menu/recording.md#on-time-tolerance), and the move that comes out is the
 recorded one.
@@ -229,16 +230,11 @@ any length drills every combo in it.
 
 ![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](../media/rc7-sequence-drill.gif)
 
-### The sequence bar
+### The sequence card
 
-Drilling a sequence adds a header and a row of its combos to the helper's bar.
-
-- **Header:** SEQUENCE, the sequence's name, "combo k of n", the current combo's name, its links and the tolerance;
-  the streak and the best on the right.
-- **Row:** the sequence's combos in order, joined by arrows: done is green with a check, the current one is white,
-  later ones are grey.
-- **Under the row:** the current combo's own link cells. The footer names the combo that just landed and the current
-  one.
+The **SEQUENCE** card shows the drill's name and which combo you are on. It stacks up to three combos. A completed
+combo is green with a check, the current one is white, and later ones are grey. The card also shows the previous result,
+the current link count and tolerance, and the streak and best. The link cells under the strip grade the current combo.
 
 ![The sequence bar mid-drill: the strip above, then SEQUENCE, Jab pressure, combo 2 of 3, streak 0 and best 2; combo 1 green with a check, combo 2 white, combo 3 grey, the current combo's link cell and the footer](../media/rc13-sequence-bar.png)<br>
 *The sequence bar mid-drill: combo 1 done (green, with a check), combo 2 current (white), combo 3 later (grey), with the streak and the best. Eden, rc.13 (untested on hardware).*

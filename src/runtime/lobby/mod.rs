@@ -70,6 +70,8 @@ pub(crate) fn update() {
         // rc.8: each practice session's speed starts at x1.
         crate::runtime::features::game_speed::practice_changed();
     }
+    // rc.15: 1 Frame's entry hold is armed for this frame or not (its one atomic).
+    crate::runtime::features::game_speed::refresh_hold();
     // The CPU level's Training session clock: it runs in every scene, so the character select between two Training entries
     // ends a session.
     crate::runtime::features::cpu_level::poll();

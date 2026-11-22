@@ -21,6 +21,7 @@ pub mod mashout;
 pub mod notices;
 pub mod practice;
 pub mod edge_juggle;
+pub(super) mod egg_zone;
 pub mod recorder;
 pub mod recording_host;
 pub mod reset_hub;

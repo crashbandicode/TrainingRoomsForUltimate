@@ -1,16 +1,8 @@
 //! SPEC-input-01 section 9 host rows for the named layer's frame source: the named lockout, the capture that possesses the CPU
 //! from frame 0, the layer-owned buffer read back by the control stage, the stop chord, named playback and its end.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use std::cell::RefCell;
 

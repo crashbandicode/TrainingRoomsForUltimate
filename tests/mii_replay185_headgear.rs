@@ -3,20 +3,7 @@
 //! outfit75/hat125/colour0/voice37/specials2221 and the canonical below. Only
 //! CharInfo's noncanonical create-id/name prefix is redacted. Hat7 is explicitly
 //! a synthetic variation; its resource presence is not claimed.
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
 // rc.9 coverage: this file's cases run as one table (`case_table`, docs/COVERAGE-rc9.md).
-#[path = "../src/test_table.rs"]
-mod test_table;
-#[allow(dead_code, unused_imports)]
-#[path = "../src/model/mii/mod.rs"]
-pub mod mii;
-#[allow(unused_imports)]
-mod engine {
-    pub use super::mii;
-}
 
 use {crate::engine::mii::backend::Layout, crate::engine::mii::inventory::MiiClass, crate::engine::mii::lifetime::{Binding, Configuration, Tokens}, crate::engine::mii::native_values::{Mirrors, RowIds}, crate::engine::mii::ordinary_cpu::{self as cpu, HatPublication}, crate::engine::mii::ordinary_player::{self, Owner, SameClass, SameClassValues}, crate::engine::mii::replay::ReplayMiis};
 

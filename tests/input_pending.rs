@@ -1,20 +1,8 @@
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model/scalar_tls.rs"]
-#[allow(dead_code)]
-mod scalar_tls;
 // Original regressions for the scalar TLS input handoff. The oracle is the
 // prior two-Cell representation, not another scalar-slot implementation.
-#[path = "../src/model/input_pending.rs"]
-mod input_pending;
-#[path = "../src/model/input_delay.rs"]
-#[allow(dead_code)]
-mod input_delay;
-#[path = "../src/model/input_adapter.rs"]
-#[allow(dead_code)]
-mod input_adapter;
+use crate::model::input_pending;
+use crate::model::input_delay;
+use crate::model::input_adapter;
 
 use std::cell::{Cell, RefCell};
 use input_pending::{Pending, Tls};
@@ -24,18 +12,9 @@ thread_local! {
     static METER: Cell<bool> = const { Cell::new(false) };
 }
 static ALLOCS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-struct Allocator;
-#[global_allocator]
-static ALLOCATOR: Allocator = Allocator;
-unsafe impl std::alloc::GlobalAlloc for Allocator {
-    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
-        if METER.try_with(Cell::get).unwrap_or(false) {
-            ALLOCS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-        std::alloc::System.alloc(layout)
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
-        std::alloc::System.dealloc(ptr, layout);
+pub(super) fn count_allocation() {
+    if METER.try_with(Cell::get).unwrap_or(false) {
+        ALLOCS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

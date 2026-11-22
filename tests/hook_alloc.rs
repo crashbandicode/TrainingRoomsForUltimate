@@ -1,19 +1,10 @@
 //! Review R5 of package 1: the allocation detector (`model::hook_stats`) is proven with stubs. The
-//! test crate installs the plugin's own `CountingAllocator` as its global allocator, so the stubs'
+//! integration allocator forwards to the plugin's own `CountingAllocator`, so the stubs'
 //! allocations are counted exactly as the Switch runtime's are.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
-use model::hook_stats::{hook_allocations, snapshot, CountingAllocator, HookId, HookScope, Observer, HOOK_COUNT};
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
+use model::hook_stats::{hook_allocations, snapshot, HookId, HookScope, Observer, HOOK_COUNT};
 
 /// A stub hook that follows the rule: it works on the stack only.
 fn well_behaved_hook(id: HookId, n: u32) -> u32 {
@@ -33,13 +24,10 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
     v.len()
 }
 
-/// The counters are process-wide and the harness runs tests on several threads: the tests take turns.
-static TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
 #[test]
 fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
     use model::state::{preview::Checkpoint, record::SavedState};
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::StateFrame);
@@ -63,7 +51,7 @@ fn setup_game_transfer_validation_and_atomic_pair_commit_allocate_nothing() {
     use model::state::{machine::{Machine, SituationIds}, record::SavedState,
         settings::StateSettings, setup_transaction::{self, Exchange, Facts, Prepared, Target}};
     use model::cpu::rng::Rng;
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let exchange = Exchange::new();
     let pair = std::array::from_fn(|i| SavedState { fighter_kind: i as i32, lr: 1.0,
         saved_stage: Some(17), situation_kind: 0, ..SavedState::never_saved() });
@@ -99,7 +87,7 @@ fn setup_game_transfer_validation_and_atomic_pair_commit_allocate_nothing() {
 fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
     use model::state::file::SaveFile;
     use model::state::machine::{Machine, Role};
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     // An opaque future field must survive storage even though gameplay never
     // interprets it. Include both roles and a non-default slot.
     let mut writer = SaveFile::default();
@@ -141,7 +129,7 @@ fn imported_mii_json_stays_with_writer_when_game_records_are_copied() {
 fn a_marked_save_is_in_flight_until_every_body_captured() {
     use model::state::machine::{Machine, Role};
     use model::state::record::Marker;
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let mut machine = Machine::default();
     assert!(!machine.save_marked());
     machine.set_marker(Role::Player, 2, Marker::Save);
@@ -162,7 +150,7 @@ fn a_marked_save_is_in_flight_until_every_body_captured() {
 fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
     use model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};
     use model::state::quick_reset::{Pose, QuickReset};
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let mut quick = QuickReset::new();
     let mut machine = Machine::default();
     let mut rng = model::cpu::rng::Rng::new(8);
@@ -223,7 +211,7 @@ fn quick_reset_observation_and_temporary_restore_allocate_nothing() {
 
 #[test]
 fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let mut observer = Observer::new();
     // Whatever the other test already did is the baseline; only what follows is measured.
     let _ = observer.observe(snapshot());
@@ -266,7 +254,7 @@ fn the_detector_reports_a_stub_that_allocates_and_passes_one_that_does_not() {
 /// when the inner one drops; the per-scope counts sum to the total and the report names them (`allocs=`).
 #[test]
 fn an_allocation_is_charged_to_the_innermost_scope() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let before = snapshot();
     {
         let _outer = HookScope::enter_hook(HookId::CpuFrame);
@@ -289,7 +277,7 @@ fn an_allocation_is_charged_to_the_innermost_scope() {
 /// Nesting: a hook that calls another hook's code stays inside a scope until the outer one drops.
 #[test]
 fn nested_scopes_count_until_the_outermost_ends() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _outer = HookScope::enter_hook(HookId::CpuFrame);
@@ -310,7 +298,7 @@ fn nested_scopes_count_until_the_outermost_ends() {
 /// allocation goes to the nested hook, the outer one's to the outer one, and the line says which.
 #[test]
 fn an_allocation_is_charged_to_the_innermost_hook() {
-    let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+    let _turn = crate::allocation::hook_counter_turn();
     let before = snapshot();
     {
         let _outer = HookScope::enter_hook(HookId::CpuFrame);

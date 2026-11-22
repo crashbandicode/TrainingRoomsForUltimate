@@ -1,5 +1,4 @@
-#[path = "../src/model/edge_juggle/perfect/rule_counts.rs"]
-mod rule_counts;
+use crate::model::edge_juggle::perfect::rule_counts;
 
 use rule_counts::{Counters, PerfectRule, RuleCounts};
 

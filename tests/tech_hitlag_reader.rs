@@ -1,6 +1,3 @@
-#[path = "../src/model/tech_hitlag.rs"]
-pub mod arithmetic;
-mod model { pub use crate::arithmetic as tech_hitlag; }
 mod tech_adapter {
     #[derive(Debug,PartialEq,Eq)]
     pub enum Error { Busy, Guards, HitlagUnavailable, NotPlaced }

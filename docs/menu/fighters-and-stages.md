@@ -427,7 +427,7 @@ list doesn't grey them for that.
 **Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets**, **Tech practice**, **Mash out**
 (its screen: Start, then State, Attacker move and Grab type; it runs until Stop) and **Parry practice** (Start, then
 10 attempts or Free practice, Saved parry practices and Save this parry practice; using a saved practice starts it when
-the menu closes). **A** on a game
+the menu closes), plus **Guard the Edge** and **Juggler**. **A** on a game
 opens its own screen, laid out like **Button chords**: the path at the top (Fighters & Stages > Practice games > the
 game), then **Start** and the game's settings. The keys are the page's: Up/Down move, Left/Right change a setting, **A**
 opens it, **Y** resets it, **B** goes back to the list.
@@ -445,6 +445,17 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 ![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
 *With Eggs-ercise running, the menu reopens on its screen: the first row reads Stop with "Running" in green. B goes back to the list, A opens the screen again, and A on Stop ends the game: the menu stays open and the row reads Start; then B closes the menu. Eden, 2026-11-18, build 9aa51374 (untested on hardware).*
+
+### Guard the Edge and Juggler
+
+Open **CPU fighter and mode** and press **A** on a portrait. With the popup open, press **A** to cycle through **CPU**,
+**Perfect**, and any drills for that fighter. In CPU mode, **X** cycles the stock CPU level from 1 to 9 and back to 1.
+**B** closes the popup. Choose **Current CPU** to use the fighter already in Training.
+
+Hero's **Zoom** drill casts Zoom through Command Selection for every recovery attempt in Guard the Edge and every
+escape attempt in Juggler. Hero gets at least the 8 MP needed for each cast. Read where he will return and land a hit
+or grab during his descent or within the **Zoom landing window** after touchdown. The default is 10 frames and you can set it
+from 1 to 30. The notice shows each attempt's result and the running win count.
 
 ### Eggs-ercise
 
@@ -469,12 +480,29 @@ timer.
 
 #### Spawn area
 
-- **Where:** Practice games > Eggs-ercise > **Spawn area**
-- **Values:** In view, Whole stage
-- **Default:** In view
-- **How:** In view keeps targets on screen with the player's own camera. Whole stage uses the full stage range and, when
-  valid, its vertical bounds, so targets can appear off screen. Without valid stage vertical bounds it uses the screen's
-  vertical bounds. The setting applies at the next Start.
+Check **In view**, **Whole stage**, **Off stage**, or a combination. Each new target gets an equal chance of using each
+checked area. In view is the default and takes over when the checklist is empty. Whole stage uses the stage's world
+bounds, so a target can appear outside the current camera. Changes apply at the next Start.
+
+Open **Off-stage zone…** to edit the two mirrored zones. Use the left stick up/down for the blue **Top** and **Bottom**
+lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges** in or out. The dotted
+yellow guides mark how far inward each side can reach under the stage. The solid stage is excluded. **A** advances,
+**B** goes back or cancels from Top, and **X** previews the factory zone. In **Preview**, press **A** or **+** to apply.
+Training Rooms saves the zone for the current stage and form.
+
+A break on an Off stage target shows **Recover!**. Get offstage and then grab a ledge or land on the main stage floor
+to add it to the score. A KO cancels the hit. With **Hit streak** on, a cancellation clears the current streak and
+keeps your best.
+
+#### Moving paths and target expiry
+
+Check one or more **Moving paths** to have each new target use one selected flight. The choices are Richter's Axe,
+Pac-Man's Galaxian, Link's Boomerang, and Samus's Homing Missile. Homing Missile follows the active player's movement.
+When the list is empty, targets use the ordinary bouncing flight. Target speed changes playback speed.
+
+Set **Target expiry** to **Off** or from **1 second** through **10 seconds**. An unhit target then disappears and is
+replaced. Pausing or opening a menu freezes its timer. With **Hit streak** on, an expiry clears the current streak
+and keeps your best.
 
 ![Eggs-ercise 1 minute: the row set from Off to 1 minute, the menu closed, Fox chases the launched target and a neutral air breaks it](../media/rc14-eggs-1-minute.gif)<br>
 *Practice games > Eggs-ercise: Right turns Off into 1 minute and the menu closes. The notice reads "Eggs 0 0:59" and counts down; Fox chases the target the game launches and a neutral air breaks it and the count reads Eggs 1. Eden, rc.14 (untested on hardware).*

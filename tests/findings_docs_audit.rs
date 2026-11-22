@@ -11,13 +11,7 @@
 //! - #26: an old Recording Trigger value (`[0,1]`, Save State Load only, offered by v0.1.0 to v0.2.0-rc.3.1) silently
 //!   turned off today's Record chord, though no page shows that row. The chord no longer reads it.
 
-// rc.9 test cut: the by-path `src` files' own unit tests run once, in the lib's test binary (`src/lib.rs`), not again here.
-macro_rules! lib_unit_tests {
-    ($($body:tt)*) => {};
-}
-#[path = "../src/model.rs"]
-#[allow(dead_code)]
-mod model;
+use crate::model;
 
 use model::menu::input::Button;
 use model::menu::{Env, Menu};
