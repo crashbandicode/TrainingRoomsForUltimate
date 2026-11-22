@@ -553,6 +553,150 @@ fn sub_screen_is_remembered_across_a_close() {
     assert_eq!(other.screen(), None);
 }
 
+fn popup_plain(keeper: &PlaceKeeper, settings: Settings, env: Env) -> Menu {
+    let mut plain = Menu::new(settings, env);
+    plain.restore_place(Place { screen: None, ..keeper.place().unwrap() });
+    plain.on_request(crate::model::chords::Request::RecordingPopup);
+    plain
+}
+
+fn visit_row(m: &mut Menu, id: &str) {
+    let row = ROWS.iter().position(|row| row.id == id).unwrap();
+    for _ in 0..6 {
+        if m.page() == ROWS[row].page() { break; }
+        m.press(Button::R);
+    }
+    for _ in 0..=m.entry_count(m.page()) {
+        if m.focus() == Some(Entry::Row(row)) { return; }
+        m.press(Button::Down);
+    }
+    panic!("row {id} is not reachable");
+}
+
+fn slider_settings() -> Settings {
+    let mut settings = Settings::factory();
+    settings.menu.set("save_damage_player", &[0, 0, 1]).unwrap();
+    settings
+}
+
+fn recording_popup_over_a_kept_game_screen_is_the_popup_alone() {
+    use crate::model::recording_menu::{Face, ViewRole};
+    let settings = Settings::factory();
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, settings.clone(), Env::default());
+    on_list(m, Game::Eggs);
+    m.press(Button::A);
+    m.press(Button::A);
+    assert!(m.is_closed());
+    keeper.drop_model(&mut held);
+    let env = Env { running: Some(Game::Eggs), ..Env::default() };
+    let mut plain = popup_plain(&keeper, settings.clone(), env);
+    let m = keeper.open(&mut held, settings, env);
+    assert!(matches!(m.screen(), Some(Screen::Rows { group, .. }) if *group == game_group(Game::Eggs)));
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    let actual = frame(m);
+    let expected = frame(&plain);
+    assert_eq!(actual.crumb.string_lossy(), "Recording", "actual crumb: {}", actual.crumb.string_lossy());
+    assert!(actual.popup);
+    assert_eq!(actual.tabs[0].string_lossy(), "Save states & Macros");
+    assert_eq!(actual.tabs[1].string_lossy(), "Combos & Sequences");
+    assert_eq!(actual.hint, expected.hint);
+    assert_eq!(actual.help, expected.help);
+    assert_eq!(actual.rows, expected.rows);
+    assert!(actual.rows.iter().all(|r| !matches!(r.label.string_lossy().as_str(), "Start" | "Stop")));
+    assert_eq!(actual, expected);
+    for button in [Button::Down, Button::R] {
+        m.press(button);
+        plain.press(button);
+    }
+    assert_eq!(frame(m), frame(&plain));
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+}
+
+fn recording_popup_is_the_popup_alone_over_every_kept_screen() {
+    for kind in ["List", "Slider", "Rows"] {
+        let settings = slider_settings();
+        let mut keeper = PlaceKeeper::new();
+        let mut held = None;
+        let m = keeper.open(&mut held, settings.clone(), Env::default());
+        match kind {
+            "List" => { visit_row(m, "sdi_strength"); m.press(Button::A); }
+            "Slider" => { visit_row(m, "save_damage_limits_player"); m.press(Button::A); }
+            _ => { on_list(m, Game::Tech); m.press(Button::A); }
+        }
+        assert!(matches!((kind, m.screen()), ("List", Some(Screen::List { .. })) | ("Slider", Some(Screen::Slider { .. }))
+            | ("Rows", Some(Screen::Rows { .. }))), "fixture {kind}: {:?}", m.screen());
+        keeper.drop_model(&mut held);
+        let plain = popup_plain(&keeper, settings.clone(), Env::default());
+        let m = keeper.open(&mut held, settings, Env::default());
+        assert!(matches!((kind, m.screen()), ("List", Some(Screen::List { .. })) | ("Slider", Some(Screen::Slider { .. }))
+            | ("Rows", Some(Screen::Rows { .. }))), "restored {kind}: {:?}", m.screen());
+        m.on_request(crate::model::chords::Request::RecordingPopup);
+        assert_eq!(frame(m), frame(&plain), "{kind}");
+    }
+}
+
+fn recording_popup_takes_jumps_over_a_kept_screen() {
+    use crate::model::recording_menu::{Catalog, Face, SaveFile};
+    let settings = slider_settings();
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, settings.clone(), Env::default());
+    visit_row(m, "save_damage_limits_player");
+    m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::Slider { .. })) && !m.takes_jumps());
+    keeper.drop_model(&mut held);
+    let mut plain = popup_plain(&keeper, settings.clone(), Env::default());
+    let m = keeper.open(&mut held, settings, Env::default());
+    assert!(matches!(m.screen(), Some(Screen::Slider { .. })));
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    let catalog = Catalog { saves: (0..20).map(|i| SaveFile {
+        id: format!("s{i}"), name: format!("Save {i}"), fighters: String::new(),
+    }).collect(), ..Catalog::default() };
+    m.recording_mut().set_catalog(catalog.clone());
+    plain.recording_mut().set_catalog(catalog);
+    m.press(Button::JumpDown);
+    plain.press(Button::JumpDown);
+    assert_eq!(plain.recording().section_cursor(Face::Popup, table::SAVES_MACROS, 0), 12);
+    assert_eq!(m.recording().section_cursor(Face::Popup, table::SAVES_MACROS, 0),
+        plain.recording().section_cursor(Face::Popup, table::SAVES_MACROS, 0), "jump must not become one Down");
+    assert!(m.takes_jumps());
+    assert_eq!(frame(m), frame(&plain));
+}
+
+fn kept_game_screen_survives_a_popup_between_two_menu_openings() {
+    let settings = Settings::factory();
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, settings.clone(), Env::default());
+    on_list(m, Game::Eggs);
+    m.press(Button::A);
+    m.press(Button::A);
+    assert!(m.is_closed());
+    keeper.drop_model(&mut held);
+    let env = Env { running: Some(Game::Eggs), ..Env::default() };
+    let m = keeper.open(&mut held, settings.clone(), env);
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    m.press(Button::B);
+    assert!(!m.recording().popup_open());
+    let m = keeper.open(&mut held, settings.clone(), env);
+    assert_eq!(m.screen(), Some(&Screen::Rows { group: game_group(Game::Eggs), cursor: 0 }));
+    keeper.drop_model(&mut held);
+    let m = keeper.open(&mut held, settings, env);
+    assert_eq!(m.screen(), Some(&Screen::Rows { group: game_group(Game::Eggs), cursor: 0 }));
+}
+
+#[test]
+fn case_table() {
+    crate::test_table::run(&[
+        ("recording_popup_over_a_kept_game_screen_is_the_popup_alone", recording_popup_over_a_kept_game_screen_is_the_popup_alone as fn()),
+        ("recording_popup_is_the_popup_alone_over_every_kept_screen", recording_popup_is_the_popup_alone_over_every_kept_screen as fn()),
+        ("recording_popup_takes_jumps_over_a_kept_screen", recording_popup_takes_jumps_over_a_kept_screen as fn()),
+        ("kept_game_screen_survives_a_popup_between_two_menu_openings", kept_game_screen_survives_a_popup_between_two_menu_openings as fn()),
+    ]);
+}
+
 #[test]
 fn grey_rules_read_the_running_game() {
     let speed = row("Target speed", table::game_group(Game::Eggs));

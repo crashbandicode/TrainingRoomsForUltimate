@@ -1185,7 +1185,7 @@ impl Menu {
     /// edited, the reset confirmation) ZL is its own button and Up / Down move as usual; the input adapter asks this
     /// (through the worker) before it turns a direction into a jump (review MN-1).
     pub fn takes_jumps(&self) -> bool {
-        match self.stack.last() {
+        self.recording.popup_open() || match self.stack.last() {
             None => true,
             Some(Screen::List { .. } | Screen::Checklist { .. } | Screen::SwapGroups { .. } | Screen::Overrides { .. } | Screen::Chords { .. } | Screen::Rows { .. }) => true,
             Some(Screen::Delay { editing, .. }) => !editing,
