@@ -687,9 +687,141 @@ fn kept_game_screen_survives_a_popup_between_two_menu_openings() {
     assert_eq!(m.screen(), Some(&Screen::Rows { group: game_group(Game::Eggs), cursor: 0 }));
 }
 
+fn recording_popup_reopens_on_the_role_picked_last() {
+    use crate::model::recording_menu::{Face, ViewRole};
+    let mut live = Settings::factory();
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    m.press(Button::R);
+    assert!(m.save_roles(&mut live));
+    assert!(!m.save_roles(&mut live));
+    m.press(Button::B);
+    keeper.drop_model(&mut held);
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+    assert_eq!(m.recording().selection().record_role, ViewRole::Cpu);
+    assert_eq!(frame(m).role_tab, Some(1));
+    assert_eq!(m.recording().tab_names().len(), 1);
+    drop(held);
+    let mut live = crate::model::settings::parse(&live.to_json()).settings;
+    let keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+    assert_eq!(m.recording().selection().record_role, ViewRole::Cpu);
+    assert_eq!(frame(m).role_tab, Some(1));
+    assert_eq!(m.recording().tab_names().len(), 1);
+    m.press(Button::L);
+    assert!(m.save_roles(&mut live));
+    drop(held);
+    let live = crate::model::settings::parse(&live.to_json()).settings;
+    let keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live, Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Player);
+}
+
+fn a_role_change_is_saved_without_a_menu_close() {
+    use crate::model::recording_menu::{Face, ViewRole};
+    let mut live = Settings::factory();
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    m.press(Button::R);
+    assert!(m.save_roles(&mut live));
+    keeper.drop_model(&mut held);
+    let m = keeper.open(&mut held, live, Env::default());
+    assert!(!m.recording().popup_open());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+}
+
+fn a_held_model_keeps_its_roles_at_a_menu_opening() {
+    use crate::model::recording_menu::{Face, ViewRole};
+    let mut live = Settings::factory();
+    let keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    m.on_request(crate::model::chords::Request::RecordingPopup);
+    m.press(Button::R);
+    assert!(m.save_roles(&mut live));
+    m.press(Button::B);
+    let m = keeper.open(&mut held, live, Env::default());
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+    let m = keeper.open(&mut held, Settings::factory(), Env::default());
+    assert_eq!(m.recording().role(Face::Popup), ViewRole::Cpu);
+}
+
+fn recording_page_role_is_saved_and_restores_its_view() {
+    use crate::model::recording_menu::ViewRole;
+    let mut live = Settings::factory();
+    let keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    while m.page() != Page::Recording { m.press(Button::R); }
+    m.press(Button::ZR);
+    assert_eq!(m.recording().page_role(), ViewRole::Cpu);
+    let focus = m.focus();
+    assert!(m.save_roles(&mut live));
+    m.press(Button::B);
+    live = m.commit_onto(&live);
+    drop(held);
+    let live = crate::model::settings::parse(&live.to_json()).settings;
+    let mut keeper = PlaceKeeper::new();
+    let mut held = None;
+    let m = keeper.open(&mut held, live.clone(), Env::default());
+    assert_eq!(m.page(), Page::Recording);
+    assert_eq!(m.recording().page_role(), ViewRole::Cpu);
+    assert_eq!(m.focus(), focus);
+    assert!((0..m.entry_count(Page::Recording)).all(|i| m.entry(Page::Recording, i) != Some(Entry::Group(usize::from(table::COMBOS_SEQ)))));
+    assert_eq!(frame(m).role_tab, Some(1));
+    m.press(Button::Up);
+    let later_focus = m.focus();
+    assert_ne!(later_focus, focus);
+    keeper.drop_model(&mut held);
+    let m = keeper.open(&mut held, live, Env::default());
+    assert_eq!(m.focus(), later_focus);
+}
+
+fn popup_and_page_roles_are_saved_separately() {
+    use crate::model::recording_menu::{Face, ViewRole};
+    for (popup, page) in [(ViewRole::Cpu, ViewRole::Player), (ViewRole::Player, ViewRole::Cpu)] {
+        let mut live = Settings::factory();
+        let keeper = PlaceKeeper::new();
+        let mut held = None;
+        let m = keeper.open(&mut held, live.clone(), Env::default());
+        m.on_request(crate::model::chords::Request::RecordingPopup);
+        if popup == ViewRole::Cpu { m.press(Button::R); }
+        assert_eq!(m.recording().page_role(), ViewRole::Player);
+        m.save_roles(&mut live);
+        m.press(Button::B);
+        while m.page() != Page::Recording { m.press(Button::R); }
+        if page == ViewRole::Cpu { m.press(Button::ZR); }
+        assert_eq!(m.recording().role(Face::Popup), popup);
+        m.save_roles(&mut live);
+        drop(held);
+        let live = crate::model::settings::parse(&live.to_json()).settings;
+        let keeper = PlaceKeeper::new();
+        let mut held = None;
+        let m = keeper.open(&mut held, live, Env::default());
+        assert_eq!((m.recording().role(Face::Popup), m.recording().page_role()), (popup, page));
+    }
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
+        ("recording_popup_reopens_on_the_role_picked_last", recording_popup_reopens_on_the_role_picked_last as fn()),
+        ("a_role_change_is_saved_without_a_menu_close", a_role_change_is_saved_without_a_menu_close as fn()),
+        ("a_held_model_keeps_its_roles_at_a_menu_opening", a_held_model_keeps_its_roles_at_a_menu_opening as fn()),
+        ("recording_page_role_is_saved_and_restores_its_view", recording_page_role_is_saved_and_restores_its_view as fn()),
+        ("popup_and_page_roles_are_saved_separately", popup_and_page_roles_are_saved_separately as fn()),
         ("recording_popup_over_a_kept_game_screen_is_the_popup_alone", recording_popup_over_a_kept_game_screen_is_the_popup_alone as fn()),
         ("recording_popup_is_the_popup_alone_over_every_kept_screen", recording_popup_is_the_popup_alone_over_every_kept_screen as fn()),
         ("recording_popup_takes_jumps_over_a_kept_screen", recording_popup_takes_jumps_over_a_kept_screen as fn()),

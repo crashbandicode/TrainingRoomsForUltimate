@@ -562,6 +562,7 @@ fn handle(event: Event, s: &mut Session) {
         press(button, s);
     }
     if let Some(menu) = s.menu.as_ref() {
+        save_roles(menu);
         publish_popup(menu.recording().popup_open());
     }
     // Release-only packets also advance capture and update its hint/preview.
@@ -589,6 +590,12 @@ fn toggle_popup(s: &mut Session) {
     }
     publish_frame(s);
     publish_jumps(s);
+}
+
+fn save_roles(menu: &Menu) {
+    if SETTINGS.lock().as_mut().is_some_and(|live| menu.save_roles(live)) {
+        writer::request_settings();
+    }
 }
 
 /// Publish the pop-up's state. A close starts the close window before `POPUP` falls (`flow::popup_closed`), so

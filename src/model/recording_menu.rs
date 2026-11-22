@@ -514,6 +514,15 @@ impl RecordingScreens {
         self.page_role
     }
 
+    pub fn roles(&self) -> [ViewRole; 2] {
+        [self.popup_role, self.page_role]
+    }
+
+    pub fn set_roles(&mut self, [popup, page]: [ViewRole; 2]) {
+        self.set_popup_role(popup);
+        self.page_role = page;
+    }
+
     /// A file, picker or keyboard opened from the page owns its buttons; ZR does not change the role.
     pub fn page_overlay_open(&self) -> bool {
         self.overlay_open() && self.overlay_face == Face::Page

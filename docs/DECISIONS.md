@@ -1530,3 +1530,8 @@ In view keeps the existing behavior. The setting applies on the next Start.
 
 The Recording page shows the pop-up's Player/CPU plate in the same place, with ZR beside it where ZR changes the page
 view. The cap is hidden on a file screen, picker or keyboard. The page view and the pop-up's Record role remain separate.
+
+### RR3 — Recording roles on the card (2026-11-22)
+
+The two roles are saved independently in the top-level `recording_roles` key of `settings.json`. Files without that key
+start both roles at Player; each role persists across menu closes, leaving Training and restarting the game.
