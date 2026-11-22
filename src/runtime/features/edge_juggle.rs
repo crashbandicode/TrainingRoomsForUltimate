@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::{Mutex, Published};
 
-use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
+use super::{cpu::konst, mashout::FloorRay, notices, placement, practice, recorder, states};
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
@@ -1627,14 +1627,6 @@ unsafe fn placed_player(p1: usize) -> PlacedPlayer {
     }
 }
 
-unsafe fn write_player(p1: usize, [x, y]: [f32; 2], facing: f32) {
-    state::clear_speed_all(p1);
-    state::init_pos(p1, &state::Vector3f { x, y, z: 0.0 });
-    state::set_lr(p1, facing);
-    state::set_situation_kind(p1, konst(C::SituationGround));
-    state::status_request(p1, konst(C::StatusWait));
-}
-
 /// Player 1 stands on its written start: the written x, on the floor the write found (the first floor under its feet
 /// has the written height there). Another x is off the start. `None`: the floor could not be read, which shows
 /// nothing; a Player 1 on another floor at the same x is then missed, as before this check existed.
@@ -1682,39 +1674,22 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     if jump_count == UNRESOLVED || !game::granted(crate::model::sites_pkg4::WORK_SET_INT_OFFSET) {
         return None;
     }
-    let [cx, cy] = setup.cpu;
+    let [cx, _] = setup.cpu;
     let damage = natives::damage(bodies.cpu, 0);
     if !damage.is_finite() {
         return None;
     }
     let facing = if cx < x { -1.0 } else { 1.0 };
-    write_player(bodies.p1, [x, y], facing);
-    state::clear_speed_all(bodies.cpu);
-    state::set_pos(
-        bodies.cpu,
-        &state::Vector3f {
-            x: cx,
-            y: cy,
-            z: 0.0,
-        },
-    );
+    placement::stand(bodies.p1, [x, y], facing);
     let cpu_facing = crate::model::edge_juggle::recovery_away_facing(
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
     ).unwrap_or(-facing);
-    state::set_lr(bodies.cpu, cpu_facing);
-    state::set_situation_kind(bodies.cpu, air);
+    placement::lift(bodies.cpu, setup.cpu, cpu_facing);
     natives::set_int(bodies.cpu, drill.placed_jump_count(), jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
-    state::status_request(bodies.cpu, fall);
+    placement::fall(bodies.cpu);
     Some([x, y])
-}
-
-/// Like Tech practice, reapply the hold because MotionModule sleep leaves physics running.
-unsafe fn hold_cpu(cpu: usize, [x, y]: [f32; 2]) {
-    state::set_sleep(cpu, true);
-    state::clear_speed_all(cpu);
-    state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
 }
 
 fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
@@ -2156,11 +2131,11 @@ pub unsafe fn frame(fighter: usize) {
                 let watched = run.settle.map(|at| (placed_player(p1), on_start(p1, at), run.rounds.player_rewrites()));
                 let (rewrite, ready) = PlacedPlayer::before_ready(watched, falling, drill);
                 if let (true, Some(at)) = (rewrite, run.settle) {
-                    write_player(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
+                    placement::stand(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
                     run.rounds.player_rewritten();
                 }
                 if falling {
-                    hold_cpu(cpu, run.setup.cpu);
+                    placement::hold(cpu, run.setup.cpu);
                     *held_cpu = Some(body);
                 } else {
                     state::status_request(cpu, fall);
@@ -2175,7 +2150,7 @@ pub unsafe fn frame(fighter: usize) {
     } else {
         let before = run.rounds.phase;
         if matches!(before, Phase::Ready(_)) && *held_cpu == Some(body) {
-            hold_cpu(cpu, run.setup.cpu);
+            placement::hold(cpu, run.setup.cpu);
         }
         let zoom = matches!(run.opponent.mode, Mode::Drill(DrillId::Zoom));
         if before == Phase::Live && zoom {

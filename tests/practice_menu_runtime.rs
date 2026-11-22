@@ -163,11 +163,50 @@ fn edge_juggle_remembers_whether_the_start_was_moved() {
 }
 
 #[test]
+fn placement_helpers_keep_the_drills_native_write_order() {
+    fn ordered(body: &str, calls: &[&str]) {
+        let mut previous = 0;
+        for call in calls {
+            assert_eq!(body.matches(call).count(), 1, "{call}");
+            let at = body.find(call).unwrap();
+            assert!(at >= previous, "{call}");
+            previous = at + call.len();
+        }
+    }
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let helpers = src("src/runtime/features/placement.rs");
+    let stand = item(&helpers, "pub(super) unsafe fn stand(");
+    ordered(stand, &["state::clear_speed_all(", "state::init_pos(", "state::set_lr(",
+        "state::set_situation_kind(", "state::status_request("]);
+    assert_eq!(stand.matches("state::").count(), 6);
+    assert!(stand.contains("konst(C::SituationGround)"));
+    assert!(stand.contains("konst(C::StatusWait)"));
+    let lift = item(&helpers, "pub(super) unsafe fn lift(");
+    ordered(lift, &["state::clear_speed_all(", "state::set_pos(", "state::set_lr(",
+        "state::set_situation_kind("]);
+    assert_eq!(lift.matches("state::").count(), 5);
+    assert!(lift.contains("konst(C::SituationAir)"));
+    let fall = item(&helpers, "pub(super) unsafe fn fall(");
+    ordered(fall, &["state::status_request("]);
+    assert_eq!(fall.matches("state::").count(), 1);
+    assert!(fall.contains("konst(C::StatusFall)"));
+    let hold = item(&helpers, "pub(super) unsafe fn hold(");
+    ordered(hold, &["state::set_sleep(", "state::clear_speed_all(", "state::set_pos("]);
+    assert_eq!(hold.matches("state::").count(), 4);
+    assert!(!hold.contains("status_request"));
+    let place = item(&runtime, "unsafe fn try_place(");
+    ordered(place, &["placement::stand(bodies.p1", "placement::lift(bodies.cpu",
+        "natives::set_int(", "state::heal(", "state::add_damage(", "placement::fall(bodies.cpu)"]);
+    assert!(!runtime.contains("fn write_player("));
+    assert!(!runtime.contains("fn hold_cpu("));
+}
+
+#[test]
 fn edge_juggle_settles_a_hit_player_before_ready() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     assert!(!runtime.contains("fn settle_player"));
     let place = item(&runtime, "unsafe fn try_place(");
-    assert!(place.contains("write_player(bodies.p1"));
+    assert!(place.contains("placement::stand(bodies.p1"));
     assert!(place.contains("Some([x, y])"));
     assert!(!place.contains("state::init_pos(bodies.p1"));
     let on_start = item(&runtime, "unsafe fn on_start(");
@@ -194,9 +233,12 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     let settle = frame.find("PlacedPlayer::before_ready(").expect("judge before Ready");
     let ready = frame.find("run.rounds.placed()").expect("Ready transition");
     assert!(settle < ready);
-    assert!(frame.contains("write_player(p1, at,"));
+    assert!(frame.contains("placement::stand(p1, at,"));
     assert!(!frame.contains("Placement::Airborne if"));
-    assert!(!item(&runtime, "unsafe fn hold_cpu(").contains("p1"));
+    let placement = src("src/runtime/features/placement.rs");
+    assert!(!item(&placement, "pub(super) unsafe fn hold(").contains("p1"));
+    assert!(item(&placement, "pub(super) unsafe fn stand(").contains("state::init_pos(body"));
+    assert!(frame.contains("placement::hold(cpu, run.setup.cpu)"));
 }
 
 #[test]
