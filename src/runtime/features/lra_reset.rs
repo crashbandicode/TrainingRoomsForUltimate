@@ -41,6 +41,11 @@ pub unsafe fn reset_check(ctx: &mut InlineCtx) {
         notified: PENDING_NOTIFIED.load(Ordering::Acquire),
     });
     let step = lra_reset::defer_step(&mut pending, facts);
+    let after = step.write.unwrap_or(facts.x8);
+    // Active waiting-room practice also passes this scene predicate; its owed flag is absorbed at the next Training scene's first CPU init.
+    if lra_reset::reset_passes(after, facts.native_training) {
+        lra_reset::RESET_OWED.owe();
+    }
     if step.post_notice {
         // A required notice (review R2): Combo Display Off does not clear it. Marked sent only once the mailbox took
         // it, so a full mailbox is retried on the next check.

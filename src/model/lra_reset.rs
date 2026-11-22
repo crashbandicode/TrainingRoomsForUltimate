@@ -5,6 +5,8 @@
 //! when the game resets Training. The upstream HEAD change that runs the hub only outside Training
 //! (`077a8e43`, SPEC-state-06 question 1) is not adopted: the hub runs in native Training only.
 
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
+
 /// What the inline hook inside the game's reset check does to register `x8`: when the setting is
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
 /// happens (SPEC-state-06 §4). `None` leaves the register alone.
@@ -50,11 +52,11 @@ pub fn install_ended_ok(reason: &str) -> bool {
 }
 
 /// The lifecycle generation (review R3): one count, raised by every lifecycle exit a deferred reset must not
-/// outlive. The roster's scene change (every mode-key change, so also leaving Training), the P1 entry's destruction
-/// (Training -> CSS -> Training keeps the same mode key; the P1 entry identity ends there) and the Training session
-/// clear. A deferred reset keeps the generation of its press and fires only while it is unchanged, so a lifecycle
-/// exit between two reset checks, or at the settling check itself, drops it. Raised from any thread; the reset hook
-/// stays the deferred record's only reader and writer (it reads the count with `Acquire`).
+/// outlive. The roster's scene change (every mode-key change, so also leaving Training) and a qualifying P1 entry
+/// destruction (Training -> CSS -> Training keeps the same mode key) raise it in `character_roster::scene_changed`
+/// and `character_roster::on_destroy`. A deferred reset keeps the generation of its press and fires only while it is
+/// unchanged, so a lifecycle exit between two reset checks, or at the settling check itself, drops it. Raised from any
+/// thread; the reset hook stays the deferred record's only reader and writer (it reads the count with `Acquire`).
 pub static GENERATION: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 /// A lifecycle exit: every deferred reset asked for before it is dropped.
@@ -169,8 +171,65 @@ pub fn defer_step(pending: &mut Option<Pending>, f: Facts) -> Step {
 /// Whether the fighter on-init wrapper runs the hub after the game's own on-init (SPEC-state-06
 /// §5.1): only for the CPU-operated fighter, so the hub runs once per reset and not once per
 /// fighter; only in native Training; not while a hot swap is replacing a fighter.
+/// The wrapper also needs an owed reset (primary ruling 2026-11-22; docs/DECISIONS.md:666,1334).
 pub const fn hub_should_run(cpu_operated: bool, native_training: bool, hot_swap_in_progress: bool) -> bool {
     cpu_operated && native_training && !hot_swap_in_progress
+}
+
+const STAGE_IDLE: u8 = 0;
+const STAGE_LIVE: u8 = 1;
+const STAGE_HUB_RAN: u8 = 2;
+
+pub struct ResetOwed {
+    flag: AtomicBool,
+    generation: AtomicU32,
+    stage: AtomicU8,
+}
+
+impl ResetOwed {
+    pub const fn new() -> Self {
+        Self { flag: AtomicBool::new(false), generation: AtomicU32::new(u32::MAX), stage: AtomicU8::new(STAGE_IDLE) }
+    }
+
+    pub fn owe(&self) {
+        self.flag.store(true, Ordering::Release);
+    }
+
+    pub fn stage_published(&self) {
+        self.stage.store(STAGE_LIVE, Ordering::Release);
+    }
+
+    pub fn stage_completed(&self) {
+        if self.stage.swap(STAGE_IDLE, Ordering::AcqRel) == STAGE_LIVE {
+            self.owe();
+        }
+    }
+
+    pub fn stage_retained(&self) {
+        self.stage.store(STAGE_IDLE, Ordering::Release);
+    }
+
+    pub fn take(&self, cpu_role: bool, native_training: bool, hot_swap_in_progress: bool, lifecycle_generation: u32) -> bool {
+        if !hub_should_run(cpu_role, native_training, hot_swap_in_progress) {
+            return false;
+        }
+        let requested = self.flag.swap(false, Ordering::AcqRel);
+        let changed = self.generation.swap(lifecycle_generation, Ordering::AcqRel) != lifecycle_generation;
+        let stage = self.stage.compare_exchange(STAGE_LIVE, STAGE_HUB_RAN, Ordering::AcqRel, Ordering::Acquire).is_ok();
+        requested | changed | stage
+    }
+}
+
+impl Default for ResetOwed {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub static RESET_OWED: ResetOwed = ResetOwed::new();
+
+pub const fn reset_passes(x8_after: u64, native_training: bool) -> bool {
+    native_training && x8_after == RESET_REQUESTED
 }
 
 /// The steps of `on_reset()` in order (SPEC-state-06 §5.2), then the plugin's own additions.

@@ -1,6 +1,6 @@
 //! The fighter on-init wrapper (SPEC-state-06 §5.1): the fighter vtable's `on_init` slot is replaced
 //! by a wrapper that calls the game's own on-init and then, for the CPU-operated fighter in native
-//! Training and not during a hot swap, runs the reset hub.
+//! Training and not during a hot swap, runs the reset hub when a reset is owed.
 //!
 //! Facts (read from the owned 13.0.5 main; the `on_init` site's guard covers the words): the
 //! function takes the fighter object in x0 and one more argument in x1; the fighter's entry id is
@@ -44,6 +44,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     unsafe { crate::runtime::lobby::observe(a0) };
     // SAFETY: `a0` is the fighter object the game just initialised.
     let cpu = unsafe { cpu_operated(a0) };
+    // This flag currently has no writer; an unowed swap init is stopped by the owed-reset decision.
     let hot_swap = published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire);
     let training = scene::is_native_training();
     let role_cpu = cpu && training && unsafe {
@@ -55,10 +56,11 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
             crate::runtime::roster::character_roster::training_cpu_quantity(),
         )
     };
-    if lra_reset::hub_should_run(role_cpu, training, hot_swap) {
+    // With several CPUs, the first eligible init consumes the owed reset.
+    if lra_reset::RESET_OWED.take(role_cpu, training, hot_swap, lra_reset::GENERATION.load(Ordering::Acquire)) {
         super::btt_camera::interrupt_placement();
         hub::run(Clear::TrainingReset);
-        // rc.14: L+R+A and Change Stage restart an Eggs-ercise run; a fighter swap (hot swap) does not.
+        // L+R+A, Change Stage and a new lifecycle restart the run; a fighter swap alone does not.
         crate::runtime::features::hitbox::eggs_reset();
         crate::runtime::features::mashout::reset();
         crate::runtime::features::btt::reset();
