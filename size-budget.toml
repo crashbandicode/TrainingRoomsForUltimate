@@ -2365,3 +2365,11 @@ ceiling = 191679
 date = "2026-11-22"
 reason = "Eggs-ercise moving paths on In view and Whole stage are fitted into a box cut to the floor line the target appeared over; a path flies only with a target's width of room on each axis it uses, a sampled spot with that room is preferred, and Pop up is used when none has it. Measured normalized implementation 191679, 25 above the integration ceiling 191654, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 14:06:33Z (HANDOFF-PRIMARY-tr-primary-2.md line 1336): the operator's order that Eggs-ercise moving paths stay on the stage, root cause, red test and fix for the next round; the measured growth is reported with READY under the operator's measured LOC rule; option A ruled 2026-11-22 15:46:34Z (line 1443): 8 units of room on each axis a path uses, a sampled spot with room preferred, Pop up when none has it"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191809
+date = "2026-11-22"
+reason = "Intermediate-build items of the edge-juggle-sol lane on aad616bc: the drill's CPU Behavior is changed without the pause screen between AI kinds (+38); a held Up or Down repeats and quickens on every menu list and the Recording page's list jump goes on to the next section (+46); Break the Targets' crosshair is one shared component, Guard the Edge and Juggler pick their starts with it, and the place, hold and floor writes are lifted for the Recording placement wizard (+46). Measured normalized implementation 191809, 130 above the integration ceiling 191679, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 about 21:20Z, in answer to the lane's size request of 21:11:32Z in the integration inbox: one size entry of 191809 (+130) approved for the operator's orders of 19:05:48Z, 19:22:06Z and 20:00:14Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1576-1579, 1587-1589 and 1596-1597: the list scrolling defaults D1 to D3, the pause flash fix and the shared crosshair in this intermediate build) under the operator's measured LOC rule; the Ally release NRO and BSS delta is reported with READY"
