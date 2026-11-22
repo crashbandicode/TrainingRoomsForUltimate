@@ -2373,3 +2373,11 @@ ceiling = 191809
 date = "2026-11-22"
 reason = "Intermediate-build items of the edge-juggle-sol lane on aad616bc: the drill's CPU Behavior is changed without the pause screen between AI kinds (+38); a held Up or Down repeats and quickens on every menu list and the Recording page's list jump goes on to the next section (+46); Break the Targets' crosshair is one shared component, Guard the Edge and Juggler pick their starts with it, and the place, hold and floor writes are lifted for the Recording placement wizard (+46). Measured normalized implementation 191809, 130 above the integration ceiling 191679, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 about 21:20Z, in answer to the lane's size request of 21:11:32Z in the integration inbox: one size entry of 191809 (+130) approved for the operator's orders of 19:05:48Z, 19:22:06Z and 20:00:14Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1576-1579, 1587-1589 and 1596-1597: the list scrolling defaults D1 to D3, the pause flash fix and the shared crosshair in this intermediate build) under the operator's measured LOC rule; the Ally release NRO and BSS delta is reported with READY"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191961
+date = "2026-11-22"
+reason = "The shared refusal ordering and no-floor refusal, and Guard the Edge and Juggler in waiting-room practice. Measured normalized implementation 191961, 152 above the integration ceiling 191809, with zero spare. TEST-FLOW 2026-11-22 point 2: line-count growth pre-approved by the operator (~21:33Z), NRO and BSS reported with READY; tr-primary-2 ~21:41Z, rulings ~23:00Z and the lobby-parity order ~23:14Z."
+approved_by = "tr-primary-2, 2026-11-22 ~21:41Z, rulings ~23:00Z and the lobby-parity order ~23:14Z, under the operator's measured LOC rule; NRO and BSS reported with READY"
