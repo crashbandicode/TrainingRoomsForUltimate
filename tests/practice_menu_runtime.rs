@@ -313,6 +313,195 @@ fn egg_zone_camera_tracks_the_live_wizard() {
 }
 
 #[test]
+fn the_strip_asks_the_shared_wizard_state() {
+    let hud = src("src/runtime/features/hud_draw.rs");
+    let draw = item(&hud, "pub unsafe fn draw(");
+    assert!(draw.contains("WIZARDS.hides_strip(owners)"));
+    assert!(draw.contains("let menu_open = owners.covers_hud()"));
+    assert!(draw.contains("let chip = (!menu_open"));
+    assert!(draw.contains("combo::hud_tick(strip_shown"));
+    assert!(draw.contains("combo::card(strip_shown)"));
+    assert!(draw.contains("strip_shown.then(parry::view)"));
+    assert!(draw.contains("input_display::hud_tick(\n            strip_shown"));
+}
+
+#[test]
+fn every_wizard_reports_through_the_one_shared_path() {
+    let model = src("src/model/wizard.rs");
+    let all = model.split_once("pub const ALL:").unwrap().1.split_once("= [").unwrap().1.split_once("];").unwrap().0;
+    let listed: Vec<_> = all.split(',').map(str::trim).filter(|s| !s.is_empty())
+        .map(|s| s.strip_prefix("Self::").or_else(|| s.strip_prefix("Kind::")).unwrap()).collect();
+    let cases = [
+        ("DrillStart", "src/runtime/features/edge_juggle.rs"),
+        ("EggZone", "src/runtime/features/egg_zone.rs"),
+        ("TechWizard", "src/runtime/features/tech.rs"),
+        ("TechPlacing", "src/runtime/features/tech.rs"),
+        ("BttPlacing", "src/runtime/features/btt.rs"),
+    ];
+    assert_eq!(listed.len(), cases.len());
+    for kind in &listed { assert_eq!(cases.iter().filter(|(name, _)| name == kind).count(), 1, "{kind}"); }
+    for (kind, path) in cases {
+        let text = src(path);
+        let call = format!("WIZARDS.set_up(Kind::{kind},");
+        let args: Vec<_> = text.match_indices(&call).map(|(at, _)| text[at + call.len()..].trim_start()).collect();
+        assert!(!args.is_empty(), "{kind}: no shared writer");
+        let up = args.iter().any(|arg| arg.starts_with("true") || (!arg.starts_with("false") && !arg.starts_with("0")));
+        let down = args.iter().any(|arg| arg.starts_with("false") || (!arg.starts_with("true") && !arg.starts_with("1")));
+        assert!(up && down, "{kind}: report both up and down");
+    }
+    let tech = src("src/runtime/features/tech.rs");
+    let edge = src("src/runtime/features/edge_juggle.rs");
+    assert!(!tech.contains("static WIZARD_ACTIVE:") && !tech.contains("static PLACING:"));
+    assert!(!edge.contains("static WIZARD:"));
+    for path in ["src/runtime/features/chords.rs", "src/runtime/ui/input.rs"] {
+        let text = src(path);
+        for reader in ["tech::wizard_active()", "edge_juggle::wizard_active()", "egg_zone::wizard_active()"] {
+            assert_eq!(text.matches(reader).count(), 1, "{path}: {reader}");
+        }
+        assert_eq!(text.matches("::wizard_active()").count(), 3, "{path}: exactly the three prompt readers");
+        assert!(!text.contains("WIZARDS"), "{path}: prompt ownership uses the wizard readers");
+    }
+}
+
+fn lowers_directly_or_through(body: &str, module: &str, implementation: &str, kind: &str) -> bool {
+    let needle = format!("WIZARDS.set_up(Kind::{kind}, false)");
+    if body.contains(&needle) { return true; }
+    let calls = body.split_once('{').map_or(body, |(_, rest)| rest);
+    implementation.lines().filter(|line| (line.starts_with("fn ") || line.starts_with("pub") || line.starts_with("unsafe fn ")) && line.contains("fn ")).any(|line| {
+        let Some((_, after_fn)) = line.split_once("fn ") else { return false };
+        let name: String = after_fn.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+        let call = format!("{name}(");
+        let qualified = format!("{module}::{call}");
+        let head = format!("{}fn {name}(", line.split_once("fn ").unwrap().0);
+        let local = implementation.contains(body) && calls.match_indices(&call).any(|(at, _)| {
+            at == 0 || !matches!(calls.as_bytes()[at - 1], b':' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_')
+        });
+        (calls.contains(&qualified) || local) && item(implementation, &head).contains(&needle)
+    })
+}
+
+#[test]
+fn guard_the_edge_runtime_enters_and_leaves_through_the_shared_path() {
+    let edge = src("src/runtime/features/edge_juggle.rs");
+    assert!(!edge.contains("static WIZARD:"));
+    let poll = item(&edge, "pub unsafe fn poll(");
+    let back = poll.split_once("if key_down(key::B)").unwrap().1.split_once("if key_down(key::X)").unwrap().0;
+    let cancel = back.split_once("if !wizard.back()").unwrap().1;
+    assert!(cancel.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "Cancel lowers the bit");
+    let apply = poll.split_once("run.wizard = None;").unwrap().1;
+    assert!(apply.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "Apply lowers the bit");
+    let frame = item(&edge, "pub unsafe fn frame(");
+    let scene_exit = frame.split_once("if !scene::is_native_training()").unwrap().1.split_once("if published::HOT_SWAP_IN_PROGRESS").unwrap().0;
+    assert!(scene_exit.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "scene exit");
+    let no_body = frame.split_once("let Some((drill, body))").unwrap().1.split_once("let cpu = body.accessor").unwrap().0;
+    assert!(no_body.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "ended drill or missing body");
+    let stage_change = frame.split_once("if engine.run.as_ref().is_some_and(|run| run.wizard.is_some() && run.stage_key != stage_key)").unwrap().1
+        .split_once("let Some((stage, p1_start)) = setup_stage(p1)").unwrap().0;
+    assert!(stage_change.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "stage change clears even if new setup fails");
+    assert!(frame.contains("WIZARDS.set_up(Kind::DrillStart, editing)"), "wizard entry and non-editing start");
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "fn handle(").contains("edge_juggle::menu_opened()"));
+    assert!(item(&worker, "fn press(").contains("m.take_stop()"));
+    assert!(item(&worker, "fn press(").contains("practice::stop()"), "Stop follows menu opening");
+    let practice = src("src/runtime/features/practice.rs");
+    assert!(lowers_directly_or_through(item(&practice, "pub fn stop()"), "edge_juggle", &edge, "DrillStart"), "Stop ends the drill");
+    assert!(frame.contains("if drill.is_none() && !ENGINE_ACTIVE.load(Ordering::Acquire)"), "a live engine keeps its frame until the frame lowers the bit");
+    assert!(!src("src/runtime/features/recorder.rs").contains("WIZARDS"), "a session clear leaves each wizard to its own frame");
+}
+
+#[test]
+fn egg_zone_runtime_enters_and_leaves_through_the_shared_path() {
+    let zone = src("src/runtime/features/egg_zone.rs");
+    let frame = item(&zone, "pub unsafe fn frame(");
+    let entry = frame.find("WIZARDS.set_up(Kind::EggZone, true)").expect("entry");
+    assert_eq!(zone.matches("WIZARDS.set_up(Kind::EggZone, true)").count(), 1, "one entry");
+    assert_eq!(zone.matches("LIVE.store(").count(), 1, "one lease publication");
+    assert!(frame.rfind("compare_exchange(generation, 0").unwrap() < entry);
+    assert!(entry < frame.find("LIVE.store(").unwrap());
+    let close = item(&zone, "fn close()");
+    let swap = close.find("LIVE.swap(0,").unwrap();
+    assert!(swap < close.find("WIZARDS.set_up(Kind::EggZone, false)").unwrap());
+    assert_eq!(zone.matches("WIZARDS.set_up(Kind::EggZone, false)").count(), 1, "close is the only exit");
+    for head in ["pub fn menu_opened()", "pub unsafe fn prepare(", "pub unsafe fn frame("] {
+        assert!(item(&zone, head).contains("close();"), "{head}");
+    }
+    assert!(item(&zone, "pub fn reset()").contains("menu_opened();"));
+    let poll = item(&zone, "pub unsafe fn poll(");
+    for outcome in ["Outcome::Cancel", "Outcome::Apply"] {
+        let arm = poll.split_once(outcome).unwrap().1.split_once("        }").unwrap().0;
+        assert!(arm.contains("close();"), "{outcome}");
+    }
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "fn handle(").contains("egg_zone::menu_opened()"));
+    assert!(item(&worker, "fn press(").contains("m.take_stop()"));
+    assert!(item(&worker, "fn press(").contains("practice::stop()"), "Stop follows menu opening");
+    let left = frame.split_once("if !scene::is_training()").unwrap().1.split_once("return;").unwrap().0;
+    assert!(left.contains("close();"), "leaving Training closes on the next frame");
+    let departure = src("src/runtime/lobby/training/mod.rs");
+    assert!(item(&departure, "pub(crate) fn clear_session_state()").contains("egg_zone::reset()"), "scene departure");
+}
+
+#[test]
+fn every_wizard_is_lowered_by_the_menu_and_by_its_own_frame() {
+    let tech = src("src/runtime/features/tech.rs");
+    let btt = src("src/runtime/features/btt.rs");
+    let worker = src("src/runtime/ui/worker.rs");
+    let opening = item(&worker, "fn handle(");
+    let press = item(&worker, "fn press(");
+    assert!(press.contains("m.take_stop()") && press.contains("practice::stop()"));
+    for (kind, module, implementation) in [
+        ("TechWizard", "tech", &tech),
+        ("TechPlacing", "tech", &tech),
+    ] {
+        assert!(lowers_directly_or_through(item(implementation, "pub fn menu_opened()"), module, implementation, kind), "{kind}: menu opening");
+        assert!(opening.contains(&format!("{module}::menu_opened()")), "{kind}: Stop follows opening");
+    }
+    assert!(opening.contains("btt::menu_opened()"));
+    let wizard = item(&tech, "fn wizard_poll(");
+    for arm in ["WizardOutcome::Start", "WizardOutcome::Cancelled"] {
+        let body = wizard.split_once(arm).unwrap().1.split_once("        }").unwrap().0;
+        assert!(body.contains("WIZARDS.set_up(Kind::TechWizard, false)"), "{arm}");
+    }
+    let frame = item(&tech, "pub unsafe fn frame(");
+    let left = frame.split_once("if crate::model::scene::scene(facts).is_none()").unwrap().1.split_once("release_camera_requests();").unwrap().0;
+    for kind in ["TechWizard", "TechPlacing"] { assert!(left.contains(&format!("WIZARDS.set_up(Kind::{kind}, false)")), "{kind}: a frame outside the practice scenes"); }
+    let interrupted = frame.split_once("if wizard_active() && interrupted").unwrap().1.split_once("BACK_MENU.store").unwrap().0;
+    assert!(interrupted.contains("WIZARDS.set_up(Kind::TechWizard, false)"), "an interrupted live draft closes");
+    let reset = frame.split_once("if run.epoch != Some(epoch) || reset").unwrap().1.split_once("if view.cancelled").unwrap().0;
+    assert!(reset.contains("WIZARDS.set_up(Kind::TechPlacing, false)"), "an interrupted placing view closes");
+    let poll = item(&btt, "pub unsafe fn poll(");
+    let pass = item(&btt, "unsafe fn pass(");
+    assert!(pass.contains("mode.close_menu(on, place)"), "the stopped game leaves Placing");
+    assert!(pass.contains("mode.close_menu(false, false)"), "a pass outside the practice scenes leaves Placing");
+    assert!(item(&btt, "pub fn reading()").contains("running()") && item(&btt, "pub fn idle()").contains("!reading()"), "a published phase keeps the pass that lowers it");
+    let paired = |body: &str| ["phase", "mode.phase()"].iter().any(|value| {
+        body.contains(&format!("PHASE.store({value} as u8"))
+            && (body.contains(&format!("WIZARDS.set_up(Kind::BttPlacing, {value} == Phase::Placing)"))
+                || body.contains(&format!("WIZARDS.set_up(Kind::BttPlacing, matches!({value}, Phase::Placing))")))
+    });
+    let functions: Vec<_> = btt.lines().filter(|line| (line.starts_with("fn ") || line.starts_with("pub") || line.starts_with("unsafe fn ")) && line.contains("fn ")).filter_map(|line| {
+        let (prefix, tail) = line.split_once("fn ")?;
+        let name: String = tail.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+        let head = format!("{prefix}fn {name}(");
+        Some((name, head))
+    }).collect();
+    let setter = functions.iter().find_map(|(name, head)| {
+        let receives_poll = poll.contains(&format!("{name}(mode.phase())"))
+            || poll.contains("let phase = mode.phase()") && poll.contains(&format!("{name}(phase)"));
+        (paired(item(&btt, head)) && receives_poll && pass.contains(&format!("{name}(phase)"))).then_some(name)
+    });
+    assert!(paired(poll) && paired(pass) || setter.is_some(), "each phase publication carries the same Placing bit");
+    let phase_off = |body: &str| setter.is_some_and(|name| body.contains(&format!("{name}(Phase::Off)")))
+        || body.contains("PHASE.store(Phase::Off as u8") && body.contains("WIZARDS.set_up(Kind::BttPlacing, false)");
+    for (_, head) in &functions {
+        let body = item(&btt, head);
+        if body.contains("PHASE.store(") {
+            assert!(paired(body) || phase_off(body), "{head}: every phase writer shares its value");
+        }
+    }
+}
+
+#[test]
 fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
     let zone = src("src/runtime/features/egg_zone.rs");
     let draw = item(&zone, "pub fn draw(");

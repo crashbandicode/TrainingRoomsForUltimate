@@ -110,7 +110,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     };
     let owners = published::input_owners();
     let menu_open = owners.covers_hud();
-    let strip_shown = !menu_open && input_display::sampling();
+    let strip_shown = !published::WIZARDS.hides_strip(owners) && input_display::sampling();
     // Lobby practice reserves the top band for the native panels.
     let drop = C.scene_drop(scene::current() == Some(crate::model::scene::Scene::Lobby));
     let draw_settings = input_display::settings();

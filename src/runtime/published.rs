@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::model::settings::Snapshot;
 
+pub static WIZARDS: crate::model::wizard::Active = crate::model::wizard::Active::new();
+
 static INPUT_DELAY: AtomicU8 = AtomicU8::new(0);
 static LRA_RESET: AtomicBool = AtomicBool::new(true);
 static STAGE_HAZARDS: AtomicBool = AtomicBool::new(false);

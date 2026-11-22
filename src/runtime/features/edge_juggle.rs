@@ -34,6 +34,7 @@ use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
+use crate::model::wizard::Kind;
 use crate::runtime::{
     game::{self, natives},
     published, scene, state_natives as state,
@@ -86,7 +87,6 @@ static P1_BUTTONS: AtomicU32 = AtomicU32::new(0);
 static START: AtomicU8 = AtomicU8::new(0);
 static ENGINE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static RESTART: AtomicBool = AtomicBool::new(false);
-static WIZARD: AtomicBool = AtomicBool::new(false);
 static OPEN: AtomicBool = AtomicBool::new(false);
 static BACK: AtomicBool = AtomicBool::new(false);
 
@@ -260,6 +260,11 @@ pub fn menu_opened() {
     notices::clear(NOTICE);
 }
 
+/// Stop from the menu worker lowers the bit; the next frame retires the run.
+pub fn stopped() {
+    published::WIZARDS.set_up(Kind::DrillStart, false);
+}
+
 pub fn menu_closed() {
     OPEN.store(false, Ordering::Release);
 }
@@ -275,7 +280,7 @@ pub fn take_menu_request() -> bool {
 }
 
 pub fn wizard_active() -> bool {
-    WIZARD.load(Ordering::Acquire) && wanted().is_some()
+    published::WIZARDS.is_up(Kind::DrillStart) && wanted().is_some()
 }
 
 pub(super) fn placement_active() -> bool {
@@ -1492,6 +1497,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         run.confirm_player = false;
         if !wizard.back() {
             practice::finish(run.drill.game());
+            published::WIZARDS.set_up(Kind::DrillStart, false);
             BACK.store(true, Ordering::Release);
         }
         return true;
@@ -1525,7 +1531,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
             run.setup = wizard.setup;
             kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved()));
             run.wizard = None;
-            WIZARD.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::DrillStart, false);
         } else {
             wizard.advance();
         }
@@ -1842,7 +1848,7 @@ pub unsafe fn frame(fighter: usize) {
         }
         engine.held_cpu = None;
         ENGINE_ACTIVE.store(false, Ordering::Release);
-        WIZARD.store(false, Ordering::Release);
+        published::WIZARDS.set_up(Kind::DrillStart, false);
         return;
     }
     if published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire) {
@@ -1886,7 +1892,7 @@ pub unsafe fn frame(fighter: usize) {
         engine.wake_cpu(body);
         if engine.run.take().is_some() {
             ENGINE_ACTIVE.store(false, Ordering::Release);
-            WIZARD.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::DrillStart, false);
             notices::clear(NOTICE);
         }
         return;
@@ -1931,6 +1937,7 @@ pub unsafe fn frame(fighter: usize) {
     let stage_key = (id, form);
     if engine.run.as_ref().is_some_and(|run| run.wizard.is_some() && run.stage_key != stage_key) {
         super::btt_camera::interrupt_placement();
+        published::WIZARDS.set_up(Kind::DrillStart, false);
     }
     if start != 0
         || engine
@@ -2001,7 +2008,11 @@ pub unsafe fn frame(fighter: usize) {
         });
         let _ = START.compare_exchange(start, 0, Ordering::AcqRel, Ordering::Acquire);
         ENGINE_ACTIVE.store(true, Ordering::Release);
-        WIZARD.store(editing, Ordering::Release);
+        published::WIZARDS.set_up(Kind::DrillStart, editing);
+        // Close the race with Stop on the menu worker.
+        if wanted().is_none() {
+            published::WIZARDS.set_up(Kind::DrillStart, false);
+        }
     }
     if RESTART.swap(false, Ordering::AcqRel) {
         engine.wake_cpu(Some(body));
