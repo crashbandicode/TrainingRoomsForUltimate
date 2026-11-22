@@ -336,6 +336,13 @@ fn a_refusal_keeps_plain_order_and_passes_every_standing_notice() {
     assert_eq!(q.tick(true, false).draw.unwrap().header, "Game speed");
     for _ in 4..=31 { assert!(q.tick(true, false).draw.is_none()); }
     assert_eq!(q.tick(true, false).draw.unwrap().header, "S");
+    assert_eq!(q.take_delivered(), Some(9));
+    for _ in 0..48 {
+        let out = q.tick(true, false);
+        assert!(out.visible && out.draw.is_none());
+    }
+    assert!(q.is_empty());
+    assert_eq!(q.take_delivered(), Some(7));
 
     let mut q = Queue::new();
     for id in 0..CAPACITY as u8 {
