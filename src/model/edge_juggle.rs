@@ -237,6 +237,51 @@ pub struct Observation {
     pub hit: bool,
 }
 
+/// Player 1 as the drill reads it around its start write.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlacedPlayer {
+    /// The game's own hit freeze.
+    pub hit_freeze: bool,
+    /// Standing idle, the status the start write asks for.
+    pub wait: bool,
+}
+
+impl PlacedPlayer {
+    /// A start write that finds Player 1 idle holds. One that finds it in a hit does not: a speed outlives the write
+    /// and Player 1 slides off its point in Wait (docs/design/rc15-gte-wizard-start.md).
+    pub const fn watch(self) -> bool {
+        self.hit_freeze || !self.wait
+    }
+
+    /// On a frame between a watched start write and Ready: write the start again? Only while the hit still freezes
+    /// Player 1 or it stands idle off its point; a status of its own is the player's. `spent` counts the rewrites of
+    /// this attempt: at most one ready period of them, then the drill goes on as before.
+    pub const fn rewrite(self, on_point: bool, drill: Drill, spent: u16) -> bool {
+        spent < drill.ready_frames() && (self.hit_freeze || self.wait && !on_point)
+    }
+
+    /// One placement update between the start write and Ready. `watched` is, for a watched start, Player 1 as read on
+    /// this update, whether it stands on its start (`None` when the floor under it could not be read), and the rewrites
+    /// spent; `None` for a start that found it idle.
+    /// Player 1 is judged on every update, also while the CPU is not in Fall yet. Returns (write the start again,
+    /// start Ready): Ready starts on the first update with the CPU in Fall and nothing written.
+    pub const fn before_ready(watched: Option<(Self, Option<bool>, u16)>, cpu_falling: bool, drill: Drill) -> (bool, bool) {
+        let rewrite = match watched {
+            // An unread floor shows no displacement: only a hit freeze is written again then.
+            Some((player, on_start, spent)) => player.rewrite(
+                match on_start {
+                    Some(on_start) => on_start,
+                    None => true,
+                },
+                drill,
+                spent,
+            ),
+            None => false,
+        };
+        (rewrite, cpu_falling && !rewrite)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Place,
@@ -798,6 +843,64 @@ impl Wizard {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn hit_player_start_is_rewritten_until_it_holds() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let own_status = PlacedPlayer { hit_freeze: false, wait: false };
+        let frozen_idle = PlacedPlayer { hit_freeze: true, wait: true };
+        let frozen_other = PlacedPlayer { hit_freeze: true, wait: false };
+        assert!(!idle.watch());
+        assert!(own_status.watch());
+        assert!(frozen_idle.watch());
+        assert!(frozen_other.watch());
+
+        assert!(idle.rewrite(false, Drill::GuardEdge, 0));
+        assert!(!idle.rewrite(true, Drill::GuardEdge, 0));
+        assert!(frozen_idle.rewrite(true, Drill::GuardEdge, 0));
+        assert!(!own_status.rewrite(false, Drill::GuardEdge, 0));
+        assert!(frozen_other.rewrite(false, Drill::GuardEdge, 0));
+
+        assert_eq!(Drill::GuardEdge.ready_frames(), 60);
+        assert_eq!(Drill::Juggler.ready_frames(), 45);
+        assert!(idle.rewrite(false, Drill::GuardEdge, 59));
+        assert!(!idle.rewrite(false, Drill::GuardEdge, 60));
+        assert!(idle.rewrite(false, Drill::Juggler, 44));
+        assert!(!idle.rewrite(false, Drill::Juggler, 45));
+
+        let mut spent = 0;
+        for (player, on_point) in [(frozen_idle, true); 8].into_iter().chain([(idle, false); 5]) {
+            if player.rewrite(on_point, Drill::GuardEdge, spent) {
+                spent += 1;
+            }
+        }
+        assert_eq!(spent, 13);
+        assert!(!idle.rewrite(true, Drill::GuardEdge, spent));
+    }
+
+    #[test]
+    fn player_start_is_judged_on_every_update_before_ready() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let own = PlacedPlayer { hit_freeze: false, wait: false };
+        let frozen = PlacedPlayer { hit_freeze: true, wait: true };
+        let g = Drill::GuardEdge;
+        let j = Drill::Juggler;
+        assert_eq!(PlacedPlayer::before_ready(None, false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(None, true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 0)), false, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(true), 0)), false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(true), 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((frozen, Some(true), 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((own, Some(false), 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 59)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 60)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 44)), true, j), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 45)), true, j), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((frozen, None, 0)), true, g), (true, false));
+    }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {
         let mut session = Session::new(drill, limit);

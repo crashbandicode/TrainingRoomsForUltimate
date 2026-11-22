@@ -2325,3 +2325,11 @@ ceiling = 188611
 date = "2026-11-22"
 reason = "raise: 1 Frame Save hold (the kept step bit marked in previous, Controller identity, re-entry with the speed-hold close under the poll's one lock, the skipped-poll branch); 188611 measured on c2fc22f2, 4 over 188607"
 approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; folded into one entry by its 06:53:42Z order (line 909); NRO and BSS reported at the gate"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188680
+date = "2026-11-22"
+reason = "Rewrite Player 1's drill start while a hit still moves it (rc15-gte-wizard-start 82b0ebc1). 188680 measured on its merge with the strip layout fixes and the 1 Frame Save hold, 69 over 188611."
+approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start fix on rc15-gte-wizard-start under the measured LOC rule; merge onto the integration main ordered 07:55:29Z"
