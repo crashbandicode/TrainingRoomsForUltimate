@@ -329,7 +329,7 @@ impl Motion {
         let at = core::array::from_fn(|axis| {
             let lo = bounds[0][axis] - scale * envelope[0][axis];
             let hi = bounds[1][axis] - scale * envelope[1][axis];
-            anchor[axis].clamp(lo, hi.max(lo))
+            anchor[axis].clamp(lo, hi.max(lo)).min(bounds[1][axis])
         });
         Self { flight: path.map(|path| Flight::new(path, right)), at, scale, bounds, side }
     }
@@ -835,6 +835,13 @@ impl Run {
         // spot a third in from either end still has room on its own side), `MIN_GAP` where there is room.
         let spacing = MIN_GAP.min((total - 2.0 * P1_GAP).max(0.0) / 3.0);
         let body = [self.p1[0], self.p1[1] + BODY];
+        let flown = self.path.zip(path_bounds);
+        let fit = |[a, b]: [Point; 2]| {
+            let (path, [[west, low], [east, high]]) = flown?;
+            let bounds = [[west.max(a[0] + RADIUS), low.max(a[1].max(b[1]) + RADIUS)], [east.min(b[0] - RADIUS), high]];
+            let [from, to] = path.envelope();
+            (0..2).all(|i| bounds[1][i] - bounds[0][i] >= [2.0 * RADIUS, 0.0][usize::from(from[i] == to[i])]).then_some(bounds)
+        };
         let mut random = || {
             self.rng = 1_013_904_223u32.wrapping_add(self.rng.wrapping_mul(1_664_525));
             (self.rng >> 8) as f32 / (1u32 << 24) as f32
@@ -858,18 +865,18 @@ impl Run {
             let from_last = last.map_or(0.0, |l| spacing - dist([disc[0], disc[1] + lift], l));
             from_last.max(P1_GAP - dist(disc, body)).max(0.0)
         };
-        let (disc, perch, vx, [a, b]) = (0..32).map(|_| pick()).min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
+        let (disc, perch, vx, line) = (0..32)
+            .map(|_| pick())
+            .min_by(|p, q| fit(q.3).is_some().cmp(&fit(p.3).is_some()).then_with(|| short(p.0).total_cmp(&short(q.0))))?;
         let launch = (LAUNCH * speed).min((2.0 * g * (top - disc[1]).max(0.0)).sqrt());
         (self.egg, self.age, self.fly, self.perch) = (Some([disc[0], disc[1] + lift]), 0, [launch, vx, g], perch);
-        if let (Some(path), Some([[west, low], [east, high]])) = (self.path, path_bounds) {
+        if let Some((path, _)) = flown {
             let right = if matches!(path, Path::Missile) {
                 self.p1[0] >= disc[0]
             } else {
                 self.next_random() >> 31 == 0
             };
-            let bounds = [[west.max(a[0] + RADIUS), low.max(a[1].max(b[1]) + RADIUS)], [east.min(b[0] - RADIUS), high]];
-            let [from, to] = path.envelope();
-            if (0..2).all(|i| bounds[0][i] < bounds[1][i] || (bounds[0][i] == bounds[1][i] && from[i] == to[i])) {
+            if let Some(bounds) = fit(line) {
                 self.motion = Some(Motion::new(self.path, disc, bounds, None, right));
                 self.perch = true;
             } else {

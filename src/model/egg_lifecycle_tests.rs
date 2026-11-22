@@ -577,12 +577,142 @@ fn a_pop_up_fallback_takes_the_same_random_draws_as_a_flight() {
         run.step(false, 0.0, &[], false, 0);
         run
     };
-    let (mut fallback, mut flight) = (narrow(12.0), narrow(16.0));
+    let (mut fallback, mut flight) = (narrow(12.0), narrow(20.0));
     for target in 0..2 {
         assert!(fallback.egg_at().is_some() && flight.egg_at().is_some(), "target {target}");
         assert_eq!((fallback.motion.is_some(), flight.motion.is_some()), (false, true), "target {target}");
         assert_eq!(fallback.rng, flight.rng, "target {target}: the Pop up fallback and the flight took different random draws");
         contact(&mut fallback);
         contact(&mut flight);
+    }
+}
+
+fn first_target(area: u8, bit: u8, seed: u32, view: View, floors: &[Floor]) -> Run {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, area], seed);
+    run.configure(1 << bit, 0);
+    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+    if !floors.is_empty() {
+        run.set_floors(floors);
+        run.sense([58.0, -30.0]);
+    }
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(view));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    run
+}
+
+#[test]
+fn an_axe_with_a_hair_of_height_pops_up() {
+    let floor = f32::from_bits(0x42a3_ffff);
+    let run = first_target(WHOLE, 0, 7, VIEW, &[[[32.0, floor], [64.0, floor]]]);
+    assert!(
+        run.motion.is_none() && run.path.is_none(),
+        "an Axe in a box {} high would be scaled to nothing and stay at one point: Pop up",
+        86.0 - (floor + RADIUS)
+    );
+    let [x, y] = run.egg_at().expect("a target on the floor a hair under the top of the box");
+    assert!((42.0..=54.0).contains(&x) && y == floor + RADIUS, "({x}, {y})");
+}
+
+#[test]
+fn a_path_that_needs_height_appears_over_a_floor_that_has_it() {
+    for (area, high) in [(IN_VIEW, 42.0), (WHOLE, 82.0), (WHOLE, f32::from_bits(0x42a3_ffff))] {
+        let floors = [[[-50.0, high], [50.0, high]], [[-50.0, 0.0], [50.0, 0.0]]];
+        let mut seen = [0usize; 2];
+        for seed in 0..32u32 {
+            let level = first_target(area, 2, seed.wrapping_mul(0x9e37_79b9), VIEW, &floors);
+            let main_spot = level.egg.expect("a Boomerang target");
+            assert!(level.motion.is_some(), "a Boomerang needs no height: area {area} floor at {high} seed {seed}");
+            seen[usize::from(main_spot[1] > 35.0)] += 1;
+            for bit in [0u8, 1, 3] {
+                let mut run = first_target(area, bit, seed.wrapping_mul(0x9e37_79b9), VIEW, &floors);
+                let spot = run.egg.expect("a target");
+                let case = format!(
+                    "area {area} floor at {high} path {bit} seed {seed}: sampled at {spot:?}, the Boomerang at {main_spot:?}"
+                );
+                assert!(run.motion.is_some() && spot[1] < 35.0, "should fly over the floor with room: {case}");
+                if main_spot[1] < 35.0 {
+                    assert_eq!(spot, main_spot, "a spot with room keeps its place: {case}");
+                }
+                if bit != 3 {
+                    assert_eq!(run.rng, level.rng, "choosing among the sampled spots takes no random draw: {case}");
+                }
+                let first = run.egg_at().unwrap();
+                let mut moved = false;
+                for tick in 0..200 {
+                    let [x, y] = run.egg_at().unwrap();
+                    assert!((-46.0..=46.0).contains(&x) && y >= RADIUS, "left its floor: tick {tick}: ({x}, {y}); {case}");
+                    moved |= [x, y] != first;
+                    run.step(true, 0.0, &[], false, 0);
+                }
+                assert!(moved, "should move: {case}");
+            }
+        }
+        assert!(seen.iter().all(|n| *n > 0), "the Boomerang's targets appeared over both floors: {seen:?}");
+    }
+}
+
+fn flies_or_pops_up(mut run: Run, flies: bool, room: Option<usize>, case: &str) {
+    let first = run.egg_at().expect("a target");
+    assert_eq!((run.motion.is_some(), run.path.is_some()), (flies, flies), "{case}");
+    if let (Some(motion), Some(axis)) = (run.motion, room) {
+        assert_eq!(motion.bounds[1][axis] - motion.bounds[0][axis], 2.0 * RADIUS, "{case}");
+    }
+    let mut moved = false;
+    for _ in 0..200 {
+        run.step(true, 0.0, &[], false, 0);
+        moved |= run.egg_at().unwrap() != first;
+    }
+    assert!(moved, "should move: {case}");
+}
+
+#[test]
+fn a_moving_path_needs_a_target_width_of_room() {
+    for bit in 0..4u8 {
+        for (half, flies) in [(18.0f32, true), (17.5, false)] {
+            let run = first_target(IN_VIEW, bit, 7, View(VIEW.0, VIEW.1, [-half, half], VIEW.3), &[]);
+            let case = format!("path {bit} with {} units of room sideways", 2.0 * (half - DRIFT - RADIUS));
+            flies_or_pops_up(run, flies, Some(0), &case);
+        }
+        for (floor, flies, room) in [(74.0f32, true, Some(1)), (74.5, bit == 2, None)] {
+            let run = first_target(WHOLE, bit, 7, VIEW, &[[[-50.0, floor], [50.0, floor]]]);
+            let case = format!("path {bit} with {} units of room above", 86.0 - floor - RADIUS);
+            flies_or_pops_up(run, flies, room, &case);
+        }
+    }
+}
+
+#[test]
+fn a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for_none() {
+    const WITH_ROOM: [u32; 18] = [1, 3, 5, 6, 8, 9, 10, 12, 15, 16, 17, 18, 20, 24, 27, 29, 30, 31];
+    let floors = [[[-50.0, 82.0], [50.0, 82.0]], [[60.0, 0.0], [82.0, 0.0]]];
+    for seed in 0..32u32 {
+        let run = first_target(WHOLE, 0, seed.wrapping_mul(0x9e37_79b9), VIEW, &floors);
+        let spot = run.egg.expect("a target");
+        let flies = WITH_ROOM.contains(&seed);
+        assert_eq!(
+            (run.motion.is_some(), run.path.is_some(), spot[0] > 60.0),
+            (flies, flies, flies),
+            "seed {seed} sampled at {spot:?}: an Axe over the short floor when one of its 32 spots is there, else Pop up"
+        );
+    }
+}
+
+#[test]
+fn a_flight_starts_inside_its_box() {
+    let floors = [[[-50.0, 42.0], [50.0, 42.0]], [[-50.0, 0.0], [50.0, 0.0]]];
+    for area in [IN_VIEW, WHOLE] {
+        for bit in 0..4u8 {
+            for seed in 0..32u32 {
+                let run = first_target(area, bit, seed.wrapping_mul(0x9e37_79b9), VIEW, &floors);
+                let (at, [low, high]) = (run.egg_at().expect("a target"), run.motion.expect("a moving path").bounds);
+                assert!(
+                    (0..2).all(|i| (low[i]..=high[i]).contains(&at[i])),
+                    "area {area} path {bit} seed {seed}: starts at {at:?}, outside its box from {low:?} to {high:?}"
+                );
+            }
+        }
     }
 }

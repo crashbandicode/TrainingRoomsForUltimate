@@ -501,8 +501,9 @@ Pac-Man's Galaxian, Link's Boomerang, and Samus's Homing Missile. Homing Missile
 When the list is empty, targets use the ordinary bouncing flight. Target speed changes playback speed.
 
 With **In view** or **Whole stage**, a moving target stays over the floor it appeared on: it does not pass the ends
-of that floor and does not drop below it. A flight that needs more room than that is flown smaller, and with no room
-at all the target uses Pop up. **Off stage** targets keep to their zone.
+of that floor and does not drop below it. A flight that needs more room than that is flown smaller. A flight needs at
+least one target's width of room in each direction it moves: a target appears where a floor gives its flight that
+room, and uses Pop up when none of the spots tried does. **Off stage** targets keep to their zone.
 
 Set **Target expiry** to **Off** or from **1 second** through **10 seconds**. An unhit target then disappears and is
 replaced. Pausing or opening a menu freezes its timer. With **Hit streak** on, an expiry clears the current streak
