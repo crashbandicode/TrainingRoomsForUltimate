@@ -238,6 +238,116 @@ fn the_standing_api_is_bounded_and_allocation_free() {
     assert_eq!(taken, [Some(2), Some(3), Some(4), Some(5), None]);
 }
 
+fn a_refusal_shows_at_once_over_the_guard_wizard_page_and_gives_it_back() {
+    const HEADER: &str = "Edge · 1/3";
+    const PAGE: &str = "CPU (-12, 2) · Stick or D-pad move · A next · X default start · Y other side";
+    const MOVED: &str = "CPU (-131, 2) · Stick or D-pad move · A next · X default start · Y other side";
+    let mut q = Queue::new();
+    q.upsert(0x34, HEADER, Body::copied(PAGE), u16::MAX, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), (HEADER, PAGE));
+    assert!(q.tick(true, false).draw.is_none());
+    let mut plain = q;
+    plain.post_static("Input Recording", "Pick a point off the stage", 120, DEFAULT_COLOR);
+    for _ in 0..121 {
+        let out = plain.tick(true, false);
+        assert!(out.visible && out.draw.is_none());
+    }
+    q.post_refusal("Input Recording", Body::copied("Pick a point off the stage"), 120, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Input Recording", "Pick a point off the stage"));
+    q.upsert(0x34, HEADER, Body::copied(MOVED), u16::MAX, DEFAULT_COLOR);
+    for _ in 2..=120 {
+        let out = q.tick(true, false);
+        assert!(out.visible && out.draw.is_none());
+    }
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), (HEADER, MOVED));
+    assert!(q.tick(true, false).draw.is_none());
+    assert!(q.is_queued(0x34));
+    assert_eq!(q.len(), 1);
+    assert_eq!(q.take_delivered(), None);
+}
+
+fn a_refused_juggler_player_point_shows_over_its_page_once_per_press() {
+    const PAGE: &str = "P1 (-34, 0) · Stick or D-pad move · A next";
+    let mut q = Queue::new();
+    q.upsert(0x34, "Juggle · 3/4", Body::copied(PAGE), u16::MAX, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Juggle · 3/4", PAGE));
+    for _ in 0..2 {
+        q.post_refusal("Input Recording", Body::copied("Pick a point above a floor"), 120, DEFAULT_COLOR);
+    }
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Input Recording", "Pick a point above a floor"));
+    for _ in 2..=120 { assert!(q.tick(true, false).draw.is_none()); }
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Input Recording", "Pick a point above a floor"));
+    for _ in 122..=240 { assert!(q.tick(true, false).draw.is_none()); }
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Juggle · 3/4", PAGE));
+    assert_eq!(q.len(), 1);
+}
+
+fn a_refusal_during_a_running_drill_shows_over_the_drill_status() {
+    let mut q = Queue::new();
+    q.upsert(0x34, "Guard the Edge", Body::copied("  0/0 · Streak 0 · Best 0"), u16::MAX, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Guard the Edge", "  0/0 · Streak 0 · Best 0"));
+    q.post_refusal("Input Recording", Body::copied("Stop the drill to start recording or play inputs"), 120, DEFAULT_COLOR);
+    for n in 1..=120 {
+        if n % 30 == 0 {
+            q.upsert(0x34, "Guard the Edge", Body::copied(&format!("status {n}")), u16::MAX, DEFAULT_COLOR);
+        }
+        let out = q.tick(true, false);
+        assert!(out.visible);
+        if n == 1 {
+            let draw = out.draw.unwrap();
+            assert_eq!((draw.header, draw.body.as_str()), ("Input Recording", "Stop the drill to start recording or play inputs"));
+        } else {
+            assert!(out.draw.is_none(), "tick {n}");
+        }
+    }
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Guard the Edge", "status 120"));
+    assert!(q.is_queued(0x34));
+}
+
+fn a_refusal_keeps_plain_order_and_passes_every_standing_notice() {
+    let before = ALLOCS.with(Cell::get);
+    let mut q = Queue::new();
+    q.post_static("Save State", "Saved", 3, DEFAULT_COLOR);
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "Save State");
+    q.upsert(7, "S", Body::copied("standing"), 5, DEFAULT_COLOR);
+    q.post_refusal("Input Recording", Body::copied("no"), 2, DEFAULT_COLOR);
+    for _ in 0..2 { assert!(q.tick(true, false).draw.is_none()); }
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "Input Recording");
+    assert!(q.tick(true, false).draw.is_none());
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "S");
+
+    let mut q = Queue::new();
+    q.upsert(7, "S", Body::copied("standing"), 50, DEFAULT_COLOR);
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "S");
+    q.show_now(9, "Game speed", Body::copied("1/2"), 30, DEFAULT_COLOR);
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "Game speed");
+    q.post_refusal("Input Recording", Body::copied("no"), 2, DEFAULT_COLOR);
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "Input Recording");
+    assert!(q.tick(true, false).draw.is_none());
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "Game speed");
+    for _ in 4..=31 { assert!(q.tick(true, false).draw.is_none()); }
+    assert_eq!(q.tick(true, false).draw.unwrap().header, "S");
+
+    let mut q = Queue::new();
+    for id in 0..CAPACITY as u8 {
+        q.upsert(id, "S", Body::copied("standing"), 5, DEFAULT_COLOR);
+    }
+    let header = q.front_header();
+    q.post_refusal("Input Recording", Body::copied("no"), 2, DEFAULT_COLOR);
+    assert_eq!(q.len(), CAPACITY);
+    assert_eq!(q.front_header(), header);
+    assert_eq!(ALLOCS.with(Cell::get), before);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -252,5 +362,9 @@ fn case_table() {
         ("pane_rules_fixture", pane_rules_fixture as fn()),
         ("missing_accessor_zero", missing_accessor_zero as fn()),
         ("the_standing_api_is_bounded_and_allocation_free", the_standing_api_is_bounded_and_allocation_free as fn()),
+        ("a_refusal_shows_at_once_over_the_guard_wizard_page_and_gives_it_back", a_refusal_shows_at_once_over_the_guard_wizard_page_and_gives_it_back as fn()),
+        ("a_refused_juggler_player_point_shows_over_its_page_once_per_press", a_refused_juggler_player_point_shows_over_its_page_once_per_press as fn()),
+        ("a_refusal_during_a_running_drill_shows_over_the_drill_status", a_refusal_during_a_running_drill_shows_over_the_drill_status as fn()),
+        ("a_refusal_keeps_plain_order_and_passes_every_standing_notice", a_refusal_keeps_plain_order_and_passes_every_standing_notice as fn()),
     ]);
 }

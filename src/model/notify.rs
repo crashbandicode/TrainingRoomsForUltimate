@@ -11,6 +11,7 @@
 //! `upsert` and kept behind every plain notice that has not been drawn, so a plain notice never waits for
 //! it. A standing notice is delivered when its whole visible time has run; its owner takes the id with
 //! `take_delivered` and so tells "seen" from "wiped" (`clear`, session clear).
+//! A standing notice on screen is interrupted only by a refusal (`post_refusal`) or `show_now`, and comes back with the time it had left.
 
 /// Entries the queue holds.
 pub const CAPACITY: usize = 8;
@@ -133,9 +134,9 @@ impl Queue {
         self.entries[0].map(|e| e.header)
     }
 
-    /// The queue slot of the first standing notice that has not been drawn yet (plain notices go ahead of it).
-    fn plain_position(&self) -> usize {
-        (0..self.len).find(|&i| self.entries[i].is_some_and(|e| e.standing.is_some() && !e.drawn)).unwrap_or(self.len)
+    /// The first standing notice a plain notice goes ahead of: one not drawn yet, or also one on screen for a refusal.
+    fn plain_position(&self, on_screen: bool) -> usize {
+        (0..self.len).find(|&i| self.entries[i].is_some_and(|e| e.standing.is_some() && (on_screen || !e.drawn))).unwrap_or(self.len)
     }
 
     /// Make room for one more entry: a full queue drops its oldest waiting plain notice (never the one on
@@ -167,7 +168,7 @@ impl Queue {
         if !self.make_room() {
             return;
         }
-        let at = self.plain_position();
+        let at = self.plain_position(false);
         self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None, required: false });
     }
 
@@ -177,8 +178,23 @@ impl Queue {
         if !self.make_room() {
             return;
         }
-        let at = self.plain_position();
+        let at = self.plain_position(false);
         self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None, required: true });
+    }
+
+    /// A refusal goes in front of a standing notice on screen; that notice returns with its time left.
+    /// A plain notice already ahead of it stays ahead of this one.
+    pub fn post_refusal(&mut self, header: &'static str, body: Body, length: u16, color: [u8; 4]) {
+        if !self.make_room() {
+            return;
+        }
+        let at = self.plain_position(true);
+        if at == 0 {
+            if let Some(first) = self.entries[0].as_mut() {
+                first.drawn = false;
+            }
+        }
+        self.insert(at, Entry { header, body, length: length.max(1), color, drawn: false, standing: None, required: false });
     }
 
     pub fn post_static(&mut self, header: &'static str, body: &'static str, length: u16, color: [u8; 4]) {
