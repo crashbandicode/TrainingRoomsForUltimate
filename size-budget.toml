@@ -2397,3 +2397,11 @@ ceiling = 191838
 date = "2026-11-22"
 reason = "The Recording pop-up's role and the Recording page's view are saved to the card: a top-level recording_roles key of settings.json, read when a menu model is built and written through the existing settings writer as soon as a role changes, because a pop-up session never runs the menu's close commit. A file without the key reads Player for both. Measured normalized implementation 191838, 50 above the item 3 ceiling 191788, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 about 20:30Z, ruling on preview-vis-sol's 20:22:56Z ask: one [[budget]] entry per item commit of rc15/recording-menu-mix, raised to the measured number, under the operator's measured LOC rule, and the roles as a top-level key of settings.json through the existing settings writer, missing reads Player; the operator changed RR3 to keep the roles on the card (HANDOFF-PRIMARY-tr-primary-2.md line 1602); NRO and BSS deltas are reported per item with the gate"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191842
+date = "2026-11-22"
+reason = "The saved pop-up role is adopted at boot (rr_host::adopt_saved_role, called from the menu worker's remember), so the first Record chord after a restart records on the role saved on the card before any menu or pop-up press. Measured normalized implementation 191842, 4 above the item 4 ceiling 191838, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 about 21:41Z: line-count raises are pre-approved under the operator's test flow of 2026-11-22 (artifacts/phase23/TEST-FLOW-2026-11-22.md, point 2), and the fix answers rv-preview-vis's review FAIL of 21:13:19Z; NRO and BSS deltas are reported with READY"

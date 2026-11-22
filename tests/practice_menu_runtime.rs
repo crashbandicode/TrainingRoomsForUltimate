@@ -59,6 +59,17 @@ fn recording_roles_reach_the_card_from_one_place() {
 }
 
 #[test]
+fn the_saved_popup_role_is_adopted_at_boot() {
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "pub fn remember(").contains("rr_host::adopt_saved_role(&settings)"));
+    assert!(item(&src("src/runtime/ui/mod.rs"), "pub fn install(").contains("worker::remember(settings.clone())"));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    for (path, text) in runtime_sources(&root) {
+        assert_eq!(text.matches("adopt_saved_role(").count(), usize::from(path.ends_with("ui/worker.rs")), "{}", path.display());
+    }
+}
+
+#[test]
 fn a_menu_visit_suspends_tech_practice_and_b_resumes_it() {
     let tech = src("src/runtime/features/tech.rs");
     let frame = item(&tech, "pub unsafe fn frame(");

@@ -33,3 +33,7 @@ Older files default to Player. Tests: `an_old_file_without_recording_roles_reads
 `a_role_change_is_saved_without_a_menu_close`, `a_held_model_keeps_its_roles_at_a_menu_opening`,
 `recording_page_role_is_saved_and_restores_its_view`, `popup_and_page_roles_are_saved_separately`,
 `recording_roles_reach_the_card_from_one_place`.
+
+At boot, `worker::remember` adopts the saved pop-up role through `rr_host::adopt_saved_role`, so the first Record chord
+after a restart records on that role without a menu visit. Tests: `a_cold_start_records_on_the_saved_popup_role`,
+`the_saved_popup_role_is_adopted_at_boot`.

@@ -113,6 +113,7 @@ static SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 pub fn remember(settings: Settings) {
     let mut guard = SETTINGS.lock();
     publish_egg_zones(&settings.egg_zones);
+    crate::engine::rr_host::adopt_saved_role(&settings);
     *guard = Some(settings);
 }
 

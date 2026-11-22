@@ -33,6 +33,7 @@ Player and CPU tabs on the top line show the page's view. The ZR cap appears bes
 on a file's screen, picker or keyboard the tabs remain without the cap.
 The page view and pop-up role are remembered separately in `settings.json` across menu closes, leaving Training and
 restarting the game.
+After a restart, Record uses the remembered pop-up role even before you open the menu.
 
 ## Save states & Macros
 
