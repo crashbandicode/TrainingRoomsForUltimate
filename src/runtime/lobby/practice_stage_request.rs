@@ -54,7 +54,6 @@ impl State {
         Self { next: 0, seen: None, queued: None, live: None, settled: None, status: None, last_activation: None }
     }
     fn phase(&mut self, phase: Phase) {
-        if self.live.is_some() && matches!(phase, Phase::Retained(_)) { crate::model::lra_reset::RESET_OWED.stage_retained(); }
         if let Some(mut status) = self.status {
             if status.phase != phase {
                 status.phase = phase;
@@ -76,7 +75,6 @@ impl State {
         }
     }
     fn retire(&mut self) {
-        if self.live.is_some() { crate::model::lra_reset::RESET_OWED.stage_retained(); }
         if let (Some(_), Some((scene, _))) = (self.live, self.seen) {
             // Published but not completed: the departing scene's live stage is unknown.
             crate::runtime::lobby::training_stage_rotation::direct_uncertain(scene.mode, scene.melee);
@@ -317,7 +315,6 @@ pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_ob
                 crate::engine::compat::logging::diagnostic(format_args!(
                     "[PracticeStageRequest] native_complete lease={c:?} state={} active={} pair=({},{}) task=({},0x{:x}) slots={:?} resources={:?}",
                     v.state,v.active,v.incoming,v.outgoing,v.task_state,v.task_fiber,v.slots,v.resources));
-                crate::model::lra_reset::RESET_OWED.stage_completed();
                 state.live=None; state.settled=Some(c); state.phase(Phase::Complete);
                 crate::runtime::lobby::training_stage_rotation::direct_completed(scene.mode, scene.melee, c.target, c.hash);
             }
@@ -369,7 +366,6 @@ pub(crate) unsafe fn update(wrapper:usize,core:usize,mode:u32,melee:u8,active_ob
             // or native call occurs between first write and state publication.
             state.live=Some(commit); state.settled=None; state.last_activation=None;
             publish(commit,descriptor);
-            crate::model::lra_reset::RESET_OWED.stage_published();
             crate::engine::compat::logging::diagnostic(format_args!("[PracticeStageRequest] published lease={commit:?}"));
             state.phase(Phase::NativeOwned);
         }

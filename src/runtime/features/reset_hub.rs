@@ -49,20 +49,18 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
     // This flag currently has no writer; an unowed swap init is stopped by the owed-reset decision.
     let hot_swap = published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire);
     let training = scene::is_native_training();
-    let role_cpu = cpu && training && unsafe {
-        let entry = ((a0 + lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read();
-        crate::model::cpu::role::is_cpu_role(
-            crate::model::cpu::role::Scene::Training,
-            entry,
-            cpu,
-            crate::runtime::roster::character_roster::training_cpu_quantity(),
-        )
-    };
-    // With several CPUs, the first eligible init consumes the owed reset.
-    if lra_reset::RESET_OWED.take(role_cpu, training, hot_swap, lra_reset::GENERATION.load(Ordering::Acquire)) {
+    let entry = if a0 == 0 { -1 } else { unsafe { ((a0 + lra_reset::FIGHTER_ENTRY_ID_FIELD) as *const i32).read() } };
+    let role_cpu = cpu && training && crate::model::cpu::role::is_cpu_role(
+        crate::model::cpu::role::Scene::Training,
+        entry,
+        cpu,
+        crate::runtime::roster::character_roster::training_cpu_quantity(),
+    );
+    // The first eligible init with a passed reset or a newly destroyed entry consumes every cause.
+    if lra_reset::RESET_OWED.take(role_cpu, training, hot_swap, entry) {
         super::btt_camera::interrupt_placement();
         hub::run(Clear::TrainingReset);
-        // L+R+A, Change Stage and a new lifecycle restart the run; a fighter swap alone does not.
+        // A passed reset check or newly destroyed entry restarts the run; a fighter swap alone does not.
         crate::runtime::features::hitbox::eggs_reset();
         crate::runtime::features::mashout::reset();
         crate::runtime::features::btt::reset();

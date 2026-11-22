@@ -5,7 +5,7 @@
 //! when the game resets Training. The upstream HEAD change that runs the hub only outside Training
 //! (`077a8e43`, SPEC-state-06 question 1) is not adopted: the hub runs in native Training only.
 
-use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 
 /// What the inline hook inside the game's reset check does to register `x8`: when the setting is
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
@@ -176,47 +176,30 @@ pub const fn hub_should_run(cpu_operated: bool, native_training: bool, hot_swap_
     cpu_operated && native_training && !hot_swap_in_progress
 }
 
-const STAGE_IDLE: u8 = 0;
-const STAGE_LIVE: u8 = 1;
-const STAGE_HUB_RAN: u8 = 2;
+/// Bits 0..=7 mark entries destroyed since the last hub run; bit 8 marks a passed reset check.
+/// A transform or TR hot swap destroys no entry. Primary rulings 2026-11-22 05:47Z, 06:01:34Z and 06:57:13Z.
+/// Change Stage runs the hub only if the CPU entry is destroyed or its reset check passes there (not measured).
+/// A passed check with no subsequent CPU init is spent by the next CPU-role init (not measured).
+pub struct ResetOwed(AtomicU32);
 
-pub struct ResetOwed {
-    flag: AtomicBool,
-    generation: AtomicU32,
-    stage: AtomicU8,
-}
+/// The game's reset check let a reset through.
+const RESET_PASSED: u32 = 1 << 8;
 
 impl ResetOwed {
-    pub const fn new() -> Self {
-        Self { flag: AtomicBool::new(false), generation: AtomicU32::new(u32::MAX), stage: AtomicU8::new(STAGE_IDLE) }
-    }
+    /// Every entry counts as new at boot, so the first CPU init of the process runs the hub as before.
+    pub const fn new() -> Self { Self(AtomicU32::new(0xff)) }
 
-    pub fn owe(&self) {
-        self.flag.store(true, Ordering::Release);
-    }
+    /// Record a passed reset check.
+    pub fn owe(&self) { self.0.fetch_or(RESET_PASSED, Ordering::AcqRel); }
 
-    pub fn stage_published(&self) {
-        self.stage.store(STAGE_LIVE, Ordering::Release);
-    }
+    /// Record the destruction of a native entry in the supported range.
+    pub fn entry_destroyed(&self, entry: u32) { if entry < 8 { self.0.fetch_or(1 << entry, Ordering::AcqRel); } }
 
-    pub fn stage_completed(&self) {
-        if self.stage.swap(STAGE_IDLE, Ordering::AcqRel) == STAGE_LIVE {
-            self.owe();
-        }
-    }
-
-    pub fn stage_retained(&self) {
-        self.stage.store(STAGE_IDLE, Ordering::Release);
-    }
-
-    pub fn take(&self, cpu_role: bool, native_training: bool, hot_swap_in_progress: bool, lifecycle_generation: u32) -> bool {
-        if !hub_should_run(cpu_role, native_training, hot_swap_in_progress) {
-            return false;
-        }
-        let requested = self.flag.swap(false, Ordering::AcqRel);
-        let changed = self.generation.swap(lifecycle_generation, Ordering::AcqRel) != lifecycle_generation;
-        let stage = self.stage.compare_exchange(STAGE_LIVE, STAGE_HUB_RAN, Ordering::AcqRel, Ordering::Acquire).is_ok();
-        requested | changed | stage
+    /// One atomic transition: a passed check or this entry's destruction owes the hub; consuming it clears all causes.
+    pub fn take(&self, cpu_role: bool, native_training: bool, hot_swap_in_progress: bool, entry: i32) -> bool {
+        if !hub_should_run(cpu_role, native_training, hot_swap_in_progress) || !(0..8).contains(&entry) { return false; }
+        let mask = RESET_PASSED | (1 << entry);
+        self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire, |word| (word & mask != 0).then_some(0)).is_ok()
     }
 }
 
@@ -226,8 +209,10 @@ impl Default for ResetOwed {
     }
 }
 
+/// Shared reset and entry-destruction causes, consumed by an eligible CPU init.
 pub static RESET_OWED: ResetOwed = ResetOwed::new();
 
+/// Whether the reset-check hook let the game's reset through.
 pub const fn reset_passes(x8_after: u64, native_training: bool) -> bool {
     native_training && x8_after == RESET_REQUESTED
 }

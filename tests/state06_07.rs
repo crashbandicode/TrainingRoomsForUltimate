@@ -262,40 +262,34 @@ fn reset_hub_runs_the_game_resets_only_for_an_owed_reset() {
     assert_eq!(reset.matches("RESET_OWED.owe()").count(), 1);
     let guarded = reset.split_once("if lra_reset::reset_passes(").expect("reset-pass gate").1;
     assert!(guarded.split_once('}').unwrap().0.contains("RESET_OWED.owe()"));
-    let stage = include_str!("../src/runtime/lobby/practice_stage_request.rs");
-    assert_eq!(stage.matches("RESET_OWED.stage_published()").count(), 1);
-    assert_eq!(stage.matches("RESET_OWED.stage_completed()").count(), 1);
-    assert_eq!(stage.matches("RESET_OWED.stage_retained()").count(), 2);
-    assert!(!stage.contains("RESET_OWED.owe()"));
-    let queue = stage.split_once("fn queue(").unwrap().1.split_once("\n}").unwrap().0;
-    assert!(!queue.contains("RESET_OWED"));
-    let publish = stage.split_once("publish(commit,descriptor);").unwrap().1;
-    assert!(publish.trim_start().starts_with("crate::model::lra_reset::RESET_OWED.stage_published();"));
-    let retire = stage.split_once("fn retire(&mut self)").unwrap().1.split_once("\n    }").unwrap().0;
-    assert!(retire.contains("self.live.is_some()") && retire.contains("RESET_OWED.stage_retained()"));
-    let phase = stage.split_once("fn phase(&mut self, phase: Phase)").unwrap().1.split_once("\n    }").unwrap().0;
-    assert!(phase.contains("self.live.is_some() && matches!(phase, Phase::Retained(_))"));
-    let complete = stage.split_once("if policy::complete(v,c) => {").unwrap().1.split_once("\n            }").unwrap().0;
-    assert!(complete.find("RESET_OWED.stage_completed()").unwrap() < complete.find("state.live=None").unwrap());
+    let roster = include_str!("../src/runtime/roster/character_roster.rs");
+    let destroy = roster.split_once("pub unsafe fn on_destroy(").unwrap().1.split_once("\n}").unwrap().0;
+    assert!(destroy.contains("let owner = read::<u32>(entry, 0xe0);\n    crate::model::lra_reset::RESET_OWED.entry_destroyed(owner);"));
+    assert!(destroy.find("RESET_OWED.entry_destroyed(").unwrap() < destroy.find(".lock()").unwrap());
 
-    fn check_setters(path: &std::path::Path, setters: &mut Vec<std::path::PathBuf>) {
+    fn check_setters(path: &std::path::Path, pattern: &str, setters: &mut Vec<std::path::PathBuf>) {
         for entry in std::fs::read_dir(path).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
             if entry.file_type().unwrap().is_dir() {
-                check_setters(&path, setters);
+                check_setters(&path, pattern, setters);
             } else if path.extension().is_some_and(|ext| ext == "rs") {
                 let source = std::fs::read_to_string(&path).unwrap();
-                for _ in source.match_indices("RESET_OWED.owe()") {
+                for _ in source.match_indices(pattern) {
                     setters.push(path.clone());
                 }
             }
         }
     }
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut setters = Vec::new();
-    check_setters(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut setters);
+    check_setters(&src, "RESET_OWED.owe()", &mut setters);
     assert_eq!(setters.len(), 1);
     assert!(setters[0].ends_with("src/runtime/features/lra_reset.rs"));
+    setters.clear();
+    check_setters(&src, "RESET_OWED.entry_destroyed(", &mut setters);
+    assert_eq!(setters.len(), 1);
+    assert!(setters[0].ends_with("src/runtime/roster/character_roster.rs"));
 }
 
 #[test]
@@ -311,7 +305,7 @@ fn mashout_attempt_survives_a_cpu_transform_init() {
 
 fn settled_owed() -> lra_reset::ResetOwed {
     let owed = lra_reset::ResetOwed::new();
-    assert!(owed.take(true, true, false, 7));
+    assert!(owed.take(true, true, false, 1));
     owed
 }
 
@@ -336,6 +330,7 @@ fn state06_one_owed_reset_runs_the_hub_once_for_several_cpus() {
     assert!(owed.take(true, true, false, 1));
     assert!(!owed.take(true, true, false, 2));
     assert!(!owed.take(true, true, false, 3));
+    for entry in 1..=3 { owed.entry_destroyed(entry); }
     owed.owe();
     assert!(owed.take(true, true, false, 1));
     assert!(!owed.take(true, true, false, 2));
@@ -351,17 +346,21 @@ fn state06_a_stage_request_alone_owes_nothing() {
 #[test]
 fn state06_hub_needs_an_owed_reset() {
     let owed = lra_reset::ResetOwed::new();
-    assert!(!owed.take(false, true, false, 7));
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(false, true, false, 0));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
     assert!(lra_reset::hub_should_run(true, true, false));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(true, true, false, 1));
     owed.owe();
-    assert!(!owed.take(true, true, true, 7));
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-    assert!(owed.take(true, true, false, 8));
-    assert!(!owed.take(true, true, false, 8));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    owed.entry_destroyed(1);
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    owed.entry_destroyed(2);
+    assert!(!owed.take(true, true, false, 1));
+    assert!(owed.take(true, true, false, 2));
+    assert!(!owed.take(true, true, false, 2));
     assert!(lra_reset::reset_passes(2, true));
     assert!(!lra_reset::reset_passes(2, false));
     assert!(!lra_reset::reset_passes(0, true));
@@ -371,20 +370,25 @@ fn state06_hub_needs_an_owed_reset() {
 fn state06_unrelated_inits_do_not_spend_an_owed_reset() {
     let owed = settled_owed();
     owed.owe();
-    assert!(!owed.take(false, true, false, 7));
-    assert!(!owed.take(true, false, false, 7));
-    assert!(!owed.take(true, true, true, 7));
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(false, true, false, 0));
+    assert!(!owed.take(true, false, false, 1));
+    assert!(!owed.take(true, true, true, 1));
+    assert!(!owed.take(true, true, false, -1));
+    assert!(!owed.take(true, true, false, 8));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    owed.entry_destroyed(8);
+    assert!(!owed.take(true, true, false, 1));
 }
 
 #[test]
 fn state06_a_reset_owed_outside_native_training_is_absorbed_by_the_next_scene() {
     let owed = settled_owed();
     owed.owe();
-    assert!(!owed.take(true, false, false, 7));
-    assert!(owed.take(true, true, false, 8));
-    assert!(!owed.take(true, true, false, 8));
+    assert!(!owed.take(true, false, false, 1));
+    owed.entry_destroyed(1);
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
 }
 
 #[test]
@@ -395,12 +399,12 @@ fn state06_owed_follows_the_reset_check_through_a_deferral() {
     let step = lra_reset::defer_step(&mut pending, press);
     assert_eq!(step.write, Some(0));
     assert!(!lra_reset::reset_passes(step.write.unwrap_or(press.x8), press.native_training));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(true, true, false, 1));
     let cancel = lra_reset::Facts { menu_open: true, ..at(0, false, 10, 7) };
     let step = lra_reset::defer_step(&mut pending, cancel);
     assert_eq!(step.cancelled, Some(lra_reset::Cancel::MenuOpened));
     assert!(!lra_reset::reset_passes(step.write.unwrap_or(cancel.x8), cancel.native_training));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(true, true, false, 1));
 
     lra_reset::defer_step(&mut pending, press);
     let settled = at(0, false, 10, 7);
@@ -410,53 +414,46 @@ fn state06_owed_follows_the_reset_check_through_a_deferral() {
     if lra_reset::reset_passes(step.write.unwrap_or(settled.x8), settled.native_training) {
         owed.owe();
     }
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
 
     let off = lra_reset::Facts { lra_reset_on: false, ..press };
     let step = lra_reset::defer_step(&mut pending, off);
     assert_eq!(step.write, Some(0));
     assert!(!lra_reset::reset_passes(step.write.unwrap_or(off.x8), off.native_training));
-    assert!(!owed.take(true, true, false, 7));
+    assert!(!owed.take(true, true, false, 1));
 }
 
 #[test]
-fn state06_change_stage_owes_one_reset_only_when_it_runs() {
-    let owed = settled_owed();
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_published();
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_completed();
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_published();
-    owed.stage_completed();
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_published();
-    owed.stage_retained();
-    assert!(!owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_published();
-    assert!(!owed.take(false, true, false, 7));
-    assert!(!owed.take(true, true, true, 7));
-    owed.stage_completed();
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-}
-
-#[test]
-fn lra_and_change_stage_still_run_the_hub_once() {
+fn lra_and_a_new_scene_still_run_the_hub_once() {
     let owed = settled_owed();
     if lra_reset::reset_passes(lra_reset::RESET_REQUESTED, true) {
         owed.owe();
     }
-    assert!(owed.take(true, true, false, 7));
-    assert!(!owed.take(true, true, false, 7));
-    owed.stage_published();
-    assert!(owed.take(true, true, false, 7));
-    owed.stage_completed();
-    assert!(!owed.take(true, true, false, 7));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    owed.entry_destroyed(1);
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+}
+
+#[test]
+fn gte_restart_request_follows_the_owed_reset() {
+    let owed = lra_reset::ResetOwed::new();
+    assert!(!owed.take(false, true, false, 0));
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    // f8h-pyra-1: the drill starts before the incoming Mythra init on the same entry.
+    assert!(!owed.take(true, true, false, 1));
+    owed.owe();
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    owed.entry_destroyed(1);
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 1));
+    let hub = include_str!("../src/runtime/features/reset_hub.rs");
+    assert_eq!(hub.matches("edge_juggle::restart()").count(), 1);
+    assert!(owed_reset_block(hub).contains("edge_juggle::restart()"));
 }
 
 #[test]
@@ -484,7 +481,7 @@ fn eggs_run_and_streak_survive_a_cpu_transform_init() {
     let mut before = String::new();
     run.write_notice(&mut before).unwrap();
     assert!(!before.ends_with("1:00"));
-    if owed.take(true, true, false, 7) {
+    if owed.take(true, true, false, 1) {
         run.reset(11);
         streak.restart(true);
     }
@@ -493,7 +490,7 @@ fn eggs_run_and_streak_survive_a_cpu_transform_init() {
     assert_eq!(after, before);
     assert_eq!((run.score, streak.counts()), (1, (1, 1)));
     owed.owe();
-    if owed.take(true, true, false, 7) {
+    if owed.take(true, true, false, 1) {
         run.reset(11);
         streak.restart(true);
     }
@@ -521,13 +518,13 @@ fn btt_running_run_survives_a_cpu_transform_init() {
     for _ in 0..30 { btt.pass_indexed(true, |_, _| false); }
     let mut before = String::new();
     btt.write_notice(&mut before).unwrap();
-    if owed.take(true, true, false, 7) { btt.reset(); }
+    if owed.take(true, true, false, 1) { btt.reset(); }
     let mut after = String::new();
     btt.write_notice(&mut after).unwrap();
     assert_eq!((btt.phase(), after), (Phase::Running, before));
     assert_eq!(btt.pass_indexed(false, |i, _| i == 0), 0);
     owed.owe();
-    if owed.take(true, true, false, 7) { btt.reset(); }
+    if owed.take(true, true, false, 1) { btt.reset(); }
     assert_eq!(btt.phase(), Phase::Ready);
     btt.feed(Pad { pressed: 1, ..Pad::default() });
     assert_eq!(btt.pass_indexed(false, |i, _| i == 0), 1);
@@ -543,13 +540,13 @@ fn tech_attempt_and_wizard_survive_a_cpu_transform_init() {
     controller.session.summary.record(Grade::Perfect(Some(1)));
     controller.session.elapsed = 42;
     controller.session.phase = Phase::Flight;
-    if owed.take(true, true, false, 7) {
+    if owed.take(true, true, false, 1) {
         controller.start(controller.session.length);
     }
     assert_eq!((controller.session.phase, controller.session.summary.attempts, controller.session.summary.streak, controller.session.elapsed),
         (Phase::Flight, 1, 1, 42));
     owed.owe();
-    if owed.take(true, true, false, 7) {
+    if owed.take(true, true, false, 1) {
         controller.start(controller.session.length);
     }
     assert_eq!((controller.session.phase, controller.session.length, controller.session.summary.attempts, controller.session.summary.streak, controller.session.elapsed),
@@ -569,10 +566,10 @@ fn parry_reset_does_not_run_on_a_cpu_transform_init() {
     // This proves only that parry::reset() does not run on a transform init. An open Parry attempt is still dropped
     // through the frame-strip clear (reset_hub.rs, input_display::fighter_initialised()), which runs on every fighter
     // init. Today's behaviour stays (primary ruling 2026-11-22 option (a)); gating that clear is queued for the operator.
-    if owed.take(true, true, false, 7) { detector = Detector::new(); }
+    if owed.take(true, true, false, 1) { detector = Detector::new(); }
     assert_eq!(detector, before);
     owed.owe();
-    if owed.take(true, true, false, 7) { detector = Detector::new(); }
+    if owed.take(true, true, false, 1) { detector = Detector::new(); }
     assert!(!detector.busy());
 }
 
@@ -583,10 +580,10 @@ fn recording_survives_a_cpu_transform_init() {
     let mut recorder = Recorder::new();
     recorder.start_named_playback(20, 1, 0, 1).unwrap();
     assert_eq!(recorder.mode(), Mode::Playback);
-    if owed.take(true, true, false, 7) { recorder.stop(); }
+    if owed.take(true, true, false, 1) { recorder.stop(); }
     assert_eq!(recorder.mode(), Mode::Playback);
     owed.owe();
-    if owed.take(true, true, false, 7) { recorder.stop(); }
+    if owed.take(true, true, false, 1) { recorder.stop(); }
     assert_eq!(recorder.mode(), Mode::None);
     let hub = include_str!("../src/runtime/hub.rs");
     assert!(hub.contains("recorder::on_reset(cause)"));

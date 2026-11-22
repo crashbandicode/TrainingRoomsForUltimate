@@ -42,7 +42,7 @@ pub unsafe fn reset_check(ctx: &mut InlineCtx) {
     });
     let step = lra_reset::defer_step(&mut pending, facts);
     let after = step.write.unwrap_or(facts.x8);
-    // Active waiting-room practice also passes this scene predicate; its owed flag is absorbed at the next Training scene's first CPU init.
+    // Active waiting-room practice also passes this predicate; its owed flag waits for an eligible native Training CPU init.
     if lra_reset::reset_passes(after, facts.native_training) {
         lra_reset::RESET_OWED.owe();
     }

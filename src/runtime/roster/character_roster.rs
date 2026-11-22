@@ -1559,6 +1559,7 @@ pub unsafe fn on_destroy(entry: *const u8) {
         return;
     }
     let owner = read::<u32>(entry, 0xe0);
+    crate::model::lra_reset::RESET_OWED.entry_destroyed(owner);
     // R3-1: revoke both body registrations before body-bank/nested destruction.
     training::practice::entry_departed(entry as usize, owner);
     body_bank::on_destroy(entry);
