@@ -21,8 +21,8 @@ use crate::model::edge_juggle::perfect::{
     PlanHeight, PlanInput, Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::{
-    Difficulty, Drill, Observation, Outcome, Phase, Placement, PlacementAction, PlacementFrame,
-    Reaction, Session, Setup, Stage, Wizard, WizardStep,
+    CpuObject, Difficulty, Drill, Observation, Outcome, Phase, Placement, PlacementAction,
+    PlacementFrame, Reaction, Session, Setup, Stage, Wizard, WizardStep,
 };
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
@@ -1899,6 +1899,16 @@ pub unsafe fn frame(fighter: usize) {
     let Some(kind) = natives::fighter_kind(cpu) else {
         return;
     };
+    if CpuObject::sighted(run.body == body, kind, natives::status_kind(cpu)) == CpuObject::Arriving {
+        // The swap makes the replacement active before its first status. It is not adopted,
+        // restarted on or placed. A live measured swap keeps its clock, as for the empty slot.
+        if run.rounds.phase == Phase::Live
+            && run.niche.as_ref().is_some_and(|guide| guide.waiting_for_form(run.rounds.frames))
+        {
+            run.rounds.advance_attempt(Observation::default());
+        }
+        return;
+    }
     let measured_swap = run.rounds.phase == Phase::Live
         && kind == perfect::pyra::MYTHRA
         && game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)

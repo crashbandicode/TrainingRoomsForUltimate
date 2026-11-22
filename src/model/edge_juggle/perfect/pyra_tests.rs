@@ -1,5 +1,6 @@
 use super::*;
 use crate::model::edge_juggle::perfect::{niche::pad, Segment, JUMP, SPECIAL};
+use crate::model::edge_juggle::{CpuObject, Drill, Observation, Phase, Placement, PlacementAction, PlacementFrame, Session};
 
 const NEAR: Point = [-79.986, 0.0];
 const FAR: Point = [79.989, 0.0];
@@ -42,6 +43,70 @@ fn facts(stage: (i32, u32), beat: Beat) -> RouteFacts<'static> {
 
 fn tick(frame: u32, fighter: i32, status: i32) -> Beat {
     Beat { frame: LOW.frame + frame, fighter, status, ..LOW }
+}
+
+#[test]
+fn a_replacement_without_a_status_is_not_restarted_on_or_placed() {
+    // Native code cannot run on the host. On 133979fc (f13-pyrasched-1, seq 19007-19012) the
+    // changed-body restart ran on the swap's replacement and the refill requested Wait of it.
+    let runtime = include_str!("../../../runtime/features/edge_juggle.rs");
+    let (_, frame) = runtime.split_once("pub unsafe fn frame(fighter: usize)").unwrap();
+    let (_, read) = frame.split_once("let Some(kind) = natives::fighter_kind(cpu)").unwrap();
+    let (arrival, later) = read.split_once("let measured_swap").unwrap();
+    assert!(arrival.contains("== CpuObject::Arriving"));
+    assert!(arrival.contains("run.rounds.advance_attempt(Observation::default())"));
+    assert_eq!(arrival.matches("return;").count(), 2, "the absent kind and the arriving object both leave");
+    for native in ["restart_drill", "state::", "reset_recovery_resources", "run.body = body", "run.placement"] {
+        assert!(!arrival.contains(native), "{native}");
+    }
+    assert!(later.contains("run.rounds.restart_drill()"), "a replacement with a kind and a status still restarts");
+}
+
+#[test]
+fn the_swap_replacement_arrives_before_its_kind_and_status() {
+    // Seq 19000-19001 and 19007-19010 show the owned Pyra and the unresolved replacement.
+    assert_eq!(CpuObject::sighted(true, PYRA, SWAP_START), CpuObject::Owned);
+    assert_eq!(CpuObject::sighted(false, -1, -1), CpuObject::Arriving);
+    assert_eq!(CpuObject::sighted(false, MYTHRA, -1), CpuObject::Arriving);
+    assert_eq!(CpuObject::sighted(false, -1, SWAP_END), CpuObject::Arriving);
+    assert_eq!(CpuObject::sighted(false, MYTHRA, SWAP_END), CpuObject::Replaced);
+    assert_eq!(CpuObject::sighted(false, 0, 0), CpuObject::Replaced);
+    assert_eq!(CpuObject::sighted(true, -1, -1), CpuObject::Owned);
+}
+
+#[test]
+fn row_38_keeps_its_attempt_across_the_arrival_frame() {
+    // Seq 19000-19012 show the live swap and the restart on the unresolved replacement.
+    let mut flight = SwapReturn::start(&facts((3, 0), LOW), LOW).unwrap();
+    assert_eq!(flight.step(LOW), Some(pad([1.0, 0.0], JUMP)));
+    assert_eq!(flight.step(tick(1, PYRA, JUMP_AERIAL)), Some(pad([1.0, 0.0], JUMP)));
+    assert_eq!(flight.step(tick(40, PYRA, JUMP_AERIAL)), Some(pad([1.0, 0.0], 0)));
+    assert_eq!(flight.step(tick(41, PYRA, JUMP_AERIAL)), Some(pad([0.0, -0.6], SPECIAL)));
+    assert!(!flight.waiting_for_mythra(LOW.frame + 42));
+    assert_eq!(flight.step(tick(42, PYRA, SWAP_START)), Some(pad([0.0, -0.6], SPECIAL)));
+    assert_eq!(flight.step(tick(52, PYRA, SWAP_START)), Some(pad([1.0, 0.0], 0)));
+
+    let mut session = Session::new(Drill::GuardEdge, None);
+    session.placed();
+    for _ in 0..Drill::GuardEdge.ready_frames() {
+        session.advance_attempt(Observation::default());
+    }
+    assert_eq!(session.phase, Phase::Live);
+    while session.frames < LOW.frame + 52 {
+        session.advance_attempt(Observation::default());
+    }
+    let mut restarted = session;
+    assert_eq!(CpuObject::sighted(false, -1, -1), CpuObject::Arriving);
+    assert!(flight.waiting_for_mythra(session.frames));
+    let before = session.frames;
+    session.advance_attempt(Observation::default());
+    assert_eq!(session.phase, Phase::Live);
+    assert_eq!(session.frames, before + 1);
+    assert!(flight.follow(session.frames, MYTHRA, SWAP_END));
+
+    restarted.restart_drill();
+    assert_eq!(restarted.phase, Phase::Place);
+    assert_eq!(Placement::ResetResources.action(PlacementFrame::default()), PlacementAction::ResetResources);
 }
 
 #[test]

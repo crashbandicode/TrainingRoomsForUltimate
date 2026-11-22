@@ -265,6 +265,34 @@ impl Phase {
     }
 }
 
+/// The game's answer for an object that has no kind, or no status, yet.
+pub const NO_NATIVE_VALUE: i32 = -1;
+
+/// Entry 1's object as a run meets it on one frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CpuObject {
+    /// The object the run owns.
+    Owned,
+    /// A replacement the game made active before giving it a kind and a first status (the
+    /// Aegis swap). A status request ends the current status and it has none, so nothing
+    /// may be requested of it, and it is not a new CPU yet.
+    Arriving,
+    /// A replacement with a kind and a status.
+    Replaced,
+}
+
+impl CpuObject {
+    pub fn sighted(owned: bool, kind: i32, status: i32) -> Self {
+        if owned {
+            Self::Owned
+        } else if kind == NO_NATIVE_VALUE || status == NO_NATIVE_VALUE {
+            Self::Arriving
+        } else {
+            Self::Replaced
+        }
+    }
+}
+
 /// Placement has a native grounded resource reset before the airborne start.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Placement {
