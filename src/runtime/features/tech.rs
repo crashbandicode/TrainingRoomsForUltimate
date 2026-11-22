@@ -19,13 +19,14 @@ use crate::model::tech::{
     planner,
     session::{Bests, Length, Phase},
     solver,
-    surface::{Kind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
+    surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
     Vec2,
 };
 use crate::model::tech_launch::{DecisionSnapshot, FlightParams, Launcher};
 use crate::model::practice_games::{self, Game};
 use crate::model::tech_settings::{self, Config};
+use crate::model::wizard::Kind;
 use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
 use hos_lock::{Mailbox, Mutex, Published};
@@ -40,10 +41,8 @@ static START: AtomicBool = AtomicBool::new(false);
 static EDIT: AtomicBool = AtomicBool::new(false);
 static RESET: AtomicBool = AtomicBool::new(false);
 static RUNNING: AtomicBool = AtomicBool::new(false);
-static PLACING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static WIZARD_REQUEST: AtomicBool = AtomicBool::new(false);
-static WIZARD_ACTIVE: AtomicBool = AtomicBool::new(false);
 static WIZARD_SKIP: AtomicBool = AtomicBool::new(false);
 static BACK_MENU: AtomicBool = AtomicBool::new(false);
 static HITLAG: OnceLock<HitlagResolver> = OnceLock::new();
@@ -122,13 +121,13 @@ pub fn publish(snapshot: &Snapshot) {
 }
 pub fn open_wizard() {
     WIZARD_REQUEST.store(true, Ordering::Release);
-    WIZARD_ACTIVE.store(true, Ordering::Release);
+    published::WIZARDS.set_up(Kind::TechWizard, true);
     // Publish the complete request even if the game consumed menu_closed's
     // earlier restart between the worker's two calls.
     START.store(true, Ordering::Release);
 }
 pub fn wizard_active() -> bool {
-    WIZARD_ACTIVE.load(Ordering::Acquire)
+    published::WIZARDS.is_up(Kind::TechWizard)
 }
 pub fn take_menu_request() -> bool {
     BACK_MENU.swap(false, Ordering::AcqRel)
@@ -140,8 +139,8 @@ fn release_camera_requests() {
 pub fn menu_opened() {
     release_camera_requests();
     GUARD_PRESS.store(false, Ordering::Release);
-    PLACING.store(false, Ordering::Release);
-    WIZARD_ACTIVE.store(false, Ordering::Release);
+    published::WIZARDS.set_up(Kind::TechPlacing, false);
+    published::WIZARDS.set_up(Kind::TechWizard, false);
     OPEN.store(true, Ordering::Release);
     notices::clear(NOTICE);
 }
@@ -165,7 +164,7 @@ pub fn running() -> bool {
     RUNNING.load(Ordering::Acquire)
 }
 pub fn placing() -> bool {
-    PLACING.load(Ordering::Acquire)
+    published::WIZARDS.is_up(Kind::TechPlacing)
 }
 /// Native decision seam posts the exact attempt-tagged snapshot, before status
 /// mutation. ContactReceipt alone deliberately cannot synthesize this snapshot.
@@ -185,11 +184,11 @@ pub fn guard_press() {
         GUARD_PRESS.store(true, Ordering::Release);
     }
 }
-fn kind(config: Config) -> Option<Kind> {
+fn kind(config: Config) -> Option<SurfaceKind> {
     match config.surface {
-        1 => Some(Kind::Floor),
-        2 => Some(Kind::Wall),
-        3 => Some(Kind::Ceiling),
+        1 => Some(SurfaceKind::Floor),
+        2 => Some(SurfaceKind::Wall),
+        3 => Some(SurfaceKind::Ceiling),
         _ => None,
     }
 }
@@ -284,11 +283,11 @@ fn wizard_poll(view: &mut ViewState, sample: Sample, stick: [f32; 2], range: [f3
             view.wizard_config = wizard.config();
             view.picker.selected = wizard.selected;
             view.start = true;
-            WIZARD_ACTIVE.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechWizard, false);
         }
         Some(WizardOutcome::Cancelled) => {
             view.cancelled = true;
-            WIZARD_ACTIVE.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechWizard, false);
             BACK_MENU.store(true, Ordering::Release);
         }
         _ => {}
@@ -554,8 +553,8 @@ pub unsafe fn frame(fighter: usize) {
             }
         });
         RUNNING.store(false, Ordering::Release);
-        PLACING.store(false, Ordering::Release);
-        WIZARD_ACTIVE.store(false, Ordering::Release);
+        published::WIZARDS.set_up(Kind::TechPlacing, false);
+        published::WIZARDS.set_up(Kind::TechWizard, false);
         notices::clear(NOTICE);
         drop(view);
         release_camera_requests();
@@ -596,7 +595,7 @@ pub unsafe fn frame(fighter: usize) {
             }
             *slot = None;
             RUNNING.store(false, Ordering::Release);
-            PLACING.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechPlacing, false);
             return;
         }
         if slot.is_none() {
@@ -691,7 +690,7 @@ pub unsafe fn frame(fighter: usize) {
                 view.wizard = None;
                 view.wizard_config = None;
                 view.cancelled = true;
-                WIZARD_ACTIVE.store(false, Ordering::Release);
+                published::WIZARDS.set_up(Kind::TechWizard, false);
                 BACK_MENU.store(true, Ordering::Release);
             }
             // A native Training reset can rebuild collision without changing
@@ -716,7 +715,7 @@ pub unsafe fn frame(fighter: usize) {
             run.decision = None;
             run.pending = false;
             run.planning_failed = false;
-            PLACING.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechPlacing, false);
             run.scan = None;
             run.scan_done = false;
             run.bootstrap = None;
@@ -738,7 +737,7 @@ pub unsafe fn frame(fighter: usize) {
             if run.controller.session.phase != Phase::Off {
                 run.controller.stop(&mut run.adapter);
             }
-            PLACING.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechPlacing, false);
             return;
         }
         if let Some(message) = run.recovery_error {
@@ -859,12 +858,10 @@ pub unsafe fn frame(fighter: usize) {
             run.reroll = true;
             run.sampled = None;
             run.planning_failed = false;
-            PLACING.store(
-                EDIT.swap(false, Ordering::AcqRel)
-                    || wizard_active()
-                    || config.surface == 4 && view.picker.selected.is_none(),
-                Ordering::Release,
-            );
+            let placing = EDIT.swap(false, Ordering::AcqRel)
+                || wizard_active()
+                || config.surface == 4 && view.picker.selected.is_none();
+            published::WIZARDS.set_up(Kind::TechPlacing, placing);
         }
         if placing() {
             if !view.start {
@@ -906,7 +903,7 @@ pub unsafe fn frame(fighter: usize) {
             if let Some(draft) = view.wizard_config {
                 run.config = draft;
             }
-            PLACING.store(false, Ordering::Release);
+            published::WIZARDS.set_up(Kind::TechPlacing, false);
         }
         let Ok(attempt) = run.adapter.attempt() else {
             return;

@@ -19,6 +19,7 @@ use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::Game;
 use crate::model::settings::Snapshot;
 use crate::model::storage::ROOT;
+use crate::model::wizard::Kind;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{btt_camera, notices};
 use crate::runtime::game::natives;
@@ -135,6 +136,12 @@ pub fn placing() -> bool {
     PHASE.load(Ordering::Acquire) == Phase::Placing as u8
 }
 
+/// Publish the phase and placing bit while the BTT lock is held.
+fn set_phase(phase: Phase) {
+    PHASE.store(phase as u8, Ordering::Release);
+    published::WIZARDS.set_up(Kind::BttPlacing, phase == Phase::Placing);
+}
+
 /// A practice game is running (Placing, Ready, Running or Done): Hide CPU's rule reads it beside `eggs_running()` (V2.6).
 pub fn running() -> bool {
     PHASE.load(Ordering::Acquire) != Phase::Off as u8
@@ -164,7 +171,7 @@ pub unsafe fn poll(controller: usize, sample: Sample, keys: Option<(bool, bool)>
     let (save, load) = keys.unwrap_or_default();
     let mut mode = BTT.lock();
     let hide = mode.feed(Pad { stick, held: sample.held, pressed: sample.pressed, save, load });
-    PHASE.store(mode.phase() as u8, Ordering::Release);
+    set_phase(mode.phase());
     hide
 }
 
@@ -274,7 +281,7 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
         }
     }
     let phase = mode.phase();
-    PHASE.store(phase as u8, Ordering::Release);
+    set_phase(phase);
     if let Some(text) = mode.notice() {
         HUD.publish(text);
         // For the Eden rows: a line per change, and while Running (its clock changes every frame) every tenth, or on a break.

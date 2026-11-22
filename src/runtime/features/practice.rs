@@ -60,6 +60,7 @@ pub fn start(game: Game, how: How) {
 /// Stop the running game (the menu worker, Stop with the menu open).
 pub fn stop() {
     let was = Game::from_code(ACTIVE.swap(0, Ordering::AcqRel));
+    super::edge_juggle::stopped();
     super::parry::stopped();
     diagnostic(format_args!("[Practice] stop game={was:?}"));
 }

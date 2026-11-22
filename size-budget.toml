@@ -2373,3 +2373,11 @@ ceiling = 191684
 date = "2026-11-22"
 reason = "An open Recording pop-up owns the frame as it owns the presses: frame_of draws the pop-up and no kept sub-screen, and takes_jumps is true while it is open, so the pop-up chord over a kept game or list screen no longer draws that screen's breadcrumb and rows on the pop-up's panel. Measured normalized implementation 191684, 5 above the integration ceiling 191679, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 about 20:30Z, ruling on preview-vis-sol's 20:22:56Z ask: one [[budget]] entry per item commit of rc15/recording-menu-mix, raised to the measured number (item 1: 191684, +5), under the operator's measured LOC rule; NRO and BSS deltas are reported per item with the gate"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191756
+date = "2026-11-22"
+reason = "One shared wizard-active state (model::wizard::Active, one atomic byte, runtime::published::WIZARDS): the Guard the Edge and Juggler start wizard, the Eggs-ercise zone editor, the Stage tech wizard and its placement, and Break the Targets placement report their entry and every exit through set_up, and the HUD draw hides the input strip, its combo card and the helper bar while any wizard is up. The shared byte replaces the three private wizard flags of tech.rs and edge_juggle.rs. Measured normalized implementation 191756, 72 above the item 1 ceiling 191684, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 about 20:30Z, ruling on preview-vis-sol's 20:22:56Z ask: one [[budget]] entry per item commit of rc15/recording-menu-mix, raised to the measured number, under the operator's measured LOC rule; the shared state was ordered at 18:37Z and 18:40Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1554 and 1558); NRO and BSS deltas are reported per item with the gate"

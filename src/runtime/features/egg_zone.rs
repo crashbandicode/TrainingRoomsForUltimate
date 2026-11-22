@@ -13,6 +13,7 @@ use crate::model::eggs::View;
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::storage::FixedPath;
+use crate::model::wizard::Kind;
 use crate::runtime::{game::natives, published, scene, ui::worker};
 
 use super::{edge_juggle, mashout::FloorRay, notices, states, tech_surfaces};
@@ -54,6 +55,7 @@ pub fn take_menu_request() -> bool {
 
 fn close() {
     if LIVE.swap(0, Ordering::AcqRel) != 0 {
+        published::WIZARDS.set_up(Kind::EggZone, false);
         notices::clear(NOTICE);
     }
 }
@@ -208,6 +210,7 @@ pub unsafe fn frame(fighter: usize) {
         let wizard = Wizard::new(saved);
         let zone = wizard.zone(stage);
         state.wizard = Some(wizard);
+        published::WIZARDS.set_up(Kind::EggZone, true);
         LIVE.store(generation, Ordering::Release);
         prompt(wizard.step(), zone);
     }

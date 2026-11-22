@@ -9,6 +9,8 @@
 pub mod adapter;
 #[path = "model/ui/events.rs"]
 pub mod ui_events;
+#[path = "model/wizard.rs"]
+pub mod wizard;
 #[path = "model/ui/readiness.rs"]
 pub mod readiness;
 #[path = "model/ui/catalog.rs"]
