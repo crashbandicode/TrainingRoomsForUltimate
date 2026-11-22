@@ -448,6 +448,15 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 ### Guard the Edge and Juggler
 
+Guard the Edge's setup has three pages: CPU start, Player 1 start, then Preview. Move the crosshair with the stick
+(2 units a frame at full tilt) or D-pad (1 unit a press). The CPU start must be off the stage; **A** refuses a point
+over or under it. On the CPU page, **X** restores that side's default and **Y** picks the other side's default.
+Player 1's crosshair chooses a point on the main floor.
+
+Juggler has four pages: CPU spot, Percent, Player 1 start, then Preview. Its CPU and Player 1 pages use the same
+crosshair controls; the Player 1 start can be on a floor or platform. The Percent page still uses the D-pad to change
+the value by 1 horizontally or 10 vertically.
+
 Open **CPU fighter and mode** and press **A** on a portrait. With the popup open, press **A** to cycle through **CPU**,
 **Perfect**, and any drills for that fighter. In CPU mode, **X** cycles the stock CPU level from 1 to 9 and back to 1.
 **B** closes the popup. Choose **Current CPU** to use the fighter already in Training.

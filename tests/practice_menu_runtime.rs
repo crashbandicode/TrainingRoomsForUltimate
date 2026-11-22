@@ -103,14 +103,55 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 }
 
 #[test]
+fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let poll = item(&runtime, "pub unsafe fn poll(");
+    assert!(poll.contains("wizard.set_side_default(run.stage, false)"));
+    let y = poll.find("key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu").unwrap();
+    let other = poll[y..].find("wizard.set_side_default(run.stage, true)").unwrap() + y;
+    let check = poll.find("!wizard.accepts_cpu(run.stage)").unwrap();
+    let refusal = poll[check..].find("notices::refuse(\"Pick a point off the stage\"); // restriction: edge-juggle-start-over-stage").unwrap() + check;
+    let back = poll[refusal..].find("return true;").unwrap() + refusal;
+    let save = poll.find("run.setup = wizard.setup").unwrap();
+    assert!(y < other && other < check && check < refusal && refusal < back && back < save);
+}
+
+#[test]
+fn edge_wizard_notices_name_three_pages() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let notice = item(&runtime, "fn post_notice(");
+    for text in [
+        "Edge · 1/3", "Edge · 2/3", "Edge · 3/3",
+        "CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side",
+        "CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next",
+        "P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next",
+        "{percent}% · D-pad change · A next",
+        "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start",
+    ] {
+        assert!(notice.contains(text), "{text}");
+    }
+}
+
+#[test]
+fn edge_bests_key_uses_the_bucket() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("run.stage.bucket(run.setup.cpu)"));
+    assert!(!frame.contains("run.setup.area"));
+}
+
+#[test]
 fn edge_wizard_marks_its_cpu_start_readably() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let look = item(&runtime, "pub fn look(");
     assert!(!look.contains("scale: 0.3"));
     let hitbox = src("src/runtime/features/hitbox.rs");
-    assert!(item(&hitbox, "pub unsafe fn draw_orbs(").contains("orbs::edge_pointer("));
+    let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
+    assert!(draw.contains("orbs::edge_pointer("));
+    assert!(draw.contains("looks[4..9].iter_mut().zip(pointer)"));
+    assert!(draw.contains("size: 14.0"));
     let notice = item(&runtime, "fn post_notice(");
-    assert!(notice.contains("{} ({x:.0}, {y:.0}) · D-pad choose · A next"));
+    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next"));
 }
 
 #[test]
@@ -118,12 +159,13 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let notice = item(&runtime, "fn post_notice(");
     assert!(notice.contains("\"{percent}% · D-pad change · A next\""));
-    assert!(notice.contains("\"P1 ({px:.0}, {py:.0}) · Stick move · A next\""));
+    assert!(notice.contains("\"P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next\""));
     let page_text = notice.split_once("let _ = match wizard.step {").unwrap().1;
-    for head in ["WizardStep::Area =>", "WizardStep::Percent =>", "WizardStep::Player =>"] {
+    for head in ["WizardStep::Percent =>", "WizardStep::Player =>"] {
         let line = page_text.lines().find(|line| line.contains(head)).unwrap();
         assert!(!line.contains("CPU"), "{line}");
     }
+    assert!(!page_text.contains("WizardStep::Area"));
     assert!(!page_text.contains("WizardStep::Percent if run.drill == Drill::GuardEdge"));
     assert!(!page_text.contains("WizardStep::Player if run.drill == Drill::GuardEdge"));
 }
@@ -131,16 +173,15 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
 #[test]
 fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
-    assert!(item(&runtime, "pub fn look(").contains("wizard.shows_cpu()"));
+    assert!(item(&runtime, "pub fn look(").contains("wizard.marks()"));
     let hitbox = src("src/runtime/features/hitbox.rs");
     let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
-    assert!(draw.contains(".filter(|_| pointed)"));
+    assert!(draw.contains("marks.pointer"));
     assert!(!draw.contains(".filter(|_| edge_wizard)"));
     let notice = item(&runtime, "fn post_notice(");
     for text in [
-        "\"{} ({x:.0}, {y:.0}) · D-pad choose · A next\"",
-        "\"CPU x {x:.0} · Height {:+.0} · Stick move · A next\"",
-        "\"CPU ({x:.0}, {y:.0}) · Stick move · A next\"",
+        "\"CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next\"",
+        "\"CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side\"",
         "\"CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start\"",
     ] {
         assert!(notice.contains(text), "{text}");

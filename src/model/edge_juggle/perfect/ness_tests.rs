@@ -208,7 +208,7 @@ fn ness_leading_fall_is_anchored_to_the_native_release_and_lost_cast_returns_sto
 
 #[test]
 fn ness_deep_fixture_is_a_shared_stage_specific_wizard_default() {
-    use crate::model::edge_juggle::{Area, Drill, Stage, Wizard};
+    use crate::model::edge_juggle::{Drill, Stage, Wizard};
     let stage = Stage::new(
         [-230.0, 230.0, 180.0, -140.0],
         [-210.0, 210.0, 160.0, -130.0],
@@ -220,15 +220,9 @@ fn ness_deep_fixture_is_a_shared_stage_specific_wizard_default() {
         ((0, 0), [84.0, -88.0]),
         ((311, 0), [84.0, -88.0]),
     ] {
-        let mut wizard =
+        let wizard =
             Wizard::new(Drill::GuardEdge, stage, [-75.0, 0.0], 0, key, Some(KIND)).unwrap();
-        for _ in 0..4 {
-            if wizard.setup.area == Area::LowerLeft {
-                break;
-            }
-            wizard.change_area(stage, 1);
-        }
-        assert_eq!(wizard.setup.area, Area::LowerLeft);
+        assert_eq!(stage.bucket(wizard.setup.cpu), 0);
         assert_eq!(wizard.setup.cpu, [NEAR[0] - expected[0], expected[1]]);
     }
 }

@@ -5,7 +5,9 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use hos_lock::{Mutex, Published};
 
 use super::{cpu::konst, mashout::FloorRay, notices, placement, practice, recorder, states};
+use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
+use crate::model::crosshair::Marks;
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
@@ -118,7 +120,6 @@ struct Run {
     stage_floor_y: f32,
     wizard: Option<Wizard>,
     defaults: Setup,
-    cursor: [f32; 2],
     confirm_player: bool,
     setup: Setup,
     rounds: Session,
@@ -1452,17 +1453,6 @@ fn axis(pressed: u16, negative: u8, positive: u8) -> i16 {
     i16::from(pressed & (1 << positive) != 0) - i16::from(pressed & (1 << negative) != 0)
 }
 
-fn moved(point: [f32; 2], stick: [f32; 2]) -> [f32; 2] {
-    [0, 1].map(|i| {
-        point[i]
-            + if stick[i].abs() > 0.3 {
-                2.0 * stick[i]
-            } else {
-                0.0
-            }
-    })
-}
-
 /// P1's raw poll. The next fighter frame resolves the floor under the new cursor.
 pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     if !wizard_active() {
@@ -1487,6 +1477,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     let horizontal = axis(pressed, key::DPAD_LEFT, key::DPAD_RIGHT);
     let vertical = axis(pressed, key::DPAD_DOWN, key::DPAD_UP);
     let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
+    let pad = Pad { stick, held: sample.held, pressed, save: false, load: false };
 
     if key_down(key::B) {
         run.confirm_player = false;
@@ -1497,30 +1488,33 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        wizard.back_to_defaults(run.defaults);
-        run.cursor = wizard.setup.p1;
+        if run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+            wizard.set_side_default(run.stage, false);
+        } else {
+            wizard.back_to_defaults(run.defaults);
+        }
         run.confirm_player = false;
         return true;
     }
+    if key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+        wizard.set_side_default(run.stage, true);
+        return true;
+    }
     match wizard.step {
-        WizardStep::Area => {
-            let delta = horizontal + vertical * 2;
-            if delta != 0 {
-                wizard.change_area(run.stage, i32::from(delta));
-            }
-        }
-        WizardStep::Cpu => wizard.move_cpu(run.stage, moved(wizard.setup.cpu, stick)),
+        WizardStep::Cpu => wizard.steer(run.stage, &pad),
         WizardStep::Percent => wizard.change_percent(horizontal + vertical * 10),
         WizardStep::Player => {
-            if let Some(cursor) = run.stage.player_cursor(run.drill, moved(run.cursor, stick)) {
-                run.cursor = cursor;
-            }
+            wizard.steer(run.stage, &pad);
             run.confirm_player |= key_down(key::A);
             return true;
         }
         WizardStep::Preview => {}
     }
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
+        if wizard.step == WizardStep::Cpu && !wizard.accepts_cpu(run.stage) {
+            notices::refuse("Pick a point off the stage"); // restriction: edge-juggle-start-over-stage
+            return true;
+        }
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
             kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved()));
@@ -1723,37 +1717,34 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
     let mut header = run.drill.game().title();
     if let Some(wizard) = run.wizard {
         let Setup {
-            area,
             cpu: [x, y],
             p1: [px, py],
             percent,
         } = wizard.setup;
         let number = match wizard.step {
-            WizardStep::Area => 0,
-            WizardStep::Cpu => usize::from(run.drill == Drill::GuardEdge),
+            WizardStep::Cpu => 0,
             WizardStep::Percent => 1,
-            WizardStep::Player => 2,
-            WizardStep::Preview => 3,
+            WizardStep::Player => if run.drill == Drill::GuardEdge { 1 } else { 2 },
+            WizardStep::Preview => if run.drill == Drill::GuardEdge { 2 } else { 3 },
         };
-        header = [
-            ["Edge · 1/4", "Edge · 2/4", "Edge · 3/4", "Edge · 4/4"],
-            [
+        header = match run.drill {
+            Drill::GuardEdge => ["Edge · 1/3", "Edge · 2/3", "Edge · 3/3"][number],
+            Drill::Juggler => [
                 "Juggle · 1/4",
                 "Juggle · 2/4",
                 "Juggle · 3/4",
                 "Juggle · 4/4",
-            ],
-        ][run.drill as usize][number];
+            ][number],
+        };
         let _ = match wizard.step {
-            WizardStep::Area => write!(text, "{} ({x:.0}, {y:.0}) · D-pad choose · A next", area.title()),
             WizardStep::Cpu if run.drill == Drill::Juggler => write!(
                 text,
-                "CPU x {x:.0} · Height {:+.0} · Stick move · A next",
+                "CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next",
                 y - run.stage_floor_y,
             ),
-            WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick move · A next"),
+            WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side"),
             WizardStep::Percent => write!(text, "{percent}% · D-pad change · A next"),
-            WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick move · A next"),
+            WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next"),
             WizardStep::Preview => write!(
                 text,
                 "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start"
@@ -1945,7 +1936,6 @@ pub unsafe fn frame(fighter: usize) {
             wizard: editing.then_some(wizard),
             setup,
             defaults: wizard.setup,
-            cursor: wizard.setup.p1,
             confirm_player: false,
             rounds: Session::new(drill, limit),
             body,
@@ -2033,11 +2023,12 @@ pub unsafe fn frame(fighter: usize) {
         run.damage_stop = false;
         run.player_ledge = None;
     }
-    let key = (drill, kind, run.setup.area as u8, run.opponent.mode);
+    let bucket = if drill == Drill::GuardEdge { run.stage.bucket(run.setup.cpu) } else { 0 };
+    let key = (drill, kind, bucket, run.opponent.mode);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             let confirm = std::mem::take(&mut run.confirm_player);
-            let placed = wizard.player_floor(run.stage, run.cursor, confirm, |point| {
+            let placed = wizard.player_floor(run.stage, wizard.cursor(), confirm, |point| {
                 snap_player(p1, drill, run.stage, point)
             });
             if let Some(p1) = placed {
@@ -2065,8 +2056,7 @@ pub unsafe fn frame(fighter: usize) {
     let dead_or_rebirthing = status == konst(C::StatusDead) || status == konst(C::StatusRebirth);
     let damage = Some(natives::damage(cpu, 0)).filter(|d| d.is_finite());
     let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);
-    let [left, right] = run.stage.ledges;
-    let side = |x| usize::from(x > left[0].midpoint(right[0]));
+    let side = |x| run.stage.side(x);
     let player_ledge =
         (natives::situation_kind(p1) == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
     let cpu_ledge = side(natives::pos_x(cpu));
@@ -2197,27 +2187,16 @@ pub unsafe fn frame(fighter: usize) {
     }
     post_notice(run, best_time(bests, key), best_time(streaks, key));
 }
-pub fn look(active: bool) -> ([Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS], bool) {
-    use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
-    let mut marks = [None; super::btt::LOOKS];
+pub fn look(active: bool) -> Marks {
+    let empty = Marks { looks: [None; super::btt::LOOKS], pointer: None };
     if !active || !wizard_active() {
-        return (marks, false);
+        return empty;
     }
     let Some(engine) = ENGINE.try_lock() else {
-        return (marks, false);
+        return empty;
     };
     let Some(wizard) = engine.run.as_ref().and_then(|run| run.wizard) else {
-        return (marks, false);
+        return empty;
     };
-    marks[0] = Some((wizard.setup.cpu, EGG_WHOLE));
-    if matches!(wizard.step, WizardStep::Player | WizardStep::Preview) {
-        marks[super::btt::LOOKS - 1] = Some((
-            wizard.setup.p1,
-            EggLook {
-                picture: EggPicture::Cursor,
-                ..EGG_WHOLE
-            },
-        ));
-    }
-    (marks, wizard.shows_cpu())
+    wizard.marks()
 }
