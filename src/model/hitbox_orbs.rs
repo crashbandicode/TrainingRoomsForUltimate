@@ -519,6 +519,29 @@ pub fn pane_tick(drawn: usize, shown: usize) -> Option<PaneTick> {
 
 /// The layout canvas (`panes`): 1920 x 1080, origin at the centre, y up.
 pub const CANVAS_HALF: [f32; 2] = [960.0, 540.0];
+
+/// Five dots pointing toward an off-canvas start, kept clear of the canvas edges.
+pub fn edge_pointer(point: [f32; 2]) -> Option<[[f32; 2]; 5]> {
+    if !point.into_iter().all(f32::is_finite)
+        || (point[0].abs() <= CANVAS_HALF[0] && point[1].abs() <= CANVAS_HALF[1])
+    {
+        return None;
+    }
+    let bounds = [CANVAS_HALF[0] - 40.0, CANVAS_HALF[1] - 90.0];
+    let tip = [point[0].clamp(-bounds[0], bounds[0]), point[1].clamp(-bounds[1], bounds[1])];
+    let delta = [point[0] - tip[0], point[1] - tip[1]];
+    let scale = delta[0].abs().max(delta[1].abs());
+    let unit = [delta[0] / scale, delta[1] / scale];
+    let length = unit[0].hypot(unit[1]);
+    let dir = [unit[0] / length, unit[1] / length];
+    let perp = [-dir[1], dir[0]];
+    let arm = |along: f32, across: f32| [
+        tip[0] - along * dir[0] + across * perp[0],
+        tip[1] - along * dir[1] + across * perp[1],
+    ];
+    Some([tip, arm(14.0, 10.0), arm(14.0, -10.0), arm(28.0, 20.0), arm(28.0, -20.0)])
+}
+
 /// The half screen size the game's `world_to_screen` falls back to when its size words are 0 (`main+0x44728b8`,
 /// `+0x44724c4`).
 pub const SCREEN_HALF_DEFAULT: [f32; 2] = [960.0, 540.0];

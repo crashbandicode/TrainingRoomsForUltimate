@@ -103,6 +103,19 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 }
 
 #[test]
+fn edge_wizard_marks_its_cpu_start_readably() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let look = item(&runtime, "pub fn look(");
+    assert!(!look.contains("scale: 0.3"));
+    let hitbox = src("src/runtime/features/hitbox.rs");
+    assert!(item(&hitbox, "pub unsafe fn draw_orbs(").contains("orbs::edge_pointer("));
+    let notice = item(&runtime, "fn post_notice(");
+    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · D-pad choose"));
+    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · {percent}% · D-pad change"));
+    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · P1 ({px:.0}, {py:.0})"));
+}
+
+#[test]
 fn edge_juggle_remembers_whether_the_start_was_moved() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     assert!(item(&runtime, "pub unsafe fn poll(").contains("wizard.unmoved(run.stage)"));

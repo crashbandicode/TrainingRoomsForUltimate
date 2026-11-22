@@ -966,6 +966,17 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
             Some((plan(&dot, [255; 4])?, look))
         });
+        if let Some(pointer) = own[3]
+            .filter(|_| edge_wizard)
+            .and_then(|([x, y], _)| project_to_canvas([x, y, 0.0], half))
+            .and_then(|canvas| orbs::edge_pointer(canvas))
+        {
+            for (look, point) in looks[4..9].iter_mut().zip(pointer) {
+                *look = Some((orbs::Pill {
+                    caps: [point; 2], band: point, length: 0.0, size: 14.0, rot: 0.0, color: [255; 4],
+                }, p::EGG_WHOLE));
+            }
+        }
         let hide = super::hide_cpu::draw_hide();
         let combat = board.as_ref().filter(|_| on).map(|sample| &sample.board);
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.

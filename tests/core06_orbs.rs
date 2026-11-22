@@ -12,6 +12,29 @@ fn sphere(key: u32, x: f32, size: f32) -> Sphere {
     Sphere { key, joint: 0x1234, pos: [x, 0.0, 0.0], scale: hitbox::sphere_scale(size), tint: hitbox::HURTBOX_TINT }
 }
 
+#[test]
+fn a_start_outside_the_picture_gets_a_pointer_at_the_border() {
+    let [half_x, half_y] = orbs::CANVAS_HALF;
+    assert_eq!(orbs::edge_pointer([0.0, 0.0]), None);
+    assert_eq!(orbs::edge_pointer([half_x, half_y]), None);
+    assert_eq!(orbs::edge_pointer([f32::NAN, 0.0]), None);
+    assert_eq!(orbs::edge_pointer([0.0, f32::INFINITY]), None);
+    let x = -(half_x - 40.0);
+    assert_eq!(
+        orbs::edge_pointer([-half_x - 100.0, 0.0]),
+        Some([[x, 0.0], [x + 14.0, -10.0], [x + 14.0, 10.0], [x + 28.0, -20.0], [x + 28.0, 20.0]])
+    );
+    let below = orbs::edge_pointer([0.0, -half_y - 100.0]).unwrap();
+    assert_eq!(below[0], [0.0, -(half_y - 90.0)]);
+    assert!(below[1..].iter().all(|p| p[1] > below[0][1]));
+    let corner = orbs::edge_pointer([half_x + 100.0, half_y + 100.0]).unwrap();
+    assert_eq!(corner[0], [half_x - 40.0, half_y - 90.0]);
+    assert!(corner.iter().all(|p| p[0].abs() <= half_x && p[1].abs() <= half_y));
+    let extreme = orbs::edge_pointer([f32::MAX, f32::MAX]).unwrap();
+    assert!(extreme.iter().flatten().all(|value| value.is_finite()));
+    assert_ne!(extreme[0], extreme[1]);
+}
+
 fn own_orbs_are_never_refused_and_conclude_with_the_status() {
     let wants: Vec<Sphere> = (0..74).map(|i| sphere(hitbox::sphere_key(hitbox::KIND_HURT, i, 0), i as f32, 2.0)).collect();
     let mut set = HandleSet::new();
