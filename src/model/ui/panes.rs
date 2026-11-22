@@ -481,9 +481,9 @@ pub mod cb {
         pub const BACKDROP: usize = 1;
         pub const HEADER: usize = 2;
         pub const STREAK: usize = 3;
-        pub const RESULT: usize = 4;
-        pub const REASON: usize = 5;
-        pub const PILL: usize = 6;
+        pub const RESULT: usize = SEQ_BACKDROP + 1;
+        pub const REASON: usize = RESULT + 1;
+        pub const PILL: usize = STREAK + 1;
         /// Per cell, one block of `CELLS` each: backdrop, title, verdict, offset, ruler, window, recorded and your press.
         pub const CELL: usize = PILL + PILLS;
         pub const TITLE: usize = CELL + CELLS;
@@ -498,7 +498,7 @@ pub mod cb {
         pub const SEQ_BACKDROP: usize = YOURS + CELLS;
         /// The header: the SEQUENCE pill and its word, the name, "combo k of n ·", the combo, "· N links",
         /// "· tolerance ±1f", and on the right "streak N" and "· best M".
-        pub const SEQ_PILL: usize = SEQ_BACKDROP + 1;
+        pub const SEQ_PILL: usize = REASON + 1;
         pub const SEQ_PILL_TEXT: usize = SEQ_PILL + 1;
         pub const SEQ_NAME: usize = SEQ_PILL_TEXT + 1;
         pub const SEQ_STEP: usize = SEQ_NAME + 1;

@@ -100,9 +100,9 @@ pub const C: CardSpec = CardSpec {
     // Title and pills split if all the result squares would touch the streak.
     // Result and reason split if they cannot share one line.
     single_extra_rows: [12.0, 28.0, 58.0, 74.0],
-    sequence_rows: [20.0, 48.0, 76.0, 158.0, 182.0],
-    // Two shorter-status rows fit when the previous result and current status cannot share one row.
-    sequence_extra_rows: [153.0, 167.0],
+    sequence_rows: [20.0, 47.0, 73.0, 160.0, 184.0],
+    // When the previous result and the current status cannot share a row, each gets its own, 19 units apart.
+    sequence_extra_rows: [146.0, 165.0],
     caption_gap: 6.0,
     font_widths: [
         super::super::iv::FONT_SUB.0 * 0.56,
@@ -111,8 +111,8 @@ pub const C: CardSpec = CardSpec {
     pill: [14.0, 20.0, 16.0],
     sequence_pill: [156.0, 28.0],
     chip: ChipSpec {
-        pitch: 28.0,
-        height: 26.0,
+        pitch: 26.0,
+        height: 24.0,
         pad: 14.0,
         stroke: 2.0,
         check_room: 24.0,

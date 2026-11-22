@@ -140,11 +140,13 @@ fn a_drilled_sequence_draws_the_corner_card_and_helper_cells() {
     assert!(looks[at::SEQ_CHECK_SHORT].visible && looks[at::SEQ_CHECK_LONG].visible);
     assert_eq!((text(at::SEQ_CHIP_TEXT + 1), looks[at::SEQ_CHIP_EDGE + 1].color), (Text::new("2  Nair loop combo"), TEXT));
     assert!(!looks[at::SEQ_CHECK_SHORT + 1].visible && !looks[at::SEQ_CHIP_EDGE + 2].visible);
-    assert_eq!(looks[at::SEQ_CHIP_EDGE].y - looks[at::SEQ_CHIP_EDGE + 1].y, 28.0);
+    assert_eq!(looks[at::SEQ_CHIP_EDGE].y - looks[at::SEQ_CHIP_EDGE + 1].y, 26.0);
     assert_eq!(text(at::SEQ_LANDED), Text::new("Ryu BnB landed"));
     assert_eq!(text(at::RESULT), Text::new("ready: 2 links"));
     assert_eq!(looks[at::SEQ_LANDED].y, looks[at::RESULT].y, "short captions share a row");
     assert!(looks[at::SEQ_LANDED].x < looks[at::RESULT].x);
+    assert_eq!((C.card.top - looks[at::RESULT].y, C.card.top - looks[at::SEQ_STREAK].y), (160.0, 184.0));
+    assert_eq!((C.card.top - looks[at::SEQ_NAME].y, C.card.top - looks[at::SEQ_CHIP_EDGE].y), (47.0, 73.0));
     // The cells stay below the central strip at full width.
     assert_eq!(text(at::TITLE), Text::new("1 Jab>Up tilt"));
     assert_eq!(looks[at::CELL].w, 309.0);
@@ -164,6 +166,10 @@ fn after_a_drop_the_bar_names_it_and_restarts_at_combo_one() {
     assert_eq!((looks[at::REASON].text, looks[at::REASON].color), (Text::new("L2 Attack 3f late"), WARN));
     assert_eq!(looks[at::SEQ_STEP].text, Text::new("restart 1/2"));
     assert!(!looks[at::RESULT].visible);
+    let row = |i: usize| C.card.top - looks[i].y;
+    assert_eq!((row(at::SEQ_LANDED), row(at::REASON), row(at::SEQ_STREAK)), (146.0, 165.0, 184.0), "three status rows, 19 apart");
+    let order = [at::BACKDROP, at::SEQ_BACKDROP, at::RESULT, at::REASON, at::SEQ_PILL];
+    assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "status text is drawn over both plates");
     assert_eq!(looks[at::SEQ_CHIP_EDGE].color, TEXT, "combo 1 is current again");
     assert_eq!(looks[at::SEQ_CHIP_EDGE + 1].color, BAD, "the dropped combo");
     assert_eq!((looks[at::SEQ_STREAK].text, looks[at::SEQ_BEST].text), (Text::new("streak 0"), Text::new("· best 9")));
