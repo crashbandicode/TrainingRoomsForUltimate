@@ -316,6 +316,39 @@ fn settled_owed() -> lra_reset::ResetOwed {
 }
 
 #[test]
+fn state06_one_owed_reset_runs_the_hub_once_for_several_cpus() {
+    use std::sync::{Arc, Barrier};
+    let concurrent = Arc::new(lra_reset::ResetOwed::new());
+    assert!(concurrent.take(true, true, false, 1));
+    concurrent.owe();
+    let barrier = Arc::new(Barrier::new(8));
+    let threads: Vec<_> = (0..8).map(|_| {
+        let owed = Arc::clone(&concurrent);
+        let barrier = Arc::clone(&barrier);
+        std::thread::spawn(move || {
+            barrier.wait();
+            owed.take(true, true, false, 1)
+        })
+    }).collect();
+    assert_eq!(threads.into_iter().map(|thread| thread.join().unwrap()).filter(|won| *won).count(), 1);
+
+    let owed = lra_reset::ResetOwed::new();
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 2));
+    assert!(!owed.take(true, true, false, 3));
+    owed.owe();
+    assert!(owed.take(true, true, false, 1));
+    assert!(!owed.take(true, true, false, 2));
+    assert!(!owed.take(true, true, false, 3));
+}
+
+#[test]
+fn state06_a_stage_request_alone_owes_nothing() {
+    let stage = include_str!("../src/runtime/lobby/practice_stage_request.rs");
+    assert!(!stage.contains("RESET_OWED"));
+}
+
+#[test]
 fn state06_hub_needs_an_owed_reset() {
     let owed = lra_reset::ResetOwed::new();
     assert!(!owed.take(false, true, false, 7));
