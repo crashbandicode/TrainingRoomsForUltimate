@@ -652,9 +652,7 @@ impl Menu {
     }
 
     fn row_visible(&self, row: &Row) -> bool {
-        let native_only = matches!(row.control, Control::Game(Game::GuardEdge | Game::Juggler))
-            || matches!(row.group, table::EDGE | table::JUGGLE);
-        row.visible(self.env.pilot_present) && !(native_only && self.env.waiting_room)
+        row.visible(self.env.pilot_present)
     }
 
     fn group_visible(&self, group: usize) -> bool {

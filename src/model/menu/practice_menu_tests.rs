@@ -78,6 +78,35 @@ fn games_list_is_one_row_per_game() {
 }
 
 #[test]
+fn guard_the_edge_and_juggler_show_in_a_waiting_room() {
+    let mut screens = Vec::new();
+    for env in [Env::default(), Env { waiting_room: true, ..Env::default() }] {
+        let m = Menu::new(Settings::factory(), env);
+        let games: Vec<_> = (0..m.entry_count(Page::FightersStages))
+            .filter_map(|index| match m.entry(Page::FightersStages, index) {
+                Some(Entry::Row(row)) if ROWS[row].group == table::GAMES => Some(ROWS[row].title),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(games, ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler"]);
+        let mut visible = Vec::new();
+        for game in [Game::GuardEdge, Game::Juggler] {
+            let mut m = Menu::new(Settings::factory(), env);
+            on_list(&mut m, game);
+            m.press(Button::A);
+            let group = table::game_group(game);
+            assert_eq!(m.screen(), Some(&Screen::Rows { group, cursor: 0 }));
+            let titles: Vec<_> = m.sub_rows(group).map(|row| ROWS[row].title).collect();
+            assert!(!titles.is_empty());
+            assert!(titles.contains(&"CPU fighter and mode"));
+            visible.push(titles);
+        }
+        screens.push(visible);
+    }
+    assert_eq!(screens[0], screens[1]);
+}
+
+#[test]
 fn a_game_row_opens_its_sub_screen_on_start() {
     for game in Game::ALL {
         let mut m = opened(game);
