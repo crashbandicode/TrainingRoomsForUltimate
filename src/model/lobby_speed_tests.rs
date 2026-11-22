@@ -762,9 +762,15 @@ fn a_skipped_poll_forgets_the_kept_step_button() {
     let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).map(|l| format!("{l}\n")).collect::<String>();
     let chords = code(include_str!("../runtime/features/chords.rs"));
     assert!(chords.contains("POLLED.swap(controller, Ordering::Relaxed) != controller"));
-    assert!(chords.contains("if reentry && STATE.lock().detector.reenter() {"));
+    assert!(chords.contains("let closed = reentry && state.detector.reenter();"));
     assert!(chords.contains("on_hold(HoldEvent::Closed, style)"));
     assert!(chords.contains("StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) })"));
+    let poll = chords.split_once("pub unsafe fn on_poll").unwrap().1.split_once("\n}\n").unwrap().0;
+    assert_eq!(poll.matches("STATE.lock()").count(), 1, "one lock acquisition on P1's poll");
+    let after_lock = poll.find("let (accepted,").unwrap();
+    let close = poll.find("on_hold(HoldEvent::Closed, style)").unwrap();
+    let hold = poll.find("game_speed::on_hold(hold, style)").unwrap();
+    assert!(after_lock < close && close < hold, "close outside the lock before this poll's hold event");
     assert!(code(include_str!("../runtime/features/input_delay.rs")).contains("chords::on_poll(0)"));
 }
 

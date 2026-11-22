@@ -60,8 +60,9 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
        checks see no current bit. The mark counts only without a just-released bit, so a release in a refresh the poll
        did not see stays a release (review-games-astra-3 23:51:14Z). A re-entry (a P1 poll the runtime skipped, or a
        poll on another Controller than the last) starts with no kept step bit and no chord-owned button, closes an
-       open speed hold with its pop-up, and leaves pending requests; a session clear on the same Controller keeps
-       the kept bit and chord-owned buttons.
+       open speed hold with its pop-up, and leaves pending requests. The reset runs under the poll's one lock; the
+       pop-up close is acted on after the lock is let go, before this poll's own hold event. A session clear on the
+       same Controller keeps the kept bit and chord-owned buttons.
      - **When the taking ends with the button still down** (the speed chord let go first): the bit goes back into the
        current set without its edge. It is a hold (the game's count to 18), never a press.
      - **Inferred, Eden:** P1's poll comes before the mode object's read in an update, as it does for Plus on the card.

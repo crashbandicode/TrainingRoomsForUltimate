@@ -67,11 +67,6 @@ pub unsafe fn on_poll(controller: usize) {
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
-    // A re-entry (STEP-PATH-CONTRACT.md section 5): nothing the last poll kept is carried over, and an open speed hold
-    // closes with its pop-up before this poll reads the pad's buttons. The lock is let go before the pop-up is touched.
-    if reentry && STATE.lock().detector.reenter() {
-        crate::runtime::features::game_speed::on_hold(HoldEvent::Closed, style);
-    }
     // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
     let step_keep = lobby_speed::StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) });
     let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
@@ -83,6 +78,9 @@ pub unsafe fn on_poll(controller: usize) {
     let drill_running = super::edge_juggle::running();
     let accepted = {
         let mut state = STATE.lock();
+        // A re-entry (STEP-PATH-CONTRACT.md section 5), under this poll's one lock: nothing the last poll kept is
+        // carried over and an open speed hold is closed before the detector reads this poll.
+        let closed = reentry && state.detector.reenter();
         // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
         // thread takes `STATE` while it works).
         if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
@@ -111,9 +109,9 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block, recorder_refused)
+        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block, recorder_refused, closed)
     };
-    let (accepted, chord_bits, hold, display, refused, keys, block, recorder_refused) = accepted;
+    let (accepted, chord_bits, hold, display, refused, keys, block, recorder_refused, closed) = accepted;
     // rc.15: the step button never steps while the speed hold is open or while a chord that passed keeps it (Save
     // State's ZL saved and stepped in 985c79c6; held on, Training ran from its 18th update).
     let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
@@ -128,6 +126,10 @@ pub unsafe fn on_poll(controller: usize) {
     }
     if recorder_refused {
         crate::runtime::features::notices::refuse("Stop the drill to start recording or play inputs");
+    }
+    // The re-entry's close first (the pop-up goes), then what this poll did to the hold: both after the lock is let go.
+    if closed {
+        crate::runtime::features::game_speed::on_hold(HoldEvent::Closed, style);
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
     crate::runtime::features::game_speed::training_apply();
