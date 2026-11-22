@@ -769,8 +769,13 @@ fn a_skipped_poll_forgets_the_kept_step_button() {
     assert_eq!(poll.matches("STATE.lock()").count(), 1, "one lock acquisition on P1's poll");
     let after_lock = poll.find("let (accepted,").unwrap();
     let close = poll.find("on_hold(HoldEvent::Closed, style)").unwrap();
-    let hold = poll.find("game_speed::on_hold(hold, style)").unwrap();
-    assert!(after_lock < close && close < hold, "close outside the lock before this poll's hold event");
+    let effects = [
+        poll.find("egg_zone::poll(").unwrap(),
+        poll.find("notices::save_state_refused(").unwrap(),
+        poll.find("notices::refuse(").unwrap(),
+        poll.find("game_speed::on_hold(hold, style)").unwrap(),
+    ];
+    assert!(after_lock < close && effects.into_iter().all(|at| close < at), "the re-entry's close is the first side effect after the lock");
     assert!(code(include_str!("../runtime/features/input_delay.rs")).contains("chords::on_poll(0)"));
 }
 
@@ -872,6 +877,19 @@ fn pending_requests_survive_a_re_entry() {
     let _ = pad.handoff([0, 0, 0, 0]);
     assert!(!pad.closed, "no hold was open");
     assert!(pad.detector.consume(Request::SaveState), "the accepted Save is still pending");
+}
+
+fn a_re_entry_close_and_a_refused_save_fall_on_the_same_poll() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, L, R};
+    use crate::model::state::refused::{Action, Refused};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    pad.style = 7;
+    let polled = pad.handoff([L | R | DOWN, L | R, DOWN, 0]);
+    assert_eq!(polled, NO_STEP);
+    assert!(pad.closed, "the old pop-up's close");
+    assert_eq!(pad.detector.take_refused(), Some((Action::Save, Refused::GameCubeTriggers)), "and a refused Save on the same poll: the runtime posts the close first");
 }
 
 /// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, in Training or here.
@@ -995,6 +1013,7 @@ fn case_table() {
         ("an_open_speed_hold_does_not_follow_a_controller_handoff", an_open_speed_hold_does_not_follow_a_controller_handoff as fn()),
         ("a_speed_chord_pressed_after_a_handoff_opens_the_hold_again", a_speed_chord_pressed_after_a_handoff_opens_the_hold_again as fn()),
         ("pending_requests_survive_a_re_entry", pending_requests_survive_a_re_entry as fn()),
+        ("a_re_entry_close_and_a_refused_save_fall_on_the_same_poll", a_re_entry_close_and_a_refused_save_fall_on_the_same_poll as fn()),
         ("holding_the_speed_chord_never_steps", holding_the_speed_chord_never_steps as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
