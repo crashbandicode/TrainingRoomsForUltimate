@@ -2152,7 +2152,7 @@ approved_by = "Operator 2026-11-20 moved both games into the current rc.15 card 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 186037
+ceiling = 186044
 date = "2026-11-21"
-reason = "rc.15 niche recovery candidate on 79cc06f1. Recovery routes, grounded placement and the scoped Juggler forecast and ordinary recovery timing changes measure 186037 normalized implementation lines, exactly 15011 over the approved 171026 base."
+reason = "rc.15 niche recovery candidate on 79cc06f1. Recovery routes, grounded placement and the scoped Juggler forecast and ordinary recovery timing changes measure 186044 normalized implementation lines, exactly 15018 over the approved 171026 base. The last 54 lines are the Pyra replacement-body fix (8fce8d0e, +34) and the operator rulings of 2026-11-22 for Sonic, Lucas and Hero (fb44f2fa, +20)."
 approved_by = "Primary e7ee8f1c directed one measured-delta budget entry for the operator's rc.15 niche-recovery hold and Perfect verification rows, 2026-11-20."
