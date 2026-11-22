@@ -18,6 +18,17 @@ fn item<'a>(text: &'a str, head: &str) -> &'a str {
 }
 
 #[test]
+fn the_role_tabs_draw_the_models_caps() {
+    let view = src("src/runtime/ui/view.rs");
+    let draw = item(&view, "unsafe fn draw_role_tabs(");
+    assert!(draw.contains("p::role_caps(frame.role_keys)"));
+    assert!(!draw.contains("const KEYS"));
+    assert!(view.contains("self.show(IDX_TITLE, frame.role_tab.is_none())"));
+    let recording = src("src/model/recording_menu.rs");
+    assert!(item(&recording, "pub fn handle_page(").contains("self.page_overlay_open()"));
+}
+
+#[test]
 fn a_menu_visit_suspends_tech_practice_and_b_resumes_it() {
     let tech = src("src/runtime/features/tech.rs");
     let frame = item(&tech, "pub unsafe fn frame(");

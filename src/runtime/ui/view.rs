@@ -109,7 +109,7 @@ impl Panes {
             }
         }
         self.text(IDX_TITLE, frame.title.units(), TEXT_DIM);
-        self.show(IDX_TITLE, !frame.popup);
+        self.show(IDX_TITLE, frame.role_tab.is_none());
         self.show(IDX_SEP, !frame.popup);
         self.text(IDX_CRUMB, frame.crumb.units(), TEXT);
         self.at(IDX_CRUMB, 0.0, if frame.popup { TAB_Y } else { CRUMB_Y });
@@ -271,11 +271,9 @@ impl Panes {
         self.rect_at(index + 3, x, y - h / 2.0 + edge / 2.0, w, edge, color);
     }
 
-    /// The r8 title's L/R role tabs: the plate, "Player" and "CPU" with the lit one on the accent, and the L and R
-    /// key caps. Only the pop-up has them.
+    /// Role tabs: L/R in the pop-up, ZR on the page, no caps on a file screen.
     unsafe fn draw_role_tabs(&self, frame: &Frame) {
         const NAMES: [&[u16]; 2] = [&[80, 108, 97, 121, 101, 114], &[67, 80, 85]];
-        const KEYS: [&[u16]; 2] = [&[76], &[82]];
         let Some(lit) = frame.role_tab.map(usize::from) else {
             for index in IDX_ROLE_BG..IDX_ROLE_KEY + 2 {
                 self.hide(index);
@@ -284,11 +282,20 @@ impl Panes {
         };
         self.rect_at(IDX_ROLE_BG, ROLE_X, TAB_Y, 2.0 * ROLE_TAB_W + 8.0, ROLE_H + 8.0, HIGHLIGHT);
         self.rect_at(IDX_ROLE_HI, p::role_tab_x(lit.min(1)), TAB_Y, ROLE_TAB_W, ROLE_H, ACCENT);
+        let caps = p::role_caps(frame.role_keys);
         for tab in 0..2 {
             let color = if tab == lit { TEXT } else { TEXT_DIM };
             self.label(IDX_ROLE + tab, NAMES[tab], p::role_tab_x(tab), TAB_Y, ROLE_TAB_W, color);
-            self.rect_at(IDX_ROLE_CAP + tab, ROLE_CAP_X[tab], TAB_Y, ROLE_CAP, ROLE_CAP, RULE);
-            self.label(IDX_ROLE_KEY + tab, KEYS[tab], ROLE_CAP_X[tab], TAB_Y, ROLE_CAP, TEXT_DIM);
+            match caps[tab] {
+                Some((key, w)) => {
+                    self.rect_at(IDX_ROLE_CAP + tab, ROLE_CAP_X[tab], TAB_Y, w, ROLE_CAP, RULE);
+                    self.label(IDX_ROLE_KEY + tab, key, ROLE_CAP_X[tab], TAB_Y, w, TEXT_DIM);
+                }
+                None => {
+                    self.hide(IDX_ROLE_CAP + tab);
+                    self.hide(IDX_ROLE_KEY + tab);
+                }
+            }
         }
     }
 
