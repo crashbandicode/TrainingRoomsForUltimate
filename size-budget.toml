@@ -2356,4 +2356,4 @@ basis = "rustfmt-sloc4"
 ceiling = 188662
 date = "2026-11-22"
 reason = "Gate Training reset effects on one atomic word for passed reset checks and destroyed fighter entries. Measured normalized implementation 188662, 51 above the integration ceiling 188611, with zero spare. The release gate measures NRO and BSS."
-approved_by = "Lead hit-streak-sol, 2026-11-22, directed an exact measured entry for the reset-owed redesign in BRIEF-3."
+approved_by = "PENDING tr-primary-2: measured entry under the operator's LOC rule of 2026-11-20 for the reset-owed latch it ordered 2026-11-22 05:47Z (HANDOFF-PRIMARY-tr-primary-2.md line 864); asked for in the review request; NRO and BSS reported at the gate"

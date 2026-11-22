@@ -177,7 +177,7 @@ pub const fn hub_should_run(cpu_operated: bool, native_training: bool, hot_swap_
 }
 
 /// Bits 0..=7 mark entries destroyed since the last hub run; bit 8 marks a passed reset check.
-/// A transform or TR hot swap destroys no entry. Primary rulings 2026-11-22 05:47Z, 06:01:34Z and 06:57:13Z.
+/// A transform or TR hot swap destroys no entry (read from source, not measured). Primary rulings 2026-11-22 05:47Z, 06:01:34Z, 06:57:13Z.
 /// Change Stage runs the hub only if the CPU entry is destroyed or its reset check passes there (not measured).
 /// A passed check with no subsequent CPU init is spent by the next CPU-role init (not measured).
 pub struct ResetOwed(AtomicU32);
