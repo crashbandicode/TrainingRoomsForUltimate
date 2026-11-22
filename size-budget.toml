@@ -2337,7 +2337,7 @@ approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start f
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 191455
+ceiling = 191514
 date = "2026-11-22"
-reason = "Guard the Edge niche recoveries after 6395498b on integration main de5a582b, as one folded entry: the measured Pyra and Mythra swap with the replacement-body handling, the Ness, Lucas, Hero, Sonic, Snake, Sheik and Meta Knight routes, native-wait placement with the Player 1 start fix in its model-driven form, the operator's Sonic, Lucas and Hero rulings, the per-session bound on Player 1 rewrites and the settled-selection rule for the drill's selected CPU. No private restart tracker. The measured normalized implementation count is 191455, 2775 over main's 188680 entry, with no headroom. NRO and BSS are reported at the gate."
+reason = "Guard the Edge niche recoveries after 6395498b on integration main de5a582b, as one folded entry: the measured Pyra and Mythra swap with the replacement-body handling, the Ness, Lucas, Hero, Sonic, Snake, Sheik and Meta Knight routes, native-wait placement with the Player 1 start fix in its model-driven form, the operator's Sonic, Lucas and Hero rulings, the per-session bound on Player 1 rewrites and the settled-selection rule for the drill's selected CPU. No private restart tracker. The measured normalized implementation count is 191514, 2834 over main's 188680 entry, with no headroom. NRO and BSS are reported at the gate."
 approved_by = "tr-primary-2, 2026-11-22 07:34Z, 08:07:11Z, 08:44:17Z and 09:18:12Z (HANDOFF-PRIMARY-tr-primary-2.md lines 913, 934-935, 975, 1018 and 1057-1059): one folded niche entry, re-measured after the tracker is removed and the two review fixes are folded in, under the operator's measured LOC rule; flag only if the NRO grows more than about 8 KiB or BSS grows"
