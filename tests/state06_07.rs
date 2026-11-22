@@ -524,7 +524,7 @@ fn tech_attempt_and_wizard_survive_a_cpu_transform_init() {
 }
 
 #[test]
-fn parry_open_attempt_survives_a_cpu_transform_init() {
+fn parry_reset_does_not_run_on_a_cpu_transform_init() {
     use model::parry::{Detector, Frame};
     let owed = settled_owed();
     let mut detector = Detector::new();
@@ -533,7 +533,9 @@ fn parry_open_attempt_survives_a_cpu_transform_init() {
     detector.step(&Frame { stop: true, guard_damage: true, just_shield: Some(false), ..held }, 6);
     assert!(detector.busy());
     let before = detector;
-    // The frame-strip clear at reset_hub.rs:42 is a separate path awaiting a ruling.
+    // This proves only that parry::reset() does not run on a transform init. An open Parry attempt is still dropped
+    // through the frame-strip clear (reset_hub.rs, input_display::fighter_initialised()), which runs on every fighter
+    // init. Today's behaviour stays (primary ruling 2026-11-22 option (a)); gating that clear is queued for the operator.
     if owed.take(true, true, false, 7) { detector = Detector::new(); }
     assert_eq!(detector, before);
     owed.owe();
