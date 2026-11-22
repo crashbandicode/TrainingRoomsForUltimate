@@ -562,7 +562,8 @@ impl Btt {
         }
     }
 
-    /// The game initialised the fighters again (L+R+A, Change Stage): a run starts over, Placing stays.
+    /// The reset hub ran (an L+R+A reset, or a new Training scene): a run starts over, Placing stays. A new stage
+    /// goes through `enter` instead.
     pub fn reset(&mut self) {
         if matches!(self.phase, Phase::Ready | Phase::Running | Phase::Done) {
             self.ready();

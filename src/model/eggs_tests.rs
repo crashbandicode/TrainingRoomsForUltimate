@@ -50,7 +50,7 @@ fn notice(run: &Run) -> String {
     text
 }
 
-/// A reset (L+R+A, Change Stage) and the draw's next tick, which publishes the camera the first target spawns by.
+/// A reset (the reset hub) and the draw's next tick, which publishes the camera the first target spawns by.
 fn restart(run: &mut Run, seed: u32) {
     run.reset(seed);
     settle(run, RESET_CENTRE);
@@ -457,7 +457,7 @@ fn eggs_first_target_waits_for_floors() {
     let egg = run.egg_at().expect("then the target");
     assert_eq!((floor_under(egg, &STAGE[3..]), run.floors_wanted()), (Some(54.0), false), "on the only floor read: {egg:?}");
     run.reset(4);
-    assert!(run.floors_wanted(), "a reset (Change Stage too) reads them again");
+    assert!(run.floors_wanted(), "a reset reads them again");
 }
 
 /// rc.15 (docs/DECISIONS.md, SPEC V2.3 superseded): one of Player 1's articles breaks the disc; only the fighter's own attack
@@ -893,7 +893,7 @@ fn notice_after(run: &mut Run) -> String {
     pass(run, &[], false);
     notice(run)
 }
-/// L+R+A and Change Stage spawn their first target after the reset camera's glide. Eden `wa-eggsfly-9c16babe-1`
+/// A reset spawns its first target after the reset camera's glide. Eden `wa-eggsfly-9c16babe-1`
 /// and `-a6266ac1-1` spawned a target (x 32.7, x 70.3) by the panned camera of the walk before the reset, then drew it off
 /// screen for 95 of 96 and 92 of 93 ticks.
 fn eggs_restart_waits_for_camera() {
@@ -1216,7 +1216,7 @@ fn eggs_swap_and_stage() {
     assert_eq!(run.plan([TIMED, ANY, NORMAL, DISC, IN_VIEW], None, 0, || TRAINING), Plan::Read, "the fighter cycle continues the run");
     restart(&mut run, 3);
     assert_eq!(pass(&mut run, &[], false), Some(u16::MAX));
-    assert_eq!(notice(&run), "Eggs 0   1:00", "Change Stage restarts it (the reset hub)");
+    assert_eq!(notice(&run), "Eggs 0   1:00", "the reset hub restarts it");
 }
 
 fn eggs_nana() {

@@ -173,7 +173,8 @@ pub fn eggs_finished() -> bool {
     EGG_FINISHED.load(Ordering::Acquire) && !EGG_START.load(Ordering::Acquire)
 }
 
-/// The reset hub ran (L+R+A, Change Stage): an armed run starts over. Game thread.
+/// The reset hub ran (an L+R+A reset, or a new Training scene's first CPU init): an armed run starts over. Game thread.
+/// A TR Change Stage initialises no fighter and does not reach the hub (trace boot latch-order-2, release 116a3829).
 pub fn eggs_reset() {
     let mut state = RUN.lock();
     state.run.reset(seed());

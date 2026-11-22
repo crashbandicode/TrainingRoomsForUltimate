@@ -187,7 +187,8 @@ pub fn overlay_pictures() -> [crate::model::eggs::Look; LOOKS] {
     BTT.try_lock().map_or([None; LOOKS], |mut mode| mode.sample_simulation_pictures())
 }
 
-/// L+R+A or Change Stage initialised the fighters again (the reset hub, the game thread): a run starts over.
+/// The reset hub ran (an L+R+A reset or a new Training scene; the game thread): a run starts over. A changed stage
+/// does not come through here: the pass sees the new stage id and calls the mode's `enter`.
 pub fn reset() {
     BTT.lock().reset();
 }

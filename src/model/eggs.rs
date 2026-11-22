@@ -698,7 +698,8 @@ impl Run {
         self.set_areas(1u8.checked_shl(rows[4].into()).unwrap_or(1));
     }
 
-    /// The game initialised the fighters again (L+R+A, Change Stage; the reset hub): an armed run starts over.
+    /// The reset hub ran (an L+R+A reset, or a new Training scene): an armed run starts over. A TR Change Stage
+    /// does not call this.
     pub fn reset(&mut self, seed: u32) {
         if self.rows[0] != OFF {
             let settings = (self.areas, self.paths, self.expiry);
