@@ -1,7 +1,7 @@
 # Record: place the fighters and pick their state first (for the operator's answer)
 
 Mockups, not Eden stills (2026-11-22, hit-streak-sol, source `7d962416`; branch `design/record-placement-and-state`,
-commits `e8eb999d` and `c82d6957`, its correction after review).
+commits `e8eb999d` and its two corrections after review).
 Five decisions, one picture each; the recommended option has a green outline. Nothing here is implemented, and no Eden
 measurement was made for this page.
 
@@ -106,6 +106,9 @@ About +110 lines.
 5. A missed tech face up or face down as the game gives it (recommended, after the measurement), or a choice?
 6. Every load of the start save reproduces the state (recommended), or only Play? Play without a count (recommended),
    or with Record's count?
-7. Two new messages need your approval: `Not recorded · CPU could not start in Footstool` (the check failed), and
-   `Stop the practice game to place fighters` (the wizard uses the practice games' pictures and camera).
+7. Three new messages and one limit need your approval: `Not recorded · CPU could not start in Footstool` (Record's
+   check failed); `Not placed · CPU could not start in Footstool` (the same check failed on Play or on a Load of that
+   save: the load is ended, both fighters are let go where they are, and Play does not start);
+   `Stop the practice game to place fighters` (the wizard uses the practice games' pictures and camera); and the
+   check's limit, 60 frames.
 8. Each fighter keeps its damage (recommended), or a Percent page like Juggler's (about +40 lines)?
