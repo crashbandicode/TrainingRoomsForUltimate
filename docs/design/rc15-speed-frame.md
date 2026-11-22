@@ -46,14 +46,19 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
      - **When:** while the speed hold is open, and for a chord that passed (Save State and the other ZL chords) from
        the poll it passed until its ZL is let go. Neither steps a frame, pressed or held, and ZL doesn't reach the
        fighter either. A plain ZL is never touched.
-     - **What:** the bit leaves the current, previous and just-released sets, so the mode object reads no press and no
-       hold. Plus keeps its current set and loses only its edges (6e226733); that isn't enough here, because the mode
-       object also reads the hold (`2bd5445d` did that: a chord's ZL kept down ran Training from the 18th update).
+     - **What:** the bit leaves the current and both edge sets and is marked in previous, so the mode object reads no
+       press and no hold. Plus keeps its current set and loses only its edges (6e226733); that isn't enough here,
+       because the mode object also reads the hold (`2bd5445d` did that: a chord's ZL kept down ran Training from the
+       18th update).
      - **How the poll still knows the button is down:** with the bit out of the current set, the game's refresh makes
-       a press of it again every update while it is down (6e226733's trace), and none once it is up. The poll leaves
-       the just-down bit set itself, so a second poll before a refresh (the same trace has them) reads the same. The
-       detector gets the bit as held and not pressed: the chord stays one chord and fires once. The mode object's
-       press check needs the current bit too, so the just-down bit alone is no press to it.
+       a press of it again every update while it is down (6e226733's trace), and none once it is up. The poll leaves the
+       mark in previous: a refresh copies the cleared current there and puts the held bit back in current, while a poll
+       repeated before a refresh finds both edges zeroed but current and previous as the poll left them
+       (`smash-training-lobby` `artifacts/phase23/1f-save-hold/repoll-boot/`, exact 3448686c trace: 46 of 46 repeats).
+       The detector gets the bit as held and not pressed: the chord stays one chord and fires once. The game's release
+       check is previous AND just-released, which stays clear; the mark is no release. The mode object's press and hold
+       checks see no current bit. The mark counts only without a just-released bit, so a release in a refresh the poll
+       did not see stays a release (review-games-astra-3 23:51:14Z). A P1 poll the runtime skips forgets the kept bit.
      - **When the taking ends with the button still down** (the speed chord let go first): the bit goes back into the
        current set without its edge. It is a hold (the game's count to 18), never a press.
      - **Inferred, Eden:** P1's poll comes before the mode object's read in an update, as it does for Plus on the card.
@@ -133,7 +138,7 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
 
 | Operator clause | Design | Test |
 | --- | --- | --- |
-| "we should have the single frame option for the speed toggle" | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_training_step_is_the_mode_objects_and_its_button_is_zl`, `a_plain_step_press_steps_the_lobby_once`, `a_plain_held_step_button_still_runs_from_the_eighteenth_update`, `a_held_save_state_chord_never_steps`, `holding_the_speed_chord_never_steps` |
+| "we should have the single frame option for the speed toggle" | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_training_step_is_the_mode_objects_and_its_button_is_zl`, `a_plain_step_press_steps_the_lobby_once`, `a_plain_held_step_button_still_runs_from_the_eighteenth_update`, `a_held_save_state_chord_never_steps`, `a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared`, `the_kept_step_button_is_marked_in_the_previous_set`, `a_release_the_poll_did_not_see_is_not_a_held_step_button`, `a_skipped_poll_forgets_the_kept_step_button`, `holding_the_speed_chord_never_steps` |
 | "you'll need to test that one doesn't desync against vanilla" | §2.3: a held entry, no global or room write; Eden (b) | `the_lobby_path_never_writes_the_update_rate_words`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice`, `a_step_press_under_the_speed_hold_is_not_a_frame_step` |
 | "and doesn't stay enabled into a match" | §2.5; Eden (c) | `every_reset_returns_the_lobby_to_x1_and_ends_the_hold`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice` |
 

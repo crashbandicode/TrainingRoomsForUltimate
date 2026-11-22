@@ -95,27 +95,31 @@ pub const fn step_take(style: u32, hold_open: bool, owned: u32) -> u32 {
 /// after the mapping call, so the bits are not put back; the pause check (`.1558e20`) is the same reader, kept from
 /// Plus by its edges alone, but Training also reads the hold.
 ///
-/// With the bit gone from the current set, the next poll can't read "still down" there. Its just-down bit says it
-/// instead: the poll leaves it set, and the game's refresh sets it again as long as the button is down (a press
-/// rebuilt from the cleared current set, 6e226733) and clears it once the button is up. A poll that runs again before
-/// a refresh (6e226733's trace has two) reads the same.
+/// The poll leaves the kept bit in the previous set. A refresh copies the current set the poll left into previous
+/// (the mark goes) and puts the bit back in current while the button is down. A poll repeated before a refresh finds
+/// both edge sets zeroed by the game (`main+0x3665650`; exact-3448686c trace `1f-save-hold/repoll-boot`, 46 of 46
+/// repeats) and current and previous as the poll left them, so the mark in previous still says held. The mark is a
+/// previous bit without a just-released bit: the poll leaves just-released clear and the game's clear zeroes it. The
+/// game's release check is previous AND just-released, so the mark is no release to it. After a refresh this stage did
+/// not poll, a released button shows previous AND just-released: that is the game's release and reads as let go
+/// (review-games-astra-3 23:51:14Z).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct StepKeep(pub u32);
 
 impl StepKeep {
     /// The current and just-down sets as the button is: a kept bit still down is held, never a new press.
-    pub const fn seen(self, current: u32, just_down: u32) -> (u32, u32) {
-        let down = (current | just_down) & self.0;
+    pub const fn seen(self, [current, previous, just_down, just_release]: [u32; 4]) -> (u32, u32) {
+        let down = (current | previous & !just_release) & self.0;
         (current | down, just_down & !down)
     }
 
     /// One poll: `sets` are the controller's four button sets as found (`chords::field::BUTTONS`), `take` is
-    /// `step_take`. The sets to leave in the controller, and what is kept now. A bit no longer taken goes back as
-    /// held without a press.
-    pub const fn keep(self, [current, previous, just_down, just_release]: [u32; 4], take: u32) -> (Self, [u32; 4]) {
-        let (held, pressed) = self.seen(current, just_down);
+    /// `step_take`. The sets to leave in the controller, with a kept bit marked in previous and absent from the edges,
+    /// and what is kept now. A bit no longer taken goes back as held without a press.
+    pub const fn keep(self, sets: [u32; 4], take: u32) -> (Self, [u32; 4]) {
+        let (held, pressed) = self.seen(sets);
         let kept = take & held;
-        (Self(kept), [held & !take, previous & !take, pressed & !take | kept, just_release & !take])
+        (Self(kept), [held & !take, sets[1] & !take | kept, pressed & !take, sets[3] & !take])
     }
 }
 

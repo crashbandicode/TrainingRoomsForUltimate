@@ -60,14 +60,15 @@ fn blocked() -> bool {
 /// # Safety
 /// `controller` is the live `Controller` pointer the mapping call passed, or 0.
 pub unsafe fn on_poll(controller: usize) {
+    // P1's poll with no Training controller to read (`input_delay::note`): no step button is kept over the gap.
     if controller == 0 {
-        return;
+        return STEP_KEPT.store(0, Ordering::Relaxed);
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
     // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
     let step_keep = lobby_speed::StepKeep(STEP_KEPT.load(Ordering::Relaxed));
-    let (current, just_down) = step_keep.seen(read(field::CURRENT_BUTTONS), read(field::JUST_DOWN));
+    let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
     let sample = Sample::of(style, current, just_down)
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
