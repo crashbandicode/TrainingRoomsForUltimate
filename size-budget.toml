@@ -2361,7 +2361,7 @@ approved_by = "tr-primary-2 2026-11-22 08:22:35Z (HANDOFF-PRIMARY-tr-primary-2.m
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 191889
+ceiling = 191918
 date = "2026-11-22"
-reason = "Eggs-ercise zone editor crop window spike: dim outside the zones and draw their edges on existing menu rectangles while the editor is open, retaining the band guide for the proving boot. Measured normalized implementation 191889, 235 above main's 191654, with zero spare. The release gate measures NRO and BSS."
+reason = "Eggs-ercise zone editor crop window spike: dim outside the zones and draw their edges on existing menu rectangles while the editor is open, retaining the band guide for the proving boot. Measured normalized implementation 191918, 264 above main's 191654, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 17:07:18Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1494-1495): the crop window spike, then design 3 at about +150 to 200 lines, under the operator's measured LOC rule"

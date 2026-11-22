@@ -178,6 +178,63 @@ fn the_crop_window_leaves_every_menu_pane_as_the_table_starts_it() {
     }
 }
 
+/// The crop window's state through a layout resolved again (review 2026-11-22 19:00:21Z): a registration with the
+/// editor up, the editor ended, and the regular calculate resolving the same panes; the editor still up through the
+/// second resolve; and a new layout's panes while the window is up.
+#[test]
+fn the_crop_window_is_put_back_when_the_layout_is_resolved_again() {
+    use model::egg_zone::{CropRect, CROP_RECTS};
+    use nn::ui2d::Picture;
+    use view::Crop;
+
+    fn fixture() -> (Vec<Picture>, Panes) {
+        let mut pictures: Vec<Picture> = (0..p::MENU_COUNT).map(|_| unsafe { core::mem::zeroed() }).collect();
+        let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
+        for (i, picture) in pictures.iter_mut().enumerate() {
+            picture.pane.flags = u8::from(p::spec(i).visible);
+            all[i] = &mut picture.pane;
+        }
+        (pictures, Panes { container: all[0], all })
+    }
+    fn check(pictures: &[Picture], table: bool, stage: &str) {
+        for (i, picture) in pictures.iter().enumerate().skip(1) {
+            assert_eq!(picture.pane.flags & 1 != 0, table && p::spec(i).visible,
+                "{} visibility {stage}", p::name_of(i).as_str());
+        }
+    }
+    let (pictures, a) = fixture();
+    let b = Panes { container: a.container, all: a.all };
+    let mut rects = [None; CROP_RECTS];
+    rects[0] = Some(CropRect { x: 10.0, y: 20.0, w: 30.0, h: 40.0, color: [1, 2, 3, 4] });
+    rects[5] = Some(CropRect { x: -50.0, y: 60.0, w: 70.0, h: 80.0, color: [5, 6, 7, 8] });
+    let mut crop = Crop::new();
+    unsafe { crop.resolved(Some(&a)); crop.pass(&a, true, Some(&rects)); }
+    for (i, picture) in pictures.iter().enumerate().skip(1) {
+        let visible = i == p::IDX_TILE_STRIPE || i == p::IDX_TILE_STRIPE + 5;
+        assert_eq!(picture.pane.flags & 1 != 0, visible, "{} visibility during crop", p::name_of(i).as_str());
+    }
+    unsafe { crop.resolved(Some(&b)); crop.pass(&b, false, None); }
+    check(&pictures, true, "after the editor ended and the layout was resolved again");
+
+    let mut crop = Crop::new();
+    unsafe {
+        crop.resolved(Some(&a));
+        crop.pass(&a, true, Some(&rects));
+        crop.resolved(Some(&b));
+        crop.pass(&b, true, None);
+    }
+    check(&pictures, false, "after resolving again while editing");
+    unsafe { crop.pass(&b, false, None) };
+    check(&pictures, true, "after leaving");
+
+    unsafe { crop.pass(&a, true, Some(&rects)) };
+    let (other_pictures, c) = fixture();
+    unsafe { crop.resolved(Some(&c)) };
+    check(&other_pictures, true, "on a newly resolved layout");
+    unsafe { crop.pass(&c, true, None) };
+    check(&other_pictures, false, "after entering on the new layout");
+}
+
 /// SOLO-S-PLACEMENT (operator 2026-11-05): on every layout the roster grid uses, the Player and CPU "S" marks never
 /// intersect the tile's name label. With the portrait drawn they sit on its lower corners (covering it partly), clear
 /// of the order badges above; without it the centred name stays clear too.

@@ -15,7 +15,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::{chips, thumbs, hud, pane, registry};
-use crate::runtime::ui::view::Panes;
+use crate::runtime::ui::view::{Crop, Panes};
 use crate::runtime::game;
 
 const INFO_TRAINING: &[u8] = b"info_training";
@@ -28,8 +28,8 @@ struct Resolved {
     status_r: *mut Pane,
     drawn_seq: u32,
     shown: bool,
-    /// The zone editor's crop window is up: the menu's panes are hidden for it.
-    crop: bool,
+    /// The zone editor's crop window on these panes.
+    crop: Crop,
 }
 
 // SAFETY: the pointers are only used on the UI job thread inside the tick.
@@ -41,7 +41,7 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
     status_r: core::ptr::null_mut(),
     drawn_seq: 0,
     shown: false,
-    crop: false,
+    crop: Crop::new(),
 });
 
 /// Set by the registration tick: the layout object is new, so its panes must be resolved again.
@@ -81,9 +81,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         active
     } else { false };
     hud::run(layout, name);
-    // The zone editor's crop window, left by the hitbox draw of this pass (`egg_zone::draw`). Taken on every pass,
+    // The zone editor's crop window, left by this layout's hitbox draw (`egg_zone::draw`). Taken on every pass,
     // before any early return, so a set this pass does not use never reaches a later one.
-    let rects = crate::runtime::features::egg_zone::crop();
+    let rects = crate::runtime::features::egg_zone::crop(layout as usize);
     hud::hud_rule(layout, name);
     hud::cpu_panels(layout, name);
     if !practice_layout {
@@ -113,6 +113,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     let Some(mut r) = RESOLVED.try_lock() else { return };
     if r.layout != layout as usize || INVALIDATE.swap(false, Ordering::AcqRel) {
         resolve(&mut r, layout, waiting);
+        // What the crop window hid comes back through the panes just resolved.
+        let Resolved { panes, crop, .. } = &mut *r;
+        crop.resolved(panes.as_ref());
     }
     let r = &mut *r;
     let Resolved { panes, status_r, drawn_seq, shown, crop, .. } = r;
@@ -147,19 +150,7 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     MENU_SHOWN.store(visible, Ordering::Release);
     // The zone editor's crop window (design 3) is drawn on the menu's own rectangles while the menu is closed.
     let editing = !visible && !PAUSE_ACTIVE.load(Ordering::Acquire) && crate::runtime::features::egg_zone::wizard_active();
-    if !editing {
-        if core::mem::take(crop) {
-            panes.crop_leave();
-        }
-    } else {
-        if !core::mem::replace(crop, true) {
-            panes.crop_enter();
-        }
-        // A pass whose guide was not drawn keeps the rectangles of the pass before.
-        if let Some(rects) = rects {
-            panes.crop_draw(&rects);
-        }
-    }
+    crop.pass(panes, editing, rects.as_ref());
     pane::set_visible(panes.container, visible || editing);
     if visible || editing {
         pane::set_alpha(panes.container, if visible { alpha } else { 255 });
@@ -234,7 +225,6 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     r.status_r = core::ptr::null_mut();
     r.drawn_seq = 0;
     r.shown = false;
-    r.crop = false;
     let layout_name = if waiting { "info_waiting" } else { "info_training" };
     let root = (*layout).root_pane;
     let total = pane::count(root);

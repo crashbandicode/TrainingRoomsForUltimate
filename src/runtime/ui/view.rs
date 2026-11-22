@@ -71,6 +71,46 @@ impl Panes {
     }
 }
 
+/// The zone editor's crop window on the resolved panes: whether the menu's panes are hidden for it.
+pub struct Crop {
+    up: bool,
+}
+
+impl Crop {
+    pub const fn new() -> Self {
+        Self { up: false }
+    }
+
+    /// The layout's panes were resolved, for the first time or again: what the window hid comes back through the
+    /// panes just resolved, whether they are the same panes (still hidden) or a new layout's (as the table starts
+    /// them). A pass that still has the editor up enters again.
+    pub unsafe fn resolved(&mut self, panes: Option<&Panes>) {
+        if core::mem::take(&mut self.up) {
+            if let Some(panes) = panes {
+                panes.crop_leave();
+            }
+        }
+    }
+
+    /// One pass of the menu tick: enter when the editor is up with the menu closed and place this pass's rectangles;
+    /// leave when it is not.
+    pub unsafe fn pass(&mut self, panes: &Panes, editing: bool, rects: Option<&[Option<CropRect>; CROP_RECTS]>) {
+        if !editing {
+            if core::mem::take(&mut self.up) {
+                panes.crop_leave();
+            }
+            return;
+        }
+        if !core::mem::replace(&mut self.up, true) {
+            panes.crop_enter();
+        }
+        // A pass whose guide was not drawn keeps the rectangles of the pass before.
+        if let Some(rects) = rects {
+            panes.crop_draw(rects);
+        }
+    }
+}
+
 impl Panes {
     unsafe fn text(&self, index: usize, units: &[u16], color: [u8; 4]) {
         let pane = self.all[index];

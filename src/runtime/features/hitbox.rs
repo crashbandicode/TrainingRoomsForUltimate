@@ -984,7 +984,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         let bits = SHOWN.load(Ordering::Acquire);
         if zone_wizard {
             if let Some(view) = view() {
-                super::egg_zone::draw(view, |[a, b], width, color| {
+                super::egg_zone::draw(layout as usize, view, |[a, b], width, color| {
                     let [dx, dy] = [b[0] - a[0], b[1] - a[1]];
                     let length = dx.hypot(dy);
                     if length > 0.0 && length.is_finite() {

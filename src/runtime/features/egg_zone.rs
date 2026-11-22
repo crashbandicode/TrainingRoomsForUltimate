@@ -36,9 +36,9 @@ static REQUEST: AtomicU32 = AtomicU32::new(0);
 static LIVE: AtomicU32 = AtomicU32::new(0);
 static BACK: AtomicU32 = AtomicU32::new(0);
 
-/// The crop window `draw` computed in this pass, taken by the menu tick that follows it (`ui::tick`). The tick reads
-/// no camera itself: the projection stays behind the hitbox unit's draw.
-static CROP: Mutex<Option<[Option<CropRect>; CROP_RECTS]>> = Mutex::new(None);
+/// The crop window `draw` computed in this pass and the layout it was drawn for, taken by that layout's menu tick
+/// (`ui::tick`) right after the draw. The tick reads no camera itself: the projection stays behind the hitbox unit's draw.
+static CROP: Mutex<Option<(usize, [Option<CropRect>; CROP_RECTS])>> = Mutex::new(None);
 
 pub fn request() {
     REQUEST.store(epoch(), Ordering::Release);
@@ -52,9 +52,14 @@ pub fn wizard_active() -> bool {
     LIVE.load(Ordering::Acquire) == epoch()
 }
 
-/// This pass's crop window, once; `None` when the editor's guide was not drawn in this pass.
-pub fn crop() -> Option<[Option<CropRect>; CROP_RECTS]> {
-    CROP.try_lock()?.take()
+/// This pass's crop window for `layout`, once; `None` when the editor's guide was not drawn for it in this pass.
+pub fn crop(layout: usize) -> Option<[Option<CropRect>; CROP_RECTS]> {
+    let mut slot = CROP.try_lock()?;
+    let (owner, rects) = (*slot)?;
+    (owner == layout).then(|| {
+        *slot = None;
+        rects
+    })
 }
 
 pub fn take_menu_request() -> bool {
@@ -349,14 +354,14 @@ fn display(map: impl Fn(Point) -> Point) -> Option<Display> {
 
 /// Paint on the shared orb bands, using the live world projection plus a
 /// compact overview when a bar is outside the camera.
-pub fn draw(view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
+pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
     let View(scale, origin, ..) = view;
     let map = |p: Point| [p[0] * scale[0] + origin[0], p[1] * scale[1] + origin[1]];
     let Some(display) = display(map) else { return };
     if let Some(mut crop) = CROP.try_lock() {
         let vertical = display.zone.vertical().map(|y| map([0.0, y])[1]);
         let sides = Side::BOTH.map(|side| display.zone.horizontal(side).map(|span| span.map(|x| map([x, 0.0])[0])));
-        *crop = Some(crop_window(vertical, sides, display.step));
+        *crop = Some((layout, crop_window(vertical, sides, display.step)));
     }
     display.guides(map, &mut |segment, width, color| {
         for (width, color) in stroke_layers(width, color) {
