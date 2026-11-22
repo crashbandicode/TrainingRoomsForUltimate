@@ -1525,3 +1525,231 @@ break a target, except under Hits of 12%+). V2.2's on-screen rule stays: targets
 as the default and **Whole stage** as an option. Whole stage lets targets appear anywhere on the stage's floors within
 the stage's range, even off screen, using the player's own camera. It supersedes the on-screen rule for Whole stage only;
 In view keeps the existing behavior. The setting applies on the next Start.
+
+## PENDING OPERATOR (2026-11-22): Guard the Edge and Juggler — the return rule, the crosshair, Player 1's start
+
+**Pending: the operator has not answered, and nothing below is implemented.** Design by the edge-juggle-sol lane on
+source `7d962416` (the rc.15 round head), after the operator's hand test of the card build, in which the wizard's start
+mark, the pointer, the remembered start and Player 1's start point all worked. No Eden measurement was made for this
+page; the numbers in GJ4 are read from the rc.15 combined-proof traces. The pictures are mockups drawn by
+`artifacts/phase23/edge-juggle/illustrations/make_gte_next.py` (not in this repo); the recommended option has a
+**green outline**. Line counts are estimates; the size gate measures the real ones.
+
+| # | Decision | Recommendation |
+| --- | --- | --- |
+| GJ1 | Guard the Edge: a KO counts only once Player 1 is back on the stage | **A:** back means standing on a floor or a platform, or holding a ledge; a 10 s limit; a Player 1 KO, or the limit, makes the attempt a miss |
+| GJ2 | Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page | **Yes.** One crosshair page replaces the Area and CPU pages (4 pages become 3). It is simpler to use; the code saving is small |
+| GJ3 | Juggler wizard: the same crosshair for the CPU spot, and the Percent page | **Yes** for the crosshair; **keep** the Percent page |
+| GJ4 | Player 1's start: the two defects seen in the combined proof | **Measure first.** The crosshair removes neither. The next attempt waits for a KO'd Player 1; the start on the floor's last point is decided after the measurement |
+
+### GJ1 · Guard the Edge: a KO counts only once Player 1 is back
+
+The operator, 2026-11-22, verbatim: "I want to add the requirement that the p1 returns to the stage successfully after a
+successful edgeguard for it to count."
+
+**Today.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
+`src/runtime/features/edge_juggle.rs:2090`; `src/model/edge_juggle.rs:495–502`). Player 1 is not read.
+
+**Proposed rule (A).**
+
+1. When the CPU is KO'd, the card says `KO · get back to the stage` and a return window opens.
+2. **Back on the stage** means Player 1 is standing on a floor of the stage (the main floor or a platform) or holding a
+   ledge. It is the test the drill already applies to the CPU's own recovery ("Recovered on stage", "Recovered at the
+   ledge"). A Player 1 who is on the stage when the KO happens is back on that same frame, so an edge-guard from the
+   stage is scored exactly as today.
+3. **Limit:** 10 seconds after the KO. A fall ends sooner by itself, so only stalling reaches the limit.
+4. **Player 1 KO'd**, by the CPU or by a self-destruct, at any time from the release until it is back: the attempt is
+   not counted as secured.
+5. **Not counted** is a miss: the attempt is added to the total, the streak goes to 0 and no time is recorded.
+6. **Fastest** stays the time from the release to the KO, and is recorded only for a counted attempt.
+
+| The card | When |
+| --- | --- |
+| `KO · get back to the stage  2/4 · Streak 2 · Best 3` | the CPU is KO'd and Player 1 is not back yet |
+| `Secured  3/5 · Streak 3 · Best 3 · 4.20 s` | Player 1 is back (the text of today) |
+| `Not counted · P1 KO  2/5 · Streak 0 · Best 3` | Player 1 was KO'd before getting back |
+| `Not counted · no return  2/5 · Streak 0 · Best 3` | the 10 s ran out |
+| `P1 KO  2/5 · Streak 0 · Best 3` | Player 1 was KO'd while the CPU was still recovering |
+
+**Native state read.** No new hook and no new native site.
+
+- Player 1's situation: `SITUATION_KIND_GROUND` and `SITUATION_KIND_CLIFF`. The drill already reads Player 1's situation
+  for the ledge (`:2096`) and the CPU's for its own result (`:2103`).
+- Player 1's KO: its status is `FIGHTER_STATUS_KIND_DEAD`, `FIGHTER_STATUS_KIND_STANDBY` or
+  `FIGHTER_STATUS_KIND_REBIRTH`. The CPU's KO is read from Dead and Rebirth in the same way today. Standby is added
+  because it is the status Player 1's object asked for at its KO in the Lucas trace (GJ4).
+
+**Options.**
+
+| | Option | Cost to the player |
+| --- | --- | --- |
+| **A** (recommended) | a floor, a platform or a ledge grab counts; an uncounted KO is a miss | none for an edge-guard from the stage; off the stage you must make it back |
+| B | a floor only: a ledge grab must be followed by a getup | about a second more per attempt for the getup |
+| C | as A, but an uncounted KO leaves the total and the streak alone | a traded stock does not show in the count |
+
+Code: about +60 to +80 lines, tests about +90. The rule is for the ordinary Guard the Edge scoring (CPU 9 and Perfect);
+the Zoom drill and Juggler are not changed.
+
+**Unproven on a running game.**
+
+- Which of the three statuses Player 1 goes through at a KO in Training. The trace shows Standby once, then a Fall
+  request at (0, 150); no Rebirth request was captured.
+- What the respawned CPU does to a Player 1 who is still returning. If it interferes, it is held with the existing
+  CPU hold until the next release.
+- The trace readers take event 1 as the KO frame. With this rule event 1 is written when Player 1 is back, and a new
+  event marks the KO; the readers of the sealed rows change with it.
+
+![GJ1: the KO counts when Player 1 is back on the stage](decisions/gte-next-GJ1-return.png)
+
+### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
+
+The operator, 2026-11-22, verbatim: "does it make more sense for it to use the same crosshair as the [Break the Targets]
+instead of picking a quadrant? would save code and be simpler". This would replace the four start areas the operator
+chose on 2026-11-20 (Q1 of the Guard the Edge design).
+
+**What the crosshair is in the code.**
+
+- **The controls** are one function, `model::btt::placing_motion` (`src/model/btt.rs:295–310`): the stick moves the
+  point 2 units a frame outside a 0.3 dead zone, and the D-pad moves it 1 unit a press, repeating while held. Tech
+  practice already uses it (`src/model/tech/picker.rs:127`).
+- **The picture** (`EggPicture::Cursor`) and **the Fixed camera** that shows the whole stage (`btt_camera`) are shared
+  already. Guard the Edge and Juggler hold that camera, and they draw Player 1's point with that picture
+  (`src/runtime/features/edge_juggle.rs:2237–2246`).
+- **Not shared today:** the two wizards move their points with their own stick-only function (`:1455–1464`), with no
+  D-pad step, and the CPU start is drawn as the target mark.
+
+**The proposed wizard (3 pages; today 4).**
+
+1. **CPU start:** the crosshair. It opens on the current fighter's default start, as today. Stick or D-pad moves it, A
+   goes on, X returns to the default start, Y jumps to the other side's default start.
+2. **Player 1's start:** the same crosshair and controls, on the main floor between the ledges, as today.
+3. **Preview:** the target mark on the CPU start and the crosshair on Player 1's start, as today.
+
+**What the drill still needs, and where it comes from.**
+
+| Need | Today | With the crosshair |
+| --- | --- | --- |
+| Side and ledge | the chosen quadrant's side | the point's side of the stage centre, and that side's ledge. The placement and the route code already read them from the point (`:1690`, `src/model/edge_juggle.rs:722`) |
+| Upper or lower | the chosen quadrant | upper when the point is at or above its ledge's height. Only the best-times key reads it (`:2061`), so the saved bests keep their four buckets |
+| Where a start is allowed | inside the quadrant: at least 1 unit outside the ledge and 1 unit inside the blast line (`src/model/edge_juggle.rs:647–666`) | the same two limits without the quadrant. Over or under the stage, A is refused with `Pick a point off the stage` |
+| Route envelope | each fighter's measured routes test the point itself (`perfect::*::in_region`), and the planner reads the live CPU | unchanged |
+| Default start | per fighter and quadrant (`src/model/edge_juggle.rs:749–832`) | per fighter and side: the same table and offsets. The generic middle of each quadrant goes away |
+
+**The marks and the remembered start.**
+
+- **The larger mark:** on page 1 the CPU start is the crosshair itself. Once it is set, the large target mark stays on
+  it on pages 2 and 3, as today.
+- **The pointer:** kept, and it follows the crosshair on page 1. Unlike in Break the Targets, the crosshair must be
+  able to leave the picture, because some default starts lie outside it (the farthest are Pyra's, 104 units outside the
+  ledge, and Incineroar's, 110).
+- **The remembered start:** unchanged. A start the player never moved follows the current fighter's default; a moved one
+  stays exactly as set. "The default for its area" becomes "the default for its side".
+- **Player 1's point:** the same crosshair. Its picture is the crosshair already; it gains the D-pad step.
+
+**Code.** About −110 and +65 lines of product code, and about 230 lines of the wizard's tests rewritten. The saving is
+small because the quadrant page is about 55 lines and the per-fighter table of default starts stays. The gain is for
+the player: one page fewer, whole-unit steps, and the same controls as Break the Targets and Tech practice.
+
+**Risks.**
+
+1. Every Eden route, still reader and sealed-row recipe that drives or reads the wizard's pages changes with them.
+   The starts of the rc.15 rows stay reachable: the defaults are unchanged, and the D-pad makes whole-unit points exact.
+2. The crosshair can be outside the picture. The pointer, the coordinates in the notice and X cover that.
+3. The refusal over and under the stage is a new path to test.
+4. The best-times bucket is read from the point, so a start moved across the ledge's height changes bucket.
+5. The four one-press quadrant middles are gone; the player moves the crosshair there.
+6. The wizard's texts change, so the rc.15 guide pictures of these pages are redone.
+
+Unproven on a running game: the crosshair outside the picture with the pointer, and the feel of the 1-unit D-pad step
+over the long off-stage distances.
+
+![GJ2: one crosshair page instead of the quadrant and CPU pages](decisions/gte-next-GJ2-edge-crosshair.png)
+
+### GJ3 · Juggler wizard: the same crosshair for the CPU spot; the Percent page
+
+The operator, 2026-11-22, verbatim: "also for juggler when selecting the area for the cpu I would reuse the same
+crosshair. and sorry I meant the break the targets crosshair".
+
+Juggler has no quadrant page. Its first page is already a free point anywhere in the stage's camera range, moved with
+the stick alone and drawn as the target mark; the notice shows its x and its height above the floor.
+
+**Proposed.** That page uses the crosshair picture and Break the Targets' controls, so the D-pad's 1-unit step is
+added. The height is still read from the point. Player 1's page uses the same crosshair, on any floor or platform as
+today. The pages stay four: CPU spot, Percent, Player 1, Preview. Code: about −5 and +10 lines, shared with GJ2.
+
+**The Percent page.**
+
+| | Option | Cost |
+| --- | --- | --- |
+| **A** (recommended) | keep the page as it is: D-pad ±1 and ±10 | none. The D-pad's two uses are on different pages |
+| B | make it a menu row, like Guard the Edge's percent | the wizard has 3 pages like Guard the Edge's; about +40 lines and one new saved setting |
+
+![GJ3: the crosshair on Juggler's CPU page](decisions/gte-next-GJ3-juggler-crosshair.png)
+
+### GJ4 · Player 1's start: two measured defects the crosshair does not remove
+
+Both were seen in the rc.15 combined proof on release `83eecc32`. They are next-build items (tr-primary-2 ledger,
+2026-11-22 14:10:49Z and 14:12:48Z).
+
+**Defect 1: a start on the floor's last point (Sonic boot `cp1a-sonic-83ee-1`, 26 releases).**
+
+- The Player page's cursor stops on the floor's last point, x −79.9856 on Final Destination. The floor is readable
+  there, and the Preview prints `P1 (−80, 0)`.
+- No release has Player 1 there. In 24 of 26 it rests in the edge-teeter wait at x −79.03. In 2 of 26 (releases 1 and
+  4) it is 2 units past the ledge and falling one frame after the start write, and hangs on the ledge.
+- Not established: what decides between the two, and whether the start was written again. The review of 14:21:36Z
+  found that the note's conclusion "the rewrite never acted" is not supported: the hit freeze, the watched flag, the
+  rewrites spent and the writes themselves were not recorded.
+- Note: `artifacts/phase23/edge-juggle/ROOT-CAUSE-sonic-lip-p1-start.md`.
+
+**Defect 2: Player 1 KO'd between two attempts (Lucas boots, attempt 18 both times).** The release of attempt 18 has
+Player 1 in the air above the stage centre, at (0, 73.7) and (0, 75.2). A new reading of the two traces for this page
+(`artifacts/phase23/edge-juggle/evidence/tools/obj_status_frames.py`, not in this repo) shows it is a KO, not a start
+written to a wrong point:
+
+| Frame (first boot) | What the trace has |
+| --- | --- |
+| 23061 | attempt 17 is released with Player 1 on its start, (−68, 0) |
+| 23104–23109 | the CPU, back on the stage, asks for an up smash beside Player 1 |
+| 23181 | Player 1's object asks for Standby at (−77, 180), above the top of the stage |
+| about 23184 | Ready starts (the release less its 60 frames) |
+| 23185 | Player 1's object asks for Fall at exactly (0, 150); the plugin never writes that point |
+| 23244 | attempt 18 is released with Player 1 at (0, 73.7), falling |
+
+- The second boot has the same Fall request at (0, 150), 56 frames before its attempt 18.
+- Stills of the first boot show Player 1's damage growing from attempt to attempt (9.6 % at attempt 23, 45.2 % at
+  attempt 29). The drill sets the CPU's percent at every release and leaves Player 1's alone.
+- Not in the trace: the start write, Player 1's percent, and which hit KO'd it. The up smash 72 frames before the
+  Standby request is the likely one; that is an inference.
+- Hero's centre-high release (attempt 27, at (0, 72.2)) fits the same pattern and was not read again for this page.
+  Hero's two other outliers are slides along the floor, which is another case.
+
+**Does the crosshair remove them?** No. The crosshair changes how the point is picked, not what the game does with a
+fighter written onto it. The cursor already stops on the readable end of the floor today.
+
+**Proposed. No code until the operator answers.**
+
+1. **Measure first**, in one boot on the bridge lineup: at every start write, Player 1's status, hit freeze and speed,
+   the watched flag, the rewrites spent and each write, and Player 1's position and status on the next three frames.
+   One start on the floor's last point and one inside it, for Sonic, Lucas and Hero.
+2. **A KO'd Player 1:** the next attempt does not start while Player 1 is KO'd, and writes its start once it is back
+   in play. GJ1 needs the same read. Player 1's percent is left alone, as today; resetting it to 0 at every release is
+   the alternative, and would be a new behaviour.
+3. **The floor's last point,** after the measurement:
+   - **A** (recommended): keep it as a start and make it repeat, so every release begins in the edge-teeter wait.
+   - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
+   - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
+
+![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
+
+### Planned tests and proof (not written, not run)
+
+| Operator clause | Design | Planned test |
+| --- | --- | --- |
+| Player 1 returns to the stage successfully after a successful edgeguard for it to count | GJ1 rule A: the return window, the 10 s limit, a Player 1 KO or the limit is a miss | model tests of the session for each of the five card texts; a source test of the two native reads |
+| Use the same crosshair as Break the Targets instead of picking a quadrant | GJ2: one crosshair page with the shared controls; side, ledge and upper or lower read from the point | model tests of the allowed region, the two defaults, the remembered start and the best-times bucket |
+| For Juggler, reuse the same crosshair when selecting the CPU's area | GJ3: the shared controls and picture on Juggler's CPU page | a model test of the D-pad step on that page |
+| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the lip start after the measurement | model tests of the wait; the fix for the floor's last point gets its tests after the measurement |
+
+The Eden proof of each uses the bridge lineup (tr-primary-2 ledger, 2026-11-22 17:09:54Z) and playbook `b49b4e1` or
+later.
