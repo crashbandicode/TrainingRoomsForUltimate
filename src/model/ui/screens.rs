@@ -607,6 +607,10 @@ fn confirm_reset_frame(menu: &Menu, screen: &Screen, frame: &mut Frame) {
 
 /// The frame of whatever the menu shows now. Grid screens (`Screen::Grid`) are drawn by `grids`.
 pub fn frame_of(menu: &Menu, frame: &mut Frame, stage: StageLabel) {
+    if menu.recording().popup_open() {
+        page_frame(menu, frame);
+        return;
+    }
     let Some(screen) = menu.screen().copied() else {
         page_frame(menu, frame);
         return;
