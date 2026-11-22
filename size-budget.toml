@@ -2361,7 +2361,7 @@ approved_by = "tr-primary-2 2026-11-22 08:22:35Z (HANDOFF-PRIMARY-tr-primary-2.m
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 192187
+ceiling = 192232
 date = "2026-11-22"
-reason = "Eggs-ercise zone editor design 3: crop windows with limits, handles and inset edges on existing menu rectangles, sample targets instead of hatching, and only the inset backing and contour on bands. Measured normalized implementation 192187, 533 above main's 191654, with zero spare. The release gate measures NRO and BSS."
+reason = "Eggs-ercise zone editor design 3: crop windows with limits, handles and inset edges on existing menu rectangles, sample targets instead of hatching, and only the inset backing and contour on bands. Measured normalized implementation 192232, 578 above main's 191654, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 17:07:18Z and 17:51Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1494-1495 and 1522): design 3 under the operator's measured LOC rule; the measured lines and the resident memory are reported with the implementation"

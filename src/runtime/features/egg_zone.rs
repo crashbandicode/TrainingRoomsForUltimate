@@ -269,7 +269,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     else {
         return false;
     };
-    let was = wizard.step();
+    let before = *wizard;
     let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
     let outcome = wizard.input(stage, stick, sample.pressed);
     match outcome {
@@ -283,7 +283,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
             close();
             notices::post("Off-stage zone", "Applied", 90, DEFAULT_COLOR);
         }
-        _ if wizard.step() != was => prompt(wizard.step(), wizard.zone(stage)),
+        _ if wizard.prompts_after(before) => prompt(wizard.step(), wizard.zone(stage)),
         _ => {}
     }
     true

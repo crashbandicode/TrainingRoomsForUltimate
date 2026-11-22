@@ -132,6 +132,37 @@ fn zone_wizard_polls_guard_edge_controls() {
     }
 }
 
+#[test]
+fn zone_wizard_writes_the_notice_again_when_x_resets_the_preview() {
+    let stage = battlefield();
+    let mut wizard = Wizard::new(None);
+    let factory = wizard.zone(&stage);
+    let before = wizard;
+    assert_eq!(wizard.input(&stage, [0.0, 1.0], 0), Outcome::Editing);
+    assert_ne!(wizard.zone(&stage), factory);
+    assert!(!wizard.prompts_after(before));
+    let before = wizard;
+    assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::A), Outcome::Editing);
+    assert!(wizard.prompts_after(before));
+    for _ in 0..3 {
+        wizard.input(&stage, [0.0; 2], 1 << key::A);
+    }
+    assert_eq!(wizard.step(), Step::Preview);
+    let before = wizard;
+    assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::X), Outcome::Editing);
+    assert!(wizard.prompts_after(before));
+    assert_eq!(wizard.zone(&stage), Wizard::new(None).zone(&stage));
+    let before = wizard;
+    assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::X), Outcome::Editing);
+    assert!(!wizard.prompts_after(before));
+    let mut wizard = Wizard::new(None);
+    wizard.input(&stage, [0.0, 1.0], 0);
+    let before = wizard;
+    assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::X), Outcome::Editing);
+    assert_eq!(wizard.step(), Step::Preview);
+    assert!(wizard.prompts_after(before));
+}
+
 fn crop_rect(x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) -> Option<CropRect> {
     Some(CropRect { x, y, w, h, color })
 }

@@ -485,6 +485,12 @@ impl Wizard {
         self.step
     }
 
+    /// Whether the notice must be written again after an input: the step changed, or X loaded the factory zone at
+    /// Preview, the one step whose notice shows the zone's numbers.
+    pub fn prompts_after(self, before: Self) -> bool {
+        self.step != before.step || (self.step == Step::Preview && self.bins != before.bins)
+    }
+
     pub fn zone(self, stage: &Stage) -> Zone {
         stage.resolve(Some(self.bins))
     }

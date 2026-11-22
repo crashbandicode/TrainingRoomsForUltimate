@@ -7,6 +7,8 @@ edge is thicker. The two-colour handle marks the boundary being adjusted, at
 the middle of its on-screen part; an edge with no on-screen part has no handle.
 One yellow line per side marks the inner limit, replacing the dashes.
 Sample target pictures replace hatching and show places a target can appear.
+X at Preview now writes the notice again with the factory zone's numbers;
+before, the notice kept the old numbers.
 The overview inset remains when a zone extends out of view.
 
 The world view uses up to 19 rectangles: five dims, two limit lines, eight
@@ -67,7 +69,7 @@ implementation.
 | Keep which side is inward / off-stage | Yellow inner edge, purple outer edge, and one yellow line a side at the inner limit. | `crop_window_marks_the_inner_limit_once_a_side` |
 | Keep the inset view | The inset keeps its backing and contour and gets its own limits and edges, after every world rectangle. | `crop_window_draws_the_inset_after_the_world_view` |
 | Keep every function: where a target can appear (the hatching's) | Up to five sample targets a side, on the outward-connected part of each row. | `zone_samples_are_spots_a_target_can_appear_at` |
-| Keep the editor's buttons | `Wizard`, `poll` and the notice are untouched; only the drawing changed. | `zone_wizard_polls_guard_edge_controls` |
+| Keep the editor's buttons | The controls are unchanged; at Preview, X also refreshes the notice when the zone changes. | `zone_wizard_polls_guard_edge_controls` `zone_wizard_writes_the_notice_again_when_x_resets_the_preview` |
 | Readability on bright and dark stages | Edges, limits and handles are opaque and the surroundings are dimmed. A host test can pin only the opaque colours; the Eden run shows a bright and a dark stage. | `crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker` |
 | No added panes, textures or materials in any layout archive; reuse existing panes | The rectangles are 29 of the roster grid's stripes; the pane table and both built archives keep their counts. | `the_pane_table_keeps_the_count_the_game_loaded` `crop_stripes_are_matching_hidden_rectangles_under_the_same_parent` |
 | The pill cap stays 170 | The orb pools are untouched. | `the_orb_pools_keep_the_pill_cap` |
