@@ -1452,7 +1452,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        wizard.reset(run.defaults);
+        wizard.back_to_defaults(run.defaults);
         run.cursor = wizard.setup.p1;
         run.confirm_player = false;
         return true;
@@ -2148,17 +2148,17 @@ pub unsafe fn frame(fighter: usize) {
     }
     post_notice(run, best_time(bests, key), best_time(streaks, key));
 }
-pub fn look(active: bool) -> [Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS] {
+pub fn look(active: bool) -> ([Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS], bool) {
     use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
     let mut marks = [None; super::btt::LOOKS];
     if !active || !wizard_active() {
-        return marks;
+        return (marks, false);
     }
     let Some(engine) = ENGINE.try_lock() else {
-        return marks;
+        return (marks, false);
     };
     let Some(wizard) = engine.run.as_ref().and_then(|run| run.wizard) else {
-        return marks;
+        return (marks, false);
     };
     marks[0] = Some((wizard.setup.cpu, EGG_WHOLE));
     if matches!(wizard.step, WizardStep::Player | WizardStep::Preview) {
@@ -2170,5 +2170,5 @@ pub fn look(active: bool) -> [Option<([f32; 2], crate::model::panes::EggLook)>; 
             },
         ));
     }
-    marks
+    (marks, wizard.shows_cpu())
 }

@@ -779,7 +779,11 @@ impl Wizard {
         self.drill == Drill::GuardEdge && !self.moved
     }
 
-    pub fn reset(&mut self, defaults: Setup) {
+    pub fn shows_cpu(&self) -> bool {
+        matches!(self.step, WizardStep::Area | WizardStep::Cpu | WizardStep::Preview)
+    }
+
+    pub fn back_to_defaults(&mut self, defaults: Setup) {
         self.setup = defaults;
         self.moved = false;
         self.step = WizardStep::Preview;
@@ -1202,6 +1206,28 @@ mod tests {
     }
 
     #[test]
+    fn the_pointer_steps_are_the_ones_that_show_the_cpu_coordinates() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let steps = |drill| {
+            let mut wizard = Wizard::new(drill, stage, [0.0; 2], 100, (0, 0), None).unwrap();
+            [(); 4].map(|()| {
+                let seen = (wizard.step, wizard.shows_cpu());
+                wizard.advance();
+                seen
+            })
+        };
+        assert_eq!(steps(Drill::GuardEdge), [
+            (WizardStep::Area, true), (WizardStep::Cpu, true), (WizardStep::Player, false), (WizardStep::Preview, true),
+        ]);
+        assert_eq!(steps(Drill::Juggler), [
+            (WizardStep::Cpu, true), (WizardStep::Percent, false), (WizardStep::Player, false), (WizardStep::Preview, true),
+        ]);
+    }
+
+    #[test]
     fn a_moved_start_stays_as_set_even_back_on_its_default() {
         let stage = Stage::new(
             [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
@@ -1232,7 +1258,7 @@ mod tests {
 
         let mut c = a;
         c.step = WizardStep::Cpu;
-        c.reset(fresh.setup);
+        c.back_to_defaults(fresh.setup);
         assert!(c.unmoved());
         assert_eq!((c.setup, c.step), (fresh.setup, WizardStep::Preview));
         assert_eq!(diddy.remembered(stage, c.setup, c.unmoved()).cpu, diddy.setup.cpu);

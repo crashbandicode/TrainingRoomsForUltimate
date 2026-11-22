@@ -129,11 +129,35 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
 }
 
 #[test]
+fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    assert!(item(&runtime, "pub fn look(").contains("wizard.shows_cpu()"));
+    let hitbox = src("src/runtime/features/hitbox.rs");
+    let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
+    assert!(draw.contains(".filter(|_| pointed)"));
+    assert!(!draw.contains(".filter(|_| edge_wizard)"));
+    let notice = item(&runtime, "fn post_notice(");
+    for text in [
+        "\"{} ({x:.0}, {y:.0}) · D-pad choose · A next\"",
+        "\"CPU x {x:.0} · Height {:+.0} · Stick move · A next\"",
+        "\"CPU ({x:.0}, {y:.0}) · Stick move · A next\"",
+        "\"CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start\"",
+    ] {
+        assert!(notice.contains(text), "{text}");
+    }
+    let page_text = notice.split_once("let _ = match wizard.step {").unwrap().1;
+    for head in ["WizardStep::Percent =>", "WizardStep::Player =>"] {
+        let line = page_text.lines().find(|line| line.contains(head)).unwrap();
+        assert!(!line.contains("{x:") && !line.contains("{y:"), "{line}");
+    }
+}
+
+#[test]
 fn edge_juggle_remembers_whether_the_start_was_moved() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let poll = item(&runtime, "pub unsafe fn poll(");
     assert!(poll.contains("wizard.unmoved()"));
-    assert!(poll.contains("wizard.reset(run.defaults)"));
+    assert!(poll.contains("wizard.back_to_defaults(run.defaults)"));
     assert!(!poll.contains("wizard.setup = run.defaults"));
     assert!(item(&runtime, "pub unsafe fn frame(").contains("wizard.remembered("));
 }

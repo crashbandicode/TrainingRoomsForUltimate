@@ -894,12 +894,12 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
-    let marks = if edge_wizard {
+    let (marks, pointed) = if edge_wizard {
         super::edge_juggle::look(active)
     } else if tech {
-        super::tech::look(active)
+        (super::tech::look(active), false)
     } else {
-        marks
+        (marks, false)
     };
     own[3..].copy_from_slice(&marks);
     if zone_wizard {
@@ -967,7 +967,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             Some((plan(&dot, [255; 4])?, look))
         });
         if let Some(pointer) = own[3]
-            .filter(|_| edge_wizard)
+            .filter(|_| pointed)
             .and_then(|([x, y], _)| project_to_canvas([x, y, 0.0], half))
             .and_then(|canvas| orbs::edge_pointer(canvas))
         {

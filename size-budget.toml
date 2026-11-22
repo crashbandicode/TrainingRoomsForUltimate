@@ -2333,3 +2333,11 @@ ceiling = 188680
 date = "2026-11-22"
 reason = "Rewrite Player 1's drill start while a hit still moves it (rc15-gte-wizard-start 82b0ebc1). 188680 measured on its merge with the strip layout fixes and the 1 Frame Save hold, 69 over 188611."
 approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start fix on rc15-gte-wizard-start under the measured LOC rule; merge onto the integration main ordered 07:55:29Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188764
+date = "2026-11-22"
+reason = "Guard the Edge wizard on rc15-gte-wizard-start over main de5a582b: draw the CPU start at full size, show its coordinates on the Area step, point to it from the picture border when it is outside the picture on the steps that show its coordinates, and let a remembered start the player never edited follow the current fighter's default. 188764 measured on de5a582b plus this branch; the branch adds 85 (188765 against 188680 when measured on 84fab501)."
+approved_by = "tr-primary-2, 2026-11-22 04:24Z (HANDOFF-PRIMARY-tr-primary-2.md line 771), ruled the option 3 mark with an edge marker and the unmoved remembered start on rc15-gte-wizard-start under the measured LOC rule; the explicit edit flag and the pointer steps were ruled at 08:49:08Z (line 1036)"
