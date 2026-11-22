@@ -134,7 +134,7 @@ fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
     assert!(item(&runtime, "pub fn look(").contains("wizard.shows_cpu()"));
     let hitbox = src("src/runtime/features/hitbox.rs");
     let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
-    assert!(draw.contains(".filter(|_| pointed)"));
+    assert!(draw.contains(".filter(|_| pointed && !zone_wizard)"));
     assert!(!draw.contains(".filter(|_| edge_wizard)"));
     let notice = item(&runtime, "fn post_notice(");
     for text in [
@@ -313,10 +313,11 @@ fn egg_zone_camera_tracks_the_live_wizard() {
 }
 
 #[test]
-fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
+fn zone_overlay_dims_the_live_view_and_backs_the_inset_guide() {
     let zone = src("src/runtime/features/egg_zone.rs");
     let draw = item(&zone, "pub fn draw(");
-    assert!(draw.contains("stroke_layers(width, color)"), "world marks draw the dark and colored layers");
+    assert!(draw.contains("crop_window(crop_view(&map), inset, display.step)"), "the live view's marks are the crop window");
+    assert!(!draw.contains("stroke_layers"));
     assert!(draw.contains("INSET_BACKING"), "every inset mark has a dark background");
     assert!(item(&zone, "fn prompt(").contains("notices::show_now("), "the built-in notice includes the dark label plate");
 }
