@@ -230,6 +230,53 @@ fn state06_hub_trigger_rules() {
     assert!(sites::find("on_init").is_some());
 }
 
+fn owed_reset_block(source: &str) -> &str {
+    source
+        .split_once("RESET_OWED.take(")
+        .expect("on-init must consume an owed reset")
+        .1
+        .split_once("\n    }\n    result")
+        .expect("the owed-reset block ends before the return")
+        .0
+}
+
+#[test]
+fn reset_hub_runs_the_game_resets_only_for_an_owed_reset() {
+    let hub = include_str!("../src/runtime/features/reset_hub.rs");
+    let block = owed_reset_block(hub);
+    for call in [
+        "btt_camera::interrupt_placement()",
+        "hub::run(Clear::TrainingReset)",
+        "hitbox::eggs_reset()",
+        "mashout::reset()",
+        "btt::reset()",
+        "tech::reset()",
+        "parry::reset()",
+        "edge_juggle::restart()",
+        "egg_zone::reset()",
+    ] {
+        assert_eq!(hub.matches(call).count(), 1, "{call}");
+        assert!(block.contains(call), "{call} must be inside the owed-reset block");
+    }
+    let reset = include_str!("../src/runtime/features/lra_reset.rs");
+    assert_eq!(reset.matches("RESET_OWED.owe()").count(), 1);
+    let guarded = reset.split_once("if lra_reset::reset_passes(").expect("reset-pass gate").1;
+    assert!(guarded.split_once('}').unwrap().0.contains("RESET_OWED.owe()"));
+    let stage = include_str!("../src/runtime/lobby/practice_stage_request.rs");
+    assert_eq!(stage.matches("RESET_OWED.stage_published()").count(), 1);
+    assert_eq!(stage.matches("RESET_OWED.stage_completed()").count(), 1);
+    assert!(!stage.contains("RESET_OWED.owe()"));
+}
+
+#[test]
+fn mashout_attempt_survives_a_cpu_transform_init() {
+    let hub = include_str!("../src/runtime/features/reset_hub.rs");
+    assert!(owed_reset_block(hub).contains("mashout::reset()"));
+    let mashout = include_str!("../src/runtime/features/mashout.rs");
+    assert!(mashout.contains("game.p1 != p1 || game.cpu != cpu"));
+    assert!(mashout.contains("game.fail(\"Fighter changed · no grade\")"));
+}
+
 #[test]
 fn state06_hub_order() {
     assert_eq!(
@@ -396,4 +443,3 @@ fn state06_hub_trigger_facts_match_the_guarded_words() {
     assert!(sites::feature_usable(sites::Feature::ResetHub, |_| true));
     assert!(!sites::feature_usable(sites::Feature::ResetHub, |s| s.name != "is_operation_cpu"));
 }
-
