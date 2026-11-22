@@ -1525,3 +1525,18 @@ break a target, except under Hits of 12%+). V2.2's on-screen rule stays: targets
 as the default and **Whole stage** as an option. Whole stage lets targets appear anywhere on the stage's floors within
 the stage's range, even off screen, using the player's own camera. It supersedes the on-screen rule for Whole stage only;
 In view keeps the existing behavior. The setting applies on the next Start.
+
+### rc.15 zone editor: design 3, the crop window (operator decision, 2026-11-22)
+
+At about 17:07Z the operator chose design 3: "I would go with design 3 as it looks the cleanest." Design 1 used cards
+and design 2 used solid lines. The crop window reuses existing rectangles and practice pictures: no pane, texture or
+material is added. The HB-PILLS cap stays at 170 pills; the earlier proposal to assign orb pictures permanently to the
+guide, leaving 141 to 151 pills, is not taken.
+
+![Model rendering of design 3, the crop window](decisions/rc15-zone-editor-design-3-crop-window.png)
+
+*Model rendering of design 3.*
+
+![Eden proving boot of the crop window spike](decisions/rc15-zone-editor-crop-proving-boot.png)
+
+*Eden proving boot, build `2a29baf4`: the spike still draws today's guide inside the zones. It is not the full implementation.*

@@ -485,8 +485,9 @@ checked area. In view is the default and takes over when the checklist is empty.
 bounds, so a target can appear outside the current camera. Changes apply at the next Start.
 
 Open **Off-stage zone…** to edit the two mirrored zones. Use the left stick up/down for the blue **Top** and **Bottom**
-lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges** in or out. The dotted
-yellow guides mark how far inward each side can reach under the stage. The solid stage is excluded. **A** advances,
+lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges** in or out. Yellow
+limit lines mark how far inward each side can reach under the stage. The active edge has a handle, sample targets show
+places targets can appear, and the rest of the screen is dimmed. The solid stage is excluded. **A** advances,
 **B** goes back or cancels from Top, and **X** previews the factory zone. In **Preview**, press **A** or **+** to apply.
 Training Rooms saves the zone for the current stage and form.
 
