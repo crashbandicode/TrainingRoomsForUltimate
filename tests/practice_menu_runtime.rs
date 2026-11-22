@@ -131,7 +131,10 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
 #[test]
 fn edge_juggle_remembers_whether_the_start_was_moved() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
-    assert!(item(&runtime, "pub unsafe fn poll(").contains("wizard.unmoved(run.stage)"));
+    let poll = item(&runtime, "pub unsafe fn poll(");
+    assert!(poll.contains("wizard.unmoved()"));
+    assert!(poll.contains("wizard.reset(run.defaults)"));
+    assert!(!poll.contains("wizard.setup = run.defaults"));
     assert!(item(&runtime, "pub unsafe fn frame(").contains("wizard.remembered("));
 }
 

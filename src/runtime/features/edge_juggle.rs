@@ -1452,10 +1452,9 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        wizard.setup = run.defaults;
+        wizard.reset(run.defaults);
         run.cursor = wizard.setup.p1;
         run.confirm_player = false;
-        wizard.step = WizardStep::Preview;
         return true;
     }
     match wizard.step {
@@ -1479,7 +1478,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
-            kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved(run.stage)));
+            kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved()));
             run.wizard = None;
             WIZARD.store(false, Ordering::Release);
         } else {
