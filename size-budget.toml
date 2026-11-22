@@ -2317,3 +2317,11 @@ ceiling = 188607
 date = "2026-11-21"
 reason = "Compact frame strip layout C. One strip_layout spec (strip.rs, card.rs, mod.rs: +924) places the strip, the corner card and the link cells for both the archived pane recipes and the live HUD, replacing 328 lines of fixed geometry in panes.rs and combo_plan.rs. Link history gets its On/Off setting with the fold into LINK, and the panel fades over the overlay's fighter anchors. The exact normalized delta is +699 over 187908, with zero spare. No new native site. The combined release gate measures NRO and BSS against 3448686c."
 approved_by = "Operator through tr-primary-2, 2026-11-21 18:58Z, ordered compact strip C with the Link history switch and its layout abstracted from its functionality into the intermediate build, under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188608
+date = "2026-11-22"
+reason = "raise: 1 Frame Save hold (the kept step bit marked in previous, Controller identity and re-entry with the speed-hold close, the skipped-poll branch); 188608 measured on c2fc22f2, 1 over 188607"
+approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate"
