@@ -1,6 +1,6 @@
 # Eggs-ercise zone editor: three redesigns (for the operator's pick)
 
-Model renderings, not Eden stills (2026-11-22, fusion-g2-3, commit `119ed546` on `rc15-zone-guide-contrast-rebased`).
+Model renderings, not Eden stills (2026-11-22, fusion-g2-3, commit `a92bc320`, the top boundary shown active as the step-1 notice says on `rc15-zone-guide-contrast-rebased`).
 Each picture shows the design over the bright Small Battlefield still of run B7; below, the left zone at 2x over that still and over a dark frame.
 
 All three keep the hitbox pill cap at 170 and add no pane, texture or material. The hitbox drawing is already off while the editor is open, so the editor borrows its idle bands and caps (and the practice games' ten target pictures) and gives them back when it closes.
