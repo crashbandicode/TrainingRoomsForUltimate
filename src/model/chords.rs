@@ -535,6 +535,12 @@ impl Detector {
         self.pending != 0
     }
 
+    /// P1's poll follows a gap (a poll the runtime skipped) or comes from another Controller: the buttons this stage
+    /// kept from the game are no longer its own (review-games-astra-3 2026-11-22 00:50Z).
+    pub fn reenter(&mut self) {
+        (self.swallow, self.hidden) = (0, 0);
+    }
+
     /// Session clear: scene departure, hot swap, the waiting-room UI becoming busy. The speed hold closes too (the
     /// runtime takes the pop-up down).
     pub fn clear_session(&mut self) {

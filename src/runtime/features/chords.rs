@@ -9,7 +9,7 @@
 //! NOT YET SWITCH-RUN.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use hos_lock::Mutex;
 
@@ -60,14 +60,15 @@ fn blocked() -> bool {
 /// # Safety
 /// `controller` is the live `Controller` pointer the mapping call passed, or 0.
 pub unsafe fn on_poll(controller: usize) {
-    // P1's poll with no Training controller to read (`input_delay::note`): no step button is kept over the gap.
+    let reentry = POLLED.swap(controller, Ordering::Relaxed) != controller;
+    // P1's poll with no Training controller to read (`input_delay::note`) only records the gap.
     if controller == 0 {
-        return STEP_KEPT.store(0, Ordering::Relaxed);
+        return;
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
     // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
-    let step_keep = lobby_speed::StepKeep(STEP_KEPT.load(Ordering::Relaxed));
+    let step_keep = lobby_speed::StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) });
     let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
     let sample = Sample::of(style, current, just_down)
@@ -77,6 +78,9 @@ pub unsafe fn on_poll(controller: usize) {
     let drill_running = super::edge_juggle::running();
     let accepted = {
         let mut state = STATE.lock();
+        if reentry {
+            state.detector.reenter();
+        }
         // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
         // thread takes `STATE` while it works).
         if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
@@ -171,6 +175,10 @@ pub unsafe fn on_poll(controller: usize) {
 
 /// rc.15: the step bits the last poll kept out of the current set (`lobby_speed::StepKeep`; P1's poll only).
 static STEP_KEPT: AtomicU32 = AtomicU32::new(0);
+
+/// The Controller of P1's last poll through this stage (0 after a poll with no Training controller). A poll on another
+/// one follows a gap or a handoff: nothing the last poll kept, step bit or chord button, is carried over.
+static POLLED: AtomicUsize = AtomicUsize::new(0);
 
 /// The controller fields `on_poll` changed for the mapping call, to put back when it returns.
 static HIDDEN: Mutex<Option<(usize, [u32; 8])>> = Mutex::new(None);

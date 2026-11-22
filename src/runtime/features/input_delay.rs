@@ -67,7 +67,7 @@ fn note(out: usize, slot: i64, state: usize) {
         ui::input::on_p1_poll(state);
         unsafe { chords::on_poll(controller) };
     } else if slot == 0 {
-        // rc.15: P1's poll outside Training or during a hot swap: the chord stage forgets a step button it kept.
+        // rc.15: P1's poll outside Training or during a hot swap: the chord stage records the gap.
         unsafe { chords::on_poll(0) };
     }
 }

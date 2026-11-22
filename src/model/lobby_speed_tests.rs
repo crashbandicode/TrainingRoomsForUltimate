@@ -555,6 +555,7 @@ struct Pad {
     sets: [u32; 4],
     detector: crate::model::chords::Detector,
     keep: StepKeep,
+    reentry: bool,
     lobby: FrameStep,
     training: FrameStep,
 }
@@ -579,16 +580,27 @@ impl Pad {
         self.poll()
     }
 
-    /// A refresh whose P1 poll the runtime skips (outside Training, a hot swap): `chords::on_poll(0)` forgets the kept bit;
+    /// A refresh whose P1 poll the runtime skips (outside Training, a hot swap): `chords::on_poll(0)` records the gap;
     /// the detector is not polled.
     fn skipped(&mut self, hw: u32) {
         self.refresh(hw);
-        self.keep = StepKeep(0);
+        self.reentry = true;
+    }
+
+    /// P1's next poll comes from another Controller, whose four sets are `sets`.
+    fn handoff(&mut self, sets: [u32; 4]) -> Polled {
+        self.sets = sets;
+        self.reentry = true;
+        self.poll()
     }
 
     /// The poll alone: the same controller once more before the next refresh (6e226733's trace has such polls).
     fn poll(&mut self) -> Polled {
         use crate::model::chords::{physical_mask, ChordSet, Sample};
+        if std::mem::take(&mut self.reentry) {
+            self.keep = StepKeep(0);
+            self.detector.reenter();
+        }
         let (held, pressed) = self.keep.seen(self.sets);
         self.detector.poll(&ChordSet::factory(), Sample::of(self.style, held, pressed), false);
         let event = self.detector.hold_event();
@@ -740,12 +752,79 @@ fn a_skipped_poll_forgets_the_kept_step_button() {
     pad.detector.clear_session();
     pad.skipped(0);
     pad.skipped(0);
-    assert_eq!(pad.keep, StepKeep(0));
+    assert!(pad.reentry, "the gap is recorded");
     assert_eq!(pad.update(ZL), STEP, "a new press after the gap is a press");
+    assert_eq!(pad.keep, StepKeep(0));
     assert_eq!(StepKeep(ZL).seen([ZL, 0, ZL, 0]), (ZL, 0), "a bit still kept would have read it as held");
     let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).map(|l| format!("{l}\n")).collect::<String>();
+    let chords = code(include_str!("../runtime/features/chords.rs"));
+    assert!(chords.contains("POLLED.swap(controller, Ordering::Relaxed) != controller"));
+    assert!(chords.contains("state.detector.reenter();"));
+    assert!(chords.contains("StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) })"));
     assert!(code(include_str!("../runtime/features/input_delay.rs")).contains("chords::on_poll(0)"));
-    assert!(code(include_str!("../runtime/features/chords.rs")).contains("return STEP_KEPT.store(0, Ordering::Relaxed);"));
+}
+
+fn an_exposed_release_keeps_the_games_release_edge() {
+    use crate::model::chords::bit::{DPAD_UP as UP, R, ZL};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.update(R | UP | ZL), (HoldEvent::Held, false, false));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.refresh(ZL);
+    let polled = pad.update(0);
+    assert!(!polled.1 && !polled.2, "no step");
+    assert_eq!((pad.sets, pad.keep), ([0, ZL, 0, ZL], StepKeep(0)), "not owned any more: the game's release is left as it is");
+}
+
+fn a_bare_step_press_after_a_gap_is_a_press() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.skipped(DOWN | ZL);
+    pad.skipped(0);
+    assert_eq!(pad.update(ZL), STEP, "a bare ZL after the gap steps");
+    assert_eq!(pad.update(ZL), NO_STEP);
+}
+
+fn a_kept_step_button_does_not_follow_a_controller_handoff() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, R, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.update(R | UP | ZL), (HoldEvent::Held, false, false));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    let polled = pad.handoff([0, ZL, 0, 0]);
+    assert!(!polled.1 && !polled.2);
+    assert_eq!((pad.sets, pad.keep), ([0, ZL, 0, 0], StepKeep(0)), "the other pad's words are left as they are");
+
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    assert_eq!(pad.handoff([ZL, 0, ZL, 0]), STEP, "a bare ZL on the other pad steps");
+}
+
+fn a_session_clear_on_the_same_pad_keeps_the_chords_step_button() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.detector.clear_session();
+    for _ in 0..20 {
+        assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    }
+    assert_eq!(pad.keep, StepKeep(ZL));
+    assert!(!pad.detector.consume(Request::SaveState), "no second save");
 }
 
 /// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, in Training or here.
@@ -862,6 +941,10 @@ fn case_table() {
         ("the_kept_step_button_is_marked_in_the_previous_set", the_kept_step_button_is_marked_in_the_previous_set as fn()),
         ("a_release_the_poll_did_not_see_is_not_a_held_step_button", a_release_the_poll_did_not_see_is_not_a_held_step_button as fn()),
         ("a_skipped_poll_forgets_the_kept_step_button", a_skipped_poll_forgets_the_kept_step_button as fn()),
+        ("an_exposed_release_keeps_the_games_release_edge", an_exposed_release_keeps_the_games_release_edge as fn()),
+        ("a_bare_step_press_after_a_gap_is_a_press", a_bare_step_press_after_a_gap_is_a_press as fn()),
+        ("a_kept_step_button_does_not_follow_a_controller_handoff", a_kept_step_button_does_not_follow_a_controller_handoff as fn()),
+        ("a_session_clear_on_the_same_pad_keeps_the_chords_step_button", a_session_clear_on_the_same_pad_keeps_the_chords_step_button as fn()),
         ("holding_the_speed_chord_never_steps", holding_the_speed_chord_never_steps as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
