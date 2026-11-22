@@ -15,7 +15,6 @@ pub use crate::model::btt::LOOKS;
 use crate::model::btt::{self, Ask, Btt, Five, Hot, Pad, Phase, HEADER, HOT};
 use crate::model::chords::{field, Sample};
 use crate::model::eggs::{self, View};
-use crate::model::panes::EggLook;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::Game;
 use crate::model::settings::Snapshot;
