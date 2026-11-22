@@ -2337,7 +2337,7 @@ approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start f
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 191514
+ceiling = 188764
 date = "2026-11-22"
-reason = "Guard the Edge niche recoveries after 6395498b on integration main de5a582b, as one folded entry: the measured Pyra and Mythra swap with the replacement-body handling, the Ness, Lucas, Hero, Sonic, Snake, Sheik and Meta Knight routes, native-wait placement with the Player 1 start fix in its model-driven form, the operator's Sonic, Lucas and Hero rulings, the per-session bound on Player 1 rewrites and the settled-selection rule for the drill's selected CPU. No private restart tracker. The measured normalized implementation count is 191514, 2834 over main's 188680 entry, with no headroom. NRO and BSS are reported at the gate."
-approved_by = "tr-primary-2, 2026-11-22 07:34Z, 08:07:11Z, 08:44:17Z and 09:18:12Z (HANDOFF-PRIMARY-tr-primary-2.md lines 913, 934-935, 975, 1018 and 1057-1059): one folded niche entry, re-measured after the tracker is removed and the two review fixes are folded in, under the operator's measured LOC rule; flag only if the NRO grows more than about 8 KiB or BSS grows"
+reason = "Guard the Edge wizard on rc15-gte-wizard-start over main de5a582b: draw the CPU start at full size, show its coordinates on the Area step, point to it from the picture border when it is outside the picture on the steps that show its coordinates, and let a remembered start the player never edited follow the current fighter's default. 188764 measured on de5a582b plus this branch; the branch adds 85 (188765 against 188680 when measured on 84fab501)."
+approved_by = "tr-primary-2, 2026-11-22 04:24Z (HANDOFF-PRIMARY-tr-primary-2.md line 771), ruled the option 3 mark with an edge marker and the unmoved remembered start on rc15-gte-wizard-start under the measured LOC rule; the explicit edit flag and the pointer steps were ruled at 08:49:08Z (line 1036)"

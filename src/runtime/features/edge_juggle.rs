@@ -92,7 +92,7 @@ static BACK: AtomicBool = AtomicBool::new(false);
 
 struct Engine {
     run: Option<Run>,
-    kept: [Option<(StageKey, Setup)>; 2],
+    kept: [Option<(StageKey, Setup, bool)>; 2],
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
@@ -1497,10 +1497,9 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        wizard.setup = run.defaults;
+        wizard.back_to_defaults(run.defaults);
         run.cursor = wizard.setup.p1;
         run.confirm_player = false;
-        wizard.step = WizardStep::Preview;
         return true;
     }
     match wizard.step {
@@ -1524,7 +1523,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
-            kept[run.drill as usize] = Some((run.stage_key, run.setup));
+            kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved()));
             run.wizard = None;
             WIZARD.store(false, Ordering::Release);
         } else {
@@ -1771,7 +1770,7 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
             ],
         ][run.drill as usize][number];
         let _ = match wizard.step {
-            WizardStep::Area => write!(text, "{} · D-pad choose · A next", area.title()),
+            WizardStep::Area => write!(text, "{} ({x:.0}, {y:.0}) · D-pad choose · A next", area.title()),
             WizardStep::Cpu if run.drill == Drill::Juggler => write!(
                 text,
                 "CPU x {x:.0} · Height {:+.0} · Stick move · A next",
@@ -1952,8 +1951,8 @@ pub unsafe fn frame(fighter: usize) {
             return;
         };
         let last = engine.kept[drill as usize]
-            .filter(|(stage, _)| *stage == stage_key)
-            .map(|(_, setup)| setup);
+            .filter(|(stage, ..)| *stage == stage_key)
+            .map(|(_, setup, unmoved)| wizard.remembered(stage, setup, unmoved));
         let editing = start == 2 || last.is_none();
         let mut setup = last.unwrap_or(wizard.setup);
         if drill == Drill::GuardEdge {
@@ -2223,25 +2222,19 @@ pub unsafe fn frame(fighter: usize) {
     }
     post_notice(run, best_time(bests, key), best_time(streaks, key));
 }
-pub fn look(active: bool) -> [Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS] {
+pub fn look(active: bool) -> ([Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS], bool) {
     use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
     let mut marks = [None; super::btt::LOOKS];
     if !active || !wizard_active() {
-        return marks;
+        return (marks, false);
     }
     let Some(engine) = ENGINE.try_lock() else {
-        return marks;
+        return (marks, false);
     };
     let Some(wizard) = engine.run.as_ref().and_then(|run| run.wizard) else {
-        return marks;
+        return (marks, false);
     };
-    marks[0] = Some((
-        wizard.setup.cpu,
-        EggLook {
-            scale: 0.3,
-            ..EGG_WHOLE
-        },
-    ));
+    marks[0] = Some((wizard.setup.cpu, EGG_WHOLE));
     if matches!(wizard.step, WizardStep::Player | WizardStep::Preview) {
         marks[super::btt::LOOKS - 1] = Some((
             wizard.setup.p1,
@@ -2251,5 +2244,5 @@ pub fn look(active: bool) -> [Option<([f32; 2], crate::model::panes::EggLook)>; 
             },
         ));
     }
-    marks
+    (marks, wizard.shows_cpu())
 }
