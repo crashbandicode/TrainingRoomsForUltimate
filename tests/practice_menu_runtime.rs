@@ -17,6 +17,10 @@ fn item<'a>(text: &'a str, head: &str) -> &'a str {
     &text[at..end]
 }
 
+fn member<'a>(text: &'a str, head: &str) -> &'a str {
+    item(text, head).split_once("\n    }\n").expect(head).0
+}
+
 #[test]
 fn a_menu_visit_suspends_tech_practice_and_b_resumes_it() {
     let tech = src("src/runtime/features/tech.rs");
@@ -447,6 +451,18 @@ fn egg_zone_camera_tracks_the_live_wizard() {
     let placement = on_frame.find("btt_camera::update_placement(").unwrap();
     let render = on_frame.find("btt_camera::frame(want_camera)").unwrap();
     assert!(hitbox < placement && placement < render);
+}
+
+#[test]
+fn recording_lists_use_the_menus_list_jump() {
+    let recording = src("src/model/recording_menu.rs");
+    let implementation = recording.split_once("#[cfg(test)]\nmod tests").unwrap().0;
+    assert!(!implementation.contains("fn page_by(") && !implementation.contains("const PAGE:"));
+    for head in ["fn page_section(", "fn press_file(", "fn press_picker("] {
+        let body = member(implementation, head);
+        assert!(body.contains("jumped(") || body.contains("jumped_within("), "{head}");
+    }
+    assert!(src("src/model/menu/mod.rs").contains("fn jumped_within("));
 }
 
 #[test]

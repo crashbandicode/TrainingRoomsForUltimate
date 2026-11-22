@@ -405,16 +405,20 @@ pub(crate) fn group_of(entry: Entry) -> usize {
     }
 }
 
+/// A list cursor one window further, stopping at an end; None when already there or the list is empty.
+pub(crate) fn jumped_within(cursor: usize, len: usize, forward: bool) -> Option<usize> {
+    let last = len.checked_sub(1)?;
+    let cursor = cursor.min(last);
+    match forward {
+        true => (cursor < last).then(|| (cursor + LIST_JUMP).min(last)),
+        false => (cursor > 0).then(|| cursor.saturating_sub(LIST_JUMP)),
+    }
+}
+
 /// A list cursor after ZL + Up / Down: one window further, stopping at the first or last entry; from there the next
 /// jump wraps to the other end, as Up / Down do.
-fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
-    let last = len.saturating_sub(1);
-    match forward {
-        true if cursor >= last => 0,
-        true => (cursor + LIST_JUMP).min(last),
-        false if cursor == 0 => last,
-        false => cursor.saturating_sub(LIST_JUMP),
-    }
+pub(crate) fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
+    jumped_within(cursor, len, forward).unwrap_or(if forward { 0 } else { len.saturating_sub(1) })
 }
 
 /// The menu.

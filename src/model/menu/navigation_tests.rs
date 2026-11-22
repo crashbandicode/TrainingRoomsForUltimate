@@ -181,6 +181,30 @@ fn section_starts(m: &Menu, page: Page) -> Vec<usize> {
 }
 
 #[test]
+fn a_list_jump_inside_a_list_stops_at_its_ends() {
+    assert_eq!(jumped_within(0, 0, false), None);
+    assert_eq!(jumped_within(0, 0, true), None);
+    assert_eq!(jumped_within(0, 1, false), None);
+    assert_eq!(jumped_within(0, 1, true), None);
+    assert_eq!(jumped_within(0, 30, false), None);
+    assert_eq!(jumped_within(0, 30, true), Some(12));
+    assert_eq!(jumped_within(15, 30, false), Some(3));
+    assert_eq!(jumped_within(15, 30, true), Some(27));
+    assert_eq!(jumped_within(29, 30, false), Some(17));
+    assert_eq!(jumped_within(29, 30, true), None);
+    assert_eq!(jumped_within(99, 30, false), Some(17));
+    assert_eq!(jumped_within(99, 30, true), None);
+    for len in 0usize..=30 {
+        for cursor in 0..=len + 2 {
+            for forward in [false, true] {
+                let wrap = if forward { 0 } else { len.saturating_sub(1) };
+                assert_eq!(jumped(cursor, len, forward), jumped_within(cursor, len, forward).unwrap_or(wrap));
+            }
+        }
+    }
+}
+
+#[test]
 fn page_jump_wraps_at_the_edges() {
     // A page: ZL + Up from the first section goes to the last, ZL + Down from the last to the first.
     let mut m = on_page(Page::FightersStages);

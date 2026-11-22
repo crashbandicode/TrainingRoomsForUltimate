@@ -7,11 +7,9 @@
 use super::combo::Combo;
 use super::menu::input::Button;
 use super::menu::table::{COMBOS_SEQ, SAVES_MACROS};
+use super::menu::{jumped, jumped_within};
 use super::numbered_picker::{self, CatalogTile, NumberKey, TileKind};
 use super::ordered_ids;
-
-/// How far ZL+Up / ZL+Down moves a section. The menu's section jump uses the same distance.
-pub const PAGE: usize = 12;
 
 const SAVE_ON: [u8; 4] = [242, 152, 72, 255];
 const SAVE_OFF: [u8; 4] = [126, 132, 144, 255];
@@ -1019,13 +1017,15 @@ impl RecordingScreens {
             _ if !on_library => PageHit::Passthrough,
             Button::Up => self.nudge_page(group, -1),
             Button::Down => self.nudge_page(group, 1),
-            Button::JumpUp => {
-                self.page_section(Face::Page, group, false);
-                PageHit::Consumed
-            }
-            Button::JumpDown => {
-                self.page_section(Face::Page, group, true);
-                PageHit::Consumed
+            Button::JumpUp | Button::JumpDown => {
+                let down = button == Button::JumpDown;
+                let section = usize::from(self.place(Face::Page, group).section);
+                let len = self.items(Face::Page, group, section as u8).len();
+                match jumped_within(self.place(Face::Page, group).at[section], len, down) {
+                    Some(at) => { self.place_mut(Face::Page, group).at[section] = at; PageHit::Consumed }
+                    None if self.leave_section(group, down) => PageHit::Consumed,
+                    None => PageHit::Passthrough,
+                }
             }
             Button::Left | Button::Right => {
                 self.swap_section(Face::Page, group);
@@ -1143,18 +1143,19 @@ impl RecordingScreens {
             self.place_mut(Face::Page, group).at[usize::from(section)] = if delta < 0 { at - 1 } else { at + 1 };
             return PageHit::Consumed;
         }
-        if delta > 0 && section == 0 {
-            self.place_mut(Face::Page, group).section = 1;
-            self.place_mut(Face::Page, group).at[1] = 0;
-            return PageHit::Consumed;
+        if self.leave_section(group, delta > 0) { PageHit::Consumed }
+        else if delta < 0 { PageHit::LeaveUp } else { PageHit::LeaveDown }
+    }
+
+    /// Up / Down or a jump at a page section's edge: on to the other section's near end. False at the two lists' outer end.
+    fn leave_section(&mut self, group: u8, down: bool) -> bool {
+        let section = self.place(Face::Page, group).section;
+        if down == (section == 0) {
+            let at = if down { 0 } else { self.items(Face::Page, group, 0).len().saturating_sub(1) };
+            let place = self.place_mut(Face::Page, group);
+            (place.section, place.at[usize::from(down)]) = (u8::from(down), at);
         }
-        if delta < 0 && section == 1 {
-            let upper = self.items(Face::Page, group, 0).len();
-            self.place_mut(Face::Page, group).section = 0;
-            self.place_mut(Face::Page, group).at[0] = upper.saturating_sub(1);
-            return PageHit::Consumed;
-        }
-        if delta < 0 { PageHit::LeaveUp } else { PageHit::LeaveDown }
+        down == (section == 0)
     }
 
     fn swap_section(&mut self, face: Face, group: u8) {
@@ -1172,7 +1173,7 @@ impl RecordingScreens {
         let section = usize::from(self.place(face, group).section);
         let len = self.items(face, group, section as u8).len();
         let at = self.place(face, group).at[section];
-        self.place_mut(face, group).at[section] = page_by(at, len, forward);
+        self.place_mut(face, group).at[section] = jumped(at, len, forward);
     }
 
     fn toggle_drills(&mut self, face: Face, group: u8) {
@@ -1264,7 +1265,7 @@ impl RecordingScreens {
             }
             Button::JumpUp | Button::JumpDown => {
                 if let Some(file) = self.file.as_mut() {
-                    file.cursor = page_by(file.cursor, len, button == Button::JumpDown);
+                    file.cursor = jumped(file.cursor, len, button == Button::JumpDown);
                 }
             }
             Button::Left => self.flip_switch(false),
@@ -1511,7 +1512,12 @@ impl RecordingScreens {
                     }
                 }
             }
-            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::X | Button::Y | Button::JumpUp | Button::JumpDown => {
+            Button::JumpUp | Button::JumpDown => {
+                if let Some(picker) = self.picker.as_mut() {
+                    picker.cursor = jumped(picker.cursor, picker.ids.len(), button == Button::JumpDown);
+                }
+            }
+            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::X | Button::Y => {
                 return false;
             }
         }
@@ -2088,20 +2094,6 @@ fn header_of(group: u8, section: u8) -> &'static str {
     }
 }
 
-fn page_by(cursor: usize, len: usize, forward: bool) -> usize {
-    if len == 0 {
-        return 0;
-    }
-    // One page further, stopping on the first or last entry; from there the next page wraps, as the menu's jumps do.
-    let cursor = cursor.min(len - 1);
-    match forward {
-        true if cursor + 1 == len => 0,
-        true => (cursor + PAGE).min(len - 1),
-        false if cursor == 0 => len - 1,
-        false => cursor.saturating_sub(PAGE),
-    }
-}
-
 fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
     let mut values = vec![0u8; ids.len() + 1];
     for (rank, step) in order.iter().enumerate() {
@@ -2468,19 +2460,18 @@ mod tests {
         let len = screens.section(Face::Popup, SAVES_MACROS, 0).rows.len();
         assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1);
         screens.press_popup(Button::JumpUp);
-        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1 - PAGE);
+        assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), len - 1 - crate::model::menu::LIST_JUMP);
         screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
         screens.handle_page(Button::JumpDown, true, SAVES_MACROS);
         assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), 12);
     }
 
-    /// Operator ~23:10Z (rc15/submenu-page-switch): the library lists wrap like the other lists. In the pop-up, Up / Down
-    /// wrap inside the section; on the pop-up and the page, ZL + Up / Down stop on the edge, then wrap.
+    /// The pop-up wraps inside its section; page jumps at an edge go on to the other section.
     fn library_lists_wrap_at_their_edges() {
         let mut screens = screens();
         open_popup(&mut screens);
         let len = screens.section(Face::Popup, SAVES_MACROS, 0).rows.len();
-        assert!(len > PAGE + 1);
+        assert!(len > crate::model::menu::LIST_JUMP + 1);
         screens.set_cursor(Face::Popup, SAVES_MACROS, 0, len - 1);
         screens.press_popup(Button::Down);
         assert_eq!(screens.section_cursor(Face::Popup, SAVES_MACROS, 0), 0, "Down wraps to the first entry");
@@ -2494,8 +2485,10 @@ mod tests {
         let page = screens.section(Face::Page, SAVES_MACROS, 0).rows.len();
         screens.set_cursor(Face::Page, SAVES_MACROS, 0, page - 1);
         screens.handle_page(Button::JumpDown, true, SAVES_MACROS);
-        assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), 0, "the page's ZL + Down wraps too");
+        assert_eq!((screens.current_section(Face::Page, SAVES_MACROS),
+            screens.section_cursor(Face::Page, SAVES_MACROS, 1)), (1, 0));
         screens.handle_page(Button::JumpUp, true, SAVES_MACROS);
+        assert_eq!(screens.current_section(Face::Page, SAVES_MACROS), 0);
         assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), page - 1);
     }
 
@@ -2517,6 +2510,86 @@ mod tests {
         assert_eq!(menu.focus(), Some(crate::model::menu::Entry::Group(usize::from(SAVES_MACROS))));
         menu.recording_mut().set_catalog(long_catalog());
         menu
+    }
+
+    fn recording_page_jump_goes_on_past_a_section() {
+        use crate::model::menu::Entry;
+        let mut m = recording_list_menu();
+        let saves = m.recording().section(Face::Page, SAVES_MACROS, 0).rows.len();
+        let macros = m.recording().section(Face::Page, SAVES_MACROS, 1).rows.len();
+        assert!(saves > 1 && macros > 13);
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        m.press(Button::JumpDown);
+        assert_eq!((m.recording().current_section(Face::Page, SAVES_MACROS),
+            m.recording().section_cursor(Face::Page, SAVES_MACROS, 0)), (0, saves - 1));
+        m.press(Button::JumpDown);
+        assert_eq!((m.recording().current_section(Face::Page, SAVES_MACROS),
+            m.recording().section_cursor(Face::Page, SAVES_MACROS, 1)), (1, 0));
+        let mut expected = 0;
+        while expected < macros - 1 {
+            expected = (expected + 12).min(macros - 1);
+            m.press(Button::JumpDown);
+            assert_eq!(m.recording().section_cursor(Face::Page, SAVES_MACROS, 1), expected);
+        }
+        m.press(Button::JumpDown);
+        assert_eq!(m.focus(), Some(Entry::Group(usize::from(COMBOS_SEQ))));
+        let mut m = recording_list_menu();
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        m.press(Button::JumpUp);
+        assert_eq!((m.recording().current_section(Face::Page, SAVES_MACROS),
+            m.recording().section_cursor(Face::Page, SAVES_MACROS, 0)), (0, saves - 1));
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        let last_group = match m.entry(Page::Recording, m.entry_count(Page::Recording) - 1) {
+            Some(Entry::ResetPage(group)) => group,
+            other => panic!("last entry: {other:?}"),
+        };
+        let first = (0..m.entry_count(Page::Recording)).filter_map(|i| m.entry(Page::Recording, i))
+            .find(|entry| matches!(entry, Entry::Row(row) if usize::from(ROWS[*row].group) == last_group))
+            .expect("last group's first focusable row");
+        m.press(Button::JumpUp);
+        assert_eq!(m.focus(), Some(first));
+    }
+
+    fn recording_picker_takes_the_list_jump() {
+        let mut m = recording_list_menu();
+        let last = m.recording().section(Face::Page, SAVES_MACROS, 1).rows.len() - 1;
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, last);
+        assert!(m.press_outcome(Button::A));
+        assert!(m.recording().picker_open());
+        let len = m.recording().picker_rows().len();
+        assert!(len > 13);
+        let cursor = |m: &Menu| m.recording().picker_rows().iter().position(|r| r.cursor).unwrap();
+        assert_eq!(cursor(&m), 0);
+        let mut expected = 0;
+        while expected < len - 1 {
+            expected = (expected + 12).min(len - 1);
+            assert!(m.press_outcome(Button::JumpDown));
+            assert_eq!(cursor(&m), expected);
+        }
+        assert!(m.press_outcome(Button::JumpDown));
+        assert_eq!(cursor(&m), 0);
+        assert!(m.press_outcome(Button::JumpUp));
+        assert_eq!(cursor(&m), len - 1);
+        while expected > 0 {
+            expected = expected.saturating_sub(12);
+            assert!(m.press_outcome(Button::JumpUp));
+            assert_eq!(cursor(&m), expected);
+        }
+        assert!(m.press_outcome(Button::JumpUp));
+        assert_eq!(cursor(&m), len - 1);
+    }
+
+    fn zl_down_reaches_the_recording_lists_through_the_adapter() {
+        use crate::model::adapter::{bit, Adapter};
+        for face in [Face::Page, Face::Popup] {
+            let mut m = recording_list_menu();
+            if face == Face::Popup { m.on_request(Request::RecordingPopup); }
+            m.recording_mut().set_cursor(face, SAVES_MACROS, 1, 0);
+            let mut a = Adapter::new();
+            assert_eq!(adapter_poll(&mut m, &mut a, 1 << bit::ZL), []);
+            assert_eq!(adapter_poll(&mut m, &mut a, (1 << bit::ZL) | (1 << bit::DPAD_DOWN)), [Button::JumpDown]);
+            assert_eq!(m.recording().section_cursor(face, SAVES_MACROS, 1), 12, "{face:?}");
+        }
     }
 
     fn adapter_poll(menu: &mut Menu, adapter: &mut crate::model::adapter::Adapter, bits: u32) -> Vec<Button> {
@@ -3013,6 +3086,9 @@ mod tests {
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
             ("library_lists_wrap_at_their_edges", library_lists_wrap_at_their_edges as fn()),
             ("holding_down_on_the_recording_lists_quickens", holding_down_on_the_recording_lists_quickens as fn()),
+            ("recording_page_jump_goes_on_past_a_section", recording_page_jump_goes_on_past_a_section as fn()),
+            ("recording_picker_takes_the_list_jump", recording_picker_takes_the_list_jump as fn()),
+            ("zl_down_reaches_the_recording_lists_through_the_adapter", zl_down_reaches_the_recording_lists_through_the_adapter as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),
             ("set_active_is_one_row_for_the_role_in_view", set_active_is_one_row_for_the_role_in_view as fn()),
             ("a_macro_plays_as_a_playback_slot", a_macro_plays_as_a_playback_slot as fn()),
