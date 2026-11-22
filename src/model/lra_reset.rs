@@ -178,10 +178,10 @@ pub const fn hub_should_run(cpu_operated: bool, native_training: bool, hot_swap_
 
 /// Bits 0..=7 mark fighter entries destroyed since the last hub run; bit 8 marks a passed reset check.
 /// Primary rulings 2026-11-22 05:47Z, 06:01:34Z and 06:57:13Z.
-/// Measured on this release, one flight each (trace boots latch-order-1 and latch-order-2): the
-/// check reads 2 once per L+R+A and the fighters' inits follow it; leaving Training destroys the
-/// entries, and the next Training's first CPU init is new; a TR Change Stage initialises no fighter
-/// and so never reaches the hub, with or without this word.
+/// Measured once each on release 116a3829 of 186695f7 (trace boots latch-order-1 and -2): in the
+/// one L+R+A flown the check read 2 once and the fighters' inits followed it; leaving Training
+/// destroyed the entries and the next Training's first CPU init was new; the one TR Change Stage
+/// flown (ordinary Training, Final Destination to Waiting Room) initialised no fighter, no hub ran.
 /// Not measured: an in-slot transform, a Pokemon Trainer switch and a TR hot swap are taken from
 /// source to destroy no entry. A passed check with no CPU init after it would be spent by the next
 /// CPU-role init.
