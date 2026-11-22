@@ -450,6 +450,16 @@ fn egg_zone_camera_tracks_the_live_wizard() {
 }
 
 #[test]
+fn the_menu_hook_holds_repeats_while_the_worker_is_behind() {
+    let input = src("src/runtime/ui/input.rs");
+    let poll = item(&input, "pub fn on_p1_poll(");
+    let backlog = poll.find("adapter.set_backlog(worker::input_pending())").expect("backlog");
+    assert!(backlog < poll.find("adapter.poll(").unwrap());
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "pub fn input_pending()").contains("INPUT.is_empty()"));
+}
+
+#[test]
 fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
     let zone = src("src/runtime/features/egg_zone.rs");
     let draw = item(&zone, "pub fn draw(");

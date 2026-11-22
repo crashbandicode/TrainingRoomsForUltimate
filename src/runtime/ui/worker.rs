@@ -30,6 +30,8 @@ use crate::engine::rr_runtime::{apply_catalog, apply_index, CatalogCache, MenuIn
 use crate::engine::stages::stage_forms::Selection;
 
 static INPUT: Ring<64> = Ring::new();
+/// Whether the menu worker has input waiting.
+pub fn input_pending() -> bool { !INPUT.is_empty() }
 /// What wakes the menu worker (`wake`, any thread, game hooks included). A `hos_lock::Event`, not `std::thread::park`/`unpark`:
 /// std's parker on this target is pthread's, whose `unpark` takes a mutex the parked worker holds around its wait, so a game hook
 /// waking the worker could wait for it (the lock-free runtime). Setting the event never waits.

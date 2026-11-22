@@ -205,6 +205,16 @@ fn n7_reopen_cancels_unconfirmed_capture_and_y_disables_only_on_confirm() {
 }
 
 #[test]
+fn a_ring_with_an_event_is_not_empty() {
+    let ring = Ring::<2>::new();
+    assert!(ring.is_empty());
+    assert!(ring.push(ring.generation(), Event::Open));
+    assert!(!ring.is_empty());
+    assert_eq!(ring.pop(), Some((ring.generation(), Event::Open)));
+    assert!(ring.is_empty());
+}
+
+#[test]
 fn n7_ring_full_and_session_retirement_cannot_deliver_old_confirmation() {
     let ring = Ring::<2>::new();
     let old = ring.generation();

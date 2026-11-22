@@ -1793,3 +1793,25 @@ fighter written onto it. The cursor already stops on the readable end of the flo
 
 The Eden proof of each uses the bridge lineup (tr-primary-2 ledger, 2026-11-22 17:09:54Z) and playbook `b49b4e1` or
 later.
+
+## Menu lists (2026-11-22): a held Up / Down repeats and quickens; the Recording page jump goes on — decided
+
+**Decided by the operator on 2026-11-22** (tr-primary-2 ledger, 19:05:48Z: defaults D1 to D3 approved), on the
+operator's report that holding Down on the Recording lists does not speed up and that the page-down shortcut does not
+work there. Finding by the preview-vis-sol lane on source `aad616bc`: no menu list sped up on a hold, because the one
+input adapter every menu screen shares never repeated a D-pad direction and repeated a stick at a constant 21 frames;
+and the Recording lists had a private copy of the list jump that wrapped inside one list.
+
+| # | Decided |
+| --- | --- |
+| D1 | A held Up or Down, on the D-pad or a stick, repeats on every menu list and quickens: the first repeat after 21 frames, then every 8 frames, every 5 from one second held, every 4 from two seconds. Left and Right keep their rule (a stick repeats every 21 frames, the D-pad does not repeat): they change values. A held ZL + Up / Down repeats every 21 frames and does not quicken |
+| D2 | The D-pad now repeats. A direction that was already held when the menu opened does not repeat until it is released. The same holds for a direction held while the menu was closed, as when the Recording pop-up opens (added by the edge-juggle-sol lane, posted 19:38:36Z) |
+| D3 | On the Recording page's lists ZL + Up / Down move one window (12 rows) and stop on the list's first or last entry; the next jump goes on to the other list, and past the two lists to the page's previous or next section, through the menu's own list jump. The pop-up lists, a file's screen and the chain picker jump a window and wrap, as the menu's other pop-up lists do; the chain picker took no jump before |
+
+The speeds are three constants (`HOLD_QUICKEN`), to be tuned after the operator has tried them. A repeat waits while
+the menu's worker has not taken the previous press, so the cursor does not run on after the release.
+
+D3 replaces, for the Recording page's lists only, the rule of rc15/submenu-page-switch (operator, about 23:10Z) that
+ZL + Up / Down "stop on the edge, then wrap" on the page.
+
+For Eden routes: a menu D-pad Up or Down held 21 frames or longer now steps more than once.

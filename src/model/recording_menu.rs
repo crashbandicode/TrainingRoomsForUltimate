@@ -2499,6 +2499,49 @@ mod tests {
         assert_eq!(screens.section_cursor(Face::Page, SAVES_MACROS, 0), page - 1);
     }
 
+    fn long_catalog() -> Catalog {
+        let mut catalog = example();
+        catalog.saves.truncate(3);
+        for i in 0..45 {
+            catalog.macros.push(MacroFile {
+                id: format!("long-{i}"), name: format!("Long {i}"), chain: false, steps: Vec::new(),
+                start_save: None, start_save_on: true, recorded_on: String::new(), span: 0,
+            });
+        }
+        catalog
+    }
+
+    fn recording_list_menu() -> Menu {
+        let mut menu = menu();
+        to_recording(&mut menu);
+        assert_eq!(menu.focus(), Some(crate::model::menu::Entry::Group(usize::from(SAVES_MACROS))));
+        menu.recording_mut().set_catalog(long_catalog());
+        menu
+    }
+
+    fn adapter_poll(menu: &mut Menu, adapter: &mut crate::model::adapter::Adapter, bits: u32) -> Vec<Button> {
+        use crate::model::adapter::Style;
+        use crate::model::menu::chord::Chord;
+        adapter.set_jumps(menu.takes_jumps());
+        let presses: Vec<_> = adapter.poll(bits, Style::Pro, true, true, [Chord::NONE; 2]).presses().collect();
+        for button in &presses { menu.press(*button); }
+        presses
+    }
+
+    fn holding_down_on_the_recording_lists_quickens() {
+        use crate::model::adapter::{bit, Adapter};
+        for face in [Face::Page, Face::Popup] {
+            let mut m = recording_list_menu();
+            if face == Face::Popup { m.on_request(Request::RecordingPopup); }
+            m.recording_mut().set_cursor(face, SAVES_MACROS, 1, 0);
+            assert!(m.recording().section(face, SAVES_MACROS, 1).rows.len() >= 40);
+            let mut a = Adapter::new();
+            assert_eq!(adapter_poll(&mut m, &mut a, 1 << bit::DPAD_DOWN), [Button::Down]);
+            for _ in 1..=120 { adapter_poll(&mut m, &mut a, 1 << bit::DPAD_DOWN); }
+            assert_eq!(m.recording().section_cursor(face, SAVES_MACROS, 1), 19, "{face:?}");
+        }
+    }
+
     fn x_cycles_the_loop_only_in_macros() {
         let mut screens = screens();
         open_popup(&mut screens);
@@ -2969,6 +3012,7 @@ mod tests {
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
             ("library_lists_wrap_at_their_edges", library_lists_wrap_at_their_edges as fn()),
+            ("holding_down_on_the_recording_lists_quickens", holding_down_on_the_recording_lists_quickens as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),
             ("set_active_is_one_row_for_the_role_in_view", set_active_is_one_row_for_the_role_in_view as fn()),
             ("a_macro_plays_as_a_playback_slot", a_macro_plays_as_a_playback_slot as fn()),
