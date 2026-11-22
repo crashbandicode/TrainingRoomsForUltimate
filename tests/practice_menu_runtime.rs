@@ -138,6 +138,28 @@ fn every_refusal_goes_through_the_queue_s_refusal_post() {
 }
 
 #[test]
+fn a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let read = frame.find("wizard.player_floor(").unwrap();
+    let found = frame[read..].find("if let Some(p1) = placed {").unwrap() + read;
+    let missing = frame[found..].find("} else if confirm {").unwrap() + found;
+    let refusal = frame[missing..].find("notices::refuse(\"Pick a point above a floor\"); // restriction: edge-juggle-player-no-floor").unwrap() + missing;
+    let notice = frame[refusal..].find("post_notice(run").unwrap() + refusal;
+    assert!(read < found && found < missing && missing < refusal && refusal < notice);
+
+    let placement = src("src/runtime/features/placement.rs");
+    let floor = item(&placement, "pub(super) unsafe fn floor_under(");
+    assert!(floor.contains("let top = if platforms { (y + 1.0).min(top) } else { top };"));
+    assert!(floor.contains("let floor = ray.floor(x, [top, bottom], platforms)?;"));
+    assert_eq!(floor.matches("ray.floor(").count(), 1);
+
+    let restrictions = src("docs/RESTRICTIONS.md");
+    assert!(restrictions.contains("`edge-juggle-player-no-floor`"));
+    assert!(restrictions.contains("\"Pick a point above a floor\""));
+}
+
+#[test]
 fn edge_wizard_notices_name_three_pages() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let notice = item(&runtime, "fn post_notice(");

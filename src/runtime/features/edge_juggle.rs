@@ -2028,6 +2028,8 @@ pub unsafe fn frame(fighter: usize) {
                 if confirm {
                     wizard.advance();
                 }
+            } else if confirm {
+                notices::refuse("Pick a point above a floor"); // restriction: edge-juggle-player-no-floor
             }
         }
         post_notice(run, best_time(bests, key), best_time(streaks, key));
