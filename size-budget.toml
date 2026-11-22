@@ -2349,3 +2349,11 @@ ceiling = 191601
 date = "2026-11-22"
 reason = "Guard the Edge niche recoveries after 6395498b on integration main eb9c7722, as one folded entry: the measured Pyra and Mythra swap with the replacement-body handling, the Ness, Lucas, Hero, Sonic, Snake, Sheik and Meta Knight routes, native-wait placement with the Player 1 start fix in its model-driven form, the operator's Sonic, Lucas and Hero rulings, the per-session bound on Player 1 rewrites and the settled-selection rule for the drill's selected CPU. No private restart tracker. The measured normalized implementation count is 191601, 2837 over main's 188764 entry, with no headroom. NRO and BSS are reported at the gate."
 approved_by = "tr-primary-2, 2026-11-22 07:34Z, 08:07:11Z, 08:44:17Z, 09:18:12Z and 10:14:33Z (HANDOFF-PRIMARY-tr-primary-2.md lines 913, 934-935, 975, 1018, 1057-1059 and 1087-1088): one folded niche entry, re-measured after the tracker is removed and the review fixes are folded in, under the operator's measured LOC rule; the NRO growth of 32,768 B over main with flat BSS is flagged to the operator (line 1044)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188662
+date = "2026-11-22"
+reason = "Gate Training reset effects on one atomic word for passed reset checks and destroyed fighter entries. Measured normalized implementation 188662, 51 above the integration ceiling 188611, with zero spare. The release gate measures NRO and BSS."
+approved_by = "Lead hit-streak-sol, 2026-11-22, directed an exact measured entry for the reset-owed redesign in BRIEF-3."
