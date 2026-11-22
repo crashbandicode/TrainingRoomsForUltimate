@@ -724,7 +724,8 @@ fn a_release_the_poll_did_not_see_is_not_a_held_step_button() {
     assert_eq!(pad.keep, StepKeep(ZL));
     pad.refresh(ZL);
     assert_eq!(pad.update(0), NO_STEP);
-    assert_eq!((pad.sets, pad.keep), ([0, ZL, 0, ZL], StepKeep(0)), "the game's release stays a release");
+    // The detector hides the chord's ZL through the poll that sees it released, so its edge is taken too (as 3448686c).
+    assert_eq!((pad.sets, pad.keep), ([0, 0, 0, 0], StepKeep(0)), "the release is no hold: nothing in current, nothing kept");
     assert_eq!(pad.update(0), NO_STEP);
     assert_eq!(pad.update(ZL), STEP);
 }
