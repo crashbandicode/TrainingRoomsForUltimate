@@ -81,6 +81,9 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         active
     } else { false };
     hud::run(layout, name);
+    // The zone editor's crop window, left by the hitbox draw of this pass (`egg_zone::draw`). Taken on every pass,
+    // before any early return, so a set this pass does not use never reaches a later one.
+    let rects = crate::runtime::features::egg_zone::crop();
     hud::hud_rule(layout, name);
     hud::cpu_panels(layout, name);
     if !practice_layout {
@@ -152,8 +155,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
         if crop.is_none() {
             *crop = Some(panes.crop_enter());
         }
-        // A tick that cannot read the editor keeps the rectangles of the tick before.
-        if let Some(rects) = crate::runtime::features::egg_zone::crop() {
+        // A pass whose guide was not drawn keeps the rectangles of the pass before.
+        if let Some(rects) = rects {
             panes.crop_draw(&rects);
         }
     }
