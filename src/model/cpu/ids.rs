@@ -109,6 +109,7 @@ game_constants! {
     // Status kinds of the situation predicates (SPEC-cpu-01 §3).
     StatusNone = "FIGHTER_STATUS_KIND_NONE",
     StatusWait = "FIGHTER_STATUS_KIND_WAIT",
+    StatusOttottoWait = "FIGHTER_STATUS_KIND_OTTOTTO_WAIT",
     StatusDamage = "FIGHTER_STATUS_KIND_DAMAGE",
     StatusDamageFly = "FIGHTER_STATUS_KIND_DAMAGE_FLY",
     StatusDamageFlyRoll = "FIGHTER_STATUS_KIND_DAMAGE_FLY_ROLL",

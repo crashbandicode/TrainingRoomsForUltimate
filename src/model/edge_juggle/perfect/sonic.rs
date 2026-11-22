@@ -1,6 +1,7 @@
 //! Sonic's measured Spin Dash crossing, double jump, and turned Spring.
 
 use super::{niche::pad, region, Correction, Point, RouteFacts, JUMP, SPECIAL};
+use crate::model::cpu::ids::UNRESOLVED;
 
 pub const KIND: i32 = 0x29;
 pub const ROW: u8 = 23;
@@ -352,6 +353,15 @@ fn guarder_above_lip(near: Point, player: Point) -> bool {
     // The dash passes through the near ledge's hang point. A hit there
     // interrupts the measured Spin Dash timing and displaces its jump.
     player.into_iter().all(f32::is_finite) && player[1] >= near[1]
+}
+
+/// Row 23's guarder stands: grounded, and in Wait or in the edge-teeter wait the game puts
+/// a fighter in at the lip (operator ruling 2026-11-22; f3b-sonic-b-3, 55 of 55 placements).
+pub fn guarder_standing(grounded: bool, status: i32, wait: i32, teeter_wait: i32) -> bool {
+    grounded
+        && [wait, teeter_wait]
+            .into_iter()
+            .any(|standing| standing != UNRESOLVED && status == standing)
 }
 
 fn on_line(actual: Pose, expected: Pose) -> bool {

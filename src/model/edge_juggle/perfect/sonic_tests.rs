@@ -41,6 +41,40 @@ fn release(position: Point) -> SonicBeat {
 }
 
 #[test]
+fn sonic_counts_the_edge_teeter_wait_as_standing_and_nothing_else_does() {
+    let runtime = include_str!("../../../runtime/features/edge_juggle/niche_pad.rs");
+    let (_, admission) = runtime.split_once("if fighter == sonic::KIND {").unwrap();
+    let (admission, _) = admission.split_once("SonicFlight::start(").unwrap();
+    let (_, step) = runtime.split_once("MeasuredFlight::SpinDash(flight)) = &mut self.measured").unwrap();
+    let (step, _) = step.split_once("flight.step(SonicBeat").unwrap();
+    for block in [admission, step] {
+        assert!(block.contains("sonic_guarder_standing(p1)"));
+        assert!(!block.contains("grounded_wait(p1)"));
+    }
+    assert!(runtime.matches("grounded_wait(p1)").count() >= 4);
+    let (_, wait) = runtime.split_once("unsafe fn grounded_wait").unwrap();
+    let (wait, _) = wait.split_once('}').unwrap();
+    assert!(wait.contains("natives::status_kind(p1) == wait"));
+    assert!(!wait.contains("Ottotto"));
+}
+
+#[test]
+fn the_edge_teeter_wait_counts_as_standing() {
+    let (wait, teeter) = (0, 0x7f);
+    assert!(guarder_standing(true, wait, wait, teeter));
+    assert!(guarder_standing(true, teeter, wait, teeter));
+    assert!(!guarder_standing(true, 0x7e, wait, teeter));
+    assert!(!guarder_standing(true, 0x77, wait, teeter));
+    assert!(!guarder_standing(false, wait, wait, teeter));
+    assert!(!guarder_standing(false, teeter, wait, teeter));
+    assert!(guarder_standing(true, wait, wait, UNRESOLVED));
+    for status in [wait, teeter, UNRESOLVED] {
+        assert!(!guarder_standing(true, status, UNRESOLVED, UNRESOLVED));
+    }
+    assert!(!guarder_standing(true, UNRESOLVED, wait, UNRESOLVED));
+}
+
+#[test]
 fn sonic_admits_the_proven_cells_and_refuses_unproven_conditions() {
     for stage in [(3, 0), (0, 0), (311, 0)] {
         for position in [

@@ -386,7 +386,7 @@ impl NicheGuide {
             }, 1.0));
         }
         if fighter == sonic::KIND {
-            if !grounded_wait(p1) {
+            if !sonic_guarder_standing(p1) {
                 return None;
             }
             let row = niche::measured_row(sonic::ROW, niche::CANDIDATE_ROWS)?;
@@ -860,7 +860,10 @@ impl NicheGuide {
                 facing: if flight.launch_frame(frame) { natives::lr(cpu) } else { 0.0 },
                 jumps: if dodge || jump || flight.first_jump_row(frame) { remaining_jumps(cpu)? } else { 0 },
                 can_dodge: dodge && air_dodge_enabled(cpu),
-                can_jump: (dodge || jump) && niche_start_enabled(cpu, Move::Jump, true),
+                // The jump is pressed on the air dodge's last row and the game takes it on the
+                // next one; the term reads 0 on that row (fe7-lucasterm-2). The reserve decides.
+                can_jump: dodge && niche_start_enabled(cpu, Move::Jump, true)
+                    || jump && remaining_jumps(cpu) == Some(1),
                 can_thunder: (dodge || cast) && niche_start_enabled(cpu, Move::Bolt, available),
             });
         }
@@ -936,7 +939,9 @@ impl NicheGuide {
                 facing: 0.0,
                 jumps: if observes_jumps { remaining_jumps(cpu)? } else { 0 },
                 can_dodge: dodge && air_dodge_enabled(cpu),
-                can_jump: (dodge || jump) && niche_start_enabled(cpu, Move::Jump, true),
+                // As for Lucas: the buffered press is decided by the reserve.
+                can_jump: dodge && niche_start_enabled(cpu, Move::Jump, true)
+                    || jump && remaining_jumps(cpu) == Some(1),
                 can_cast: (dodge || cast) && reach.is_some() && niche_start_enabled(cpu, Move::Rise, available),
                 mp: if dodge || jump || cast { hero_mana(cpu) } else { None },
             });
@@ -1012,7 +1017,7 @@ impl NicheGuide {
         }
         if let Some(MeasuredFlight::SpinDash(flight)) = &mut self.measured {
             let press = flight.side_press(frame);
-            if press && (!grounded_wait(p1)
+            if press && (!sonic_guarder_standing(p1)
                 || !flight.guarder_clear([natives::pos_x(p1), natives::pos_y(p1)]))
             {
                 return None;
@@ -1334,6 +1339,17 @@ unsafe fn grounded_wait(p1: usize) -> bool {
     let wait = konst(C::StatusWait);
     ground != UNRESOLVED && wait != UNRESOLVED
         && natives::situation_kind(p1) == ground && natives::status_kind(p1) == wait
+}
+
+unsafe fn sonic_guarder_standing(p1: usize) -> bool {
+    let ground = konst(C::SituationGround);
+    ground != UNRESOLVED
+        && sonic::guarder_standing(
+            natives::situation_kind(p1) == ground,
+            natives::status_kind(p1),
+            konst(C::StatusWait),
+            konst(C::StatusOttottoWait),
+        )
 }
 
 pub(super) unsafe fn niche_start_enabled(cpu: usize, movement: Move, available: bool) -> bool {

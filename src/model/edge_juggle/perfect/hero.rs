@@ -167,8 +167,7 @@ impl HeroFlight {
                 .then(|| pad(FORWARD, if age == route.shield + 1 { GUARD } else { 0 }));
         }
         if age == jump {
-            // The final EscapeAir think is still in that status when the
-            // next pad is read. The live JumpAerial term must be enabled.
+            // The final EscapeAir think is still in that status when the next pad is read.
             return (matches!(beat.status, DODGE | FALL)
                 && beat.jumps == 1
                 && has_mana(beat)

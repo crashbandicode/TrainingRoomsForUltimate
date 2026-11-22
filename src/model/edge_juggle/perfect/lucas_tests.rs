@@ -42,6 +42,24 @@ fn fixture(stage: (i32, u32), out: f32, above: f32) -> (RouteFacts<'static>, Luc
 }
 
 #[test]
+fn lucas_and_hero_gate_the_buffered_jump_on_the_reserve() {
+    // fe7-lucasterm-2: term 0x1e00003e reads 0 on the last air-dodge think, 4/4; 01:52Z ruling.
+    let runtime = include_str!("../../../runtime/features/edge_juggle/niche_pad.rs");
+    for (flight, beat) in [("Lucas", "LucasBeat"), ("Hero", "HeroBeat")] {
+        let marker = format!("MeasuredFlight::{flight}(flight)) = &mut self.measured");
+        let (_, block) = runtime.split_once(&marker).unwrap();
+        let end = format!("flight.step({beat} {{");
+        let (before, body) = block.split_once(&end).unwrap();
+        let (body, _) = body.split_once("});").unwrap();
+        for required in ["dodge && niche_start_enabled(cpu, Move::Jump, true)", "jump && remaining_jumps(cpu) == Some(1)"] {
+            assert!(body.contains(required), "{flight}: {required}");
+        }
+        assert!(!before.contains("(dodge || jump) && niche_start_enabled(cpu, Move::Jump, true)"));
+        assert!(!body.contains("(dodge || jump) && niche_start_enabled(cpu, Move::Jump, true)"));
+    }
+}
+
+#[test]
 fn lucas_at_rest_admission_requires_the_flown_box_geometry_and_all_three_resources() {
     for stage in [(3, 0), (0, 0), (311, 0)] {
         for (out, above) in [(10.0, 2.0), (14.0, 2.0), (18.0, 2.0), (22.0, 2.0)] {
