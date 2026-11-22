@@ -163,6 +163,35 @@ fn edge_juggle_remembers_whether_the_start_was_moved() {
 }
 
 #[test]
+fn drill_cpu_behavior_between_ai_kinds_skips_the_native_pause() {
+    let runtime = src("src/runtime/features/cpu_level.rs");
+    let step = item(&runtime, "unsafe fn step_drill_panel(");
+    assert!(step.contains(".direct(entry_type, ai_type, cpu, menu, state.drill_pause)"));
+    let direct = step.find(".direct(entry_type, ai_type, cpu, menu, state.drill_pause)").expect("direct AI apply");
+    let setter = step.find("set_behavior(controller, i32::from(control))").expect("native setter");
+    let check = step.find("if field::read_unchecked::<u8>(ai, AI_BEHAVIOR) == control {").expect("setter readback");
+    let mirror = step.find("field::write_unchecked(entry, ENTRY_BEHAVIOR, control)").expect("entry mirror");
+    let branch = &step[check..];
+    let branch = &branch[..branch.find("\n            }\n").expect("readback block")];
+    let level = check + branch.find("field::write_unchecked(panel, PANEL_LEVEL, desired.level)").expect("level");
+    let behavior = check + branch.find("field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu)").expect("behavior");
+    let done = check + branch.find("return false;").expect("no pause");
+    let pulse = step.find("state.drill_pause.pulse(").expect("stock pause fallback");
+    assert!(direct < setter && setter < check && check < mirror && mirror < level);
+    assert!(level < behavior && behavior < done && done < pulse);
+    assert!(branch.contains("field::write_unchecked(entry, ENTRY_BEHAVIOR, control)"));
+    let table = src("data/tables/rows_edge_juggle.ROWS.tsv");
+    let row = table.lines().find(|line| line.starts_with("\"edge_juggle.ai_set_behavior\"")).unwrap();
+    assert!(row.contains("\tSeamKind::Called\t"));
+    let chords = src("src/runtime/features/chords.rs");
+    let injection = chords.find("if super::cpu_level::poll_drill(").expect("pause poll");
+    let body = &chords[injection..];
+    let body = &body[..body.find("\n    }\n").unwrap()];
+    assert!(body.contains("at.read_volatile() | chords::bit::PLUS"));
+    assert_eq!(chords.matches("at.read_volatile() | chords::bit::PLUS").count(), 1);
+}
+
+#[test]
 fn placement_helpers_keep_the_drills_native_write_order() {
     fn ordered(body: &str, calls: &[&str]) {
         let mut previous = 0;

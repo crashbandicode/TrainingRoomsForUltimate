@@ -35,6 +35,8 @@ const ROWS: &[&str] = &[
 
 /// `cpu_level.ai_set_rank`.
 const AI_SET_RANK: usize = 0x6b8400;
+/// `edge_juggle.ai_set_behavior`.
+const AI_SET_BEHAVIOR: usize = 0x6b82b0;
 /// `cpu_level.rank_table`: the ranks of Lv 2..=9.
 const RANK_TABLE: usize = 0x4470dc0;
 /// The Training state root and the pause menu's chain (`cpu_level.training_rank_choice`, as `roster_cpu_quantity_root`).
@@ -357,8 +359,8 @@ pub(super) fn drill_started() {
     DRILL_APPLIED.store(false, Ordering::Release);
 }
 
-/// Stage only the native menu selection on P1's poll. If the controller type changes, request a
-/// normal pause/resume. The game's menu transaction applies its controller and operation flags.
+/// Change between AI types on P1's poll. A change involving Control or a non-CPU operator uses the
+/// normal pause/resume transaction to apply the controller and operation flags.
 pub(super) fn poll_drill(quiet: bool) -> bool {
     if !DRILL_BEHAVIOR.load(Ordering::Acquire) {
         return false;
@@ -405,7 +407,11 @@ unsafe fn step_drill_panel(base: usize, state: &mut State, level: Option<u8>, pa
         state.drill_panel = panel;
     }
     let entry = game::natives::fighter_entry(1);
-    let Some(ai) = field::child(entry, ENTRY_CONTROLLER).and_then(|c| field::child(c, CONTROLLER_AI)) else {
+    let Some(controller) = field::child(entry, ENTRY_CONTROLLER) else {
+        DRILL_APPLIED.store(false, Ordering::Release);
+        return false;
+    };
+    let Some(ai) = field::child(controller, CONTROLLER_AI) else {
         DRILL_APPLIED.store(false, Ordering::Release);
         return false;
     };
@@ -417,13 +423,30 @@ unsafe fn step_drill_panel(base: usize, state: &mut State, level: Option<u8>, pa
         DRILL_APPLIED.store(false, Ordering::Release);
         return false;
     }
-    let applied = current.applied(
-        field::read_unchecked(entry, ENTRY_BEHAVIOR),
-        field::read_unchecked(ai, AI_BEHAVIOR),
-        game::natives::is_operation_cpu(1),
-    );
+    let entry_type = field::read_unchecked(entry, ENTRY_BEHAVIOR);
+    let ai_type = field::read_unchecked(ai, AI_BEHAVIOR);
+    let cpu = game::natives::is_operation_cpu(1);
+    let applied = current.applied(entry_type, ai_type, cpu);
     let desired = state.drill_behavior.step(level, panel, current, applied);
     let needs_stock = desired.is_some_and(|desired| !applied || desired.menu != current.menu);
+    if needs_stock {
+        if let Some((desired, control)) = desired
+            .and_then(|d| Some((d, d.direct(entry_type, ai_type, cpu, menu, state.drill_pause)?)))
+        {
+            // Between AI kinds the game's own apply is its type setter and the entry's copy: no pause is needed.
+            if ai_type != control {
+                let set_behavior: extern "C" fn(usize, i32) = std::mem::transmute(base + AI_SET_BEHAVIOR);
+                set_behavior(controller, i32::from(control));
+            }
+            if field::read_unchecked::<u8>(ai, AI_BEHAVIOR) == control {
+                field::write_unchecked(entry, ENTRY_BEHAVIOR, control);
+                field::write_unchecked(panel, PANEL_LEVEL, desired.level);
+                field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu);
+                DRILL_APPLIED.store(false, Ordering::Release);
+                return false;
+            }
+        }
+    }
     if let Some(desired) = desired.filter(|_| menu == BehaviorMenu::Open || menu == BehaviorMenu::Closed && !needs_stock) {
         if desired != current {
             field::write_unchecked(panel, PANEL_LEVEL, desired.level);

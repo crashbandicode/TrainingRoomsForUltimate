@@ -128,6 +128,15 @@ impl CpuBehavior {
             control == entry && control == ai && operation_cpu == (control != 0x24)
         })
     }
+
+    /// The control type the drill sets itself with the pause menu closed: the wanted selection and the live fighter
+    /// are both AI kinds (not Control) and the operator flag already says CPU, so the game's own apply would change
+    /// only the type. `None`: the stock pause apply has to make the change.
+    pub fn direct(self, entry: u8, ai: u8, operation_cpu: bool, menu: BehaviorMenu, pause: BehaviorPause) -> Option<u8> {
+        let control = self.control_type()?;
+        (operation_cpu && menu == BehaviorMenu::Closed && pause == BehaviorPause::Idle
+            && ![control, entry, ai].contains(&0x24)).then_some(control)
+    }
 }
 
 /// Save the selection once. Retain it through Stop until the game applies the restored selection.
@@ -1132,6 +1141,72 @@ mod tests {
             assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
         }
         assert_eq!(Drill::Juggler.placed_jump_count(), 0);
+    }
+
+    #[test]
+    fn drill_behavior_between_ai_kinds_is_set_directly() {
+        use BehaviorMenu::Closed;
+        let nine = CpuBehavior::stock(9);
+        for menu in 0..8u32 {
+            let from = CpuBehavior { menu, level: 0 };
+            let kind = from.control_type().unwrap();
+            assert_eq!(nine.direct(kind, kind, true, Closed, BehaviorPause::Idle), Some(0), "start from menu {menu}");
+            assert_eq!(from.direct(0, 0, true, Closed, BehaviorPause::Idle), Some(kind), "restore to menu {menu}");
+        }
+        // A half-applied type (the entry's copy and the AI disagree) is still between AI kinds.
+        assert_eq!(nine.direct(1, 5, true, Closed, BehaviorPause::Idle), Some(0));
+    }
+
+    #[test]
+    fn control_or_an_open_menu_takes_the_stock_pause_apply() {
+        use BehaviorMenu::{Closed, Open, Transition};
+        let (nine, control, idle) = (CpuBehavior::stock(9), CpuBehavior { menu: 8, level: 2 }, BehaviorPause::Idle);
+        assert_eq!(control.direct(0, 0, true, Closed, idle), None, "to Control");
+        assert_eq!(nine.direct(0x24, 0x24, false, Closed, idle), None, "from Control");
+        assert_eq!(nine.direct(0x24, 1, true, Closed, idle), None);
+        assert_eq!(nine.direct(1, 0x24, true, Closed, idle), None);
+        assert_eq!(nine.direct(1, 1, false, Closed, idle), None, "the operator flag is not CPU");
+        assert_eq!(nine.direct(1, 1, true, Open, idle), None, "the player's own pause applies it on resume");
+        assert_eq!(nine.direct(1, 1, true, Transition, idle), None);
+        assert_eq!(nine.direct(1, 1, true, Closed, BehaviorPause::Opening), None, "a pause transaction is in flight");
+        assert_eq!(nine.direct(1, 1, true, Closed, BehaviorPause::Closing), None);
+        assert_eq!(CpuBehavior { menu: 9, level: 0 }.direct(1, 1, true, Closed, idle), None, "not a menu value");
+    }
+
+    #[test]
+    fn a_drill_between_ai_kinds_never_asks_for_the_pause() {
+        // The game as the drill's poll sees it, and one poll written the way `step_drill_panel` composes the model.
+        struct Game { panel: CpuBehavior, entry: u8, ai: u8, cpu: bool }
+        fn poll(game: &mut Game, lease: &mut BehaviorLease, pause: &mut BehaviorPause, level: Option<u8>) -> bool {
+            let applied = game.panel.applied(game.entry, game.ai, game.cpu);
+            let desired = lease.step(level, 7, game.panel, applied);
+            let needs_stock = desired.is_some_and(|d| !applied || d.menu != game.panel.menu);
+            if let Some((d, control)) = desired.filter(|_| needs_stock)
+                .and_then(|d| Some((d, d.direct(game.entry, game.ai, game.cpu, BehaviorMenu::Closed, *pause)?)))
+            {
+                (game.ai, game.entry, game.panel) = (control, control, d);
+                return false;
+            }
+            if let Some(d) = desired.filter(|_| !needs_stock) { game.panel = d; }
+            pause.pulse(needs_stock, BehaviorMenu::Closed, true)
+        }
+        for menu in 0..8u32 {
+            let original = CpuBehavior { menu, level: 2 };
+            let kind = original.control_type().unwrap();
+            let mut game = Game { panel: original, entry: kind, ai: kind, cpu: true };
+            let (mut lease, mut pause) = (BehaviorLease::new(), BehaviorPause::Idle);
+            for _ in 0..4 { assert!(!poll(&mut game, &mut lease, &mut pause, Some(9)), "start, menu {menu}"); }
+            assert_eq!((game.panel, game.entry, game.ai), (CpuBehavior::stock(9), 0, 0), "menu {menu}");
+            assert!(lease.held());
+            for _ in 0..4 { assert!(!poll(&mut game, &mut lease, &mut pause, None), "stop, menu {menu}"); }
+            assert_eq!((game.panel, game.entry, game.ai), (original, kind, kind), "menu {menu}");
+            assert!(!lease.held());
+        }
+        // Control still asks for the stock pause.
+        let mut game = Game { panel: CpuBehavior { menu: 8, level: 2 }, entry: 0x24, ai: 0x24, cpu: false };
+        let (mut lease, mut pause) = (BehaviorLease::new(), BehaviorPause::Idle);
+        assert!(poll(&mut game, &mut lease, &mut pause, Some(9)));
+        assert_eq!((game.entry, game.ai), (0x24, 0x24), "nothing written outside the pause");
     }
 
     #[test]
