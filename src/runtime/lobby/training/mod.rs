@@ -61,6 +61,7 @@ pub(crate) fn clear_session_state() {
     crate::runtime::features::states::clear_session();
     crate::runtime::features::recorder::session_clear();
     crate::runtime::features::egg_zone::reset();
+    crate::runtime::features::edge_juggle::practice_cpu::clear_session();
 }
 
 /// A recording or a playback is running (package 4's recorder).

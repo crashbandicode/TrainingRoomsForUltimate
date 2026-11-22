@@ -142,9 +142,9 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
 #[test]
 fn edge_juggle_keeps_a_settled_selection_through_its_own_form_change() {
     let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
-    assert!(service.contains("picker::service(selected, target, observed, "));
+    assert!(service.contains("picker::tick(settled(), selected, original, "));
     assert!(service.contains("static SETTLED"));
-    assert!(service.matches("see(None, None)").count() >= 2);
+    assert!(service.contains("pub(in crate::runtime) fn clear_session()"));
     assert!(!service.contains("observed != target"));
     assert!(!service.contains("cpu_loaded_kind"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
@@ -156,6 +156,9 @@ fn edge_juggle_keeps_a_settled_selection_through_its_own_form_change() {
     assert!(!frame.contains("cpu_loaded_kind"));
     let roster = src("src/runtime/roster/character_roster.rs");
     assert!(!roster.contains("LOADED_AS"));
+    let training = src("src/runtime/lobby/training/mod.rs");
+    assert!(item(&training, "pub(crate) fn clear_session_state(").contains("practice_cpu::clear_session()"));
+    assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join("src/model/swap/forms.rs").exists());
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its

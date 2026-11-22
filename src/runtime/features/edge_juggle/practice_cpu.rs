@@ -22,6 +22,11 @@ fn see(target: Option<u32>, live: Option<u32>) -> picker::Settled {
     next
 }
 
+/// The practice session ended (leaving Training, or Training -> character select -> Training): no settlement survives.
+pub(in crate::runtime) fn clear_session() {
+    SETTLED.store(NONE, Ordering::Release);
+}
+
 /// The picker gate's question for the live CPU kind; also notes the selection as settled when it is live.
 pub(super) fn answers(wanted: u32, live: u32) -> bool {
     picker::answers(wanted, live, see(Some(wanted), Some(live)).is(wanted))
@@ -38,40 +43,38 @@ pub(super) fn switching() -> bool {
 /// Only the game frame calls the roster. The picker publishes its selection through the active drill.
 pub(in crate::runtime) fn service_practice_cpu_selection() {
     let original = ORIGINAL.load(Ordering::Relaxed);
+    let original = (original != NONE).then_some(original);
     let selected = super::cpu_selection();
-    let Some(target) = selected.or(Some(original).filter(|kind| *kind != NONE)) else {
-        see(None, None);
-        return;
-    };
-    if !scene::is_native_training() {
-        see(None, None);
-        ORIGINAL.store(NONE, Ordering::Relaxed);
-        TEMPORARY.store(NONE, Ordering::Release);
-        SWITCHING.store(false, Ordering::Release);
-        return;
-    }
-    if selected.is_none() && super::super::practice::active().is_some() && !super::running() {
-        // Another game owns the opponent until it stops.
-        SWITCHING.store(false, Ordering::Release);
-        return;
-    }
-    let ready = !roster::busy() && roster::cpu_reload_ready();
-    let observed = ready.then(roster::cpu_kind).flatten();
-    let step = picker::service(selected, target, observed, see(Some(target), observed).is(target));
-    SWITCHING.store(step.switching, Ordering::Release);
-    if step.request {
-        if let Some(observed) = observed {
-            let previous = TEMPORARY.swap(target, Ordering::AcqRel);
-            if roster::request_practice_cpu_kind(target) {
-                if selected.is_some() && original == NONE {
-                    ORIGINAL.store(observed, Ordering::Relaxed);
+    let (next, tick) = picker::tick(settled(), selected, original, scene::is_native_training(),
+        || super::super::practice::active().is_some() && !super::running(),
+        || (!roster::busy() && roster::cpu_reload_ready()).then(roster::cpu_kind).flatten(),
+    );
+    SETTLED.store(next.kind().unwrap_or(NONE), Ordering::Release);
+    match tick {
+        picker::Tick::Idle => return,
+        picker::Tick::Left => {
+            ORIGINAL.store(NONE, Ordering::Relaxed);
+            TEMPORARY.store(NONE, Ordering::Release);
+            SWITCHING.store(false, Ordering::Release);
+        }
+        picker::Tick::OtherGame => SWITCHING.store(false, Ordering::Release),
+        picker::Tick::Serve { target, observed, step } => {
+            SWITCHING.store(step.switching, Ordering::Release);
+            if step.request {
+                if let Some(observed) = observed {
+                    let previous = TEMPORARY.swap(target, Ordering::AcqRel);
+                    if roster::request_practice_cpu_kind(target) {
+                        if selected.is_some() && original.is_none() {
+                            ORIGINAL.store(observed, Ordering::Relaxed);
+                        }
+                    } else {
+                        TEMPORARY.store(previous, Ordering::Release);
+                    }
                 }
-            } else {
-                TEMPORARY.store(previous, Ordering::Release);
+            } else if observed.is_some() && selected.is_none() {
+                ORIGINAL.store(NONE, Ordering::Relaxed);
+                TEMPORARY.store(NONE, Ordering::Release);
             }
         }
-    } else if observed.is_some() && selected.is_none() {
-        ORIGINAL.store(NONE, Ordering::Relaxed);
-        TEMPORARY.store(NONE, Ordering::Release);
     }
 }
