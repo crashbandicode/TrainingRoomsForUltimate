@@ -2321,15 +2321,7 @@ approved_by = "Operator through tr-primary-2, 2026-11-21 18:58Z, ordered compact
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 188608
-date = "2026-11-22"
-reason = "raise: 1 Frame Save hold (the kept step bit marked in previous, Controller identity and re-entry with the speed-hold close, the skipped-poll branch); 188608 measured on c2fc22f2, 1 over 188607"
-approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate"
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
 ceiling = 188611
 date = "2026-11-22"
-reason = "raise: one lock acquisition for the re-entry on P1's poll (1 Frame Save hold); 188611 measured on c2fc22f2, +3 against 188608"
-approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate"
+reason = "raise: 1 Frame Save hold (the kept step bit marked in previous, Controller identity, re-entry with the speed-hold close under the poll's one lock, the skipped-poll branch); 188611 measured on c2fc22f2, 4 over 188607"
+approved_by = "tr-primary-2 2026-11-22 01:59Z (HANDOFF-PRIMARY-tr-primary-2.md line 692): raise to the measured number under the operator's LOC rule of 2026-11-20; folded into one entry by its 06:53:42Z order (line 909); NRO and BSS reported at the gate"
