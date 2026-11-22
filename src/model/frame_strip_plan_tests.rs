@@ -102,8 +102,15 @@ fn last_row_moves_keep_a_gap_from_their_pill() {
     for n in 0..iv::HISTORY {
         let pill = C.strip.last(0, n);
         let moves = C.strip.last(2, n);
-        assert!(moves.x - moves.w / 2.0 >= pill.x + pill.w / 2.0 + 6.0);
-        assert!(moves.x + moves.w / 2.0 <= C.strip.last(0, n + 1).x - C.strip.last(0, n + 1).w / 2.0);
+        let (left, right) = (moves.x - moves.w / 2.0, moves.x + moves.w / 2.0);
+        assert_eq!((left - (pill.x + pill.w / 2.0), moves.w), (8.0, 192.0));
+        let (bound, clear) = if n + 1 < iv::HISTORY {
+            let next = C.strip.last(0, n + 1);
+            (next.x - next.w / 2.0, 4.0)
+        } else {
+            (C.strip.width / 2.0, 16.0)
+        };
+        assert_eq!(bound - right, clear);
         let pane = strip_pane_spec(&C, IDX_IV + at::MOVE_TEXT + n);
         assert_eq!((pane.x, pane.w), (moves.x, moves.w));
     }
