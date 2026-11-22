@@ -156,11 +156,17 @@ fn publish_egg_zones(zones: &EggZones) {
 
 /// Read the active stage's override without locks, allocation, or file access.
 pub fn egg_zone(stage: i32) -> Option<[u8; 4]> {
-    let stage = egg_zone_index(stage)?;
+    let index = egg_zone_index(stage)?;
     let pending = EGG_ZONE_WRITE.load(Ordering::Acquire);
-    if pending >> 32 == stage as u64 + 1 {
+    if pending >> 32 == index as u64 + 1 {
         return Some((pending as u32).to_le_bytes());
     }
+    committed_egg_zone(stage)
+}
+
+/// The override the settings hold, without an Apply the worker has not committed yet: the test bridge's `zone.saved`.
+fn committed_egg_zone(stage: i32) -> Option<[u8; 4]> {
+    let stage = egg_zone_index(stage)?;
     let present = EGG_ZONE_PRESENT[stage / 64].load(Ordering::Acquire) & (1 << (stage % 64)) != 0;
     present.then(|| EGG_ZONES[stage].load(Ordering::Acquire).to_le_bytes())
 }
@@ -480,7 +486,7 @@ fn publish_bridge_state(s: &mut Session) {
                 game != crate::model::practice_games::Game::Eggs || !crate::runtime::features::hitbox::eggs_finished()
             }),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
-            zone, zone_up, zone_saved: zone.and_then(|z| egg_zone(z.stage)),
+            zone, zone_up, zone_saved: zone.and_then(|z| committed_egg_zone(z.stage)),
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),
             scene: crate::runtime::bridge_state::scene(now),

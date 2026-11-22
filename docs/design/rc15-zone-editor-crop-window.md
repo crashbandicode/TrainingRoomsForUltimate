@@ -75,7 +75,7 @@ The optional `tr.menu/1` test bridge publishes these keys:
 | `zone.y` | The edited bottom and top, or empty when closed. |
 | `zone.left` | The edited left zone, or empty when absent or closed. |
 | `zone.right` | The edited right zone, or empty when absent or closed. |
-| `zone.saved` | The saved settings for that stage, or empty when none. |
+| `zone.saved` | The saved settings for that stage as the settings hold them (an Apply shows once the worker has committed it), or empty when none. |
 
 ## Requirement trace
 
@@ -87,7 +87,7 @@ The optional `tr.menu/1` test bridge publishes these keys:
 | Keep the inset view | The inset keeps its backing and contour and gets its own limits and edges, after every world rectangle. | `crop_window_draws_the_inset_after_the_world_view` |
 | Keep every function: where a target can appear (the hatching's) | Up to five sample targets a side, on the outward-connected part of each row. | `zone_samples_are_spots_a_target_can_appear_at` |
 | Keep the editor's buttons | The controls are unchanged; at Preview, X also refreshes the notice when the zone changes. | `zone_wizard_polls_guard_edge_controls` `zone_wizard_writes_the_notice_again_when_x_resets_the_preview` |
-| The test bridge reads the editor state | The snapshot carries the current step, bounds, settings and close outcome. | `the_zone_editor_snapshot_shows_open_values_and_closed_outcomes` `zone_editor_packing_round_trips_and_reserves_zero` `zone_cell_reads_complete_states_and_declines_an_in_progress_write` |
+| The test bridge reads the editor state | The snapshot carries the current step, bounds, settings and close outcome. | `the_zone_editor_snapshot_shows_open_values_and_closed_outcomes` `zone_editor_packing_round_trips_and_reserves_zero` `zone_cell_reads_complete_states_and_declines_an_in_progress_write` `the_bridge_reports_the_committed_zone_not_a_queued_apply` |
 | Readability on bright and dark stages | Edges, limits and handles are opaque and the surroundings are dimmed. A host test can pin only the opaque colours; the Eden run shows a bright and a dark stage. | `crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker` `zone_overlay_dims_the_live_view_and_backs_the_inset_guide` |
 | No added panes, textures or materials in any layout archive; reuse existing panes | The rectangles are 29 of the roster grid's stripes; the pane table and both built archives keep their counts. | `the_pane_table_keeps_the_count_the_game_loaded` `crop_stripes_are_matching_hidden_rectangles_under_the_same_parent` |
 | The pill cap stays 170 | The orb pools are untouched. | `the_orb_pools_keep_the_pill_cap` |

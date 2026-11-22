@@ -323,6 +323,18 @@ fn zone_overlay_dims_the_live_view_and_backs_the_inset_guide() {
 }
 
 #[test]
+fn the_bridge_reports_the_committed_zone_not_a_queued_apply() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let publish = item(&worker, "fn publish_bridge_state(");
+    assert!(publish.contains("zone_saved: zone.and_then(|z| committed_egg_zone(z.stage))"));
+    let committed = item(&worker, "fn committed_egg_zone(");
+    assert!(!committed.contains("EGG_ZONE_WRITE"), "a queued Apply is not saved yet");
+    assert!(committed.contains("EGG_ZONE_PRESENT") && committed.contains("EGG_ZONES[stage]"));
+    let game = item(&worker, "pub fn egg_zone(");
+    assert!(game.contains("EGG_ZONE_WRITE") && game.contains("committed_egg_zone(stage)"), "the game still plays a queued Apply");
+}
+
+#[test]
 fn location_editors_use_one_camera_and_cpu_session() {
     let camera = src("src/runtime/features/btt_camera.rs");
     let frame = item(&camera, "pub(super) fn update_placement(");
