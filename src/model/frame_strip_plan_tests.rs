@@ -97,6 +97,19 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
 }
 
 #[test]
+fn last_row_moves_keep_a_gap_from_their_pill() {
+    use crate::model::panes::{iv, IDX_IV, strip_pane_spec};
+    for n in 0..iv::HISTORY {
+        let pill = C.strip.last(0, n);
+        let moves = C.strip.last(2, n);
+        assert!(moves.x - moves.w / 2.0 >= pill.x + pill.w / 2.0 + 6.0);
+        assert!(moves.x + moves.w / 2.0 <= C.strip.last(0, n + 1).x - C.strip.last(0, n + 1).w / 2.0);
+        let pane = strip_pane_spec(&C, IDX_IV + at::MOVE_TEXT + n);
+        assert_eq!((pane.x, pane.w), (moves.x, moves.w));
+    }
+}
+
+#[test]
 fn compact_bounds_and_fade_follow_the_scene_and_visible_rows() {
     assert_eq!(C.strip.bounds(true, false), [0.0, 23.0, 1296.0, 170.0]);
     assert_eq!(C.strip.bounds(false, false), [0.0, 39.0, 1296.0, 138.0]);

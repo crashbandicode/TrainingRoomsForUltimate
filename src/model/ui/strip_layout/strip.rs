@@ -44,6 +44,9 @@ pub const NOW_TEXT_Y: f32 = TOP - 11.0;
 pub const LAST_Y: f32 = TOP - 153.5;
 pub const PILL_W: f32 = 96.0;
 pub const PILL_STRIDE: f32 = 300.0;
+/// The move names start a gap after their pill and end before the next pill.
+pub const MOVE_GAP: f32 = 8.0;
+pub const MOVE_W: f32 = PILL_STRIDE - PILL_W - MOVE_GAP - 4.0;
 pub const PILL_X0: f32 = FIRST_X + PILL_W / 2.0;
 
 #[derive(Clone, Copy)]
@@ -70,7 +73,7 @@ pub struct StripSpec {
     legs: [f32; 3],
     readout_left: [f32; 2],
     readout_rows: [f32; 3],
-    history: [f32; 4],
+    history: [f32; 6],
     tag_widths: [f32; 3],
 }
 
@@ -100,7 +103,7 @@ pub const C: StripSpec = StripSpec {
     legs: [LEG_Y, BAR_Y, BRACKET_TEXT_Y],
     readout_left: [READ_X, READ_SUB_X],
     readout_rows: READ_VALUE_Y,
-    history: [LAST_Y, PILL_X0, PILL_STRIDE, PILL_W],
+    history: [LAST_Y, PILL_X0, PILL_STRIDE, PILL_W, MOVE_GAP, MOVE_W],
     tag_widths: [92.0, 54.0, 40.0],
 };
 
@@ -258,12 +261,12 @@ impl StripSpec {
     }
 
     pub const fn last(&self, part: usize, n: usize) -> Place {
-        let [y, x0, stride, w] = self.history;
+        let [y, x0, stride, w, gap, moves] = self.history;
         let x = x0 + n as f32 * stride;
         match part {
             0 => Place::new(x, y, w),
             1 => Place::new(x, y, 0.0),
-            _ => Place::new(x + w / 2.0 + 100.0, y, 0.0),
+            _ => Place::new(x + w / 2.0 + gap + moves / 2.0, y, moves),
         }
     }
 }
@@ -413,12 +416,10 @@ pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name
             Align::Center,
             FONT_TAG,
         ),
-        i if i < STICK => iv_text(
-            name,
-            with_width(spec.last(2, i - MOVE_TEXT), 200.0),
-            Align::Left,
-            FONT_TAG,
-        ),
+        i if i < STICK => {
+            let place = spec.last(2, i - MOVE_TEXT);
+            iv_text(name, [place.x, place.y, place.w], Align::Left, FONT_TAG)
+        }
         i if i < TAG_BOX => hidden(under(
             text(
                 name,
