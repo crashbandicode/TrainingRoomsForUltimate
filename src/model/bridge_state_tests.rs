@@ -46,6 +46,14 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "keyboard=0",
         "game=\"\"",
         "game.running=0",
+        "zone.step=\"\"",
+        "zone.last=\"\"",
+        "zone.stage=-1",
+        "zone.bins=\"\"",
+        "zone.y=\"\"",
+        "zone.left=\"\"",
+        "zone.right=\"\"",
+        "zone.saved=\"\"",
         "notice.header=\"Eggs-ercise\"",
         "notice.body=\"Eggs 0   1:00\"",
         "scene=\"training\"",
@@ -72,6 +80,80 @@ fn an_open_editor_has_an_integer_selection_and_a_quoted_key() {
     let mut out = String::new();
     snapshot(&view, &mut out);
     assert!(out.contains("\neditor=\"parry_saved\"\neditor.sel=2\neditor.sel_key=\"rename\"\nkeyboard=1\n"), "{out}");
+}
+
+fn editor_zone() -> ZoneEditor {
+    ZoneEditor { stage: 3, step: 2, bins: [200, 40, 255, 8], last: ZoneEditor::APPLIED,
+        vertical: [-30.0, 80.5], sides: [Some([-200.25, -90.0]), None] }
+}
+
+#[test]
+fn the_zone_editor_snapshot_shows_open_values_and_closed_outcomes() {
+    let zone = editor_zone();
+    let mut out = String::new();
+    let mut view = View { zone: Some(zone), zone_up: true, ..View::default() };
+    snapshot(&view, &mut out);
+    let zone_lines = |text: &str| text.lines().filter(|line| line.starts_with("zone.")).map(str::to_owned).collect::<Vec<_>>();
+    assert_eq!(zone_lines(&out), [
+        "zone.step=\"inner\"", "zone.last=\"\"", "zone.stage=3", "zone.bins=\"200,40,255,8\"",
+        "zone.y=\"-30.00,80.50\"", "zone.left=\"-200.25,-90.00\"", "zone.right=\"\"", "zone.saved=\"\"",
+    ]);
+    view.zone_up = false;
+    view.zone_saved = Some(zone.bins);
+    snapshot(&view, &mut out);
+    assert_eq!(zone_lines(&out), [
+        "zone.step=\"\"", "zone.last=\"applied\"", "zone.stage=3", "zone.bins=\"\"",
+        "zone.y=\"\"", "zone.left=\"\"", "zone.right=\"\"", "zone.saved=\"200,40,255,8\"",
+    ]);
+    for (last, expected) in [(ZoneEditor::CANCELLED, "cancelled"), (0, "")] {
+        view.zone = Some(ZoneEditor { last, ..zone });
+        snapshot(&view, &mut out);
+        assert!(out.contains(&format!("\nzone.last=\"{expected}\"\n")), "{out}");
+    }
+    view.zone = None;
+    view.zone_up = true;
+    view.zone_saved = None;
+    snapshot(&view, &mut out);
+    assert!(out.contains("\nzone.step=\"\"\nzone.last=\"\"\nzone.stage=-1\n"), "{out}");
+}
+
+#[test]
+fn zone_editor_packing_round_trips_and_reserves_zero() {
+    for zone in [
+        editor_zone(),
+        ZoneEditor { stage: 308, step: 4, bins: [0, 255, 64, 32], last: ZoneEditor::CANCELLED,
+            vertical: [-137.85, -2.25], sides: [Some([-250.0, -90.5]), Some([10.0, 120.25])] },
+        ZoneEditor { stage: 0, step: 0, bins: [0; 4], last: 0, vertical: [0.0; 2], sides: [None; 2] },
+    ] {
+        let packed = zone.pack();
+        assert_ne!(packed[0], 0);
+        assert_eq!(ZoneEditor::unpack(packed), Some(zone));
+    }
+    assert_eq!(ZoneEditor::unpack([0; 4]), None);
+}
+
+#[test]
+fn zone_cell_reads_complete_states_and_declines_an_in_progress_write() {
+    let cell = ZoneCell::new();
+    assert_eq!(cell.read(), Some([0; 4]));
+    let words = editor_zone().pack();
+    cell.write(words);
+    assert_eq!(cell.read(), Some(words));
+    cell.seq.store(1, std::sync::atomic::Ordering::Relaxed);
+    assert_eq!(cell.read(), None);
+}
+
+#[test]
+fn long_zone_lines_and_optional_rows_stay_under_the_snapshot_bound() {
+    let zone = ZoneEditor { stage: i16::MAX.into(), step: 4, bins: [255; 4], last: 0,
+        vertical: [f32::MIN, f32::MAX], sides: [Some([f32::MIN, f32::MAX]); 2] };
+    let long: Vec<String> = (0..200).map(|i| format!("Row number {i} with a long \"title\"")).collect();
+    let rows: Vec<&str> = long.iter().map(String::as_str).collect();
+    let view = View { zone: Some(zone), zone_up: true, zone_saved: Some([255; 4]), rows: &rows, ..eggs_start() };
+    let mut out = String::new();
+    assert!(!snapshot(&view, &mut out));
+    assert!(out.len() <= MAX, "{}", out.len());
+    assert!(out.contains("\nzone.step=\"preview\"\n"), "{out}");
 }
 
 #[test]

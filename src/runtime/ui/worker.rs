@@ -454,6 +454,11 @@ fn publish_bridge_state(s: &mut Session) {
             Some(Screen::Grid { cell, .. }) => Some(*cell),
             _ => None,
         }))).map(|i| i as i64);
+        // The zone editor: whether it is up is read before its state (the game thread writes the state first). A state
+        // that is being written leaves the snapshot as it was until the next pass.
+        let zone_up = crate::runtime::features::egg_zone::wizard_active();
+        let Some(zone) = crate::runtime::bridge_state::zone() else { return };
+        let zone = crate::model::bridge_state::ZoneEditor::unpack(zone);
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
@@ -475,6 +480,7 @@ fn publish_bridge_state(s: &mut Session) {
                 game != crate::model::practice_games::Game::Eggs || !crate::runtime::features::hitbox::eggs_finished()
             }),
             notice: (!notice.0.is_empty()).then_some((notice.0.as_str(), notice.1.as_str())),
+            zone, zone_up, zone_saved: zone.and_then(|z| egg_zone(z.stage)),
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),
             scene: crate::runtime::bridge_state::scene(now),

@@ -2,7 +2,7 @@
 //! TrainingRooms has no link-time dependency on the bridge: the UI worker looks its table up by name at most once a second
 //! for the first 30 s (`nn::ro::LookupSymbol`), validates it before any call, registers once and keeps that handle for the
 //! boot. Without the bridge the lookups stop at 30 s and every entry point is one relaxed load. Publishing happens on the
-//! worker only; the game thread's one call (`note_notice`) never waits (it skips when the reader holds the notice).
+//! worker only; the game thread's calls (`note_notice`, `note_zone`) never wait.
 
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -36,6 +36,17 @@ const SYMBOL: &[u8] = b"ssbu_hw_bridge_state_api_v1\0";
 /// Off once the lookup window ended without a bridge (or its table was unusable): every entry point returns at once.
 static ENABLED: AtomicBool = AtomicBool::new(true);
 static FOUND: AtomicBool = AtomicBool::new(false);
+/// The zone editor's state: written by the game thread under the editor's own lock, read by the worker.
+static ZONE: m::ZoneCell = m::ZoneCell::new();
+
+/// The editor's state after an input (game thread). One relaxed load without a bridge; `state` is not called then.
+pub fn note_zone(state: impl FnOnce() -> m::ZoneEditor) {
+    if FOUND.load(Ordering::Relaxed) { ZONE.write(state().pack()); }
+}
+
+/// The last complete state; `None` while one is being written.
+pub fn zone() -> Option<[u64; 4]> { ZONE.read() }
+
 /// The practice layout's last regular pass (the snapshot's `scene`): `uptime_ms << 2 | kind` (1 Training, 2 lobby
 /// practice), one atomic store from the UI tick (never a lock), read by the worker; older than `SCENE_FRESH_MS` is gone.
 static SCENE_AT: AtomicU64 = AtomicU64::new(0);
@@ -178,6 +189,7 @@ impl Provider {
         let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
         let notice = shown.map_or((String::new(), String::new()), |(h, b)| (h.to_string(), b.to_string()));
         view(&notice, ACK.load(Ordering::Acquire), &mut self.snapshot);
+        if self.snapshot.is_empty() { return; }
         if !self.publisher.wants(self.snapshot.as_bytes()) {
             return;
         }

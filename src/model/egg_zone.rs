@@ -476,7 +476,7 @@ pub enum Outcome {
     Apply([u8; 4]),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Wizard {
     bins: [u8; 4],
     step: Step,
@@ -492,6 +492,10 @@ impl Wizard {
 
     pub fn step(self) -> Step {
         self.step
+    }
+
+    pub fn bins(self) -> [u8; 4] {
+        self.bins
     }
 
     /// Whether the notice must be written again after an input: the step changed, or X loaded the factory zone at

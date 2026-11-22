@@ -168,6 +168,17 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     Stage::new(id, range, ledges, outline)
 }
 
+/// The editor's state for the optional test bridge (`zone.*`). Call it before `LIVE` changes.
+fn publish(stage: &Stage, wizard: Wizard, last: u8) {
+    crate::runtime::bridge_state::note_zone(|| {
+        let zone = wizard.zone(stage);
+        crate::model::bridge_state::ZoneEditor {
+            stage: stage.id(), step: wizard.step() as u8, bins: wizard.bins(), last,
+            vertical: zone.vertical(), sides: Side::BOTH.map(|side| zone.horizontal(side)),
+        }
+    });
+}
+
 /// A request arrives from the menu after it has committed the selected rows.
 pub unsafe fn frame(fighter: usize) {
     let generation = epoch();
@@ -221,6 +232,7 @@ pub unsafe fn frame(fighter: usize) {
     {
         let wizard = Wizard::new(saved);
         let zone = wizard.zone(stage);
+        publish(stage, wizard, 0);
         state.wizard = Some(wizard);
         LIVE.store(generation, Ordering::Release);
         prompt(wizard.step(), zone);
@@ -274,17 +286,21 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     let outcome = wizard.input(stage, stick, sample.pressed);
     match outcome {
         Outcome::Cancel => {
+            publish(stage, *wizard, crate::model::bridge_state::ZoneEditor::CANCELLED);
             state.wizard = None;
             close();
             BACK.store(generation, Ordering::Release);
         }
         Outcome::Apply(bins) if worker::request_egg_zone(stage.id(), bins) => {
+            publish(stage, *wizard, crate::model::bridge_state::ZoneEditor::APPLIED);
             state.wizard = None;
             close();
             notices::post("Off-stage zone", "Applied", 90, DEFAULT_COLOR);
         }
-        _ if wizard.prompts_after(before) => prompt(wizard.step(), wizard.zone(stage)),
-        _ => {}
+        _ => {
+            if *wizard != before { publish(stage, *wizard, 0); }
+            if wizard.prompts_after(before) { prompt(wizard.step(), wizard.zone(stage)); }
+        }
     }
     true
 }
