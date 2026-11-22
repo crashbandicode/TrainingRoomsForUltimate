@@ -28696,7 +28696,7 @@
       "dest": "src/runtime/lobby/practice_stage_request.rs",
       "crate": "root",
       "src_sha256": "a8da0a25cd70d8782d76e6eb8c21a1a5e80a052314bb20dc57d3de0bd5d8d211",
-      "dest_sha256": "a361bc61c0656076868dfb19ad1f0b8d84e0249604b82ebe7dd43354bc4dd837",
+      "dest_sha256": "3a6a91a05dda1eb25fc1d731eeef501a7591d238d946645b60c63219f3b5215b",
       "edits": [
         {
           "old": "notification(\"Practice Stage\".into(), message, 180);",
@@ -28822,6 +28822,26 @@
           "old": "    }\n    match prepare(ticket,state.settled) {\n",
           "new": "    }\n    // rc.14: a custom stage waits, queued, for the game's read of it (`custom_stages::service`).\n    if let Some(id)=crate::engine::stages::custom_stages::decode(ticket.selection.stage) {\n        use crate::runtime::lobby::custom_stages::{self as custom, Readiness};\n        custom::pick(id);\n        match custom::readiness(id) {\n            Readiness::Waiting => { state.queued=Some(ticket); return; }\n            Readiness::Failed => {\n                custom::pick(0);\n                custom::refused(id,\"the game's read of it did not finish\");\n                state.phase(Phase::Refused(custom::NOTICE_POSTED));\n                return;\n            }\n            Readiness::Ready => custom::pick(0),\n        }\n    }\n    match prepare(ticket,state.settled) {\n",
           "reason": "rc.14 custom stages after cs-proof-2 (the primary 2026-11-15 ~05:18Z: list and data through the game's own save object, never a file): each in-scope update runs custom_stages::service (list snapshot, the game's read); a custom Change Stage ticket waits queued for the read, or fails with the approved notice"
+        },
+        {
+          "old": "    fn phase(&mut self, phase: Phase) {\n",
+          "new": "    fn phase(&mut self, phase: Phase) {\n        if self.live.is_some() && matches!(phase, Phase::Retained(_)) { crate::model::lra_reset::RESET_OWED.stage_retained(); }\n",
+          "reason": "Reset-owed latch tracks published Change Stage requests and retires retained or departed requests without fabricating a reset."
+        },
+        {
+          "old": "    fn retire(&mut self) {\n",
+          "new": "    fn retire(&mut self) {\n        if self.live.is_some() { crate::model::lra_reset::RESET_OWED.stage_retained(); }\n",
+          "reason": "Reset-owed latch tracks published Change Stage requests and retires retained or departed requests without fabricating a reset."
+        },
+        {
+          "old": "                state.live=None; state.settled=Some(c); state.phase(Phase::Complete);\n",
+          "new": "                crate::model::lra_reset::RESET_OWED.stage_completed();\n                state.live=None; state.settled=Some(c); state.phase(Phase::Complete);\n",
+          "reason": "Reset-owed latch tracks published Change Stage requests and retires retained or departed requests without fabricating a reset."
+        },
+        {
+          "old": "            publish(commit,descriptor);\n",
+          "new": "            publish(commit,descriptor);\n            crate::model::lra_reset::RESET_OWED.stage_published();\n",
+          "reason": "Reset-owed latch tracks published Change Stage requests and retires retained or departed requests without fabricating a reset."
         }
       ]
     },
