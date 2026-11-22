@@ -1572,17 +1572,9 @@ unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {
-    let [_, _, top, bottom] = natives::camera_limit_range()?;
-    let ray = FloorRay::new(p1)?;
     let platforms = drill == Drill::Juggler;
-    let x = if platforms {
-        x
-    } else {
-        x.clamp(stage.ledges[0][0], stage.ledges[1][0])
-    };
-    let top = if platforms { (y + 1.0).min(top) } else { top };
-    let floor = ray.floor(x, [top, bottom], platforms)?;
-    Some([x, floor.height(x)?])
+    let x = if platforms { x } else { x.clamp(stage.ledges[0][0], stage.ledges[1][0]) };
+    placement::floor_under(p1, [x, y], platforms)
 }
 
 /// Give the native fighter scripts one grounded transition before a new fall.

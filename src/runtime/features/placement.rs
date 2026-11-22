@@ -1,6 +1,18 @@
-use super::cpu::konst;
+use super::{cpu::konst, mashout::FloorRay};
 use crate::model::cpu::ids::C;
-use crate::runtime::state_natives as state;
+use crate::runtime::{game::natives, state_natives as state};
+
+/// The floor point a fighter stands on for a crosshair at `at`. With `platforms`, the first floor at or below the
+/// crosshair's own height (one unit of slack above it), so a crosshair moved down past a platform finds the floor
+/// under that platform; without, the main floor only, cast from the camera's top. `None`: no floor there, or the
+/// floor reads are not granted.
+pub(super) unsafe fn floor_under(body: usize, [x, y]: [f32; 2], platforms: bool) -> Option<[f32; 2]> {
+    let [_, _, top, bottom] = natives::camera_limit_range()?;
+    let ray = FloorRay::new(body)?;
+    let top = if platforms { (y + 1.0).min(top) } else { top };
+    let floor = ray.floor(x, [top, bottom], platforms)?;
+    Some([x, floor.height(x)?])
+}
 
 /// Stand on a floor point; the caller has checked the constants and grants.
 pub(super) unsafe fn stand(body: usize, [x, y]: [f32; 2], facing: f32) {

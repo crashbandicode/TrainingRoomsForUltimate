@@ -233,6 +233,31 @@ fn drill_cpu_behavior_between_ai_kinds_skips_the_native_pause() {
 }
 
 #[test]
+fn a_crosshair_below_a_platform_finds_the_floor_under_it() {
+    let helpers = src("src/runtime/features/placement.rs");
+    assert!(helpers.contains("pub(super) unsafe fn floor_under("));
+    let floor = item(&helpers, "pub(super) unsafe fn floor_under(");
+    let mut previous = 0;
+    for call in [
+        "natives::camera_limit_range()",
+        "FloorRay::new(body)",
+        "ray.floor(x, [top, bottom], platforms)",
+        "floor.height(x)",
+    ] {
+        let at = floor.find(call).expect(call);
+        assert!(at >= previous, "{call}");
+        previous = at + call.len();
+    }
+    assert!(floor.contains("if platforms { (y + 1.0).min(top) } else { top }"));
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let snap = item(&runtime, "unsafe fn snap_player(");
+    assert!(snap.contains("placement::floor_under(p1, [x, y], platforms)"));
+    assert!(!snap.contains("FloorRay::new("));
+    assert!(!snap.contains("ray.floor("));
+    assert!(snap.contains("x.clamp(stage.ledges[0][0], stage.ledges[1][0])"));
+}
+
+#[test]
 fn placement_helpers_keep_the_drills_native_write_order() {
     fn ordered(body: &str, calls: &[&str]) {
         let mut previous = 0;
