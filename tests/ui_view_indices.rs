@@ -156,7 +156,7 @@ fn the_crop_window_leaves_every_menu_pane_as_the_table_starts_it() {
     let panes = Panes { container: all[0], all };
     let mut rects = [None; CROP_RECTS];
     rects[0] = Some(CropRect { x: 10.0, y: 20.0, w: 30.0, h: 40.0, color: [1, 2, 3, 4] });
-    rects[5] = Some(CropRect { x: -50.0, y: 60.0, w: 70.0, h: 80.0, color: [5, 6, 7, 8] });
+    rects[CROP_RECTS - 1] = Some(CropRect { x: -50.0, y: 60.0, w: 70.0, h: 80.0, color: [5, 6, 7, 8] });
 
     unsafe { panes.crop_enter(); }
     for (i, picture) in pictures.iter().enumerate().skip(1) {
@@ -164,10 +164,10 @@ fn the_crop_window_leaves_every_menu_pane_as_the_table_starts_it() {
     }
     unsafe { panes.crop_draw(&rects) };
     for (i, picture) in pictures.iter().enumerate().skip(1) {
-        let visible = i == p::IDX_TILE_STRIPE || i == p::IDX_TILE_STRIPE + 5;
+        let visible = i == p::IDX_TILE_STRIPE || i == p::IDX_TILE_STRIPE + CROP_RECTS - 1;
         assert_eq!(picture.pane.flags & 1 != 0, visible, "{} visibility during crop", p::name_of(i).as_str());
     }
-    for offset in [0, 5] {
+    for offset in [0, CROP_RECTS - 1] {
         let rect = rects[offset].unwrap();
         let pane = &pictures[p::IDX_TILE_STRIPE + offset].pane;
         assert_eq!((pane.pos_x, pane.pos_y, pane.size_x, pane.size_y), (rect.x, rect.y, rect.w, rect.h));
@@ -175,6 +175,18 @@ fn the_crop_window_leaves_every_menu_pane_as_the_table_starts_it() {
     unsafe { panes.crop_enter(); panes.crop_leave(); }
     for (i, picture) in pictures.iter().enumerate().skip(1) {
         assert_eq!(picture.pane.flags & 1 != 0, p::spec(i).visible, "{} visibility after leave", p::name_of(i).as_str());
+    }
+}
+
+#[test]
+fn crop_stripes_are_matching_hidden_rectangles_under_the_same_parent() {
+    use model::egg_zone::CROP_RECTS;
+    assert_eq!(CROP_RECTS, 29);
+    let first = p::spec(p::IDX_TILE_STRIPE);
+    for i in 0..CROP_RECTS {
+        let spec = p::spec(p::IDX_TILE_STRIPE + i);
+        assert!(matches!(spec.kind, p::Kind::Rect { .. }) && !spec.visible);
+        assert_eq!(spec.parent, first.parent);
     }
 }
 

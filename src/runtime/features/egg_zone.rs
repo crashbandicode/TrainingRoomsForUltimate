@@ -8,7 +8,7 @@ use hos_lock::Mutex;
 
 use crate::model::chords::{field, Sample};
 use crate::model::edge_juggle::perfect::{self, Outline, Point, Segment};
-use crate::model::egg_zone::{blast_rect, crop_window, stroke_layers, CropRect, Outcome, Side, Stage, Step, Wizard, Zone, CROP_RECTS};
+use crate::model::egg_zone::{blast_rect, crop_window, CropRect, CropView, Outcome, Side, Stage, Step, Wizard, Zone, CROP_RECTS};
 use crate::model::eggs::View;
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
@@ -294,7 +294,7 @@ struct Display {
     span: [f32; 2],
     inward: [f32; 2],
     step: Step,
-    hatching: [Option<Segment>; 10],
+    samples: [Option<Point>; 10],
     overview: Option<Outline>,
 }
 
@@ -314,61 +314,28 @@ fn display(map: impl Fn(Point) -> Point) -> Option<Display> {
     let [lo, hi] = [[left, bottom], [right, top]].map(map);
     let overview = (lo[0] < -940.0 || lo[1] < -500.0 || hi[0] > 940.0 || hi[1] > 500.0)
         .then(|| *stage.outline());
-    let hatching = std::array::from_fn(|i| {
-        let side = Side::BOTH[i / 5];
-        let [[left, low], [right, high]] = zone.rect(side)?;
-        let [outer, inner] = if side == Side::Left {
-            [left, right]
-        } else {
-            [right, left]
-        };
-        let y = low + (high - low) * ((i % 5 + 1) as f32 / 6.0);
-        let start = [outer, y];
-        // Only shade the air directly connected outward at this height.
-        if !stage.contains(&zone, side, start) {
-            return None;
-        }
-        if stage.allows_move(&zone, side, start, [inner, y]) {
-            return Some([start, [inner, y]]);
-        }
-        let (mut end, mut hidden) = (outer, inner);
-        for _ in 0..6 {
-            let mid = end.midpoint(hidden);
-            if stage.allows_move(&zone, side, start, [mid, y]) {
-                end = mid;
-            } else {
-                hidden = mid;
-            }
-        }
-        Some([start, [end, y]])
-    });
     Some(Display {
         zone,
         span: [left, right],
         inward: stage.inner_limit(),
         step: wizard.step(),
-        hatching,
+        samples: stage.samples(&zone),
         overview,
     })
 }
 
-/// Paint on the shared orb bands, using the live world projection plus a
-/// compact overview when a bar is outside the camera.
-pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) {
+/// Leave this pass's crop window for `layout` in the `CROP` slot and return the spots of the sample targets. On the
+/// shared orb bands it paints only the overview inset's backing and contour, when a bar is outside the camera.
+pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4])) -> [Option<Point>; 10] {
     let View(scale, origin, ..) = view;
     let map = |p: Point| [p[0] * scale[0] + origin[0], p[1] * scale[1] + origin[1]];
-    let Some(display) = display(map) else { return };
-    if let Some(mut crop) = CROP.try_lock() {
-        let vertical = display.zone.vertical().map(|y| map([0.0, y])[1]);
-        let sides = Side::BOTH.map(|side| display.zone.horizontal(side).map(|span| span.map(|x| map([x, 0.0])[0])));
-        *crop = Some((layout, crop_window(vertical, sides, display.step)));
-    }
-    display.guides(map, &mut |segment, width, color| {
-        for (width, color) in stroke_layers(width, color) {
-            line(segment, width, color);
-        }
-    });
-    if let Some(outline) = &display.overview {
+    let Some(display) = display(map) else { return [None; 10] };
+    let crop_view = |project: &dyn Fn(Point) -> Point| CropView {
+        vertical: display.zone.vertical().map(|y| project([0.0, y])[1]),
+        sides: Side::BOTH.map(|side| display.zone.horizontal(side).map(|span| span.map(|x| project([x, 0.0])[0]))),
+        limits: display.inward.map(|x| project([x, 0.0])[0]),
+    };
+    let inset = display.overview.as_ref().map(|outline| {
         let [bottom, top] = display.zone.vertical();
         let [left, right] = display.span;
         let origin = [left.midpoint(right), bottom.midpoint(top)];
@@ -377,8 +344,7 @@ pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4
             |span, p| span.max(2.0 * (p[0] - origin[0]).abs()).max(2.0 * (p[1] - origin[1]).abs()),
         );
         let scale = 218.0 / span;
-        // One dark pane backs every inset stroke. With 28 guides per view and
-        // up to 64 contour segments, both views use at most 149 of 172 bands.
+        // One backing and up to 64 contour segments use at most 65 of the 172 bands.
         line([[681.0, 347.0], [919.0, 347.0]], 238.0, INSET_BACKING);
         let overview = |p: Point| {
             [
@@ -390,47 +356,10 @@ pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4
         for &segment in outline.segments() {
             line(segment.map(overview), 3.0, [240, 240, 255, 230]);
         }
-        display.guides(overview, &mut line);
+        crop_view(&overview)
+    });
+    if let Some(mut crop) = CROP.try_lock() {
+        *crop = Some((layout, crop_window(crop_view(&map), inset, display.step)));
     }
-}
-
-impl Display {
-    fn guides(&self, map: impl Fn(Point) -> Point, line: &mut impl FnMut(Segment, f32, [u8; 4])) {
-        for segment in self.hatching.iter().flatten() {
-            line(segment.map(&map), 5.0, [112, 204, 255, 222]);
-        }
-        let [bottom, top] = self.zone.vertical();
-        let [left, right] = self.span;
-        let mut guide = |a, b, k, color: [u8; 3]| {
-            let active = self.step == k || self.step == Step::Preview;
-            let [r, g, b0] = color;
-            line(
-                [map(a), map(b)],
-                if active { 5.0 } else { 3.0 },
-                [r, g, b0, if active { 250 } else { 190 }],
-            );
-        };
-        for (y, step) in [(top, Step::Top), (bottom, Step::Bottom)] {
-            guide([left, y], [right, y], step, [66, 142, 255]);
-        }
-        for side in Side::BOTH {
-            let Some([lo, hi]) = self.zone.horizontal(side) else {
-                continue;
-            };
-            let [outer, inner] = if side == Side::Left { [lo, hi] } else { [hi, lo] };
-            guide([inner, bottom], [inner, top], Step::Inner, [255, 221, 77]);
-            guide([outer, bottom], [outer, top], Step::Outer, [206, 132, 255]);
-        }
-        for side in Side::BOTH {
-            if self.zone.horizontal(side).is_none() {
-                continue;
-            }
-            let x = self.inward[side as usize];
-            let slice = (top - bottom) / 11.0;
-            for i in (0..11).step_by(2) {
-                let y = bottom + i as f32 * slice;
-                line([map([x, y]), map([x, y + slice])], 2.0, [255, 221, 77, 180]);
-            }
-        }
-    }
+    display.samples
 }

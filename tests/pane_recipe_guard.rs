@@ -24,6 +24,18 @@ fn the_committed_recipes_were_built_from_this_pane_table() {
     assert_eq!(pane_table::digest(&panes::specs()), committed(), "{REBUILD}");
 }
 
+/// The crop window adds no panes. A count change needs a boot that reaches Training.
+#[test]
+fn the_pane_table_keeps_the_count_the_game_loaded() {
+    assert_eq!(panes::specs().len(), 1646, "pane count changed: boot the build to Training");
+}
+
+#[test]
+fn the_orb_pools_keep_the_pill_cap() {
+    assert_eq!((panes::ORBS, panes::CAPS, panes::BANDS), (512, 340, 172));
+    assert_eq!(panes::CAPS / 2, 170);
+}
+
 /// The guard sees a change to any spec field, a renamed pane and an added pane, as the badge port's were.
 #[test]
 fn a_changed_pane_table_fails_the_guard() {

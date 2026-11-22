@@ -257,6 +257,40 @@ impl Stage {
                 .iter()
                 .all(|&s| !crosses([from, to], s) && s.into_iter().all(|p| clear_of([from, to], p)))
     }
+
+    /// Where a target can appear, for the editor's sample pictures: up to five spots a side (`side as usize * 5 + row`,
+    /// rows bottom to top), each on the part of its row that is connected outward.
+    pub fn samples(&self, zone: &Zone) -> [Option<Point>; 10] {
+        const FRACTIONS: [f32; 5] = [0.35, 0.65, 0.3, 0.5, 0.25];
+        std::array::from_fn(|i| {
+            let side = Side::BOTH[i / 5];
+            let [[left, low], [right, high]] = zone.rect(side)?;
+            let [outer, inner] = if side == Side::Left { [left, right] } else { [right, left] };
+            let row = i % 5;
+            let y = low + (high - low) * ((row + 1) as f32 / 6.0);
+            let start = [outer, y];
+            // Only sample the air directly connected outward at this height.
+            if !self.contains(zone, side, start) {
+                return None;
+            }
+            let end = if self.allows_move(zone, side, start, [inner, y]) {
+                inner
+            } else {
+                let (mut end, mut hidden) = (outer, inner);
+                for _ in 0..6 {
+                    let mid = end.midpoint(hidden);
+                    if self.allows_move(zone, side, start, [mid, y]) {
+                        end = mid;
+                    } else {
+                        hidden = mid;
+                    }
+                }
+                end
+            };
+            let spot = [outer + FRACTIONS[row] * (end - outer), y];
+            Some(if self.contains(zone, side, spot) { spot } else { start })
+        })
+    }
 }
 
 /// The two heights coincide except on a vertical segment.
@@ -305,17 +339,21 @@ fn crosses([a, b]: Segment, [c, d]: Segment) -> bool {
     straddles(a, b, c, d) && straddles(c, d, a, b)
 }
 
-/// The world overlay paints a shadow before each colored stroke.
-pub fn stroke_layers(width: f32, color: [u8; 4]) -> [(f32, [u8; 4]); 2] {
-    [(width + 5.0, [10, 15, 27, 235]), (width, color)]
-}
-
 /// One flat rectangle of the crop window, in canvas units (1920 x 1080, origin at the centre, y up): centre and size.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CropRect { pub x: f32, pub y: f32, pub w: f32, pub h: f32, pub color: [u8; 4] }
 
-/// The most rectangles one crop window draws: five dims and four edges a side.
-pub const CROP_RECTS: usize = 13;
+/// One view of the zones, the world view or the inset, in canvas units: `vertical` is [bottom, top],
+/// `sides[Side as usize]` that side's [left, right], `limits[Side as usize]` the x of that side's inner limit.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CropView {
+    pub vertical: [f32; 2],
+    pub sides: [Option<[f32; 2]>; 2],
+    pub limits: [f32; 2],
+}
+
+/// Five dims, two limits, eight edges and four handle rectangles, then ten inset rectangles.
+pub const CROP_RECTS: usize = 29;
 
 const CROP_X: [f32; 2] = [-960.0, 960.0];
 const CROP_Y: [f32; 2] = [-540.0, 540.0];
@@ -323,46 +361,82 @@ const CROP_DIM: [u8; 4] = [10, 15, 27, 140];
 const CROP_BLUE: [u8; 4] = [66, 142, 255, 255];
 const CROP_YELLOW: [u8; 4] = [255, 221, 77, 255];
 const CROP_PURPLE: [u8; 4] = [206, 132, 255, 255];
-const CROP_THIN: f32 = 3.0;
-const CROP_ACTIVE: f32 = 7.0;
+const CROP_INK: [u8; 4] = [10, 15, 27, 255];
 
-/// The crop window (design 3): everything outside the two zones dimmed, and each zone's four boundaries as thin
-/// opaque rectangles just outside it. All inputs are canvas units: `vertical` is [bottom, top], `sides[Side as usize]`
-/// that side's [left, right]. The rectangles come back to front, the unused entries last.
-pub fn crop_window(vertical: [f32; 2], sides: [Option<[f32; 2]>; 2], step: Step) -> [Option<CropRect>; CROP_RECTS] {
-    let mut rects = [None; CROP_RECTS];
-    let mut count = 0;
-    let mut push = |[left, right]: [f32; 2], [bottom, top]: [f32; 2], color| {
-        let (w, h) = (right - left, top - bottom);
-        if w > 0.0 && h > 0.0 {
-            rects[count] = Some(CropRect { x: left.midpoint(right), y: bottom.midpoint(top), w, h, color });
-            count += 1;
+fn crop_limits(view: CropView, width: f32, push: &mut impl FnMut([f32; 2], [f32; 2], [u8; 4])) {
+    for (i, side) in view.sides.into_iter().enumerate() {
+        if side.is_some() {
+            let x = view.limits[i];
+            push([x - width / 2.0, x + width / 2.0], view.vertical, CROP_YELLOW);
         }
-    };
-    let [bottom, top] = vertical;
-    let [low, high] = vertical.map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
-    push(CROP_X, [high, CROP_Y[1]], CROP_DIM);
-    push(CROP_X, [CROP_Y[0], low], CROP_DIM);
-    let mut cursor = CROP_X[0];
-    for [left, right] in sides.into_iter().flatten() {
-        let [left, right] = [left, right].map(|x| x.clamp(CROP_X[0], CROP_X[1]));
-        push([cursor, left], [low, high], CROP_DIM);
-        cursor = cursor.max(right);
     }
-    push([cursor, CROP_X[1]], [low, high], CROP_DIM);
-    let width = |edge| if step == edge || step == Step::Preview { CROP_ACTIVE } else { CROP_THIN };
-    for (i, side) in sides.into_iter().enumerate() {
+}
+
+fn crop_edges(view: CropView, step: Step, thin: f32, active: f32,
+    push: &mut impl FnMut([f32; 2], [f32; 2], [u8; 4]))
+{
+    let [bottom, top] = view.vertical;
+    let width = |edge| if step == edge || step == Step::Preview { active } else { thin };
+    for (i, side) in view.sides.into_iter().enumerate() {
         let Some([left, right]) = side else { continue };
         let (t, b, inner, outer) = (width(Step::Top), width(Step::Bottom), width(Step::Inner), width(Step::Outer));
-        push([left - CROP_THIN, right + CROP_THIN], [top, top + t], CROP_BLUE);
-        push([left - CROP_THIN, right + CROP_THIN], [bottom - b, bottom], CROP_BLUE);
+        push([left - thin, right + thin], [top, top + t], CROP_BLUE);
+        push([left - thin, right + thin], [bottom - b, bottom], CROP_BLUE);
         let (in_x, out_x) = if i == Side::Left as usize {
             ([right, right + inner], [left - outer, left])
         } else {
             ([left - inner, left], [right, right + outer])
         };
-        push(in_x, [bottom - CROP_THIN, top + CROP_THIN], CROP_YELLOW);
-        push(out_x, [bottom - CROP_THIN, top + CROP_THIN], CROP_PURPLE);
+        push(in_x, [bottom - thin, top + thin], CROP_YELLOW);
+        push(out_x, [bottom - thin, top + thin], CROP_PURPLE);
+    }
+}
+
+/// The crop window (design 3). The world view: everything outside the two zones dimmed; then, opaque, each side's
+/// inner limit, each zone's four boundaries just outside it (the step's one thicker) and a handle on the boundary
+/// the step moves. Then the inset's limits and boundaries. The rectangles come back to front, the unused entries last.
+pub fn crop_window(world: CropView, inset: Option<CropView>, step: Step) -> [Option<CropRect>; CROP_RECTS] {
+    let mut rects = [None; CROP_RECTS];
+    let mut count = 0;
+    let mut push = |[left, right]: [f32; 2], [bottom, top]: [f32; 2], color| {
+        let (w, h) = (right - left, top - bottom);
+        if w > 0.0 && h > 0.0 && count < CROP_RECTS {
+            rects[count] = Some(CropRect { x: left.midpoint(right), y: bottom.midpoint(top), w, h, color });
+            count += 1;
+        }
+    };
+    let [bottom, top] = world.vertical;
+    let [low, high] = world.vertical.map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
+    push(CROP_X, [high, CROP_Y[1]], CROP_DIM);
+    push(CROP_X, [CROP_Y[0], low], CROP_DIM);
+    let mut cursor = CROP_X[0];
+    for [left, right] in world.sides.into_iter().flatten() {
+        let [left, right] = [left, right].map(|x| x.clamp(CROP_X[0], CROP_X[1]));
+        push([cursor, left], [low, high], CROP_DIM);
+        cursor = cursor.max(right);
+    }
+    push([cursor, CROP_X[1]], [low, high], CROP_DIM);
+    let (thin, active) = (5.0, 11.0);
+    crop_limits(world, 3.0, &mut push);
+    crop_edges(world, step, thin, active, &mut push);
+    for (i, side) in world.sides.into_iter().enumerate() {
+        let Some([left, right]) = side else { continue };
+        let [x0, x1] = [left - thin, right + thin].map(|x| x.clamp(CROP_X[0], CROP_X[1]));
+        let [y0, y1] = [bottom - thin, top + thin].map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
+        let half = active / 2.0;
+        let (x, y, w, h, iw, ih, color) = match step {
+            Step::Top if x1 > x0 => (x0.midpoint(x1), top + half, 36.0, 30.0, 20.0, 14.0, CROP_BLUE),
+            Step::Bottom if x1 > x0 => (x0.midpoint(x1), bottom - half, 36.0, 30.0, 20.0, 14.0, CROP_BLUE),
+            Step::Inner if y1 > y0 => (if i == 0 { right + half } else { left - half }, y0.midpoint(y1), 30.0, 36.0, 14.0, 20.0, CROP_YELLOW),
+            Step::Outer if y1 > y0 => (if i == 0 { left - half } else { right + half }, y0.midpoint(y1), 30.0, 36.0, 14.0, 20.0, CROP_PURPLE),
+            _ => continue,
+        };
+        push([x - w / 2.0, x + w / 2.0], [y - h / 2.0, y + h / 2.0], color);
+        push([x - iw / 2.0, x + iw / 2.0], [y - ih / 2.0, y + ih / 2.0], CROP_INK);
+    }
+    if let Some(inset) = inset {
+        crop_limits(inset, 2.0, &mut push);
+        crop_edges(inset, step, 2.0, 4.0, &mut push);
     }
     rects
 }

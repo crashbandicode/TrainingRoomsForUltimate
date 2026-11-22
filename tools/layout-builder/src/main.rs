@@ -445,6 +445,32 @@ mod tests {
     use super::*;
     use nx_layout_toolbox::bntx::decode::decode_texture_image;
 
+    /// The crop window adds no layout resources. A count change needs a boot that reaches Training.
+    #[test]
+    fn the_built_layouts_keep_the_counts_the_game_loaded() {
+        fn count(pane: &nx_layout_toolbox::bflyt::BasePane) -> usize {
+            1 + pane.children.iter().map(count).sum::<usize>()
+        }
+        let dir = std::env::var("UI_STOCK_FIXTURE").unwrap_or_else(|_| "/home/intpa/smash-training-lobby/pkg5-scratch/stock".into());
+        for (kind, waiting, expected) in [
+            ("training", false, (1824, 132, 89)),
+            ("waiting", true, (1710, 85, 137)),
+        ] {
+            let stock = std::path::Path::new(&dir).join(format!("info_{kind}.arc"));
+            assert!(stock.is_file(), "{kind} stock fixture {} is missing: both archives are required (UI_STOCK_FIXTURE)", stock.display());
+            let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+            let out = std::env::temp_dir().join(format!("layout-count-{}-{nonce}-{kind}", std::process::id()));
+            std::fs::create_dir(&out).unwrap();
+            build(stock.to_str().unwrap(), out.to_str().unwrap(), waiting).unwrap();
+            let arc = read_arc(&std::fs::read(out.join("target.arc")).unwrap()).unwrap();
+            let layout = read_bflyt(&arc.files[arc.position(&format!("blyt/info_{kind}.bflyt")).unwrap()].data).unwrap();
+            let bntx = read_bntx(&arc.files[arc.position("timg/__Combined.bntx").unwrap()].data).unwrap();
+            let actual = (count(layout.root_pane.as_ref().unwrap()), layout.materials.len(), bntx.textures.len());
+            std::fs::remove_dir_all(&out).unwrap();
+            assert_eq!(actual, expected, "{kind} pane, material and texture counts changed: boot the build to Training");
+        }
+    }
+
     /// Both glyphs land in a round-tripped archive under the names rr-6 binds, and the opaque texels are white.
     #[test]
     fn save_and_repeat_land_in_the_built_archive() {
