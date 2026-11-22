@@ -49,17 +49,22 @@ fn tick(frame: u32, fighter: i32, status: i32) -> Beat {
 fn a_replacement_without_a_status_is_not_restarted_on_or_placed() {
     // Native code cannot run on the host. On 133979fc (f13-pyrasched-1, seq 19007-19012) the
     // changed-body restart ran on the swap's replacement and the refill requested Wait of it.
+    // A start or restart request must not bind that object to a run either (review 00:47:01Z).
     let runtime = include_str!("../../../runtime/features/edge_juggle.rs");
     let (_, frame) = runtime.split_once("pub unsafe fn frame(fighter: usize)").unwrap();
-    let (_, read) = frame.split_once("let Some(kind) = natives::fighter_kind(cpu)").unwrap();
-    let (arrival, later) = read.split_once("let measured_swap").unwrap();
-    assert!(arrival.contains("== CpuObject::Arriving"));
+    let (before, after) = frame.split_once("== CpuObject::Arriving").unwrap();
+    for early in ["START.compare_exchange", "RESTART.swap", "engine.run = Some(Run", "Wizard::new", "restart_drill"] {
+        assert!(!before.contains(early), "{early} runs before the object is classified");
+    }
+    let (arrival, later) = after.split_once("let id = natives::stage_id();").unwrap();
     assert!(arrival.contains("run.rounds.advance_attempt(Observation::default())"));
-    assert_eq!(arrival.matches("return;").count(), 2, "the absent kind and the arriving object both leave");
-    for native in ["restart_drill", "state::", "reset_recovery_resources", "run.body = body", "run.placement"] {
+    assert_eq!(arrival.matches("return;").count(), 1, "the arriving object leaves the frame");
+    for native in ["state::", "reset_recovery_resources", "run.body = body", "run.placement", "START", "RESTART"] {
         assert!(!arrival.contains(native), "{native}");
     }
-    assert!(later.contains("run.rounds.restart_drill()"), "a replacement with a kind and a status still restarts");
+    for kept in ["START.compare_exchange", "RESTART.swap", "run.rounds.restart_drill()"] {
+        assert!(later.contains(kept), "{kept}");
+    }
 }
 
 #[test]

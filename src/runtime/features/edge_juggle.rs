@@ -1803,6 +1803,20 @@ pub unsafe fn frame(fighter: usize) {
         }
         return;
     }
+    let kind = natives::fighter_kind(cpu);
+    let owned = engine.run.as_ref().is_some_and(|run| run.body == body);
+    if kind.is_some_and(|kind| CpuObject::sighted(owned, kind, natives::status_kind(cpu)) == CpuObject::Arriving) {
+        // The swap makes the replacement active before its first status. No run binds it, no
+        // request is consumed for it and nothing is asked of it. A live measured swap keeps
+        // its clock, as for the empty slot.
+        if let Some(run) = engine.run.as_mut().filter(|run| {
+            run.rounds.phase == Phase::Live
+                && run.niche.as_ref().is_some_and(|guide| guide.waiting_for_form(run.rounds.frames))
+        }) {
+            run.rounds.advance_attempt(Observation::default());
+        }
+        return;
+    }
     let id = natives::stage_id();
     let Some(form) = natives::stage_form(id) else {
         return;
@@ -1896,19 +1910,9 @@ pub unsafe fn frame(fighter: usize) {
     else {
         return;
     };
-    let Some(kind) = natives::fighter_kind(cpu) else {
+    let Some(kind) = kind else {
         return;
     };
-    if CpuObject::sighted(run.body == body, kind, natives::status_kind(cpu)) == CpuObject::Arriving {
-        // The swap makes the replacement active before its first status. It is not adopted,
-        // restarted on or placed. A live measured swap keeps its clock, as for the empty slot.
-        if run.rounds.phase == Phase::Live
-            && run.niche.as_ref().is_some_and(|guide| guide.waiting_for_form(run.rounds.frames))
-        {
-            run.rounds.advance_attempt(Observation::default());
-        }
-        return;
-    }
     let measured_swap = run.rounds.phase == Phase::Live
         && kind == perfect::pyra::MYTHRA
         && game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
