@@ -1,7 +1,7 @@
 # Record: place the fighters and pick their state first (for the operator's answer)
 
 Mockups, not Eden stills (2026-11-22, hit-streak-sol, source `7d962416`; branch `design/record-placement-and-state`,
-commit `e8eb999d`).
+commits `e8eb999d` and `c82d6957`, its correction after review).
 Five decisions, one picture each; the recommended option has a green outline. Nothing here is implemented, and no Eden
 measurement was made for this page.
 
@@ -69,6 +69,9 @@ start whose fighter is not where it was put.
   recording, for Player 1 and for the CPU: a placed recording has no Lockout and no Standby.
 - **A, recommended:** the recording starts as the state begins: the footstool as it happens, the missed tech as it hits
   the floor, the trip as it starts. **B:** it starts once the fighter is lying, sitting or falling.
+- **A is not certain yet.** It needs a hold that stops the state's own clock during the count, for both fighters. Two
+  existing pieces are candidates and neither is proven for this. If the measurement finds none, only B can be built,
+  and I come back to you with that result.
 - **The CPU** reacts to its state with the settings you have: its Tumble and Footstool triggers, Mistech Options after
   a missed tech or a trip.
 - **Fighters:** none is known to be unable to enter a state. That is not measured.
@@ -98,7 +101,8 @@ About +110 lines.
 1. The row in Recording › Options only (recommended), or also Y in the pop-up?
 2. On the stage or off it for each fighter (recommended), or one choice for both?
 3. The fighters face each other (recommended), or a facing for each on the States page (about +20 lines)?
-4. The recording starts as the state begins (recommended), or once the fighter is lying, sitting or falling?
+4. The recording starts as the state begins (recommended, if the measured hold allows it), or once the fighter is
+   lying, sitting or falling?
 5. A missed tech face up or face down as the game gives it (recommended, after the measurement), or a choice?
 6. Every load of the start save reproduces the state (recommended), or only Play? Play without a count (recommended),
    or with Record's count?
