@@ -500,6 +500,10 @@ Check one or more **Moving paths** to have each new target use one selected flig
 Pac-Man's Galaxian, Link's Boomerang, and Samus's Homing Missile. Homing Missile follows the active player's movement.
 When the list is empty, targets use the ordinary bouncing flight. Target speed changes playback speed.
 
+With **In view** or **Whole stage**, a moving target stays over the stage: it does not pass the outer ends of the
+stage's floors and does not drop below the floor it appeared over. A flight that needs more room than that is flown
+smaller. **Off stage** targets keep to their zone.
+
 Set **Target expiry** to **Off** or from **1 second** through **10 seconds**. An unhit target then disappears and is
 replaced. Pausing or opening a menu freezes its timer. With **Hit streak** on, an expiry clears the current streak
 and keeps your best.

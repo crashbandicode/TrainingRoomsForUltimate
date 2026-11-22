@@ -2357,3 +2357,11 @@ ceiling = 191654
 date = "2026-11-22"
 reason = "Gate Training reset effects on one atomic word for passed reset checks and destroyed fighter entries. Measured normalized implementation 191654, 53 above the integration ceiling 191601, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2 2026-11-22 08:22:35Z (HANDOFF-PRIMARY-tr-primary-2.md line 993): 188,664 (+53) approved under the operator's LOC rule of 2026-11-20; NRO and BSS reported at the gate; after the rebase onto 04959678 the measured difference is +53"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191664
+date = "2026-11-22"
+reason = "Eggs-ercise moving paths on In view and Whole stage are fitted into a box cut to the stage: the outer ends of the usable floors and the floor the target appeared over; with no room there the target uses Pop up. Measured normalized implementation 191664, 10 above the integration ceiling 191654, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 14:06:33Z (HANDOFF-PRIMARY-tr-primary-2.md line 1336): the operator's order that Eggs-ercise moving paths stay on the stage, root cause, red test and fix for the next round; the measured growth is reported with READY under the operator's measured LOC rule"

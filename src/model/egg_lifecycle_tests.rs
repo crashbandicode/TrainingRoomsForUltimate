@@ -405,3 +405,64 @@ fn offstage_spawns_without_view_and_sweeps_motion_in_its_original_side() {
         assert!(moved, "selected flight {path} should move");
     }
 }
+
+#[test]
+fn moving_paths_stay_over_the_stage() {
+    const MAIN: Floor = [[-50.0, 0.0], [50.0, 0.0]];
+    const PLATFORM: Floor = [[-40.0, 30.0], [-10.0, 30.0]];
+    for area in [IN_VIEW, WHOLE] {
+        for target in [DISC, CPU] {
+            for bit in 0..4u8 {
+                for seed in 0..24u32 {
+                    let mut run = Run::IDLE;
+                    run.start([FREE, ANY, NORMAL, target, area], seed.wrapping_mul(0x9e37_79b9));
+                    run.configure(1 << bit, 0);
+                    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+                    run.set_floors(&[MAIN, PLATFORM]);
+                    run.sense([58.0, -30.0]);
+                    for _ in 0..=SETTLE {
+                        run.look(true, || Some(VIEW));
+                    }
+                    run.step(false, 0.0, &[], false, 0);
+                    let floor = if run.egg.expect("a target")[1] >= 30.0 { 30.0 } else { 0.0 };
+                    let first = run.egg_at().unwrap();
+                    let mut moved = false;
+                    for tick in 0..200 {
+                        let [x, y] = run.egg_at().unwrap();
+                        assert!(
+                            (-46.01..=46.01).contains(&x) && y >= floor + RADIUS - 0.01,
+                            "left the stage: area {area} target {target} path {bit} seed {seed} tick {tick}: \
+                             ({x}, {y}), floor from -50 to 50 at {floor}"
+                        );
+                        moved |= [x, y] != first;
+                        run.step(true, 0.0, &[], false, 0);
+                    }
+                    assert!(moved, "area {area} target {target} path {bit} seed {seed} should fly");
+                    let [low, high] = run.motion.expect("a moving path").bounds;
+                    assert_eq!((low, high[0]), ([-46.0, floor + RADIUS], 46.0));
+                    assert!((high[1] - [52.4286, 86.0][usize::from(area)]).abs() < 0.001, "{high:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_moving_path_with_no_room_over_its_floor_pops_up() {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], 7);
+    run.configure(0b1111, 0);
+    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+    let narrow = View(VIEW.0, VIEW.1, [-12.0, 12.0], VIEW.3);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(narrow));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    let [x, y] = run.egg_at().expect("a target in the four-unit range");
+    assert!((-2.0..=2.0).contains(&x));
+    assert!(run.motion.is_none() && run.path.is_none(), "no room for a flight: Pop up");
+    for _ in 0..30 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    assert!(run.egg_at().unwrap()[1] > y + 20.0, "the Pop up flight is at its apex after 30 ticks");
+}
