@@ -23,7 +23,7 @@ use crate::model::edge_juggle::perfect::{
 use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
 use crate::model::edge_juggle::{
     CpuObject, Drill, Observation, Outcome, Phase, PlacedPlayer, Placement, PlacementAction, PlacementFrame,
-    Reaction, Session, Settle, Setup, Stage, Wizard, WizardStep,
+    Reaction, Session, Setup, Stage, Wizard, WizardStep,
 };
 
 #[path = "edge_juggle/zoom.rs"]
@@ -145,8 +145,8 @@ struct Run {
     sdi_start: Option<u32>,
     player_ledge: Option<usize>,
     placement: Placement,
-    /// Player 1's watched start and the rewrites spent in this attempt.
-    settle: Settle,
+    /// The point a watched start write wrote for Player 1; None when the write found it idle.
+    settle: Option<[f32; 2]>,
     notice: FixedPath<128>,
 }
 #[derive(Clone, Copy)]
@@ -1921,7 +1921,11 @@ pub unsafe fn frame(fighter: usize) {
     }
     let active_run = engine.run.as_ref().filter(|run| start == 0 && run.drill == drill);
     let opponent = active_run.map_or_else(|| OPPONENT.read(), |run| run.opponent);
-    if practice_cpu::switching() || opponent.fighter.is_some_and(|wanted| !picker::is_selected(wanted, kind as u32)) {
+    if practice_cpu::switching()
+        || opponent.fighter.is_some_and(|wanted| {
+            !picker::is_selected(wanted, crate::runtime::roster::character_roster::cpu_loaded_kind(), kind as u32)
+        })
+    {
         engine.wake_cpu(Some(body));
         return;
     }
@@ -1997,7 +2001,7 @@ pub unsafe fn frame(fighter: usize) {
             sdi_start: None,
             player_ledge: None,
             placement: Placement::ResetResources,
-            settle: Settle::default(),
+            settle: None,
             notice: FixedPath::new(),
         });
         let _ = START.compare_exchange(start, 0, Ordering::AcqRel, Ordering::Acquire);
@@ -2033,10 +2037,6 @@ pub unsafe fn frame(fighter: usize) {
         && run.niche.as_ref().is_some_and(|guide| guide.accepts_form(Some(kind)));
     if measured_swap || legacy_swap {
         run.body = body;
-        if run.opponent.fighter.is_some() {
-            // Keep the selected CPU through a swap accepted from its niche guide.
-            run.opponent.fighter = Some(kind as u32);
-        }
         if legacy_swap {
             run.niche = None;
         }
@@ -2151,18 +2151,18 @@ pub unsafe fn frame(fighter: usize) {
                 use crate::model::sites_pkg2 as sites;
                 let watch = placed_player(p1).watch() && game::granted(sites::POS_X_OFFSET) && game::granted(sites::POS_Y_OFFSET);
                 if let Some(at) = try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
-                    run.settle.placed(at, watch);
+                    run.settle = watch.then_some(at);
                     run.placement = Placement::Airborne;
                 }
             }
             PlacementAction::AwaitNativeWait => {}
             action @ (PlacementAction::RequestFall | PlacementAction::HoldStart) => {
                 let falling = action == PlacementAction::HoldStart;
-                let watched = run.settle.watched().map(|(at, spent)| (placed_player(p1), on_start(p1, at), spent));
+                let watched = run.settle.map(|at| (placed_player(p1), on_start(p1, at), run.rounds.player_rewrites()));
                 let (rewrite, ready) = PlacedPlayer::before_ready(watched, falling, drill);
-                if let (true, Some((at, _))) = (rewrite, run.settle.watched()) {
+                if let (true, Some(at)) = (rewrite, run.settle) {
                     write_player(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
-                    run.settle.rewritten();
+                    run.rounds.player_rewritten();
                 }
                 if falling {
                     hold_cpu(cpu, run.setup.cpu);
@@ -2172,7 +2172,6 @@ pub unsafe fn frame(fighter: usize) {
                 }
                 if ready {
                     run.rounds.placed();
-                    run.settle.next_attempt();
                     run.zoom = zoom::NativeAttempt::default();
                     run.placement = Placement::ResetResources;
                 }

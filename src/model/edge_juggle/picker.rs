@@ -1,14 +1,15 @@
 //! Fighter, behavior and settings shared by the two practice games.
 use core::fmt::{self, Write};
 
-use crate::model::{fighter_choices::CHOICES, fighter_forms::Forms, settings::Snapshot, tech_settings::selected};
+use crate::model::{fighter_choices::CHOICES, settings::Snapshot, tech_settings::selected};
 
 use super::Drill;
 
-/// Whether the CPU in the slot is the fighter the drill selected. A fighter with forms (Pyra and Mythra, the
-/// Pokémon Trainer's three) is one selection in any of its forms: a form change is its own move.
-pub fn is_selected(selected: u32, kind: u32) -> bool {
-    Forms::starting(selected).same_group(kind)
+/// Whether the CPU entry is the drill's selection: it was loaded as the selected fighter. The kind an entry was
+/// loaded as does not change with its form, so Pyra's own swap to Mythra keeps a Pyra selection, and choosing Mythra
+/// while a Pyra entry is in the slot is another selection. `live` stands in until the roster has seen the entry.
+pub fn is_selected(selected: u32, loaded_as: Option<u32>, live: u32) -> bool {
+    selected == loaded_as.unwrap_or(live)
 }
 
 /// One roster tick of the selection service.
@@ -20,10 +21,10 @@ pub struct Service {
     pub request: bool,
 }
 
-/// `selected`: the drill's choice, if any; `target`: that choice or the original to restore; `observed`: the
-/// CPU kind the roster sees when it is ready for a request.
-pub fn service(selected: Option<u32>, target: u32, observed: Option<u32>) -> Service {
-    let satisfied = observed.map(|kind| is_selected(target, kind));
+/// `selected`: the drill's choice, if any; `target`: that choice or the original to restore; `loaded_as`: the kind
+/// the CPU entry was loaded as, when the roster is ready for a request.
+pub fn service(selected: Option<u32>, target: u32, loaded_as: Option<u32>) -> Service {
+    let satisfied = loaded_as.map(|kind| kind == target);
     Service { switching: selected.is_none() && satisfied != Some(true), request: satisfied == Some(false) }
 }
 
@@ -159,34 +160,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn forms_share_one_cpu_selection() {
-        for (selected, kind, expected) in [
-            (0x5a, 0x5b, true),
-            (0x5b, 0x5a, true),
-            (0x24, 0x25, true),
-            (0x26, 0x24, true),
-            (0x5a, 0x00, false),
-            (0x00, 0x00, true),
-            (0x00, 0x5a, false),
-        ] {
-            assert_eq!(is_selected(selected, kind), expected, "{selected:#x}, {kind:#x}");
-        }
-    }
-
-    #[test]
-    fn selection_service_respects_form_families_and_restoration() {
-        for (selected, target, observed, switching, request) in [
-            (Some(0x5a), 0x5a, Some(0x5b), false, false),
-            (Some(0x5a), 0x5a, Some(0x00), false, true),
-            (Some(0x5a), 0x5a, None, false, false),
-            (None, 0x00, Some(0x5b), true, true),
-            (None, 0x5a, Some(0x5b), false, false),
-            (None, 0x00, None, true, false),
-            (None, 0x00, Some(0x00), false, false),
-        ] {
-            assert_eq!(service(selected, target, observed), Service { switching, request },
-                "{selected:?}, {target:#x}, {observed:?}");
-        }
+    fn selection_is_the_kind_the_entry_was_loaded_as() {
+        use crate::engine::swap::character_forms::EntryState;
+        let entry = EntryState {
+            count: 2, kinds: [0x5a, 0x5b, u32::MAX], actor_count: 1, installed: 2,
+            index: 1, previous_or_next: 0xff, pending: 0xff, flags: 0x64,
+            outer: 6, loader: 14, changing: 0, guard: 0,
+        };
+        let (forms, live) = entry.ready().expect("ready swapped Pyra entry");
+        assert_eq!(live, 0x5b);
+        let loaded = forms.kinds[0];
+        assert_eq!(loaded, 0x5a);
+        let no_request = Service { switching: false, request: false };
+        let request = Service { switching: false, request: true };
+        assert_eq!(service(Some(0x5a), 0x5a, Some(loaded)), no_request);
+        assert!(is_selected(0x5a, Some(loaded), live));
+        assert_eq!(service(Some(0x5b), 0x5b, Some(loaded)), request);
+        assert!(!is_selected(0x5b, Some(loaded), live));
+        assert_eq!(service(Some(0x5a), 0x5a, Some(0x00)), request);
+        assert_eq!(service(None, 0x00, Some(loaded)), Service { switching: true, request: true });
+        assert_eq!(service(None, 0x5a, Some(loaded)), no_request);
+        assert_eq!(service(None, 0x00, None), Service { switching: true, request: false });
+        assert_eq!(service(Some(0x5a), 0x5a, None), no_request);
+        assert!(is_selected(0x5a, None, 0x5a));
+        assert!(!is_selected(0x5a, None, 0x5b));
     }
     }
 }

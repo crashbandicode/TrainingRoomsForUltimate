@@ -282,35 +282,6 @@ impl PlacedPlayer {
     }
 }
 
-/// Player 1's watched start within one attempt: the point the last start write wrote, and the rewrites the attempt
-/// has spent. The allowance is the attempt's: a placement that starts again keeps what is spent.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Settle {
-    at: Option<[f32; 2]>,
-    spent: u16,
-}
-
-impl Settle {
-    /// A start write. It is watched only when it found Player 1 in a hit or not idle.
-    pub fn placed(&mut self, at: [f32; 2], watch: bool) {
-        self.at = watch.then_some(at);
-    }
-
-    /// The watched point and the rewrites spent so far in this attempt.
-    pub fn watched(self) -> Option<([f32; 2], u16)> {
-        self.at.map(|at| (at, self.spent))
-    }
-
-    pub fn rewritten(&mut self) {
-        self.spent += 1;
-    }
-
-    /// Ready started: the next attempt has its own allowance.
-    pub fn next_attempt(&mut self) {
-        *self = Self::default();
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Place,
@@ -419,6 +390,7 @@ pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::F
 pub struct Session {
     drill: Drill,
     limit: Option<u16>,
+    rewrites: u16,
     pub phase: Phase,
     pub attempts: u16,
     pub secured: u16,
@@ -433,6 +405,7 @@ impl Session {
         Self {
             drill,
             limit,
+            rewrites: 0,
             phase: Phase::Place,
             attempts: 0,
             secured: 0,
@@ -455,10 +428,21 @@ impl Session {
 
     pub fn placed(&mut self) {
         if self.phase == Phase::Place {
+            self.rewrites = 0;
             self.frames = 0;
             self.hits = 0;
             self.phase = Phase::Ready(self.drill.ready_frames());
         }
+    }
+
+    /// Rewrites of Player 1's start spent since this session's last Ready. A placement that starts again keeps
+    /// them; Ready and a new session (a Training reset, another CPU body) start a new allowance.
+    pub const fn player_rewrites(&self) -> u16 {
+        self.rewrites
+    }
+
+    pub fn player_rewritten(&mut self) {
+        self.rewrites = self.rewrites.saturating_add(1);
     }
 
     pub fn advance_zoom(
@@ -1018,39 +1002,62 @@ mod tests {
     }
 
     #[test]
-    fn player_rewrites_are_bounded_per_attempt_across_placement_restarts() {
+    fn player_rewrites_survive_a_placement_restart_within_a_session() {
         let idle = PlacedPlayer { hit_freeze: false, wait: true };
-        let at = [1.0, 2.0];
+        let airborne = PlacementFrame { airborne: true, ..PlacementFrame::default() };
+        let grounded = PlacementFrame { grounded: true, ..PlacementFrame::default() };
+        let wait = PlacementFrame { wait: true, ..grounded };
+        let fall = PlacementFrame { fall: true, ..airborne };
         for (drill, before_restart) in [(Drill::GuardEdge, 59), (Drill::Juggler, 44)] {
-            let mut settle = Settle::default();
+            let mut session = Session::new(drill, None);
+            let mut placement = Placement::Airborne;
             let mut writes = 0;
-            settle.placed(at, true);
             for _ in 0..before_restart {
-                let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
-                assert_eq!(PlacedPlayer::before_ready(watched, false, drill), (true, false));
-                settle.rewritten();
+                assert_eq!(placement.action(airborne), PlacementAction::RequestFall);
+                assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), session.player_rewrites())), false, drill), (true, false));
+                session.player_rewritten();
                 writes += 1;
             }
-            settle.placed(at, true);
-            assert_eq!(settle.watched(), Some((at, before_restart)));
-            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
-            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (true, false));
-            settle.rewritten();
+            assert_eq!(placement.action(grounded), PlacementAction::RestartPlacement);
+            placement = Placement::ResetResources;
+            assert_eq!(placement.action(grounded), PlacementAction::ResetResources);
+            placement = Placement::Grounded;
+            assert_eq!(placement.action(wait), PlacementAction::PlaceStart);
+            placement = Placement::Airborne;
+            assert_eq!(session.player_rewrites(), before_restart);
+            assert_eq!(placement.action(fall), PlacementAction::HoldStart);
+            assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), session.player_rewrites())), true, drill), (true, false));
+            session.player_rewritten();
             writes += 1;
-            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
-            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (false, true));
+            assert_eq!(placement.action(fall), PlacementAction::HoldStart);
+            assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), session.player_rewrites())), true, drill), (false, true));
             assert_eq!(writes, drill.ready_frames());
-
-            settle.placed(at, false);
-            assert_eq!(settle.watched(), None);
-            settle.placed(at, true);
-            assert_eq!(settle.watched(), Some((at, drill.ready_frames())));
-            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
-            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (false, true));
-            settle.next_attempt();
-            settle.placed(at, true);
-            assert_eq!(settle.watched(), Some((at, 0)));
+            session.placed();
+            assert_eq!(session.player_rewrites(), 0);
+            assert_eq!(session.phase, Phase::Ready(drill.ready_frames()));
         }
+    }
+
+    #[test]
+    fn a_new_session_and_ready_start_a_new_player_allowance() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let drill = Drill::GuardEdge;
+        let mut session = Session::new(drill, None);
+        for _ in 0..59 {
+            session.player_rewritten();
+        }
+        session.restart_drill();
+        assert_eq!(session.player_rewrites(), 0);
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), session.player_rewrites())), true, drill), (true, false));
+        for _ in 0..59 {
+            session.player_rewritten();
+        }
+        session.placed();
+        assert_eq!(session.player_rewrites(), 0);
+        assert_eq!(session.phase, Phase::Ready(drill.ready_frames()));
+        session.discard_attempt();
+        assert_eq!(session.player_rewrites(), 0);
+        assert_eq!(session.phase, Phase::Place);
     }
 
     #[test]

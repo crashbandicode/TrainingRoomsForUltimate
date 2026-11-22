@@ -121,13 +121,16 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     let watch = frame.find("placed_player(p1).watch()").expect("watch before the write");
     let place = frame.find("try_place(").expect("start write");
     assert!(watch < place);
-    assert!(frame.contains("run.settle.placed(at, watch)"));
+    assert!(frame.contains("run.settle = watch.then_some(at);"));
     assert!(!frame.contains("then_some((at, 0))"));
-    assert_eq!(frame.matches("run.settle.next_attempt()").count(), 1);
-    let placed = frame.find("run.rounds.placed()").expect("Ready transition");
-    let next = frame.find("run.settle.next_attempt()").expect("next attempt");
-    let reset = frame[next..].find("run.placement = Placement::ResetResources;").expect("placement reset") + next;
-    assert!(placed < next && next < reset);
+    assert_eq!(frame.matches("run.rounds.player_rewritten()").count(), 1);
+    assert!(!runtime.contains("run.settle.next_attempt()"));
+    let model = src("src/model/edge_juggle.rs");
+    let placed = item(&model, "pub fn placed(").split_once("\n    }\n").expect("placed body").0;
+    assert!(placed.contains("self.rewrites = 0;"));
+    let restart = item(&model, "pub fn restart_drill(").split_once("\n    }\n").expect("restart body").0;
+    assert!(restart.contains("Self::new("));
+    assert!(!restart.contains("rewrites"));
     let settle = frame.find("PlacedPlayer::before_ready(").expect("judge before Ready");
     let ready = frame.find("run.rounds.placed()").expect("Ready transition");
     assert!(settle < ready);
@@ -137,15 +140,31 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
 }
 
 #[test]
-fn edge_juggle_treats_a_form_change_as_the_selected_cpu() {
+fn edge_juggle_selects_the_cpu_by_the_kind_its_entry_was_loaded_as() {
     let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
+    assert!(service.contains("roster::cpu_loaded_kind"));
     assert!(service.contains("picker::service("));
+    assert!(!service.contains("roster::cpu_kind"));
     assert!(!service.contains("observed != target"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
-    assert!(frame.contains("picker::is_selected(wanted, kind as u32)"));
+    assert!(frame.contains("picker::is_selected(wanted, "));
+    assert!(frame.contains("cpu_loaded_kind()"));
     assert!(!frame.contains("wanted != kind as u32"));
     assert!(!frame.contains("followed_swap"));
+    assert!(!frame.contains("run.opponent.fighter = Some(kind as u32)"));
+    let roster = src("src/runtime/roster/character_roster.rs");
+    let lines: Vec<_> = roster.lines().collect();
+    let mut assignments = 0;
+    for (index, line) in lines.iter().enumerate() {
+        if line.contains("state.observed = ") {
+            assignments += 1;
+            assert!(lines.get(index + 1).is_some_and(|next| next.contains("LOADED_AS[role as usize].store(")),
+                "missing loaded-as publication after line {}", index + 1);
+        }
+    }
+    assert!(assignments >= 5);
+    assert!(item(&roster, "pub fn cpu_loaded_kind(").contains("LOADED_AS[Role::Cpu as usize]"));
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
