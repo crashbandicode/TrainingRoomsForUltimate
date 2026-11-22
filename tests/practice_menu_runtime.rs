@@ -105,21 +105,25 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 #[test]
 fn edge_juggle_settles_a_hit_player_before_ready() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
+    assert!(!runtime.contains("fn settle_player"));
     let place = item(&runtime, "unsafe fn try_place(");
     assert!(place.contains("write_player(bodies.p1"));
+    assert!(place.contains("Some([x, y])"));
     assert!(!place.contains("state::init_pos(bodies.p1"));
-    let settle = item(&runtime, "unsafe fn settle_player(");
-    assert!(settle.contains(".rewrite("));
-    assert!(settle.contains("write_player("));
-    assert!(settle.contains("snap_player("));
+    let on_start = item(&runtime, "unsafe fn on_start(");
+    assert!(on_start.contains("natives::pos_x(p1) != x"));
+    assert!(on_start.contains(".height(x)"));
+    assert!(!on_start.contains("snap_player("));
     let frame = item(&runtime, "pub unsafe fn frame(");
     let watch = frame.find("placed_player(p1).watch()").expect("watch before the write");
     let place = frame.find("try_place(").expect("start write");
     assert!(watch < place);
-    assert!(frame.contains("run.settle = watch.then_some(0)"));
-    let settle = frame.find("settle_player(").expect("settle before Ready");
+    assert!(frame.contains("run.settle = watch.then_some((at, 0))"));
+    let settle = frame.find("PlacedPlayer::before_ready(").expect("judge before Ready");
     let ready = frame.find("run.rounds.placed()").expect("Ready transition");
     assert!(settle < ready);
+    assert!(frame.contains("write_player(p1, at,"));
+    assert!(!frame.contains("Placement::Airborne if"));
     assert!(!item(&runtime, "unsafe fn hold_cpu(").contains("p1"));
 }
 

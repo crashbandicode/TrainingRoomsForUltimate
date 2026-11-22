@@ -145,8 +145,8 @@ struct Run {
     sdi_start: Option<u32>,
     player_ledge: Option<usize>,
     placement: Placement,
-    /// Rewrites of Player 1's start since a watched start write; None when the write found it idle.
-    settle: Option<u16>,
+    /// The point a watched start write wrote for Player 1 and the rewrites since; None when the write found it idle.
+    settle: Option<([f32; 2], u16)>,
     notice: FixedPath<128>,
 }
 #[derive(Clone, Copy)]
@@ -1591,28 +1591,24 @@ unsafe fn write_player(p1: usize, [x, y]: [f32; 2], facing: f32) {
     state::status_request(p1, konst(C::StatusWait));
 }
 
-/// Between a watched start write and Ready: write Player 1's start again while the model asks.
-unsafe fn settle_player(p1: usize, drill: Drill, stage: Stage, setup: Setup, spent: &mut Option<u16>) -> bool {
-    let Some(count) = *spent else {
-        return false;
-    };
-    if !game::granted(crate::model::sites_pkg2::POS_X_OFFSET) {
+/// Player 1 stands on its written start: the written x, on the floor the write found (the first floor under its feet
+/// has the written height there). A floor that cannot be read is not the start.
+unsafe fn on_start(p1: usize, [x, y]: [f32; 2]) -> bool {
+    if natives::pos_x(p1) != x {
         return false;
     }
-    let Some([x, y]) = snap_player(p1, drill, stage, setup.p1) else {
+    let Some([_, _, _, bottom]) = natives::camera_limit_range() else {
         return false;
     };
-    if !placed_player(p1).rewrite(natives::pos_x(p1) == x, drill, count) {
+    let Some(ray) = FloorRay::new(p1) else {
         return false;
-    }
-    write_player(p1, [x, y], if setup.cpu[0] < x { -1.0 } else { 1.0 });
-    *spent = Some(count + 1);
-    true
+    };
+    ray.floor(x, [natives::pos_y(p1) + 1.0, bottom], true).and_then(|floor| floor.height(x)) == Some(y)
 }
 
-unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> bool {
+unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> Option<[f32; 2]> {
     let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
-        return false;
+        return None;
     };
     let [wait, fall, ground, air] = [
         C::StatusWait,
@@ -1622,7 +1618,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     ]
     .map(konst);
     if [wait, fall, ground, air].contains(&UNRESOLVED) {
-        return false;
+        return None;
     }
     use crate::model::sites_pkg3 as s;
     if ![
@@ -1639,16 +1635,16 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     .into_iter()
     .all(game::granted)
     {
-        return false;
+        return None;
     }
     let jump_count = konst(C::WorkIntJumpCount);
     if jump_count == UNRESOLVED || !game::granted(crate::model::sites_pkg4::WORK_SET_INT_OFFSET) {
-        return false;
+        return None;
     }
     let [cx, cy] = setup.cpu;
     let damage = natives::damage(bodies.cpu, 0);
     if !damage.is_finite() {
-        return false;
+        return None;
     }
     let facing = if cx < x { -1.0 } else { 1.0 };
     write_player(bodies.p1, [x, y], facing);
@@ -1670,7 +1666,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
     state::status_request(bodies.cpu, fall);
-    true
+    Some([x, y])
 }
 
 /// Like Tech practice, reapply the hold because MotionModule sleep leaves physics running.
@@ -2074,25 +2070,35 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
                 Placement::Grounded if obs.grounded => {
-                    // Read before the write: its Wait request is not Player 1's status yet.
-                    let watch = placed_player(p1).watch();
-                    if try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
-                        run.settle = watch.then_some(0);
+                    // Read before the write: its Wait request is not Player 1's status yet. Without the position
+                    // rows the start cannot be judged, so it is not watched.
+                    use crate::model::sites_pkg2 as sites;
+                    let watch = placed_player(p1).watch() && game::granted(sites::POS_X_OFFSET) && game::granted(sites::POS_Y_OFFSET);
+                    if let Some(at) = try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
+                        run.settle = watch.then_some((at, 0));
                         run.placement = Placement::Airborne;
                     }
                 }
                 Placement::Grounded => run.placement = Placement::ResetResources,
-                Placement::Airborne if status == konst(C::StatusFall) => {
-                    hold_cpu(cpu, run.setup.cpu);
-                    *held_cpu = Some(body);
-                    if !settle_player(p1, drill, run.stage, run.setup, &mut run.settle) {
+                Placement::Airborne => {
+                    let falling = status == konst(C::StatusFall);
+                    let watched = run.settle.map(|(at, spent)| (placed_player(p1), on_start(p1, at), spent));
+                    let (rewrite, ready) = PlacedPlayer::before_ready(watched, falling, drill);
+                    if let (true, Some((at, spent))) = (rewrite, run.settle) {
+                        write_player(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
+                        run.settle = Some((at, spent + 1));
+                    }
+                    if falling {
+                        hold_cpu(cpu, run.setup.cpu);
+                        *held_cpu = Some(body);
+                    } else {
+                        state::status_request(cpu, konst(C::StatusFall));
+                    }
+                    if ready {
                         run.rounds.placed();
                         run.zoom = zoom::NativeAttempt::default();
                         run.placement = Placement::ResetResources;
                     }
-                }
-                Placement::Airborne => {
-                    state::status_request(cpu, konst(C::StatusFall));
                 }
             }
         }

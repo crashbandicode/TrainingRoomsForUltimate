@@ -2321,7 +2321,7 @@ approved_by = "Operator through tr-primary-2, 2026-11-21 18:58Z, ordered compact
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 188648
+ceiling = 188663
 date = "2026-11-22"
-reason = "Rewrite Player 1's drill start while a hit still moves it. The measured normalized implementation count is 188648, adding 53 lines over the c2fc22f2 gate's 188595 and 41 over the previous ceiling of 188607."
+reason = "Rewrite Player 1's drill start while a hit still moves it. The measured normalized implementation count is 188663, adding 68 lines over the c2fc22f2 gate's 188595 and 56 over the previous ceiling of 188607."
 approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start fix on rc15-gte-wizard-start under the measured LOC rule"

@@ -259,6 +259,18 @@ impl PlacedPlayer {
     pub const fn rewrite(self, on_point: bool, drill: Drill, spent: u16) -> bool {
         spent < drill.ready_frames() && (self.hit_freeze || self.wait && !on_point)
     }
+
+    /// One placement update between the start write and Ready. `watched` is, for a watched start, Player 1 as read on
+    /// this update, whether it stands on its start, and the rewrites spent; `None` for a start that found it idle.
+    /// Player 1 is judged on every update, also while the CPU is not in Fall yet. Returns (write the start again,
+    /// start Ready): Ready starts on the first update with the CPU in Fall and nothing written.
+    pub const fn before_ready(watched: Option<(Self, bool, u16)>, cpu_falling: bool, drill: Drill) -> (bool, bool) {
+        let rewrite = match watched {
+            Some((player, on_start, spent)) => player.rewrite(on_start, drill, spent),
+            None => false,
+        };
+        (rewrite, cpu_falling && !rewrite)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -855,6 +867,27 @@ mod tests {
         }
         assert_eq!(spent, 13);
         assert!(!idle.rewrite(true, Drill::GuardEdge, spent));
+    }
+
+    #[test]
+    fn player_start_is_judged_on_every_update_before_ready() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let own = PlacedPlayer { hit_freeze: false, wait: false };
+        let frozen = PlacedPlayer { hit_freeze: true, wait: true };
+        let g = Drill::GuardEdge;
+        let j = Drill::Juggler;
+        assert_eq!(PlacedPlayer::before_ready(None, false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(None, true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 0)), false, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, true, 0)), false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, true, 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((frozen, true, 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((own, false, 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 59)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 60)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 44)), true, j), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 45)), true, j), (false, true));
     }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {
