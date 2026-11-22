@@ -75,13 +75,21 @@ a_flight_starts_inside_its_box: area 0 path 1 seed 0: starts at [46.000008, 5.26
 a_path_that_needs_height_appears_over_a_floor_that_has_it: left its floor: tick 0: (46.000008, 5.26359); area 0 floor at 42 path 1 seed 0: sampled at [-39.32128, 5.26359], the Boomerang at [-2.167122, 46.0]
 ```
 
-`Motion::new` now holds the start inside the box. It places Off stage flights too, and holds their start inside the zone's box the same way; nothing else about them changes.
+The on-stage spawn now holds the start inside the box after the fit.
+
+`0a372163` made that change in `Motion::new`, which also places Off stage flights, and said nothing else about them changed. review-games-astra-3 failed that on 2026-11-22 (16:37:02Z and 16:38:08Z). Off stage, a fitted start one float step past the zone's box fails the clearance check, and the target then starts at its drawn spot; with the start held inside the box the check passes. In the reviewer's fixture (zone settings 64, 0, 220, 173, Galaxian, seed 682) that moved the start 35.39 units, and with Player 1 near it the spawn went on to draw all 32 candidates instead of stopping at the first. So `Motion::new` is main's again, the hold is on the on-stage path only, and Off stage placement and draws are main's. The red runs on `0a372163` of the two tests written for that finding:
+
+```text
+an_off_stage_start_is_placed_as_on_main: assertion `left == right` failed: the fit starts a float step past the zone's box, so the target starts at its drawn spot: [-50.568626, -55.840355]
+an_off_stage_spawn_takes_the_draws_it_took_on_main: assertion `left == right` failed: the first drawn spot is clear of Player 1 and ends the draws after three: [-50.568626, -69.81018], rng 0x2c4d2f4e
+```
 
 Where is there no room? Sideways, a floor line the spawn accepts leaves more than 12 units unless a blast line cuts the box, so sideways room is missing only there and on the stand-in ground (below) of a spawn range under 16 units wide. Above, the target rests a radius above its floor and the box ends a radius under the screen's top (In view) or the camera range's top (Whole stage), or under the upper blast line where that is lower. So a floor less than 16 units under that top has no room for a path that uses height.
 
 ## Random draws
 
-- Every target takes the same draws as on main: its 32 candidate spots, then the direction draw of a path other than Homing Missile. Choosing among the candidates takes no draw, and the direction draw is taken whether the target then flies or falls back to Pop up. So the sequence a seed gives depends neither on the room nor on the fallback.
+- On In view and Whole stage, with the same floors and view, a target takes the same draws as on main: its 32 candidate spots, then the direction draw of a path other than Homing Missile. What one candidate draws depends on its floor, as on main: where 8 units or more are free above the target it takes a coin and, on heads, a height. Choosing among the candidates takes no draw, and the direction draw is taken whether the target then flies or falls back to Pop up. So for the same candidates the sequence a seed gives depends neither on the room rule nor on the fallback.
+- Off stage targets are placed and drawn by main's code, which is not changed.
 - The sampled spot (`Run::egg`) is one of the same 32 candidates as on main. It is main's candidate when that one has room for the path, and otherwise the best candidate that has. Which candidate is best also depends on where the previous target was broken, and that can differ now because the flight differs.
 - The displayed start (`egg_at`) is the sampled spot moved into the box by the fit. That was so before; with the smaller box it is moved more often and further.
 
@@ -89,6 +97,7 @@ Where is there no room? Sideways, a floor line the spawn accepts leaves more tha
 
 - **A Pop up target at the top of the box does not move.** Pop up's launch is lowered so that the target stays under the top of the box. On a floor whose target sits at that top there is nothing to rise into, and the target stays where it appeared. That is main's behaviour for every Pop up target on such a floor, with or without Moving paths, and it is not changed. A selected path now comes to it only when all 32 candidates are on floors without room for it.
 - **A short floor with room can be missed.** The 32 candidates are drawn by floor length. Where the only floor with room is short beside the others, some targets draw no candidate on it and use Pop up. In the test's fixture (2 units of spawn span with room beside 80 without) that is 14 of the 32 seeds.
+- **Off stage is main's.** There the fit can still start a flight a float step past the zone's box, and the clearance check then starts the target at its drawn spot. Holding that start inside the box would change where Off stage targets appear and how many candidates they draw, so it is not done here.
 - **Each floor line stands alone.** The floors are the game's floor lines, without their kind and without their neighbours. On a floor made of several lines (a slope, a step) a target keeps to the one line it appeared over, so its flight is smaller there. Joining lines needs a rule for gaps and steps; none is approved.
 - **Platforms give small flights.** A target that appears on a platform keeps over it. On a box 30 units wide a Galaxian is flown at one sixth of its size.
 - **What is above the floor line is not read.** A target can pass through a platform above its floor. Solid ground, walls and ceilings inside the box are not known to the model.
@@ -110,3 +119,4 @@ The seeds named in `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for
 | Among the 32 sampled spots one with room wins; Pop up only when none has it (the same ruling) | The choice of the spot and the Pop up fallback | `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for_none`, `a_path_that_needs_height_appears_over_a_floor_that_has_it` |
 | The floor envelope alone does not guarantee reachability; handle the Boomerang rest on both floors (tr-primary-2, 2026-11-22, after review 14:59:45Z) | The box is the target's own floor line, not the span of all floors | `a_boomerang_rests_over_the_floor_it_appeared_over`, `moving_paths_keep_to_their_own_floor_across_a_gap` (targets on both floors) |
 | The draws a seed gives do not change with the fallback (review 14:58:57Z, point 2) | The direction draw is taken before the room check, and choosing among the candidates takes no draw | `a_pop_up_fallback_takes_the_same_random_draws_as_a_flight`, `a_path_that_needs_height_appears_over_a_floor_that_has_it` |
+| Off stage placement and draws stay main's (review 16:37:02Z and 16:38:08Z) | `Motion::new` and the Off stage spawn are not changed; the start is held inside the box on the on-stage path only | `an_off_stage_start_is_placed_as_on_main`, `an_off_stage_spawn_takes_the_draws_it_took_on_main` |

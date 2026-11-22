@@ -716,3 +716,43 @@ fn a_flight_starts_inside_its_box() {
         }
     }
 }
+
+fn off_stage_galaxian(p1: [f32; 2]) -> Run {
+    use crate::model::edge_juggle::perfect::Outline;
+    use crate::model::egg_zone::Stage;
+
+    let hull = [[-50.0, 0.0], [50.0, 0.0], [34.0, -25.0], [-34.0, -25.0]];
+    let mut outline = Outline::new();
+    for index in 0..hull.len() {
+        outline.add([hull[index], hull[(index + 1) % hull.len()]]);
+    }
+    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline).unwrap();
+    let zone = stage.resolve(Some([64, 0, 220, 173]));
+    let clearance = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, OFF_STAGE], 682);
+    run.configure(2, 0);
+    run.set_zone(zone);
+    run.sense(p1);
+    run.pass(Pass { tick: true, y: 0.0, hits: &[], air: false, kind: 0 }, |_| None, &clearance);
+    run
+}
+
+#[test]
+fn an_off_stage_start_is_placed_as_on_main() {
+    let run = off_stage_galaxian([0.0, 0.0]);
+    let spot = run.egg.expect("an Off stage target");
+    assert_eq!(spot[0], -85.96105, "the fit starts a float step past the zone's box, so the target starts at its drawn spot: {spot:?}");
+}
+
+#[test]
+fn an_off_stage_spawn_takes_the_draws_it_took_on_main() {
+    let run = off_stage_galaxian([-50.568626, -63.840355]);
+    let spot = run.egg.expect("an Off stage target");
+    assert_eq!(
+        (spot[0], run.rng),
+        (-85.96105, 0x79ac_3270),
+        "the first drawn spot is clear of Player 1 and ends the draws after three: {spot:?}, rng {:#x}",
+        run.rng
+    );
+}

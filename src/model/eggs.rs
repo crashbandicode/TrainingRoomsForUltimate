@@ -329,7 +329,7 @@ impl Motion {
         let at = core::array::from_fn(|axis| {
             let lo = bounds[0][axis] - scale * envelope[0][axis];
             let hi = bounds[1][axis] - scale * envelope[1][axis];
-            anchor[axis].clamp(lo, hi.max(lo)).min(bounds[1][axis])
+            anchor[axis].clamp(lo, hi.max(lo))
         });
         Self { flight: path.map(|path| Flight::new(path, right)), at, scale, bounds, side }
     }
@@ -877,7 +877,9 @@ impl Run {
                 self.next_random() >> 31 == 0
             };
             if let Some(bounds) = fit(line) {
-                self.motion = Some(Motion::new(self.path, disc, bounds, None, right));
+                let mut motion = Motion::new(self.path, disc, bounds, None, right);
+                motion.at = [0, 1].map(|axis| motion.at[axis].min(bounds[1][axis]));
+                self.motion = Some(motion);
                 self.perch = true;
             } else {
                 self.path = None;
