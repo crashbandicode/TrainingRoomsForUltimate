@@ -237,6 +237,30 @@ pub struct Observation {
     pub hit: bool,
 }
 
+/// Player 1 as the drill reads it around its start write.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlacedPlayer {
+    /// The game's own hit freeze.
+    pub hit_freeze: bool,
+    /// Standing idle, the status the start write asks for.
+    pub wait: bool,
+}
+
+impl PlacedPlayer {
+    /// A start write that finds Player 1 idle holds. One that finds it in a hit does not: a speed outlives the write
+    /// and Player 1 slides off its point in Wait (docs/design/rc15-gte-wizard-start.md).
+    pub const fn watch(self) -> bool {
+        self.hit_freeze || !self.wait
+    }
+
+    /// On a frame between a watched start write and Ready: write the start again? Only while the hit still freezes
+    /// Player 1 or it stands idle off its point; a status of its own is the player's. `spent` counts the rewrites of
+    /// this attempt: at most one ready period of them, then the drill goes on as before.
+    pub const fn rewrite(self, on_point: bool, drill: Drill, spent: u16) -> bool {
+        spent < drill.ready_frames() && (self.hit_freeze || self.wait && !on_point)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Place,
@@ -798,6 +822,40 @@ impl Wizard {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn hit_player_start_is_rewritten_until_it_holds() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let own_status = PlacedPlayer { hit_freeze: false, wait: false };
+        let frozen_idle = PlacedPlayer { hit_freeze: true, wait: true };
+        let frozen_other = PlacedPlayer { hit_freeze: true, wait: false };
+        assert!(!idle.watch());
+        assert!(own_status.watch());
+        assert!(frozen_idle.watch());
+        assert!(frozen_other.watch());
+
+        assert!(idle.rewrite(false, Drill::GuardEdge, 0));
+        assert!(!idle.rewrite(true, Drill::GuardEdge, 0));
+        assert!(frozen_idle.rewrite(true, Drill::GuardEdge, 0));
+        assert!(!own_status.rewrite(false, Drill::GuardEdge, 0));
+        assert!(frozen_other.rewrite(false, Drill::GuardEdge, 0));
+
+        assert_eq!(Drill::GuardEdge.ready_frames(), 60);
+        assert_eq!(Drill::Juggler.ready_frames(), 45);
+        assert!(idle.rewrite(false, Drill::GuardEdge, 59));
+        assert!(!idle.rewrite(false, Drill::GuardEdge, 60));
+        assert!(idle.rewrite(false, Drill::Juggler, 44));
+        assert!(!idle.rewrite(false, Drill::Juggler, 45));
+
+        let mut spent = 0;
+        for (player, on_point) in [(frozen_idle, true); 8].into_iter().chain([(idle, false); 5]) {
+            if player.rewrite(on_point, Drill::GuardEdge, spent) {
+                spent += 1;
+            }
+        }
+        assert_eq!(spent, 13);
+        assert!(!idle.rewrite(true, Drill::GuardEdge, spent));
+    }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {
         let mut session = Session::new(drill, limit);

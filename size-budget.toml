@@ -2317,3 +2317,11 @@ ceiling = 188607
 date = "2026-11-21"
 reason = "Compact frame strip layout C. One strip_layout spec (strip.rs, card.rs, mod.rs: +924) places the strip, the corner card and the link cells for both the archived pane recipes and the live HUD, replacing 328 lines of fixed geometry in panes.rs and combo_plan.rs. Link history gets its On/Off setting with the fold into LINK, and the panel fades over the overlay's fighter anchors. The exact normalized delta is +699 over 187908, with zero spare. No new native site. The combined release gate measures NRO and BSS against 3448686c."
 approved_by = "Operator through tr-primary-2, 2026-11-21 18:58Z, ordered compact strip C with the Link history switch and its layout abstracted from its functionality into the intermediate build, under the measured LOC rule for memory-efficient changes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 188648
+date = "2026-11-22"
+reason = "Rewrite Player 1's drill start while a hit still moves it. The measured normalized implementation count is 188648, adding 53 lines over the c2fc22f2 gate's 188595 and 41 over the previous ceiling of 188607."
+approved_by = "tr-primary-2, 2026-11-22 05:45:52Z, approved the Player 1 start fix on rc15-gte-wizard-start under the measured LOC rule"

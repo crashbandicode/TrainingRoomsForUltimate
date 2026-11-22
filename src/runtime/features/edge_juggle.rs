@@ -22,7 +22,7 @@ use crate::model::edge_juggle::perfect::{
 };
 use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
 use crate::model::edge_juggle::{
-    Drill, Observation, Outcome, Phase, Reaction, Session, Setup, Stage, Wizard,
+    Drill, Observation, Outcome, Phase, PlacedPlayer, Reaction, Session, Setup, Stage, Wizard,
     WizardStep,
 };
 
@@ -145,6 +145,8 @@ struct Run {
     sdi_start: Option<u32>,
     player_ledge: Option<usize>,
     placement: Placement,
+    /// Rewrites of Player 1's start since a watched start write; None when the write found it idle.
+    settle: Option<u16>,
     notice: FixedPath<128>,
 }
 #[derive(Clone, Copy)]
@@ -1573,6 +1575,41 @@ unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool 
     true
 }
 
+unsafe fn placed_player(p1: usize) -> PlacedPlayer {
+    let wait = konst(C::StatusWait);
+    PlacedPlayer {
+        hit_freeze: natives::tech_in_damage_stop(p1) == Some(true),
+        wait: wait != UNRESOLVED && natives::status_kind(p1) == wait,
+    }
+}
+
+unsafe fn write_player(p1: usize, [x, y]: [f32; 2], facing: f32) {
+    state::clear_speed_all(p1);
+    state::init_pos(p1, &state::Vector3f { x, y, z: 0.0 });
+    state::set_lr(p1, facing);
+    state::set_situation_kind(p1, konst(C::SituationGround));
+    state::status_request(p1, konst(C::StatusWait));
+}
+
+/// Between a watched start write and Ready: write Player 1's start again while the model asks.
+unsafe fn settle_player(p1: usize, drill: Drill, stage: Stage, setup: Setup, spent: &mut Option<u16>) -> bool {
+    let Some(count) = *spent else {
+        return false;
+    };
+    if !game::granted(crate::model::sites_pkg2::POS_X_OFFSET) {
+        return false;
+    }
+    let Some([x, y]) = snap_player(p1, drill, stage, setup.p1) else {
+        return false;
+    };
+    if !placed_player(p1).rewrite(natives::pos_x(p1) == x, drill, count) {
+        return false;
+    }
+    write_player(p1, [x, y], if setup.cpu[0] < x { -1.0 } else { 1.0 });
+    *spent = Some(count + 1);
+    true
+}
+
 unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> bool {
     let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
         return false;
@@ -1614,11 +1651,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
         return false;
     }
     let facing = if cx < x { -1.0 } else { 1.0 };
-    state::clear_speed_all(bodies.p1);
-    state::init_pos(bodies.p1, &state::Vector3f { x, y, z: 0.0 });
-    state::set_lr(bodies.p1, facing);
-    state::set_situation_kind(bodies.p1, ground);
-    state::status_request(bodies.p1, wait);
+    write_player(bodies.p1, [x, y], facing);
     state::clear_speed_all(bodies.cpu);
     state::set_pos(
         bodies.cpu,
@@ -1919,6 +1952,7 @@ pub unsafe fn frame(fighter: usize) {
             sdi_start: None,
             player_ledge: None,
             placement: Placement::ResetResources,
+            settle: None,
             notice: FixedPath::new(),
         });
         let _ = START.compare_exchange(start, 0, Ordering::AcqRel, Ordering::Acquire);
@@ -2040,7 +2074,10 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 }
                 Placement::Grounded if obs.grounded => {
+                    // Read before the write: its Wait request is not Player 1's status yet.
+                    let watch = placed_player(p1).watch();
                     if try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
+                        run.settle = watch.then_some(0);
                         run.placement = Placement::Airborne;
                     }
                 }
@@ -2048,9 +2085,11 @@ pub unsafe fn frame(fighter: usize) {
                 Placement::Airborne if status == konst(C::StatusFall) => {
                     hold_cpu(cpu, run.setup.cpu);
                     *held_cpu = Some(body);
-                    run.rounds.placed();
-                    run.zoom = zoom::NativeAttempt::default();
-                    run.placement = Placement::ResetResources;
+                    if !settle_player(p1, drill, run.stage, run.setup, &mut run.settle) {
+                        run.rounds.placed();
+                        run.zoom = zoom::NativeAttempt::default();
+                        run.placement = Placement::ResetResources;
+                    }
                 }
                 Placement::Airborne => {
                     state::status_request(cpu, konst(C::StatusFall));

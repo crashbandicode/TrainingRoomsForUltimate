@@ -102,6 +102,27 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
     assert!(wizard < hold && hold < mode, "the shared editor owns the CPU before the drill's lead-in and live dispatch");
 }
 
+#[test]
+fn edge_juggle_settles_a_hit_player_before_ready() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let place = item(&runtime, "unsafe fn try_place(");
+    assert!(place.contains("write_player(bodies.p1"));
+    assert!(!place.contains("state::init_pos(bodies.p1"));
+    let settle = item(&runtime, "unsafe fn settle_player(");
+    assert!(settle.contains(".rewrite("));
+    assert!(settle.contains("write_player("));
+    assert!(settle.contains("snap_player("));
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let watch = frame.find("placed_player(p1).watch()").expect("watch before the write");
+    let place = frame.find("try_place(").expect("start write");
+    assert!(watch < place);
+    assert!(frame.contains("run.settle = watch.then_some(0)"));
+    let settle = frame.find("settle_player(").expect("settle before Ready");
+    let ready = frame.find("run.rounds.placed()").expect("Ready transition");
+    assert!(settle < ready);
+    assert!(!item(&runtime, "unsafe fn hold_cpu(").contains("p1"));
+}
+
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its
 /// submodules included, and the models Game never shadows the runtime struct Game of mashout.rs.
 #[test]
