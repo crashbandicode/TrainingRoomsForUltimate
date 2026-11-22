@@ -257,7 +257,8 @@ fn crop_window_with_one_side_or_a_zone_off_the_screen() {
     assert_eq!(one.iter().flatten().count(), 10);
     let below = crop_window(CropView { vertical: [-700.0, -600.0], ..crop_world() }, None, Step::Top);
     assert_eq!(below[0], crop_rect(0.0, 0.0, 1920.0, 1080.0, dim));
-    assert_eq!(below.iter().flatten().count(), 15);
+    assert_eq!(below.iter().flatten().count(), 11);
+    assert!(below.iter().flatten().all(|r| r.color != [10, 15, 27, 255]));
 }
 
 #[test]
@@ -293,6 +294,26 @@ fn crop_window_puts_a_handle_on_the_boundary_the_step_moves() {
         let off = crop_window(CropView { vertical: [600.0, 700.0], ..crop_world() }, None, step);
         assert!(off.iter().flatten().all(|r| r.color != ink));
     }
+}
+
+#[test]
+fn crop_window_handles_require_the_active_edge_on_both_axes() {
+    let ink = [10, 15, 27, 255];
+    let right = CropView { vertical: [300.0, 541.0], sides: [None, Some([400.0, 700.0])],
+        limits: [-300.0, 300.0] };
+    for (view, step) in [
+        (right, Step::Top),
+        (CropView { vertical: [-541.0, -300.0], ..right }, Step::Bottom),
+        (CropView { vertical: [-100.0, 200.0], sides: [None, Some([600.0, 961.0])], ..right }, Step::Outer),
+        (CropView { vertical: [-100.0, 200.0], sides: [Some([-961.0, -600.0]), None], ..right }, Step::Outer),
+        (CropView { vertical: [-100.0, 200.0], sides: [None, Some([-961.0, 300.0])], ..right }, Step::Inner),
+        (CropView { vertical: [300.0, 540.0], ..right }, Step::Top),
+    ] {
+        assert!(crop_window(view, None, step).iter().flatten().all(|r| r.color != ink));
+    }
+    let partial = crop_window(CropView { vertical: [300.0, 535.0], ..right }, None, Step::Top);
+    let handles: Vec<_> = partial.iter().flatten().filter(|r| r.color == ink).collect();
+    assert_eq!(handles, [crop_rect(550.0, 540.5, 20.0, 14.0, ink).as_ref().unwrap()]);
 }
 
 #[test]

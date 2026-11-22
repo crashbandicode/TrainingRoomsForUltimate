@@ -421,15 +421,24 @@ pub fn crop_window(world: CropView, inset: Option<CropView>, step: Step) -> [Opt
     crop_edges(world, step, thin, active, &mut push);
     for (i, side) in world.sides.into_iter().enumerate() {
         let Some([left, right]) = side else { continue };
-        let [x0, x1] = [left - thin, right + thin].map(|x| x.clamp(CROP_X[0], CROP_X[1]));
-        let [y0, y1] = [bottom - thin, top + thin].map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
-        let half = active / 2.0;
-        let (x, y, w, h, iw, ih, color) = match step {
-            Step::Top if x1 > x0 => (x0.midpoint(x1), top + half, 36.0, 30.0, 20.0, 14.0, CROP_BLUE),
-            Step::Bottom if x1 > x0 => (x0.midpoint(x1), bottom - half, 36.0, 30.0, 20.0, 14.0, CROP_BLUE),
-            Step::Inner if y1 > y0 => (if i == 0 { right + half } else { left - half }, y0.midpoint(y1), 30.0, 36.0, 14.0, 20.0, CROP_YELLOW),
-            Step::Outer if y1 > y0 => (if i == 0 { left - half } else { right + half }, y0.midpoint(y1), 30.0, 36.0, 14.0, 20.0, CROP_PURPLE),
-            _ => continue,
+        let (edge_x, edge_y, horizontal, color) = match step {
+            Step::Top => ([left - thin, right + thin], [top, top + active], true, CROP_BLUE),
+            Step::Bottom => ([left - thin, right + thin], [bottom - active, bottom], true, CROP_BLUE),
+            Step::Inner => (if i == 0 { [right, right + active] } else { [left - active, left] },
+                [bottom - thin, top + thin], false, CROP_YELLOW),
+            Step::Outer => (if i == 0 { [left - active, left] } else { [right, right + active] },
+                [bottom - thin, top + thin], false, CROP_PURPLE),
+            Step::Preview => continue,
+        };
+        let [x0, x1] = edge_x.map(|x| x.clamp(CROP_X[0], CROP_X[1]));
+        let [y0, y1] = edge_y.map(|y| y.clamp(CROP_Y[0], CROP_Y[1]));
+        if x1 <= x0 || y1 <= y0 {
+            continue;
+        }
+        let (x, y, w, h, iw, ih) = if horizontal {
+            (x0.midpoint(x1), edge_y[0].midpoint(edge_y[1]), 36.0, 30.0, 20.0, 14.0)
+        } else {
+            (edge_x[0].midpoint(edge_x[1]), y0.midpoint(y1), 30.0, 36.0, 14.0, 20.0)
         };
         push([x - w / 2.0, x + w / 2.0], [y - h / 2.0, y + h / 2.0], color);
         push([x - iw / 2.0, x + iw / 2.0], [y - ih / 2.0, y + ih / 2.0], CROP_INK);

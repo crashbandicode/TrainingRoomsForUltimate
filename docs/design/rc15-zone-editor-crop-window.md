@@ -5,6 +5,8 @@ steps, buttons, notice text, zones, boundaries or wide camera. Blue edges mark
 Top and Bottom, yellow the Inner edge and purple the Outer edge; the active
 edge is thicker. The two-colour handle marks the boundary being adjusted, at
 the middle of its on-screen part; an edge with no on-screen part has no handle.
+The active edge must meet the canvas on both axes; touching only its border
+does not count.
 One yellow line per side marks the inner limit, replacing the dashes.
 Sample target pictures replace hatching and show places a target can appear.
 X at Preview now writes the notice again with the factory zone's numbers;
@@ -65,7 +67,7 @@ implementation.
 | Operator clause | Design | Test |
 | --- | --- | --- |
 | "I'd like to maintain the functionality": the zones | Everything outside the two zones is dimmed; each zone is a clear window. | `crop_window_dims_everything_outside_both_zones` `crop_window_with_one_side_or_a_zone_off_the_screen` |
-| Keep the boundaries and the active edge | Four opaque edges a side, just outside the zone; the step's edge is thicker and carries a handle. | `crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker` `crop_window_puts_a_handle_on_the_boundary_the_step_moves` |
+| Keep the boundaries and the active edge | Four opaque edges a side, just outside the zone; the step's edge is thicker and carries a handle. | `crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker` `crop_window_puts_a_handle_on_the_boundary_the_step_moves` `crop_window_handles_require_the_active_edge_on_both_axes` |
 | Keep which side is inward / off-stage | Yellow inner edge, purple outer edge, and one yellow line a side at the inner limit. | `crop_window_marks_the_inner_limit_once_a_side` |
 | Keep the inset view | The inset keeps its backing and contour and gets its own limits and edges, after every world rectangle. | `crop_window_draws_the_inset_after_the_world_view` |
 | Keep every function: where a target can appear (the hatching's) | Up to five sample targets a side, on the outward-connected part of each row. | `zone_samples_are_spots_a_target_can_appear_at` |
