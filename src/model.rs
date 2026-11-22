@@ -113,6 +113,8 @@ pub mod ordered_ids;
 pub mod pause_helper;
 #[path = "model/swap/choices.rs"]
 pub(crate) mod fighter_choices;
+#[path = "model/swap/forms.rs"]
+pub(crate) mod fighter_forms;
 #[path = "model/mashout.rs"]
 pub mod mashout;
 #[path = "model/edge_juggle.rs"]

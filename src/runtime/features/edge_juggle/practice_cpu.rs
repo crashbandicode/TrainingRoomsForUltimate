@@ -1,6 +1,7 @@
 //! Temporary practice CPU selection, serviced by the game frame's roster owner.
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+use crate::model::edge_juggle::picker;
 use crate::runtime::{roster::character_roster as roster, scene};
 
 const NONE: u32 = u32::MAX;
@@ -34,9 +35,10 @@ pub(in crate::runtime) fn service_practice_cpu_selection() {
     }
     let ready = !roster::busy() && roster::cpu_reload_ready();
     let observed = ready.then(roster::cpu_kind).flatten();
-    SWITCHING.store(selected.is_none() && observed != Some(target), Ordering::Release);
-    if let Some(observed) = observed {
-        if observed != target {
+    let step = picker::service(selected, target, observed);
+    SWITCHING.store(step.switching, Ordering::Release);
+    if step.request {
+        if let Some(observed) = observed {
             let previous = TEMPORARY.swap(target, Ordering::AcqRel);
             if roster::request_practice_cpu_kind(target) {
                 if selected.is_some() && original == NONE {
@@ -45,9 +47,9 @@ pub(in crate::runtime) fn service_practice_cpu_selection() {
             } else {
                 TEMPORARY.store(previous, Ordering::Release);
             }
-        } else if selected.is_none() {
-            ORIGINAL.store(NONE, Ordering::Relaxed);
-            TEMPORARY.store(NONE, Ordering::Release);
         }
+    } else if observed.is_some() && selected.is_none() {
+        ORIGINAL.store(NONE, Ordering::Relaxed);
+        TEMPORARY.store(NONE, Ordering::Release);
     }
 }

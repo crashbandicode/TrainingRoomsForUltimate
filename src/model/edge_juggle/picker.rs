@@ -1,9 +1,31 @@
 //! Fighter, behavior and settings shared by the two practice games.
 use core::fmt::{self, Write};
 
-use crate::model::{fighter_choices::CHOICES, settings::Snapshot, tech_settings::selected};
+use crate::model::{fighter_choices::CHOICES, fighter_forms::Forms, settings::Snapshot, tech_settings::selected};
 
 use super::Drill;
+
+/// Whether the CPU in the slot is the fighter the drill selected. A fighter with forms (Pyra and Mythra, the
+/// Pokémon Trainer's three) is one selection in any of its forms: a form change is its own move.
+pub fn is_selected(selected: u32, kind: u32) -> bool {
+    Forms::starting(selected).same_group(kind)
+}
+
+/// One roster tick of the selection service.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Service {
+    /// The original CPU is being restored and is not in the slot yet.
+    pub switching: bool,
+    /// Ask the roster for `target`.
+    pub request: bool,
+}
+
+/// `selected`: the drill's choice, if any; `target`: that choice or the original to restore; `observed`: the
+/// CPU kind the roster sees when it is ready for a request.
+pub fn service(selected: Option<u32>, target: u32, observed: Option<u32>) -> Service {
+    let satisfied = observed.map(|kind| is_selected(target, kind));
+    Service { switching: selected.is_none() && satisfied != Some(true), request: satisfied == Some(false) }
+}
 
 pub const HERO: u32 = 0x53;
 pub const FIGHTER_CHOICES: usize = CHOICES.len() + 1;
@@ -128,5 +150,43 @@ impl Picker {
         if matches!(self.mode(), Mode::Cpu(_)) {
             self.level = self.level % 9 + 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn forms_share_one_cpu_selection() {
+        for (selected, kind, expected) in [
+            (0x5a, 0x5b, true),
+            (0x5b, 0x5a, true),
+            (0x24, 0x25, true),
+            (0x26, 0x24, true),
+            (0x5a, 0x00, false),
+            (0x00, 0x00, true),
+            (0x00, 0x5a, false),
+        ] {
+            assert_eq!(is_selected(selected, kind), expected, "{selected:#x}, {kind:#x}");
+        }
+    }
+
+    #[test]
+    fn selection_service_respects_form_families_and_restoration() {
+        for (selected, target, observed, switching, request) in [
+            (Some(0x5a), 0x5a, Some(0x5b), false, false),
+            (Some(0x5a), 0x5a, Some(0x00), false, true),
+            (Some(0x5a), 0x5a, None, false, false),
+            (None, 0x00, Some(0x5b), true, true),
+            (None, 0x5a, Some(0x5b), false, false),
+            (None, 0x00, None, true, false),
+            (None, 0x00, Some(0x00), false, false),
+        ] {
+            assert_eq!(service(selected, target, observed), Service { switching, request },
+                "{selected:?}, {target:#x}, {observed:?}");
+        }
+    }
     }
 }

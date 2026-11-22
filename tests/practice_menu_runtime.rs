@@ -121,13 +121,31 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     let watch = frame.find("placed_player(p1).watch()").expect("watch before the write");
     let place = frame.find("try_place(").expect("start write");
     assert!(watch < place);
-    assert!(frame.contains("run.settle = watch.then_some((at, 0))"));
+    assert!(frame.contains("run.settle.placed(at, watch)"));
+    assert!(!frame.contains("then_some((at, 0))"));
+    assert_eq!(frame.matches("run.settle.next_attempt()").count(), 1);
+    let placed = frame.find("run.rounds.placed()").expect("Ready transition");
+    let next = frame.find("run.settle.next_attempt()").expect("next attempt");
+    let reset = frame[next..].find("run.placement = Placement::ResetResources;").expect("placement reset") + next;
+    assert!(placed < next && next < reset);
     let settle = frame.find("PlacedPlayer::before_ready(").expect("judge before Ready");
     let ready = frame.find("run.rounds.placed()").expect("Ready transition");
     assert!(settle < ready);
     assert!(frame.contains("write_player(p1, at,"));
     assert!(!frame.contains("Placement::Airborne if"));
     assert!(!item(&runtime, "unsafe fn hold_cpu(").contains("p1"));
+}
+
+#[test]
+fn edge_juggle_treats_a_form_change_as_the_selected_cpu() {
+    let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
+    assert!(service.contains("picker::service("));
+    assert!(!service.contains("observed != target"));
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("picker::is_selected(wanted, kind as u32)"));
+    assert!(!frame.contains("wanted != kind as u32"));
+    assert!(!frame.contains("followed_swap"));
 }
 
 /// tr-review / gate ed64bb9d (release and DIAG exit 101): Mash out reads the running game through one function, its

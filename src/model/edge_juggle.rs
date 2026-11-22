@@ -282,6 +282,35 @@ impl PlacedPlayer {
     }
 }
 
+/// Player 1's watched start within one attempt: the point the last start write wrote, and the rewrites the attempt
+/// has spent. The allowance is the attempt's: a placement that starts again keeps what is spent.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Settle {
+    at: Option<[f32; 2]>,
+    spent: u16,
+}
+
+impl Settle {
+    /// A start write. It is watched only when it found Player 1 in a hit or not idle.
+    pub fn placed(&mut self, at: [f32; 2], watch: bool) {
+        self.at = watch.then_some(at);
+    }
+
+    /// The watched point and the rewrites spent so far in this attempt.
+    pub fn watched(self) -> Option<([f32; 2], u16)> {
+        self.at.map(|at| (at, self.spent))
+    }
+
+    pub fn rewritten(&mut self) {
+        self.spent += 1;
+    }
+
+    /// Ready started: the next attempt has its own allowance.
+    pub fn next_attempt(&mut self) {
+        *self = Self::default();
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Place,
@@ -986,6 +1015,42 @@ mod tests {
         assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), true, g), (false, true));
         assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), false, g), (false, false));
         assert_eq!(PlacedPlayer::before_ready(Some((frozen, None, 0)), true, g), (true, false));
+    }
+
+    #[test]
+    fn player_rewrites_are_bounded_per_attempt_across_placement_restarts() {
+        let idle = PlacedPlayer { hit_freeze: false, wait: true };
+        let at = [1.0, 2.0];
+        for (drill, before_restart) in [(Drill::GuardEdge, 59), (Drill::Juggler, 44)] {
+            let mut settle = Settle::default();
+            let mut writes = 0;
+            settle.placed(at, true);
+            for _ in 0..before_restart {
+                let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
+                assert_eq!(PlacedPlayer::before_ready(watched, false, drill), (true, false));
+                settle.rewritten();
+                writes += 1;
+            }
+            settle.placed(at, true);
+            assert_eq!(settle.watched(), Some((at, before_restart)));
+            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
+            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (true, false));
+            settle.rewritten();
+            writes += 1;
+            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
+            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (false, true));
+            assert_eq!(writes, drill.ready_frames());
+
+            settle.placed(at, false);
+            assert_eq!(settle.watched(), None);
+            settle.placed(at, true);
+            assert_eq!(settle.watched(), Some((at, drill.ready_frames())));
+            let watched = settle.watched().map(|(_, spent)| (idle, Some(false), spent));
+            assert_eq!(PlacedPlayer::before_ready(watched, true, drill), (false, true));
+            settle.next_attempt();
+            settle.placed(at, true);
+            assert_eq!(settle.watched(), Some((at, 0)));
+        }
     }
 
     #[test]
