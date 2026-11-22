@@ -103,6 +103,13 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 }
 
 #[test]
+fn edge_juggle_remembers_whether_the_start_was_moved() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    assert!(item(&runtime, "pub unsafe fn poll(").contains("wizard.unmoved(run.stage)"));
+    assert!(item(&runtime, "pub unsafe fn frame(").contains("wizard.remembered("));
+}
+
+#[test]
 fn edge_juggle_settles_a_hit_player_before_ready() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     assert!(!runtime.contains("fn settle_player"));

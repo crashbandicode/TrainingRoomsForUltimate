@@ -92,7 +92,7 @@ static BACK: AtomicBool = AtomicBool::new(false);
 
 struct Engine {
     run: Option<Run>,
-    kept: [Option<(StageKey, Setup)>; 2],
+    kept: [Option<(StageKey, Setup, bool)>; 2],
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
@@ -1479,7 +1479,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
-            kept[run.drill as usize] = Some((run.stage_key, run.setup));
+            kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved(run.stage)));
             run.wizard = None;
             WIZARD.store(false, Ordering::Release);
         } else {
@@ -1900,8 +1900,8 @@ pub unsafe fn frame(fighter: usize) {
             return;
         };
         let last = engine.kept[drill as usize]
-            .filter(|(stage, _)| *stage == stage_key)
-            .map(|(_, setup)| setup);
+            .filter(|(stage, ..)| *stage == stage_key)
+            .map(|(_, setup, unmoved)| wizard.remembered(stage, setup, unmoved));
         let editing = start == 2 || last.is_none();
         let mut setup = last.unwrap_or(wizard.setup);
         if drill == Drill::GuardEdge {

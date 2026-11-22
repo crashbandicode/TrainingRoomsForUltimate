@@ -769,6 +769,23 @@ impl Wizard {
         left.filter(|(side, _)| *side == area).map(|(_, offset)| offset).or(shared)
     }
 
+    fn default_cpu(&self, stage: Stage, area: Area) -> Option<[f32; 2]> {
+        Self::area_release(stage, area, Self::release_offset(area, self.left_start, self.area_offset))
+    }
+
+    pub fn unmoved(&self, stage: Stage) -> bool {
+        self.drill == Drill::GuardEdge && self.default_cpu(stage, self.setup.area) == Some(self.setup.cpu)
+    }
+
+    pub fn remembered(&self, stage: Stage, mut setup: Setup, unmoved: bool) -> Setup {
+        if unmoved {
+            if let Some(cpu) = self.default_cpu(stage, setup.area) {
+                setup.cpu = cpu;
+            }
+        }
+        setup
+    }
+
     pub fn change_area(&mut self, stage: Stage, delta: i32) {
         let area = self.setup.area.step(delta);
         let offset = Self::release_offset(area, self.left_start, self.area_offset);
@@ -1172,6 +1189,38 @@ mod tests {
         }
         assert_eq!(session.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
         assert_eq!((session.secured, session.attempts), (0, 0));
+    }
+
+    #[test]
+    fn unmoved_remembered_start_follows_the_current_fighter() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let key = (0, 0);
+        let mut a = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, None).unwrap();
+        let diddy = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(perfect::diddy::KIND)).unwrap();
+        assert_eq!(diddy.setup.cpu, [-94.0, -30.0]);
+        assert_ne!(a.setup.cpu, diddy.setup.cpu);
+        assert_eq!(diddy.remembered(stage, a.setup, true).cpu, diddy.setup.cpu);
+        assert!(a.unmoved(stage));
+        assert_eq!(diddy.remembered(stage, a.setup, false).cpu, a.setup.cpu);
+        a.move_cpu(stage, [-100.0, -20.0]);
+        assert!(!a.unmoved(stage));
+        a.change_area(stage, 2);
+        assert_eq!(a.setup.area, Area::UpperLeft);
+        assert!(a.unmoved(stage));
+        let mut upper_diddy = diddy;
+        upper_diddy.change_area(stage, 2);
+        assert_eq!(diddy.remembered(stage, a.setup, true).cpu, upper_diddy.setup.cpu);
+        let juggler = Wizard::new(Drill::Juggler, stage, [0.0; 2], 100, key, None).unwrap();
+        assert!(!juggler.unmoved(stage));
+
+        let lucario_100 = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(perfect::lucario::KIND)).unwrap();
+        let lucario_130 = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 130, key, Some(perfect::lucario::KIND)).unwrap();
+        assert!(lucario_100.unmoved(stage));
+        assert_ne!(lucario_100.setup.cpu, lucario_130.setup.cpu);
+        assert_eq!(lucario_130.remembered(stage, lucario_100.setup, true).cpu, lucario_130.setup.cpu);
     }
 
     #[test]
