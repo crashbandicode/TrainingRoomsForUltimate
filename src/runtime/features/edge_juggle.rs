@@ -1592,18 +1592,15 @@ unsafe fn write_player(p1: usize, [x, y]: [f32; 2], facing: f32) {
 }
 
 /// Player 1 stands on its written start: the written x, on the floor the write found (the first floor under its feet
-/// has the written height there). A floor that cannot be read is not the start.
-unsafe fn on_start(p1: usize, [x, y]: [f32; 2]) -> bool {
+/// has the written height there). Another x is off the start. `None`: the floor could not be read, which shows
+/// nothing; a Player 1 on another floor at the same x is then missed, as before this check existed.
+unsafe fn on_start(p1: usize, [x, y]: [f32; 2]) -> Option<bool> {
     if natives::pos_x(p1) != x {
-        return false;
+        return Some(false);
     }
-    let Some([_, _, _, bottom]) = natives::camera_limit_range() else {
-        return false;
-    };
-    let Some(ray) = FloorRay::new(p1) else {
-        return false;
-    };
-    ray.floor(x, [natives::pos_y(p1) + 1.0, bottom], true).and_then(|floor| floor.height(x)) == Some(y)
+    let [_, _, _, bottom] = natives::camera_limit_range()?;
+    let floor = FloorRay::new(p1)?.floor(x, [natives::pos_y(p1) + 1.0, bottom], true)?;
+    Some(floor.height(x)? == y)
 }
 
 unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> Option<[f32; 2]> {

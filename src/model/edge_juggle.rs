@@ -261,12 +261,21 @@ impl PlacedPlayer {
     }
 
     /// One placement update between the start write and Ready. `watched` is, for a watched start, Player 1 as read on
-    /// this update, whether it stands on its start, and the rewrites spent; `None` for a start that found it idle.
+    /// this update, whether it stands on its start (`None` when the floor under it could not be read), and the rewrites
+    /// spent; `None` for a start that found it idle.
     /// Player 1 is judged on every update, also while the CPU is not in Fall yet. Returns (write the start again,
     /// start Ready): Ready starts on the first update with the CPU in Fall and nothing written.
-    pub const fn before_ready(watched: Option<(Self, bool, u16)>, cpu_falling: bool, drill: Drill) -> (bool, bool) {
+    pub const fn before_ready(watched: Option<(Self, Option<bool>, u16)>, cpu_falling: bool, drill: Drill) -> (bool, bool) {
         let rewrite = match watched {
-            Some((player, on_start, spent)) => player.rewrite(on_start, drill, spent),
+            // An unread floor shows no displacement: only a hit freeze is written again then.
+            Some((player, on_start, spent)) => player.rewrite(
+                match on_start {
+                    Some(on_start) => on_start,
+                    None => true,
+                },
+                drill,
+                spent,
+            ),
             None => false,
         };
         (rewrite, cpu_falling && !rewrite)
@@ -878,16 +887,19 @@ mod tests {
         let j = Drill::Juggler;
         assert_eq!(PlacedPlayer::before_ready(None, false, g), (false, false));
         assert_eq!(PlacedPlayer::before_ready(None, true, g), (false, true));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 0)), false, g), (true, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 0)), true, g), (true, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, true, 0)), false, g), (false, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, true, 0)), true, g), (false, true));
-        assert_eq!(PlacedPlayer::before_ready(Some((frozen, true, 0)), true, g), (true, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((own, false, 0)), true, g), (false, true));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 59)), true, g), (true, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 60)), true, g), (false, true));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 44)), true, j), (true, false));
-        assert_eq!(PlacedPlayer::before_ready(Some((idle, false, 45)), true, j), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 0)), false, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(true), 0)), false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(true), 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((frozen, Some(true), 0)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((own, Some(false), 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 59)), true, g), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 60)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 44)), true, j), (true, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, Some(false), 45)), true, j), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), true, g), (false, true));
+        assert_eq!(PlacedPlayer::before_ready(Some((idle, None, 0)), false, g), (false, false));
+        assert_eq!(PlacedPlayer::before_ready(Some((frozen, None, 0)), true, g), (true, false));
     }
 
     fn release(drill: Drill, limit: Option<u16>) -> Session {

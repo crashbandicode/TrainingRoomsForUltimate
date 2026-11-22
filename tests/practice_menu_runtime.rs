@@ -111,8 +111,11 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     assert!(place.contains("Some([x, y])"));
     assert!(!place.contains("state::init_pos(bodies.p1"));
     let on_start = item(&runtime, "unsafe fn on_start(");
+    assert!(on_start.contains("-> Option<bool>"));
+    assert!(on_start.contains("return Some(false);"));
     assert!(on_start.contains("natives::pos_x(p1) != x"));
     assert!(on_start.contains(".height(x)"));
+    assert!(on_start.contains("Some(floor.height(x)? == y)"));
     assert!(!on_start.contains("snap_player("));
     let frame = item(&runtime, "pub unsafe fn frame(");
     let watch = frame.find("placed_player(p1).watch()").expect("watch before the write");
