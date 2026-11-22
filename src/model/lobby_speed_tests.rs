@@ -556,6 +556,8 @@ struct Pad {
     detector: crate::model::chords::Detector,
     keep: StepKeep,
     reentry: bool,
+    /// The re-entry closed an open speed hold: the runtime takes the pop-up down.
+    closed: bool,
     lobby: FrameStep,
     training: FrameStep,
 }
@@ -599,7 +601,7 @@ impl Pad {
         use crate::model::chords::{physical_mask, ChordSet, Sample};
         if std::mem::take(&mut self.reentry) {
             self.keep = StepKeep(0);
-            self.detector.reenter();
+            self.closed = self.detector.reenter();
         }
         let (held, pressed) = self.keep.seen(self.sets);
         self.detector.poll(&ChordSet::factory(), Sample::of(self.style, held, pressed), false);
@@ -754,12 +756,14 @@ fn a_skipped_poll_forgets_the_kept_step_button() {
     pad.skipped(0);
     assert!(pad.reentry, "the gap is recorded");
     assert_eq!(pad.update(ZL), STEP, "a new press after the gap is a press");
+    assert!(!pad.closed, "the session clear had already closed the hold");
     assert_eq!(pad.keep, StepKeep(0));
     assert_eq!(StepKeep(ZL).seen([ZL, 0, ZL, 0]), (ZL, 0), "a bit still kept would have read it as held");
     let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).map(|l| format!("{l}\n")).collect::<String>();
     let chords = code(include_str!("../runtime/features/chords.rs"));
     assert!(chords.contains("POLLED.swap(controller, Ordering::Relaxed) != controller"));
-    assert!(chords.contains("state.detector.reenter();"));
+    assert!(chords.contains("if reentry && STATE.lock().detector.reenter() {"));
+    assert!(chords.contains("on_hold(HoldEvent::Closed, style)"));
     assert!(chords.contains("StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) })"));
     assert!(code(include_str!("../runtime/features/input_delay.rs")).contains("chords::on_poll(0)"));
 }
@@ -825,6 +829,43 @@ fn a_session_clear_on_the_same_pad_keeps_the_chords_step_button() {
     }
     assert_eq!(pad.keep, StepKeep(ZL));
     assert!(!pad.detector.consume(Request::SaveState), "no second save");
+}
+
+fn an_open_speed_hold_does_not_follow_a_controller_handoff() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, R, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    let polled = pad.handoff([R, R, 0, 0]);
+    assert_eq!(polled, NO_STEP, "the hold is not held on the other pad");
+    assert!(pad.closed, "the pop-up's close is acted on");
+    assert_eq!(pad.detector.hidden(), 0);
+    assert_eq!(pad.sets, [R, R, 0, 0], "the other pad's words are left as they are");
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState), "another chord passes on the new pad");
+}
+
+fn a_speed_chord_pressed_after_a_handoff_opens_the_hold_again() {
+    use crate::model::chords::bit::{DPAD_UP as UP, R};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    let polled = pad.handoff([R | UP, 0, R | UP, 0]);
+    assert_eq!(polled.0, HoldEvent::Opened, "closed first, then opened by its own press");
+    assert!(pad.closed);
+}
+
+fn pending_requests_survive_a_re_entry() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(DOWN);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    let _ = pad.handoff([0, 0, 0, 0]);
+    assert!(!pad.closed, "no hold was open");
+    assert!(pad.detector.consume(Request::SaveState), "the accepted Save is still pending");
 }
 
 /// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, in Training or here.
@@ -945,6 +986,9 @@ fn case_table() {
         ("a_bare_step_press_after_a_gap_is_a_press", a_bare_step_press_after_a_gap_is_a_press as fn()),
         ("a_kept_step_button_does_not_follow_a_controller_handoff", a_kept_step_button_does_not_follow_a_controller_handoff as fn()),
         ("a_session_clear_on_the_same_pad_keeps_the_chords_step_button", a_session_clear_on_the_same_pad_keeps_the_chords_step_button as fn()),
+        ("an_open_speed_hold_does_not_follow_a_controller_handoff", an_open_speed_hold_does_not_follow_a_controller_handoff as fn()),
+        ("a_speed_chord_pressed_after_a_handoff_opens_the_hold_again", a_speed_chord_pressed_after_a_handoff_opens_the_hold_again as fn()),
+        ("pending_requests_survive_a_re_entry", pending_requests_survive_a_re_entry as fn()),
         ("holding_the_speed_chord_never_steps", holding_the_speed_chord_never_steps as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),

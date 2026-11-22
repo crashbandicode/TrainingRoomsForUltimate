@@ -67,6 +67,11 @@ pub unsafe fn on_poll(controller: usize) {
     }
     let read = |offset: usize| ((controller + offset) as *const u32).read_volatile();
     let style = read(field::STYLE);
+    // A re-entry (STEP-PATH-CONTRACT.md section 5): nothing the last poll kept is carried over, and an open speed hold
+    // closes with its pop-up before this poll reads the pad's buttons. The lock is let go before the pop-up is touched.
+    if reentry && STATE.lock().detector.reenter() {
+        crate::runtime::features::game_speed::on_hold(HoldEvent::Closed, style);
+    }
     // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
     let step_keep = lobby_speed::StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) });
     let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
@@ -78,9 +83,6 @@ pub unsafe fn on_poll(controller: usize) {
     let drill_running = super::edge_juggle::running();
     let accepted = {
         let mut state = STATE.lock();
-        if reentry {
-            state.detector.reenter();
-        }
         // A newly published value and the INI shortcuts (atomics) are adopted here, on the game's poll (stream/sync: no other
         // thread takes `STATE` while it works).
         if let Some(live) = crate::runtime::published::live_if_newer(&ADOPTED) {
