@@ -139,6 +139,45 @@ fn every_item_tile_has_an_icon() {
     }
 }
 
+/// The zone editor's crop window (design 3) over shim panes of the real length: entering hides every menu pane, the
+/// draw shows only its rectangles, and leaving puts every pane back to the table's starting visibility, also when the
+/// layout was resolved again with the editor up and the window entered twice (review 2026-11-22 17:53:48Z).
+#[test]
+fn the_crop_window_leaves_every_menu_pane_as_the_table_starts_it() {
+    use model::egg_zone::{CropRect, CROP_RECTS};
+    use nn::ui2d::Picture;
+
+    let mut pictures: Vec<Picture> = (0..p::MENU_COUNT).map(|_| unsafe { core::mem::zeroed() }).collect();
+    let mut all = [core::ptr::null_mut(); p::MENU_COUNT];
+    for (i, picture) in pictures.iter_mut().enumerate() {
+        picture.pane.flags = u8::from(p::spec(i).visible);
+        all[i] = &mut picture.pane;
+    }
+    let panes = Panes { container: all[0], all };
+    let mut rects = [None; CROP_RECTS];
+    rects[0] = Some(CropRect { x: 10.0, y: 20.0, w: 30.0, h: 40.0, color: [1, 2, 3, 4] });
+    rects[5] = Some(CropRect { x: -50.0, y: 60.0, w: 70.0, h: 80.0, color: [5, 6, 7, 8] });
+
+    unsafe { panes.crop_enter(); }
+    for (i, picture) in pictures.iter().enumerate().skip(1) {
+        assert_eq!(picture.pane.flags & 1, 0, "{} should be hidden on enter", p::name_of(i).as_str());
+    }
+    unsafe { panes.crop_draw(&rects) };
+    for (i, picture) in pictures.iter().enumerate().skip(1) {
+        let visible = i == p::IDX_TILE_STRIPE || i == p::IDX_TILE_STRIPE + 5;
+        assert_eq!(picture.pane.flags & 1 != 0, visible, "{} visibility during crop", p::name_of(i).as_str());
+    }
+    for offset in [0, 5] {
+        let rect = rects[offset].unwrap();
+        let pane = &pictures[p::IDX_TILE_STRIPE + offset].pane;
+        assert_eq!((pane.pos_x, pane.pos_y, pane.size_x, pane.size_y), (rect.x, rect.y, rect.w, rect.h));
+    }
+    unsafe { panes.crop_enter(); panes.crop_leave(); }
+    for (i, picture) in pictures.iter().enumerate().skip(1) {
+        assert_eq!(picture.pane.flags & 1 != 0, p::spec(i).visible, "{} visibility after leave", p::name_of(i).as_str());
+    }
+}
+
 /// SOLO-S-PLACEMENT (operator 2026-11-05): on every layout the roster grid uses, the Player and CPU "S" marks never
 /// intersect the tile's name label. With the portrait drawn they sit on its lower corners (covering it partly), clear
 /// of the order badges above; without it the centred name stays clear too.

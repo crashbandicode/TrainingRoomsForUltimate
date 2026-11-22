@@ -15,7 +15,7 @@ use crate::runtime::diag_log::diagnostic;
 use crate::runtime::published::INPUT_OWNERS;
 use crate::runtime::ui::state::{self, CLOSE_COUNT, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, LAYOUT_READY, MENU_SHOWN, OPEN, PAUSE_ACTIVE, POLLS_AT_TICK};
 use crate::runtime::ui::{chips, thumbs, hud, pane, registry};
-use crate::runtime::ui::view::{CropSaved, Panes};
+use crate::runtime::ui::view::Panes;
 use crate::runtime::game;
 
 const INFO_TRAINING: &[u8] = b"info_training";
@@ -28,8 +28,8 @@ struct Resolved {
     status_r: *mut Pane,
     drawn_seq: u32,
     shown: bool,
-    /// The zone editor's crop window is up: the menu panes it hid.
-    crop: Option<CropSaved>,
+    /// The zone editor's crop window is up: the menu's panes are hidden for it.
+    crop: bool,
 }
 
 // SAFETY: the pointers are only used on the UI job thread inside the tick.
@@ -41,7 +41,7 @@ static RESOLVED: Mutex<Resolved> = Mutex::new(Resolved {
     status_r: core::ptr::null_mut(),
     drawn_seq: 0,
     shown: false,
-    crop: None,
+    crop: false,
 });
 
 /// Set by the registration tick: the layout object is new, so its panes must be resolved again.
@@ -148,12 +148,12 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
     // The zone editor's crop window (design 3) is drawn on the menu's own rectangles while the menu is closed.
     let editing = !visible && !PAUSE_ACTIVE.load(Ordering::Acquire) && crate::runtime::features::egg_zone::wizard_active();
     if !editing {
-        if let Some(saved) = crop.take() {
-            panes.crop_leave(&saved);
+        if core::mem::take(crop) {
+            panes.crop_leave();
         }
     } else {
-        if crop.is_none() {
-            *crop = Some(panes.crop_enter());
+        if !core::mem::replace(crop, true) {
+            panes.crop_enter();
         }
         // A pass whose guide was not drawn keeps the rectangles of the pass before.
         if let Some(rects) = rects {
@@ -234,7 +234,7 @@ unsafe fn resolve(r: &mut Resolved, layout: *mut Layout, waiting: bool) {
     r.status_r = core::ptr::null_mut();
     r.drawn_seq = 0;
     r.shown = false;
-    r.crop = None;
+    r.crop = false;
     let layout_name = if waiting { "info_waiting" } else { "info_training" };
     let root = (*layout).root_pane;
     let total = pane::count(root);
