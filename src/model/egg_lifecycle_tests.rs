@@ -406,45 +406,94 @@ fn offstage_spawns_without_view_and_sweeps_motion_in_its_original_side() {
     }
 }
 
-#[test]
-fn moving_paths_stay_over_the_stage() {
-    const MAIN: Floor = [[-50.0, 0.0], [50.0, 0.0]];
-    const PLATFORM: Floor = [[-40.0, 30.0], [-10.0, 30.0]];
+fn keeps_over_its_floor(floors: &[Floor; 2], own: fn([f32; 2]) -> usize, [area, target, bit]: [u8; 3], seed: u32) -> usize {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, target, area], seed.wrapping_mul(0x9e37_79b9));
+    run.configure(1 << bit, 0);
+    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+    run.set_floors(floors);
+    run.sense([58.0, -30.0]);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    let sampled = run.egg.expect("a target");
+    let index = own(sampled);
+    let [[west, floor], [east, _]] = floors[index];
+    let case = format!(
+        "area {area} target {target} path {bit} seed {seed}, sampled at {sampled:?}, its floor from {west} to {east} at {floor}"
+    );
+    assert!((west + DRIFT..=east - DRIFT).contains(&sampled[0]), "sampled off its floor's spawn span: {case}");
+    let first = run.egg_at().unwrap();
+    let mut moved = false;
+    for tick in 0..200 {
+        let [x, y] = run.egg_at().unwrap();
+        assert!((west..=east).contains(&x) && y >= floor + RADIUS, "left its floor: tick {tick}: ({x}, {y}); {case}");
+        moved |= [x, y] != first;
+        run.step(true, 0.0, &[], false, 0);
+    }
+    assert!(moved, "should fly: {case}");
+    let [low, high] = run.motion.expect("a moving path").bounds;
+    assert_eq!((low, high[0]), ([west + RADIUS, floor + RADIUS], east - RADIUS), "{case}");
+    assert!((high[1] - [52.4286, 86.0][usize::from(area)]).abs() < 0.001, "{high:?}");
+    index
+}
+
+fn every_path_keeps_over_its_floor(floors: &[Floor; 2], own: fn([f32; 2]) -> usize) {
+    let mut seen = [0usize; 2];
     for area in [IN_VIEW, WHOLE] {
         for target in [DISC, CPU] {
             for bit in 0..4u8 {
-                for seed in 0..24u32 {
-                    let mut run = Run::IDLE;
-                    run.start([FREE, ANY, NORMAL, target, area], seed.wrapping_mul(0x9e37_79b9));
-                    run.configure(1 << bit, 0);
-                    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
-                    run.set_floors(&[MAIN, PLATFORM]);
-                    run.sense([58.0, -30.0]);
-                    for _ in 0..=SETTLE {
-                        run.look(true, || Some(VIEW));
-                    }
-                    run.step(false, 0.0, &[], false, 0);
-                    let floor = if run.egg.expect("a target")[1] >= 30.0 { 30.0 } else { 0.0 };
-                    let first = run.egg_at().unwrap();
-                    let mut moved = false;
-                    for tick in 0..200 {
-                        let [x, y] = run.egg_at().unwrap();
-                        assert!(
-                            (-46.01..=46.01).contains(&x) && y >= floor + RADIUS - 0.01,
-                            "left the stage: area {area} target {target} path {bit} seed {seed} tick {tick}: \
-                             ({x}, {y}), floor from -50 to 50 at {floor}"
-                        );
-                        moved |= [x, y] != first;
-                        run.step(true, 0.0, &[], false, 0);
-                    }
-                    assert!(moved, "area {area} target {target} path {bit} seed {seed} should fly");
-                    let [low, high] = run.motion.expect("a moving path").bounds;
-                    assert_eq!((low, high[0]), ([-46.0, floor + RADIUS], 46.0));
-                    assert!((high[1] - [52.4286, 86.0][usize::from(area)]).abs() < 0.001, "{high:?}");
+                for seed in 0..32u32 {
+                    seen[keeps_over_its_floor(floors, own, [area, target, bit], seed)] += 1;
                 }
             }
         }
     }
+    assert!(seen.iter().all(|n| *n > 0), "targets appeared over both floors: {seen:?}");
+}
+
+#[test]
+fn moving_paths_stay_over_the_stage() {
+    every_path_keeps_over_its_floor(&[[[-50.0, 0.0], [50.0, 0.0]], [[-40.0, 30.0], [-10.0, 30.0]]], |at| {
+        usize::from(at[1] >= 30.0)
+    });
+}
+
+#[test]
+fn moving_paths_keep_to_their_own_floor_across_a_gap() {
+    every_path_keeps_over_its_floor(&[[[-50.0, 0.0], [-28.0, 0.0]], [[25.0, 0.0], [50.0, 0.0]]], |at| {
+        usize::from(at[0] > 0.0)
+    });
+}
+
+#[test]
+fn a_boomerang_rests_over_the_floor_it_appeared_over() {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], 0);
+    run.configure(1 << 2, 0);
+    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+    run.set_floors(&[[[-50.0, 0.0], [-28.0, 0.0]], [[25.0, 0.0], [50.0, 0.0]]]);
+    run.sense([58.0, -30.0]);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(VIEW));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    let sampled = run.egg.expect("a target");
+    assert!((-40.0..=-38.0).contains(&sampled[0]), "seed 0 samples a spot on the left floor: {sampled:?}");
+    let start = run.egg_at().unwrap();
+    let mut reach = [start[0]; 2];
+    for _ in 0..200 {
+        run.step(true, 0.0, &[], false, 0);
+        let x = run.egg_at().unwrap()[0];
+        reach = [reach[0].min(x), reach[1].max(x)];
+    }
+    let rest = run.egg_at().unwrap();
+    assert!(
+        (-50.0..=-28.0).contains(&rest[0]),
+        "the Boomerang started at {start:?} and rests at {rest:?}, over no floor (floors from -50 to -28 and from 25 to 50)"
+    );
+    assert!(reach[1] - reach[0] > 10.0, "it flies out and back: from {} to {}", reach[0], reach[1]);
 }
 
 #[test]
@@ -465,4 +514,75 @@ fn a_moving_path_with_no_room_over_its_floor_pops_up() {
         run.step(true, 0.0, &[], false, 0);
     }
     assert!(run.egg_at().unwrap()[1] > y + 20.0, "the Pop up flight is at its apex after 30 ticks");
+}
+
+#[test]
+fn a_moving_path_with_exactly_no_room_pops_up() {
+    let mut run = Run::IDLE;
+    run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], 7);
+    run.configure(1, 0);
+    run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+    let narrow = View(VIEW.0, VIEW.1, [-14.0, 14.0], VIEW.3);
+    for _ in 0..=SETTLE {
+        run.look(true, || Some(narrow));
+    }
+    run.step(false, 0.0, &[], false, 0);
+    let [x, y] = run.egg_at().expect("a target in the eight-unit range");
+    assert!((-4.0..=4.0).contains(&x));
+    assert!(run.motion.is_none() && run.path.is_none(), "a box of no width: Pop up, not an Axe held at one point");
+    for _ in 0..30 {
+        run.step(true, 0.0, &[], false, 0);
+    }
+    assert!(run.egg_at().unwrap()[1] > y + 20.0, "the Pop up flight is at its apex after 30 ticks");
+}
+
+#[test]
+fn a_moving_path_needs_room_only_on_the_axes_it_uses() {
+    for (bit, flies) in [(2u8, true), (0, false)] {
+        let mut run = Run::IDLE;
+        run.start([FREE, ANY, NORMAL, DISC, WHOLE], 7);
+        run.configure(1 << bit, 0);
+        run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+        run.set_floors(&[[[-50.0, 82.0], [50.0, 82.0]]]);
+        run.sense([58.0, -30.0]);
+        for _ in 0..=SETTLE {
+            run.look(true, || Some(VIEW));
+        }
+        run.step(false, 0.0, &[], false, 0);
+        let first = run.egg_at().expect("a target on the floor at the top of the box");
+        assert_eq!(first[1], 86.0, "no room above the target");
+        assert_eq!((run.motion.is_some(), run.path.is_some()), (flies, flies), "path {bit} with room sideways and none above");
+        let mut reach = [first[0]; 2];
+        for _ in 0..200 {
+            run.step(true, 0.0, &[], false, 0);
+            let [x, y] = run.egg_at().unwrap();
+            assert_eq!(y, 86.0);
+            reach = [reach[0].min(x), reach[1].max(x)];
+        }
+        assert_eq!(reach[1] - reach[0] > 60.0, flies, "path {bit} went from {} to {}", reach[0], reach[1]);
+    }
+}
+
+#[test]
+fn a_pop_up_fallback_takes_the_same_random_draws_as_a_flight() {
+    let narrow = |half: f32| {
+        let mut run = Run::IDLE;
+        run.start([FREE, ANY, NORMAL, DISC, IN_VIEW], 7);
+        run.configure(1, 0);
+        run.set_blast([[-145.0, -100.0], [140.0, 125.0]]);
+        let view = View(VIEW.0, VIEW.1, [-half, half], VIEW.3);
+        for _ in 0..=SETTLE {
+            run.look(true, || Some(view));
+        }
+        run.step(false, 0.0, &[], false, 0);
+        run
+    };
+    let (mut fallback, mut flight) = (narrow(12.0), narrow(16.0));
+    for target in 0..2 {
+        assert!(fallback.egg_at().is_some() && flight.egg_at().is_some(), "target {target}");
+        assert_eq!((fallback.motion.is_some(), flight.motion.is_some()), (false, true), "target {target}");
+        assert_eq!(fallback.rng, flight.rng, "target {target}: the Pop up fallback and the flight took different random draws");
+        contact(&mut fallback);
+        contact(&mut flight);
+    }
 }

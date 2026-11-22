@@ -851,33 +851,30 @@ impl Run {
             // In the air half the time, the disc kept a radius under the screen's top (its launch is lowered to fit below).
             let room = (top - on - 2.0 * RADIUS).max(0.0);
             let air = if room < 2.0 * RADIUS || random() < 0.5 { 0.0 } else { random() * REACH.min(room) };
-            ([x, on + RADIUS + air], air > 0.0, (2.0 * random() - 1.0) * DRIFT_SPEED * speed, a[1].max(b[1]))
+            ([x, on + RADIUS + air], air > 0.0, (2.0 * random() - 1.0) * DRIFT_SPEED * speed, [a, b])
         };
         let dist = |p: [f32; 2], q: [f32; 2]| (p[0] - q[0]).hypot(p[1] - q[1]);
         let short = |disc: [f32; 2]| {
             let from_last = last.map_or(0.0, |l| spacing - dist([disc[0], disc[1] + lift], l));
             from_last.max(P1_GAP - dist(disc, body)).max(0.0)
         };
-        let (disc, perch, vx, floor) = (0..32).map(|_| pick()).min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
+        let (disc, perch, vx, [a, b]) = (0..32).map(|_| pick()).min_by(|a, b| short(a.0).total_cmp(&short(b.0)))?;
         let launch = (LAUNCH * speed).min((2.0 * g * (top - disc[1]).max(0.0)).sqrt());
         (self.egg, self.age, self.fly, self.perch) = (Some([disc[0], disc[1] + lift]), 0, [launch, vx, g], perch);
-        let over_stage = path_bounds.and_then(|[[west, low], [east, high]]| {
-            let ends = |i: usize| spans.iter().map(move |span| span.1[i][0]);
-            let west = west.max(ends(0).fold(f32::INFINITY, f32::min) + RADIUS);
-            let east = east.min(ends(1).fold(f32::NEG_INFINITY, f32::max) - RADIUS);
-            let low = low.max(floor + RADIUS);
-            (west <= east && low <= high).then_some([[west, low], [east, high]])
-        });
-        if let Some(bounds) = over_stage {
-            let right = if matches!(self.path, Some(Path::Missile)) {
+        if let (Some(path), Some([[west, low], [east, high]])) = (self.path, path_bounds) {
+            let right = if matches!(path, Path::Missile) {
                 self.p1[0] >= disc[0]
             } else {
                 self.next_random() >> 31 == 0
             };
-            self.motion = Some(Motion::new(self.path, disc, bounds, None, right));
-            self.perch = true;
-        } else {
-            self.path = None;
+            let bounds = [[west.max(a[0] + RADIUS), low.max(a[1].max(b[1]) + RADIUS)], [east.min(b[0] - RADIUS), high]];
+            let [from, to] = path.envelope();
+            if (0..2).all(|i| bounds[0][i] < bounds[1][i] || (bounds[0][i] == bounds[1][i] && from[i] == to[i])) {
+                self.motion = Some(Motion::new(self.path, disc, bounds, None, right));
+                self.perch = true;
+            } else {
+                self.path = None;
+            }
         }
         self.serial = self.serial.wrapping_add(1);
         self.clock_started = true;
