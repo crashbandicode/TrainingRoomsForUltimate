@@ -555,6 +555,9 @@ struct Pad {
     sets: [u32; 4],
     detector: crate::model::chords::Detector,
     keep: StepKeep,
+    reentry: bool,
+    /// The re-entry closed an open speed hold: the runtime takes the pop-up down.
+    closed: bool,
     lobby: FrameStep,
     training: FrameStep,
 }
@@ -569,16 +572,38 @@ impl Pad {
         Self { style, ..Self::default() }
     }
 
-    fn update(&mut self, hw: u32) -> Polled {
+    fn refresh(&mut self, hw: u32) {
         let was = self.sets[0];
         self.sets = [hw, was, hw & !was, !hw & was];
+    }
+
+    fn update(&mut self, hw: u32) -> Polled {
+        self.refresh(hw);
+        self.poll()
+    }
+
+    /// A refresh whose P1 poll the runtime skips (outside Training, a hot swap): `chords::on_poll(0)` records the gap;
+    /// the detector is not polled.
+    fn skipped(&mut self, hw: u32) {
+        self.refresh(hw);
+        self.reentry = true;
+    }
+
+    /// P1's next poll comes from another Controller, whose four sets are `sets`.
+    fn handoff(&mut self, sets: [u32; 4]) -> Polled {
+        self.sets = sets;
+        self.reentry = true;
         self.poll()
     }
 
     /// The poll alone: the same controller once more before the next refresh (6e226733's trace has such polls).
     fn poll(&mut self) -> Polled {
         use crate::model::chords::{physical_mask, ChordSet, Sample};
-        let (held, pressed) = self.keep.seen(self.sets[0], self.sets[2]);
+        if std::mem::take(&mut self.reentry) {
+            self.keep = StepKeep(0);
+            self.closed = self.detector.reenter();
+        }
+        let (held, pressed) = self.keep.seen(self.sets);
         self.detector.poll(&ChordSet::factory(), Sample::of(self.style, held, pressed), false);
         let event = self.detector.hold_event();
         let open = matches!(event, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
@@ -589,6 +614,13 @@ impl Pad {
         let ([current, _, just_down, _], step) = (self.sets, step_mask(self.style));
         self.training.poll(just_down & current & step != 0, current & step != 0, false);
         (event, self.lobby.take(), self.training.take())
+    }
+
+    /// The poll once more before the next refresh, as the exact-3448686c trace has it (`1f-save-hold/repoll-boot`, 46 of
+    /// 46 repeats): the game has zeroed the two edge sets by then, current and previous are as the last poll left them.
+    fn repoll(&mut self) -> Polled {
+        (self.sets[2], self.sets[3]) = (0, 0);
+        self.poll()
     }
 
     /// `updates` refreshes with `hw` held, every third polled twice: the first update that stepped, if any.
@@ -641,7 +673,8 @@ fn a_held_save_state_chord_never_steps() {
     assert_eq!(pad.poll(), NO_STEP, "polled again before the refresh");
     // Held far past the run count: the mode object reads no ZL at all, and the chord stays one save.
     assert_eq!(pad.hold(DOWN | ZL, 60), None);
-    assert_eq!((pad.sets[0], pad.sets[1], pad.keep), (DOWN, DOWN, StepKeep(ZL)));
+    // Previous carries the mark; the mode object's press (just down AND current) and hold (current) see no ZL.
+    assert_eq!((pad.sets, pad.keep), ([DOWN, DOWN | ZL, 0, 0], StepKeep(ZL)));
     // Down let go first: the ZL is the chord's until it is let go itself.
     assert_eq!(pad.hold(ZL, 60), None);
     assert!(!pad.detector.consume(Request::SaveState), "one save");
@@ -652,6 +685,211 @@ fn a_held_save_state_chord_never_steps() {
     assert!(pad.detector.consume(Request::SaveState));
     assert_eq!(pad.update(0), NO_STEP);
     assert_eq!(pad.update(ZL), STEP);
+}
+
+/// rc.15 (1F Save hold): a poll repeated before a refresh finds the edge sets cleared. The chord's ZL is still the chord's.
+fn a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.repoll(), NO_STEP, "polled again with the edges cleared");
+    assert_eq!(pad.keep, StepKeep(ZL), "the repeated poll still keeps the chord's ZL");
+    for n in 1..=60 {
+        assert_eq!(pad.update(DOWN | ZL), NO_STEP, "chord held, update {n}");
+        assert_eq!(pad.repoll(), NO_STEP, "chord held, repeated poll {n}");
+    }
+    for n in 1..=60 {
+        assert_eq!(pad.update(ZL), NO_STEP, "Down let go first, update {n}");
+        assert_eq!(pad.repoll(), NO_STEP, "Down let go first, repeated poll {n}");
+    }
+    assert!(!pad.detector.consume(Request::SaveState), "one save");
+    assert_eq!(pad.update(0), NO_STEP);
+    assert_eq!(pad.repoll(), NO_STEP);
+    assert_eq!(pad.keep, StepKeep(0));
+    assert_eq!(pad.update(ZL), STEP, "a fresh ZL steps once");
+    assert_eq!(pad.repoll(), NO_STEP);
+}
+
+fn the_kept_step_button_is_marked_in_the_previous_set() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    assert_eq!(StepKeep(0).keep([DOWN | ZL, DOWN, ZL, 0], ZL), (StepKeep(ZL), [DOWN, DOWN | ZL, 0, 0]));
+    assert_eq!(StepKeep(ZL).keep([DOWN, DOWN | ZL, 0, 0], ZL), (StepKeep(ZL), [DOWN, DOWN | ZL, 0, 0]));
+    assert_eq!(StepKeep(ZL).keep([DOWN | ZL, DOWN, ZL, 0], ZL), (StepKeep(ZL), [DOWN, DOWN | ZL, 0, 0]));
+    assert_eq!(StepKeep(ZL).keep([DOWN, DOWN, 0, 0], ZL), (StepKeep(0), [DOWN, DOWN, 0, 0]));
+    assert_eq!(StepKeep(ZL).keep([ZL, 0, ZL, 0], 0), (StepKeep(0), [ZL, 0, 0, 0]));
+    assert_eq!(StepKeep(ZL).seen([DOWN, DOWN | ZL, 0, 0]), (DOWN | ZL, 0));
+}
+
+/// review-games-astra-3 23:51:14Z: a release in a refresh the poll did not see stays a release.
+fn a_release_the_poll_did_not_see_is_not_a_held_step_button() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    assert_eq!(StepKeep(ZL).keep([0, ZL, 0, ZL], 0), (StepKeep(0), [0, ZL, 0, ZL]));
+    assert_eq!(StepKeep(ZL).keep([0, ZL, 0, ZL], ZL), (StepKeep(0), [0, 0, 0, 0]));
+    assert_eq!(StepKeep(ZL).seen([0, ZL, 0, ZL]), (0, 0));
+    assert_eq!(StepKeep(ZL).seen([DOWN, DOWN | ZL, 0, 0]), (DOWN | ZL, 0));
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.refresh(ZL);
+    assert_eq!(pad.update(0), NO_STEP);
+    // The detector hides the chord's ZL through the poll that sees it released, so its edge is taken too (as 3448686c).
+    assert_eq!((pad.sets, pad.keep), ([0, 0, 0, 0], StepKeep(0)), "the release is no hold: nothing in current, nothing kept");
+    assert_eq!(pad.update(0), NO_STEP);
+    assert_eq!(pad.update(ZL), STEP);
+}
+
+fn a_skipped_poll_forgets_the_kept_step_button() {
+    use crate::model::chords::bit::{DPAD_UP as UP, R, ZL};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.update(R | UP | ZL), (HoldEvent::Held, false, false));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.detector.clear_session();
+    pad.skipped(0);
+    pad.skipped(0);
+    assert!(pad.reentry, "the gap is recorded");
+    assert_eq!(pad.update(ZL), STEP, "a new press after the gap is a press");
+    assert!(!pad.closed, "the session clear had already closed the hold");
+    assert_eq!(pad.keep, StepKeep(0));
+    assert_eq!(StepKeep(ZL).seen([ZL, 0, ZL, 0]), (ZL, 0), "a bit still kept would have read it as held");
+    let code = |text: &str| text.lines().filter(|l| !l.trim_start().starts_with("//")).map(|l| format!("{l}\n")).collect::<String>();
+    let chords = code(include_str!("../runtime/features/chords.rs"));
+    assert!(chords.contains("POLLED.swap(controller, Ordering::Relaxed) != controller"));
+    assert!(chords.contains("let closed = reentry && state.detector.reenter();"));
+    assert!(chords.contains("on_hold(HoldEvent::Closed, style)"));
+    assert!(chords.contains("StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) })"));
+    let poll = chords.split_once("pub unsafe fn on_poll").unwrap().1.split_once("\n}\n").unwrap().0;
+    assert_eq!(poll.matches("STATE.lock()").count(), 1, "one lock acquisition on P1's poll");
+    let after_lock = poll.find("let (accepted,").unwrap();
+    let close = poll.find("on_hold(HoldEvent::Closed, style)").unwrap();
+    let effects = [
+        poll.find("egg_zone::poll(").unwrap(),
+        poll.find("notices::save_state_refused(").unwrap(),
+        poll.find("notices::refuse(").unwrap(),
+        poll.find("game_speed::on_hold(hold, style)").unwrap(),
+    ];
+    assert!(after_lock < close && effects.into_iter().all(|at| close < at), "the re-entry's close is the first side effect after the lock");
+    assert!(code(include_str!("../runtime/features/input_delay.rs")).contains("chords::on_poll(0)"));
+}
+
+fn an_exposed_release_keeps_the_games_release_edge() {
+    use crate::model::chords::bit::{DPAD_UP as UP, R, ZL};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.update(R | UP | ZL), (HoldEvent::Held, false, false));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.refresh(ZL);
+    let polled = pad.update(0);
+    assert!(!polled.1 && !polled.2, "no step");
+    assert_eq!((pad.sets, pad.keep), ([0, ZL, 0, ZL], StepKeep(0)), "not owned any more: the game's release is left as it is");
+}
+
+fn a_bare_step_press_after_a_gap_is_a_press() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.skipped(DOWN | ZL);
+    pad.skipped(0);
+    assert_eq!(pad.update(ZL), STEP, "a bare ZL after the gap steps");
+    assert_eq!(pad.update(ZL), NO_STEP);
+}
+
+fn a_kept_step_button_does_not_follow_a_controller_handoff() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, R, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    assert_eq!(pad.update(R | UP | ZL), (HoldEvent::Held, false, false));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    let polled = pad.handoff([0, ZL, 0, 0]);
+    assert!(!polled.1 && !polled.2);
+    assert_eq!((pad.sets, pad.keep), ([0, ZL, 0, 0], StepKeep(0)), "the other pad's words are left as they are");
+
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    assert_eq!(pad.handoff([ZL, 0, ZL, 0]), STEP, "a bare ZL on the other pad steps");
+}
+
+fn a_session_clear_on_the_same_pad_keeps_the_chords_step_button() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState));
+    assert_eq!(pad.keep, StepKeep(ZL));
+    pad.detector.clear_session();
+    for _ in 0..20 {
+        assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    }
+    assert_eq!(pad.keep, StepKeep(ZL));
+    assert!(!pad.detector.consume(Request::SaveState), "no second save");
+}
+
+fn an_open_speed_hold_does_not_follow_a_controller_handoff() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, R, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    let polled = pad.handoff([R, R, 0, 0]);
+    assert_eq!(polled, NO_STEP, "the hold is not held on the other pad");
+    assert!(pad.closed, "the pop-up's close is acted on");
+    assert_eq!(pad.detector.hidden(), 0);
+    assert_eq!(pad.sets, [R, R, 0, 0], "the other pad's words are left as they are");
+    assert_eq!(pad.update(DOWN), NO_STEP);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    assert!(pad.detector.consume(Request::SaveState), "another chord passes on the new pad");
+}
+
+fn a_speed_chord_pressed_after_a_handoff_opens_the_hold_again() {
+    use crate::model::chords::bit::{DPAD_UP as UP, R};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    let polled = pad.handoff([R | UP, 0, R | UP, 0]);
+    assert_eq!(polled.0, HoldEvent::Opened, "closed first, then opened by its own press");
+    assert!(pad.closed);
+}
+
+fn pending_requests_survive_a_re_entry() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, ZL};
+    use crate::model::chords::Request;
+    let mut pad = Pad::new(5);
+    pad.update(DOWN);
+    assert_eq!(pad.update(DOWN | ZL), NO_STEP);
+    let _ = pad.handoff([0, 0, 0, 0]);
+    assert!(!pad.closed, "no hold was open");
+    assert!(pad.detector.consume(Request::SaveState), "the accepted Save is still pending");
+}
+
+fn a_re_entry_close_and_a_refused_save_fall_on_the_same_poll() {
+    use crate::model::chords::bit::{DPAD_DOWN as DOWN, DPAD_UP as UP, L, R};
+    use crate::model::state::refused::{Action, Refused};
+    let mut pad = Pad::new(5);
+    pad.update(R);
+    assert_eq!(pad.update(R | UP), (HoldEvent::Opened, false, false));
+    pad.style = 7;
+    let polled = pad.handoff([L | R | DOWN, L | R, DOWN, 0]);
+    assert_eq!(polled, NO_STEP);
+    assert!(pad.closed, "the old pop-up's close");
+    assert_eq!(pad.detector.take_refused(), Some((Action::Save, Refused::GameCubeTriggers)), "and a refused Save on the same poll: the runtime posts the close first");
 }
 
 /// rc.15 review (tr-primary-2, 2026-11-21 16:55Z): holding the speed chord never steps a frame, in Training or here.
@@ -764,6 +1002,18 @@ fn case_table() {
         ("a_plain_step_press_steps_the_lobby_once", a_plain_step_press_steps_the_lobby_once as fn()),
         ("a_plain_held_step_button_still_runs_from_the_eighteenth_update", a_plain_held_step_button_still_runs_from_the_eighteenth_update as fn()),
         ("a_held_save_state_chord_never_steps", a_held_save_state_chord_never_steps as fn()),
+        ("a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared", a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared as fn()),
+        ("the_kept_step_button_is_marked_in_the_previous_set", the_kept_step_button_is_marked_in_the_previous_set as fn()),
+        ("a_release_the_poll_did_not_see_is_not_a_held_step_button", a_release_the_poll_did_not_see_is_not_a_held_step_button as fn()),
+        ("a_skipped_poll_forgets_the_kept_step_button", a_skipped_poll_forgets_the_kept_step_button as fn()),
+        ("an_exposed_release_keeps_the_games_release_edge", an_exposed_release_keeps_the_games_release_edge as fn()),
+        ("a_bare_step_press_after_a_gap_is_a_press", a_bare_step_press_after_a_gap_is_a_press as fn()),
+        ("a_kept_step_button_does_not_follow_a_controller_handoff", a_kept_step_button_does_not_follow_a_controller_handoff as fn()),
+        ("a_session_clear_on_the_same_pad_keeps_the_chords_step_button", a_session_clear_on_the_same_pad_keeps_the_chords_step_button as fn()),
+        ("an_open_speed_hold_does_not_follow_a_controller_handoff", an_open_speed_hold_does_not_follow_a_controller_handoff as fn()),
+        ("a_speed_chord_pressed_after_a_handoff_opens_the_hold_again", a_speed_chord_pressed_after_a_handoff_opens_the_hold_again as fn()),
+        ("pending_requests_survive_a_re_entry", pending_requests_survive_a_re_entry as fn()),
+        ("a_re_entry_close_and_a_refused_save_fall_on_the_same_poll", a_re_entry_close_and_a_refused_save_fall_on_the_same_poll as fn()),
         ("holding_the_speed_chord_never_steps", holding_the_speed_chord_never_steps as fn()),
         ("the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice", the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice as fn()),
         ("every_reset_returns_the_lobby_to_x1_and_ends_the_hold", every_reset_returns_the_lobby_to_x1_and_ends_the_hold as fn()),
