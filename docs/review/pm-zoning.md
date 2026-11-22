@@ -1,6 +1,6 @@
 # Projectile Madness zoning design (rc.16) for the operator
 
-Copied from rc16/projectile-madness 8ed8db26 docs/DECISIONS.md (review PASS 15:54:52Z with caption qualifications: the Z7 arcs are illustrative lobs, not measured impacts; Z1 keeps the unknown-main-floor fallback). The pictures are renderings, not game footage.
+Copied from rc16/projectile-madness c46cb88c docs/DECISIONS.md (review PASS 15:58:38Z). The pictures are renderings, not game footage.
 
 ## rc.16 Projectile Madness zoning (2026-11-22): pending operator
 
@@ -21,7 +21,7 @@ until an Eden pass confirms it on the exact build, and no projectile's flight ha
 
 | # | Question for the operator | Recommendation |
 | --- | --- | --- |
-| Z1 | Where do both fighters start? | **A:** placed far apart at every Start, restart and KO: Simon and Richter 120 units, Samus 110, Young Link 100, Min Min 90, capped by the floor. Nobody is placed when less than 64 units fit, or in a waiting room before its two-console check |
+| Z1 | Where do both fighters start? | **A:** placed far apart at every Start, restart and KO: Simon and Richter 120 units, Samus 110, Young Link 100, Min Min 90, capped by the floor. Nobody is placed when less than 64 units fit, when the main floor cannot be established, or in a waiting room before its two-console check |
 | Z2 | Strings instead of single shots? | **Yes:** 2 to 4 projectiles back to back, each closing a lane the others leave open, then a short reset |
 | Z3 | Young Link's string | Boomerang, bomb and arrow in any of the six orders. Holding the bomb while the others are thrown is proposed and not shown yet |
 | Z4 | Simon's and Richter's string | Cross, axe and holy water in any order; one table for both |
@@ -47,8 +47,8 @@ the countdown that already holds Player 1.
   Battlefield, Small Battlefield, Hollow Bastion, Kalos, Lylat, Northern Cave) allows 120; Town and City 125; Pokémon
   Stadium 2 147; Smashville 99. Other stages are read at Start.
 - **When nobody is placed (part of A):** the attempt starts as today when the cap is under 64 units (a floor shorter
-  than 104), when the main floor cannot be established, and in a waiting room until the two-console check has passed
-  on the build that places.
+  than 104), when the main floor cannot be established, in a waiting room until the two-console check has passed on
+  the build that places, and on a console where the placement calls did not pass their guards.
 - **B, a Start distance row** (Far / As you stand) is one more setting to explain. **C** keeps today.
 - **Cost:** placing is new for this game (the build wrote only the pad). The distances are starting values: Min Min's
   waits for her reach.
@@ -158,8 +158,9 @@ Min Min becomes the fifth opponent. A is her left ARM (always Dragon) and B her 
 - **Read from the game, every frame:** Player 1's position, ground or air, status, speed (from the last positions),
   jumps left and fast fall, and the fighter's own gravity, fall speed, air speed and run speed. Each read uses a call
   the plugin already makes for another feature (Guard the Edge reads the same physics). Projectile Madness's own
-  admission list has to grow to include them. The names are confirmed in the stock files; the values and the jump
-  formula are not validated.
+  admission list has to grow to include them; where they did not pass their guards, the opponent aims at the seen spot
+  and the game still runs. The names are confirmed in the stock files; the values and the jump formula are not
+  validated.
 - **Modelled, because the game cannot tell:** where Player 1 will be when the shot arrives, the jump arc and landing
   spot, which lane Player 1 takes next (the habit table of today), and the projectile's own flight (tables measured in
   Eden).
@@ -170,7 +171,7 @@ Min Min becomes the fifth opponent. A is her left ARM (always Dragon) and B her 
   of reaction, 14 to draw). A runner at 1.75 units a frame moves 51 units in that time. A level shot down Player 1's
   own lane still meets Player 1. The lead decides the shots that land at a spot or cross a height: a thrown bomb, the
   axe, the holy water's timing, an angled boomerang, any shot at a jumper. How much it changes each one depends on
-  flights that are not measured yet.
+  flights that are not measured yet. The arcs in the picture are sketches, not measured flights.
 - **By level:** Easy aims at where Player 1 is; Normal leads ground movement by half; Hard leads fully, with jump arcs
   and landing spots.
 
