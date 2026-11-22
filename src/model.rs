@@ -147,6 +147,8 @@ pub mod egg_paths;
 pub mod spacing;
 #[path = "model/btt.rs"]
 pub mod btt;
+#[path = "model/crosshair.rs"]
+pub mod crosshair;
 #[path = "model/lockon.rs"]
 pub mod lockon;
 #[path = "model/sites_lockon.rs"]
