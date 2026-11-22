@@ -305,6 +305,27 @@ mod tests {
     }
 
     #[test]
+    fn a_busy_roster_keeps_the_settlement() {
+        const PYRA: u32 = 0x5a;
+        const MYTHRA: u32 = 0x5b;
+        const MARIO: u32 = 0x00;
+        let (mut settled, _) = tick(Settled::default(), Some(PYRA), Some(MARIO), true, || false, || Some(PYRA));
+        assert!(settled.is(PYRA));
+        let (next, step) = tick(settled, Some(PYRA), Some(MARIO), true, || false, || Some(MYTHRA));
+        settled = next;
+        assert_eq!(step, Tick::Serve { target: PYRA, observed: Some(MYTHRA), step: Service { switching: false, request: false } });
+        for _ in 0..3 {
+            let (next, step) = tick(settled, Some(PYRA), Some(MARIO), true, || false, || None);
+            settled = next;
+            assert_eq!(step, Tick::Serve { target: PYRA, observed: None, step: Service { switching: false, request: false } });
+            assert!(settled.is(PYRA));
+        }
+        let (settled, step) = tick(settled, Some(PYRA), Some(MARIO), true, || false, || Some(MYTHRA));
+        assert!(settled.is(PYRA));
+        assert_eq!(step, Tick::Serve { target: PYRA, observed: Some(MYTHRA), step: Service { switching: false, request: false } });
+    }
+
+    #[test]
     fn another_game_ends_the_settlement() {
         const PYRA: u32 = 0x5a;
         const MYTHRA: u32 = 0x5b;

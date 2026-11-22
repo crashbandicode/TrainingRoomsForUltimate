@@ -22,8 +22,9 @@ fn see(target: Option<u32>, live: Option<u32>) -> picker::Settled {
     next
 }
 
-/// The practice session ended (leaving Training, or Training -> character select -> Training): no settlement survives.
-pub(in crate::runtime) fn clear_session() {
+/// The CPU's fighter entry was destroyed (leaving Training, or Training -> character select -> Training): the
+/// settlement ends with it. Generic session clears and Player 1 reloads do not come here.
+pub(in crate::runtime) fn cpu_entry_departed() {
     SETTLED.store(NONE, Ordering::Release);
 }
 

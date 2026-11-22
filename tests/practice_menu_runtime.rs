@@ -204,7 +204,8 @@ fn edge_juggle_keeps_a_settled_selection_through_its_own_form_change() {
     let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
     assert!(service.contains("picker::tick(settled(), selected, original, "));
     assert!(service.contains("static SETTLED"));
-    assert!(service.contains("pub(in crate::runtime) fn clear_session()"));
+    assert!(service.contains("pub(in crate::runtime) fn cpu_entry_departed()"));
+    assert!(!service.contains("fn clear_session"));
     assert!(!service.contains("observed != target"));
     assert!(!service.contains("cpu_loaded_kind"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
@@ -217,7 +218,31 @@ fn edge_juggle_keeps_a_settled_selection_through_its_own_form_change() {
     let roster = src("src/runtime/roster/character_roster.rs");
     assert!(!roster.contains("LOADED_AS"));
     let training = src("src/runtime/lobby/training/mod.rs");
-    assert!(item(&training, "pub(crate) fn clear_session_state(").contains("practice_cpu::clear_session()"));
+    assert!(!item(&training, "pub(crate) fn clear_session_state(").contains("practice_cpu"));
+    let cpu = src("src/runtime/features/cpu.rs");
+    let departure = item(&cpu, "pub fn entry_departed(");
+    assert!(departure.contains("if owner == 1"));
+    assert!(departure.contains("practice_cpu::cpu_entry_departed()"));
+    fn find_departure_sites(dir: &Path, found: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let entry = entry.unwrap();
+            let file_type = entry.file_type().unwrap();
+            let path = entry.path();
+            if file_type.is_dir() {
+                find_departure_sites(&path, found);
+            } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "rs")
+                && std::fs::read_to_string(&path).unwrap().contains("cpu_entry_departed()")
+            {
+                found.push(path);
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let mut found = Vec::new();
+    find_departure_sites(&root, &mut found);
+    assert_eq!(found.len(), 2);
+    assert!(found.contains(&root.join("features/cpu.rs")));
+    assert!(found.contains(&root.join("features/edge_juggle/practice_cpu.rs")));
     assert!(!Path::new(env!("CARGO_MANIFEST_DIR")).join("src/model/swap/forms.rs").exists());
 }
 
