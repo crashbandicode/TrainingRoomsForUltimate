@@ -110,9 +110,22 @@ fn edge_wizard_marks_its_cpu_start_readably() {
     let hitbox = src("src/runtime/features/hitbox.rs");
     assert!(item(&hitbox, "pub unsafe fn draw_orbs(").contains("orbs::edge_pointer("));
     let notice = item(&runtime, "fn post_notice(");
-    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · D-pad choose"));
-    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · {percent}% · D-pad change"));
-    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · P1 ({px:.0}, {py:.0})"));
+    assert!(notice.contains("{} ({x:.0}, {y:.0}) · D-pad choose · A next"));
+}
+
+#[test]
+fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let notice = item(&runtime, "fn post_notice(");
+    assert!(notice.contains("\"{percent}% · D-pad change · A next\""));
+    assert!(notice.contains("\"P1 ({px:.0}, {py:.0}) · Stick move · A next\""));
+    let page_text = notice.split_once("let _ = match wizard.step {").unwrap().1;
+    for head in ["WizardStep::Area =>", "WizardStep::Percent =>", "WizardStep::Player =>"] {
+        let line = page_text.lines().find(|line| line.contains(head)).unwrap();
+        assert!(!line.contains("CPU"), "{line}");
+    }
+    assert!(!page_text.contains("WizardStep::Percent if run.drill == Drill::GuardEdge"));
+    assert!(!page_text.contains("WizardStep::Player if run.drill == Drill::GuardEdge"));
 }
 
 #[test]

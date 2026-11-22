@@ -1726,16 +1726,14 @@ fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
             ],
         ][run.drill as usize][number];
         let _ = match wizard.step {
-            WizardStep::Area => write!(text, "{} · CPU ({x:.0}, {y:.0}) · D-pad choose · A next", area.title()),
+            WizardStep::Area => write!(text, "{} ({x:.0}, {y:.0}) · D-pad choose · A next", area.title()),
             WizardStep::Cpu if run.drill == Drill::Juggler => write!(
                 text,
                 "CPU x {x:.0} · Height {:+.0} · Stick move · A next",
                 y - run.stage_floor_y,
             ),
             WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick move · A next"),
-            WizardStep::Percent if run.drill == Drill::GuardEdge => write!(text, "CPU ({x:.0}, {y:.0}) · {percent}% · D-pad change · A next"),
             WizardStep::Percent => write!(text, "{percent}% · D-pad change · A next"),
-            WizardStep::Player if run.drill == Drill::GuardEdge => write!(text, "CPU ({x:.0}, {y:.0}) · P1 ({px:.0}, {py:.0}) · Stick move · A next"),
             WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick move · A next"),
             WizardStep::Preview => write!(
                 text,

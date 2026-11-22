@@ -28,12 +28,12 @@ A start write that finds Player 1 idle is not watched and follows the existing p
 | Player 1's own movement before the release stays the player's; no hold through Ready | Only hit freeze, or Wait observed off the start, is rewritten; an unreadable floor shows nothing; the Ready hold still covers the CPU only | `hit_player_start_is_rewritten_until_it_holds`, `player_start_is_judged_on_every_update_before_ready`, `edge_juggle_settles_a_hit_player_before_ready` |
 | The drill never stalls | At most one ready period of rewrites, from the existing constants | `hit_player_start_is_rewritten_until_it_holds`, `player_start_is_judged_on_every_update_before_ready` |
 | An unmoved remembered CPU start follows the current fighter's default | Remember whether the saved point equals its default and recompute that default for the current fighter | `unmoved_remembered_start_follows_the_current_fighter`, `edge_juggle_remembers_whether_the_start_was_moved` |
-| The CPU start is readable throughout the wizard | Use the whole CPU mark and show its coordinates in the wizard notice | `edge_wizard_marks_its_cpu_start_readably` |
+| The CPU start is readable in the wizard | Use the whole CPU mark and show its coordinates on the Area step without changing the sealed notice pages | `edge_wizard_marks_its_cpu_start_readably`, `edge_wizard_notice_keeps_the_pages_the_sealed_rows_read` |
 | An off-picture CPU start has a pointer | Project the start and draw a five-dot chevron at the canvas edge | `a_start_outside_the_picture_gets_a_pointer_at_the_border`, `edge_wizard_marks_its_cpu_start_readably` |
 
 ## Cursor mark and remembered start
 
-The CPU start uses the whole marker. Its coordinates appear in every Guard the Edge wizard step, and a five-dot chevron points toward a start outside the picture.
+The CPU start uses the whole marker. The Area step shows its coordinates without the word CPU. The Percent and Player steps are unchanged because the sealed rows' readers (`guard_rows.py:46–54`) tell the pages apart by that word. A five-dot chevron points toward a start outside the picture.
 
 Only an unmoved remembered start changes when the fighter changes; a manually moved start and Juggler's saved start stay where they were. A percent-dependent default follows the current percent.
 
