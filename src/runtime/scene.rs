@@ -57,6 +57,11 @@ pub fn current() -> Option<Scene> {
     scene::scene(facts())
 }
 
+/// Where practice is live now, including during a fighter swap.
+pub fn practice_scene() -> Option<Scene> {
+    scene::practice(facts())
+}
+
 /// The game's own predicate alone (native Training, not widened): for the few rules the specs bind to native Training only
 /// (the reset check, hazards).
 pub fn is_native_training() -> bool {

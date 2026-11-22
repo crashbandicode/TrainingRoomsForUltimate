@@ -67,7 +67,7 @@ fn fighter_click_cycles_modes() {
 
 #[test]
 fn x_cycles_all_stock_cpu_levels() {
-    use crate::model::cpu::level::{training_drill_target, CpuLevel, Where, RANK_TABLE_13_0_5};
+    use crate::model::cpu::level::{drill_target, CpuLevel, Where, RANK_TABLE_13_0_5};
     use crate::model::edge_juggle::CpuBehavior;
     for game in GAMES {
         let mut m = Menu::new(Settings::factory(), Env::default());
@@ -79,7 +79,7 @@ fn x_cycles_all_stock_cpu_levels() {
             let level = mode.stock_level();
             let cpu = CpuBehavior::stock(level);
             assert_eq!(cpu.level, u32::from(expected - 1));
-            assert_eq!(training_drill_target(
+            assert_eq!(drill_target(
                 Some(level), CpuLevel::Off, Where::Training { behavior: cpu.menu }, 1, RANK_TABLE_13_0_5,
             ), Some(rank));
         }

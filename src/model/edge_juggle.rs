@@ -184,6 +184,41 @@ impl BehaviorLease {
     }
 }
 
+/// The waiting room has no pause panel: the first training partner's control type is the room's Training Partner
+/// Behavior. Save the room's type once, ask for the stock CPU (type 0), give the saved type back at Stop.
+#[derive(Default)]
+pub struct PartnerLease(Option<(usize, u8)>);
+
+impl PartnerLease {
+    pub const fn new() -> Self { Self(None) }
+    pub fn held(&self) -> bool { self.0.is_some() }
+
+    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
+    /// A Control type (0x24) or a fighter no CPU operates is never written.
+    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
+        if self.0.is_some_and(|(old, _)| old != owner) {
+            self.0 = None;
+        }
+        if !operation_cpu || entry == 0x24 || ai == 0x24 {
+            return None;
+        }
+        if level.is_some() {
+            match &mut self.0 {
+                None => self.0 = Some((owner, entry)),
+                Some((_, saved)) if entry != 0 => *saved = entry,
+                Some(_) => {}
+            }
+            return (entry != 0 || ai != 0).then_some(0);
+        }
+        let (_, saved) = self.0?;
+        if entry == saved && ai == saved {
+            self.0 = None;
+            return None;
+        }
+        Some(saved)
+    }
+}
+
 /// The guarded Training HUD state used by the stock pause input handler.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum BehaviorMenu {
@@ -395,9 +430,9 @@ pub const fn drill_owns_pad(owns_primary: bool, recorder_active: bool) -> bool {
     owns_primary && !recorder_active
 }
 
-/// CPU settings affect both registered bodies of the opposed entry.
-pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::FighterKey) -> bool {
-    active && key.entry == 1
+/// CPU settings affect both registered bodies of the scene's primary opposed entry.
+pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::FighterKey, primary: u8) -> bool {
+    active && key.entry == primary
 }
 
 /// Runtime admits placement, then ticks only on eligible simulation frames.
@@ -1202,6 +1237,68 @@ mod tests {
     }
 
     #[test]
+    fn the_waiting_room_partner_is_a_stock_cpu_for_the_drill_and_gets_its_type_back() {
+        struct Game { owner: usize, entry: u8, ai: u8, cpu: bool }
+        fn poll(game: &mut Game, lease: &mut PartnerLease, level: Option<u8>) -> Option<u8> {
+            let write = lease.step(level, game.owner, game.entry, game.ai, game.cpu);
+            if let Some(control) = write {
+                game.entry = control;
+                game.ai = control;
+            }
+            write
+        }
+
+        let mut game = Game { owner: 1, entry: 7, ai: 7, cpu: true };
+        let mut lease = PartnerLease::new();
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+        assert!(lease.held());
+        assert_eq!(poll(&mut game, &mut lease, None), Some(7));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        game.entry = 1;
+        game.ai = 1;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, None), Some(1));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        game.entry = 0;
+        game.ai = 0;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+        assert!(lease.held());
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        game.entry = 7;
+        game.ai = 7;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        game.ai = 7;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, None), Some(7));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+
+        for (entry, ai, cpu) in [(7, 7, false), (0x24, 7, true), (7, 0x24, true)] {
+            let mut game = Game { owner: 1, entry, ai, cpu };
+            let mut lease = PartnerLease::new();
+            assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+            assert!(!lease.held());
+            assert_eq!(poll(&mut game, &mut lease, None), None);
+
+            let mut held = PartnerLease::new();
+            assert_eq!(held.step(Some(9), 1, 7, 7, true), Some(0));
+            assert_eq!(held.step(None, 1, entry, ai, cpu), None);
+            assert!(held.held());
+        }
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 7, 7, true), Some(0));
+        assert_eq!(lease.step(None, 2, 1, 1, true), None);
+        assert!(!lease.held());
+    }
+
+    #[test]
     fn a_drill_between_ai_kinds_never_asks_for_the_pause() {
         // The game as the drill's poll sees it, and one poll written the way `step_drill_panel` composes the model.
         struct Game { panel: CpuBehavior, entry: u8, ai: u8, cpu: bool }
@@ -1397,11 +1494,16 @@ mod tests {
         let primary = FighterKey::new(1, false).unwrap();
         let partner = FighterKey::new(1, true).unwrap();
         for key in [primary, partner] {
-            assert!(suspends_cpu_settings(true, key));
-            assert!(!suspends_cpu_settings(false, key));
+            assert!(suspends_cpu_settings(true, key, 1));
+            assert!(!suspends_cpu_settings(false, key, 1));
         }
         for entry in [0, 2, 4] {
-            assert!(!suspends_cpu_settings(true, FighterKey::new(entry, false).unwrap()));
+            assert!(!suspends_cpu_settings(true, FighterKey::new(entry, false).unwrap(), 1));
+        }
+        for partner in [false, true] {
+            assert!(suspends_cpu_settings(true, FighterKey::new(4, partner).unwrap(), 4));
+            assert!(!suspends_cpu_settings(false, FighterKey::new(4, partner).unwrap(), 4));
+            assert!(!suspends_cpu_settings(true, FighterKey::new(1, partner).unwrap(), 4));
         }
         assert!(drill_owns_pad(true, false));
         assert!(!drill_owns_pad(false, false));

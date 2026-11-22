@@ -64,6 +64,8 @@ pub(crate) unsafe fn request() -> Result<(), &'static str> {
     if !accepted {
         return Err("A restore is already in progress");
     }
+    // The waiting room's L + R + A restarts a drill's set as Training's reset hub does.
+    crate::runtime::features::edge_juggle::restart();
     recorder::on_load_request();
     super::hud_load(Role::Player.index(), true);
     super::hud_load(Role::Cpu.index(), true);

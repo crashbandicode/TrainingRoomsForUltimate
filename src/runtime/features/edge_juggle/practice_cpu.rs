@@ -22,7 +22,7 @@ fn see(target: Option<u32>, live: Option<u32>) -> picker::Settled {
     next
 }
 
-/// The CPU's fighter entry was destroyed (leaving Training, or Training -> character select -> Training): the
+/// The CPU's fighter entry was destroyed (leaving practice, or changing fighters): the
 /// settlement ends with it. Generic session clears and Player 1 reloads do not come here.
 pub(in crate::runtime) fn cpu_entry_departed() {
     SETTLED.store(NONE, Ordering::Release);
@@ -46,7 +46,7 @@ pub(in crate::runtime) fn service_practice_cpu_selection() {
     let original = ORIGINAL.load(Ordering::Relaxed);
     let original = (original != NONE).then_some(original);
     let selected = super::cpu_selection();
-    let (next, tick) = picker::tick(settled(), selected, original, scene::is_native_training(),
+    let (next, tick) = picker::tick(settled(), selected, original, scene::practice_scene().is_some(),
         || super::super::practice::active().is_some() && !super::running(),
         || (!roster::busy() && roster::cpu_reload_ready()).then(roster::cpu_kind).flatten(),
     );

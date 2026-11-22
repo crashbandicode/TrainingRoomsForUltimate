@@ -107,6 +107,59 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 }
 
 #[test]
+fn the_drills_run_in_a_waiting_room_against_the_first_training_partner() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    assert!(!runtime.contains("scene::is_native_training()"));
+    let cpu_entry = item(&runtime, "fn cpu_entry(");
+    assert!(cpu_entry.contains("LOBBY_CPU_ENTRY") && cpu_entry.contains("scene::practice_scene()"));
+    assert!(member(&runtime, "unsafe fn current()").contains("natives::module_accessor(cpu_entry())"));
+    assert!(item(&runtime, "pub unsafe fn frame(").contains("natives::is_operation_cpu(cpu_entry())"));
+    assert!(item(&runtime, "fn controls_cpu(").contains("natives::module_accessor(cpu_entry())"));
+
+    let zoom = src("src/runtime/features/edge_juggle/zoom.rs");
+    assert!(zoom.contains("natives::fighter_entry(super::cpu_entry())"));
+    assert!(!zoom.contains("fighter_entry(1)"));
+    let picker = src("src/runtime/features/edge_juggle/practice_cpu.rs");
+    assert!(picker.contains("scene::practice_scene().is_some()"));
+    assert!(!picker.contains("is_native_training"));
+
+    let level = src("src/runtime/features/cpu_level.rs");
+    let poll = item(&level, "pub(super) fn poll_drill(");
+    assert!(poll.contains("scene::practice_scene()"));
+    let partner = poll.find("step_drill_partner(").unwrap();
+    let panel = poll.find("step_drill_panel(").unwrap();
+    assert!(partner < panel);
+    let step = item(&level, "unsafe fn step_drill_partner(");
+    assert!(step.contains("state.drill_partner.step("));
+    assert!(step.contains("AI_SET_BEHAVIOR") && step.contains("ENTRY_BEHAVIOR"));
+    assert!(!step.contains("PANEL_"));
+    assert!(item(&level, "pub(crate) unsafe fn frame(").contains("rules::drill_target("));
+
+    let reset = src("src/runtime/features/states/quick_reset.rs");
+    let request = item(&reset, "fn request(");
+    assert!(request.find("begin_temporary(").unwrap() < request.find("edge_juggle::restart();").unwrap());
+    let cpu = src("src/runtime/features/cpu.rs");
+    assert!(item(&cpu, "pub fn entry_departed(").contains("owner == LOBBY_CPU_ENTRY as u32"));
+
+    let rows = src("data/tables/rows_edge_juggle.ROWS.tsv");
+    let scope = "\tScopes(Scopes::TRAINING.0 | Scopes::LOBBY_WAITING.0)\t";
+    for row in rows.lines().filter(|line| line.starts_with("\"edge_juggle.attack_forecast_")) {
+        assert!(row.contains(scope), "{row}");
+    }
+    for name in ["ai_set_behavior", "special_available_snapshot", "special_available", "escape_slide_distance",
+        "escape_cancel_frame", "special_height", "special_length"] {
+        let prefix = format!("\"edge_juggle.{name}\"");
+        assert!(rows.lines().find(|line| line.starts_with(&prefix)).unwrap().contains(scope), "{name}");
+    }
+    for row in rows.lines().filter(|line| line.starts_with("\"edge_juggle.training_")
+        || line.starts_with("\"edge_juggle.live_") || line.starts_with("\"edge_juggle.pause_hud_")) {
+        assert!(row.contains("\tScopes::TRAINING\t"), "{row}");
+    }
+    let zoom_rows = src("data/tables/rows_edge_zoom.ROWS.tsv");
+    assert_eq!(zoom_rows.lines().filter(|line| line.starts_with("\"edge_zoom.") && line.contains(scope)).count(), 3);
+}
+
+#[test]
 fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let poll = item(&runtime, "pub unsafe fn poll(");

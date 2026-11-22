@@ -1815,3 +1815,12 @@ D3 replaces, for the Recording page's lists only, the rule of rc15/submenu-page-
 ZL + Up / Down "stop on the edge, then wrap" on the page.
 
 For Eden routes: a menu D-pad Up or Down held 21 frames or longer now steps more than once.
+
+## Guard the Edge and Juggler in the waiting room; parity by default (operator)
+
+**2026-11-22:** "juggler and guard the edge aren't showing in lobby please fix that" and "by default as a standing rule we want parity for all features between training and the lobby".
+
+Both games are listed and run in a waiting room's practice as in Training; the opponent is the first training partner.
+The room has no pause panel, so while a drill runs the plugin sets that partner's control type to the stock CPU with
+the game's own setter and gives the room's Training Partner Behavior back at Stop, and its level is the drill's.
+The room's L + R + A also restarts the drill's set. Eden rows for both scenes are in the combined run.

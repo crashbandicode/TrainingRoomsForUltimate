@@ -95,11 +95,16 @@ pub fn target(level: CpuLevel, place: Where, entry: i32, table: [i32; 8]) -> Opt
     if applies { rank_for(level, table) } else { None }
 }
 
-/// A native Training drill temporarily takes over just the practice opponent's rank.
-pub fn training_drill_target(
+/// A drill temporarily takes over the practice opponent's rank: entry 1 in Training, the first partner in a lobby.
+pub fn drill_target(
     drill: Option<u8>, configured: CpuLevel, place: Where, entry: i32, table: [i32; 8],
 ) -> Option<u8> {
-    let level = if entry == 1 && matches!(place, Where::Training { .. }) {
+    let opponent = match place {
+        Where::Training { .. } => entry == 1,
+        Where::Lobby => entry == *LOBBY_ENTRIES.start(),
+        Where::Elsewhere => false,
+    };
+    let level = if opponent {
         drill.map_or(configured, CpuLevel::Lv)
     } else {
         configured
@@ -300,13 +305,19 @@ mod tests {
     fn practice_rank_resumes_the_configured_level_and_preserves_the_native_rank() {
         let place = Where::Training { behavior: behavior::CPU_LEVEL };
         let mut entry = EntryRank::new();
-        assert_eq!(entry.step(training_drill_target(None, CpuLevel::Lv(7), place, 1, T), 21), Some(60));
-        assert_eq!(entry.step(training_drill_target(Some(9), CpuLevel::Lv(7), place, 1, T), 60), Some(100));
-        assert_eq!(entry.step(training_drill_target(None, CpuLevel::Lv(7), place, 1, T), 100), Some(60));
-        assert_eq!(entry.step(training_drill_target(None, CpuLevel::Off, place, 1, T), 60), Some(21));
-        assert_eq!(training_drill_target(Some(9), CpuLevel::Off, Where::Elsewhere, 1, T), None);
-        assert_eq!(training_drill_target(Some(9), CpuLevel::Off, place, 2, T), None);
-        assert_eq!(training_drill_target(Some(9), CpuLevel::Off, place, 1, [0; 8]), None);
+        assert_eq!(entry.step(drill_target(None, CpuLevel::Lv(7), place, 1, T), 21), Some(60));
+        assert_eq!(entry.step(drill_target(Some(9), CpuLevel::Lv(7), place, 1, T), 60), Some(100));
+        assert_eq!(entry.step(drill_target(None, CpuLevel::Lv(7), place, 1, T), 100), Some(60));
+        assert_eq!(entry.step(drill_target(None, CpuLevel::Off, place, 1, T), 60), Some(21));
+        assert_eq!(drill_target(Some(9), CpuLevel::Off, Where::Elsewhere, 1, T), None);
+        assert_eq!(drill_target(Some(9), CpuLevel::Off, place, 2, T), None);
+        assert_eq!(drill_target(Some(9), CpuLevel::Off, place, 1, [0; 8]), None);
+        assert_eq!(drill_target(Some(9), CpuLevel::Lv(7), Where::Lobby, 4, T), Some(100));
+        assert_eq!(drill_target(Some(9), CpuLevel::Off, Where::Lobby, 4, T), Some(100));
+        for other in [5, 6] {
+            assert_eq!(drill_target(Some(9), CpuLevel::Lv(7), Where::Lobby, other, T), Some(60));
+        }
+        assert_eq!(drill_target(Some(9), CpuLevel::Lv(7), Where::Lobby, 1, T), None);
     }
 
     fn notice_again_on_the_next_training_entry() {

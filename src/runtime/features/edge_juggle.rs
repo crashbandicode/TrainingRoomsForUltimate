@@ -1,4 +1,5 @@
-//! Native Training adapter for the edge and juggle games. No additional game hooks.
+//! Training and waiting-room practice adapter for the edge and juggle games: the opponent is entry 1 or the first
+//! training partner. No additional game hooks.
 use std::fmt::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
@@ -11,7 +12,7 @@ use crate::model::crosshair::Marks;
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
-    role::FighterKey,
+    role::{FighterKey, Scene, LOBBY_CPU_ENTRY},
 };
 use crate::model::edge_juggle::perfect::game_watch::{self, OilInputs, OilStall};
 use crate::model::edge_juggle::perfect::recovery::{
@@ -165,7 +166,7 @@ struct CpuBody {
 
 impl CpuBody {
     unsafe fn current() -> Option<Self> {
-        let accessor = natives::module_accessor(1)?;
+        let accessor = natives::module_accessor(cpu_entry())?;
         natives::is_fighter(accessor).then(|| Self {
             accessor,
             object_id: natives::battle_object_id(accessor),
@@ -283,8 +284,12 @@ pub(super) fn placement_active() -> bool {
     !OPEN.load(Ordering::Acquire) && wizard_active()
 }
 
+pub(super) fn cpu_entry() -> i32 {
+    if scene::practice_scene() == Some(Scene::Lobby) { LOBBY_CPU_ENTRY } else { 1 }
+}
+
 pub fn allowed(drill: Drill) -> bool {
-    if !INSTALLED.load(Ordering::Acquire) || !scene::is_native_training() {
+    if !INSTALLED.load(Ordering::Acquire) || scene::practice_scene().is_none() {
         return false;
     }
     if super::recording_host::cpu_playback_blocks_drill() {
@@ -298,7 +303,7 @@ pub fn allowed(drill: Drill) -> bool {
 fn wanted() -> Option<Drill> {
     practice::active()
         .and_then(Drill::from_game)
-        .filter(|_| scene::is_native_training())
+        .filter(|_| scene::practice_scene().is_some())
 }
 
 pub(super) fn running() -> bool {
@@ -327,14 +332,14 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
     }
     running()
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
-        && natives::module_accessor(1) == Some(accessor)
+        && natives::module_accessor(cpu_entry()) == Some(accessor)
 }
 
 pub(super) fn suspends_cpu_settings(key: FighterKey) -> bool {
     let active = INSTALLED.load(Ordering::Acquire)
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         && running();
-    crate::model::edge_juggle::suspends_cpu_settings(active, key)
+    crate::model::edge_juggle::suspends_cpu_settings(active, key, cpu_entry() as u8)
 }
 
 /// The final mapped pad read by P1, after the existing delay and playback stages.
@@ -1794,7 +1799,7 @@ pub unsafe fn frame(fighter: usize) {
     let Some(mut engine) = ENGINE.try_lock() else {
         return;
     };
-    if !scene::is_native_training() {
+    if scene::practice_scene().is_none() {
         if let Some(old) = engine.run.take() {
             practice::finish(old.drill.game());
         }
@@ -1817,7 +1822,7 @@ pub unsafe fn frame(fighter: usize) {
     let body = CpuBody::current();
     let owns_setup = || {
         super::cpu_level::drill_applied()
-            && natives::is_operation_cpu(1)
+            && natives::is_operation_cpu(cpu_entry())
             && !OPEN.load(Ordering::Acquire)
             && !states::is_loading()
             && !recorder::busy_for_drill()

@@ -466,6 +466,10 @@ escape attempt in Juggler. Hero gets at least the 8 MP needed for each cast. Rea
 or grab during his descent or within the **Zoom landing window** after touchdown. The default is 10 frames and you can set it
 from 1 to 30. The notice shows each attempt's result and the running win count.
 
+Both drills also run in a waiting room with [Lobby Practice](#lobby-practice) On, against the first training
+partner ([Waiting rooms](../guide/waiting-rooms.md#what-works-there)). With more than one partner in the room, the
+others keep fighting, as extra CPUs do in Training.
+
 ### Eggs-ercise
 
 A practice game for your attacks. A target pops up from the ground. Hit it and it breaks, and the next one pops up
