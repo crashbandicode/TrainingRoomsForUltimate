@@ -105,12 +105,14 @@ fn the_snapshot_says_which_take_the_hud_shows() {
 }
 
 #[test]
-fn the_indicator_is_empty_without_a_fresh_practice_scene() {
+fn the_indicator_is_the_take_the_hud_drew_on_a_fresh_pass() {
     use crate::model::hud_row::Take;
-    assert_eq!(recording_indicator("", Some(Take::Player)), "");
-    assert_eq!(recording_indicator("training", Some(Take::Player)), "player");
-    assert_eq!(recording_indicator("lobby", Some(Take::Cpu)), "cpu");
-    assert_eq!(recording_indicator("training", None), "");
+    let drew = |take| indicator_stamp(1000, take);
+    assert_eq!(recording_indicator(drew(Some(Take::Player)), 1200, 500), "player");
+    assert_eq!(recording_indicator(drew(Some(Take::Cpu)), 1500, 500), "cpu");
+    assert_eq!(recording_indicator(drew(None), 1000, 500), "", "the pass drew no chip: the stock layout, the menu, no take");
+    assert_eq!(recording_indicator(drew(Some(Take::Player)), 1501, 500), "", "no pass since: a waiting room without the host");
+    assert_eq!(recording_indicator(0, 10, 500), "", "never drawn");
 }
 
 #[test]

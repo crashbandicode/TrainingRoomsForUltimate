@@ -43,7 +43,7 @@ A new data file, the 31st: `data/tables/rows_speed_label.ROWS.tsv`, written by `
 | `speed_label.style_store` | `0x13e4e4c` | the table `main+0x4753de0`, `bl 0x1bb8b20`, `str w22,[x21,#0x30]` |
 | `speed_label.glyph_styles` | `0x4753de0` | the table `1,2,3,4,5,6,6` |
 
-The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the label is written as before. The bind and 1 Frame do not depend on it. No hook, no called function added. Card scan (2026-11-23, the playbook's `scan-offsets.py`): none of the card's other 20 plugins references the five offsets or the three functions around them.
+The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the label is written as before. The bind and 1 Frame do not depend on it. No hook, no called function added. Card scan (2026-11-23, playbook `scan-offsets.py`, `card-scan.txt`): none of the card's other 20 plugins references the five offsets or the three functions around them.
 
 ## 2. F3: the recording indicator
 
@@ -71,7 +71,7 @@ The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 3
 - **Independent of the notice queue:** Combo Display Off, a refusal or another notice does not remove it.
 - **No layout change:** no pane, texture or material is added or changed; the pane recipe guard passes unchanged.
 - **Colours:** the two role colours move from `runtime/ui/view.rs` into the model, and the roster grid and the row use the same constants.
-- **Bridge:** one line added to `tr.menu/1`, `recording.indicator` = `player`, `cpu` or empty: the role of the row the HUD drew on its last tick. Empty while the row is hidden, and whenever the practice scene is not fresh (the HUD is not being drawn), so a take left open across a scene change does not read as shown.
+- **Bridge:** one line added to `tr.menu/1`, `recording.indicator` = `player`, `cpu` or empty: the role of the take the HUD's row actually drew on its last pass. The row's writer returns the take only when the row's container, chip and text panes were there to write, and the HUD stamps each pass with it (`uptime_ms << 2 | take`, the scene stamp's form). Empty when that pass drew none (no take, the menu over the HUD, a layout without the row such as the stock layout) and when no pass ran in the last 500 ms (a waiting room without the plugin's host, a scene change), so the line never names a chip that is not on screen.
 
 ### Design: the recorded fighter's tint
 
@@ -108,9 +108,9 @@ F5:
 
 F3:
 - `a_take_shows_rec_in_the_roles_colour`, `no_take_and_no_line_hides_the_row`, `the_targets_line_alone_is_drawn_as_before`, `a_take_during_the_targets_run_shares_the_line`, `the_rec_row_is_short_and_holds_its_text`, `a_notice_stacks_under_the_rec_row`, `the_rec_row_keeps_clear_of_the_lobbys_panels` (`hud_row_tests`).
-- `the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room` (source test over `runtime/features/hud_draw.rs` and `runtime/ui/view.rs`): the draw reads the open take (`rr_host::capture_take`), builds the row for both layouts, writes text colour and chip colour, hides it under the menu, and the roster uses the model's role colours. Red on `17060a5e`.
+- `the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room` (source test over `runtime/features/hud_draw.rs`, `runtime/bridge_state.rs` and `runtime/ui/view.rs`): the draw reads the open take (`rr_host::capture_take`), builds the row for both layouts, writes text colour and chip colour, hides it under the menu, publishes what the row's writer drew (nothing without the row's container, a take only with its chip and text panes) as a stamp of that pass, and the roster uses the model's role colours. Red on `17060a5e`; the published-draw part red on `67568434`.
 - `the_open_take_is_the_capture_role` (`rr_host` tests): no take, Player 1's take and the CPU's take through the Record chord, and the bridge word equal to `recording.capture.role`'s.
-- `the_snapshot_says_which_take_the_hud_shows`, `the_indicator_is_empty_without_a_fresh_practice_scene` (`bridge_state` tests): the new line for player, cpu and none, and empty without a scene.
+- `the_snapshot_says_which_take_the_hud_shows`, `the_indicator_is_the_take_the_hud_drew_on_a_fresh_pass` (`bridge_state` tests): the new line for player, cpu and none; the stamp read as player or cpu while fresh, empty when the pass drew no chip, when no pass ran since, and before any pass.
 - `phase_notifications` (`tests/input01.rs`, its pins changed), `a_recorded_fighter_has_its_roles_tint` (the same file): the four tints, each a different hue, the CPU's recording tint the CPU's, and each phase notice in its tint's hue. Red on `17060a5e`.
 - `player_one_is_tinted_only_during_its_own_take` (`rr_host` tests): no take, Player 1's take, its stop and the CPU's take through the Record chord.
 - `the_runtime_tints_each_recorded_fighter` (source test over `runtime/features/recorder.rs` and `runtime/features/cpu.rs`): the CPU's phase tint and Player 1's take tint go through one writer, Player 1's is written to entry 0's active body from Player 1's frame in a practice scene. Red on `17060a5e`.

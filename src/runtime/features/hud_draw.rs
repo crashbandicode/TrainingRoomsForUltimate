@@ -137,8 +137,8 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         chip,
         drop,
     );
-    write_btt(root, row.as_ref(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
-    crate::runtime::bridge_state::note_recording_indicator(row.as_ref().and_then(|row| row.take));
+    let drawn = write_btt(root, row.as_ref(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
+    crate::runtime::bridge_state::note_recording_indicator(drawn);
 
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
@@ -273,12 +273,13 @@ unsafe fn place(target: *mut Pane, [x, y, w, h]: [f32; 4], shown: bool) {
 }
 
 /// The compact HUD row (`model::hud_row`): Break the Targets' line or the recording indicator. Existing builders and the
-/// target's material, independent of the transient notice queue.
-unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option<[f32; 4]>) {
+/// target's material, independent of the transient notice queue. Returns the take it drew: none while the row is hidden
+/// or the layout has no such row (the stock layout), so the bridge never names a chip that is not on screen.
+unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option<[f32; 4]>) -> Option<hud_row::Take> {
     let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());
-    if container.is_null() { return; }
+    if container.is_null() { return None; }
     pane::set_visible(container, chip.is_some());
-    let (Some(row), Some([x, y, w, _])) = (row, chip) else { return };
+    let (Some(row), Some([x, y, w, _])) = (row, chip) else { return None };
     pane::set_pos(container, x, y);
     let plate = find(container, p::IDX_BTT + 1);
     if !plate.is_null() {
@@ -298,4 +299,5 @@ unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option
         pane::set_text(text, &buffer[..n]);
         pane::set_text_color(text, p::linear(row.color));
     }
+    row.take.filter(|_| !picture.is_null() && !text.is_null())
 }

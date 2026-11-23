@@ -48,7 +48,7 @@ pub struct View<'a> {
     pub recording_page_role: &'a str,
     /// The role of the active capture, empty when there is no take.
     pub recording_capture_role: &'a str,
-    /// The role of the take the HUD's row shows, empty while it shows none.
+    /// The role of the take the HUD's row drew on its last pass, empty when it drew none or that pass is stale.
     pub recording_indicator: &'a str,
     pub list: &'a str,
     pub list_count: usize,
@@ -301,9 +301,29 @@ pub fn scene_name(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
     }
 }
 
-/// The role the HUD shows while a practice scene is fresh, empty otherwise.
-pub fn recording_indicator(scene: &str, take: Option<super::hud_row::Take>) -> &'static str {
-    if scene.is_empty() { "" } else { take.map_or("", super::hud_row::Take::key) }
+/// The HUD row's stamp for one pass: `uptime_ms << 2 | take` (0 the pass drew no take, 1 Player 1's, 2 the CPU's), the
+/// scene stamp's form.
+pub fn indicator_stamp(now_ms: u64, drawn: Option<super::hud_row::Take>) -> u64 {
+    now_ms << 2
+        | match drawn {
+            None => 0,
+            Some(super::hud_row::Take::Player) => 1,
+            Some(super::hud_row::Take::Cpu) => 2,
+        }
+}
+
+/// `recording.indicator` from that stamp: the role of the take the HUD drew, while its last pass is no older than
+/// `fresh_ms`. Empty when that pass drew none (no take, the menu over the HUD, a layout without the row's panes) and
+/// when no pass ran since (a waiting room without the plugin's host, a scene change).
+pub fn recording_indicator(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
+    if now_ms.saturating_sub(stamp >> 2) > fresh_ms {
+        return "";
+    }
+    match stamp & 3 {
+        1 => super::hud_row::Take::Player.key(),
+        2 => super::hud_row::Take::Cpu.key(),
+        _ => "",
+    }
 }
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {

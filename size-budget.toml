@@ -2457,7 +2457,7 @@ approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Reco
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196554
+ceiling = 196563
 date = "2026-11-23"
-reason = "The Training speed label is lent Player 1's glyph style so 1 Frame names its button, with five guarded rows; the compact HUD row shows REC P1 or REC CPU in the role's colour while a take is open, in Training and waiting rooms, the bridge reports it, and the recorded fighter is tinted in its role's colour. Measured 196554, 205 above 196349."
+reason = "The Training speed label is lent Player 1's glyph style so 1 Frame names its button, with five guarded rows; the compact HUD row shows REC P1 or REC CPU in the role's colour while a take is open, in Training and waiting rooms, the bridge reports it, and the recorded fighter is tinted in its role's colour. Measured 196563, 214 above 196349."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 items F5 and F3 (fix-round BRIEF.md); fusion-g2-3 lead. NRO and BSS delta reported with the gate."

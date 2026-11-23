@@ -118,10 +118,19 @@ fn the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room() {
     assert!(row > draw.find("if !waiting {").expect("Training-only branch"), "the row is shared by both scenes");
     assert!(draw.contains("rr_host::capture_take()"), "the row reads the open take");
     assert!(draw.contains("(!menu_open).then(|| hud_row::hud_row("), "the menu hides the row");
-    assert!(draw.contains("bridge_state::note_recording_indicator("), "the bridge reads the drawn row");
+    assert!(draw.contains("let drawn = write_btt(") && draw.contains("bridge_state::note_recording_indicator(drawn)"),
+            "the bridge reads what the row's writer drew");
     let write = body("unsafe fn write_btt(");
     assert!(write.contains("set_text_color") && write.contains("set_rect_color") && write.contains("p::IDX_BTT + 2"),
             "the text and chip use the row's colours");
+    assert!(write.contains("-> Option<hud_row::Take>") && write.contains("if container.is_null() { return None; }"),
+            "no row in the layout (the stock layout): nothing drawn");
+    assert!(write.contains("row.take.filter(|_| !picture.is_null() && !text.is_null())"),
+            "a take counts only with its chip and text panes");
+    let bridge = include_str!("../../runtime/bridge_state.rs");
+    assert!(bridge.contains("m::indicator_stamp(crate::runtime::clock::uptime_ms(), drawn)"), "each pass is stamped");
+    assert!(bridge.contains("m::recording_indicator(RECORDING_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)"),
+            "a stale pass reads as no chip");
     let view = include_str!("../../runtime/ui/view.rs");
     assert!(!view.contains("[255, 83, 92, 255]") && !view.contains("[75, 164, 255, 255]"));
     assert!(view.contains("hud_row::PLAYER_COLOR") && view.contains("hud_row::CPU_COLOR"),

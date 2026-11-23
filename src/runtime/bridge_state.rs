@@ -5,7 +5,7 @@
 //! worker only. Game-side notice, zone and practice producers use bounded, nonblocking handoffs.
 
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::model::bridge_state as m;
 use crate::model::menu::table::{Control, Row};
@@ -239,8 +239,9 @@ static ACK: AtomicU64 = AtomicU64::new(0);
 static ACK_HANDLED: AtomicBool = AtomicBool::new(true);
 /// Whether the HUD shows the notice slot now (hidden with the menu open, gone once the notice expires).
 static NOTICE_VISIBLE: AtomicBool = AtomicBool::new(false);
-/// The HUD row's last drawn take (0 none, 1 Player, 2 CPU), read by the worker.
-static RECORDING_INDICATOR: AtomicU8 = AtomicU8::new(0);
+/// The HUD row's last pass (the snapshot's `recording.indicator`): `m::indicator_stamp`, one atomic store from the UI
+/// tick (never a lock), read by the worker; older than `SCENE_FRESH_MS` is gone.
+static RECORDING_INDICATOR: AtomicU64 = AtomicU64::new(0);
 
 /// The current notice, written by the game thread, read by the worker; whoever finds it busy skips (never waits).
 struct Notice {
@@ -286,23 +287,17 @@ pub fn note_notice_visible(visible: bool) {
     }
 }
 
-/// The HUD row's take each tick: one atomic store, after one relaxed load without a bridge.
-pub fn note_recording_indicator(take: Option<crate::model::hud_row::Take>) {
+/// The take the HUD's row drew on this pass (`None`: it drew none): one atomic store, after one relaxed load without a
+/// bridge.
+pub fn note_recording_indicator(drawn: Option<crate::model::hud_row::Take>) {
     if FOUND.load(Ordering::Relaxed) {
-        use crate::model::hud_row::Take;
-        RECORDING_INDICATOR.store(match take { None => 0, Some(Take::Player) => 1, Some(Take::Cpu) => 2 }, Ordering::Relaxed);
+        RECORDING_INDICATOR.store(m::indicator_stamp(crate::runtime::clock::uptime_ms(), drawn), Ordering::Relaxed);
     }
 }
 
-/// The row's take while its practice scene is fresh, empty outside the practice layout.
+/// The role of the take the HUD's row drew on its last pass, empty once that pass is stale.
 pub fn recording_indicator(now_ms: u64) -> &'static str {
-    use crate::model::hud_row::Take;
-    let take = match RECORDING_INDICATOR.load(Ordering::Relaxed) {
-        1 => Some(Take::Player),
-        2 => Some(Take::Cpu),
-        _ => None,
-    };
-    m::recording_indicator(scene(now_ms), take)
+    m::recording_indicator(RECORDING_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
 }
 
 /// The notice the HUD draws (game thread). Skipped when the worker is reading it or no bridge was found.
