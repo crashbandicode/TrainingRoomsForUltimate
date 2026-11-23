@@ -190,7 +190,7 @@ impl BehaviorLease {
 }
 
 /// The waiting room has no pause panel: the first training partner's control type is the room's Training Partner
-/// Behavior. Save the room's type once, ask for the stock CPU (type 0), give the saved type back at Stop.
+/// Behavior. Save the room's type, follow a fighter swap while the entry holds the drill's 0, and give it back at Stop.
 #[derive(Default)]
 pub struct PartnerLease(Option<(usize, u8)>);
 
@@ -198,11 +198,20 @@ impl PartnerLease {
     pub const fn new() -> Self { Self(None) }
     pub fn held(&self) -> bool { self.0.is_some() }
 
-    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
-    /// A Control type (0x24) or a fighter no CPU operates is never written.
-    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
-        if self.0.is_some_and(|(old, _)| old != owner) {
+    /// The slot has no fighter this poll: the saved type stays while a drill runs or its borrowed fighter is still to go back.
+    pub fn absent(&mut self, level: Option<u8>, swapping: bool) {
+        if level.is_none() && !swapping {
             self.0 = None;
+        }
+    }
+
+    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
+    /// The saved type follows a fighter swap while the entry holds the drill's 0. Control (0x24) or non-CPU is never written.
+    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
+        if let Some((old, saved)) = self.0 {
+            if old != owner {
+                self.0 = (entry == 0).then_some((owner, saved));
+            }
         }
         if !operation_cpu || entry == 0x24 || ai == 0x24 {
             return None;
