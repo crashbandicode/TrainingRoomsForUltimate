@@ -1930,7 +1930,8 @@ recording, a macro playing on the CPU (the fact that keeps a drill from starting
 macro playing on Player 1 alone does not lift it. The Recording pop-up and the close window do not hold the CPU.
 
 After Stop, Guard the Edge and Juggler hand the CPU Behavior back under the menu unless the saved behaviour is Control,
-which waits for the close. Mash out stops driving the CPU and gives it up under the menu. A fighter a drill borrowed
-(Mash out's attacker, a drill's own CPU fighter) comes back when the menu closes: the loader takes no fighter change
-while the menu owns the input, the rule a CPU Character picked in the menu follows. This is built on the item owner's
-default; the operator may overrule it.
+which waits for the close. Mash out stops driving the CPU and gives it up while the menu is open, also when Player 1 is
+still held; from the close on it keeps the CPU neutral until that hold has ended, as a Stop without the menu does. A
+fighter a drill borrowed (Mash out's attacker, a drill's own CPU fighter) comes back when the menu closes: the loader
+takes no fighter change while the menu owns the input, the rule a CPU Character picked in the menu follows. This is
+built on the item owner's default; the operator may overrule it.
