@@ -2389,3 +2389,11 @@ ceiling = 191788
 date = "2026-11-22"
 reason = "The Recording page shows its role on the pop-up's role tabs: the same plate in the same place with the page's view lit, one ZR key cap where ZR changes the view, and no cap on a file's screen, a picker or the keyboard, which own the buttons. The frame names the key caps (RoleKeys) and the pane table gives each cap pane its text and width (role_caps), so the pop-up's L and R caps and the page's ZR cap are drawn by one path on the existing panes. Measured normalized implementation 191788, 32 above the item 2 ceiling 191756, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 about 20:30Z, ruling on preview-vis-sol's 20:22:56Z ask: one [[budget]] entry per item commit of rc15/recording-menu-mix, raised to the measured number, under the operator's measured LOC rule; the role display was agreed by the operator as RR1 and RR2 (HANDOFF-PRIMARY-tr-primary-2.md line 1602); NRO and BSS deltas are reported per item with the gate"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191842
+date = "2026-11-22"
+reason = "Save the Recording pop-up role and page view in settings.json using the settings writer. Adopt the saved pop-up role at boot so the first Record chord uses it. Old files default to Player. Measured normalized implementation 191842, 54 above the item 3 ceiling 191788. The release gate measures NRO and BSS."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording role memory and cold-start fix reviewed PASS by rv-preview-vis at 22:24:05Z."

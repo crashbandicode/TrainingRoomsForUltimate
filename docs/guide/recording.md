@@ -264,6 +264,10 @@ on the [Recording page's pop-up section](../menu/recording.md#the-recording-pop-
 - L Player and CPU R choose the side you are working on. That side is the one Record records and Edit placement edits.
 - A acts at once: no file screens. Renaming, cropping and deleting are on the page.
 
+The pop-up role and the Recording page's ZR view are remembered separately across menu closes, leaving Training and a
+restart. They are stored in `settings.json` as the top-level `recording_roles` key; older files start both at Player.
+After a restart, Record uses the remembered pop-up role even before you open the menu.
+
 ![The pop-up over the match, Player view, cursor on a save](../media/rc5-popup-trim.gif)
 
 *Cropped to the pop-up.*

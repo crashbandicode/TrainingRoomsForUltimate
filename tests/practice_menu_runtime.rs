@@ -10,6 +10,19 @@ fn src(path: &str) -> String {
     std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap()
 }
 
+fn runtime_sources(dir: &Path) -> Vec<(std::path::PathBuf, String)> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files.extend(runtime_sources(&path));
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            files.push((path.clone(), std::fs::read_to_string(path).unwrap()));
+        }
+    }
+    files
+}
+
 /// The text of the item that starts with `head`, to its closing brace at column 0.
 fn item<'a>(text: &'a str, head: &str) -> &'a str {
     let at = text.find(head).unwrap_or_else(|| panic!("{head} not found"));
@@ -26,6 +39,34 @@ fn the_role_tabs_draw_the_models_caps() {
     assert!(view.contains("self.show(IDX_TITLE, frame.role_tab.is_none())"));
     let recording = src("src/model/recording_menu.rs");
     assert!(item(&recording, "pub fn handle_page(").contains("self.page_overlay_open()"));
+}
+
+#[test]
+fn recording_roles_reach_the_card_from_one_place() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let save = item(&worker, "fn save_roles(");
+    assert!(save.contains("menu.save_roles(") && save.contains("writer::request_settings()"));
+    let handle = item(&worker, "fn handle(");
+    let poll = handle.split_once("let Event::Poll(packet)").unwrap().1;
+    assert!(poll.find("save_roles(menu);").unwrap() < poll.find("publish_popup(").unwrap());
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    for (path, text) in runtime_sources(&root) {
+        assert!(!text.contains("set_recording_roles"), "{}", path.display());
+        let free_calls = text.match_indices("save_roles(")
+            .filter(|(at, _)| *at == 0 || text.as_bytes()[*at - 1] != b'.').count();
+        assert_eq!(free_calls, if path.ends_with("ui/worker.rs") { 2 } else { 0 }, "{}", path.display());
+    }
+}
+
+#[test]
+fn the_saved_popup_role_is_adopted_at_boot() {
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "pub fn remember(").contains("rr_host::adopt_saved_role(&settings)"));
+    assert!(item(&src("src/runtime/ui/mod.rs"), "pub fn install(").contains("worker::remember(settings.clone())"));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    for (path, text) in runtime_sources(&root) {
+        assert_eq!(text.matches("adopt_saved_role(").count(), usize::from(path.ends_with("ui/worker.rs")), "{}", path.display());
+    }
 }
 
 #[test]

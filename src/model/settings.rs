@@ -3,6 +3,7 @@
 //! ```text
 //! { "menu":          { "<setting id>": [<u8>, …], … },
 //!   "defaults_menu": { "<setting id>": [<u8>, …], … },
+//!   "recording_roles": { "popup": "player" | "cpu", "page": "player" | "cpu" },
 //!   …other top-level keys of the fork (mii_preferences, stage_preferences) kept as they are }
 //! ```
 //!
@@ -348,6 +349,30 @@ impl Settings {
     /// Top-level flag set after the Training intro notices have been shown.
     /// It is not a menu row: page reset restores snapshot rows only.
     pub const INTRO_SEEN_KEY: &str = "intro_seen";
+
+    /// The recording roles are a top-level key, not a menu row; a file without it reads Player for both.
+    pub const RECORDING_ROLES_KEY: &str = "recording_roles";
+
+    /// The pop-up's Record role, then the page's view.
+    pub fn recording_roles(&self) -> [super::recording_menu::ViewRole; 2] {
+        use super::recording_menu::ViewRole;
+        let object = self.extra.get(Self::RECORDING_ROLES_KEY).and_then(Value::as_object);
+        let role = |key: &str| {
+            if object.and_then(|o| o.get(key)).and_then(Value::as_str) == Some("cpu") {
+                ViewRole::Cpu
+            } else {
+                ViewRole::Player
+            }
+        };
+        [role("popup"), role("page")]
+    }
+
+    /// Record both roles for the next settings write.
+    pub fn set_recording_roles(&mut self, roles: [super::recording_menu::ViewRole; 2]) {
+        self.extra.insert(Self::RECORDING_ROLES_KEY.to_owned(), serde_json::json!({
+            "popup": roles[0].diag(), "page": roles[1].diag(),
+        }));
+    }
 
     /// True when this file records that the intro notices were shown.
     pub fn intro_seen(&self) -> bool {
@@ -710,6 +735,37 @@ mod tests {
         assert_eq!(parse(&factory.to_json()).settings, factory);
     }
 
+    fn an_old_file_without_recording_roles_reads_player() {
+        use crate::model::recording_menu::ViewRole::Player;
+        let loaded = parse(r#"{"menu":{},"defaults_menu":{}}"#);
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.recording_roles(), [Player, Player]);
+        assert!(!loaded.settings.to_json().contains("recording_roles"));
+    }
+
+    fn recording_roles_round_trip_and_ignore_bad_values() {
+        use crate::model::recording_menu::ViewRole::{Cpu, Player};
+        for roles in [[Cpu, Player], [Player, Cpu]] {
+            let mut settings = Settings::factory();
+            settings.set_recording_roles(roles);
+            let loaded = parse(&settings.to_json());
+            assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+            assert_eq!(loaded.settings.recording_roles(), roles);
+        }
+        for (value, roles) in [
+            (serde_json::json!(3), [Player, Player]),
+            (serde_json::json!({"popup":"zzz","page":7}), [Player, Player]),
+            (serde_json::json!({"popup":"cpu"}), [Cpu, Player]),
+        ] {
+            let input = serde_json::json!({"menu":{}, "defaults_menu":{}, "recording_roles":value});
+            let loaded = parse(&input.to_string());
+            assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+            assert_eq!(loaded.settings.recording_roles(), roles);
+            let saved: Value = serde_json::from_str(&loaded.settings.to_json()).unwrap();
+            assert_eq!(saved["recording_roles"], input["recording_roles"]);
+        }
+    }
+
     fn hit_streak_defaults_to_off_in_new_and_old_settings() {
         let old = parse(r#"{"menu":{"eggsercise":[0,1,0,0,0]},"defaults_menu":{"btt":[0,1]}}"#);
         assert!(old.issues.is_empty(), "{:?}", old.issues);
@@ -768,6 +824,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("an_old_file_without_recording_roles_reads_player", an_old_file_without_recording_roles_reads_player as fn()),
+            ("recording_roles_round_trip_and_ignore_bad_values", recording_roles_round_trip_and_ignore_bad_values as fn()),
             ("factory_round_trips", factory_round_trips as fn()),
             ("retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips", retired_hitbox_colour_slot_is_ignored_in_both_snapshots_and_round_trips as fn()),
             ("a_bad_row_defaults_and_is_reported", a_bad_row_defaults_and_is_reported as fn()),

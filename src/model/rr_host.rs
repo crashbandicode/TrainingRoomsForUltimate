@@ -414,6 +414,11 @@ pub fn publish_menu_role(role: ViewRole) {
     });
 }
 
+/// Boot: the Record chord records on the pop-up role saved on the card before any menu or pop-up press.
+pub fn adopt_saved_role(settings: &crate::model::settings::Settings) {
+    publish_menu_role(settings.recording_roles()[0]);
+}
+
 /// After the record chord updates `CAP_ROLE`. A CPU-role start enters lockout. A stop leaves it.
 pub fn cpu_role_after_chord(facing: i8) {
     let mut drive = CPU_DRIVE.lock();
@@ -2395,18 +2400,13 @@ mod tests {
         .unwrap()
     }
 
-    fn record_follows_the_published_cpu_role() {
-        let _hold = hold();
-        reset_host();
-        let root = scratch("cpu-role");
-        set_record_role(Role::Cpu);
-        on_chords(true, false, false);
-        let start = service_at(&root, &none(), "2026-11-06", state(13), state(7));
+    fn assert_cpu_capture_saved(root: &Path) {
+        let start = service_at(root, &none(), "2026-11-06", state(13), state(7));
         assert!(start.diags.iter().any(|line| line == "screen=recording role=cpu recording=1"));
         push_capture(ROLE_CPU, InputFrame { buttons: 9, ..InputFrame::default() });
         push_capture(ROLE_PLAYER, InputFrame { buttons: 1, ..InputFrame::default() });
         on_chords(true, false, false);
-        let stop = service_at(&root, &none(), "2026-11-06", state(13), state(7));
+        let stop = service_at(root, &none(), "2026-11-06", state(13), state(7));
         assert!(stop.diags.iter().any(|line| line == "screen=recording role=cpu recording=0"));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();
@@ -2416,7 +2416,34 @@ mod tests {
         let save_id = saved.start_save.expect("start save");
         let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save_id).unwrap();
         assert_eq!(save.cpu.fighter_kind, 7);
-        assert!(crate::engine::rr_runtime::load_catalog(&root).unwrap().macros.iter().any(|file| file.id == listed.entries[0].id));
+        assert!(crate::engine::rr_runtime::load_catalog(root).unwrap().macros.iter().any(|file| file.id == listed.entries[0].id));
+    }
+
+    fn record_follows_the_published_cpu_role() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cpu-role");
+        set_record_role(Role::Cpu);
+        on_chords(true, false, false);
+        assert_cpu_capture_saved(&root);
+    }
+
+    fn a_cold_start_records_on_the_saved_popup_role() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("cold-role");
+        let loaded = crate::model::settings::parse(r#"{"menu":{},"defaults_menu":{},"recording_roles":{"popup":"cpu","page":"player"}}"#);
+        adopt_saved_role(&loaded.settings);
+        on_chords(true, false, false);
+        assert_eq!(capture_role(), ROLE_CPU);
+        assert_cpu_capture_saved(&root);
+
+        reset_host();
+        adopt_saved_role(&loaded.settings);
+        let old = crate::model::settings::parse(r#"{"menu":{},"defaults_menu":{}}"#);
+        adopt_saved_role(&old.settings);
+        on_chords(true, false, false);
+        assert_eq!(capture_role(), ROLE_PLAYER);
     }
 
     fn press(buttons: u32) -> MappedInputs {
@@ -4354,6 +4381,7 @@ mod tests {
             ("the_cpu_inject_slot_starts_empty", the_cpu_inject_slot_starts_empty as fn()),
             ("a_frame_past_the_resident_minute_comes_from_the_window", a_frame_past_the_resident_minute_comes_from_the_window as fn()),
             ("record_follows_the_published_cpu_role", record_follows_the_published_cpu_role as fn()),
+            ("a_cold_start_records_on_the_saved_popup_role", a_cold_start_records_on_the_saved_popup_role as fn()),
             ("cpu_role_lockout_or_standby_press_is_not_stored", cpu_role_lockout_or_standby_press_is_not_stored as fn()),
             ("cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu", cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu as fn()),
             ("a_warped_cpu_play_feeds_its_first_frame_after_the_restore", a_warped_cpu_play_feeds_its_first_frame_after_the_restore as fn()),

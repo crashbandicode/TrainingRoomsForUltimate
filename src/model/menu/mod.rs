@@ -476,6 +476,17 @@ impl Menu {
         &mut self.recording
     }
 
+    /// The pop-up's and page's roles go to live settings as soon as they change: a pop-up session never runs the
+    /// close commit. True when `live` changed and the file must be rewritten.
+    pub fn save_roles(&self, live: &mut Settings) -> bool {
+        let roles = self.recording.roles();
+        let changed = live.recording_roles() != roles;
+        if changed {
+            live.set_recording_roles(roles);
+        }
+        changed
+    }
+
     /// A chord request. `RecordingPopup` toggles the pop-up. Other requests are not this screen's.
     pub fn on_request(&mut self, request: super::chords::Request) {
         if request == super::chords::Request::RecordingPopup {
@@ -502,6 +513,7 @@ impl Menu {
             practice_cpu_pop: None,
             ignored: false,
         };
+        menu.recording.set_roles(menu.settings.recording_roles());
         menu.sync();
         menu
     }
