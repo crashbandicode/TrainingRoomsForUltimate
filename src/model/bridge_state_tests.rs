@@ -65,6 +65,7 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.popup.role=\"\"",
         "recording.page.role=\"\"",
         "recording.capture.role=\"\"",
+        "recording.indicator=\"\"",
         "list=\"rows/22\"",
         "list.count=2",
         "list.index=0",
@@ -91,6 +92,25 @@ fn the_recording_popup_page_and_capture_report_independent_roles() {
     assert!(out.contains("\nrecording.popup.role=\"cpu\"\n"));
     assert!(out.contains("\nrecording.page.role=\"player\"\n"));
     assert!(out.contains("\nrecording.capture.role=\"player\"\n"));
+}
+
+#[test]
+fn the_snapshot_says_which_take_the_hud_shows() {
+    for role in ["player", "cpu", ""] {
+        let view = View { recording_indicator: role, ..View::default() };
+        let mut out = String::new();
+        assert!(snapshot(&view, &mut out));
+        assert!(out.contains(&format!("\nrecording.capture.role=\"\"\nrecording.indicator=\"{role}\"\n")));
+    }
+}
+
+#[test]
+fn the_indicator_is_empty_without_a_fresh_practice_scene() {
+    use crate::model::hud_row::Take;
+    assert_eq!(recording_indicator("", Some(Take::Player)), "");
+    assert_eq!(recording_indicator("training", Some(Take::Player)), "player");
+    assert_eq!(recording_indicator("lobby", Some(Take::Cpu)), "cpu");
+    assert_eq!(recording_indicator("training", None), "");
 }
 
 #[test]

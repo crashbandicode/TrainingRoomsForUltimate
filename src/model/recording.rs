@@ -129,10 +129,19 @@ pub enum Possession {
     Cpu,
 }
 
-/// Light notice-body colours for the recording phases. Each clears 4.5:1 on `panes::NOTICE_PLATE`.
-pub const LOCKOUT_COLOR: [u8; 4] = [148, 176, 255, 255];
+/// Light notice-body colours for the recording phases. Each clears 4.5:1 on `panes::NOTICE_PLATE` and has its phase's
+/// tint hue: yellow, magenta, and the CPU's blue.
+pub const LOCKOUT_COLOR: [u8; 4] = [255, 224, 112, 255];
 pub const STANDBY_COLOR: [u8; 4] = [255, 156, 255, 255];
-pub const RECORDING_COLOR: [u8; 4] = [255, 132, 124, 255];
+pub const RECORDING_COLOR: [u8; 4] = [148, 176, 255, 255];
+
+/// The colour-blend tints of a recorded fighter (fix round 2026-11-23, F3). While its take records, a fighter has its
+/// role's hue, the roster's scheme the HUD row's chip uses (`hud_row`): Player 1 red, the CPU blue. The CPU's two
+/// phases before its take records keep hues of their own: lockout yellow (it was blue until then), standby magenta.
+pub const PLAYER_TINT: [f32; 3] = [1.0, 0.0, 0.0];
+pub const CPU_TINT: [f32; 3] = [0.0, 0.0, 1.0];
+pub const LOCKOUT_TINT: [f32; 3] = [1.0, 1.0, 0.0];
+pub const STANDBY_TINT: [f32; 3] = [1.0, 0.0, 1.0];
 
 /// The phase the player sees: the tint and the HUD notice (SPEC-input-01 §2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -146,19 +155,19 @@ pub enum Phase {
 
 impl Phase {
     /// The colour-blend tint of the CPU model while the phase lasts (every frame of lockout, standby
-    /// and recording).
+    /// and recording). Player 1's own take tints Player 1 (`PLAYER_TINT`, `rr_host::player_tint`).
     pub const fn tint(self) -> Option<[f32; 3]> {
         match self {
-            Phase::Lockout => Some([0.0, 0.0, 1.0]),
-            Phase::Standby => Some([1.0, 0.0, 1.0]),
-            Phase::Recording => Some([1.0, 0.0, 0.0]),
+            Phase::Lockout => Some(LOCKOUT_TINT),
+            Phase::Standby => Some(STANDBY_TINT),
+            Phase::Recording => Some(CPU_TINT),
             _ => None,
         }
     }
 
     /// The notice body and its RGBA text colour; the header is `NOTICE_HEADER`.
-    /// The colours are light enough to clear 4.5:1 on the dark notice plate. The hue stays
-    /// blue, magenta, and red for lockout, standby, and recording.
+    /// The colours are light enough to clear 4.5:1 on the dark notice plate. The hue
+    /// stays each phase's tint: yellow, magenta, and blue for lockout, standby, and recording.
     pub const fn notice(self) -> Option<(&'static str, [u8; 4])> {
         match self {
             Phase::Lockout => Some(("Lockout", LOCKOUT_COLOR)),

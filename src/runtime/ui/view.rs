@@ -6,16 +6,13 @@ use skyline::nn::ui2d::Pane;
 use crate::model::effect_chips::Placement;
 use crate::model::egg_zone::{CropRect, CROP_RECTS};
 use crate::model::frame::{Frame, Tone, View, POP_PAD};
+use crate::model::hud_row;
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
 use crate::model::panes as p;
 use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CHIP_LAYERS, CHIP_SIZE, CONN_BOXES, CONN_BOX_H, CONN_INDENT, CONN_LEFT, CONN_LINES, CONN_RIGHT, CONN_STEM_X, CONN_TREE, CRUMB_Y, CURSOR_WHITE, GREEN_ROW, GROUPS, GROUP_X, HEAD_MARK_X, HEAD_SQ, HIGHLIGHT, IDX_BADGE, IDX_BADGE_NUM, IDX_BG, IDX_CHIP, IDX_CHIP_BADGE, IDX_CHIP_HI, IDX_CHIP_LABEL, IDX_CHIP_NEEDLE, IDX_CONN, IDX_CONN_BOX, IDX_CONN_DIV, IDX_CONN_HEAD, IDX_CONN_PILL, IDX_CONN_PILL_TEXT, IDX_CONN_TREE, IDX_CRUMB, IDX_CURSOR, IDX_DIVIDER, IDX_GREEN, IDX_GROUP_HI, IDX_HAIRLINE, IDX_HEAD_SQ, IDX_HELP, IDX_HINT, IDX_ITEM_ICON, IDX_OUTLINE, IDX_ROLE, IDX_ROLE_BG, IDX_ROLE_CAP, IDX_ROLE_HI, IDX_ROLE_KEY, IDX_ROW, IDX_ROW_HI, IDX_SEP, IDX_SUB, IDX_TAB_BOX, IDX_TAB_HI, IDX_TILE, IDX_TILE_BADGE, IDX_TILE_HI, IDX_TILE_LABEL, IDX_TILE_SOLO, IDX_TILE_STRIPE, IDX_TITLE, ITEM_ICONS, KIND_COMBO, KIND_MACRO, KIND_SEQUENCE, MENU_COUNT, PANEL_H, PANEL_W, PILL_H, POP_TAB_Y, ROLE_CAP, ROLE_CAP_X, ROLE_H, ROLE_TAB_W, ROLE_X, ROWS, ROW_FIRST_Y, ROW_H, ROW_LEFT, ROW_RIGHT, RULE, SUB_DROP, SUB_RISE, TAB_BOXES, TAB_BOX_W, TAB_H, TAB_Y, TEXT, TEXT_DIM, TEXT_OFF, TEXT_ON, TILES, TILE_AREA_H, VALUE_DROP};
 
-/// The fork's role colours (`src/training/ui/roster_grid.rs:9-10`): the roster grid's Player and CPU badges, stripes,
-/// Solo Popo markers and cursor tint.
-const PLAYER: [u8; 4] = [255, 83, 92, 255];
-const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
 use crate::model::frame::Text;
 
@@ -711,7 +708,7 @@ impl Panes {
             let (x, y) = centre(usize::from(frame.tile_focus));
             // The fork's cursor tint (roster_grid.rs:279-291): the active cell's highlight takes the
             // editing role's colour at alpha 80, so the same-role order badge stays legible over it.
-            let [r, g, b, _] = [PLAYER, CPU][usize::from(frame.tile_cpu)];
+            let [r, g, b, _] = [hud_row::PLAYER_COLOR, hud_row::CPU_COLOR][usize::from(frame.tile_cpu)];
             let tint = [ACCENT, [r, g, b, 80]][usize::from(frame.tile_roster_grid)];
             self.rect_at(IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
         } else {
@@ -728,7 +725,7 @@ impl Panes {
         let roster = frame.view == View::Tiles && frame.tile_roster_grid;
         let count = usize::from(frame.tile_count);
         let ic = (0..count).find(|i| roster && frame.tile_n[*i] == 0x4b);
-        for (r, (side, colour)) in [(-1.0, PLAYER), (1.0, CPU)].into_iter().enumerate() {
+        for (r, (side, colour)) in [(-1.0, hud_row::PLAYER_COLOR), (1.0, hud_row::CPU_COLOR)].into_iter().enumerate() {
             for i in 0..TILES {
                 let on = roster && i < count && frame.tile_state[i] != TILE_HIDDEN;
                 let ((x, y), b, at) = (centre(i), &frame.tile_badges[r][i], r * TILES + i);

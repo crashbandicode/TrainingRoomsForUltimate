@@ -17,6 +17,37 @@ const R_UP: Chord = Chord((1 << logical::R) | (1 << logical::DPAD_UP));
 use logical::{DPAD_LEFT as LEFT, DPAD_RIGHT as RIGHT, DPAD_UP as UP, R};
 
 #[test]
+fn the_training_write_lends_the_glyph_style_around_the_text_call() {
+    let source = include_str!("../runtime/features/game_speed.rs");
+    let body = |name: &str| {
+        let start = source.find(name).unwrap_or_else(|| panic!("missing {name}"));
+        &source[start..start + source[start..].find("\n}\n").expect("end of function")]
+    };
+    let tick = body("pub(crate) unsafe fn training_tick(");
+    let lend = tick.find("rules::label_lend(").expect("the text call borrows the player's glyph style");
+    let text = tick.find("text(menu, write.value").expect("the native text call");
+    let writes: Vec<_> = tick.match_indices("field::write_unchecked::<u32>(menu, rules::GLYPH_STYLE").map(|(at, _)| at).collect();
+    assert!(lend < text, "the lend precedes the text call");
+    assert!(writes.iter().any(|at| *at < text) && writes.iter().any(|at| *at > text),
+            "the glyph style is written before and restored after the text call");
+    assert!(body("pub(crate) fn on_hold(").contains("STYLE.store(style"), "the poll keeps Player 1's style");
+    let init = body("pub(crate) fn init(");
+    assert!(init.contains("seam_install::gate(") && init.contains("rules::LABEL_ROWS"), "the label rows are gated");
+}
+
+#[test]
+fn the_one_frame_label_is_lent_player_ones_glyph_style() {
+    for (value, style, rows, expected) in [
+        (2, 5, true, Some(5)), (2, 7, true, Some(6)), (2, 1, true, Some(1)),
+        (2, 0, true, None), (2, 8, true, None), (2, 5, false, None),
+        (1, 5, true, None), (3, 5, true, None), (4, 5, true, None),
+        (5, 5, true, None), (6, 5, true, None),
+    ] {
+        assert_eq!(label_lend(value, style, rows), expected, "{value} {style} {rows}");
+    }
+}
+
+#[test]
 fn speeds_are_the_native_values_and_labels() {
     let table = [(1, "x1"), (2, "1 Frame"), (3, "2/3"), (4, "1/2"), (5, "1/4"), (6, "x1.5")];
     for (value, label) in table {

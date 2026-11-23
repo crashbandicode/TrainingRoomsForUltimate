@@ -309,16 +309,60 @@ fn session_clear_stops() {
 
 #[test]
 fn phase_notifications() {
-    assert_eq!(Phase::Lockout.tint(), Some([0.0, 0.0, 1.0]));
+    assert_eq!(Phase::Lockout.tint(), Some([1.0, 1.0, 0.0]));
     assert_eq!(Phase::Standby.tint(), Some([1.0, 0.0, 1.0]));
-    assert_eq!(Phase::Recording.tint(), Some([1.0, 0.0, 0.0]));
+    assert_eq!(Phase::Recording.tint(), Some([0.0, 0.0, 1.0]));
     assert_eq!(Phase::Playback.tint(), None);
-    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [148, 176, 255, 255])));
+    assert_eq!(Phase::Idle.tint(), None);
+    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [255, 224, 112, 255])));
     assert_eq!(Phase::Standby.notice(), Some(("Standby", [255, 156, 255, 255])));
-    assert_eq!(Phase::Recording.notice(), Some(("Recording", [255, 132, 124, 255])));
+    assert_eq!(Phase::Recording.notice(), Some(("Recording", [148, 176, 255, 255])));
     assert_eq!(Phase::Playback.notice(), Some(("Playback", [236, 238, 242, 255])));
     assert_eq!(Phase::Idle.notice(), None);
     assert_eq!(NOTICE_HEADER, "Input Recording");
+}
+
+/// Fix round 2026-11-23, F3: while its take records, a fighter has its role's hue (Player 1 red, the CPU blue); the
+/// CPU's lockout and standby keep hues of their own, and each phase notice has its tint's hue.
+#[test]
+fn a_recorded_fighter_has_its_roles_tint() {
+    assert_eq!((PLAYER_TINT, CPU_TINT), ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0]));
+    assert_eq!(Phase::Recording.tint(), Some(CPU_TINT));
+    assert_eq!((Phase::Lockout.tint(), Phase::Standby.tint()), (Some(LOCKOUT_TINT), Some(STANDBY_TINT)));
+    let tints = [PLAYER_TINT, CPU_TINT, LOCKOUT_TINT, STANDBY_TINT];
+    for (i, tint) in tints.iter().enumerate() {
+        assert!(!tints[i + 1..].contains(tint), "{tint:?} is used twice");
+    }
+    for phase in [Phase::Lockout, Phase::Standby, Phase::Recording] {
+        let (tint, (_, colour)) = (phase.tint().unwrap(), phase.notice().unwrap());
+        let off = (0..3).filter(|&i| tint[i] == 0.0).map(|i| colour[i]).max().unwrap();
+        let on = (0..3).filter(|&i| tint[i] == 1.0).map(|i| colour[i]).min().unwrap();
+        assert!(off < on, "{phase:?}: the notice has its tint's hue");
+    }
+}
+
+/// The CPU's phase tint and Player 1's take tint go through one writer; Player 1's is written to entry 0's active body
+/// from Player 1's own frame in a practice scene (Training and the waiting room).
+#[test]
+fn the_runtime_tints_each_recorded_fighter() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    let body = |source: &'static str, name: &str| {
+        let start = source.find(name).unwrap_or_else(|| panic!("missing {name}"));
+        &source[start..start + source[start..].find("\n}\n").expect("end of function")]
+    };
+    let writer = body(recorder, "unsafe fn tint(accessor: usize");
+    assert!(writer.contains("MODEL_COLOR_BLEND") && writer.contains("natives::set_color_rgb(accessor, r, g, b, blend)"));
+    assert_eq!(recorder.matches("natives::set_color_rgb(").count(), 1, "one writer");
+    assert!(body(recorder, "unsafe fn on_ai_frame(").contains("tint(body.accessor, rgb)"), "the CPU's phase tint");
+    let player = body(recorder, "pub(crate) unsafe fn tint_player(");
+    assert!(player.contains("recording_host::player_tint()"), "only during Player 1's take");
+    assert!(player.contains("ENABLED.load(") && player.contains("load_consts()"), "behind the recorder's guards");
+    assert!(player.contains("natives::module_accessor(0) == Some(accessor)"), "entry 0's active body, never Nana");
+    assert!(player.contains("tint(accessor, rgb)"));
+    let frame = body(include_str!("../src/runtime/features/cpu.rs"), "unsafe fn fighter_frame(");
+    let scene = frame.find("if training && current_frame {").expect("Player 1's practice-scene frame");
+    let call = frame.find("recorder::tint_player(accessor);").expect("Player 1's tint");
+    assert!(scene < call && call < frame.find("if !training {").expect("the CPU's part"), "in Player 1's block");
 }
 
 #[test]

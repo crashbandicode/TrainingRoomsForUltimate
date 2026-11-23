@@ -8,6 +8,7 @@
 //!   Checks the controller is the CPU entry's own (rule R3: never Nana, never an AI-driven P1), starts a
 //!   mash-triggered playback, injects the frame, runs the end-of-run check and the chords, applies the
 //!   phase tint and posts the phase notice.
+//! * `tint_player` (from Player 1's fighter frame, `cpu::fighter_frame`): Player 1's fighter is red while its own take is open.
 //! * `request_playback` / `on_state_restored` / `stop`: the entry points the CPU behaviours, the save
 //!   states and the hubs call.
 //!
@@ -450,10 +451,8 @@ unsafe fn on_ai_frame(ai: usize) {
         let rec = rec();
         (rec.phase(), rec.length())
     };
-    if let (Some([r, g, b]), blend) = (phase.tint(), MODEL_COLOR_BLEND.load(Ordering::Acquire)) {
-        if blend != UNRESOLVED {
-            natives::set_color_rgb(body.accessor, r, g, b, blend);
-        }
+    if let Some(rgb) = phase.tint() {
+        tint(body.accessor, rgb);
     }
     if LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
@@ -463,6 +462,30 @@ unsafe fn on_ai_frame(ai: usize) {
     bump(COUNT_NOTICE);
     host_cpu(controller);
     report_counts();
+}
+
+/// One frame of a recorded fighter's colour-blend tint: written on every frame it lasts, as the phase tint always was.
+unsafe fn tint(accessor: usize, [r, g, b]: [f32; 3]) {
+    let blend = MODEL_COLOR_BLEND.load(Ordering::Acquire);
+    if blend != UNRESOLVED {
+        natives::set_color_rgb(accessor, r, g, b, blend);
+    }
+}
+
+/// Player 1's fighter frame in a practice scene (`cpu::fighter_frame`, entry 0; Training and the waiting room): on every
+/// frame of Player 1's take (`rr_host::player_tint`) entry 0's active body is the Player role's red, never Nana, as the
+/// CPU's. It does not depend on the CPU's AI frame, which a drill, a placement or Mash Out skips.
+///
+/// # Safety
+/// `accessor` is the live accessor of the entry-0 fighter whose frame just ran.
+pub(crate) unsafe fn tint_player(accessor: usize) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
+    let Some(rgb) = recording_host::player_tint() else { return };
+    if load_consts() && natives::module_accessor(0) == Some(accessor) {
+        tint(accessor, rgb);
+    }
 }
 
 unsafe fn write_controller(controller: usize, write: Inject) {

@@ -48,6 +48,8 @@ pub struct View<'a> {
     pub recording_page_role: &'a str,
     /// The role of the active capture, empty when there is no take.
     pub recording_capture_role: &'a str,
+    /// The role of the take the HUD's row shows, empty while it shows none.
+    pub recording_indicator: &'a str,
     pub list: &'a str,
     pub list_count: usize,
     pub list_index: Option<usize>,
@@ -203,6 +205,7 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     push_str(out, "recording.popup.role", view.recording_popup_role);
     push_str(out, "recording.page.role", view.recording_page_role);
     push_str(out, "recording.capture.role", view.recording_capture_role);
+    push_str(out, "recording.indicator", view.recording_indicator);
     push_str(out, "list", view.list);
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
@@ -296,6 +299,11 @@ pub fn scene_name(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
         2 => "lobby",
         _ => "",
     }
+}
+
+/// The role the HUD shows while a practice scene is fresh, empty otherwise.
+pub fn recording_indicator(scene: &str, take: Option<super::hud_row::Take>) -> &'static str {
+    if scene.is_empty() { "" } else { take.map_or("", super::hud_row::Take::key) }
 }
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {

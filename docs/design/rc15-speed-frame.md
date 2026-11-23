@@ -30,7 +30,7 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
    `0x1bbbd30` text, the HUD refresh, then `training_apply`'s writes: `+0x194 = 2`, the old slot freed, the step clear,
    code 0 / 60). From the next update the game's own `FUN_015569e0` pauses and steps on ZL exactly as after the pause
    menu. The stopwatch: `hud_icon` shows it for any value but x1 and `0x1bbbd30` writes value 2's label, as the menu
-   does.
+   does. The label's button glyph needs the menu's glyph style, which only a menu open sets: `rc15-fix-f5-f3.md` (2026-11-23).
    - **Leaving 1 Frame by the bind:** the apply already clears bit 2 (`.155b608`), but nothing then syncs the paused word
      in closed-menu play (the only syncs are `FUN_015569e0`'s and the pause/resume side's), so the game would stay paused.
      The bind does what the mode object's own run path does (`.1556b64`–`.1556b84`): if the paused word has bit 2, clear
