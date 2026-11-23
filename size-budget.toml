@@ -2381,3 +2381,11 @@ ceiling = 191961
 date = "2026-11-22"
 reason = "The shared refusal ordering and no-floor refusal, and Guard the Edge and Juggler in waiting-room practice. Measured normalized implementation 191961, 152 above the integration ceiling 191809, with zero spare. TEST-FLOW 2026-11-22 point 2: line-count growth pre-approved by the operator (~21:33Z), NRO and BSS reported with READY; tr-primary-2 ~21:41Z, rulings ~23:00Z and the lobby-parity order ~23:14Z."
 approved_by = "tr-primary-2, 2026-11-22 ~21:41Z, rulings ~23:00Z and the lobby-parity order ~23:14Z, under the operator's measured LOC rule; NRO and BSS reported with READY"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 192209
+date = "2026-11-23"
+reason = "A refused Save or Load in front of a standing notice; the test bridge's focused-list keys (operator: checks read the bridge); the partner given back before Lobby Practice turns off during a drill (review FAIL 2026-11-23 00:12:52Z). Measured normalized implementation 192209, 248 above the integration ceiling 191961, with zero spare. TEST-FLOW 2026-11-22 point 2: line-count growth pre-approved by the operator, NRO and BSS reported with READY; tr-primary-2 2026-11-23 ~00:11Z."
+approved_by = "tr-primary-2, 2026-11-23 ~00:11Z, under the operator's measured LOC rule; NRO and BSS reported with READY"
