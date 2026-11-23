@@ -351,12 +351,13 @@ fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
 fn a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
-    let read = frame.find("wizard.player_floor(").unwrap();
-    let found = frame[read..].find("if let Some(p1) = placed {").unwrap() + read;
+    let read = frame.find("wizard.settle_player(").unwrap();
+    let found = frame[read..].find("if placed && confirm {").unwrap() + read;
     let missing = frame[found..].find("} else if confirm {").unwrap() + found;
     let refusal = frame[missing..].find("notices::refuse(\"Pick a point above a floor\"); // restriction: edge-juggle-player-no-floor").unwrap() + missing;
     let notice = frame[refusal..].find("post_notice(capture, run").unwrap() + refusal;
     assert!(read < found && found < missing && missing < refusal && refusal < notice);
+    assert!(!frame.contains("wizard.setup.p1 ="));
 
     let placement = src("src/runtime/features/placement.rs");
     let floor = item(&placement, "pub(super) unsafe fn floor_under(");
