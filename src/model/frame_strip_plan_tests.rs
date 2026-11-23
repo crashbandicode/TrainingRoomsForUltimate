@@ -45,6 +45,132 @@ fn true_combo() -> Tracker {
     t
 }
 
+fn directional_combo(from: Move, to: Move, from_angle: Option<crate::model::frame_strip::Angle>,
+                     to_angle: Option<crate::model::frame_strip::Angle>) -> Tracker {
+    let mut tracker = Tracker::new();
+    for frame in 1..=26u32 {
+        let p1 = match frame {
+            1 | 2 | 20 => idle(),
+            3..=19 => Sample {
+                angle: from_angle,
+                active: frame == 7,
+                ..attack(from, 1, frame - 3)
+            },
+            _ => Sample {
+                angle: to_angle,
+                active: frame == 26,
+                ..attack(to, if from == to { 1 } else { 2 }, frame - 21)
+            },
+        };
+        let cpu = match frame {
+            7 | 26 => Sample { stop: true, hitstun: true, reaction: Some(30.0), ..Sample::default() },
+            8..=25 => Sample { hitstun: true, reaction: Some(30.0), ..Sample::default() },
+            _ => idle(),
+        };
+        tracker.step(p1, cpu, NONE);
+    }
+    tracker
+}
+
+#[test]
+fn the_lane_draws_each_mark_on_its_frame_in_a_label_box() {
+    use crate::model::frame_strip::{Aim, Angle};
+    for (active, color) in [(false, INK), (true, TEXT)] {
+        let mut tracker = Tracker::new();
+        tracker.step(idle(), idle(), NONE);
+        tracker.step(Sample { angle: Some(Angle::Up), active, ..attack(Move::SideTilt, 1, 0) }, idle(), NONE);
+        assert_eq!(aims_shown(&tracker), [Some(Aim { frame: 2, dir: 2 }), None]);
+        let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+        let mark = look_at(&seen, at::RUN_LABEL);
+        assert!(mark.visible);
+        assert_eq!(mark.text, Text::new("↑"));
+        assert_eq!((mark.x, mark.y, mark.w, mark.rot),
+                   (C.strip.lane_run(0, WINDOW - 1, 1, true).x,
+                    C.strip.lane_run(0, WINDOW - 1, 1, true).y,
+                    C.strip.lane_run(0, WINDOW - 1, 1, true).w,
+                    C.strip.lane_run(0, WINDOW - 1, 1, true).rot));
+        assert_eq!(mark.color, color);
+        assert!(!look_at(&seen, at::RUN_LABEL + RUN_LABELS).visible);
+        for _ in 0..WINDOW {
+            tracker.step(Sample::default(), Sample::default(), NONE);
+        }
+        assert_eq!(aims_shown(&tracker), [None; 2]);
+    }
+}
+
+#[test]
+fn marks_take_two_label_boxes_and_lengths_keep_the_rest() {
+    use crate::model::frame_strip::Angle;
+    let mut tracker = Tracker::new();
+    for (index, mv, angle, recovery) in [
+        (0, Move::SideTilt, Angle::Up, 0),
+        (1, Move::SideSmash, Angle::Down, 8),
+        (2, Move::SideTilt, Angle::Up, 8),
+    ] {
+        tracker.step(Sample { angle: Some(angle), active: true, ..attack(mv, index, 0) }, idle(), NONE);
+        for frame in 1..=recovery {
+            tracker.step(Sample { angle: Some(angle), ..attack(mv, index, frame) }, idle(), NONE);
+        }
+    }
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    let texts: Vec<_> = (0..4).map(|n| String::from_utf16(look_at(&seen, at::RUN_LABEL + n).text.units()).unwrap()).collect();
+    assert_eq!(texts, ["↑", "↓", "8", "8"]);
+}
+
+#[test]
+fn the_bridge_reports_only_the_marks_whose_label_box_exists() {
+    use crate::model::frame_strip::Angle;
+    let mut tracker = Tracker::new();
+    tracker.step(Sample { angle: Some(Angle::Down), active: true, ..attack(Move::SideSmash, 1, 0) }, idle(), NONE);
+    tracker.step(Sample { angle: Some(Angle::Up), active: true, ..attack(Move::SideTilt, 2, 0) }, idle(), NONE);
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(look_at(&seen, at::RUN_LABEL).text, Text::new("↑"), "the newest mark takes the first box");
+    assert_eq!(look_at(&seen, at::RUN_LABEL + 1).text, Text::new("↓"));
+    assert_eq!(aims_drawn(&tracker, [true, true]), [Some(6), Some(2)]);
+    assert_eq!(aims_drawn(&tracker, [false, true]), [Some(6), None], "the newest mark's box is missing");
+    assert_eq!(aims_drawn(&tracker, [true, false]), [Some(2), None], "the older mark's box is missing");
+    assert_eq!(aims_drawn(&tracker, [false, false]), [None; 2]);
+}
+
+#[test]
+fn a_diagonal_is_written_as_its_two_cardinal_arrows() {
+    assert_eq!((0..8).map(arrow).collect::<Vec<_>>(), ["→", "↑→", "↑", "↑←", "←", "↓←", "↓", "↓→"]);
+    assert!((0..8).flat_map(|dir| arrow(dir).chars()).all(|c| ('\u{2190}'..='\u{2193}').contains(&c)));
+}
+
+#[test]
+fn the_last_row_and_the_link_line_name_the_direction_beside_the_move() {
+    use crate::model::frame_strip::{Angle, Shown};
+    let tracker = directional_combo(Move::Jab, Move::SideTilt, None, Some(Angle::Up));
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Jab > Side tilt ↑");
+    let link = tracker.latest_link().unwrap();
+    assert_eq!(String::from_utf16(folded_link(&link).units()).unwrap(), "TRUE · Jab > Side tilt ↑");
+    let (_, line, _) = Renderer::new().draw_with_spec(
+        &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: false, cells: false, spec: &C },
+        |_, _, _| {},
+    );
+    assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), "TRUE · Jab > Side tilt ↑");
+    let special = Link { to: Move::Other, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] }], ..link };
+    assert_eq!(String::from_utf16(link_moves(&special, TEXT_UNITS).units()).unwrap(), "Jab > Up B ← →");
+    let named = Link { to: Move::SideTilt, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(2), None] }], ..link };
+    assert_eq!(String::from_utf16(link_moves(&named, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
+    let plain = Link { shown: [Shown::default(); 2], ..link };
+    assert_eq!(String::from_utf16(link_moves(&plain, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt");
+}
+
+#[test]
+fn a_long_pair_of_moves_drops_its_spaces_to_fit() {
+    use crate::model::frame_strip::{Angle, Shown};
+    let tracker = directional_combo(Move::SideSmash, Move::SideSmash, Some(Angle::Down), Some(Angle::Down));
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Side smash↓>Side smash↓");
+    let link = tracker.latest_link().unwrap();
+    assert_eq!(String::from_utf16(folded_link(&link).units()).unwrap(), "TRUE · Side smash↓>Side smash↓");
+    let short = Link { from: Move::Jab, shown: [Shown::default(), Shown { of: None, dirs: [Some(6), None] }], ..link };
+    assert_eq!(String::from_utf16(folded_link(&short).units()).unwrap(), "TRUE · Jab > Side smash ↓");
+}
+
 #[test]
 fn runtime_and_archive_share_the_strip_layout() {
     use crate::model::panes::{IDX_IV, strip_pane_spec};
