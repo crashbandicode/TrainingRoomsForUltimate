@@ -254,7 +254,7 @@ steps run.
 
 - **Start state:** a chain's Edit chain open (the numbered picker).
 - **What it does:** A gives the next number; R removes one and later numbers close up; A on a
-  numbered tile does nothing; B is done. The chain picker lists recordings only.
+  numbered tile does nothing; X is done, B backs out. The chain picker lists recordings only.
 - **What passes it:** the picker behaves as Character Cycles does, including R's refusal on the
   last remaining number; no chain tile appears in the chain picker.
 - **Source:** RR-3 requirement trace (A1, A9); stage-1 report lines 197, 203.

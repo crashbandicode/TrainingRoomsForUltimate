@@ -286,7 +286,7 @@ ROWS = [
       'RR-5 Design factory-row table; %s A14' % STAGE1,
       ['chord table screenshot', 'factory arrays [6,9] [6,8] [7,9] [7,8] [7,10] [7,11] [6,11] [6,10]']),
     R('rr-picker', 'rr_picker', 'xps', False,
-      "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, B is done; the chain picker lists recordings only",
+      "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, X is done, B backs out; the chain picker lists recordings only",
       'RR-3 requirement trace (A1, A9); %s lines 197, 203' % STAGE1,
       ['picker screenshot sequence', 'chain picker lists no chain tile']),
     R('rr-hot', 'rr_hot', 'xps', False,

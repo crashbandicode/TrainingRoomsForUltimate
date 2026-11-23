@@ -41,7 +41,7 @@ pub(super) fn switching() -> bool {
     SWITCHING.load(Ordering::Acquire)
 }
 
-pub(super) fn restoring() -> bool {
+pub(in crate::runtime) fn restoring() -> bool {
     ORIGINAL.load(Ordering::Acquire) != NONE
 }
 
