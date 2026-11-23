@@ -1922,10 +1922,13 @@ at once, but Guard the Edge, Juggler and Mash out could wait for the menu to clo
 
 The open menu now uses the panels' special stop on every fighter but Player 1 that the panels hold: the CPU and
 extra CPUs in Training, and the practice partner in a waiting room. Both scenes use the same stop; Training does not
-pause the whole game because the menu's own services, including the keyboard and fighter changes, run on fighter
-frames. Player 1 is not frozen. Fighter changes, save-state loads, recordings, playbacks and previews go on; the
-Recording pop-up and the close window do not hold the CPU.
+pause the whole game because the menu's own services, including the keyboard, run on fighter frames. Player 1 is not
+frozen. The hold stands down while something else drives or places the CPU: a preview, a save-state load, a
+recording, a macro playing on the CPU (the fact that keeps a drill from starting) and a fighter that is loading. A
+macro playing on Player 1 alone does not lift it. The Recording pop-up and the close window do not hold the CPU.
 
 After Stop, Guard the Edge and Juggler hand the CPU Behavior back under the menu unless the saved behaviour is Control,
-which waits for the close. Mash out restores under the menu; the other games already ended at once. This is built on
-the item owner's default; the operator may overrule it.
+which waits for the close. Mash out stops driving the CPU and gives it up under the menu. A fighter a drill borrowed
+(Mash out's attacker, a drill's own CPU fighter) comes back when the menu closes: the loader takes no fighter change
+while the menu owns the input, the rule a CPU Character picked in the menu follows. This is built on the item owner's
+default; the operator may overrule it.
