@@ -453,6 +453,10 @@ Guard the Edge's setup has three pages: CPU start, Player 1 start, then Preview.
 over or under it. On the CPU page, **X** restores that side's default and **Y** picks the other side's default.
 Player 1's crosshair chooses a point on the main floor.
 
+While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
+is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
+out of the setup puts the CPU back where it stood. (Eden, 2026-11-23; untested on hardware.)
+
 Juggler has four pages: CPU spot, Percent, Player 1 start, then Preview. Its CPU and Player 1 pages use the same
 crosshair controls; the Player 1 start can be on a floor or platform. The Percent page still uses the D-pad to change
 the value by 1 horizontally or 10 vertically.

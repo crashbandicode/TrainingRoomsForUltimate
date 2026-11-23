@@ -2505,7 +2505,15 @@ approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196706
+ceiling = 196636
 date = "2026-11-23"
-reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 196572 on 152629cd, which alone measures 196331, so they add 241. Install 2 a7f7f13b measures 196465 and shares no counted file with them: 196465 + 241 = 196706."
+reason = "Install 2, integration total after merging F8, F12, F15, F9, the GJ4 rework and F11 on 152629cd: 196465 (F9 entry, measured on its merged tree) + 0 (GJ4 rework) + 171 (F11, which dropped its own entry because it fitted under F12 196638 on its base) = 196636 measured on 3aace984, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and F11 reviewed READY (rv-edge-juggle-sol PASS 19:31:37Z and 20:04:20Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196888
+date = "2026-11-23"
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes add 252 counted lines: 196717 measured with them on install 2 a7f7f13b, which alone measures 196465. Install 2 1a0b3a64 measures 196636 and shares no counted file with them: 196636 + 252 = 196888."
 approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."

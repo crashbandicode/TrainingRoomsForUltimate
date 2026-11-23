@@ -8,7 +8,7 @@ use hos_lock::{Mutex, Published};
 use super::{cpu::konst, mashout::FloorRay, notices, placement, practice, recorder, states};
 use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
-use crate::model::crosshair::Marks;
+use crate::model::crosshair::{self, CpuPreview, Marks};
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
@@ -100,6 +100,8 @@ struct Engine {
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
+    /// The picker’s hold on the CPU at its picked start (`placement::preview`).
+    preview: Option<CpuPreview>,
     rng: Rng,
 }
 static ENGINE: Mutex<Engine> = Mutex::new(Engine {
@@ -108,6 +110,7 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     bests: [None; 24],
     streaks: [None; 24],
     held_cpu: None,
+    preview: None,
     rng: Rng::new(0),
 });
 
@@ -123,6 +126,8 @@ struct Run {
     wizard: Option<Wizard>,
     defaults: Setup,
     confirm_player: bool,
+    /// How the picker shows the CPU point this frame (`crosshair::cpu_view`).
+    cpu_view: &'static str,
     setup: Setup,
     rounds: Session,
     body: CpuBody,
@@ -1712,6 +1717,9 @@ fn report_drill_state(capture: PracticeCapture, run: &Run, best: Option<u32>, be
             Drill::Juggler => best,
         };
         let mut fields = run.rounds.practice_fields(run.wizard, best);
+        if run.wizard.is_some() {
+            fields.wizard_cpu = run.cpu_view;
+        }
         if run.wizard.is_none() && run.rounds.phase == Phase::Place {
             fields.step = match run.placement {
                 Placement::ResetResources => "reset_resources",
@@ -1811,7 +1819,26 @@ impl Engine {
         if let Some(current) = current.filter(|&body| held == Some(body)) {
             state::set_sleep(current.accessor, false);
         }
+        // A left picker puts the CPU back where it stood. A loading save state places the fighters itself.
+        if let Some(preview) = self.preview.take() {
+            if let Some(current) = current.filter(|body| body.object_id == preview.body() && !states::is_loading()) {
+                placement::restore(current.accessor, preview.origin());
+            }
+        }
     }
+}
+
+/// The picker’s hold on the CPU at its picked start, and the word the practice state shows for it.
+unsafe fn hold_preview(
+    preview: &mut Option<CpuPreview>,
+    held_cpu: &mut Option<CpuBody>,
+    body: CpuBody,
+    at: [f32; 2],
+) -> &'static str {
+    if placement::preview(preview, body.accessor, body.object_id, at) == Some(true) {
+        *held_cpu = Some(body);
+    }
+    crosshair::cpu_view(preview.as_ref())
 }
 
 /// One step per primary P1 fighter frame, with current owned accessors and no waits.
@@ -1832,6 +1859,7 @@ pub unsafe fn frame(fighter: usize) {
             practice::finish(old.drill.game());
         }
         engine.held_cpu = None;
+        engine.preview = None;
         ENGINE_ACTIVE.store(false, Ordering::Release);
         published::WIZARDS.set_up(Kind::DrillStart, false);
         return;
@@ -1977,6 +2005,7 @@ pub unsafe fn frame(fighter: usize) {
             setup,
             defaults: wizard.setup,
             confirm_player: false,
+            cpu_view: "",
             rounds: Session::new(drill, limit),
             body,
             previous_damage: None,
@@ -2024,6 +2053,7 @@ pub unsafe fn frame(fighter: usize) {
         bests,
         streaks,
         held_cpu,
+        preview,
         rng,
         ..
     } = &mut *engine
@@ -2084,8 +2114,13 @@ pub unsafe fn frame(fighter: usize) {
                 notices::refuse("Pick a point above a floor"); // restriction: edge-juggle-player-no-floor
             }
         }
+        run.cpu_view = hold_preview(preview, held_cpu, body, wizard.setup.cpu);
         post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
         return;
+    }
+    if preview.take().is_some() && held_cpu.take() == Some(body) {
+        // The picker held the CPU asleep: the placement that follows needs it awake.
+        state::set_sleep(cpu, false);
     }
     if !game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
         || !game::granted(crate::model::sites_pkg2::SITUATION_KIND_OFFSET)
@@ -2253,5 +2288,6 @@ pub fn look(active: bool) -> Marks {
     let Some(wizard) = engine.run.as_ref().and_then(|run| run.wizard) else {
         return empty;
     };
-    wizard.marks()
+    // Without the game HUD its magnifier is hidden too, so the border pointer stays.
+    wizard.marks().shown(engine.preview.is_some() && published::hud())
 }
