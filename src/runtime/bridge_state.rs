@@ -80,6 +80,10 @@ impl PracticeCapture {
         Self { admission: 0, activation: 0 }
     }
 
+    pub fn only(self, activation: u64) -> Self {
+        if self.activation == activation { self } else { Self::default() }
+    }
+
     pub fn submit(self, sample: impl FnOnce() -> Fields) {
         self.post(false, || Some(sample()));
     }

@@ -196,6 +196,8 @@ static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
 static START: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
+static RESULT_GENERATION: AtomicU64 = AtomicU64::new(0);
+static RESULT_ACTIVATION: AtomicU64 = AtomicU64::new(0);
 static ARMED: AtomicU64 = AtomicU64::new(0);
 static P1: AtomicUsize = AtomicUsize::new(0);
 static THRESHOLD: AtomicU32 = AtomicU32::new(0);
@@ -290,6 +292,21 @@ pub fn set_admission(on: bool) {
 }
 fn admission() -> Admission {
     Admission::new(READY.load(Ordering::Acquire) && SLOTS_READY.load(Ordering::Acquire))
+}
+
+/// The practice activation that owns this generation's grade (the worker posts a result for no other).
+fn own_result(generation: u64) {
+    use crate::runtime::features::practice::{activation, STARTING};
+    RESULT_GENERATION.store(0, Ordering::Release);
+    RESULT_ACTIVATION.store(activation().0 & !STARTING, Ordering::Release);
+    RESULT_GENERATION.store(generation, Ordering::Release);
+}
+
+/// (generation, activation), or None while the pair is being replaced.
+pub(super) fn result_owner() -> Option<(u64, u64)> {
+    let generation = RESULT_GENERATION.load(Ordering::Acquire);
+    let activation = RESULT_ACTIVATION.load(Ordering::Acquire);
+    (generation != 0 && generation == RESULT_GENERATION.load(Ordering::Acquire)).then_some((generation, activation))
 }
 
 /// rc.15 practice menu: Mash out runs while it is the running game (Start to Stop), no longer while its row is On.
@@ -1117,7 +1134,9 @@ pub unsafe fn frame(fighter: usize) {
     };
     let capture = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
     frame_game(fighter, &mut game);
-    capture.submit(|| game.practice_fields());
+    if !START.load(Ordering::Acquire) {
+        capture.submit(|| game.practice_fields());
+    }
 }
 
 unsafe fn frame_game(fighter: usize, game: &mut Game) {
@@ -1187,6 +1206,7 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
         game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+        own_result(game.generation);
         if game.config != config {
             game.roll = None;
         }
@@ -1505,6 +1525,7 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
         Step::Retry if released => {
             post(worker::Event::Cancel(game.generation), game.generation);
             game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            own_result(game.generation);
             game.saw_catch = false;
             game.followed = false;
             game.trolley = None;
@@ -1546,6 +1567,7 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
             let kind = ((body + 0xc) as *const u32).read();
             game.original.get_or_insert(kind);
             game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            own_result(game.generation);
             game.p1 = p1;
             game.cpu = cpu;
             game.saw_catch = false;

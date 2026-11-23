@@ -162,9 +162,14 @@ pub unsafe fn poll(controller: usize, sample: Sample, keys: Option<(bool, bool)>
     }
     let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
     let (save, load) = keys.unwrap_or_default();
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Btt);
     let mut mode = BTT.lock();
     let hide = mode.feed(Pad { stick, held: sample.held, pressed: sample.pressed, save, load });
     PHASE.store(mode.phase() as u8, Ordering::Release);
+    // Input-owned changes (cursor, count, phase) are published here: no fighter pass runs while the game is held.
+    if !START.load(Ordering::Acquire) {
+        capture.submit(|| mode.practice_fields());
+    }
     hide
 }
 
@@ -205,10 +210,6 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
         btt_camera::request(btt::BTT_PLACEMENT_OWNER, false);
         return 0;
     }
-    let on = on();
-    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Btt);
-    let start = START.swap(false, Ordering::AcqRel);
-    let place = start && PLACE.swap(false, Ordering::AcqRel);
     let owners = published::input_owners();
     let live = crate::model::scene::scene(facts).is_some();
     // The mode's camera and the stage's range (the normal placing box) where `btt::own_camera` says; elsewhere the game's own
@@ -216,7 +217,11 @@ unsafe fn pass(at: usize, top: [f32; 3], hits: &[eggs::Hit], mut hit: impl FnMut
     let native = live && btt::own_camera(facts);
     let range = native.then(|| natives::camera_limit_range()).flatten();
     let stage = if live { natives::stage_id() } else { -1 };
+    let on = on();
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(Game::Btt);
     let (mut broken, mut mode) = (0, BTT.lock());
+    let start = START.swap(false, Ordering::AcqRel);
+    let place = start && PLACE.swap(false, Ordering::AcqRel);
     mode.sense(range, top[1]);
     if start {
         mode.streak.restart(STREAK_RUN.load(Ordering::Acquire));

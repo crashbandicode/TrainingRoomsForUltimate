@@ -18,7 +18,7 @@ use crate::model::tech::{
     picker::{self, Pick, Picker},
     planner,
     practice_state::{self as state, View as StateView},
-    session::{Bests, Length, Phase},
+    session::{Bests, Length, Phase, Session},
     solver,
     surface::{Kind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
@@ -531,25 +531,28 @@ fn with_practice_frame(
     LIVE.with(|cell| {
         let mut slot = cell.borrow_mut();
         update(&mut slot, view);
-        if let Some(run) = slot.as_ref() {
-            capture.submit(|| {
-                let phase = if view.cancelled {
-                    StateView::Cancelled
-                } else if open {
-                    StateView::Paused
-                } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
-                    StateView::Failed
-                } else if view.surfaces.state != Walk::Closed || !run.scan_done {
-                    StateView::Discovering
-                } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
-                    StateView::Wizard(wizard, view.preview_blocked)
-                } else if placing() {
-                    StateView::Placing(&view.picker)
-                } else {
-                    StateView::Session
-                };
-                state::project_tech_state(&run.controller.session, phase)
-            });
+        if !START.load(Ordering::Acquire) {
+            if let Some(run) = slot.as_ref() {
+                capture.submit(|| {
+                    let phase = if view.cancelled {
+                        StateView::Cancelled
+                    } else if open {
+                        StateView::Paused
+                    } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
+                        StateView::Failed
+                    } else if view.surfaces.state != Walk::Closed || !run.scan_done {
+                        StateView::Discovering
+                    } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
+                        StateView::Wizard(wizard, view.preview_blocked)
+                    } else if placing() {
+                        StateView::Placing(&view.picker)
+                    } else {
+                        StateView::Session
+                    };
+                    let session = if run.restart_pending { &Session::IDLE } else { &run.controller.session };
+                    state::project_tech_state(session, phase)
+                });
+            }
         }
     });
 }
@@ -874,7 +877,6 @@ pub unsafe fn frame(fighter: usize) {
             }
         }
         if run.restart_pending || run.controller.session.phase == Phase::Off {
-            run.restart_pending = false;
             if run.controller.session.phase != Phase::Off {
                 run.controller.stop(&mut run.adapter);
             }
@@ -885,6 +887,7 @@ pub unsafe fn frame(fighter: usize) {
             run.fighter_kind = fighter_kind;
             run.config = view.wizard_config.unwrap_or(config);
             camera = run.config.camera;
+            run.restart_pending = false;
             run.controller.start(length(run.config));
             run.start_hint = StartHint::Pending(MaterialDraws::default());
             run.decision = None;

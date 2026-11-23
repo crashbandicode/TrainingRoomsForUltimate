@@ -151,6 +151,7 @@ mod tests {
         let fresh = project_tech_state(&Session::IDLE, View::Discovering);
         assert_eq!((fresh.phase, fresh.attempts, fresh.score, fresh.last_outcome),
             ("discovering", Some(0), Some(0), ""));
+        assert_eq!(fresh.step, "starting");
     }
 
     #[test]

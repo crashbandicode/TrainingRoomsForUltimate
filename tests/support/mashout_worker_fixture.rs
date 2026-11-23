@@ -220,6 +220,11 @@ mod worker {
         fn a_new_activation_does_not_inherit_the_previous_done_grade() {
             reset();
             ACTIVATION.store(1, Ordering::Release);
+            let stale = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
+            ACTIVATION.store(2, Ordering::Release);
+            stale.result(|| panic!("a stale capture must not project"));
+            crate::runtime::bridge_state::PracticeCapture::default().result(|| panic!("a disabled capture must not project"));
+            ACTIVATION.store(1, Ordering::Release);
             own_result(5, 1);
             begin(1, SeedOrigin::Export);
             finish(1);
@@ -248,6 +253,10 @@ mod worker {
             assert_eq!(posted[0].0, 2);
             assert!(!posted[0].1.last_outcome.is_empty());
 
+            own_result(7, 2);
+            service();
+            assert!(RESULTS.lock().unwrap().is_empty(), "a different generation must not publish");
+            own_result(6, 2);
             ACTIVATION.store(3, Ordering::Release);
             queue(Event::TechGrade(6, crate::model::tech::session::Grade::Perfect(Some(2)), None, 3));
             service();

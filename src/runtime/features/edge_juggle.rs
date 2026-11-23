@@ -1929,7 +1929,10 @@ pub unsafe fn frame(fighter: usize) {
             run.rounds.discard_attempt();
             run.placement = Placement::ResetResources;
             run.notice = FixedPath::new();
-            report_drill_state(capture, run, None, None);
+            // A pending Start belongs to the next run.
+            if START.load(Ordering::Acquire) == 0 {
+                report_drill_state(capture, run, None, None);
+            }
         }
         return;
     }

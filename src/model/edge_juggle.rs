@@ -407,6 +407,7 @@ pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::F
 pub struct Session {
     drill: Drill,
     limit: Option<u16>,
+    last: Option<Outcome>,
     rewrites: u16,
     pub phase: Phase,
     pub attempts: u16,
@@ -422,6 +423,7 @@ impl Session {
         Self {
             drill,
             limit,
+            last: None,
             rewrites: 0,
             phase: Phase::Place,
             attempts: 0,
@@ -483,6 +485,7 @@ impl Session {
     }
 
     fn finish_attempt(&mut self, outcome: Outcome) {
+        self.last = Some(outcome);
         if outcome != Outcome::Unresolved {
             self.attempts = self.attempts.saturating_add(1);
             if matches!(outcome, Outcome::Secured | Outcome::ZoomWin) {
@@ -612,12 +615,12 @@ impl Session {
             };
         }
 
-        let (phase, remaining_frames, last_outcome) = match self.phase {
-            Phase::Place => ("place", None, ""),
-            Phase::Ready(left) => ("ready", Some(u32::from(left)), ""),
-            Phase::Live => ("live", None, ""),
-            Phase::Result(outcome, left) => ("result", Some(u32::from(left)), outcome.bridge_name()),
-            Phase::Done => ("done", None, ""),
+        let (phase, remaining_frames) = match self.phase {
+            Phase::Place => ("place", None),
+            Phase::Ready(left) => ("ready", Some(u32::from(left))),
+            Phase::Live => ("live", None),
+            Phase::Result(_, left) => ("result", Some(u32::from(left))),
+            Phase::Done => ("done", None),
         };
         let edge = self.drill == Drill::GuardEdge;
         Fields {
@@ -629,7 +632,7 @@ impl Session {
             best,
             attempts: Some(u32::from(self.attempts)),
             hits: (!edge).then_some(u32::from(self.hits)),
-            last_outcome,
+            last_outcome: self.last.map_or("", |outcome| outcome.bridge_name()),
             ..Fields::default()
         }
     }
@@ -1294,6 +1297,15 @@ mod tests {
         }
         assert_eq!(unresolved.practice_fields(None, None).last_outcome, "unresolved");
         assert_eq!(unresolved.practice_fields(None, None).attempts, Some(0));
+
+        let mut juggler = release(Drill::Juggler, None);
+        juggler.advance_attempt(Observation { grounded: true, ..Observation::default() });
+        for _ in 0..RESULT_FRAMES {
+            juggler.advance_attempt(Observation::default());
+        }
+        assert_eq!(juggler.practice_fields(None, None).last_outcome, "landed");
+        juggler.restart_drill();
+        assert_eq!(juggler.practice_fields(None, None).last_outcome, "");
     }
 
     #[test]

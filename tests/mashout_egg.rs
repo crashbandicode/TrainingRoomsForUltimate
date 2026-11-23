@@ -266,6 +266,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
     ] {
         fixture = fixture.replace(&format!("{marker}\n"), &format!("{value}\n"));
     }
+    fixture.push_str("\nfn own_result(_: u64) {}\n");
     run_fixture(fixture, "egg");
 }
 
@@ -294,6 +295,13 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
 
 #[test]
 fn a_new_activation_does_not_inherit_the_previous_done_grade() {
+    let runtime = include_str!("../src/runtime/features/mashout.rs");
+    let assignment = "game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;";
+    let sites: Vec<_> = runtime.match_indices(assignment).map(|(at, _)| at + assignment.len()).collect();
+    assert_eq!(sites.len(), 3);
+    for site in sites {
+        assert!(runtime[site..].trim_start().starts_with("own_result(game.generation);"));
+    }
     run_worker_fixture("worker-practice", true);
 }
 
