@@ -958,6 +958,23 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             let ((a, ea), (b, eb)) = (end(orb.centre)?, end(orb.tail)?);
             orbs::plan_pill([a, b], [ea, eb], half, color)
         };
+        if zone_wizard {
+            if let Some(view) = view() {
+                let samples = super::egg_zone::draw(layout as usize, view, |[a, b], width, color| {
+                    let [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+                    let length = dx.hypot(dy);
+                    if length > 0.0 && length.is_finite() {
+                        if let Some(band) = used.take_band() {
+                            let center = [a[0].midpoint(b[0]), a[1].midpoint(b[1])];
+                            write_pane(cache.panes[p::CAPS + band], center, [length, width], dy.atan2(dx).to_degrees(), color);
+                        }
+                    }
+                });
+                for (slot, spot) in own.iter_mut().zip(samples) {
+                    *slot = spot.map(|spot| (spot, p::EGG_WHOLE));
+                }
+            }
+        }
         // The target and its break animations are pictures whatever Hitbox Visualization says (rc.14): each is planned at the
         // target's size in the texture's colours; its look scales and fades it (a break grows and fades).
         let mut dot = Orb::NONE;
@@ -968,7 +985,7 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             Some((plan(&dot, [255; 4])?, look))
         });
         if let Some(pointer) = own[3]
-            .filter(|_| pointed)
+            .filter(|_| pointed && !zone_wizard)
             .and_then(|([x, y], _)| project_to_canvas([x, y, 0.0], half))
             .and_then(|canvas| orbs::edge_pointer(canvas))
         {
@@ -982,20 +999,6 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         let combat = board.as_ref().filter(|_| on).map(|sample| &sample.board);
         // Hitboxes and grabs take the panes first. Uncertain snapshots yield no fighter panes this tick.
         let bits = SHOWN.load(Ordering::Acquire);
-        if zone_wizard {
-            if let Some(view) = view() {
-                super::egg_zone::draw(view, |[a, b], width, color| {
-                    let [dx, dy] = [b[0] - a[0], b[1] - a[1]];
-                    let length = dx.hypot(dy);
-                    if length > 0.0 && length.is_finite() {
-                        if let Some(band) = used.take_band() {
-                            let center = [a[0].midpoint(b[0]), a[1].midpoint(b[1])];
-                            write_pane(cache.panes[p::CAPS + band], center, [length, width], dy.atan2(dx).to_degrees(), color);
-                        }
-                    }
-                });
-            }
-        }
         let drawn = orbs::targets_drawn(combat.is_some() || !on, hurt_on || grader, n_targets);
         let write_pill = |pill: orbs::Pill, used: &mut orbs::PaneUse, over: &mut u32, panes: &[usize; p::ORBS]| {
             let Some((cap, band)) = used.take(pill.length > 0.0) else {

@@ -186,7 +186,7 @@ fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
     assert!(item(&runtime, "pub fn look(").contains("wizard.shows_cpu()"));
     let hitbox = src("src/runtime/features/hitbox.rs");
     let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
-    assert!(draw.contains(".filter(|_| pointed)"));
+    assert!(draw.contains(".filter(|_| pointed && !zone_wizard)"));
     assert!(!draw.contains(".filter(|_| edge_wizard)"));
     let notice = item(&runtime, "fn post_notice(");
     for text in [
@@ -554,12 +554,25 @@ fn every_wizard_is_lowered_by_the_menu_and_by_its_own_frame() {
 }
 
 #[test]
-fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
+fn zone_overlay_dims_the_live_view_and_backs_the_inset_guide() {
     let zone = src("src/runtime/features/egg_zone.rs");
     let draw = item(&zone, "pub fn draw(");
-    assert!(draw.contains("stroke_layers(width, color)"), "world marks draw the dark and colored layers");
+    assert!(draw.contains("crop_window(crop_view(&map), inset, display.step)"), "the live view's marks are the crop window");
+    assert!(!draw.contains("stroke_layers"));
     assert!(draw.contains("INSET_BACKING"), "every inset mark has a dark background");
     assert!(item(&zone, "fn prompt(").contains("notices::show_now("), "the built-in notice includes the dark label plate");
+}
+
+#[test]
+fn the_bridge_reports_the_committed_zone_not_a_queued_apply() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let publish = item(&worker, "fn publish_bridge_state(");
+    assert!(publish.contains("zone_saved: zone.and_then(|z| committed_egg_zone(z.stage))"));
+    let committed = item(&worker, "fn committed_egg_zone(");
+    assert!(!committed.contains("EGG_ZONE_WRITE"), "a queued Apply is not saved yet");
+    assert!(committed.contains("EGG_ZONE_PRESENT") && committed.contains("EGG_ZONES[stage]"));
+    let game = item(&worker, "pub fn egg_zone(");
+    assert!(game.contains("EGG_ZONE_WRITE") && game.contains("committed_egg_zone(stage)"), "the game still plays a queued Apply");
 }
 
 #[test]

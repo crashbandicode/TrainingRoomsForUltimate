@@ -4,6 +4,7 @@
 use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
+use crate::model::egg_zone::{CropRect, CROP_RECTS};
 use crate::model::frame::{Frame, Tone, View, POP_PAD};
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
@@ -17,6 +18,10 @@ const PLAYER: [u8; 4] = [255, 83, 92, 255];
 const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
 use crate::model::frame::Text;
+
+/// The crop window's rectangles: the roster grid's stripes, flat rectangles that never take a texture.
+const IDX_CROP: usize = IDX_TILE_STRIPE;
+const _: () = assert!(CROP_RECTS <= 2 * TILES);
 
 /// The resolved panes of the menu in the layout now showing.
 pub struct Panes {
@@ -33,6 +38,76 @@ fn tone_color(tone: Tone) -> [u8; 4] {
         Tone::Dim => TEXT_DIM,
         Tone::On => TEXT_ON,
         Tone::Off => TEXT_OFF,
+    }
+}
+
+impl Panes {
+    /// The zone editor is up with the menu closed: hide every menu pane, so the shown container draws only what
+    /// `crop_draw` places.
+    pub unsafe fn crop_enter(&self) {
+        for i in 1..MENU_COUNT {
+            self.hide(i);
+        }
+    }
+
+    /// The editor closed or the menu shows again: every menu pane back to the visibility the pane table starts it
+    /// with, which is what the menu's first full draw after a layout registration starts from. Nothing about the
+    /// hidden panes is kept, so a layout resolved again while the editor is up loses nothing.
+    pub unsafe fn crop_leave(&self) {
+        for i in 1..MENU_COUNT {
+            self.show(i, p::spec(i).visible);
+        }
+    }
+
+    /// This tick's rectangles, back to front; an unused entry hides its pane.
+    pub unsafe fn crop_draw(&self, rects: &[Option<CropRect>; CROP_RECTS]) {
+        for (i, rect) in rects.iter().enumerate() {
+            if let Some(CropRect { x, y, w, h, color }) = *rect {
+                self.rect_at(IDX_CROP + i, x, y, w, h, color);
+            } else {
+                self.hide(IDX_CROP + i);
+            }
+        }
+    }
+}
+
+/// The zone editor's crop window on the resolved panes: whether the menu's panes are hidden for it.
+pub struct Crop {
+    up: bool,
+}
+
+impl Crop {
+    pub const fn new() -> Self {
+        Self { up: false }
+    }
+
+    /// The layout's panes were resolved, for the first time or again: what the window hid comes back through the
+    /// panes just resolved, whether they are the same panes (still hidden) or a new layout's (as the table starts
+    /// them). A pass that still has the editor up enters again.
+    pub unsafe fn resolved(&mut self, panes: Option<&Panes>) {
+        if core::mem::take(&mut self.up) {
+            if let Some(panes) = panes {
+                panes.crop_leave();
+            }
+        }
+    }
+
+    /// One pass of the menu tick: enter when the editor is up with the menu closed and place this pass's rectangles;
+    /// leave when it is not.
+    pub unsafe fn pass(&mut self, panes: &Panes, editing: bool, rects: Option<&[Option<CropRect>; CROP_RECTS]>) {
+        if !editing {
+            if core::mem::take(&mut self.up) {
+                panes.crop_leave();
+            }
+            return;
+        }
+        if !core::mem::replace(&mut self.up, true) {
+            panes.crop_enter();
+        }
+        // A pass whose guide was not drawn keeps the rectangles of the pass before.
+        if let Some(rects) = rects {
+            panes.crop_draw(rects);
+        }
     }
 }
 

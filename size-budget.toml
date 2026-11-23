@@ -2413,3 +2413,11 @@ ceiling = 191884
 date = "2026-11-22"
 reason = "Lobby Practice is On by default, and the first-install notices also post on the waiting room's HUD once its practice session is open (one flag and one pure rule). Measured normalized implementation 191884, 15 above the integration ceiling 191869, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 23:41:32Z (HANDOFF-PRIMARY-tr-primary-2.md line 1643): the operator's order that Lobby Practice defaults to On, with the first-install notices in the waiting room; the growth is under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2), NRO and BSS reported with READY"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 192711
+date = "2026-11-22"
+reason = "Eggs-ercise zone editor design 3: crop windows with limits, handles and inset edges on existing menu rectangles, sample targets instead of hatching, only the inset backing and contour on bands, and editor state on the test bridge. Measured normalized implementation 192711, 861 above the prior measured integration total of 191850 after warning cleanup, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 17:07:18Z and 17:51Z (HANDOFF-PRIMARY-tr-primary-2.md lines 1494-1495 and 1522): design 3 under the operator's measured LOC rule; the measured lines and the resident memory are reported with the implementation"

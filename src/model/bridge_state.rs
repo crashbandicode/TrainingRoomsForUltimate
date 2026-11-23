@@ -1,8 +1,10 @@
 //! The `tr.menu/1` snapshot TrainingRooms publishes to the optional test bridge (ssbu-hw-bridge
-//! docs/PLUGIN-STATE.md v2.1): the menu's place, the open editor, the running practice game, the current notice and the
-//! handled-input count, as fixed-order `key=value` lines under the bridge's 2 KiB bound. Also the lookup schedule
-//! (at most once a second for 30 s, then off for the boot) and the publisher's change/retry rule. Nothing here runs
-//! when the bridge is absent: the runtime branches on `enabled` first.
+//! docs/PLUGIN-STATE.md v2.1): the menu's place, the open editor, the running practice game, zone editor state, the
+//! current notice and the handled-input count, as fixed-order `key=value` lines under the bridge's 2 KiB bound. Also the
+//! lookup schedule (at most once a second for 30 s, then off for the boot) and the publisher's change/retry rule.
+//! Nothing here runs when the bridge is absent: the runtime branches on `enabled` first.
+
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 /// The provider's name, schema id and version (the wire's `schema=tr.menu/1`).
 pub const NAME: &[u8] = b"tr.menu";
@@ -32,6 +34,11 @@ pub struct View<'a> {
     pub game: Option<&'a str>,
     pub game_running: bool,
     pub notice: Option<(&'a str, &'a str)>,
+    /// The zone editor's last handed-over state (`None` before its first opening this boot), whether it is up now, and
+    /// the saved zone of that state's stage.
+    pub zone: Option<ZoneEditor>,
+    pub zone_up: bool,
+    pub zone_saved: Option<[u8; 4]>,
     /// Inputs the menu handled this boot, and how the last one ended.
     pub ack: u64,
     pub ack_result: &'a str,
@@ -45,6 +52,86 @@ pub struct View<'a> {
     pub rows: &'a [&'a str],
     /// The publisher does not list the rows (the v1 limit): `rows.complete=0` whatever `rows` holds.
     pub rows_omitted: bool,
+}
+
+/// The stage spawn-zone editor for the snapshot's `zone.*` lines, as the game thread hands it over.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ZoneEditor {
+    pub stage: i32,
+    /// `egg_zone::Step as u8`: top, bottom, inner, outer, preview.
+    pub step: u8,
+    /// Top, bottom, inner, outer, as saved.
+    pub bins: [u8; 4],
+    /// How the editor closed: 0 not by its own buttons, `APPLIED`, `CANCELLED`.
+    pub last: u8,
+    /// [bottom, top] in stage units.
+    pub vertical: [f32; 2],
+    /// Left and right: that side's [lo, hi] when the stage has a zone there.
+    pub sides: [Option<[f32; 2]>; 2],
+}
+
+impl ZoneEditor {
+    pub const APPLIED: u8 = 1;
+    pub const CANCELLED: u8 = 2;
+
+    pub fn pack(self) -> [u64; 4] {
+        let pair = |[lo, hi]: [f32; 2]| u64::from(lo.to_bits()) | (u64::from(hi.to_bits()) << 32);
+        let head = (1u64 << 63) | (u64::from(self.last & 3) << 51) | (u64::from(self.step & 7) << 48)
+            | (u64::from(self.stage as u16) << 32) | u64::from(u32::from_le_bytes(self.bins));
+        [head, pair(self.vertical), self.sides[0].map_or(u64::MAX, pair), self.sides[1].map_or(u64::MAX, pair)]
+    }
+
+    pub fn unpack(words: [u64; 4]) -> Option<Self> {
+        let [head, vertical, left, right] = words;
+        if head == 0 {
+            return None;
+        }
+        let pair = |word: u64| [f32::from_bits(word as u32), f32::from_bits((word >> 32) as u32)];
+        Some(Self {
+            stage: i32::from((head >> 32) as u16),
+            step: ((head >> 48) & 7) as u8,
+            bins: (head as u32).to_le_bytes(),
+            last: ((head >> 51) & 3) as u8,
+            vertical: pair(vertical),
+            sides: [left, right].map(|word| (word != u64::MAX).then(|| pair(word))),
+        })
+    }
+}
+
+/// Game thread to worker without a lock: a read that meets a write gets nothing rather than half of it.
+pub struct ZoneCell {
+    seq: AtomicU32,
+    words: [AtomicU64; 4],
+}
+
+impl ZoneCell {
+    pub const fn new() -> Self {
+        Self { seq: AtomicU32::new(0), words: [const { AtomicU64::new(0) }; 4] }
+    }
+
+    pub fn write(&self, words: [u64; 4]) {
+        let odd = self.seq.load(Ordering::SeqCst).wrapping_add(1);
+        self.seq.store(odd, Ordering::SeqCst);
+        for (slot, value) in self.words.iter().zip(words) {
+            slot.store(value, Ordering::SeqCst);
+        }
+        self.seq.store(odd.wrapping_add(1), Ordering::SeqCst);
+    }
+
+    pub fn read(&self) -> Option<[u64; 4]> {
+        let seq = self.seq.load(Ordering::SeqCst);
+        if seq & 1 != 0 {
+            return None;
+        }
+        let words = self.words.each_ref().map(|word| word.load(Ordering::SeqCst));
+        (self.seq.load(Ordering::SeqCst) == seq).then_some(words)
+    }
+}
+
+impl Default for ZoneCell {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// The snapshot into `out` (cleared first). Returns false when the rows did not all fit (`rows.complete=0`).
@@ -71,6 +158,38 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     let _ = writeln!(out, "keyboard={}", u8::from(view.keyboard));
     push_str(out, "game", view.game.unwrap_or(""));
     let _ = writeln!(out, "game.running={}", u8::from(view.game_running));
+    let editing = view.zone.filter(|_| view.zone_up);
+    let step = editing.map_or("", |zone| match zone.step {
+        0 => "top", 1 => "bottom", 2 => "inner", 3 => "outer", 4 => "preview", _ => "",
+    });
+    push_str(out, "zone.step", step);
+    let last = if editing.is_some() { "" } else { view.zone.map_or("", |zone| match zone.last {
+        ZoneEditor::APPLIED => "applied", ZoneEditor::CANCELLED => "cancelled", _ => "",
+    }) };
+    push_str(out, "zone.last", last);
+    let _ = writeln!(out, "zone.stage={}", view.zone.map_or(-1, |zone| zone.stage));
+    if let Some(zone) = editing {
+        let [top, bottom, inner, outer] = zone.bins;
+        let _ = writeln!(out, "zone.bins=\"{top},{bottom},{inner},{outer}\"");
+        let [bottom, top] = zone.vertical;
+        let _ = writeln!(out, "zone.y=\"{bottom:.2},{top:.2}\"");
+        for (key, side) in [("zone.left", zone.sides[0]), ("zone.right", zone.sides[1])] {
+            if let Some([lo, hi]) = side {
+                let _ = writeln!(out, "{key}=\"{lo:.2},{hi:.2}\"");
+            } else {
+                push_str(out, key, "");
+            }
+        }
+    } else {
+        for key in ["zone.bins", "zone.y", "zone.left", "zone.right"] {
+            push_str(out, key, "");
+        }
+    }
+    if let Some([top, bottom, inner, outer]) = view.zone.filter(|z| z.stage >= 0).and(view.zone_saved) {
+        let _ = writeln!(out, "zone.saved=\"{top},{bottom},{inner},{outer}\"");
+    } else {
+        push_str(out, "zone.saved", "");
+    }
     let (header, body) = view.notice.unwrap_or(("", ""));
     push_str(out, "notice.header", header);
     push_str(out, "notice.body", body);
