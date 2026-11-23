@@ -58,7 +58,7 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - **A drill Make combo made** has no preview in this build. Its source macro holds its inputs, but the file cannot tell a made drill from a crop of one, and keeping a take at Make combo's save is inside the player's code (`finish_make`), which this item does not edit.
 - **A take left without its drill** (the drill file removed by hand on the card) shows up under MACROS with its keyed take name; nothing cleans it up.
 - **A drill save that fails** before the drill file is written deletes the take it just wrote. Once the drill file is written both stay, also when the index update then fails; the drill is then not made the active drill.
-- **After X or B** the page returns when the player reports no run left. Two limits are in the player's code and are not changed here: if the card's recordings cannot be read at that moment, the player clears its preview flag without dropping the frames it had queued; and a frame the pad hook is taking at the instant the queue is dropped is still handed over, within the game frame of the stop.
+- **After X or B** the page returns when the player reports no run left. If the card's recordings cannot be read at that moment, the player ends the preview's run and drops its queued frames as after a Stop, and nothing resumes when the card reads again. One limit stays in the player's code: a frame the pad hook is taking at the instant the queue is dropped is still handed over, within the game frame of the stop.
 - **A drill's own screen and the Crop editor** get no preview key: the key is on the list rows.
 - **The HUD** (frame strip, notices) stays hidden during the preview, as under the Crop editor: the menu still owns the pad.
 
@@ -75,6 +75,7 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - `x_during_a_play_on_player_one_starts_no_drill_preview` (`rr_host`): a queued or running Play keeps its inputs and is not replaced.
 - `a_takes_name_is_the_prefix_and_sixteen_hex_digits` (`combo_record`): names require the prefix and exactly 16 lowercase hex digits.
 - `a_recorded_drills_take_previews_on_player_one_through_the_play_queue` (`rr_host`): `request_preview` of the take feeds Player 1's queue exactly the take's frames, and nothing to the CPU's.
+- `a_stop_while_the_index_is_unreadable_retires_the_preview_run` (`rr_host`): an index read failure during a preview, with or without a Stop request, drops queued frames and does not resume the run.
 - `a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop` (`combo_record`): the `take` field through the file, a rename and a crop.
 - `x_previews_a_drill_that_has_its_take_on_both_faces` (`recording_menu`): a take is in no macro list or picker; the effect with the take's id and frame count on the page and in the pop-up; no effect and the `Re-record to preview` line for a drill without a take (also one with `made_from`, and one whose take file is missing); X in MACROS still cycles the loop; both hints.
 - `a_cropped_made_drill_has_no_preview` (`recording_menu` or where the crop path's test lives): a crop of a drill made from a macro keeps `made_from`, shows `Re-record to preview` and X does nothing.
