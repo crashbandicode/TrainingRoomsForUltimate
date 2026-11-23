@@ -52,6 +52,35 @@ fn a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy() 
     assert_eq!(Recorder::new().start_named_playback(NAMED_FRAMES + 1, 1, 0, 1), Err(PlayRefusal::NothingLoaded));
 }
 
+fn f4_named_playback_keeps_start_facing_until_the_restore_updates_it() {
+    let mut r = Recorder::new();
+    let layer = Layer::default();
+    for i in 0..4 {
+        layer.store(i, MappedInputs { lstick_x: 80, ..MappedInputs::NEUTRAL });
+    }
+    r.start_named_playback(4, -1, 0, -1).unwrap();
+    for facing in [-1, 1] {
+        let write = r.control_named(&ControlCtx { facing, shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+    r.set_current_facing(1);
+    let write = r.control_named(&ControlCtx { facing: -1, shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+    assert_eq!(write.stick_x, -80.0 / 120.0);
+}
+
+fn f4_named_restore_updates_the_mirror_without_a_live_turn() {
+    let mut r = Recorder::new();
+    let layer = Layer::default();
+    for i in 0..2 {
+        layer.store(i, MappedInputs { lstick_x: 80, ..MappedInputs::NEUTRAL });
+    }
+    r.start_named_playback(2, -1, 0, -1).unwrap();
+    let ctx = ControlCtx { facing: -1, shulk_dial: false };
+    assert_eq!(r.control_named(&ctx, &|i| layer.at(i)).write.unwrap().stick_x, 80.0 / 120.0);
+    r.set_current_facing(1);
+    assert_eq!(r.control_named(&ctx, &|i| layer.at(i)).write.unwrap().stick_x, -80.0 / 120.0);
+}
+
 #[test]
 fn restored_named_playback_finishes_while_drill_is_selected() {
     use model::edge_juggle::drill_owns_pad;
@@ -72,5 +101,7 @@ fn restored_named_playback_finishes_while_drill_is_selected() {
 fn case_table() {
     crate::test_table::run(&[
         ("a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy", a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy as fn()),
+        ("f4_named_playback_keeps_start_facing_until_the_restore_updates_it", f4_named_playback_keeps_start_facing_until_the_restore_updates_it as fn()),
+        ("f4_named_restore_updates_the_mirror_without_a_live_turn", f4_named_restore_updates_the_mirror_without_a_live_turn as fn()),
     ]);
 }

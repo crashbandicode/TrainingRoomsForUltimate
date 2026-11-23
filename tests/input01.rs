@@ -147,6 +147,59 @@ fn mirror_multiplier_and_shulk_dial() {
 }
 
 #[test]
+fn f4_playback_same_start_facing_survives_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, -1).unwrap();
+    for facing in [-1, 1, 1] {
+        let write = r.control(&ControlCtx { facing, shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_opposite_start_facing_stays_mirrored_after_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for facing in [1, -1, 1] {
+        let write = r.control(&ControlCtx { facing, shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, -80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_turns_only_when_the_recorded_direction_changes() {
+    let mut r = Recorder::new();
+    let frames: Vec<_> = [-80, 80, -80, 80].into_iter().flat_map(|x| [stick(x, 0); 60]).collect();
+    filled(&mut r, 0, &frames, -1);
+    r.start_playback(0, -1).unwrap();
+    let mut facing = -1;
+    let mut turns = 0;
+    for _ in 0..240 {
+        let write = r.control(&ControlCtx { facing, shulk_dial: false }).write.unwrap();
+        let next = if write.stick_x > 0.0 { 1 } else { -1 };
+        if next != facing {
+            facing = next;
+            turns += 1;
+        }
+    }
+    assert_eq!(turns, 3);
+    assert_eq!(r.frame(), 240);
+}
+
+#[test]
+fn f4_playback_shulk_dial_uses_the_recorded_sign() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for facing in [1, -1, 1] {
+        let write = r.control(&ControlCtx { facing, shulk_dial: true }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+}
+
+#[test]
 fn injected_stick_values() {
     let i = inject_values(stick(127, -127), 1);
     assert_eq!((i.stick_x, i.stick_y), (1.0, -1.0), "clamped to full deflection");

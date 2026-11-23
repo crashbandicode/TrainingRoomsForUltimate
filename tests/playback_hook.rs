@@ -12,19 +12,17 @@ fn f4_cpu_role_live_input_does_not_depend_on_facing_or_dial() {
     use model::input_delay::MappedInputs;
     use model::recording::{CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
 
-    for chord in [-1, 1] {
-        for hold in [80, -80] {
-            let mut drive = CpuRoleDrive::idle();
-            drive.begin_placed();
-            let input = MappedInputs { buttons: 42, lstick_x: hold, ..MappedInputs::NEUTRAL };
-            let mut player = input;
-            assert_eq!(drive.poll(&mut player), Some(input));
-            assert_eq!(player, MappedInputs::NEUTRAL);
-            let write = drive.control().write.unwrap();
-            assert_eq!(write.stick_x, f32::from(hold) / 120.0, "chord={chord}");
-            assert_eq!(write.clamped_x, f32::from(hold) / 120.0);
-            assert_eq!(write.buttons, 42);
-        }
+    for hold in [80, -80] {
+        let mut drive = CpuRoleDrive::idle();
+        drive.begin_placed();
+        let input = MappedInputs { buttons: 42, lstick_x: hold, ..MappedInputs::NEUTRAL };
+        let mut player = input;
+        assert_eq!(drive.poll(&mut player), Some(input));
+        assert_eq!(player, MappedInputs::NEUTRAL);
+        let write = drive.control().write.unwrap();
+        assert_eq!(write.stick_x, f32::from(hold) / 120.0);
+        assert_eq!(write.clamped_x, f32::from(hold) / 120.0);
+        assert_eq!(write.buttons, 42);
     }
 
     let mut drive = CpuRoleDrive::idle();
