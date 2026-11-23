@@ -103,6 +103,12 @@ pub fn tick(
     (settled, Tick::Serve { target, observed, step: service(selected, target, observed, settled.is(choice)) })
 }
 
+/// What the service compares the slot with (`tick`'s `observed`): the roster's `ready` read. Stub of 480345a6: a
+/// picker's hold on the CPU's body is not asked about.
+pub fn observable(_selected: Option<u32>, _held: impl FnOnce() -> bool, ready: impl FnOnce() -> Option<u32>) -> Option<u32> {
+    ready()
+}
+
 pub const HERO: u32 = 0x53;
 pub const FIGHTER_CHOICES: usize = CHOICES.len() + 1;
 pub const MODE_CHOICES: usize = 3;
@@ -355,6 +361,42 @@ mod tests {
         let (settled, step) = tick(settled, None, Some(PYRA), true, || false, || Some(PYRA));
         assert_eq!(step, Tick::Serve { target: PYRA, observed: Some(PYRA), step: Service { switching: false, request: false } });
         assert_eq!(settled.kind(), None);
+    }
+
+    #[test]
+    fn the_original_is_not_asked_for_while_a_picker_holds_the_cpu() {
+        const DONKEY: u32 = 0x01;
+        const ZERO_SUIT: u32 = 0x20;
+        // The picker was left: nothing is selected, Donkey Kong is in the slot and Zero Suit Samus is to come back.
+        let mut reads = 0;
+        let mut serve = |held: bool| {
+            tick(Settled::default(), None, Some(ZERO_SUIT), true, || false, || {
+                observable(None, || held, || {
+                    reads += 1;
+                    Some(DONKEY)
+                })
+            })
+            .1
+        };
+        let held = serve(true);
+        let let_go = serve(false);
+        // The roster hands the outgoing body's place to the incoming fighter. While the picker holds Donkey Kong at
+        // its picked start, the original is not asked for and the roster is not read.
+        assert_eq!(held, Tick::Serve { target: ZERO_SUIT, observed: None, step: Service { switching: true, request: false } });
+        // The body is back and let go: the original is asked for.
+        assert_eq!(let_go, Tick::Serve { target: ZERO_SUIT, observed: Some(DONKEY), step: Service { switching: true, request: true } });
+        assert_eq!(reads, 1);
+    }
+
+    #[test]
+    fn a_selection_is_compared_whatever_the_picker_holds() {
+        const DONKEY: u32 = 0x01;
+        // The drill's own choice is in the slot and its picker holds it: the slot is read, the hold is not asked about.
+        assert_eq!(observable(Some(DONKEY), || panic!("the hold is not asked about"), || Some(DONKEY)), Some(DONKEY));
+        assert_eq!(observable(Some(DONKEY), || panic!("the hold is not asked about"), || None), None);
+        // Nothing selected and nothing held: the roster's read, ready or not.
+        assert_eq!(observable(None, || false, || Some(DONKEY)), Some(DONKEY));
+        assert_eq!(observable(None, || false, || None), None);
     }
 
     #[test]
