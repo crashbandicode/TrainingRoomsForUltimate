@@ -8,6 +8,82 @@ use crate::engine;
 use model::hook_stats::{hook_allocations, HookId, HookScope};
 
 #[test]
+fn f4_cpu_role_live_input_does_not_depend_on_facing_or_dial() {
+    use model::input_delay::MappedInputs;
+    use model::recording::{ControlCtx, CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
+
+    for chord in [-1, 1] {
+        for hold in [80, -80] {
+            for facing in [-1, 1] {
+                for shulk_dial in [false, true] {
+                    let mut drive = CpuRoleDrive::idle();
+                    drive.begin_placed(chord);
+                    let input = MappedInputs { buttons: 42, lstick_x: hold, ..MappedInputs::NEUTRAL };
+                    let mut player = input;
+                    assert_eq!(drive.poll(&mut player), Some(input));
+                    assert_eq!(player, MappedInputs::NEUTRAL);
+                    let write = drive.control(&ControlCtx { facing, shulk_dial }).write.unwrap();
+                    assert_eq!(write.stick_x, f32::from(hold) / 120.0, "chord={chord}, facing={facing}, dial={shulk_dial}");
+                    assert_eq!(write.clamped_x, f32::from(hold) / 120.0);
+                    assert_eq!(write.buttons, 42);
+                }
+            }
+        }
+    }
+
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin(-1);
+    let ctx = ControlCtx { facing: 1, shulk_dial: false };
+    for _ in 0..LOCKOUT_FRAMES {
+        let mut player = MappedInputs { buttons: 42, ..MappedInputs::NEUTRAL };
+        assert_eq!(drive.poll(&mut player), None);
+        assert_eq!(player, MappedInputs::NEUTRAL);
+        let out = drive.control(&ctx);
+        assert!(out.write.is_none());
+        assert!(out.hold_cliff_timer);
+    }
+    assert_eq!(drive.phase(), Phase::Standby);
+    let mut player = MappedInputs { buttons: FLICK_JUMP, lstick_x: 20, ..MappedInputs::NEUTRAL };
+    assert_eq!(drive.poll(&mut player), None);
+    assert_eq!(player, MappedInputs::NEUTRAL);
+    let out = drive.control(&ctx);
+    assert!(out.hold_cliff_timer);
+    let write = out.write.unwrap();
+    assert_eq!(write.stick_x, 20.0 / 120.0);
+    assert_eq!(write.clamped_x, 0.0);
+    assert_eq!(write.buttons, FLICK_JUMP);
+}
+
+#[test]
+fn f4_cpu_role_held_stick_turns_only_on_direction_change() {
+    use model::input_delay::MappedInputs;
+    use model::recording::{ControlCtx, CpuRoleDrive};
+
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin_placed(-1);
+    let mut facing = -1;
+    let mut turns = 0;
+    let mut mismatches = 0;
+    for hold in [80, -80] {
+        for _ in 0..60 {
+            let mut player = MappedInputs { lstick_x: hold, ..MappedInputs::NEUTRAL };
+            assert!(drive.poll(&mut player).is_some());
+            let write = drive.control(&ControlCtx { facing, shulk_dial: false }).write.unwrap();
+            if write.stick_x != f32::from(hold) / 120.0 {
+                mismatches += 1;
+            }
+            let next = if write.stick_x > 0.0 { 1 } else { -1 };
+            if next != facing {
+                turns += 1;
+                facing = next;
+            }
+        }
+    }
+    assert_eq!(turns, 2);
+    assert_eq!(mismatches, 0);
+}
+
+#[test]
 fn placed_cpu_recording_has_no_lockout_or_standby() {
     use model::input_delay::MappedInputs;
     use model::recording::{ControlCtx, CpuRoleDrive, Phase};

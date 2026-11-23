@@ -2610,6 +2610,30 @@ mod tests {
         cpu_role_control(&ControlCtx { facing: 1, shulk_dial: false }).write.map(|write| write.buttons)
     }
 
+    fn f4_cpu_role_record_write_matches_playback_of_the_stored_frame() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("f4-cpu-stick");
+        cpu_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord(-1);
+        let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
+        for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
+            assert!(drive_cpu(1).is_none());
+        }
+        assert_eq!(cpu_role_phase(), Some(Phase::Standby));
+        assert_eq!(drive_cpu(0x8000), Some(0x8000));
+        let input = MappedInputs { buttons: 42, lstick_x: 80, ..MappedInputs::NEUTRAL };
+        let mut player = input;
+        assert!(cpu_role_poll(&mut player));
+        assert_eq!(player, MappedInputs::NEUTRAL);
+        assert_eq!(CAP_LEN.load(Ordering::Acquire), 1);
+        let stored = unpack(CAP_FRAMES[0].load(Ordering::Acquire));
+        assert_eq!(stored, to_frame(input));
+        let write = cpu_role_control(&ControlCtx { facing: 1, shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, playback_controller(stored).stick_x);
+    }
+
     fn cpu_role_lockout_or_standby_press_is_not_stored() {
         let _hold = hold();
         reset_host();
@@ -4810,6 +4834,7 @@ mod tests {
             ("a_cold_start_records_on_the_saved_popup_role", a_cold_start_records_on_the_saved_popup_role as fn()),
             ("cpu_role_lockout_or_standby_press_is_not_stored", cpu_role_lockout_or_standby_press_is_not_stored as fn()),
             ("cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu", cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu as fn()),
+            ("f4_cpu_role_record_write_matches_playback_of_the_stored_frame", f4_cpu_role_record_write_matches_playback_of_the_stored_frame as fn()),
             ("a_warped_cpu_play_feeds_its_first_frame_after_the_restore", a_warped_cpu_play_feeds_its_first_frame_after_the_restore as fn()),
             ("a_cpu_play_without_a_start_save_feeds_at_once", a_cpu_play_without_a_start_save_feeds_at_once as fn()),
             ("parry_each_pass_warps_to_the_start_save", parry_each_pass_warps_to_the_start_save as fn()),
