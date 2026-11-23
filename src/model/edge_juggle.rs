@@ -1118,7 +1118,7 @@ impl Wizard {
     /// The Player page keeps its cursor over a floor: a move with none under it is undone.
     pub fn settle_player(&mut self, mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>) -> bool {
         let (at, was) = (self.cross.at, self.floor_at);
-        for cursor in [Some(at), Some(was).filter(|_| at != was)].into_iter().flatten() {
+        for cursor in [Some(at), (at != was).then_some(was)].into_iter().flatten() {
             if let Some(p1) = sample(cursor) {
                 if cursor != at {
                     self.cross.jump(cursor);
