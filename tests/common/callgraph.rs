@@ -13,6 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tok {
@@ -465,6 +466,7 @@ fn lex_attrs(src: &str) -> Vec<String> {
 }
 // ---- the graph ------------------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct Graph {
     pub funcs: Vec<Func>,
     /// `file -> (alias -> module name)` from `use ... as alias;`.
@@ -644,6 +646,22 @@ impl Graph {
     }
 
     fn scan_build(runtime_dir: &Path, skip_dirs: &[&str], diag: bool) -> Graph {
+        if runtime_dir != Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime") {
+            return Self::scan_uncached(runtime_dir, skip_dirs, diag);
+        }
+        static CACHE: Mutex<Vec<(Vec<String>, bool, Graph)>> = Mutex::new(Vec::new());
+        let mut cache = CACHE.lock().unwrap();
+        if let Some((_, _, graph)) = cache.iter().find(|(dirs, include_diag, _)| {
+            *include_diag == diag && dirs.iter().map(String::as_str).eq(skip_dirs.iter().copied())
+        }) {
+            return graph.clone();
+        }
+        let graph = Self::scan_uncached(runtime_dir, skip_dirs, diag);
+        cache.push((skip_dirs.iter().map(|dir| (*dir).to_owned()).collect(), diag, graph.clone()));
+        graph
+    }
+
+    fn scan_uncached(runtime_dir: &Path, skip_dirs: &[&str], diag: bool) -> Graph {
         let mut files = Vec::new();
         rust_files(runtime_dir, &mut files);
         files.retain(|path| {
@@ -1022,6 +1040,14 @@ impl Graph {
 
 /// `NAME -> value` of every `const NAME: usize = <number>;` in the model sources.
 pub fn model_offsets(model_dir: &Path) -> BTreeMap<String, usize> {
+    if model_dir == Path::new(env!("CARGO_MANIFEST_DIR")).join("src/model") {
+        static CACHE: OnceLock<BTreeMap<String, usize>> = OnceLock::new();
+        return CACHE.get_or_init(|| model_offsets_uncached(model_dir)).clone();
+    }
+    model_offsets_uncached(model_dir)
+}
+
+fn model_offsets_uncached(model_dir: &Path) -> BTreeMap<String, usize> {
     let mut files = Vec::new();
     rust_files(model_dir, &mut files);
     let mut out = BTreeMap::new();
