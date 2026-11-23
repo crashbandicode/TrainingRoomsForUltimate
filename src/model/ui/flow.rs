@@ -59,6 +59,12 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
     open || popup || closing || prompt
 }
 
+/// Whether the open menu holds the fighters that are not Player 1, as its panels hold both: the CPU stands frozen
+/// behind the menu. Not while a preview plays, a save state loads or the recorder is busy: those go on as before.
+pub fn menu_holds_cpu(_open: bool, _previewing: bool, _loading: bool, _recorder: bool) -> bool {
+    false
+}
+
 /// Whether the menu's own screens are what Player 1's presses reach now, as the worker's `press` routes them: the
 /// open menu (not while it waits to close), or the Recording pop-up over the closed menu. Not the layer's panel, the
 /// clip editor or the closed-menu fighter question. An external screen of the open menu (the Mii list) is the
@@ -132,6 +138,29 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    fn the_open_menu_holds_the_cpu() {
+        for open in [false, true] { for previewing in [false, true] {
+            for loading in [false, true] { for recorder in [false, true] {
+                assert_eq!(menu_holds_cpu(open, previewing, loading, recorder),
+                    open && !previewing && !loading && !recorder,
+                    "open={open} previewing={previewing} loading={loading} recorder={recorder}");
+            } }
+        } }
+    }
+
+    fn the_cpu_hold_is_wired() {
+        let named = include_str!("../../runtime/macros/named_macros.rs");
+        let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(hold.contains("state::holds_cpu(queries.clip_previewing)"));
+        assert!(hold.contains("!player()"));
+        assert!(hold.contains("clip_previewing") && hold.contains("replay_loading"));
+        let state = include_str!("../../runtime/ui/state.rs");
+        let fact = state.split("pub fn holds_cpu(").nth(1).unwrap_or("").split("\n}").next().unwrap();
+        assert!(fact.contains("OPEN.load("));
+        assert!(fact.contains("states::is_loading()"));
+        assert!(fact.contains("recorder::recording_or_playback()"));
+    }
 
     fn seen(menu_open: bool, panel_visible: bool, clip_visible: bool) -> Seen {
         Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible, prompt_visible: false }
@@ -237,6 +266,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_open_menu_holds_the_cpu", the_open_menu_holds_the_cpu as fn()),
+            ("the_cpu_hold_is_wired", the_cpu_hold_is_wired as fn()),
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
             ("clip_sync_outlives_menu_on_both_entry_routes", clip_sync_outlives_menu_on_both_entry_routes as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),

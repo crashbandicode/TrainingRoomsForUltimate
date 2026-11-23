@@ -147,6 +147,15 @@ impl Owners {
     pub const fn covers_hud(self) -> bool {
         self.covers_strip() || self.contains(Self::REPLAY_EDITOR)
     }
+
+    /// The drill's CPU Behavior step on a Player 1 poll (`cpu_level::poll_drill`). `Some(pause)`: it runs, and `pause`
+    /// says whether it may drive the game's own pause for the apply. While a drill runs it waits for every owner but
+    /// the game's pause. After Stop it also runs under the plugin's menu alone, so the CPU is handed back behind the
+    /// menu; it never drives the pause there.
+    pub const fn drill_step(self, _running: bool) -> Option<bool> {
+        let others = self.0 & !Self::VANILLA_PAUSE.0;
+        if others == 0 { Some(true) } else { None }
+    }
 }
 
 /// Why the queue was emptied outside a poll.
@@ -303,6 +312,29 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
+    fn stop_hands_the_cpu_back_under_the_menu() {
+        for bits in 0..64 {
+            for running in [false, true] {
+                let expected = match (bits, running) {
+                    (0 | 16, _) => Some(true),
+                    (1 | 17, false) => Some(false),
+                    _ => None,
+                };
+                assert_eq!(Owners::from_bits(bits).drill_step(running), expected, "bits={bits} running={running}");
+            }
+        }
+    }
+
+    fn the_drill_restore_is_wired() {
+        let cpu = include_str!("../runtime/features/cpu_level.rs");
+        let poll = cpu.split("fn poll_drill_locked(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(poll.contains("drill_step(level.is_some())"));
+        assert!(poll.contains("quiet && pause"));
+        assert!(!poll.contains("owners.bits() & !Owners::VANILLA_PAUSE.bits() != 0"));
+        let mashout = include_str!("../runtime/features/mashout.rs");
+        assert!(mashout.contains("Step::Held | Step::Result | Step::Restore"));
+    }
+
     fn rec(n: u32) -> MappedInputs {
         MappedInputs { buttons: n, ..MappedInputs::NEUTRAL }
     }
@@ -404,6 +436,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("stop_hands_the_cpu_back_under_the_menu", stop_hands_the_cpu_back_under_the_menu as fn()),
+            ("the_drill_restore_is_wired", the_drill_restore_is_wired as fn()),
             ("two_polls_late", two_polls_late as fn()),
             ("the_strip_hides_while_the_waiting_rooms_menu_is_open", the_strip_hides_while_the_waiting_rooms_menu_is_open as fn()),
             ("a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates", a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates as fn()),
