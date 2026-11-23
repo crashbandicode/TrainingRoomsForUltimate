@@ -1,0 +1,305 @@
+{
+  "about": "F11 (tile-fix-g4, 2026-11-23): the Guard the Edge and Juggler pickers hold the CPU at the picked start; in view the crosshair, out of view the game's own magnifier. Read from tr.practice (wizard.cpu), the bridge's fighters and stills. Trace run, GDB stub off, as routes:bridge_on requires.",
+  "start": "frontend",
+  "early_stop": false,
+  "game_id": "01006A800016E000",
+  "on_failure": "continue",
+  "recover": [
+    {
+      "run": "routes:tr_idle"
+    }
+  ],
+  "gates": {
+    "loaded": {
+      "library": "loaded"
+    }
+  },
+  "segments": {
+    "rm-tap-a": {
+      "file": "segments/rm-tap-a.edenmacro.json",
+      "sha256": "512f4c6a67b1057ddd311d360ba8b8e98b2654953685d76bb2600c6bd0490745",
+      "cap": 30
+    },
+    "rm-tap-b": {
+      "file": "segments/rm-tap-b.edenmacro.json",
+      "sha256": "86bb27b8d9a496936ec2bc2d555af823c59ca7208466ec5f541d2251b9d70562",
+      "cap": 30
+    },
+    "rm-tap-down": {
+      "file": "segments/rm-tap-down.edenmacro.json",
+      "sha256": "73431237047eb127383d59a9bbda24baf0a3f143169120b9f5fab8b3f6b12103",
+      "cap": 30
+    },
+    "ej-left": {
+      "recipe": [
+        {
+          "buttons": "left",
+          "frames": 3,
+          "gap_frames": 8
+        }
+      ],
+      "cap": 12,
+      "file": "segments/ej-left.edenmacro.json",
+      "sha256": "582167b6c4c058772222013f6afebef7f5b332bf8740985fb4c0fa864dcf2dc2",
+      "compiled": {
+        "by": "recipe_macro.py",
+        "fps": 60,
+        "min_frames": 2
+      }
+    },
+    "ej-right": {
+      "recipe": [
+        {
+          "buttons": "right",
+          "frames": 3,
+          "gap_frames": 8
+        }
+      ],
+      "cap": 12,
+      "file": "segments/ej-right.edenmacro.json",
+      "sha256": "246eab9196ea480a7c64e3992e55152502d7be665bb26fbd9bfef54f6301f025",
+      "compiled": {
+        "by": "recipe_macro.py",
+        "fps": 60,
+        "min_frames": 2
+      }
+    },
+    "ej-up": {
+      "recipe": [
+        {
+          "buttons": "up",
+          "frames": 3,
+          "gap_frames": 8
+        }
+      ],
+      "cap": 12,
+      "file": "segments/ej-up.edenmacro.json",
+      "sha256": "2014e6437e9a827b16fbebebee4858df037bb88a5b11d183601c72f0b9b6b5e8",
+      "compiled": {
+        "by": "recipe_macro.py",
+        "fps": 60,
+        "min_frames": 2
+      }
+    },
+    "ej-x": {
+      "recipe": [
+        {
+          "buttons": "x",
+          "frames": 3,
+          "gap_frames": 8
+        }
+      ],
+      "cap": 12,
+      "file": "segments/ej-x.edenmacro.json",
+      "sha256": "2abc3c577e1e5d8cded9465c86b2abd6048d0b1f65a527c0e9149160e96b83ce",
+      "compiled": {
+        "by": "recipe_macro.py",
+        "fps": 60,
+        "min_frames": 2
+      }
+    },
+    "ej-y": {
+      "recipe": [
+        {
+          "buttons": "y",
+          "frames": 3,
+          "gap_frames": 8
+        }
+      ],
+      "cap": 12,
+      "file": "segments/ej-y.edenmacro.json",
+      "sha256": "cf3ae14648ce853112f3d9e6d73bafd7c8c924e3aa7e8512adcd36665cf9d853",
+      "compiled": {
+        "by": "recipe_macro.py",
+        "fps": 60,
+        "min_frames": 2
+      }
+    }
+  },
+  "setup": [
+    {
+      "state": "main menu, full card lineup plus the bridge, bridge on",
+      "via": "hook",
+      "ref": "routes:configure_boot, routes:load_game, routes:bridge_on, routes:to_main"
+    },
+    {
+      "state": "Training, P1 Mario on Final Destination",
+      "via": "hook",
+      "ref": "routes:reach_training"
+    },
+    {
+      "state": "the drill picker on its CPU step",
+      "via": "hook",
+      "ref": "edge_steps.py:_setup (menu Fighters & Stages, the drill's Set up row), flown in flight-755d9936"
+    }
+  ],
+  "rows": [
+    {
+      "id": "r00",
+      "start": "frontend",
+      "end": "main",
+      "role": "setup",
+      "on_failure": "stop",
+      "steps": [
+        {
+          "run": "routes:_setting",
+          "args": {
+            "key": "core.use_gdbstub",
+            "value": false
+          }
+        },
+        {
+          "run": "routes:host_network"
+        },
+        {
+          "run": "routes:configure_boot"
+        },
+        {
+          "run": "routes:load_game"
+        },
+        {
+          "run": "routes:bridge_on"
+        },
+        {
+          "run": "routes:to_main"
+        }
+      ]
+    },
+    {
+      "id": "r01",
+      "start": "main",
+      "end": "training",
+      "role": "setup",
+      "on_failure": "stop",
+      "steps": [
+        {
+          "run": "routes:reach_training",
+          "args": {
+            "p1": "Mario",
+            "stage": "Final Destination"
+          }
+        },
+        {
+          "run": "routes:tr_idle"
+        }
+      ]
+    },
+    {
+      "id": "v00",
+      "start": "training",
+      "end": "training",
+      "role": "setup",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:fullscreen"
+        }
+      ]
+    },
+    {
+      "id": "f11-t1",
+      "start": "training",
+      "end": "training",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:picker",
+          "args": {
+            "ident": "6",
+            "name": "guard",
+            "points": [
+              [
+                -130,
+                -30
+              ],
+              [
+                -200,
+                -30
+              ],
+              [
+                -230,
+                60
+              ],
+              [
+                -150,
+                -100
+              ]
+            ],
+            "expect": [
+              "in_view",
+              "in_view",
+              "magnifier",
+              "magnifier",
+              "magnifier"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-t2",
+      "start": "training",
+      "end": "training",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:through",
+          "args": {
+            "ident": "6",
+            "name": "guard-through",
+            "cpu": [
+              -200,
+              -30
+            ],
+            "player": [
+              -40,
+              0
+            ],
+            "expect": [
+              "magnifier",
+              "magnifier",
+              "magnifier"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-t3",
+      "start": "training",
+      "end": "training",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:picker",
+          "args": {
+            "ident": "7",
+            "name": "juggle",
+            "points": [
+              [
+                0,
+                100
+              ],
+              [
+                -100,
+                130
+              ]
+            ],
+            "expect": [
+              "in_view",
+              "in_view",
+              "in_view"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
