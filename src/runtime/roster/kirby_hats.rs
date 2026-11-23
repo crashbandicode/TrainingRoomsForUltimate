@@ -79,7 +79,6 @@ unsafe fn permitted() -> bool {
         && !button_config::has_pending_request()
         && !training::save_states::is_loading()
         && !training::recording_or_playback()
-        && !crate::runtime::compat::replay_preview::occupied()
 }
 
 unsafe fn role_body(role: usize) -> Option<*mut app::BattleObjectModuleAccessor> {

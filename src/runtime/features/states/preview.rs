@@ -1,13 +1,11 @@
-//! Clip checkpoints are game-owned values. UI close only posts retirement;
-//! native observations and state-machine changes run on a fighter callback.
-use super::{Raw, Role, ACTIVE, CONSTS_READY, TEMPORARY};
+//! Clip checkpoints are game-owned values, observed and restored on a fighter callback.
+use super::{Raw, Role, ACTIVE, CONSTS_READY, LOADING};
+use crate::engine::rr_host::HomeWarp;
 use crate::engine::mii::lifetime::Configuration;
-use crate::model::state::{
-    ids::C,
-    preview::{Checkpoint, Error},
-};
-use crate::runtime::{features::recorder, game::natives, lobby::training::practice};
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::model::state::{ids::C, preview::{Checkpoint, Error}};
+use crate::runtime::features::recorder;
+use crate::runtime::{game::natives, lobby::training::practice};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct Identity {
@@ -18,33 +16,48 @@ pub(super) struct Identity {
 }
 
 static CHECKPOINT: hos_lock::Mutex<Checkpoint<Identity>> = hos_lock::Mutex::new(Checkpoint::new());
-static RETIRE: AtomicBool = AtomicBool::new(false);
+static ASK: AtomicU8 = AtomicU8::new(0);
 const NOT_READY: &str = "Wait for both fighters to finish loading before previewing";
 const CHANGED: &str = "Preview fighters changed; close the editor, let them settle and reopen";
 
 pub(super) fn clear() {
+    ASK.store(0, Ordering::Release);
     CHECKPOINT.lock().clear();
-    RETIRE.store(false, Ordering::Release);
 }
 
-/// May be called by a UI worker: no game lock or native operation.
-pub(crate) fn end() {
-    RETIRE.store(true, Ordering::Release);
+pub(crate) fn request_home(home: HomeWarp) {
+    let ask = match home {
+        HomeWarp::Start { air: false } => 1,
+        HomeWarp::Start { air: true } => 2,
+        HomeWarp::Return => 3,
+    };
+    ASK.store(ask, Ordering::Release);
 }
 
-/// The machine itself releases its temporary pair after both roles finish.
-/// An open editor retains its checkpoint for crop edits/restart; close retires it.
-pub(crate) fn finish(editor_open: bool) {
-    if !editor_open {
-        end();
+pub(super) unsafe fn take_home() -> bool {
+    if LOADING.load(Ordering::Acquire) {
+        return false;
     }
-}
-
-pub(super) fn service_retirement() {
-    if RETIRE.swap(false, Ordering::AcqRel) {
+    let ask = ASK.swap(0, Ordering::AcqRel);
+    if ask == 0 {
+        return false;
+    }
+    let result = if ask == 3 {
+        let result = request(false, false);
         CHECKPOINT.lock().clear();
-        if TEMPORARY.load(Ordering::Acquire) {
-            super::cancel_pending();
+        result
+    } else {
+        request(true, ask == 2)
+    };
+    match result {
+        Ok(()) => true,
+        Err(text) => {
+            if ask == 3 {
+                crate::engine::rr_host::warp_landed();
+            } else {
+                crate::engine::rr_host::preview_refused(text);
+            }
+            false
         }
     }
 }
@@ -100,9 +113,7 @@ pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     Ok((identity, [player, cpu]))
 }
 
-/// Called only by preview's CPU callback, after its practice ownership check.
-pub(crate) unsafe fn request(start: bool) -> Result<(), &'static str> {
-    service_retirement();
+pub(super) unsafe fn request(start: bool, air: bool) -> Result<(), &'static str> {
     if !ACTIVE.load(Ordering::Acquire) || !CONSTS_READY.load(Ordering::Acquire) {
         return Err(NOT_READY);
     }
@@ -129,7 +140,14 @@ pub(crate) unsafe fn request(start: bool) -> Result<(), &'static str> {
         }
         CHECKPOINT.lock().capture(identity, pair).map_err(message)?;
     }
-    let pair = CHECKPOINT.lock().restore(&identity).map_err(message)?;
+    let mut pair = CHECKPOINT.lock().restore(&identity).map_err(message)?;
+    if air {
+        super::with(|state| {
+            if state.ids.is(C::SituationGround, pair[1].situation_kind) {
+                pair[1].situation_kind = state.ids.get(C::SituationAir);
+            }
+        });
+    }
     let accepted = super::begin_temporary(pair);
     if !accepted {
         if first {

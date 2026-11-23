@@ -70,7 +70,6 @@ const HOOK_LOCKS: &[(&str, &str)] = &[
     ("macros/named_macros.rs", "RESTORE_ANCHOR"),
     ("macros/named_macros.rs", "RESTORE_POSE"),
     ("macros/named_macros.rs", "PANEL_STOPS"),
-    ("macros/replay_preview.rs", "SESSION"),
     ("macros/replay_capture.rs", "VAULT_HOOK"),
     ("macros/replay_capture.rs", "CLOSE_INPUT"),
     ("macros/live_replay.rs", "CAPTURE"),

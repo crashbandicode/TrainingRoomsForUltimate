@@ -2489,7 +2489,7 @@ approved_by = "The item entries above, each under the operator's measured LOC ru
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196780
+ceiling = 196638
 date = "2026-11-23"
-reason = "F11: while Guard the Edge or Juggler picks the CPU start, the CPU itself waits at the picked point, so the game shows it there or its own off-screen magnifier with the direction pointer; the border chevron stays only where the body cannot be held, and the bridge reports how the point is shown. Measured 196780, 171 above 196609."
-approved_by = "Operator’s order 2026-11-23 ~16:24Z through tr-primary-2 (~16:30Z, fix-round item F11), under the operator’s measured LOC rule (TEST-FLOW-2026-11-22.md point 2)."
+reason = "F12: the roster picker's popup no longer leaves its box on the CONNECTIONS divider pane; the divider has one writer. Measured 196638, 29 above 196609."
+approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-2 (item F12), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."

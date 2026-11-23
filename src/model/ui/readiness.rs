@@ -46,15 +46,16 @@ pub struct Facts {
     pub owns_input: bool,
     /// P1 polls since the layout tick last ran.
     pub polls_since_tick: u32,
+    /// The clip editor is up: it reads Player 1 itself, so the menu does not open over it.
+    pub clip: bool,
 }
 
 /// Whether an opening chord may be accepted now.
 pub fn may_open(facts: Facts) -> bool {
-    facts.installed && facts.layout_ready && !facts.pause_active && !facts.closing
+    facts.installed && facts.layout_ready && !facts.pause_active && !facts.closing && !facts.clip
 }
 
 /// Whether the menu's ownership must be released now: it owns input but its renderer is gone.
 pub fn must_release(facts: Facts) -> bool {
     facts.owns_input && (!facts.installed || !facts.layout_ready || facts.polls_since_tick > STALL_POLLS)
 }
-

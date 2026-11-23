@@ -535,7 +535,7 @@ pub struct MashCtx {
     pub head_slot: Option<u8>,
     pub in_hitstun: bool,
     pub in_hitstop: bool,
-    /// The transition term of `Recorder::term_for_slot(head)` is enabled on the CPU (the runtime asks
+    /// The mapped term is enabled, or, for any other start, the fighter can act (the runtime asks
     /// only when `Recorder::mash_needs_term` says so).
     pub term_enabled: bool,
 }
@@ -674,7 +674,7 @@ impl Recorder {
 
     // ---- starting and stopping -----------------------------------------------------------------
 
-    /// The named layer's playback (`playback_named`, `playback_preview`): `frames` frames from the layer's buffer, mirrored by the
+    /// The named layer's playback (`playback_named`): `frames` frames from the layer's buffer, mirrored by the
     /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
     pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
         match self.mode {
@@ -847,43 +847,40 @@ impl Recorder {
 
     // ---- the mash trigger (§5.4) ---------------------------------------------------------------
 
-    /// The transition term that says the CPU can act again, derived from the slot's starting status.
-    /// Ranges are inclusive at both ends (question 3 recommendation; upstream's half-open ranges left
-    /// `ESCAPE_AIR_SLIDE` and `ESCAPE_B` in the "anything else" case). Anything else falls to the
-    /// side-special term, upstream's acknowledged placeholder (open: needs a design decision).
-    pub fn term_for_status(t: &Table, status: i32) -> C {
-        if status == UNRESOLVED {
-            return C::TermContSpecialS;
-        }
+    /// The mapped transition term for a slot's starting status; ranges are inclusive at both ends.
+    /// Anything else has no single term: wait until the fighter can act (`cpu::actionable`, SPEC-cpu-07 §3).
+    /// Upstream's side-special placeholder is not enabled for every fighter that can act: Greninja answers
+    /// no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23).
+    pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
         if t.is(C::StatusAttackAir, status) {
-            C::TermContAttackAir
+            Some(C::TermContAttackAir)
         } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {
-            C::TermContEscapeAir
+            Some(C::TermContEscapeAir)
         } else if t.is(C::StatusSpecialHi, status) {
-            C::TermContSpecialHi
+            Some(C::TermContSpecialHi)
         } else if t.is(C::StatusJumpSquat, status) {
-            C::TermContJumpSquat
+            Some(C::TermContJumpSquat)
         } else if t.is(C::StatusJumpAerial, status) {
-            C::TermContJumpAerial
+            Some(C::TermContJumpAerial)
         } else if t.is(C::StatusEscape, status) {
-            C::TermContEscape
+            Some(C::TermContEscape)
         } else if t.within(C::StatusEscapeF, C::StatusEscapeB, status) {
-            C::TermContEscapeF
+            Some(C::TermContEscapeF)
         } else if t.is(C::StatusCatch, status) {
-            C::TermContCatch
+            Some(C::TermContCatch)
         } else {
-            C::TermContSpecialS
+            None
         }
     }
 
-    /// The starting status of `slot` (from its origin), for `term_for_status`.
+    /// The starting status of `slot`, for its mapped term or, for any other start, whether the fighter can act.
     pub fn starting_status_of(&self, slot: u8) -> i32 {
         self.origin.get(usize::from(slot)).map_or(UNRESOLVED, |o| o.status)
     }
 
-    /// Whether the mash trigger evaluation needs the transition term of the queue head asked from the
-    /// game (only then is the call made): the recorder is idle, the head is a playback, and the timing
-    /// depends on the term (every case but hitstun with a hitstop timing).
+    /// Whether the mash trigger evaluation needs the mapped term or, for any other start, whether the
+    /// fighter can act: the recorder is idle, the head is a playback, and the timing depends on the
+    /// check (every case but hitstun with a hitstop timing).
     pub fn mash_needs_term(&self, s: &RecorderSettings, head: Option<u8>, in_hitstun: bool) -> bool {
         self.mode == Mode::None && head.is_some() && !(in_hitstun && s.hitstun != HitstunTiming::HitstunEnds)
     }

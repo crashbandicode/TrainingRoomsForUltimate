@@ -6,7 +6,7 @@ use crate::model::state::quick_reset::{Pose, QuickReset};
 use crate::runtime::features::{input_delay, notices, recorder};
 use crate::runtime::game::natives;
 use crate::runtime::lobby::training::practice;
-use crate::runtime::macros::{named_macros, replay_preview};
+use crate::runtime::macros::named_macros;
 use crate::runtime::published;
 use hos_lock::Mutex;
 use std::sync::atomic::Ordering;
@@ -87,8 +87,7 @@ pub(crate) unsafe fn on_input(controller: usize, out: *mut MappedInputs) -> bool
         && practice::owned()
         && published::lra_reset()
         && !published::input_owners().any()
-        && !named_macros::hook_queries().panel_visible
-        && !replay_preview::occupied();
+        && !named_macros::hook_queries().panel_visible;
     // rc.9 C14: the same AI check as Record's refusal (B4). It runs the pilot's export, so it is asked outside the lock,
     // and only while the chord is held where it counts; the model uses the answer of the chord's first poll.
     let p1_ai = eligible

@@ -180,7 +180,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 16] = [
     ),
     (Feature::Hitbox, &["damage_of", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "motion_kind", "pos_x", "pos_y", "situation_kind", "stage_id_call", "state_article_object_id", "state_clear_speed_all", "state_heal", "state_item_active_count", "state_item_active_item", "state_item_object_id", "state_lr", "state_object_is_active", "state_set_pos", "state_status_request", "status_kind", "stop_is_stop", "utility_get_category", "utility_get_kind", "work_get_int", "work_get_param_float"]),
     (Feature::InputDisplay, &["attack_data", "attack_is_attack", "attack_power_mul_status", "cancel_is_enable", "damage_of", "damage_reaction", "damage_record_dealt", "damage_record_hit_ids", "damage_record_layout", "fighter_manager_get_entry", "lua_const_lookup", "motion_frame", "prev_status_kind", "situation_kind", "state_lr", "status_kind", "stop_is_stop", "transition_term_hook", "work_get_int", "work_get_param_float", "work_is_flag"]),
-    (Feature::NamedMacros, &["fighter_information", "fighter_manager_get_entry", "is_operation_cpu", "state_lr", "ui_is_ready_go", "work_get_int"]),
+    (Feature::NamedMacros, &["fighter_manager_get_entry", "ui_is_ready_go"]),
     (
         Feature::Mashout,
         &[
@@ -223,7 +223,7 @@ pub static CROSS_NEEDS: [(Feature, &[&str]); 16] = [
     ),
     (Feature::P1Cpu, &["fighter_manager_get_entry", "situation_kind", "utility_get_category"]),
     (Feature::RecordPlace, &["camera_limit_range", "change_status_force", "damage_of", "fighter_manager_get_entry", "motion_change_hook", "motion_frame", "motion_kind", "pos_x", "pos_y", "situation_kind", "stage_id_call", "stage_table", "state_add_damage", "state_clear_speed_all", "state_heal", "state_init_pos", "state_lr", "state_set_lr", "state_set_pos", "state_set_situation_kind", "state_set_sleep", "state_status_request", "state_work_set_int", "status_kind", "work_is_flag", "work_set_flag"]),
-    (Feature::Recording, &["damage_of", "fighter_information", "is_operation_cpu", "pos_x", "pos_y", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
+    (Feature::Recording, &["cancel_is_enable", "damage_of", "fighter_information", "is_operation_cpu", "pos_x", "pos_y", "situation_kind", "status_kind", "transition_term_hook", "work_get_int", "work_is_flag"]),
     (Feature::StateCore, &["change_status_force", "damage_of", "effect_req", "effect_req_follow", "effect_req_on_joint", "fighter_information", "is_operation_cpu", "lua_const_lookup", "pos_x", "prev_status_kind", "situation_kind", "status_kind", "work_get_param_float", "work_is_flag", "work_set_flag", "work_set_float"]),
     (Feature::TechPractice, &["camera_limit_range", "change_status_force", "damage_of", "fighter_manager_get_entry", "kinetic_get_energy", "lua_const_lookup", "pos_x", "pos_y", "situation_kind", "stage_id_call", "stage_table", "state_add_damage", "state_clear_speed_all", "state_get_param_int", "state_heal", "state_init_pos", "state_lr", "state_set_lr", "state_set_pos", "state_set_situation_kind", "state_set_sleep", "state_work_set_int", "status_kind", "stop_is_stop", "stop_set_hit_stop_frame", "utility_get_kind", "work_get_float", "work_get_int", "work_get_param_float", "work_set_float"]),
 ];

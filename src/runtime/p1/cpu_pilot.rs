@@ -749,7 +749,6 @@ unsafe fn ai_process_begin(svc: usize) {
 fn menu_busy() -> bool {
     crate::runtime::compat::common::menu::captures_input()
         || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)
-        || crate::runtime::compat::replay_preview::occupied()
         || crate::runtime::lobby::training::recording_or_playback()
 }
 

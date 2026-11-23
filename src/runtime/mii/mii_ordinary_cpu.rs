@@ -577,7 +577,6 @@ unsafe fn blocker(install:bool)->Option<Blocker> {
     else if install && INSTALL.active() {Some(Blocker::Install)}
     else if training::save_states::is_loading() {Some(Blocker::SaveState)}
     else if training::recording_or_playback() {Some(Blocker::Recording)}
-    else if crate::runtime::compat::replay_preview::occupied() {Some(Blocker::ReplayPreview)}
     else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}
     else if portrait_render_held() {Some(Blocker::Portrait)}
     else {None}

@@ -2,6 +2,8 @@
 
 Edges are `use` / path references between ours-new Rust files of the package-6 feature groups (and the ours-new files of packages 3/4 they name: `EXT`). A file is carried after everything in lower layers; a CYCLE is one unit.
 
+This is the frozen source-stage graph; F7 retires its `src/replay_preview.rs` destination.
+
 ## Layer 0
 
 - `src/character_memory.rs` [Hot-swap engin]

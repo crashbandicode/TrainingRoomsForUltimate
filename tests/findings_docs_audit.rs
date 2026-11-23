@@ -610,8 +610,7 @@ fn a_setup_saved_after_a_live_swap_restores_with_the_fighters_on_screen() {
     assert_eq!(prepared.validate(target, &facts(first_body), false), Ok(()), "Y binds without the fighter check");
 }
 
-/// The runtime half (Switch-only, so a source check like `tests/lockfree_wiring.rs`): the identity the Setup library's restore
-/// and the replay preview both check reads each entry's running body.
+/// The Setup library's restore checks the running body (Switch-only source check).
 #[test]
 fn the_setup_restore_and_the_replay_preview_read_the_running_body() {
     let preview = include_str!("../src/runtime/features/states/preview.rs");

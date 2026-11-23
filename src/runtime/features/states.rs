@@ -49,7 +49,7 @@ mod preview;
 pub(crate) mod setups;
 pub(crate) use quick_reset::on_input as on_quick_reset_input;
 pub(crate) use quick_reset::request as request_quick_reset;
-pub(crate) use preview::{request as request_preview_restore, finish as finish_preview_restore, end as end_preview_restore};
+pub(crate) use preview::request_home as request_preview_home;
 
 /// Everything the per-frame step owns, behind one lock.
 struct State {
@@ -490,6 +490,23 @@ fn begin_temporary(pair: [SavedState; 2]) -> bool {
     .unwrap_or(false)
 }
 
+/// # Safety
+/// A fighter's frame on the game thread, as `on_fighter_frame`.
+unsafe fn take_named_load() -> bool {
+    let named = {
+        let _take = NAMED_TAKE.lock();
+        NAMED_LOAD.take(take_pair)
+    };
+    let Some(pair) = named else { return false };
+    let accepted = begin_temporary(pair);
+    if accepted {
+        recorder::on_load_request();
+        hud_load(Role::Player.index(), true);
+        hud_load(Role::Cpu.index(), true);
+    }
+    accepted
+}
+
 /// Ask the game's table for every constant, once. Called from the frame step outside its `HookScope`.
 fn ensure_consts() -> bool {
     if CONSTS_READY.load(Ordering::Acquire) {
@@ -553,7 +570,6 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if accessor == 0 {
         return;
     }
-    preview::service_retirement();
     let scene_facts = scene::facts();
     if !crate::model::scene::is_training(scene_facts) {
         // The shared predicate is also false during a hot swap. A suspended
@@ -603,7 +619,10 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             start_state: crate::model::state::record::StartState::Standard,
         }))
     };
-    if !crate::engine::rr_host::fighter_frame(live, ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) {
+    if !crate::engine::rr_host::fighter_frame(live, crate::engine::rr_host::save_state_step(
+        ENABLE.load(Ordering::Acquire), TEMPORARY.load(Ordering::Acquire),
+        || !nana && !reset_hub::cpu_operated(fighter) && (take_named_load() || preview::take_home()),
+    )) {
         // rc.12: with Save States Off a Save or Load press is refused once, not kept for when it goes On.
         refuse_pending(!nana && !reset_hub::cpu_operated(fighter), Refused::Off);
         return;
@@ -719,18 +738,6 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     if !nana && !reset_hub::cpu_operated(fighter) {
         apply_bound_post();
-        let named = {
-            let _take = NAMED_TAKE.lock();
-            NAMED_LOAD.take(take_pair)
-        };
-        if let Some(pair) = named {
-            let accepted = begin_temporary(pair);
-            if accepted {
-                recorder::on_load_request();
-                hud_load(Role::Player.index(), true);
-                hud_load(Role::Cpu.index(), true);
-            }
-        }
     }
     let stage_id = natives::stage_id();
     let suspend_autoload = super::edge_juggle::running();

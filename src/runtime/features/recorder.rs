@@ -43,7 +43,7 @@ use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, hide_cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
-use crate::runtime::macros::{named_macros, replay_preview};
+use crate::runtime::macros::named_macros;
 use crate::runtime::{published, scene};
 use crate::runtime::ui::pilot_export;
 
@@ -52,7 +52,6 @@ static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 /// Recording or playing back now, published by every taker of `REC` when it lets go (stream/sync slice 3): the question the menu
 /// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
-static PLAYBACK: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "diag")]
 static DIAG_PHASE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
 
@@ -75,7 +74,6 @@ impl core::ops::DerefMut for RecGuard {
 impl Drop for RecGuard {
     fn drop(&mut self) {
         ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
-        PLAYBACK.store(self.0.is_playback(), Ordering::Release);
         #[cfg(feature = "diag")]
         DIAG_PHASE.store(match self.0.phase() {
             Phase::Idle => 0, Phase::Lockout => 1, Phase::Standby => 2,
@@ -379,16 +377,10 @@ unsafe fn on_ai_frame(ai: usize) {
             (rec.mode() == Mode::Playback, rec.frame() == 0)
         };
         let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-        // A clip preview emits only while its session owns this CPU and the clip is in the foreground (SPEC-input-01 section 9).
-        let preview_blocked = playing && replay_preview::occupied() && !replay_preview::can_emit(module);
-        if preview_blocked || (playing && at_zero && !named_macros::prepare_playback_start(module)) {
+        if playing && at_zero && !named_macros::prepare_playback_start(module) {
             ControlOut { write: Some(crate::model::recording::Inject::NEUTRAL), hold_cliff_timer: false }
         } else {
-            let out = rec().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)));
-            if playing && replay_preview::occupied() {
-                replay_preview::progress(rec().frame().into());
-            }
-            out
+            rec().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)))
         }
     } else {
         rec().control(&ctx)
@@ -436,9 +428,6 @@ unsafe fn on_ai_frame(ai: usize) {
         Some(Ended::NamedPlayed) => {
             event("named_playback_complete", "", 0, "", 0);
             named_macros::end_playback();
-            if replay_preview::occupied() {
-                replay_preview::complete();
-            }
         }
         None => {}
     }
@@ -515,13 +504,15 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
     let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
-    let term_enabled = if needs {
-        let from = rec().starting_status_of(head);
-        let term = table.get(Recorder::term_for_status(&table, from));
-        term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
-    } else {
-        false
-    };
+    let from = rec().starting_status_of(head);
+    let term_enabled = needs
+        && match Recorder::term_for_status(&table, from) {
+            Some(c) => {
+                let term = table.get(c);
+                term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+            }
+            None => cpu::actionable(body.accessor),
+        };
     let start = rec().mash_should_start(
         settings,
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
@@ -620,15 +611,12 @@ unsafe fn record_refusal() -> Option<RecordRefusal> {
 
 // ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
 
-/// Published alongside ACTIVE when the game releases its recorder guard.
-pub(crate) fn is_playback() -> bool { PLAYBACK.load(Ordering::Acquire) }
-
 /// Game callback only: numbered-slot transfer executes without heap work.
 pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
     transfer.execute(&mut rec());
 }
 
-/// The layer's playback (`playback_named`, `playback_preview`): `frames` frames of its buffer, started on the CPU now.
+/// The layer's playback (`playback_named`): `frames` frames of its buffer, started on the CPU now.
 pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) -> bool {
     // SAFETY: called on the game thread with live fighters.
     unsafe {
@@ -702,20 +690,19 @@ pub fn request_playback(start: PlaybackStart) {
 }
 
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4). A load starts neither a recording nor a slot
-/// playback (revision 8.2): only the named layer and a clip preview follow up. Package 3 calls it once per restore.
+/// playback (revision 8.2): only the named layer follows up. Package 3 calls it once per restore.
 pub fn on_state_restored() {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
-    if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
-        // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
+    if crate::runtime::macros::named_active() {
+        // The named layer owns the restore's follow-up.
         let _scope = HookScope::enter_hook(HookId::NamedRestore);
         // SAFETY: both fighters were just restored.
         unsafe {
             remember_named_pose();
             named_macros::service_restore();
         }
-        return;
     }
 }
 

@@ -598,6 +598,53 @@ mod tests {
     use super::*;
     use crate::model::state::record::StartState;
 
+    /// The saved-macro editor routes previews through Recording and hides the clip page.
+    fn the_crop_preview_is_wired_to_recordings_playback() {
+        let capture = include_str!("../runtime/macros/replay_capture.rs");
+        assert!(!capture.contains("macro_file(recording, false)"));
+        assert!(capture.contains("rr_host::request_preview("));
+        assert!(capture.contains("rr_host::stop_preview()"));
+        let vault = capture.split("Some(ClipEffect::Preview(recording))").nth(1).unwrap()
+            .split("Some(ClipEffect::PreviewFile").next().unwrap();
+        assert!(vault.contains("request_clip_preview("));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        let apply = host.split("fn apply(").nth(1).unwrap().split("\n}").next().unwrap();
+        let home = apply.split("if let Some(home) = tick.home {").nth(1).unwrap().split('}').next().unwrap();
+        assert!(home.contains("request_preview_home("));
+        let checkpoint = include_str!("../runtime/features/states/preview.rs");
+        let request = checkpoint.split("unsafe fn request(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(request.contains("read_record(&raws[0])"));
+        assert!(request.contains("read_record(&raws[1])"));
+        let take = checkpoint.split("unsafe fn take_home()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(take.find("LOADING.load(").unwrap() < take.find("ASK.swap(").unwrap());
+        let returning = take.split("if ask == 3 {").nth(1).unwrap().split("} else").next().unwrap();
+        assert!(returning.contains("CHECKPOINT.lock().clear()"));
+        let states = include_str!("../runtime/features/states.rs");
+        let session = states.split("fn clear_session()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(session.contains("preview::clear()"));
+        let named = include_str!("../runtime/macros/named_macros.rs");
+        let publish = named.split("pub fn publish_queries()").nth(1).unwrap().split("\n}").next().unwrap();
+        let clip_previewing = publish.split("let clip_previewing =").nth(1).unwrap().split(';').next().unwrap();
+        assert!(clip_previewing.contains("rr_host::preview_away()"));
+        let restore = named.split("fn begin_restore()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(restore.find("rr_host::previewing()").unwrap() < restore.find("source_is_named()").unwrap());
+        let clear = named.split("fn clear_session()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(clear.contains("rr_host::drop_preview_home()"));
+        let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(hold.contains("clip_previewing"));
+        let worker = include_str!("../runtime/ui/worker.rs");
+        let clip = worker.split("if s.phase == Phase::Clip {").nth(1).unwrap().split("\n    }").next().unwrap();
+        let store = clip.split("EXT_SHOWN.store(").nth(1).unwrap().split(';').next().unwrap();
+        assert!(store.contains("hides_page()"));
+    }
+
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_crop_preview_is_wired_to_recordings_playback", the_crop_preview_is_wired_to_recordings_playback as fn()),
+        ]);
+    }
+
     #[test]
     fn a_missed_tech_start_takes_the_asked_face_whatever_the_pose_gives() {
         struct Fake { pose_up: bool, flag: bool, motion: u64, restarts: u8 }

@@ -1977,7 +1977,7 @@ unsafe fn admission_blocker() -> Option<&'static str> {
     else if super::lobby::native_ui_busy() { Some("native UI") }
     else if super::training::save_states::is_loading() { Some("save-state restore") }
     else if super::training::recording_or_playback() { Some("recording or playback") }
-    else if crate::runtime::compat::replay_preview::occupied() { Some("replay preview") }
+    else if crate::engine::rr_host::previewing() { Some("replay preview") }
     else { None }
 }
 
