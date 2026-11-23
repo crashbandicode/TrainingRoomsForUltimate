@@ -477,6 +477,23 @@ fn every_native_the_runtime_names_is_a_guarded_row() {
 fn a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_one_calls_it() {
     let a = Analysis::new();
     let entries = a.entries();
+    let entry_reach: Vec<_> = entries.iter().map(|&(i, _)| a.reach(i).0).collect();
+    let hook_offsets: Vec<_> = entries.iter().map(|&(i, _)| a.hook_offset(&a.graph.funcs[i])).collect();
+    let mut boundary_reach = Vec::new();
+    for b in BOUNDARIES {
+        let Some(owner) = b.owner else { continue };
+        for start in a.graph.find(b.function) {
+            boundary_reach.push((b, owner, a.reach(start).0));
+        }
+    }
+    let mut call_rows = BTreeMap::new();
+    for &offset in entry_reach.iter().chain(boundary_reach.iter().map(|(_, _, offsets)| offsets)).flatten() {
+        call_rows.entry(offset).or_insert_with(|| capabilities::call_rows(offset).map(|r| r.name).collect::<Vec<_>>());
+    }
+    let mut units = Vec::new();
+    for &(_, unit) in &entries {
+        if !units.contains(&unit) { units.push(unit); }
+    }
     let mut checked = 0;
     for poisoned in capabilities::all_sites() {
         // Rows with the same bytes and kind of guard on one function pass and fail together (two packages' tables
@@ -484,22 +501,23 @@ fn a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_
         let poisoned_names: Vec<&str> = capabilities::equivalent_rows(poisoned).map(|r| r.name).collect();
         let usable = |site: &model::sites::Site| !poisoned_names.contains(&site.name);
         let granted = Granted::from_usable(&usable);
-        let unit_blocked = |unit: Feature| capabilities::blocked_by(unit, &usable).is_some();
-        for &(i, unit) in &entries {
+        let blocked: Vec<_> = units.iter().map(|&unit| (unit, capabilities::blocked_by(unit, &usable).is_some())).collect();
+        let unit_blocked = |unit: Feature| blocked.iter().find(|(other, _)| *other == unit).unwrap().1;
+        for (index, &(i, unit)) in entries.iter().enumerate() {
             let f = &a.graph.funcs[i];
-            let (offsets, _) = a.reach(i);
-            let reaches = |offsets: &BTreeSet<usize>| offsets.iter().any(|&o| capabilities::call_rows(o).any(|r| poisoned_names.contains(&r.name)));
-            if reaches(&offsets) {
+            let offsets = &entry_reach[index];
+            let reaches = |offsets: &BTreeSet<usize>| offsets.iter().any(|o| call_rows[o].iter().any(|name| poisoned_names.contains(name)));
+            if reaches(offsets) {
                 assert!(unit_blocked(unit), "{} ({}) can call {} but its unit stays installed", f.key(), unit.name(), poisoned.name);
             }
             // The entry's own hook row is the unit's own row.
-            if a.hook_offset(f).is_some_and(|o| capabilities::all_sites().any(|r| r.offset == o && poisoned_names.contains(&r.name) && capabilities::unit_of_row(r) == unit)) {
+            if hook_offsets[index].is_some_and(|o| capabilities::all_sites().any(|r| r.offset == o && poisoned_names.contains(&r.name) && capabilities::unit_of_row(r) == unit)) {
                 assert!(unit_blocked(unit), "{}: its own row {} is rejected", f.key(), poisoned.name);
             }
             if !unit_blocked(unit) {
                 // Installed: every native its hard reach can call is granted.
-                for &o in &offsets {
-                    if capabilities::call_name(o).is_some() {
+                for &o in offsets {
+                    if !call_rows[&o].is_empty() {
                         assert!(granted.allows(o), "{} is installed but can call the refused native at {o:#x} (poisoned {})", f.key(), poisoned.name);
                     }
                 }
@@ -511,13 +529,10 @@ fn a_poisoned_row_disables_every_entry_point_that_can_reach_it_and_no_installed_
     for poisoned in capabilities::all_sites() {
         let poisoned_names: Vec<&str> = capabilities::equivalent_rows(poisoned).map(|r| r.name).collect();
         let usable = |site: &model::sites::Site| !poisoned_names.contains(&site.name);
-        for b in BOUNDARIES {
-            let Some(owner) = b.owner else { continue };
-            for start in a.graph.find(b.function) {
-                let (offsets, _) = a.reach(start);
-                if offsets.iter().any(|&o| capabilities::call_rows(o).any(|r| poisoned_names.contains(&r.name))) {
-                    assert!(capabilities::blocked_by(owner, &usable).is_some(), "boundary {} reaches {} but its owner {} stays installed", b.function, poisoned.name, owner.name());
-                }
+        for (b, owner, offsets) in &boundary_reach {
+            let owner = *owner;
+            if offsets.iter().any(|o| call_rows[o].iter().any(|name| poisoned_names.contains(name))) {
+                assert!(capabilities::blocked_by(owner, &usable).is_some(), "boundary {} reaches {} but its owner {} stays installed", b.function, poisoned.name, owner.name());
             }
         }
     }
@@ -1103,6 +1118,10 @@ fn mashout_rows_are_registered_without_new_writes() {
     assert_eq!(rows.len(), 32);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Relied).count(), 26);
     assert_eq!(rows.iter().filter(|site| site.kind == SeamKind::Called).count(), 4);
+    let mut others = Vec::new();
+    for unit in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
+        if !others.contains(&unit) { others.push(unit); }
+    }
     for row in rows {
         assert_eq!(row.feature, Feature::Mashout);
         assert_eq!(capabilities::all_sites().filter(|site| site.name == row.name).count(), 1);
@@ -1111,7 +1130,7 @@ fn mashout_rows_are_registered_without_new_writes() {
         let move_specific = model::sites_mashout::move_specific(row);
         assert_eq!(capabilities::blocked_by(Feature::Mashout, &usable), (!move_specific).then_some(row.name));
         assert!(!Granted::from_usable(&usable).allows(row.offset));
-        for other in capabilities::all_sites().map(capabilities::unit_of_row).filter(|unit| *unit != Feature::Mashout) {
+        for &other in &others {
             assert!(capabilities::unit_usable(other, &usable), "{} must not disable {}", row.name, other.name());
         }
     }
