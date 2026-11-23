@@ -36,10 +36,7 @@ pub fn capturing() -> bool {
 /// # Safety
 /// Game thread.
 unsafe fn record_start() -> rr_host::RecordStart {
-    rr_host::RecordStart {
-        poses: [super::states::live_pose(0), super::states::live_pose(1)],
-        speeds: [live_speed(0), live_speed(1)],
-    }
+    rr_host::RecordStart::live([live_speed(0), live_speed(1)])
 }
 
 /// A fighter's summed speed (`KineticModule::get_sum_speed_x/y`, the named layer's `snapshot_start` reading); at rest
@@ -206,8 +203,8 @@ pub fn service() {
         }
     }
     take_mismatch_answer();
-    let player = super::states::live_saved(0);
-    let cpu = super::states::live_saved(1);
+    let player = rr_host::live_pose(0).saved();
+    let cpu = rr_host::live_pose(1).saved();
     if player.fighter_kind >= 0 {
         rr_host::set_role_fighter(crate::engine::library::Role::Player, player.fighter_kind);
     }

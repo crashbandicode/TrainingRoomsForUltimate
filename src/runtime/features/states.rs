@@ -131,14 +131,6 @@ fn is_pokemon_kind(kind: i32) -> bool {
 /// The fighter objects of the two records (accessor and entry id), refreshed every frame: Kirby's hat
 /// restore reads the opponent's.
 static FIGHTER_ACC: [AtomicUsize; 2] = [const { AtomicUsize::new(0) }; 2];
-/// Pose of each role, written on the fighter frame and read by the recording worker.
-/// The worker never calls a native: the start save is this pose.
-static LIVE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
-static LIVE_SIT: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
-static LIVE_X: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
-static LIVE_Y: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
-static LIVE_DMG: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
-static LIVE_LR: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
 static FIGHTER_ENTRY: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 const H_COMMON: usize = 0;
 const H_DEAD_REBIRTH_WAIT: usize = 1;
@@ -580,7 +572,23 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     crate::runtime::export::fighter_frame(entry, kind, raw.status, raw.situation, flags, accessor, fighter);
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
-    if !ENABLE.load(Ordering::Acquire) && !TEMPORARY.load(Ordering::Acquire) {
+    // The role's own body and its live pose are published before the Save States gate: Record and the recording
+    // worker read them whatever Save States says (combined run rc15-ib-1f7e0174: Off kept the previous CPU).
+    let live = if nana {
+        None
+    } else {
+        FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
+        FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
+        Some((role.index(), crate::engine::rr_host::StartPose {
+            fighter_kind: raw.kind,
+            situation_kind: raw.situation,
+            x: natives::pos_x(accessor),
+            y: natives::pos_y(accessor),
+            percent: natives::damage(accessor, 0),
+            lr: natives::lr(accessor),
+        }))
+    };
+    if !crate::engine::rr_host::fighter_frame(live, ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) {
         // rc.12: with Save States Off a Save or Load press is refused once, not kept for when it goes On.
         refuse_pending(!nana && !reset_hub::cpu_operated(fighter), Refused::Off);
         return;
@@ -665,17 +673,6 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 n::kirby_copy_setup(accessor, opponent_entry, opponent_kind);
             }
         }
-    }
-    if !nana {
-        FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
-        FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
-        let slot = role.index();
-        LIVE_KIND[slot].store(raw.kind, Ordering::Release);
-        LIVE_SIT[slot].store(raw.situation, Ordering::Release);
-        LIVE_X[slot].store(natives::pos_x(accessor).to_bits(), Ordering::Release);
-        LIVE_Y[slot].store(natives::pos_y(accessor).to_bits(), Ordering::Release);
-        LIVE_DMG[slot].store(natives::damage(accessor, 0).to_bits(), Ordering::Release);
-        LIVE_LR[slot].store(natives::lr(accessor).to_bits(), Ordering::Release);
     }
     // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
     let switching = is_pokemon_kind(kind)
@@ -1133,32 +1130,6 @@ unsafe fn apply_buff(raw: &Raw, role: Role) {
     if out.done {
         with(|s| s.machine.finish_wait(role));
         state_diag!("[TrainingRooms] state buff_done entry={} kind={:?}", raw.entry, kind);
-    }
-}
-
-/// The recording worker's live pose of a fighter. Written by the fighter frame; this only reads atomics.
-pub fn live_saved(slot: usize) -> SavedState {
-    live_pose(slot).saved()
-}
-
-/// A fighter's live pose (the record chord's start save, `recording_host::record_start`). Atomics only, no allocation;
-/// a slot never seen is kind −1.
-pub fn live_pose(slot: usize) -> crate::engine::rr_host::StartPose {
-    let unseen = crate::engine::rr_host::StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
-    if slot >= 2 {
-        return unseen;
-    }
-    let kind = LIVE_KIND[slot].load(Ordering::Acquire);
-    if kind < 0 {
-        return unseen;
-    }
-    crate::engine::rr_host::StartPose {
-        fighter_kind: kind,
-        situation_kind: LIVE_SIT[slot].load(Ordering::Acquire),
-        x: f32::from_bits(LIVE_X[slot].load(Ordering::Acquire)),
-        y: f32::from_bits(LIVE_Y[slot].load(Ordering::Acquire)),
-        percent: f32::from_bits(LIVE_DMG[slot].load(Ordering::Acquire)),
-        lr: f32::from_bits(LIVE_LR[slot].load(Ordering::Acquire)),
     }
 }
 

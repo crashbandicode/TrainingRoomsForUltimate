@@ -619,6 +619,50 @@ pub struct RecordStart {
     pub speeds: [(f32, f32); 2],
 }
 
+impl RecordStart {
+    /// Both fighters as their latest frames published them (`fighter_frame`), with the speeds the game thread read.
+    pub fn live(speeds: [(f32, f32); 2]) -> Self {
+        Self { poses: [live_pose(0), live_pose(1)], speeds }
+    }
+}
+
+/// Each role's fighter as its latest Training frame ran it (`fighter_frame`; kind −1 before one ran): the record chord's
+/// start save and the worker's live pose. Atomics only, so the worker never calls a native.
+static LIVE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
+static LIVE_SIT: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
+/// x, y, percent and facing, as `f32` bits.
+static LIVE_F32: [[AtomicU32; 4]; 2] = [const { [const { AtomicU32::new(0) }; 4] }; 2];
+
+/// One fighter's frame in Training, in the order the frame runs it (`states::on_fighter_frame`): the role's live pose
+/// is published first, whatever Save States says, and only then does Save States Off end the frame. `live` is the
+/// role's slot and pose, `None` for a body that is not the role's own (Nana). Returns whether the save-state step runs
+/// (`save_states`: Save States is On, or a named load holds it open). Combined run rc15-ib-1f7e0174: the pose was
+/// published after the Off return, so with Save States Off a CPU take's start save named the previous CPU.
+pub fn fighter_frame(live: Option<(usize, StartPose)>, save_states: bool) -> bool {
+    if let Some((slot, pose)) = live {
+        if let (Some(kind), Some(sit), Some(cells)) = (LIVE_KIND.get(slot), LIVE_SIT.get(slot), LIVE_F32.get(slot)) {
+            kind.store(pose.fighter_kind, Ordering::Release);
+            sit.store(pose.situation_kind, Ordering::Release);
+            for (cell, value) in cells.iter().zip([pose.x, pose.y, pose.percent, pose.lr]) {
+                cell.store(value.to_bits(), Ordering::Release);
+            }
+        }
+    }
+    save_states
+}
+
+/// A fighter's live pose (`fighter_frame`). Atomics only, no allocation; a slot never seen is kind −1.
+pub fn live_pose(slot: usize) -> StartPose {
+    let unseen = StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
+    let (Some(kind), Some(sit), Some(cells)) = (LIVE_KIND.get(slot), LIVE_SIT.get(slot), LIVE_F32.get(slot)) else { return unseen };
+    let kind = kind.load(Ordering::Acquire);
+    if kind < 0 {
+        return unseen;
+    }
+    let [x, y, percent, lr] = [0, 1, 2, 3].map(|i: usize| f32::from_bits(cells[i].load(Ordering::Acquire)));
+    StartPose { fighter_kind: kind, situation_kind: sit.load(Ordering::Acquire), x, y, percent, lr }
+}
+
 /// The speed a Play gives the playing role on its first input after the warp: the macro's recorded start speed with
 /// "Keep recorded speed", zero with "Start at rest". `facing` is the facing it was recorded with; x is applied relative
 /// to it, as the recorder's inputs are.
@@ -2051,7 +2095,7 @@ fn reset_host() {
     *lock(&SAVED_PAIR) = None;
     SLOT_RESYNC.store(false, Ordering::Release);
     *lock(&KEPT_PLACEMENT) = None;
-    for slot in &ROLE_KIND {
+    for slot in ROLE_KIND.iter().chain(&LIVE_KIND) {
         slot.store(-1, Ordering::Release);
     }
 }
@@ -4245,6 +4289,58 @@ mod tests {
         assert_eq!((save.player.x, save.cpu.x), (-5.0, 5.0));
     }
 
+    /// Combined run rc15-ib-1f7e0174-yoga-main-1 (rv-integration REVIEW FAIL 2026-11-23 03:32:38Z): with Save States Off
+    /// the fighter frame returned before it published the role's live pose, so a CPU take recorded after a CPU change
+    /// kept the previous CPU (Inkling, its old pose) in the macro's start and in its start save, while the live CPU was
+    /// Pikachu. The frame publishes the live pose whatever Save States says.
+    fn a_take_with_save_states_off_starts_at_the_live_fighters() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("rec-live-off");
+        // Save States On: Mario and the CPU's Inkling.
+        assert!(fighter_frame(Some((0, pose(0, 11.3, -1.0))), true));
+        assert!(fighter_frame(Some((1, StartPose { percent: 72.0, ..pose(52, 16.5, 1.0) })), true));
+        // Save States Off, and the CPU becomes Pikachu: every frame from here ends at the Off return.
+        let mario = StartPose { percent: 84.3, ..pose(0, 79.9, 1.0) };
+        let pikachu = pose(8, 47.95, 1.0);
+        assert!(!fighter_frame(Some((0, mario)), false), "Save States Off: the save-state step does not run");
+        assert!(!fighter_frame(Some((1, pikachu)), false));
+        assert!(!fighter_frame(None, false), "a body that is not the role's own (Nana) publishes nothing");
+        assert_eq!([live_pose(0), live_pose(1)], [mario, pikachu], "the live pose is published whatever Save States says");
+        // A CPU take as the runtime drives it: the Record chord (`recording_host::on_chords`), a jab, Record again, and
+        // the worker's pass (`recording_host::service`).
+        set_record_role(Role::Cpu);
+        note_record_start(RecordStart::live([(0.0, 0.0), (0.4, 0.0)]));
+        on_chords(true, false, false);
+        push_capture(ROLE_CPU, InputFrame { buttons: 513, ..InputFrame::default() });
+        on_chords(true, false, false);
+        let _ = service_at(&root, &none(), "2026-11-23", live_pose(0).saved(), live_pose(1).saved());
+        let macros = Library::new(root.join(MACROS_DIR));
+        let recording = macros.load(&macros.list().unwrap().entries[0].id).unwrap();
+        assert_eq!((recording.start.fighter_kind, recording.start.speed_x), (8, 0.4), "the macro starts on the live CPU, not the previous one");
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(recording.start_save.as_deref().expect("a start save")).unwrap();
+        assert_eq!((save.cpu.fighter_kind, save.cpu.x, save.cpu.percent), (8, 47.95, 0.0), "the start save keeps the live CPU and its pose");
+        assert_eq!((save.player.fighter_kind, save.player.x, save.player.percent), (0, 79.9, 84.3), "and the live Player 1");
+    }
+
+    /// The runtime's side of the test above: the fighter frame publishes its body cells and hands its live pose to
+    /// `fighter_frame` before the Save States Off return, keeps no pose of its own, and Record and the worker read
+    /// the host's.
+    fn the_fighter_frame_publishes_before_the_save_states_off_return() {
+        let states = include_str!("../runtime/features/states.rs");
+        let at = states.find("pub unsafe fn on_fighter_frame(").expect("on_fighter_frame");
+        let frame = &states[at..at + states[at..].find("\n}\n").expect("end of the function")];
+        let off = frame.find("Refused::Off").expect("Save States Off");
+        assert!(frame[..off].contains("FIGHTER_ACC[role.index()].store(accessor"), "missing or out of order: FIGHTER_ACC[role.index()].store(accessor");
+        let mut from = 0;
+        for step in ["FIGHTER_ACC[role.index()].store(accessor", "FIGHTER_ENTRY[role.index()].store(entry", "rr_host::fighter_frame(", "Refused::Off"] {
+            from += frame[from..].find(step).unwrap_or_else(|| panic!("missing or out of order: {step}")) + step.len();
+        }
+        assert!(!states.contains("LIVE_KIND"), "the save states keep a live pose of their own");
+        let host = include_str!("../runtime/features/recording_host.rs");
+        assert!(host.contains("rr_host::RecordStart::live(") && !host.contains("states::live_"), "Record or the worker reads another pose");
+    }
+
     /// Plays the Player's active macro (recorded with `start`, kept `placement` if any) once and returns the start speed
     /// the role gets on the game frame that takes its first input, checking it is given only once.
     fn momentum_play(tag: &str, start: StartState, placement: Option<Placement>, start_save: bool) -> Option<StartSpeed> {
@@ -4449,6 +4545,8 @@ mod tests {
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),
             ("a_recording_keeps_where_and_how_fast_it_started", a_recording_keeps_where_and_how_fast_it_started as fn()),
+            ("a_take_with_save_states_off_starts_at_the_live_fighters", a_take_with_save_states_off_starts_at_the_live_fighters as fn()),
+            ("the_fighter_frame_publishes_before_the_save_states_off_return", the_fighter_frame_publishes_before_the_save_states_off_return as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
     }
