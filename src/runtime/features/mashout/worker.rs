@@ -74,6 +74,7 @@ struct Worker {
     origin: SeedOrigin,
     seed: Option<Seed>,
     session: Run<Key>,
+    tech_grade: Option<(u64, crate::model::tech::session::Grade, u32)>,
     shown: crate::model::storage::FixedPath<256>,
 }
 static WORKER: Mutex<Worker> = Mutex::new(Worker {
@@ -82,6 +83,7 @@ static WORKER: Mutex<Worker> = Mutex::new(Worker {
     origin: SeedOrigin::Export,
     seed: None,
     session: Run::new(),
+    tech_grade: None,
     shown: crate::model::storage::FixedPath::new(),
 });
 
@@ -112,6 +114,7 @@ pub(super) fn service() {
     let mut worker = WORKER.lock();
     let wanted = wanted();
     if !wanted {
+        worker.tech_grade = None;
         worker.session.cancel();
         EVENTS.drain(|_| ());
         show(&mut worker, "");
@@ -121,6 +124,7 @@ pub(super) fn service() {
         || !SLOTS_READY.load(Ordering::Acquire)
         || CONFIG.read().is_none()
     {
+        worker.tech_grade = None;
         worker.session.cancel();
         EVENTS.drain(|_| ());
         show(&mut worker, UNAVAILABLE_NOTICE);
@@ -246,10 +250,8 @@ pub(super) fn service() {
                 return;
             }
             worker.session.cancel();
+            worker.tech_grade = Some((generation, grade, best));
             let mut text = crate::model::storage::FixedPath::<96>::new();
-            owned(worker.generation).result(|| Some(crate::model::practice_state::Fields {
-                last_outcome: grade.practice_name(), best: Some(best), ..Default::default()
-            }));
             let _ = grade.write(&mut text);
             let _ = core::fmt::Write::write_str(&mut text, kind.map_or("", |k| if k { " · in place" } else { " · roll" }));
             let _ = core::fmt::Write::write_fmt(&mut text, format_args!(" · best {best}"));
@@ -282,7 +284,11 @@ pub(super) fn service() {
         worker.session.cancel();
     } else {
         worker.session.finish();
-        owned(worker.generation).result(|| worker.session.practice_result());
+        let done = worker.session.practice_result();
+        if done.is_some() {
+            worker.tech_grade = None;
+        }
+        owned(worker.generation).result(|| done);
         if worker.session.phase() != crate::model::mashout::run::Phase::Off {
             let mut text = crate::model::storage::FixedPath::<256>::new();
             if worker.origin == SeedOrigin::ThrowClatterStart {
@@ -291,5 +297,15 @@ pub(super) fn service() {
             let _ = worker.session.write_notice(&mut text);
             show(&mut worker, text.as_str());
         }
+    }
+    // Row 121's grade is posted on every tick while its generation is current: a post a full box refused is repeated.
+    match worker.tech_grade {
+        Some((generation, grade, best)) if generation == worker.generation => {
+            owned(generation).result(|| Some(crate::model::practice_state::Fields {
+                last_outcome: grade.practice_name(), best: Some(best), ..Default::default()
+            }));
+        }
+        Some(_) => worker.tech_grade = None,
+        None => {}
     }
 }

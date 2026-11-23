@@ -48,7 +48,7 @@ struct PracticeSample {
     result: bool,
 }
 
-static PRACTICE: hos_lock::Mailbox<PracticeSample, 8> = hos_lock::Mailbox::new();
+static PRACTICE: hos_lock::Mailbox<PracticeSample, { practice::SAMPLE_SLOTS }> = hos_lock::Mailbox::new();
 
 fn practice_admission() -> u64 {
     let address = ADMISSION.load(Ordering::Acquire);
@@ -85,21 +85,25 @@ impl PracticeCapture {
     }
 
     pub fn submit(self, sample: impl FnOnce() -> Fields) {
-        self.post(false, || Some(sample()));
+        if self.admission != 0 {
+            self.post(false, &sample());
+        }
     }
 
     /// Mash out's grading worker owns the asynchronous result, while the game thread owns phase and elapsed.
     pub fn result(self, sample: impl FnOnce() -> Option<Fields>) {
-        self.post(true, sample);
+        if self.admission != 0 {
+            if let Some(fields) = sample() {
+                self.post(true, &fields);
+            }
+        }
     }
 
-    fn post(self, result: bool, sample: impl FnOnce() -> Option<Fields>) {
-        let Self { admission, activation } = self;
-        if admission == 0 || crate::runtime::features::practice::activation().0 != activation {
-            return;
-        }
-        if let Some(fields) = sample() {
-            PRACTICE.post(PracticeSample { admission, activation, fields, result });
+    /// One copy of the hand-off: a sample of an activation that has ended is dropped.
+    #[inline(never)]
+    fn post(self, result: bool, fields: &Fields) {
+        if crate::runtime::features::practice::activation().0 == self.activation {
+            PRACTICE.post(PracticeSample { admission: self.admission, activation: self.activation, fields: *fields, result });
         }
     }
 }

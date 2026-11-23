@@ -2,6 +2,12 @@ lib_unit_tests! {
 use super::*;
 
 #[test]
+fn the_sample_mailbox_is_sized_to_one_poll_of_the_busiest_game() {
+    // BTT with Ice Climbers: two fighter passes and one P1 input poll per frame, for the two frames between drains.
+    assert_eq!(SAMPLE_SLOTS, (2 + 1) * 2);
+}
+
+#[test]
 fn practice_game_wire_fields() {
     for (game, name, phase) in [
         (Game::Eggs, "eggs", "live"),

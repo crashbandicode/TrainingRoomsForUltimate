@@ -880,6 +880,39 @@ fn cpu_think_counts_follow_the_hooks_training_or_lobby_gate() {
 }
 
 #[test]
+fn the_sample_mailbox_uses_the_models_slot_count() {
+    let bridge = src("src/runtime/bridge_state.rs");
+    assert!(bridge.contains("Mailbox<PracticeSample, { practice::SAMPLE_SLOTS }>"));
+    assert!(!bridge.contains("Mailbox<PracticeSample, 8>"));
+}
+
+#[test]
+fn practice_sample_projection_is_gated_and_stale_posts_are_dropped() {
+    let bridge = src("src/runtime/bridge_state.rs");
+    let capture = item(&bridge, "impl PracticeCapture {");
+    let submit = capture.split("    pub fn submit(").nth(1).unwrap().split("    /// Mash out").next().unwrap();
+    assert!(submit.find("if self.admission != 0 {").unwrap() < submit.find("self.post(false, &sample());").unwrap());
+    let result = capture.split("    pub fn result(").nth(1).unwrap().split("    /// One copy").next().unwrap();
+    assert!(result.find("if self.admission != 0 {").unwrap() < result.find("if let Some(fields) = sample() {").unwrap());
+    assert!(result.contains("self.post(true, &fields);"));
+    let post = capture.split("    #[inline(never)]").nth(1).unwrap();
+    assert!(post.contains("fn post(self, result: bool, fields: &Fields)"));
+    assert!(post.find("activation().0 == self.activation").unwrap() < post.find("PRACTICE.post(").unwrap());
+}
+
+#[test]
+fn the_row_121_grade_is_held_by_the_worker_and_reposted() {
+    let worker = src("src/runtime/features/mashout/worker.rs");
+    let arm = &worker[worker.find("Event::TechGrade(generation, grade, kind, best) => {").unwrap()..];
+    let arm = &arm[..arm.find("Event::Cancel(").unwrap()];
+    assert!(arm.contains("worker.tech_grade = Some((generation, grade, best));"));
+    assert!(!arm.contains(".result("));
+    let tail = &worker[worker.find("worker.session.finish();").unwrap()..];
+    let held = tail.find("Some((generation, grade, best)) if generation == worker.generation =>").unwrap();
+    assert!(held < tail.find("owned(generation).result(").unwrap());
+}
+
+#[test]
 fn a_pending_drill_start_does_not_publish_the_previous_run() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");

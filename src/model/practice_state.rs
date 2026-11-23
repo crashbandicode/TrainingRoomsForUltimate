@@ -6,6 +6,11 @@ pub const SCHEMA_ID: u32 = 2;
 pub const SCHEMA_VERSION: u32 = 1;
 pub const CPU_ENTRIES: usize = 8;
 
+/// Slots of the game-to-worker sample mailbox. The worker drains every 33 ms (two game frames). The busiest case is
+/// Break the Targets with Ice Climbers: two fighter passes and one P1 input poll post a sample each frame, six between
+/// two drains. A full mailbox drops the newest sample; the per-frame producers post again on their next pass.
+pub const SAMPLE_SLOTS: usize = 6;
+
 /// The activation the poll publishes: the live practice layout's own, none without one.
 pub fn published_activation(scene: &str, activation: impl FnOnce() -> (u64, Option<Game>)) -> (u64, Option<Game>) {
     if matches!(scene, "training" | "lobby") { activation() } else { (0, None) }
