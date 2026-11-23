@@ -1883,3 +1883,11 @@ Grids are unchanged. The Recording page's footer names ZL + Up / Down as the way
 
 The Recording-page rule was the edge-juggle-sol lane's default (posted 12:53:06Z); tr-primary-2 approved it the same
 day (ruling of about 12:55Z). The operator may still overrule it.
+
+## Recording chain back-out (2026-11-23)
+
+B on an empty new chain or sequence picker opened the keyboard, and cancelling it in Training left an unseen name
+draft open that continued to hold both fighters after the Recording menu closed. A1: B now backs out of an empty
+new picker, and a numbered picker still asks for a name; this is the edge-juggle-sol lane's default, posted 16:02:42Z,
+pending tr-primary-2. A2: a cancelled keyboard makes nothing, and the page's name draft stays open only while the page
+waits for it.
