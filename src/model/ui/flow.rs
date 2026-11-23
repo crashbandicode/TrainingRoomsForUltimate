@@ -220,6 +220,7 @@ mod tests {
         assert!(fact.contains("states::is_loading()"));
         assert!(fact.contains("recorder::recording_or_playback()"));
         assert!(fact.contains("recording_host::cpu_playback_blocks_drill()"));
+        assert!(fact.contains("rr_host::previewing()"));
     }
 
     fn f9_name_step_truth_table() {
