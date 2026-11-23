@@ -145,6 +145,9 @@ unsafe fn entry_applied(ctx: &mut InlineCtx) {
     crate::runtime::diag_log::diagnostic(format_args!(
         "[LobbyPersist] entry saved={:?} offered={:?} partners={:?} behavior={:?}",
         published(), choices.as_slice(), read::<u32>(panel, PARTNERS), read::<u32>(panel, BEHAVIOR)));
+    if let (Some(partners), Some(behavior)) = (read::<u32>(panel, PARTNERS), read::<u32>(panel, BEHAVIOR)) {
+        crate::runtime::bridge_state::note_event(crate::model::bridge_events::Event::RoomApplied { partners, behavior });
+    }
 }
 
 /// The row handler after its prologue (`0x1bc83b4`, `ldr w8,[x1]`): `x0` = ctx, `x1` = the row, `x2` = the index.
@@ -157,6 +160,7 @@ unsafe fn setter_entry(ctx: &mut InlineCtx) {
     let row = read::<i32>(ctx.registers[1].x() as usize, 0);
     let index = read::<u32>(ctx.registers[2].x() as usize, 0);
     let (Some(row), Some(index)) = (row, index) else { return };
+    crate::runtime::bridge_state::note_event(crate::model::bridge_events::Event::RoomChange { row, index });
     let Some(panel) = child(ctx.registers[0].x() as usize, 8) else { return };
     let Some(choices) = choices(panel) else { return };
     if let Some(change) = chosen(row, index, choices.as_slice()) {

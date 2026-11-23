@@ -2529,15 +2529,15 @@ approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197337
+ceiling = 197587
 date = "2026-11-23"
-reason = "F10 follow-up: after X or B the drill preview's page returns once the player has stopped, so no frame of the take is handed to Player 1 behind a shown page. Measured 197337 on install 2 0acfe3a1 with the follow-up, with no spare: 9 above 197328."
-approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10; proof-row reviews rv-preview-vis 21:16:20Z and rv-fusion-g2-3 21:16:27Z; fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 197587 on install 2 0acfe3a1, which alone measures 197328, so they add 259."
+approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197350
+ceiling = 197609
 date = "2026-11-23"
-reason = "F10 stop on a card read error: when the card's recordings cannot be read, a preview's run ends and its queued frames are dropped, as after a Stop. Measured 197350 on install 2 0acfe3a1 with both F10 follow-ups, with no spare: 13 above 197337."
-approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10; reviews rv-preview-vis 21:37:25Z and rv-fusion-g2-3 21:37:30Z; tr-primary-2 ruling 21:40:48Z (F10 makes the change in rr_host.rs); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+reason = "F10 stop follow-ups: after X or B the drill preview's page returns once the player has stopped, and a preview's run ends with its queued frames dropped when the card's recordings cannot be read. They add 22 lines: 197350 measured on 0dde6d65 (install 2 0acfe3a1 with both) against 197328 there. 197587 (install 2 a0e9e1cb) + 22 = 197609 on this head, with no spare."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10; reviews rv-preview-vis 21:16:20Z and 21:37:25Z, rv-fusion-g2-3 21:16:27Z and 21:37:30Z; tr-primary-2 ruling 21:40:48Z (F10 makes the read-error change in rr_host.rs); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
