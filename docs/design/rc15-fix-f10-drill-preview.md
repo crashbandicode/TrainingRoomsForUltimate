@@ -21,7 +21,7 @@ So a drill has nothing the player could play unless its take's frames are kept w
 When `+ Record drill…` stops and the drill is saved, the take's frames are saved as a macro file the drill owns, and the drill file names it in a new field, `take`.
 
 - **Hidden:** a take is named `Drill take` followed by a 16-digit key from its frames and save time. Its id comes from its name, so a drill copied from another card names no take here, says `Re-record to preview`, and deletes nothing. Only a macro with such a name that a drill names counts as a take; the menu removes it from its catalog.
-- **Deleted with the drill:** deleting the drill deletes its take unless another drill file still names it.
+- **Deleted with the drill:** deleting the drill deletes its take unless another drill file still names it. A file the library skips is not a drill and keeps no take. Whether the take goes is settled before the drill file is touched; when the folder cannot be read, nothing is deleted.
 - **The frames** are the ones an ordinary Record of Player 1 would have saved, with Crop trailing neutral applied as there. No start save is written; the take is not an active macro and is not marked as used. The drill, the grading target, the Record role and `made_from` (empty for a direct drill) behave as before.
 - An overfull or empty take saves neither file, as before. A crop of a drill has other inputs, so the cropped drill has no take.
 
@@ -69,6 +69,8 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - `an_index_failure_after_the_drill_file_keeps_the_pair` (`rr_runtime`): a later index failure leaves the drill and its take intact.
 - `a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take` (`rr_runtime`): a copied drill cannot name or delete a different local take.
 - `a_take_two_drill_files_name_survives_the_first_delete` (`rr_runtime`): a shared take remains until its last drill is deleted.
+- `a_skipped_combo_file_does_not_keep_a_deleted_drills_take` (`rr_runtime`): a skipped file does not keep a take.
+- `a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair` (`rr_runtime`): an unreadable folder leaves both files intact.
 - `x_during_a_play_on_player_one_starts_no_drill_preview` (`rr_host`): a queued or running Play keeps its inputs and is not replaced.
 - `a_takes_name_is_the_prefix_and_sixteen_hex_digits` (`combo_record`): names require the prefix and exactly 16 lowercase hex digits.
 - `a_recorded_drills_take_previews_on_player_one_through_the_play_queue` (`rr_host`): `request_preview` of the take feeds Player 1's queue exactly the take's frames, and nothing to the CPU's.

@@ -401,22 +401,31 @@ fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<Stri
     Ok(id)
 }
 
-/// Delete a combo or drill file. A drill's take (F10) goes with it, unless another file still names it.
-/// Only a macro with a take's name: a file that names any other macro leaves it alone.
+/// Delete a combo or drill file. A drill's take (F10) goes with it, unless another drill or combo the library reads
+/// still names it; a file the library skips is not a drill and keeps no take. That is settled before the drill file
+/// is touched: when the folder cannot be read nothing is deleted. Only a macro with a take's name is ever deleted:
+/// a file that names any other macro leaves it alone.
 pub fn delete_combo(root: &Path, id: &str) -> bool {
     let combos = ComboLibrary::new(root.join("combos"));
     let take = combos.load(id).ok().and_then(|file| file.take);
-    let deleted = combos.delete(id).is_ok();
-    if let Some(take) = take.filter(|_| deleted) {
+    let mut goes = take.is_some();
+    if let Some(take) = take.as_deref() {
+        let Ok(listing) = combos.list() else { return false };
+        for entry in listing.entries.iter().filter(|entry| entry.id != id) {
+            let Ok(file) = combos.load(&entry.id) else { return false };
+            goes &= file.take.as_deref() != Some(take);
+        }
+    }
+    if combos.delete(id).is_err() {
+        return false;
+    }
+    if let Some(take) = take.filter(|_| goes) {
         let macros = Library::new(root.join(MACROS_DIR));
-        let unreferenced = combos.list().is_ok_and(|listing| listing.skipped.is_empty() && listing.entries.iter().all(|entry| {
-            combos.load(&entry.id).is_ok_and(|file| file.take.as_deref() != Some(take.as_str()))
-        }));
-        if unreferenced && macros.load(&take).is_ok_and(|file| is_drill_take_name(&file.name)) {
+        if macros.load(&take).is_ok_and(|file| is_drill_take_name(&file.name)) {
             let _ = macros.delete(&take);
         }
     }
-    deleted
+    true
 }
 
 /// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
@@ -1084,6 +1093,43 @@ mod tests {
         assert!(macros.load(&take).is_ok());
         assert!(delete_combo(&root, &drill));
         assert!(macros.load(&take).is_err());
+    }
+
+    fn a_skipped_combo_file_does_not_keep_a_deleted_drills_take() {
+        let root = scratch("drill-skipped-combo");
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, take, 1).unwrap();
+        let typo = root.join("combos").join("typo.json");
+        std::fs::write(&typo, br#"{"schema_version":1,"name":"Typo","links":[{"from":"aerial","to":"aeria","verdict":{"kind":"true","link":-2},"steps":[{"button":"jump","aim":"neutral","offset":2}]}]}"#).unwrap();
+        let combos = ComboLibrary::new(root.join("combos"));
+        let skipped = combos.list().unwrap().skipped;
+        assert!(skipped.iter().any(|file| file.file == "typo.json" && file.reason.contains("bad combo field: to")));
+        assert!(delete_combo(&root, &drill));
+        assert!(combos.load(&drill).is_err());
+        assert!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.is_empty());
+        assert!(typo.is_file());
+    }
+
+    fn a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair() {
+        let root = scratch("drill-unreadable-combos");
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
+        let dir = root.join("combos");
+        let held = root.join("combos-held");
+        let hook_dir = dir.clone();
+        let hook_held = held.clone();
+        crate::model::store::before_next_store_list(move || {
+            std::fs::rename(&hook_dir, &hook_held).unwrap();
+            std::fs::write(&hook_dir, b"not a directory").unwrap();
+        });
+        assert!(!delete_combo(&root, &drill));
+        assert!(held.join(format!("{drill}.json")).is_file());
+        let macros = Library::new(root.join(MACROS_DIR));
+        assert!(macros.load(&take).is_ok());
+        std::fs::remove_file(&dir).unwrap();
+        std::fs::rename(&held, &dir).unwrap();
+        assert_eq!(ComboLibrary::new(dir).load(&drill).unwrap().take.as_deref(), Some(take.as_str()));
+        assert!(macros.load(&take).is_ok());
     }
 
     fn record_follows_the_popup_role() {
@@ -1919,6 +1965,8 @@ mod tests {
             ("an_index_failure_after_the_drill_file_keeps_the_pair", an_index_failure_after_the_drill_file_keeps_the_pair as fn()),
             ("a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take", a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take as fn()),
             ("a_take_two_drill_files_name_survives_the_first_delete", a_take_two_drill_files_name_survives_the_first_delete as fn()),
+            ("a_skipped_combo_file_does_not_keep_a_deleted_drills_take", a_skipped_combo_file_does_not_keep_a_deleted_drills_take as fn()),
+            ("a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair", a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair as fn()),
             ("save_chord_preserves_a_slot_written_after_its_initial_index_read", save_chord_preserves_a_slot_written_after_its_initial_index_read as fn()),
             ("discovery_yields_between_small_batches_and_keeps_menu_input_available", discovery_yields_between_small_batches_and_keeps_menu_input_available as fn()),
             ("a_failed_payload_retries_without_a_signature_change", a_failed_payload_retries_without_a_signature_change as fn()),
