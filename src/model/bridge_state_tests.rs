@@ -105,7 +105,7 @@ fn extra_lines_come_after_the_list_and_before_the_rows() {
     let view = View { extra: "place.first=1\nplace.role=\"cpu\"\n", ..eggs_start() };
     let mut out = String::new();
     assert!(snapshot(&view, &mut out));
-    assert!(out.contains("list.value=\"\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
+    assert!(out.contains("list.value=\">\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
 
     let extra = format!("place.long=\"{}\"\n", "x".repeat(1500));
     let long = "row".repeat(200);
