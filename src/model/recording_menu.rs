@@ -463,6 +463,41 @@ pub struct RecordingScreens {
 }
 
 impl RecordingScreens {
+    /// The list the cursor rests in on `face` (the bridge snapshot): that face's open numbered picker or file screen,
+    /// else, on the library (`on_library`; the pop-up always is), the current section of `group` (the pop-up uses its
+    /// own group). `None`: the keyboard is up, the catalog is loading, the list is empty, or the page's cursor is not
+    /// on a library group.
+    pub fn focus_list(&self, face: Face, group: u8, on_library: bool) -> Option<super::menu::FocusList> {
+        use super::menu::FocusList;
+        let list = |id: String, count: usize, index: usize, value: String| {
+            (count != 0).then(|| FocusList { id, count, index: index.min(count - 1), row: None, value })
+        };
+        if self.overlay_open() && self.overlay_face == face {
+            if self.loading || self.keyboard.is_some() {
+                return None;
+            }
+            if let Some(picker) = &self.picker {
+                return list("recording/picker".into(), picker.ids.len(), picker.cursor, String::new());
+            }
+            if let Some(file) = &self.file {
+                let rows = self.built_file_rows();
+                let index = file.cursor.min(rows.len().saturating_sub(1));
+                let value = rows.get(index).map_or_else(String::new, |row| row.value.clone());
+                return list("recording/file".into(), rows.len(), index, value);
+            }
+            return None;
+        }
+        if !on_library {
+            return None;
+        }
+        let group = if face == Face::Popup { self.popup_group() } else { group };
+        let place = self.place(face, group);
+        let section = place.section;
+        let count = self.items(face, group, section).len();
+        let name = if face == Face::Popup { "popup" } else { "page" };
+        list(format!("recording/{name}/{group}/{section}"), count, place.at[usize::from(section)], String::new())
+    }
+
     pub(crate) fn new() -> RecordingScreens {
         RecordingScreens {
             popup_open: false,
@@ -2512,6 +2547,33 @@ mod tests {
         menu
     }
 
+    fn bridge_recording_list_tracks_jumps_and_the_popup() {
+        use crate::model::bridge_state::list_view;
+        let mut m = menu();
+        to_recording(&mut m);
+        let mut catalog = example();
+        catalog.saves.truncate(14);
+        m.recording_mut().set_catalog(catalog);
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        let expected = format!("recording/page/{SAVES_MACROS}/0");
+        let view = list_view(&m);
+        assert_eq!((view.id.as_str(), view.count, view.index), (expected.as_str(), 14, Some(0)));
+        m.press(Button::Down);
+        assert_eq!(list_view(&m).index, Some(1));
+        m.press(Button::Up);
+        m.press(Button::JumpDown);
+        assert_eq!(list_view(&m).index, Some(12));
+        m.press(Button::JumpDown);
+        assert_eq!(list_view(&m).index, Some(13));
+        m.press(Button::JumpDown);
+        let view = list_view(&m);
+        assert_eq!((view.id, view.index), (format!("recording/page/{SAVES_MACROS}/1"), Some(0)));
+        m.recording_mut().toggle_popup();
+        let popup = list_view(&m);
+        assert_eq!(popup.id, format!("recording/popup/{SAVES_MACROS}/0"));
+        assert_eq!((popup.count, popup.index), (14, Some(0)));
+    }
+
     fn recording_page_jump_goes_on_past_a_section() {
         use crate::model::menu::Entry;
         let mut m = recording_list_menu();
@@ -3087,6 +3149,7 @@ mod tests {
             ("library_lists_wrap_at_their_edges", library_lists_wrap_at_their_edges as fn()),
             ("holding_down_on_the_recording_lists_quickens", holding_down_on_the_recording_lists_quickens as fn()),
             ("recording_page_jump_goes_on_past_a_section", recording_page_jump_goes_on_past_a_section as fn()),
+            ("bridge_recording_list_tracks_jumps_and_the_popup", bridge_recording_list_tracks_jumps_and_the_popup as fn()),
             ("recording_picker_takes_the_list_jump", recording_picker_takes_the_list_jump as fn()),
             ("zl_down_reaches_the_recording_lists_through_the_adapter", zl_down_reaches_the_recording_lists_through_the_adapter as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),

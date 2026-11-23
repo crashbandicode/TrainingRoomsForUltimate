@@ -11,6 +11,7 @@
 
 pub mod chord;
 pub mod delay;
+pub mod focus_list;
 pub mod grid;
 pub mod input;
 pub mod options;
@@ -29,6 +30,7 @@ use super::practice_games::retired;
 use super::settings::{self, Settings};
 use super::mashout::moves;
 use super::edge_juggle::{Drill, picker::{self as cpu_picker, Picker}};
+pub use focus_list::FocusList;
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
 /// reads (`RecordingScreens::loops`), not the old two-value setting stored under this id.

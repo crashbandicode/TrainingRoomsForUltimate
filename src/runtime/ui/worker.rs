@@ -459,6 +459,7 @@ fn publish_bridge_state(s: &mut Session) {
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
+        let list = m.filter(|_| open).map(crate::model::bridge_state::list_view).unwrap_or_default();
         let view = crate::model::bridge_state::View {
             open: open && m.is_some(),
             page: m.map_or("", |m| m.page().id()),
@@ -480,6 +481,10 @@ fn publish_bridge_state(s: &mut Session) {
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),
             scene: crate::runtime::bridge_state::scene(now),
+            list: &list.id,
+            list_count: list.count,
+            list_index: list.index,
+            list_value: &list.value,
             rows_omitted: true,
             ..Default::default()
         };
