@@ -1047,6 +1047,8 @@ pub fn service_at(
         return tick;
     }
     let Ok(mut book) = load_book(root) else {
+        // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
+        retire_preview_run();
         take_preview_refusal(&mut tick);
         PREVIEW.store(0, Ordering::Release);
         lock(&PREVIEW_ASK).take();
@@ -2080,6 +2082,22 @@ fn take_preview_refusal(tick: &mut Tick) {
         PREVIEW.store(0, Ordering::Release);
         lock(&PREVIEW_CLIP).take();
     }
+}
+
+/// The card's recordings cannot be read while a preview is asked for or running: the preview is over, so its role's
+/// run ends and its queued frames go, as after a Stop. Nothing is handed over once `preview_running` is false and
+/// nothing resumes when the card reads again.
+fn retire_preview_run() {
+    let role = match PREVIEW.load(Ordering::Acquire) {
+        ROLE_PLAYER => Role::Player,
+        ROLE_CPU => Role::Cpu,
+        _ => return,
+    };
+    if let Some(machine) = lock(&MACHINE).as_mut() {
+        drive_mash(machine, role, true);
+    }
+    run_flag(role).store(false, Ordering::Release);
+    clear_cut(role);
 }
 
 fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
@@ -4125,6 +4143,43 @@ mod tests {
         assert!(take_player_frame().is_none() && !preview_running());
     }
 
+    fn a_stop_while_the_index_is_unreadable_retires_the_preview_run() {
+        let _hold = hold();
+        for stop in [true, false] {
+            reset_host();
+            let root = scratch(if stop { "drill-stop-bad-index" } else { "drill-bad-index" });
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+            let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+            assert!(request_drill_preview(&take, 80));
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(take_player_frame().unwrap().buttons, 1);
+            assert!(preview_running());
+            assert!(RUN_PLAYER.load(Ordering::Acquire));
+            assert!(!PLAYER_FRAMES.is_empty());
+
+            let index = root.join(super::super::library::INDEX_FILE);
+            let held = root.join("index-held.json");
+            let had_index = index.is_file();
+            if had_index { std::fs::rename(&index, &held).unwrap(); }
+            std::fs::create_dir(&index).unwrap();
+            if stop { stop_preview(); }
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert!(!preview_running());
+            assert!(take_player_frame().is_none());
+            assert!(!RUN_PLAYER.load(Ordering::Acquire));
+
+            std::fs::remove_dir(&index).unwrap();
+            if had_index { std::fs::rename(&held, &index).unwrap(); }
+            for _ in 0..3 {
+                service_at(&root, &none(), "2026-11-23", state(8), state(7));
+                assert!(take_player_frame().is_none());
+                assert!(!preview_running());
+                assert!(!player_playback_blocks_preview());
+            }
+        }
+    }
+
     fn deleting_a_drill_deletes_its_take() {
         let _hold = hold();
         reset_host();
@@ -5472,6 +5527,7 @@ mod tests {
             ("a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change",a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change as fn()),
             ("deleting_a_drill_deletes_its_take",deleting_a_drill_deletes_its_take as fn()),
             ("a_recorded_drills_take_previews_on_player_one_through_the_play_queue",a_recorded_drills_take_previews_on_player_one_through_the_play_queue as fn()),
+            ("a_stop_while_the_index_is_unreadable_retires_the_preview_run", a_stop_while_the_index_is_unreadable_retires_the_preview_run as fn()),
             ("x_during_a_play_on_player_one_starts_no_drill_preview",x_during_a_play_on_player_one_starts_no_drill_preview as fn()),
             ("make_preserves_an_open_record_prefix_and_physical_cstick",make_preserves_an_open_record_prefix_and_physical_cstick as fn()),
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),

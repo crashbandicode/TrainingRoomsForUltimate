@@ -10,28 +10,37 @@ use crate::model::menu::input::Button;
 pub enum Step {
     /// Keep the menu hidden.
     Hide,
-    /// X or B: stop the player and show the page again.
+    /// X or B: ask the player to stop. The menu stays hidden until a pass says `Done`.
     Stop,
-    /// The take ended and its tail passed: show the page again.
+    /// Show the page again: the take ended and its tail passed, or the player has stopped after X or B.
     Done,
 }
 
-/// One drill preview after another: the tail restarts whenever the player runs.
+/// One drill preview. The tail restarts whenever the player runs; after X or B the page waits only for the player
+/// to stop.
 #[derive(Default)]
-pub struct DrillPreview { tail: PreviewTail }
+pub struct DrillPreview { tail: PreviewTail, stopping: bool }
 
 impl DrillPreview {
-    pub const fn new() -> Self { Self { tail: PreviewTail::new() } }
+    pub const fn new() -> Self { Self { tail: PreviewTail::new(), stopping: false } }
 
-    /// A press while the menu is hidden: X and B stop the preview, as in the Crop editor; nothing else acts.
-    pub fn press(&self, button: Button) -> Step {
-        if matches!(button, Button::X | Button::B) { Step::Stop } else { Step::Hide }
+    /// A press while the menu is hidden: the first X or B stops the preview, as in the Crop editor; nothing else acts.
+    pub fn press(&mut self, button: Button) -> Step {
+        if matches!(button, Button::X | Button::B) && !self.stopping {
+            self.stopping = true;
+            Step::Stop
+        } else {
+            Step::Hide
+        }
     }
 
     /// One worker pass. `running`: the player still has frames (`rr_host::preview_running`). `frame`: the game's frame
-    /// number. The page returns `PREVIEW_TAIL_FRAMES` after the last input, as after a Crop preview.
+    /// number. After X or B the page returns on the first pass with no run left, so no frame of the take is handed to
+    /// Player 1 behind a shown page. Otherwise it returns `PREVIEW_TAIL_FRAMES` after the last input, as after a
+    /// Crop preview.
     pub fn pass(&mut self, running: bool, frame: u64) -> Step {
-        if self.tail.over(running, frame) { Step::Done } else { Step::Hide }
+        let over = if self.stopping { !running } else { self.tail.over(running, frame) };
+        if over { Step::Done } else { Step::Hide }
     }
 }
 
@@ -47,14 +56,26 @@ mod tests {
             Button::L, Button::R, Button::ZL, Button::ZR, Button::JumpUp, Button::JumpDown] {
             assert_eq!(preview.press(button), Step::Hide);
         }
-        for button in [Button::X, Button::B] {
-            assert_eq!(preview.press(button), Step::Stop);
-        }
         assert_eq!(preview.pass(true, 99), Step::Hide);
         for frame in 100..=159 { assert_eq!(preview.pass(false, frame), Step::Hide); }
         assert_eq!(preview.pass(false, 160), Step::Done);
         assert_eq!(preview.pass(true, 161), Step::Hide);
         assert_eq!(preview.pass(false, 162), Step::Hide);
+        for button in [Button::X, Button::B] {
+            assert_eq!(DrillPreview::new().press(button), Step::Stop);
+        }
+    }
+
+    #[test]
+    fn after_x_or_b_the_page_waits_for_the_player_to_stop_and_skips_the_tail() {
+        for button in [Button::X, Button::B] {
+            let mut preview = DrillPreview::new();
+            assert_eq!(preview.press(button), Step::Stop);
+            assert_eq!(preview.press(Button::X), Step::Hide);
+            assert_eq!(preview.press(Button::B), Step::Hide);
+            for frame in 0..5 { assert_eq!(preview.pass(true, frame), Step::Hide); }
+            assert_eq!(preview.pass(false, 5), Step::Done);
+        }
     }
 
     #[test]
@@ -80,7 +101,8 @@ mod tests {
         assert!(hidden < press.find("menu.press_outcome(button)").expect("the menu press"));
         let hidden_press = &press[hidden..press.find("if s.menu.is_none()").unwrap()];
         assert!(hidden_press.contains("s.drill_preview.press(button) == Step::Stop"));
-        assert!(hidden_press.contains("end_drill_preview(s, true);") && hidden_press.contains("return;"));
+        assert!(hidden_press.contains("rr_host::stop_preview();") && hidden_press.contains("return;"));
+        assert!(!hidden_press.contains("end_drill_preview(") && !hidden_press.contains("PREVIEW_HIDES.s"));
         assert!(worker.contains("sync_drill_preview(&mut session);"));
         let sync = body(worker, "fn sync_drill_preview(");
         assert!(sync.contains("let gone = !(OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire))"));
@@ -88,6 +110,7 @@ mod tests {
             "the preview stops when neither menu nor popup remains");
         let end = body(worker, "fn end_drill_preview(");
         assert!(end.contains("PREVIEW_HIDES.swap(false, Ordering::AcqRel)") && end.contains("rr_host::stop_preview()"));
+        assert!(end.contains("s.drill_preview = DrillPreview::new();"));
         let handle = body(worker, "fn handle(event: Event, s: &mut Session)");
         assert!(handle.find("end_drill_preview(s, true);").unwrap() < handle.find("s.keeper.open(").unwrap());
         let reset = body(worker, "fn sync_input_generation(");
