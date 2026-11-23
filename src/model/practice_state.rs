@@ -8,7 +8,7 @@ pub const CPU_ENTRIES: usize = 8;
 
 /// The activation the poll publishes: the live practice layout's own, none without one.
 pub fn published_activation(scene: &str, activation: impl FnOnce() -> (u64, Option<Game>)) -> (u64, Option<Game>) {
-    if scene == "training" { activation() } else { (0, None) }
+    if matches!(scene, "training" | "lobby") { activation() } else { (0, None) }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

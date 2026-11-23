@@ -310,11 +310,10 @@ unsafe fn on_ai_frame(ai: usize) {
         entry_ptr != 0 && ((entry_ptr + ENTRY_CONTROLLER_FIELD) as *const usize).read() == controller
     };
     let matched = primary.filter(|body| owns_controller(body.entry_ptr));
-    if native_training {
-        crate::runtime::bridge_state::note_ai_think(matched.map(|body| body.entry_id), |entry| {
-            owns_controller(natives::fighter_entry(entry))
-        });
-    }
+    // The waiting room has the one practice CPU: only native Training walks the other entries.
+    crate::runtime::bridge_state::note_ai_think(matched.map(|body| body.entry_id), |entry| {
+        native_training && owns_controller(natives::fighter_entry(entry))
+    });
     let Some(body) = matched else {
         return;
     };

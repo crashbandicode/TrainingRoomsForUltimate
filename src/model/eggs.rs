@@ -660,7 +660,7 @@ impl Run {
         use super::practice_state::Fields;
         let mode = self.rows[0];
         let done = self.ended();
-        let phase = if !self.running() { "off" } else if done { "result" } else if self.pending { "setup" } else { "live" };
+        let phase = if !self.armed() { "off" } else if done { "result" } else if self.pending { "setup" } else { "live" };
         let best = match mode {
             TIMED => Some(self.best[128][0]),
             TEN | TWENTY => {
