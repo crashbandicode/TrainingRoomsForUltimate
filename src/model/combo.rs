@@ -53,8 +53,6 @@ pub const STEPS: usize = 12;
 /// Presses an older file stores, and the press subset a new file still writes for that reader.
 pub const LEGACY_STEPS: usize = 4;
 pub const RESULTS: usize = 8;
-/// Maximum frames a hit link waits for a travel heading.
-const AIM_WAIT: u32 = 2;
 
 /// A step's aim: the strip's stick bin (0 right, counter-clockwise in eighths) with left and right merged, so the
 /// fighter's facing does not matter.
@@ -594,6 +592,8 @@ struct Capture {
     current: Combo,
     previous: Combo,
     last_link: Option<u32>,
+    held: Option<Link>,
+    graded: Option<u32>,
     frame: u32,
 }
 
@@ -622,6 +622,8 @@ impl Helper {
                 current: Combo::EMPTY,
                 previous: Combo::EMPTY,
                 last_link: None,
+                held: None,
+                graded: None,
                 frame: 0,
             },
             seen: 0,
@@ -721,6 +723,9 @@ impl Helper {
         let input_only = self.target.as_ref().is_some_and(|t| t.input_only);
         let (exchange, first_hit) = tracker.exchange();
         if exchange != self.capture.exchange {
+            if let Some(held) = self.capture.held.take() {
+                self.take_link(held, tracker, self.capture.exchange, &mut out);
+            }
             if !input_only {
                 self.resolve_open(Outcome::Stopped, &mut out);
             }
@@ -730,28 +735,24 @@ impl Helper {
             self.capture.current = Combo::EMPTY;
             self.capture.exchange = exchange;
             self.capture.after = first_hit;
+            self.capture.graded = None;
         }
-        if let Some(link) = tracker
-            .latest_link()
-            .filter(|l| {
-                Some(l.hit) != self.capture.last_link
-                    && (!tracker.aim_pending() || tracker.frame().saturating_sub(l.hit) >= AIM_WAIT)
-            })
-        {
-            self.capture.last_link = Some(link.hit);
-            let after = self.capture.after;
-            let rec = LinkRec::of(&link, tracker, after, true);
-            self.capture.after = link.hit;
-            let first = self.capture.current.is_empty();
-            self.capture.current.push(rec);
-            self.seen = self.seen.wrapping_add(1);
-            if !input_only {
-                let actual = if self.target.as_ref().is_some_and(Combo::has_aim) {
-                    rec
-                } else {
-                    LinkRec::of(&link, tracker, after, false)
-                };
-                self.on_link(actual, first, exchange, &mut out);
+        if let Some(link) = tracker.latest_link().filter(|l| Some(l.hit) != self.capture.last_link) {
+            if let Some(held) = self.capture.held.filter(|held| held.hit != link.hit) {
+                self.capture.held = None;
+                self.take_link(held, tracker, exchange, &mut out);
+            }
+            let aims = self.target.as_ref().is_some_and(Combo::has_aim);
+            if !input_only && !aims && self.capture.graded != Some(link.hit) {
+                let rec = LinkRec::of(&link, tracker, self.capture.after, false);
+                self.capture.graded = Some(link.hit);
+                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out);
+            }
+            if tracker.aim_pending().is_some_and(|entry| entry <= link.hit) {
+                self.capture.held = Some(link);
+            } else {
+                self.capture.held = None;
+                self.take_link(link, tracker, exchange, &mut out);
             }
         }
         if input_only {
@@ -764,7 +765,7 @@ impl Helper {
             }
             return out;
         }
-        if !tracker.exchange_open() {
+        if !tracker.exchange_open() && self.capture.held.is_none() {
             self.resolve_open(Outcome::Stopped, &mut out);
             if self.pending_load {
                 self.pending_load = false;
@@ -772,6 +773,18 @@ impl Helper {
             }
         }
         out
+    }
+
+    fn take_link(&mut self, link: Link, tracker: &Tracker, exchange: u32, out: &mut Out) {
+        self.capture.last_link = Some(link.hit);
+        let rec = LinkRec::of(&link, tracker, self.capture.after, true);
+        self.capture.after = link.hit;
+        let first = self.capture.current.is_empty();
+        self.capture.current.push(rec);
+        self.seen = self.seen.wrapping_add(1);
+        if self.target.as_ref().is_some_and(|target| !target.input_only && target.has_aim()) {
+            self.on_link(rec, first, exchange, out);
+        }
     }
 
     fn step_inputs(&mut self, snap: Snap, out: &mut Out) {
@@ -795,18 +808,31 @@ impl Helper {
             self.attempt = Some(Attempt::new(start, false));
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
-            let reference = self.target.as_ref().unwrap().get(attempt.len).copied().unwrap();
+            let target = self.target.as_ref().unwrap();
+            let aims = target.has_aim();
+            let last = attempt.len + 1 == target.len();
+            let reference = target.get(attempt.len).copied().unwrap();
             let deadline =
                 reference.events().last().unwrap().offset + i32::from(self.settings.tolerance);
-            if (snap.frame - start) < deadline as u32 {
+            if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
                 break;
             }
-            let actual = self
+            let mut actual = self
                 .input
                 .combo
                 .get(attempt.len)
                 .copied()
                 .unwrap_or(LinkRec::INPUT);
+            if aims && last {
+                for event in self.input.combo.links().skip(attempt.len + 1).flat_map(LinkRec::events)
+                    .filter(|event| matches!(event.kind, Kind::Aim(_)))
+                {
+                    let Some(slot) = actual.events.iter_mut().find(|slot| slot.is_none()) else {
+                        break;
+                    };
+                    *slot = Some(event);
+                }
+            }
             self.on_link(actual, false, start, out);
             if self
                 .attempt

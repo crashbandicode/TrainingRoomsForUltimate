@@ -588,9 +588,9 @@ impl Tracker {
         (0..AIMS).filter_map(move |i| self.aims[(self.aim_head + AIMS - 1 - i) % AIMS])
     }
 
-    /// A travel began and its direction is not known yet.
-    pub fn aim_pending(&self) -> bool {
-        self.aim_from.is_some()
+    /// The entry frame of a travel whose direction is not known yet.
+    pub fn aim_pending(&self) -> Option<u32> {
+        self.aim_from.map(|(at, _)| at)
     }
 
     pub fn tags(&self) -> impl Iterator<Item = &Tag> + '_ {

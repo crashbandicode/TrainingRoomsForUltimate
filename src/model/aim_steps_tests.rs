@@ -95,7 +95,7 @@ fn the_strip_writes_each_part_on_the_snap_it_was_known() {
             for f in 0..length {
                 tracker.step(strip_sample(Move::Other, Some((direction.0 * f as f32, direction.1 * f as f32)), -1),
                     Sample::default(), MappedInputs::NEUTRAL);
-                assert_eq!(tracker.aim_pending(), f == 0);
+                assert_eq!(tracker.aim_pending(), (f == 0).then_some(entry));
             }
             for _ in 0..between {
                 tracker.step(strip_sample(Move::Other, None, -1), Sample::default(), MappedInputs::NEUTRAL);
@@ -318,7 +318,7 @@ fn a_hit_link_waits_for_the_pending_heading() {
     tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), hit_cpu, left);
     helper.step(&tracker, Settings::factory());
     assert!(tracker.latest_link().is_some());
-    assert!(tracker.aim_pending());
+    assert_eq!(tracker.aim_pending(), Some(tracker.frame()));
     assert!(helper.capture.current.is_empty(), "the hit frame must wait for its heading");
     tracker.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), hit_cpu, left);
     helper.step(&tracker, Settings::factory());
@@ -355,16 +355,22 @@ fn legacy_hit_reference() -> LinkRec {
     LinkRec::of(&tracker.latest_link().unwrap(), &tracker, tracker.exchange().1, false)
 }
 
+fn aim_hit_reference(dir: Dir) -> LinkRec {
+    let mut helper = Helper::new();
+    let (tracker, _, _) = travel_hit(&mut helper);
+    let mut reference = LinkRec::of(&tracker.latest_link().unwrap(), &tracker, tracker.exchange().1, true);
+    *reference.events.iter_mut().find(|slot| slot.is_none()).unwrap() =
+        Some(event(Kind::Aim(1), dir, 0));
+    reference
+}
+
 #[test]
 fn a_hit_keeps_a_direction_that_arrives_three_frames_later() {
     for (x, dir) in [(-11.0, Dir::Back), (11.0, Dir::Forward)] {
         for aim_target in [false, true] {
             let mut helper = Helper::new();
             if aim_target {
-                let mut reference = legacy_hit_reference();
-                *reference.events.iter_mut().find(|slot| slot.is_none()).unwrap() =
-                    Some(event(Kind::Aim(1), dir, 0));
-                helper.set_target(Some(Combo::from_links([reference]).unwrap()));
+                helper.set_target(Some(Combo::from_links([aim_hit_reference(dir)]).unwrap()));
             }
             let (mut tracker, cpu, left) = travel_hit(&mut helper);
             let hit = tracker.frame();
@@ -378,6 +384,9 @@ fn a_hit_keeps_a_direction_that_arrives_three_frames_later() {
             assert_eq!(tracker.frame(), hit + 3);
             let rec = helper.capture.current.get(0).expect("link captured with heading");
             assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == dir));
+            if aim_target {
+                assert!(helper.results().next().expect("aim target graded").clean);
+            }
         }
     }
 }
@@ -412,7 +421,7 @@ fn a_legacy_combo_is_graded_on_the_hit_frame() {
     let mut helper = Helper::new();
     helper.set_target(Some(target));
     let (tracker, _, _, out) = travel_hit_out(&mut helper, true);
-    assert!(tracker.aim_pending());
+    assert_eq!(tracker.aim_pending(), Some(tracker.frame()));
     let (index, grade) = out.link.expect("legacy target graded on hit while travel is pending");
     assert_eq!(index, 0);
     assert_eq!(grade, baseline_grade);
@@ -425,7 +434,7 @@ fn a_newer_link_does_not_wait_behind_a_held_one() {
     let (mut tracker, hit_cpu, left) = travel_hit(&mut helper);
     let first = tracker.latest_link().unwrap();
     let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
-    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), stunned_cpu, left);
+    tracker.step(strip_sample(Move::UpSpecial, Some((0.0, 0.0)), 1), stunned_cpu, left);
     helper.step(&tracker, Settings::factory());
     assert!(helper.capture.current.is_empty());
     let tilt = Sample { attack: Some(Move::UpTilt), status: 0x2b, facing: 1, ..Sample::default() };
@@ -442,7 +451,33 @@ fn a_newer_link_does_not_wait_behind_a_held_one() {
 }
 
 #[test]
-fn a_legacy_combo_grades_the_same_link_one_frame_later() {
+fn a_held_link_is_recorded_before_an_exchange_changes() {
+    let mut helper = Helper::new();
+    helper.set_target(Some(Combo::from_links([aim_hit_reference(Dir::Neutral)]).unwrap()));
+    let (mut tracker, hit_cpu, left) = travel_hit(&mut helper);
+    let exchange = tracker.exchange().0;
+    let free_cpu = Sample { actionable: true, ..Sample::default() };
+    for _ in 0..=super::super::frame_strip::DROP_MAX + 1 {
+        tracker.step(strip_sample(Move::UpSpecial, Some((0.0, 0.0)), 1), free_cpu, left);
+        let out = helper.step(&tracker, Settings::factory());
+        assert!(helper.capture.current.is_empty());
+        assert!(helper.results().next().is_none());
+        assert!(out.resolved.is_none());
+    }
+    assert!(!tracker.exchange_open());
+    let tilt = Sample { attack: Some(Move::UpTilt), status: 0x2b, facing: 1, ..Sample::default() };
+    let attack = MappedInputs { buttons: 1, lstick_y: 127, ..MappedInputs::NEUTRAL };
+    tracker.step(tilt, hit_cpu, attack);
+    assert_ne!(tracker.exchange().0, exchange);
+    let out = helper.step(&tracker, Settings::factory());
+    assert!(out.resolved.expect("held link graded before exchange reset").clean);
+    assert!(helper.capture.current.is_empty());
+    let saved = helper.capture.previous.get(0).expect("previous exchange retained");
+    assert!(saved.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Neutral));
+}
+
+#[test]
+fn a_legacy_combo_grades_the_same_link_on_the_hit_frame() {
     let mut first_helper = Helper::new();
     let (mut first, cpu, left) = travel_hit(&mut first_helper);
     let hit = first.frame();
@@ -456,10 +491,16 @@ fn a_legacy_combo_grades_the_same_link_one_frame_later() {
 
     let mut helper = Helper::new();
     helper.set_target(Some(target));
-    let (mut tracker, cpu, left) = travel_hit(&mut helper);
+    let (mut tracker, cpu, left, out) = travel_hit_out(&mut helper, true);
     assert_eq!(tracker.frame(), hit);
     assert!(helper.capture.current.is_empty());
-    assert!(helper.attempt().is_none());
+    assert_eq!(tracker.aim_pending(), Some(hit));
+    let (index, grade) = out.link.expect("legacy link was graded on the hit");
+    assert_eq!(index, 0);
+    assert!(grade.clean(1), "{grade:?}");
+    let summary = out.resolved.expect("legacy combo completed on the hit");
+    assert!(summary.clean, "{summary:?}");
+    assert_eq!(summary.outcome, Outcome::Completed);
     tracker.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), cpu, left);
     let out = helper.step(&tracker, Settings::factory());
     assert_eq!(tracker.frame(), hit + 1);
@@ -467,12 +508,7 @@ fn a_legacy_combo_grades_the_same_link_one_frame_later() {
     assert_eq!(actual.events, reference.events);
     assert!(!actual.events().any(|e| matches!(e.kind, Kind::Aim(_))));
     assert!(actual.events().any(|e| e.kind == Kind::Flick(Flick::Dash)));
-    let (index, grade) = out.link.expect("legacy link was graded");
-    assert_eq!(index, 0);
-    assert!(grade.clean(1), "{grade:?}");
-    let summary = out.resolved.expect("legacy combo completed");
-    assert!(summary.clean, "{summary:?}");
-    assert_eq!(summary.outcome, Outcome::Completed);
+    assert!(out.link.is_none(), "the link was already graded");
 }
 
 #[test]
