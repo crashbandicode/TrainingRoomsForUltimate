@@ -70,6 +70,30 @@ impl ClipSeen {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Fed {
+    pub p1: u32,
+    pub cpu: u32,
+    pub preview: bool,
+    pub hides: bool,
+}
+
+pub struct FedText;
+
+impl FedText {
+    pub const fn new() -> Self { Self }
+    pub fn as_str(&self) -> &str { "" }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FedSeen;
+
+impl FedSeen {
+    pub fn sample(&mut self, _now: Fed, _send: impl FnMut(&str) -> i32) {}
+    pub fn words(self) -> [u64; 2] { [0; 2] }
+    pub fn from_words(_words: [u64; 2]) -> Self { Self }
+}
+
 #[derive(Default)]
 pub struct Outbox {
     entries: VecDeque<(Event, u64)>,
