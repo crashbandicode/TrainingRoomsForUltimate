@@ -3,8 +3,13 @@
 Guard the Edge and Juggler now let you pick where the CPU and you start by moving a crosshair on the stage, the same
 crosshair Break the Targets uses.
 
-Recorded in Eden on build `df625a12`, 2026-11-22, Battlefield, in Training (untested on hardware). Click a picture to
-play its clip (1080p, 60 fps, no sound).
+Recorded in Eden on Battlefield, in Training (untested on hardware). Click a picture to play its clip (60 fps, no
+sound).
+
+- **Guard the Edge clip:** build `17060a5e`, 2026-11-23, 1200 × 674. The yellow "BRIDGE LIVE" badge at the top belongs
+  to the test set-up, not to the build.
+- **Juggler clip:** the earlier build `df625a12`, 2026-11-22, 1080p. It shows the input display across the top during
+  set-up; the current build hides it while you set up.
 
 ## For the README
 
@@ -36,8 +41,9 @@ Three pages. The text at the top left names the page and the point under the cro
 2. **Player 1 start.** Where you stand, on the stage's main floor. The CPU's point stays marked while you choose.
 3. **Preview.** Both points and the CPU's percent. **A** or **+** starts.
 
-In the clip: the menu, Set up…, the crosshair moved with the D-pad and the stick, **X** and **Y**, then both pages
-confirmed and the drill starting with the CPU off stage and Player 1 on the picked spot.
+In the clip: the menu, Set up…, the crosshair moved with the D-pad and the stick, a point over the stage refused
+("Pick a point off the stage"), then the CPU's point and Player 1's point confirmed, and the drill starting with the
+CPU off stage and Player 1 on the picked spot.
 
 ## Juggler: Set up…
 
@@ -54,10 +60,8 @@ Four pages.
 In the clip: the menu, Set up…, the CPU spot moved, the percent raised, Player 1 put under the left platform, and the
 drill starting with the CPU falling from the picked height.
 
-## Not in these clips (the next build)
+## Not recorded yet
 
-- The two refusals ("Pick a point off the stage", "Pick a point above a floor") show the moment you press **A**. In
-  the recorded build the first one showed late, and the second is new.
-- Both drills also run in a waiting room, against the first training partner.
-
-Both are host-tested only so far; they get their Eden test in the combined build.
+- Juggler's "Pick a point above a floor" refusal is not in its clip, which is from the earlier build.
+- Both drills also run in a waiting room, against the first training partner. That clip waits for the waiting-room
+  test run.
