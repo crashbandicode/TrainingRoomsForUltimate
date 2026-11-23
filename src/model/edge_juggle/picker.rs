@@ -103,9 +103,13 @@ pub fn tick(
     (settled, Tick::Serve { target, observed, step: service(selected, target, observed, settled.is(choice)) })
 }
 
-/// What the service compares the slot with (`tick`'s `observed`): the roster's `ready` read. Stub of 480345a6: a
-/// picker's hold on the CPU's body is not asked about.
-pub fn observable(_selected: Option<u32>, _held: impl FnOnce() -> bool, ready: impl FnOnce() -> Option<u32>) -> Option<u32> {
+/// What the service compares the slot with (`tick`'s `observed`): the roster's `ready` read, or nothing while the
+/// original is to come back and a picker still holds (`held`) the CPU's body at its picked start. The roster gives
+/// the incoming fighter the outgoing body's place, so the picker puts the body back before the original is asked for.
+pub fn observable(selected: Option<u32>, held: impl FnOnce() -> bool, ready: impl FnOnce() -> Option<u32>) -> Option<u32> {
+    if selected.is_none() && held() {
+        return None;
+    }
     ready()
 }
 

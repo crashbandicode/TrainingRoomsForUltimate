@@ -345,6 +345,11 @@ pub(super) fn cpu_selection() -> Option<u32> {
     OPPONENT.read().fighter
 }
 
+/// A picker still holds the CPU's body at its picked start (`Engine::preview`). A busy engine reads as held.
+fn holds_preview() -> bool {
+    ENGINE.try_lock().is_none_or(|engine| engine.preview.is_some())
+}
+
 pub unsafe fn controls_cpu(accessor: usize) -> bool {
     if !INSTALLED.load(Ordering::Acquire) {
         return false;
