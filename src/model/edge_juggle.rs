@@ -2005,12 +2005,12 @@ mod tests {
             [[-68.0, -4.25], [68.0, -4.25]],
         ).unwrap();
         for side in [-1.0, 1.0] {
-            let lip = [side * 67.0, -4.25];
+            let lip = [side * (68.0 - PLAYER_INSET), -4.25];
             let outside = [side * 130.0, -4.25];
             let cursor = stage.player_cursor(Drill::GuardEdge, outside).unwrap();
             assert_eq!(
                 stage.player_cursor(Drill::GuardEdge, [cursor[0] - side * 2.0, cursor[1]]),
-                Some([side * 65.0, -4.25]),
+                Some([side * (68.0 - PLAYER_INSET - 2.0), -4.25]),
             );
             assert_eq!(cursor, lip);
             assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
@@ -2018,22 +2018,29 @@ mod tests {
     }
 
     #[test]
-    fn guard_player_point_stops_one_unit_inside_the_floor_ends() {
+    fn guard_player_point_stops_outside_the_teeter_range_of_each_floor_end() {
+        // GroundModule::is_ottotto includes two 0.1 margins.
+        const TEETER_RANGE: f32 = 0.86 + 0.1 + 0.1;
         let stage = Stage::new(
             [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
-            [[-79.9856, 0.0], [79.9856, 0.0]],
+            [[-79.9856, 0.0], [79.9893, 0.0]],
         ).unwrap();
-        for side in [-1.0_f32, 1.0] {
-            let outside = [side * 150.0, 4.0];
-            let inside = [side * (79.9856_f32 - 1.5), 4.0];
-            assert_eq!(stage.player_cursor(Drill::GuardEdge, outside), Some([side * (79.9856_f32 - 1.0), 4.0]));
+        for (outside, inside, expected, literal) in [
+            ([-150.0, 4.0], [-79.9856_f32 + 1.5, 4.0],
+             [-79.9856_f32 + PLAYER_INSET, 4.0], [-79.9856_f32 + 1.25, 4.0]),
+            ([150.0, 4.0], [79.9893_f32 - 1.5, 4.0],
+             [79.9893_f32 - PLAYER_INSET, 4.0], [79.9893_f32 - 1.25, 4.0]),
+        ] {
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, outside), Some(expected));
+            assert_eq!(expected, literal);
             assert_eq!(stage.player_cursor(Drill::GuardEdge, inside), Some(inside));
             assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
         }
+        assert!(PLAYER_INSET > TEETER_RANGE);
     }
 
     #[test]
-    fn a_main_floor_narrower_than_two_units_keeps_the_player_on_its_middle() {
+    fn a_main_floor_narrower_than_two_insets_keeps_the_player_on_its_middle() {
         let stage = Stage::new(
             [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
             [[-0.5, 0.0], [1.0, 0.0]],
@@ -2042,11 +2049,16 @@ mod tests {
             assert_eq!(stage.player_cursor(Drill::GuardEdge, [x, 0.0]), Some([0.25, 0.0]));
             assert_eq!(stage.player_cursor(Drill::Juggler, [x, 0.0]), Some([x, 0.0]));
         }
-        let exactly_two = Stage::new(
+        let exactly_two_insets = Stage::new(
             [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
-            [[-1.0, 0.0], [1.0, 0.0]],
+            [[-PLAYER_INSET, 0.0], [PLAYER_INSET, 0.0]],
         ).unwrap();
-        assert_eq!(exactly_two.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([0.0, 0.0]));
+        assert_eq!(exactly_two_insets.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([0.0, 0.0]));
+        let wide_enough = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-2.0, 0.0], [2.0, 0.0]],
+        ).unwrap();
+        assert_eq!(wide_enough.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([2.0 - PLAYER_INSET, 0.0]));
     }
 
     #[test]
