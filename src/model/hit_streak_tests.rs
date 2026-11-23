@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::{Motion, Streak};
 
 const P1: u32 = 0;
@@ -151,4 +152,5 @@ fn final_sample_can_credit_native_hit_before_projectile_expiry() {
     streak.hit(P1, WEAPON);
     streak.end(body);
     assert_eq!(streak.counts(), (1, 1));
+}
 }

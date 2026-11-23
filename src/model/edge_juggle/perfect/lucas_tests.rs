@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::edge_juggle::perfect::{Segment, GUARD, JUMP, SPECIAL};
 
@@ -183,4 +184,5 @@ fn lucas_accepts_the_lowest_measured_native_dodge_height() {
         ..release
     };
     assert_eq!(flight.step(press).map(|pad| pad.press), Some(GUARD));
+}
 }

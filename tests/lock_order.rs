@@ -184,6 +184,7 @@ struct Ctx<'g> {
     graph: &'g Graph,
     by_name: BTreeMap<String, Vec<usize>>,
     locks: Vec<(String, String)>,
+    locks_by_name: BTreeMap<String, Vec<usize>>,
     /// `Graph::callees` per function: the scanner's own resolution (imports, aliases), which a path call must also pass.
     callees: Vec<BTreeSet<usize>>,
 }
@@ -194,8 +195,12 @@ impl<'g> Ctx<'g> {
         for (i, f) in graph.funcs.iter().enumerate() {
             by_name.entry(f.name.clone()).or_default().push(i);
         }
+        let mut locks_by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for (i, (_, name)) in locks.iter().enumerate() {
+            locks_by_name.entry(name.clone()).or_default().push(i);
+        }
         let callees = (0..graph.funcs.len()).map(|f| graph.callees(f)).collect();
-        Ctx { graph, by_name, locks, callees }
+        Ctx { graph, by_name, locks, locks_by_name, callees }
     }
 
     /// The callees a call can mean (`hook_locks.rs` `edges`: a path call as `Graph::callees` resolves it, then by its
@@ -258,10 +263,8 @@ impl<'g> Ctx<'g> {
         let body = &func.body;
         let name = ident(body.get(i))?;
         let qualified = i >= 2 && body[i - 1] == Tok::PathSep;
-        self.locks.iter().position(|(file, lock)| {
-            if lock != name {
-                return false;
-            }
+        self.locks_by_name.get(name)?.iter().copied().find(|&index| {
+            let (file, _) = &self.locks[index];
             let module = Path::new(file).file_stem().unwrap().to_string_lossy().into_owned();
             if qualified {
                 let q = ident(body.get(i - 2)).unwrap_or("");
@@ -1174,9 +1177,12 @@ fn typed_static_callees(graph: &Graph, f: usize) -> Vec<(usize, usize)> {
     out
 }
 
+/// `callgraph::thread_dispatch` of one function's body, read once per scan.
+type Dispatch = Option<(std::ops::Range<usize>, std::ops::Range<usize>)>;
+
 /// Whether token `at` of `f` runs on the walking thread: outside a `thread_dispatch` branch, or in its own branch.
-fn on_this_thread(graph: &Graph, f: usize, at: usize, plugin: bool) -> bool {
-    match callgraph::thread_dispatch(&graph.funcs[f].body) {
+fn on_this_thread(dispatch: &Dispatch, at: usize, plugin: bool) -> bool {
+    match dispatch {
         Some((p, g)) => !(if plugin { g.contains(&at) } else { p.contains(&at) }),
         None => true,
     }
@@ -1210,6 +1216,12 @@ struct Shared {
 /// it over (docs lane review R2, 2026-11-10). A same-file function only, and not a name the body binds itself.
 fn value_edges(graph: &Graph) -> Vec<(usize, usize, usize)> {
     let mut out = Vec::new();
+    let mut targets: BTreeMap<(&str, &str), Vec<usize>> = BTreeMap::new();
+    for (to, target) in graph.funcs.iter().enumerate() {
+        if !target.has_receiver {
+            targets.entry((target.file.as_str(), target.name.as_str())).or_default().push(to);
+        }
+    }
     for (f, func) in graph.funcs.iter().enumerate() {
         let b = &func.body;
         for i in 1..b.len() {
@@ -1218,6 +1230,7 @@ fn value_edges(graph: &Graph) -> Vec<(usize, usize, usize)> {
             if !next_ok || !matches!(b.get(i - 1), Some(Tok::Punct('(' | ',' | '=' | '[' | '{' | '&'))) {
                 continue;
             }
+            let Some(candidates) = targets.get(&(func.file.as_str(), name)) else { continue };
             let bound = (0..b.len().saturating_sub(1)).any(|k| {
                 matches!((&b[k], &b[k + 1]), (Tok::Ident(l), Tok::Ident(m)) if (l == "let" || l == "mut" || l == "for") && m == name)
                     || matches!((&b[k], &b[k + 1]), (Tok::Punct('|' | '(' | ','), Tok::Ident(m))
@@ -1226,8 +1239,8 @@ fn value_edges(graph: &Graph) -> Vec<(usize, usize, usize)> {
             if bound {
                 continue;
             }
-            for (to, target) in graph.funcs.iter().enumerate() {
-                if to != f && target.name == name && target.file == func.file && !target.has_receiver {
+            for &to in candidates {
+                if to != f {
                     out.push((f, i, to));
                 }
             }
@@ -1239,6 +1252,7 @@ fn value_edges(graph: &Graph) -> Vec<(usize, usize, usize)> {
 fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     let graph = ctx.graph;
     let n = graph.funcs.len();
+    let dispatch: Vec<_> = graph.funcs.iter().map(|f| callgraph::thread_dispatch(&f.body)).collect();
     // Per function: (token position, callee) for path and method calls and typed-static helpers.
     let mut callees: Vec<Vec<(usize, usize)>> = (0..n)
         .map(|f| {
@@ -1259,7 +1273,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
         let mut stack = starts;
         while let Some(f) = stack.pop() {
             if seen.insert(f) {
-                stack.extend(callees[f].iter().filter(|(at, _)| on_this_thread(graph, f, *at, plugin)).map(|(_, c)| *c));
+                stack.extend(callees[f].iter().filter(|(at, _)| on_this_thread(&dispatch[f], *at, plugin)).map(|(_, c)| *c));
             }
         }
         seen
@@ -1274,7 +1288,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     };
     for hook in hooks {
         for f in walk(vec![hook], false) {
-            for t in s.takes[f].iter().filter(|t| on_this_thread(graph, f, t.at, false)) {
+            for t in s.takes[f].iter().filter(|t| on_this_thread(&dispatch[f], t.at, false)) {
                 out.game_waits.entry(t.lock).or_default().insert(format!("{} (hook {})", graph.funcs[f].key(), graph.funcs[hook].key()));
                 out.game_hooks.entry(t.lock).or_default().insert(graph.funcs[hook].key());
             }
@@ -1286,7 +1300,7 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
             out.plugin_reached.entry(f).or_default().insert(name.clone());
             let held: BTreeSet<usize> = s.takes[f]
                 .iter()
-                .filter(|t| on_this_thread(graph, f, t.at, true))
+                .filter(|t| on_this_thread(&dispatch[f], t.at, true))
                 .map(|t| t.lock)
                 .chain(try_takes(ctx, f))
                 .collect();
@@ -1892,34 +1906,62 @@ fn statics_use_their_declared_foreign_or_runtime_receiver_type() {
 
 /// Strict root-to-EDITED check using the same resolver, typed-static, callback
 /// and thread-dispatch treatment as the shared-lock inventory above.
-fn menu_edit_wait_path(graph: &Graph, root: usize) -> Option<Vec<String>> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
-    let ctx = Ctx::new(graph, static_locks(&dir));
-    let edited = ctx.locks.iter().position(|(file, name)| file == "compat/menu.rs" && name == "EDITED").expect("EDITED lock");
-    let mut edges: Vec<Vec<(usize, usize)>> = (0..graph.funcs.len()).map(|f| {
-        let mut edges: Vec<_> = calls(&graph.funcs[f].body).iter()
-            .flat_map(|call| ctx.resolve(f, call).into_iter().map(move |to| (call.at, to))).collect();
-        edges.extend(typed_static_callees(graph, f));
-        edges
-    }).collect();
-    for (from, to) in callback_edges(graph) { edges[from].push((0, to)); }
-    for (from, at, to) in value_edges(graph) { edges[from].push((at, to)); }
-    let mut queue = std::collections::VecDeque::from([(root, vec![graph.funcs[root].key()])]);
-    let mut seen = BTreeSet::new();
-    while let Some((f, path)) = queue.pop_front() {
-        if !seen.insert(f) { continue; }
-        if takes(&ctx, f).iter().any(|take| take.lock == edited && on_this_thread(graph, f, take.at, false)) {
-            return Some(path);
-        }
-        for &(at, to) in &edges[f] {
-            if on_this_thread(graph, f, at, false) {
-                let mut next = path.clone();
-                next.push(graph.funcs[to].key());
-                queue.push_back((to, next));
+struct EditWaits<'g> {
+    ctx: Ctx<'g>,
+    edited: usize,
+    edges: Vec<Vec<(usize, usize)>>,
+    dispatch: Vec<Dispatch>,
+}
+
+impl<'g> EditWaits<'g> {
+    fn new(graph: &'g Graph) -> Self {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+        let ctx = Ctx::new(graph, static_locks(&dir));
+        let edited = ctx.locks.iter().position(|(file, name)| file == "compat/menu.rs" && name == "EDITED").expect("EDITED lock");
+        let mut edges: Vec<Vec<(usize, usize)>> = (0..graph.funcs.len()).map(|f| {
+            let mut edges: Vec<_> = calls(&graph.funcs[f].body).iter()
+                .flat_map(|call| ctx.resolve(f, call).into_iter().map(move |to| (call.at, to))).collect();
+            edges.extend(typed_static_callees(graph, f));
+            edges
+        }).collect();
+        for (from, to) in callback_edges(graph) { edges[from].push((0, to)); }
+        for (from, at, to) in value_edges(graph) { edges[from].push((at, to)); }
+        let dispatch = graph.funcs.iter().map(|f| callgraph::thread_dispatch(&f.body)).collect();
+        Self { ctx, edited, edges, dispatch }
+    }
+
+    fn path(&self, root: usize) -> Option<Vec<String>> {
+        let graph = self.ctx.graph;
+        let mut queue = std::collections::VecDeque::from([root]);
+        let mut seen = vec![false; graph.funcs.len()];
+        let mut parent = vec![None; graph.funcs.len()];
+        seen[root] = true;
+        while let Some(f) = queue.pop_front() {
+            if takes(&self.ctx, f).iter().any(|take| take.lock == self.edited && on_this_thread(&self.dispatch[f], take.at, false)) {
+                let mut path = Vec::new();
+                let mut node = f;
+                path.push(graph.funcs[node].key());
+                while node != root {
+                    node = parent[node].expect("discovered node has a parent");
+                    path.push(graph.funcs[node].key());
+                }
+                path.reverse();
+                return Some(path);
+            }
+            for &(at, to) in &self.edges[f] {
+                if on_this_thread(&self.dispatch[f], at, false) && !seen[to] {
+                    seen[to] = true;
+                    parent[to] = Some(f);
+                    queue.push_back(to);
+                }
             }
         }
+        None
     }
-    None
+}
+
+fn menu_edit_wait_path(graph: &Graph, root: usize) -> Option<Vec<String>> {
+    EditWaits::new(graph).path(root)
 }
 
 #[test]
@@ -1936,33 +1978,36 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
         ("ui/native_pause.rs", "native_pause::observe"),
         ("ui/tick.rs", "tick::tick"),
     ];
-    for (file, key) in [
-        ("features/hitbox.rs", "hitbox::frame"),
-        ("features/hitbox.rs", "hitbox::eggs_pass"),
-        ("features/btt.rs", "btt::poll"),
-        ("features/btt.rs", "btt::pass"),
-        ("features/btt.rs", "btt::editor_pictures"),
-        ("features/hitbox.rs", "hitbox::fighter_screen_anchors"),
-    ] {
-        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
-    }
-    for (file, key) in roots {
-        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
-        let body = &graph.funcs[one(&graph, file, key)].body;
-        let request = if key == "hitbox::draw_orbs" { "overlay_layout_scene" } else { "try_requested" };
-        let read = body.iter().position(|t| *t == Tok::Ident(request.into())).expect("fallible request");
-        let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
-        for mutation in match key {
-            "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
-            "hud_draw::draw" => &["CONTAINERS"][..],
-            "native_pause::observe" => &["retire_pause_layout", "native_pause_sample"][..],
-            _ => &["renderer_lost", "set_visible"][..],
-        } {
-            assert!(defer < body.iter().position(|t| *t == Tok::Ident((*mutation).into())).unwrap(), "{key}: Busy mutates {mutation}");
+    {
+        let waits = EditWaits::new(&graph);
+        for (file, key) in [
+            ("features/hitbox.rs", "hitbox::frame"),
+            ("features/hitbox.rs", "hitbox::eggs_pass"),
+            ("features/btt.rs", "btt::poll"),
+            ("features/btt.rs", "btt::pass"),
+            ("features/btt.rs", "btt::editor_pictures"),
+            ("features/hitbox.rs", "hitbox::fighter_screen_anchors"),
+        ] {
+            assert_eq!(waits.path(one(&graph, file, key)), None, "{key} waits on EDITED");
         }
-        if key == "tick::tick" {
-            assert!(body.iter().position(|t| *t == Tok::Ident("REGISTRATIONS".into())).unwrap() < read,
-                "deferred registration must invalidate old pane lifetimes");
+        for (file, key) in roots {
+            assert_eq!(waits.path(one(&graph, file, key)), None, "{key} waits on EDITED");
+            let body = &graph.funcs[one(&graph, file, key)].body;
+            let request = if key == "hitbox::draw_orbs" { "overlay_layout_scene" } else { "try_requested" };
+            let read = body.iter().position(|t| *t == Tok::Ident(request.into())).expect("fallible request");
+            let defer = body[read..].iter().position(|t| *t == Tok::Ident("return".into())).expect("Busy defers") + read;
+            for mutation in match key {
+                "hitbox::draw_orbs" => &["RUN", "ORB_PANES"][..],
+                "hud_draw::draw" => &["CONTAINERS"][..],
+                "native_pause::observe" => &["retire_pause_layout", "native_pause_sample"][..],
+                _ => &["renderer_lost", "set_visible"][..],
+            } {
+                assert!(defer < body.iter().position(|t| *t == Tok::Ident((*mutation).into())).unwrap(), "{key}: Busy mutates {mutation}");
+            }
+            if key == "tick::tick" {
+                assert!(body.iter().position(|t| *t == Tok::Ident("REGISTRATIONS".into())).unwrap() < read,
+                    "deferred registration must invalidate old pane lifetimes");
+            }
         }
     }
     let facts = &graph.funcs[one(&graph, "ui/facts.rs", "facts::try_publish_scene_facts")].body;
@@ -1979,11 +2024,14 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
     let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
     let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).expect("actual read uses try_lock");
     graph.funcs[read].body[at] = Tok::Ident("lock".into());
-    for (file, key) in roots {
-        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seed must FAIL the same root check");
-        assert_eq!(witness.first().unwrap(), key);
-        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
-        assert!(witness.iter().any(|key| key == "lobby::try_requested"), "{witness:?}");
+    {
+        let waits = EditWaits::new(&graph);
+        for (file, key) in roots {
+            let witness = waits.path(one(&graph, file, key)).expect("seed must FAIL the same root check");
+            assert_eq!(witness.first().unwrap(), key);
+            assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+            assert!(witness.iter().any(|key| key == "lobby::try_requested"), "{witness:?}");
+        }
     }
     // Restore the reader and seed the exact card's direct requested edge at each
     // changed root. It must still fail, independently of the try_lock mutation.
@@ -1993,7 +2041,7 @@ fn layout_menu_reads_are_nonblocking_and_a_blocking_edit_seed_fails() {
         let request = if key == "hitbox::draw_orbs" { one(&graph, file, "hitbox::overlay_layout_scene") } else { root };
         let at = graph.funcs[request].body.iter().position(|t| *t == Tok::Ident("try_requested".into())).unwrap();
         graph.funcs[request].body[at] = Tok::Ident("requested".into());
-        let witness = menu_edit_wait_path(&graph, root).expect("original card requested edge must FAIL");
+        let witness = EditWaits::new(&graph).path(root).expect("original card requested edge must FAIL");
         assert_eq!(witness.last().unwrap(), "menu::current_menu");
         graph.funcs[request].body[at] = Tok::Ident("try_requested".into());
     }
@@ -2013,17 +2061,23 @@ fn tech_receipt_roots_do_not_wait_on_edits_and_busy_preserves_ownership() {
         ("features/tech_adapter.rs", "tech_adapter::frame"),
         ("features/cpu.rs", "cpu::tech_player_receipt"),
     ];
-    for (file, key) in roots {
-        assert_eq!(menu_edit_wait_path(&graph, one(&graph, file, key)), None, "{key} waits on EDITED");
+    {
+        let waits = EditWaits::new(&graph);
+        for (file, key) in roots {
+            assert_eq!(waits.path(one(&graph, file, key)), None, "{key} waits on EDITED");
+        }
     }
     let read = one(&graph, "compat/menu.rs", "menu::try_current_menu");
     let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
     graph.funcs[read].body[at] = Tok::Ident("lock".into());
-    for (file, key) in roots {
-        let witness = menu_edit_wait_path(&graph, one(&graph, file, key)).expect("seeded blocking edit must FAIL the complete Tech root");
-        assert!(witness.iter().any(|key| key == "practice::try_context"), "{witness:?}");
-        assert!(witness.iter().any(|key| key == "cpu::try_role_scene"), "{witness:?}");
-        assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+    {
+        let waits = EditWaits::new(&graph);
+        for (file, key) in roots {
+            let witness = waits.path(one(&graph, file, key)).expect("seeded blocking edit must FAIL the complete Tech root");
+            assert!(witness.iter().any(|key| key == "practice::try_context"), "{witness:?}");
+            assert!(witness.iter().any(|key| key == "cpu::try_role_scene"), "{witness:?}");
+            assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
+        }
     }
     let source = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/features/tech_adapter.rs")).unwrap();
     assert!(source.contains(".map_err(|_| Error::Busy)?"), "receipt unavailability must stay Busy");
@@ -2116,14 +2170,14 @@ fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
     let read = one(&graph, "menu::try_current_menu");
     let at = graph.funcs[read].body.iter().position(|t| *t == Tok::Ident("try_lock".into())).unwrap();
     graph.funcs[read].body[at] = Tok::Ident("lock".into());
-    let witness = menu_edit_wait_path(&graph, root).expect("blocking EDITED seed must fail complete macro root");
+    let witness = EditWaits::new(&graph).path(root).expect("blocking EDITED seed must fail complete macro root");
     assert_eq!(witness.last().unwrap(), "menu::try_current_menu");
     graph.funcs[read].body[at] = Tok::Ident("try_lock".into());
     let facts = one(&graph, "facts::publish_frame_facts");
     let original = graph.funcs[facts].body.clone();
     for seed in ["crate::runtime::lobby::training::lobby::active();", "crate::runtime::lobby::training::practice::acquire();"] {
         graph.funcs[facts].body = callgraph::lex(seed);
-        let witness = menu_edit_wait_path(&graph, root).expect("original blocking fact read must fail complete macro root");
+        let witness = EditWaits::new(&graph).path(root).expect("original blocking fact read must fail complete macro root");
         assert!(witness.iter().any(|key| key == "facts::publish_frame_facts"), "{witness:?}");
         assert_eq!(witness.last().unwrap(), "menu::current_menu");
     }
@@ -2136,7 +2190,7 @@ fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
         let f = one(&graph, key);
         let at = graph.funcs[f].body.iter().position(|t| *t == Tok::Ident(safe.into())).unwrap();
         graph.funcs[f].body[at] = Tok::Ident(blocking.into());
-        let witness = menu_edit_wait_path(&graph, root).expect("original pre-facts blocking read must fail macro root");
+        let witness = EditWaits::new(&graph).path(root).expect("original pre-facts blocking read must fail macro root");
         assert!(witness.iter().any(|step| step == key), "{witness:?}");
         graph.funcs[f].body[at] = Tok::Ident(safe.into());
     }

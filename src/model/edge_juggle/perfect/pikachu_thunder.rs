@@ -142,6 +142,7 @@ impl Thunder {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     // 990288d6 t5-14-b27-1. Trace 12629 is the pad, 12632 its native
@@ -387,5 +388,6 @@ mod tests {
             flight.step(209, 0x1e7, false, true),
             Some(pad([90.0 / 120.0, 79.0 / 120.0], 0)),
         );
+    }
     }
 }

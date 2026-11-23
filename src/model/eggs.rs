@@ -1240,6 +1240,7 @@ mod tests;
 
 #[cfg(test)]
 mod standing_notice_tests {
+    lib_unit_tests! {
     use super::*;
 
     const TRAINING: Facts = Facts { native_training: true, lobby_active: false, waiting_room: false, busy: false };
@@ -1412,6 +1413,7 @@ mod standing_notice_tests {
             if mode == TIMED { assert_eq!(first, None); }
             else { assert!(first.unwrap().1.starts_with(if mode == TEN { "Eggs 0/10" } else { "Eggs 0/20" })); }
         }
+    }
     }
 }
 

@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::edge_juggle::perfect::{niche::pad, Segment, JUMP, SPECIAL};
 use crate::model::edge_juggle::{CpuObject, Drill, Observation, Phase, Placement, PlacementAction, PlacementFrame, Session};
@@ -185,4 +186,5 @@ fn pyra_swap_first_uses_the_transferred_jump_then_ray() {
         flight.step(Beat { can_ray: true, ..tick(49, MYTHRA, JUMP_AERIAL) }),
         Some(pad([0.0, 1.0], SPECIAL)),
     );
+}
 }
