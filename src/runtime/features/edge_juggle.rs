@@ -1737,21 +1737,7 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
     let mut text = FixedPath::<128>::new();
     let time = frames as f32 / 60.0;
     let best_streak = best_streak.unwrap_or(0);
-    let outcome = match phase {
-        Phase::Result(result, _) => match result {
-            Outcome::ZoomWin => "Win",
-            Outcome::ZoomMiss => "Miss",
-            Outcome::Secured => "Secured",
-            Outcome::RecoveredAtLedge => "Recovered at the ledge",
-            Outcome::RecoveredOnStage => "Recovered on stage",
-            Outcome::Unresolved => "Unresolved",
-            Outcome::Landed => "Landed",
-            Outcome::GrabbedLedge => "Ledge",
-            Outcome::KnockedOut => "KO",
-        },
-        Phase::Done => "Set complete · L+R+A restarts",
-        _ => "",
-    };
+    let outcome = phase.card();
     let mut header = run.drill.game().title();
     if let Some(wizard) = run.wizard {
         let Setup {
@@ -2117,8 +2103,9 @@ pub unsafe fn frame(fighter: usize) {
     let damage = Some(natives::damage(cpu, 0)).filter(|d| d.is_finite());
     let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);
     let side = |x| run.stage.side(x);
+    let p1_situation = natives::situation_kind(p1);
     let player_ledge =
-        (natives::situation_kind(p1) == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
+        (p1_situation == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
     let cpu_ledge = side(natives::pos_x(cpu));
     let situation = natives::situation_kind(cpu);
     let trump = drill == Drill::GuardEdge
@@ -2127,6 +2114,8 @@ pub unsafe fn frame(fighter: usize) {
         dead_or_rebirthing,
         grounded: situation == konst(C::SituationGround),
         cliff_catch: status == konst(C::StatusCliffCatch) && !trump,
+        player_back: p1_situation == konst(C::SituationGround) || p1_situation == konst(C::SituationCliff),
+        player_ko: player_ko(p1),
         hit: damage_stop && !run.damage_stop
             || damage
                 .zip(run.previous_damage)
@@ -2218,7 +2207,7 @@ pub unsafe fn frame(fighter: usize) {
         if !zoom {
             trace_attempt(run, before, Bodies { p1, cpu }, kind, damage);
         }
-        if before == Phase::Live && matches!(run.rounds.phase, Phase::Result(..)) {
+        if before == Phase::Live && run.rounds.phase != Phase::Live {
             run.route_history.complete();
         }
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {

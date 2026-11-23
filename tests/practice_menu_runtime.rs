@@ -35,6 +35,19 @@ fn member<'a>(text: &'a str, head: &str) -> &'a str {
 }
 
 #[test]
+fn gj1_runtime_return_wiring() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("let p1_situation = natives::situation_kind(p1);"));
+    assert!(frame.contains("(p1_situation == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)))"));
+    let obs = frame.split_once("let obs = Observation {").unwrap().1.split_once("\n    };").unwrap().0;
+    assert!(obs.contains("player_back: p1_situation == konst(C::SituationGround) || p1_situation == konst(C::SituationCliff)"));
+    assert!(obs.contains("player_ko: player_ko(p1)"));
+    assert!(frame.contains("if before == Phase::Live && run.rounds.phase != Phase::Live {\n            run.route_history.complete();"));
+    assert!(item(&runtime, "fn post_notice(").contains("let outcome = phase.card();"));
+}
+
+#[test]
 fn the_role_tabs_draw_the_models_caps() {
     let view = src("src/runtime/ui/view.rs");
     let draw = item(&view, "unsafe fn draw_role_tabs(");

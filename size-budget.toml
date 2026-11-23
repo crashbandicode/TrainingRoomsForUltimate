@@ -2461,3 +2461,11 @@ ceiling = 196369
 date = "2026-11-23"
 reason = "GJ4 waits for Player 1 to leave KO during placement and insets the Guard the Edge Player point. Measured 196369 at 2c835eb8, 20 over 17060a5e with no spare."
 approved_by = "GJ4 fix-build handoff 2026-11-23, item-specific entry under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196420
+date = "2026-11-23"
+reason = "GJ1: a Guard the Edge KO counts once Player 1 is back on the stage. Measured 196420, 51 above 196369."
+approved_by = "Operator's fix-build order 2026-11-23 ~13:36Z through tr-primary-2, under the operator's measured LOC rule."
