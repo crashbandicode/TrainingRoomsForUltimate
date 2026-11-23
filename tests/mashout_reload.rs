@@ -51,6 +51,15 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
     let choose_gate = block(block(source, "Step::Choose => {"), "if !released");
     let release_start = source.find("let released =").unwrap();
     let release = &source[release_start..=release_start + source[release_start..].find(';').unwrap()];
+    let restart = block(source, "if restart {");
+    let stopped_owner = block(source, "if config.is_none() && crate::runtime::ui::menu_app::active() {");
+    let running_owner = block(source, "else if !matches!(game.step, Step::Off | Step::Reload | Step::Restore)");
+    let ownership = format!("{stopped_owner} {running_owner}");
+    let release_first = "Step::Release if released => game.step(";
+    let release_end = "Step::Retry if released => {";
+    assert_eq!(source.matches(release_first).count(), 1);
+    assert_eq!(source.matches(release_end).count(), 1);
+    let release_arms = &source[source.find(release_first).unwrap()..source.find(release_end).unwrap()];
     let covered = block(source, "if covered && !matches!(game.step, Step::Held | Step::Result | Step::Restore)");
     let restore = block(source, "Step::Restore => {");
     let end = block(source, "fn end_practice(&mut self) {");
@@ -63,6 +72,9 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
         .replace("// CHOOSE", choose)
         .replace("// RELEASE_CHECK", release)
         .replace("// ADMISSION_GATE", choose_gate)
+        .replace("// RESTART", restart)
+        .replace("// OWNERSHIP", &ownership)
+        .replace("// RELEASE_ARMS", release_arms)
         .replace("// COVERED", covered)
         .replace("// RESTORE", restore)
         .replace("// END_PRACTICE", end);
