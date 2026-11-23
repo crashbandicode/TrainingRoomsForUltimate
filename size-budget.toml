@@ -2365,3 +2365,11 @@ ceiling = 191679
 date = "2026-11-22"
 reason = "Eggs-ercise moving paths on In view and Whole stage are fitted into a box cut to the floor line the target appeared over; a path flies only with a target's width of room on each axis it uses, a sampled spot with that room is preferred, and Pop up is used when none has it. Measured normalized implementation 191679, 25 above the integration ceiling 191654, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 14:06:33Z (HANDOFF-PRIMARY-tr-primary-2.md line 1336): the operator's order that Eggs-ercise moving paths stay on the stage, root cause, red test and fix for the next round; the measured growth is reported with READY under the operator's measured LOC rule; option A ruled 2026-11-22 15:46:34Z (line 1443): 8 units of room on each axis a path uses, a sampled spot with room preferred, Pop up when none has it"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 192477
+date = "2026-11-23"
+reason = "tr.practice/1 state publisher for the seven practice games and per-entry CPU AI-think counts on the optional test bridge, in Training and the waiting room, ported from rc15/practice-state (6499f6d4..a77cf970 without the spacing-grade lines). Measured 192477, 798 above the integration ceiling 191679."
+approved_by = "tr-primary-2 2026-11-22 ~23:50Z order for the intermediate build (operator ~22:40Z: Eden checks read the bridge); line growth pre-approved under the operator's memory rule, TEST-FLOW-2026-11-22.md point 2; NRO and BSS delta reported with READY"
