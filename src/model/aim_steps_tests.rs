@@ -250,7 +250,7 @@ fn an_old_drill_still_resolves_at_its_deadline() {
 fn full_step_snap(frame: u32, second: bool) -> Snap {
     let part = if frame == 16 { 1 } else if frame == 30 && second { 2 } else { 0 };
     Snap {
-        buttons: if frame < 10 { u32::from(frame % 2 == 0) } else { 2 },
+        buttons: if frame < 10 { u32::from(frame.is_multiple_of(2)) } else { 2 },
         lstick_y: if frame >= 10 { 127 } else { 0 },
         facing: 1,
         aim: Seen {
