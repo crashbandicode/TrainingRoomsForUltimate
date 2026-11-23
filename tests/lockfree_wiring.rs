@@ -47,6 +47,28 @@ fn ordered(src: &str, steps: &[&str]) {
     }
 }
 
+#[test]
+fn slot_capture_and_library_pad_priority_is_preserved() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    ordered(body(recorder, "on_ai_frame"),
+        &["slot_control(shulk)", "take_slot_refusal()", "cpu_role_control()", "host_cpu(controller)"]);
+    let interrupt = body(recorder, "interrupt_playback");
+    ordered(interrupt, &["settings().mash_interrupt && rr_host::slot_stop()", "cpu_playback(false)"]);
+    let start = body(recorder, "mash_start");
+    ordered(start, &["rr_host::cpu_idle()", "rr_host::slot_take(head)", "term_for_status(&table, take.status())",
+        "is_enable_transition_term", "None => cpu::actionable(body.accessor)", "rr_host::slot_start_mash(slot, take, facing)",
+        "Ok(Some(started))", "Ok(None) => {}", "Err(refusal)", "cpu::mash_pop(key)"]);
+    assert!(!start.contains("SLOT_RUN.lock()"));
+}
+
+#[test]
+fn the_ledge_query_reads_live_owed_before_locking_the_cpu() {
+    let cpu = include_str!("../src/runtime/features/cpu.rs");
+    ordered(body(cpu, "cpu_transition_term_hook"),
+        &["let owed = crate::engine::rr_host::slot_owed();",
+            "with(|cpu| cpu.ledge_transition_term(key, status, term, original, owed))"]);
+}
+
 /// Step 2a: a settings publish (the menu worker's commit, the diag reload) only notes the roster's re-plan and the preload
 /// planner's reset; the game frame (`lobby::update`, the input poll and the fighter frame on MainThread) runs both, in the order the
 /// publish made them, before the scene clock. No plugin thread reaches either, so the roster's, the planner's and the sources' locks

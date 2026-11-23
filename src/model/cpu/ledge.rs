@@ -8,6 +8,7 @@ use super::counter::{CounterId, Counters};
 use super::facts::{FrameFacts, FrameOut, PlaybackStart};
 use super::ids::{Table, C};
 use super::mash::Step;
+use super::playback::PlaybackState;
 use super::settings::{situation, trigger, CpuSettings};
 use super::status::Situation;
 
@@ -93,7 +94,7 @@ impl Ledge {
     /// native automatic climb while the CPU waits, delays, or waits for its playback to start, and (CPU-091,
     /// DECISIONS B11a) while TR holds a case it performs itself, before and after its request, for at most
     /// `UNREQUESTED_BOUND` frames; otherwise the original answer.
-    pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback_running: bool, q: TermQuery) -> bool {
+    pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback: PlaybackState, q: TermQuery) -> bool {
         let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
         if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
@@ -101,11 +102,11 @@ impl Ledge {
         }
         // CPU-091: no case yet (B11 cleared it at the menu change) holds the climb until the next frame rolls.
         // Another playback yields the feature entirely (its step does not roll), as before.
-        let Some(case) = self.case else { return (self.native_grab || playback_running) && original };
-        let hold_for_playback = is_playback(case) && !self.playback_started;
+        let Some(case) = self.case else { return (self.native_grab || playback.running) && original };
+        let hold_for_playback = is_playback(case) && (!self.playback_started || playback.owed);
         // While another playback runs the feature yields entirely, except the hold that keeps the CPU
         // on the ledge until its own playback has started.
-        let waiting = if playback_running {
+        let waiting = if playback.running {
             hold_for_playback
         } else {
             case == option::WAIT

@@ -129,7 +129,6 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "input_display::attacker_owner", owner: Some(Feature::Hitbox), gate: Gate::Flag("OWNER_ON") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
-    Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_p1_poll", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::tint_player", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     // rc.14 Break the Targets' camera: the fixed-camera switch, called from the P1 pass. It needs the

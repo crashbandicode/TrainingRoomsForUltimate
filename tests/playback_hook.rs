@@ -96,6 +96,29 @@ fn placed_cpu_recording_has_no_lockout_or_standby() {
 }
 
 #[test]
+fn playback_slot_start_frames_post_and_stop_allocate_nothing() {
+    use engine::macros::{InputFrame, MacroRecording, StartState};
+    use engine::rr_host;
+
+    let frames = vec![InputFrame { buttons: 1, ..InputFrame::default() }; 2];
+    let recording = MacroRecording::new("Slot", "13.0.5", StartState::neutral(7, 0, -1.0), frames).unwrap();
+    rr_host::set_slot(0, Some(&recording)).unwrap();
+    let _turn = crate::allocation::hook_counter_turn();
+    let before = hook_allocations();
+    {
+        let _scope = HookScope::enter_hook(HookId::RecorderAi);
+        assert!(rr_host::slot_start_mash(0, rr_host::slot_take(0).unwrap(), 1).unwrap().is_some());
+        assert_eq!(rr_host::slot_control(false).unwrap().buttons, 1);
+        assert_eq!(rr_host::slot_post(), None);
+        assert_eq!(rr_host::slot_control(false).unwrap().buttons, 1);
+        assert_eq!(rr_host::slot_post(), Some(0));
+        assert!(rr_host::slot_start_mash(0, rr_host::slot_take(0).unwrap(), 1).unwrap().is_some());
+        assert!(rr_host::slot_stop());
+    }
+    assert_eq!(hook_allocations(), before, "slot start, frames, post or stop allocated inside the hook");
+}
+
+#[test]
 fn playback_makes_no_hook_allocations() {
     use engine::library::{LoopCount, RecordingIndex, Role};
     use engine::macros::{InputFrame, MacroRecording, StartState};
