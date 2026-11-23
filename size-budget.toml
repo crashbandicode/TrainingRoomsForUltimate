@@ -2509,3 +2509,11 @@ ceiling = 196833
 date = "2026-11-23"
 reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196833 on its merge 4e34b3a0 with the install 2 head d50a0577 (F8, F12, F15, F9, the GJ4 rework), with no spare: 368 above F9's 196465 (the GJ4 rework adds none: its gate measured 196360 on dd6aa1de, as F9's entry gives for dd6aa1de). 353 of the 368 are the item as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head's 196320); 15 are the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists)."
 approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197090
+date = "2026-11-23"
+reason = "F13: a directional special's parts are drill and combo steps: an Aim event per entry into the travel status with the way the fighter went, the second part a step of its own; Aim files are versions 3 and 4. Measured 197090, 257 above 196833."
+approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F13, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
