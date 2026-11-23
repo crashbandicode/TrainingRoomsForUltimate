@@ -117,6 +117,13 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
     open || popup || closing || prompt
 }
 
+/// Whether the open menu holds the fighters that are not Player 1, as its panels hold both: the CPU stands frozen
+/// behind the menu. Not while a preview plays, a save state loads, the recorder is busy or a macro plays on the CPU:
+/// those go on as before.
+pub fn menu_holds_cpu(open: bool, previewing: bool, loading: bool, recorder: bool) -> bool {
+    open && !previewing && !loading && !recorder
+}
+
 /// Whether the menu's own screens are what Player 1's presses reach now, as the worker's `press` routes them: the
 /// open menu (not while it waits to close), or the Recording pop-up over the closed menu. Not the layer's panel, the
 /// clip editor or the closed-menu fighter question. An external screen of the open menu (the Mii list) is the
@@ -190,6 +197,32 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    fn the_open_menu_holds_the_cpu() {
+        for open in [false, true] { for previewing in [false, true] {
+            for loading in [false, true] { for recorder in [false, true] {
+                assert_eq!(menu_holds_cpu(open, previewing, loading, recorder),
+                    open && !previewing && !loading && !recorder,
+                    "open={open} previewing={previewing} loading={loading} recorder={recorder}");
+            } }
+        } }
+    }
+
+    fn the_cpu_hold_is_wired() {
+        let named = include_str!("../../runtime/macros/named_macros.rs");
+        let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(hold.contains("state::holds_cpu(queries.clip_previewing)"));
+        assert!(hold.contains("menu && !player"));
+        assert!(hold.contains("clip_previewing") && hold.contains("replay_loading"));
+        let state = include_str!("../../runtime/ui/state.rs");
+        let fact = state.split("pub fn holds_cpu(").nth(1).unwrap_or("").split("\n}").next().unwrap();
+        assert!(fact.contains("OPEN.load("));
+        assert!(fact.contains("states::is_loading()"));
+        assert!(fact.contains("recorder::recording_or_playback()"));
+        assert!(fact.contains("recording_host::cpu_playback_blocks_drill()"));
+        assert!(fact.contains("rr_host::previewing()"));
+        assert!(fact.contains("PREVIEW_HIDES.load("));
+    }
 
     fn f9_name_step_truth_table() {
         for (page, asked, draft, expected) in [
@@ -383,6 +416,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_open_menu_holds_the_cpu", the_open_menu_holds_the_cpu as fn()),
+            ("the_cpu_hold_is_wired", the_cpu_hold_is_wired as fn()),
             ("f9_name_step_truth_table", f9_name_step_truth_table as fn()),
             ("f9_owner_loss_retires_the_keyboard_job", f9_owner_loss_retires_the_keyboard_job as fn()),
             ("f9_another_owners_job_is_left_alone", f9_another_owners_job_is_left_alone as fn()),

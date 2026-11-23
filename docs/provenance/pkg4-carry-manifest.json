@@ -2448,7 +2448,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "6260bc9b55ff25381dc493dd17ea07fb291b00d0704b1bb62a6dd009413c2a8a",
+   "dest_sha256": "a5ed726d596a450574835015d2f9d7d5bcc6c6eeccf43848f38c978d55ac3508",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3369,6 +3369,11 @@
      "old": "            notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n",
      "new": "            if hidden {\n                notify(&format!(\"System keyboard failed ({code:#X})\"));\n                lock_write(&UI).on_pad(Pad::Back);\n            } else {\n                notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n            }\n",
      "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n",
+     "new": "    let menu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);\n    let player = (queries.replay_loading || menu)\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player)\n        || (menu && !player);\n",
+     "reason": "F16: Hold non-player fighters with the existing panel owner while the menu is open."
     },
     {
      "old": "    crate::engine::swap::trio::TrioFighter::from_kind(kind as u32)\n        .map(|fighter| fighter.name().to_owned())\n        .unwrap_or_else(|| format!(\"0x{kind:X}\"))\n}\n\n/// SPEC-input-01 section 9, the core's per-frame read (`has_captured_frame` and `frame_at` in one short lock, no allocation): the frame the run\n/// reads at `index` from the buffer in use, `None` while a capture has not stored it yet.\npub fn frame_for(index: usize) -> Option<MappedInputs> {\n    let source = PLAYING.load(Ordering::Acquire);\n    let frame = if source == 0 {\n        None\n    } else {\n        let buffers = &PLAY_FRAMES;\n        let generation = PLAY_GENERATION.load(Ordering::Acquire);\n        if buffers.generation() != generation { return None; }\n        let frame = buffers.frame_at(index);\n        if buffers.generation() != generation { return None; }\n        frame\n    }?;\n    Some(MappedInputs { buttons: frame.buttons, lstick_x: frame.lstick_x, lstick_y: frame.lstick_y,\n        rstick_x: frame.rstick_x, rstick_y: frame.rstick_y })\n}\n\n/// Diag build only: the keyboard's confirmed-name path without the applet (`service_keyboard` does exactly this with the typed text).\n#[cfg(feature = \"diag\")]\npub fn diag_confirm_name(name: &str) {\n    let effect = lock_write(&UI).confirm_native_name(name.to_owned());\n    apply_effect(effect);\n}\n\n/// Diag build only: `export_record_slot` without the keyboard request (see `request_native_name`).\n#[cfg(feature = \"diag\")]\npub fn diag_export_slot(slot: usize) {\n    if practice_ready() {\n        crate::runtime::macros::port::slots::export_diag(slot);\n    } else {\n        crate::runtime::macros::diag::slot_export_complete(false);\n    }\n}\n",

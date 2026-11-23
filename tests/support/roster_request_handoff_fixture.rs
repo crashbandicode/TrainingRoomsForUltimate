@@ -553,6 +553,17 @@ fn cold_owner_request_blocks_reload_until_its_native_work_settles() {
     assert!(cpu_reload_ready());
 }
 
+#[test]
+fn the_open_menu_defers_a_cpu_reload_until_it_releases_the_input() {
+    reset_fixture();
+    mii_ordinary_cpu::reset(true);
+    assert!(cpu_reload_ready());
+    MENU_CAPTURED.store(true, Ordering::Relaxed);
+    assert!(!cpu_reload_ready());
+    MENU_CAPTURED.store(false, Ordering::Relaxed);
+    assert!(cpu_reload_ready());
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Refusal {
     Busy,

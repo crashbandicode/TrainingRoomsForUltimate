@@ -55,6 +55,14 @@ pub static POLLS_AT_TICK: AtomicU32 = AtomicU32::new(0);
 /// How many times the menu's ownership was released because its renderer was lost.
 pub static RELEASES: AtomicU32 = AtomicU32::new(0);
 
+/// The open menu holds the fighters that are not Player 1 now (`flow::menu_holds_cpu`). Atomic reads only.
+pub fn holds_cpu(previewing: bool) -> bool {
+    use crate::runtime::features::{recorder, recording_host, states};
+    let previewing = previewing || PREVIEW_HIDES.load(Ordering::Acquire) || crate::engine::rr_host::previewing();
+    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing, states::is_loading(),
+        recorder::recording_or_playback() || recording_host::cpu_playback_blocks_drill())
+}
+
 /// The facts `model::readiness` decides on.
 pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {
     use crate::model::input_delay::Owners;
