@@ -387,6 +387,8 @@ pub struct Link {
     pub from: Move,
     pub to: Move,
     pub shown: [Shown; 2],
+    /// The displayed move each of `shown` was copied from; a direction that arrives later reaches the copy.
+    pub(crate) owners: [u32; 2],
     /// The spot the follow-up hit landed (rc.14, SP4), `None` when it could not be told.
     pub spot: Option<Spot>,
 }
@@ -450,6 +452,7 @@ struct Hit {
     action: u32,
     mv: Move,
     shown: Shown,
+    owner: u32,
     spot: Option<Spot>,
     /// P1's and the CPU's first actionable frames after it.
     p1_free: Option<u32>,
@@ -470,6 +473,7 @@ pub struct Tracker {
     travel: bool,
     aim_from: Option<(u32, (f32, f32))>,
     shown: Shown,
+    shown_id: u32,
     base: Option<Move>,
     history: [Option<Link>; HISTORY],
     advantage: Option<Advantage>,
@@ -532,6 +536,7 @@ impl Tracker {
             travel: false,
             aim_from: None,
             shown: Shown { of: None, dirs: [None; 2] },
+            shown_id: 0,
             base: None,
             history: [None; HISTORY],
             advantage: None,
@@ -591,11 +596,16 @@ impl Tracker {
         self.shown.dirs[slot] = Some(dir);
         self.aims[self.aim_head] = Some(Aim { frame, dir });
         self.aim_head = (self.aim_head + 1) % AIMS;
-        if let Some(hit) = self.last_hit.as_mut().filter(|hit| hit.action == self.action) {
-            hit.shown = self.shown;
+        let (shown, id) = (self.shown, self.shown_id);
+        if let Some(hit) = self.last_hit.as_mut().filter(|hit| hit.owner == id) {
+            hit.shown = shown;
         }
-        if let Some(link) = self.history[0].as_mut().filter(|link| link.hit >= frame) {
-            link.shown[1] = self.shown;
+        for link in self.history.iter_mut().flatten() {
+            for (copy, owner) in link.shown.iter_mut().zip(link.owners) {
+                if owner == id {
+                    *copy = shown;
+                }
+            }
         }
     }
 
@@ -730,6 +740,7 @@ impl Tracker {
             }
             if !(self.travel && p1.travel.is_some()) {
                 self.shown = Shown::default();
+                self.shown_id = self.shown_id.wrapping_add(1);
             }
             self.angle = None;
             self.action = self.action.wrapping_add(1);
@@ -937,6 +948,7 @@ impl Tracker {
                 from: prev.mv,
                 to: self.action_move,
                 shown: [prev.shown, self.shown],
+                owners: [prev.owner, self.shown_id],
                 spot,
             };
             self.history.copy_within(0..HISTORY - 1, 1);
@@ -949,6 +961,7 @@ impl Tracker {
             action: self.action,
             mv: self.action_move,
             shown: self.shown,
+            owner: self.shown_id,
             spot,
             p1_free: None,
             cpu_free: None,

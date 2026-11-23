@@ -668,6 +668,7 @@ pub fn hud_tick(
     draw_settings: Settings,
     parry: Option<&crate::model::parry::View>,
     cells: bool,
+    labels: [bool; 2],
     mut apply: impl FnMut(usize, &Look, Changed),
 ) -> (Option<LinkLine>, bool, [Option<u8>; 2]) {
     let tracker = *TRACKER.lock();
@@ -683,7 +684,6 @@ pub fn hud_tick(
             apply(local, look, changed)
         },
     );
-    let [newest, older] = if shown { crate::model::frame_strip_plan::aims_shown(&tracker) } else { [None; 2] };
-    let aims = [older.or(newest).map(|aim| aim.dir), older.and(newest).map(|aim| aim.dir)];
+    let aims = if shown { crate::model::frame_strip_plan::aims_drawn(&tracker, labels) } else { [None; 2] };
     (line, history, aims)
 }

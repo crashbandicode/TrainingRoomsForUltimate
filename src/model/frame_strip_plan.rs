@@ -123,8 +123,9 @@ pub fn aims_shown(tracker: &Tracker) -> [Option<Aim>; 2] {
 }
 
 /// The marks the lane can draw, oldest first, for the bridge. `boxes[n]`: Player 1's `n`th label box exists (the newest mark takes the first).
-pub fn aims_drawn(tracker: &Tracker, _boxes: [bool; 2]) -> [Option<u8>; 2] {
+pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
     let [newest, older] = aims_shown(tracker).map(|aim| aim.map(|aim| aim.dir));
+    let (newest, older) = (newest.filter(|_| boxes[0]), older.filter(|_| boxes[1]));
     [older.or(newest), older.and(newest)]
 }
 
