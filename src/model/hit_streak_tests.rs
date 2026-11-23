@@ -81,7 +81,6 @@ fn projectile_hit_counts_once() {
     frame(&mut streak, 0, 0, 1.0, false, &[]);
     assert_eq!(streak.counts(), (1, 1));
 }
-}
 
 #[test]
 fn body_and_projectile_are_one_move() {
@@ -153,4 +152,5 @@ fn final_sample_can_credit_native_hit_before_projectile_expiry() {
     streak.hit(P1, WEAPON);
     streak.end(body);
     assert_eq!(streak.counts(), (1, 1));
+}
 }
