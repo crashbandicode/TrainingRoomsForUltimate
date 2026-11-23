@@ -7,13 +7,14 @@ wireless rooms, and the online waiting room of Quickplay.
 ![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as yellow pills with the Waiting and Ready signs still on screen](../media/rc14-waiting-menu.gif)<br>
 *The room menu on Display & Controls: Hitbox Visualization opens a checklist, A ticks Hurtboxes (the row reads 1 of 6), and when the menu closes both practice fighters are drawn as yellow pills; the Waiting and Ready signs stay on screen. The footer reads 0.2.0-rc.14 · rc14 400e2c69. The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
 
-## Turn on Lobby Practice first
+## Lobby Practice is On by default
 
-Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is Off by default. While it is Off,
-TrainingRooms leaves the waiting rooms to the game: the menu doesn't open there and the chords do nothing. So turn it
-On in Training, before you look for a match.
+Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On by default: the practice
+starts as soon as the waiting room's own screen is ready. If a waiting room is the first place you practise on a new
+install, the six reminders (Welcome and the main chords) show there.
 
-With it On, the practice starts as soon as the waiting room's own screen is ready.
+Turn it Off to leave the waiting rooms to the game: the menu doesn't open there and the chords do nothing. A settings
+file that already stores Off keeps it Off.
 
 ## What works there
 

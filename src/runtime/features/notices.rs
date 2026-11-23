@@ -227,11 +227,11 @@ pub fn reset_combo_display() {
 }
 
 /// One HUD tick. `menu_open` is the plugin menu's flag (package 5; the owner bit meanwhile).
-pub fn hud_tick(native_hud_ready: bool) -> TickOut {
+pub fn hud_tick(hud_ready: bool) -> TickOut {
     let menu_open = published::input_owners().contains(crate::model::input_delay::Owners::MENU);
     // Read published values before taking either UI-owned queue lock. The INI's
     // two menu shortcuts are independently published atomics.
-    let needs_startup = native_hud_ready && STARTUP_PENDING.load(Ordering::Acquire);
+    let needs_startup = hud_ready && STARTUP_PENDING.load(Ordering::Acquire);
     let startup_chords = if needs_startup {
         published::live().map(|live| {
             let [first, second] = super::chords::shortcuts();
@@ -243,7 +243,7 @@ pub fn hud_tick(native_hud_ready: bool) -> TickOut {
     } else { None };
     let out = {
         let mut queue = QUEUE.lock();
-        if needs_startup && BOOT_NOTICES.lock().post_once(native_hud_ready, startup_chords, &mut queue) {
+        if needs_startup && BOOT_NOTICES.lock().post_once(hud_ready, startup_chords, &mut queue) {
             STARTUP_PENDING.store(false, Ordering::Release);
             INTRO_STORE_DUE.store(true, Ordering::Release);
             tr_intro_posted_v1();

@@ -12,6 +12,78 @@ use model::menu::{Entry, Env, Menu};
 use model::notify::{Queue, DEFAULT_COLOR};
 use model::recording::{Phase, NOTICE_HEADER};
 use model::settings::Settings;
+use std::path::Path;
+
+fn src(path: &str) -> String {
+    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap()
+}
+
+fn item<'a>(text: &'a str, head: &str) -> &'a str {
+    let at = text.find(head).unwrap_or_else(|| panic!("{head} not found"));
+    let end = text[at..].find("\n}\n").map_or(text.len(), |e| at + e + 3);
+    &text[at..end]
+}
+
+fn the_waiting_rooms_hud_feeds_the_first_install_notices() {
+    let hud = src("src/runtime/features/hud_draw.rs");
+    let tick = hud.find("notices::hud_tick(").expect("HUD posts notices");
+    let tick = &hud[tick..hud[tick..].find(");").expect("end of HUD tick") + tick + 2];
+    assert!(tick.contains("boot_notices::hud_ready(!notice.is_null(), waiting,"), "HUD uses the practice readiness rule");
+    assert!(tick.contains("training::session_open()"), "HUD checks the opened room session");
+    assert!(!hud.contains("hud_tick(!waiting"), "waiting-room HUD is not excluded");
+
+    let training = src("src/runtime/lobby/training/mod.rs");
+    let clear = item(&training, "pub(crate) fn clear_session_state()");
+    let recorder = clear.find("recorder::session_clear();").expect("recorder clears the notices");
+    let store = clear.find("SESSION_OPEN.store(crate::runtime::scene::lobby_active(),").expect("session follows lobby flag");
+    assert!(recorder < store, "the session flag is published after the recorder clears");
+    let end_store = store + clear[store..].find(';').expect("end of session store") + 1;
+    assert_eq!(clear[end_store..].trim(), "}", "the session store is the clear's last statement");
+    assert!(item(&training, "pub(crate) fn session_open()").contains("SESSION_OPEN.load"));
+    assert_eq!(training.matches("SESSION_OPEN.store").count(), 1);
+
+    let lobby = src("src/runtime/lobby/training/lobby.rs");
+    let update = item(&lobby, "pub fn update()");
+    let edge = &update[update.find("if now != previous {").expect("activation edge")..];
+    let edge = &edge[..edge.find("\n    }\n").expect("end of activation edge")];
+    let set_lobby = edge.find("set_lobby(now)").expect("activation updates CPU scene");
+    let clear = edge.find("super::clear_session_state();").expect("activation clears the session");
+    assert!(set_lobby < clear, "set_lobby precedes the session clear");
+    assert!(!lobby.contains("SESSION_OPEN"), "the carried file does not own the session flag");
+
+    let notices = src("src/runtime/features/notices.rs");
+    assert!(notices.contains("pub fn hud_tick(hud_ready: bool)"));
+    assert!(!notices.contains("native_hud_ready"));
+}
+
+fn the_first_install_notices_wait_for_the_rooms_session() {
+    assert!(boot_notices::hud_ready(true, false, false));
+    assert!(boot_notices::hud_ready(true, false, true));
+    assert!(!boot_notices::hud_ready(true, true, false));
+    assert!(boot_notices::hud_ready(true, true, true));
+    for waiting in [false, true] {
+        for room_session_open in [false, true] {
+            assert!(!boot_notices::hud_ready(false, waiting, room_session_open));
+        }
+    }
+
+    let mut notices = BootNotices::for_install(false, &Settings::factory());
+    let chords = Some(ChordSet::factory());
+    let mut queue = Queue::new();
+    assert!(!notices.post_once(boot_notices::hud_ready(true, true, false), chords, &mut queue));
+    assert_eq!(queue.len(), 0);
+    queue.clear();
+    assert!(notices.post_once(boot_notices::hud_ready(true, true, true), chords, &mut queue));
+    assert_eq!(queue.len(), 6);
+    let draw = queue.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("TrainingRooms", "Welcome!"));
+    assert!(!notices.post_once(boot_notices::hud_ready(true, true, true), chords, &mut queue));
+
+    let mut already_seen = BootNotices::for_install(true, &Settings::factory());
+    let mut empty = Queue::new();
+    assert!(!already_seen.post_once(boot_notices::hud_ready(true, true, true), chords, &mut empty));
+    assert_eq!(empty.len(), 0);
+}
 
 fn fresh_notices(file_existed: bool, settings: &Settings) -> BootNotices {
     BootNotices::for_install(file_existed, settings)
@@ -78,5 +150,7 @@ fn case_table() {
     crate::test_table::run(&[
         ("the_intro_seen_flag_survives_a_settings_round_trip", the_intro_seen_flag_survives_a_settings_round_trip as fn()),
         ("save_and_other_notices_still_post", save_and_other_notices_still_post as fn()),
+        ("the_waiting_rooms_hud_feeds_the_first_install_notices", the_waiting_rooms_hud_feeds_the_first_install_notices as fn()),
+        ("the_first_install_notices_wait_for_the_rooms_session", the_first_install_notices_wait_for_the_rooms_session as fn()),
     ]);
 }

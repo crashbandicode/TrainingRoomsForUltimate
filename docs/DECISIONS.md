@@ -655,6 +655,20 @@ Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on
 
 *A run: Targets 0/3 0:00.00 → 2/3 → "Done! 3 in 0:04.08 (best 0:04.06)".*
 
+## Lobby Practice is On by default (2026-11-22): decided
+
+**Decided 2026-11-22 (about 23:38Z).** The operator ordered that Lobby Practice defaults to On, and set a standing
+rule: every feature works the same in Training and in the waiting rooms, and a new feature is assumed to work in both.
+
+| # | Decided |
+| --- | --- |
+| LP1 | Fighters & Stages › Lobby Practice is On on a new install and for a settings file without the key. A stored value is kept, On or Off, in `menu` and in `defaults_menu` |
+| LP2 | The six first-install reminders (Welcome, Open Menu, Save State, Load State, Input Record, Input Playback) show the first time Training or a waiting room's practice opens, once per install as before. In a waiting room they wait until the room's practice session is open |
+| LP3 | Standing rule: a new feature has no waiting-room-only or Training-only gate, label or fallback without the operator's approval |
+
+Before this, Lobby Practice was Off until the player turned it On in Training, and the reminders showed in Training only.
+No earlier recorded decision set that default.
+
 ## rc.15 practice menu (2026-11-18): decided
 
 **Decided 2026-11-18 (~14:58Z).** The operator approved the practice-games mockup with the four recommended answers

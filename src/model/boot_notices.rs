@@ -1,4 +1,4 @@
-//! First Training HUD and save notices from the approved core/state contracts.
+//! First practice HUD and save notices from the approved core/state contracts.
 
 use core::fmt::Write;
 
@@ -45,6 +45,13 @@ pub fn intro_already_seen(file_existed: bool, settings: &super::settings::Settin
     settings.intro_seen() || file_existed
 }
 
+/// The HUD that can show the first-install notices: the plugin's notice pane exists and, in a waiting room, the
+/// room's practice session is open. Opening it clears the queue (`lobby::update`), so a post before it would be
+/// emptied unseen.
+pub const fn hud_ready(notice_pane: bool, waiting: bool, room_session_open: bool) -> bool {
+    notice_pane && (!waiting || room_session_open)
+}
+
 impl BootNotices {
     pub const fn new() -> Self {
         Self { posted: false }
@@ -55,10 +62,10 @@ impl BootNotices {
         Self { posted: intro_already_seen(file_existed, settings) }
     }
 
-    /// Only a real native Training HUD with published settings consumes the boot edge.
+    /// Only a ready practice HUD (`hud_ready`) with published settings consumes the boot edge.
     /// Session/layout resets clear the queue, not this once-per-process state.
-    pub fn post_once(&mut self, native_hud: bool, chords: Option<ChordSet>, queue: &mut Queue) -> bool {
-        if self.posted || !native_hud {
+    pub fn post_once(&mut self, hud_ready: bool, chords: Option<ChordSet>, queue: &mut Queue) -> bool {
+        if self.posted || !hud_ready {
             return false;
         }
         let Some(chords) = chords else { return false };
