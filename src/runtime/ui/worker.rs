@@ -831,8 +831,8 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
-        Effect::OpenCrop { source, combo, .. } => {
-            crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
+        Effect::OpenCrop { source, combo, player } => {
+            crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
         effect => rr_host::post_effect_at(effect, Some(version)),
     }
@@ -1172,7 +1172,7 @@ fn sync_panels(s: &mut Session) {
         }
     }
     if s.phase == Phase::Clip {
-        EXT_SHOWN.store(true, Ordering::Release);
+        EXT_SHOWN.store(!crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page()), Ordering::Release);
     }
     if open || s.phase == Phase::Clip || s.phase == Phase::Prompt {
         publish_frame(s);

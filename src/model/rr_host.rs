@@ -12,8 +12,6 @@ use super::library::{
 };
 use super::frame_queue::FrameQueue;
 use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
-#[cfg(test)]
-use super::macros::FrameSnapshot;
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
@@ -211,8 +209,8 @@ static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
-#[cfg(test)]
-static CROP: Mutex<Option<CropWindow>> = Mutex::new(None);
+static PREVIEW: AtomicU8 = AtomicU8::new(0);
+static PREVIEW_ASK: Mutex<Option<PreviewAsk>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 static STRIP: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
@@ -281,14 +279,9 @@ struct Resident {
     tape: Tape,
 }
 
-/// The crop handles. The menu names the file. The replay window names the frames.
-#[cfg(test)]
-#[derive(Clone, Debug)]
-pub struct CropWindow {
-    pub start: u32,
-    pub end: u32,
-    pub snapshot: FrameSnapshot,
-    pub name: String,
+enum PreviewAsk {
+    Start { source: String, role: Role, frames: core::ops::Range<usize> },
+    Stop,
 }
 
 /// What one worker tick asks the Switch wrapper to do.
@@ -338,14 +331,17 @@ pub fn migrated() -> bool {
 /// The clip editor's preview of a saved macro: frames `start..end` of `source` play once on `role` through the role's
 /// Play queue, warped to the macro's start save. Running from this call until the run ends or `stop_preview`.
 pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
-    let _ = (source, role, start, end);
+    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: source.to_owned(), role, frames: start as usize..end as usize });
+    PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
 
 /// Stop a running preview (nothing otherwise): the rest of its frames is dropped.
-pub fn stop_preview() {}
+pub fn stop_preview() {
+    if preview_running() { *lock(&PREVIEW_ASK) = Some(PreviewAsk::Stop); }
+}
 
 /// A preview was asked for and has not ended. Atomic read (a hook may call it).
-pub fn preview_running() -> bool { false }
+pub fn preview_running() -> bool { PREVIEW.load(Ordering::Acquire) != 0 }
 
 /// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
 /// (`recorder::recording_or_playback`) read this, because the old recorder machine never sees rr_host's takes. Playback is
@@ -371,7 +367,7 @@ pub fn pending() -> bool {
 /// gate (`pending`) and the tick (`service_at`) read the same list; an answered question that `pending` left out was never
 /// applied once migration had finished, so the held play never resumed (rc.5 Fighter Mismatch).
 fn waiting_work() -> bool {
-    lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
+    preview_running() || lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
 }
 
 fn playing() -> bool {
@@ -543,11 +539,6 @@ pub fn post_effect_at(effect: Effect, expected: Option<(u64, u64)>) {
     if !matches!(effect, Effect::None) {
         *lock(&MENU_EFFECT) = Some((expected, effect));
     }
-}
-
-#[cfg(test)]
-pub fn set_crop_window(window: CropWindow) {
-    *lock(&CROP) = Some(window);
 }
 
 /// The three chords, consumed by the AI hook. This only stores flags.
@@ -990,6 +981,7 @@ pub fn service_at(
     if menu_pending() {
         apply_menu(root, machine, &book, &mut tick);
     }
+    drive_preview(root, machine, &book, &mut tick);
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
     tick
@@ -1917,6 +1909,15 @@ fn begin_make(
     tick: &mut Tick,
 ) {
     let _ = chain;
+    warp_to_start(book, Role::Player, source, tick);
+    begin_input(1);
+    let started = start_run(root, machine, book, Role::Player, source, None);
+    let since = lock(&STRIP).0;
+    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true, since });
+    tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(started)));
+}
+
+fn warp_to_start(book: &Book, role: Role, source: &str, tick: &mut Tick) {
     match book.start_link(source) {
         StartLink::Deleted => {
             if let Some(text) = start_save_notice(super::library::StartSaveState::Deleted) {
@@ -1927,21 +1928,58 @@ fn begin_make(
         }
         StartLink::Linked(id) => {
             tick.warp = Some(id.to_string());
-            tick.warp_place = Some((Role::Player, play_placement(book, source)));
+            tick.warp_place = Some((role, play_placement(book, source)));
             WARP_HOLD.store(true, Ordering::Release);
         }
         StartLink::None => {}
     }
-    begin_input(1);
-    let effect = machine.play_file(Role::Player, book, source);
+}
+
+fn start_run(
+    root: &Path,
+    machine: &mut Playback,
+    book: &Book,
+    role: Role,
+    source: &str,
+    frames: Option<core::ops::Range<usize>>,
+) -> bool {
+    let effect = match frames {
+        Some(frames) => machine.play_range(role, book, source, frames),
+        None => machine.play_file(role, book, source),
+    };
     if effect.started {
-        drop_frames(Role::Player);
-        RUN_PLAYER.store(true, Ordering::Release);
-        step_role(root, machine, book, Role::Player);
+        drop_frames(role);
+        run_flag(role).store(true, Ordering::Release);
+        step_role(root, machine, book, role);
     }
-    let since = lock(&STRIP).0;
-    *lock(&MAKE) = Some(MakeJob { source: source.to_string(), ready: true, since });
-    tick.diags.push(format!("screen=make-combo source={source} playing={}", i32::from(effect.started)));
+    effect.started
+}
+
+fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
+    let ask = lock(&PREVIEW_ASK).take();
+    let role = match PREVIEW.load(Ordering::Acquire) {
+        ROLE_PLAYER => Some(Role::Player),
+        ROLE_CPU => Some(Role::Cpu),
+        _ => None,
+    };
+    match ask {
+        Some(PreviewAsk::Start { source, role, frames }) => {
+            warp_to_start(book, role, &source, tick);
+            if !start_run(root, machine, book, role, &source, Some(frames)) {
+                PREVIEW.store(0, Ordering::Release);
+            }
+        }
+        Some(PreviewAsk::Stop) => {
+            if let Some(role) = role {
+                drive_mash(machine, role, true);
+                run_flag(role).store(false, Ordering::Release);
+                clear_cut(role);
+            }
+            PREVIEW.store(0, Ordering::Release);
+        }
+        None if role.is_some_and(|role| !role_playing(role)) => PREVIEW.store(0, Ordering::Release),
+        None => {}
+    }
 }
 
 fn finish_make(root: &Path, tick: &mut Tick) {
@@ -1972,29 +2010,15 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     }
 }
 
-pub(crate) fn note_hot(root: &Path, kind: Kind, id: &str) {
+pub(crate) fn note_hot(root: &Path, kind: Kind, id: &str, follow: Option<(Role, &str)>) {
     let _ = RecordingIndex::update(root, |index| {
-        index.note_use(kind, id, Use::Recorded, unix_now())?;
+        let at = unix_now();
+        index.note_use(kind, id, Use::Recorded, at)?;
+        if let Some((role, _)) = follow.filter(|(role, source)| kind == Kind::Macro && index.active(*role) == Some(*source)) {
+            index.set_active(role, Some(id), at)?;
+        }
         Ok(true)
     });
-}
-
-#[cfg(test)]
-pub fn write_crop(root: &Path, source: &str, combo: bool) -> Option<String> {
-    let window = lock(&CROP).take()?;
-    if combo {
-        super::rr_runtime::crop_combo_file(root, source, window.start, window.end, &window.name).ok()
-    } else {
-        super::rr_runtime::crop_macro_file(
-            root,
-            source,
-            window.start,
-            window.end,
-            &window.snapshot,
-            &window.name,
-        )
-        .ok()
-    }
 }
 
 fn show_chord_notice(root: &Path, tick: &mut Tick) {
@@ -2162,7 +2186,8 @@ fn reset_host() {
     *lock(&MACHINE) = None;
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = None;
-    *lock(&CROP) = None;
+    PREVIEW.store(0, Ordering::Release);
+    *lock(&PREVIEW_ASK) = None;
     *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
     *lock(&HELD) = None;
@@ -2437,61 +2462,6 @@ mod tests {
                 .entries
                 .len(),
             1
-        );
-    }
-
-    fn the_worker_crop_writes_a_new_file() {
-        let _hold = hold();
-        reset_host();
-        let root = scratch("crop");
-        let recording = super::super::macros::MacroRecording::new(
-            "Nair",
-            "13.0.5",
-            StartState::neutral(8, 0, 1.0),
-            vec![
-                InputFrame {
-                    buttons: 1,
-                    ..InputFrame::default()
-                },
-                InputFrame {
-                    buttons: 2,
-                    ..InputFrame::default()
-                },
-                InputFrame {
-                    buttons: 3,
-                    ..InputFrame::default()
-                },
-                InputFrame {
-                    buttons: 4,
-                    ..InputFrame::default()
-                },
-            ],
-        )
-        .unwrap();
-        let id = Library::new(root.join(MACROS_DIR))
-            .save_new(&recording)
-            .unwrap();
-        let before = std::fs::read(root.join(MACROS_DIR).join(format!("{id}.json"))).unwrap();
-        set_crop_window(CropWindow {
-            start: 1,
-            end: 3,
-            snapshot: FrameSnapshot {
-                frame: 1,
-                state: StartState::neutral(8, 0, 1.0),
-            },
-            name: "Nair crop".into(),
-        });
-        let copy = write_crop(&root, &id, false).unwrap();
-        let after = std::fs::read(root.join(MACROS_DIR).join(format!("{id}.json"))).unwrap();
-        assert_eq!(before, after);
-        assert_ne!(copy, id);
-        assert_eq!(
-            Library::new(root.join(MACROS_DIR))
-                .load(&copy)
-                .unwrap()
-                .frames
-                .len(),
-            2
         );
     }
 
@@ -4891,7 +4861,6 @@ mod tests {
             ("the_start_save_switch_reaches_the_file_and_the_play", the_start_save_switch_reaches_the_file_and_the_play as fn()),
             ("a_posted_record_stores_the_start_save", a_posted_record_stores_the_start_save as fn()),
             ("migration_from_the_worker_runs_once", migration_from_the_worker_runs_once as fn()),
-            ("the_worker_crop_writes_a_new_file", the_worker_crop_writes_a_new_file as fn()),
             ("a_posted_menu_effect_reaches_the_worker", a_posted_menu_effect_reaches_the_worker as fn()),
             ("an_empty_posted_record_keeps_the_empty_notice", an_empty_posted_record_keeps_the_empty_notice as fn()),
             ("the_cpu_inject_slot_starts_empty", the_cpu_inject_slot_starts_empty as fn()),

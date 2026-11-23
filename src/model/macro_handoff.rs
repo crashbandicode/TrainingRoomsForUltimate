@@ -40,6 +40,8 @@ pub struct MacroQueries {
     pub clip_foreground: bool,
     /// The editor draft exists, including parking in a pending Mii reload.
     pub clip_editor_open: bool,
+    /// A clip preview plays: the fighters run although the editor's panel is up.
+    pub clip_previewing: bool,
     pub replay_loading: bool,
     pub browser_pending: bool,
     pub browser_release: bool,
@@ -89,6 +91,7 @@ impl MacroQueries {
         panel_visible: false,
         clip_foreground: false,
         clip_editor_open: false,
+        clip_previewing: false,
         replay_loading: false,
         browser_pending: false,
         browser_release: false,

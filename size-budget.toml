@@ -2453,3 +2453,11 @@ ceiling = 196349
 date = "2026-11-23"
 reason = "Recording placement lets players set both fighters' positions, damage and requested start states in Training and waiting rooms. It starts Record or Play after both requested onsets, verifies the chosen missed-tech bound motion and publishes the live samples. Measured 196349, 2211 above 194138."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording placement design and requested onset ruling 2026-11-23 03:50:00Z. Source and exact build passed rv-hit-streak 05:14:23Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196492
+date = "2026-11-23"
+reason = "A saved macro crop now previews through Play on the role it was opened for, from its start save, with the page hidden while it plays; a crop of the active macro becomes active; the menu no longer opens under the clip editor. The unused second crop path is deleted. Measured 196492, 143 above 196349."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F7 (operator order 12:40Z); review by rv-preview-vis pending at this commit."

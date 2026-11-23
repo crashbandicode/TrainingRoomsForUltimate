@@ -493,6 +493,7 @@ pub fn publish_queries() {
     };
     let loaded_matches = plays_current || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
+    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page());
     QUERIES.publish(crate::model::macro_handoff::MacroQueries {
         session: session_revision(),
         source_is_named: source_is_named(),
@@ -506,6 +507,7 @@ pub fn publish_queries() {
         restore_in_air, panel_visible: panel_visible(),
         clip_foreground: clip_foreground(), naming_pending: naming_pending(),
         clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),
+        clip_previewing,
         replay_loading: crate::runtime::macros::replay_capture::loading(), browser_pending, browser_release,
         suspended: suspended(), marker,
     });
@@ -1252,7 +1254,8 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
     let found = owned.iter().position(|&(object, address, _)| object == id && address == pointer);
     // Keep P1 held while the editor is parked for a CPU reload. The new CPU must
     // remain free to finish its native install and land before preview acquisition.
-    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading
+    let queries = hook_queries();
+    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading
         && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
             == FighterId::Player as i32);
     let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)

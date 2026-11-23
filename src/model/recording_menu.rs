@@ -1408,7 +1408,7 @@ impl RecordingScreens {
     }
 
     fn open_crop(&mut self, kind: ItemKind, source: String) {
-        self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo, player: false };
+        self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo, player: self.page_role == ViewRole::Player };
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {

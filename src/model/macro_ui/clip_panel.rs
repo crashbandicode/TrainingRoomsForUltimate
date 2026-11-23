@@ -27,8 +27,11 @@ impl PreviewTail {
     pub fn restart(&mut self) { self.ended = None; }
     /// `running`: the playback still has frames. `frame`: the game's frame number. True once the tail has passed.
     pub fn over(&mut self, running: bool, frame: u64) -> bool {
-        let _ = (running, frame);
-        false
+        if running {
+            self.ended = None;
+            return false;
+        }
+        frame >= self.ended.get_or_insert(frame).saturating_add(PREVIEW_TAIL_FRAMES)
     }
 }
 
@@ -107,14 +110,6 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     let controls = format!("{}{}A save. B close.",
         if view.context.fighters() { "D-pad Up/Down: fighter. " } else { "" },
         if view.context.preview() { "X preview. " } else { "" });
-    if view.playing {
-        return ClipHelp {
-            primary: "Previewing the selection.".to_owned(),
-            follow: "Press X to stop. Press L or R to edit the crop.".to_owned(),
-            controls,
-            notice: String::new(),
-        };
-    }
     let (primary, follow) = match view.handle {
         Handle::Out => (
             "End selected. Hold Left or Right to move it.".to_owned(),
@@ -259,7 +254,7 @@ pub struct ClipView {
 
 impl ClipView {
     /// The page is hidden while a preview plays.
-    pub fn hides_page(&self) -> bool { false }
+    pub fn hides_page(&self) -> bool { self.playing }
 }
 
 pub struct ClipEditor {
@@ -436,6 +431,10 @@ impl ClipEditor {
         self.pause();
         self.window.seek(self.window.start());
         self.handle = Handle::Playhead;
+        if matches!(self.file.as_ref(), Some(FileSource::Macro { .. })) {
+            self.playing = true;
+            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end() };
+        }
         match self.export_selection("Preview") {
             Ok(recording) => {
                 self.playing = true;

@@ -13,7 +13,7 @@ use super::library::{
 };
 #[cfg(test)]
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
-use super::macros::{FrameSnapshot, FrameWindow, InputFrame, Library, MacroRecording, StartState};
+use super::macros::{InputFrame, Library, MacroRecording, StartState};
 #[cfg(test)]
 use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
@@ -312,7 +312,6 @@ pub enum ClipFile { Macro(Box<MacroRecording>), Combo(Box<ComboRecord>) }
 
 /// Always creates a fresh id; empty keyboard text chooses the next unused number.
 pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str, follow: Option<(Role, &str)>) -> Result<String, Error> {
-    let _ = follow;
     let kind = match &file { ClipFile::Macro(_) => Kind::Macro, ClipFile::Combo(_) => Kind::Combo };
     let id = match file {
         ClipFile::Macro(mut recording) => {
@@ -328,62 +327,8 @@ pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str, follow: Option<(
             library.save_new(&recording).map_err(record)
         }
     }?;
-    super::rr_host::note_hot(root, kind, &id);
+    super::rr_host::note_hot(root, kind, &id, follow);
     Ok(id)
-}
-
-pub fn crop_macro(
-    frames: &[InputFrame],
-    start: u32,
-    end: u32,
-    snapshot: &FrameSnapshot,
-    name: &str,
-) -> Result<MacroRecording, Error> {
-    let mut window = FrameWindow::new(frames.len() as u32).map_err(record)?;
-    window.set_in(start);
-    window.set_out(end);
-    window
-        .crop(frames, snapshot, name, "13.0.5")
-        .map_err(record)
-}
-
-pub fn crop_macro_file(
-    root: &Path,
-    id: &str,
-    start: u32,
-    end: u32,
-    snapshot: &FrameSnapshot,
-    name: &str,
-) -> Result<String, Error> {
-    let library = Library::new(root.join(MACROS_DIR));
-    let original = library.load(id).map_err(record)?;
-    let cropped = crop_macro(&original.frames, start, end, snapshot, name)?;
-    library.save_new(&cropped).map_err(record)
-}
-
-pub fn crop_combo_file(
-    root: &Path,
-    id: &str,
-    start: u32,
-    end: u32,
-    name: &str,
-) -> Result<String, Error> {
-    let library = ComboLibrary::new(root.join("combos"));
-    let original = library.load(id).map_err(record)?;
-    let mut cropped = original.crop_units(start, end).map_err(record)?; cropped.name = name.to_string();
-    library.save_new(&cropped).map_err(record)
-}
-
-/// Replay export is a cropped recording with no start save.
-#[cfg(test)]
-pub fn replay_export(
-    frames: &[InputFrame],
-    start: u32,
-    end: u32,
-    snapshot: &FrameSnapshot,
-    name: &str,
-) -> Result<MacroRecording, Error> {
-    crop_macro(frames, start, end, snapshot, name)
 }
 
 #[cfg(test)]
@@ -1148,43 +1093,6 @@ mod tests {
         assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name combo", .. }));
     }
 
-    fn crop_writes_a_new_file_and_leaves_the_original() {
-        let root = scratch("crop");
-        let macros = Library::new(root.join(MACROS_DIR));
-        let source = recording("Nair", &[1, 2, 3, 4], Some("keep"));
-        let id = macros.save_new(&source).unwrap();
-        let before = std::fs::read(macros.dir().join(format!("{id}.json"))).unwrap();
-        let snapshot = FrameSnapshot {
-            frame: 1,
-            state: StartState::neutral(8, 0, 1.0),
-        };
-        let copy = crop_macro_file(&root, &id, 1, 3, &snapshot, "Nair crop").unwrap();
-        let after = std::fs::read(macros.dir().join(format!("{id}.json"))).unwrap();
-        assert_eq!(before, after);
-        assert_ne!(copy, id);
-        let cropped = macros.load(&copy).unwrap();
-        assert_eq!(cropped.frames.len(), 2);
-        assert_eq!(cropped.frames[0].buttons, 2);
-        assert!(cropped.start_save.is_none());
-        assert_eq!(macros.load(&id).unwrap().frames.len(), 4);
-
-        let combos = ComboLibrary::new(root.join("combos"));
-        let combo = Combo::from_links([
-            link(Move::Aerial, Move::SideTilt),
-            link(Move::SideTilt, Move::NeutralSpecial),
-        ])
-        .unwrap();
-        let combo_id = combos
-            .save_new(&ComboRecord::new("Loop".into(), combo, None))
-            .unwrap();
-        let combo_before = std::fs::read(combos.dir().join(format!("{combo_id}.json"))).unwrap();
-        let cropped_id = crop_combo_file(&root, &combo_id, 0, 1, "Loop crop").unwrap();
-        let combo_after = std::fs::read(combos.dir().join(format!("{combo_id}.json"))).unwrap();
-        assert_eq!(combo_before, combo_after);
-        assert_eq!(combos.load(&cropped_id).unwrap().combo.links().count(), 1);
-        assert_eq!(combos.load(&combo_id).unwrap().combo.links().count(), 2);
-    }
-
     fn file_clip_save_as_new_preserves_original() {
         use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         let root = scratch("shared-clip");
@@ -1321,17 +1229,6 @@ mod tests {
         let id = save_clip_file(&root, ClipFile::Combo(kept), &name, None).unwrap();
         assert_eq!(combos.load(&id).unwrap().name, "Combo 2");
         std::fs::remove_dir_all(root).unwrap();
-    }
-
-    fn replay_export_has_no_start_save() {
-        let frames = vec![frame(1), frame(2), frame(3)];
-        let snapshot = FrameSnapshot {
-            frame: 0,
-            state: StartState::neutral(8, 0, 1.0),
-        };
-        let exported = replay_export(&frames, 0, 2, &snapshot, "Clip").unwrap();
-        assert!(exported.start_save.is_none());
-        assert_eq!(exported.frames.len(), 2);
     }
 
     fn make_combo_on_a_chain_plays_one_pass_on_player_1() {
@@ -1892,12 +1789,10 @@ mod tests {
             ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),
             ("an_online_room_opens_every_name_keyboard", an_online_room_opens_every_name_keyboard as fn()),
-            ("crop_writes_a_new_file_and_leaves_the_original", crop_writes_a_new_file_and_leaves_the_original as fn()),
             ("a_saved_crop_of_the_roles_active_macro_becomes_active", a_saved_crop_of_the_roles_active_macro_becomes_active as fn()),
             ("file_clip_save_as_new_preserves_original", file_clip_save_as_new_preserves_original as fn()),
             ("file_clip_empty_name_uses_unused_number", file_clip_empty_name_uses_unused_number as fn()),
             ("drill_units_share_clip_editor_and_save_same_kind", drill_units_share_clip_editor_and_save_same_kind as fn()),
-            ("replay_export_has_no_start_save", replay_export_has_no_start_save as fn()),
             ("make_combo_on_a_chain_plays_one_pass_on_player_1", make_combo_on_a_chain_plays_one_pass_on_player_1 as fn()),
             ("the_chord_notice_shows_once", the_chord_notice_shows_once as fn()),
             ("the_empty_recording_notice_stays", the_empty_recording_notice_stays as fn()),

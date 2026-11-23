@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use smash::app::{self, lua_bind::*, BattleObjectModuleAccessor, Fighter};
 use smash::lib::lua_const::*;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
 
@@ -23,6 +23,7 @@ const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 // The120-scale conversion now lives in LiveInput::project, at the consumer seam.
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);
+static TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());
 static BROWSER: Mutex<Option<Browser>> = Mutex::new(None);
 static REVISION: AtomicU64 = AtomicU64::new(1);
 static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
@@ -42,7 +43,7 @@ struct Browser { ui: ClipBrowser, revision: u64 }
 /// `switch` is set only by an answered Switch prompt: the recorded fighter is then
 /// requested once, and cleared when that request settles, fails or is cancelled. An
 /// editor without it never changes the CPU, whatever fighter the track recorded.
-struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool }
+struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)> }
 impl std::ops::Deref for Editor {type Target=ClipEditor;fn deref(&self)->&ClipEditor {&self.clip}}
 impl std::ops::DerefMut for Editor {fn deref_mut(&mut self)->&mut ClipEditor {&mut self.clip}}
 impl Editor {
@@ -238,20 +239,20 @@ fn open_capture(id: &str, revision: u64) -> Result<(), String> {
     install_capture_source(source, revision)
 }
 
-/// A saved file uses the Replay window's editor, native CPU preview and keyboard.
-pub fn open_file_editor(id: &str, combo: bool) {
+/// A saved file uses the Replay window's editor and keyboard.
+pub fn open_file_editor(id: &str, combo: bool, player: bool) {
     let root = std::path::Path::new(crate::model::storage::ROOT);
     let result = if combo {
         crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(id)
             .map_err(|error| error.to_string()).and_then(ClipEditor::combo_file)
     } else {
         crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load(id)
-            .map_err(|error| error.to_string()).and_then(|recording| ClipEditor::macro_file(recording, false))
+            .map_err(|error| error.to_string()).and_then(|recording| ClipEditor::macro_file(recording, player))
     };
     let editor = match result { Ok(editor) => editor, Err(error) => { notify(error); return; } };
     if !capture_ready() { return; }
     *EDITOR.lock().unwrap() = Some(Editor { clip: editor,
-        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false });
+        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)) });
     PENDING.lock().unwrap().take();
     SELECTION_REVISION.fetch_add(1, Ordering::AcqRel);
     REVISION.fetch_add(1, Ordering::Relaxed);
@@ -279,7 +280,12 @@ fn service_file_name() {
     if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {
         let file = FILE_NAME.lock().unwrap().take();
         if let Some(file) = file {
-            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name, None) {
+            let source = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.clone());
+            let follow = source.as_ref().and_then(|(id, player)| {
+                matches!(file, crate::engine::rr_runtime::ClipFile::Macro(_))
+                    .then_some((if *player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }, id.as_str()))
+            });
+            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name, follow) {
                 Ok(id) => {
                     crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}"));
                 }
@@ -353,7 +359,7 @@ fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), St
             }
             editor.select_kind(current);
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
-                association,resolved:[None;8],resolve_failed:0,switch:false});
+                association,resolved:[None;8],resolve_failed:0,switch:false,source:None});
             PENDING.lock().unwrap().take();
             browser.take();
             drop(browser);
@@ -403,7 +409,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
                     editor.pause();
                     *RELOAD.lock().unwrap() = Some(Reload { editor, requested:false, ticks:0,
                         revision, selection:Some(ResolveSelection { action, entry }), resolving:Some(receive), resolve_error:None });
-                    crate::runtime::macros::replay_preview::request_stop();
+                    stop_preview();
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::QUICK_MENU_ACTIVE, false);
                     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
                     return true;
@@ -424,7 +430,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
     if opened {
         // The question owns the pad: a running preview stops and restores, and the
         // editor shows it paused whichever way the question is answered.
-        crate::runtime::macros::replay_preview::request_stop();
+        stop_preview();
         if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.pause(); }
     } else {
         PENDING.lock().unwrap().take();
@@ -547,6 +553,7 @@ pub fn panel_visible() -> bool {
 pub fn loading() -> bool { !crate::runtime::macros::named_macros::suspended() && RELOAD.lock().unwrap().is_some() }
 
 pub fn suspend_waiting() {
+    stop_preview();
     // An unfinished editor is value-only continuation. A pending browser open is
     // an operation instead: retire it so return cannot silently load the old ID.
     {
@@ -570,6 +577,7 @@ pub fn suspend_waiting() {
 }
 
 pub fn discard_waiting() {
+    stop_preview();
     RELOAD.lock().unwrap().take();
     close_editor_inner(false);
 }
@@ -806,6 +814,13 @@ pub fn worker_preview_notices() {
             }
         }
     });
+    if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
+        if editor.source.is_some() && editor.view().playing
+            && TAIL.lock().unwrap().over(crate::engine::rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {
+            editor.preview_progress(u32::MAX);
+            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+        }
+    }
     let dropped = PREVIEW_NOTICES.take_dropped();
     if dropped != 0 { println!("[MacroHandoff] preview_notices_dropped={dropped}"); }
 }
@@ -825,6 +840,11 @@ fn close_editor_inner(was_loading: bool) {
     close_editor_revision(was_loading, None);
 }
 
+fn stop_preview() {
+    crate::runtime::macros::replay_preview::request_stop();
+    crate::engine::rr_host::stop_preview();
+}
+
 fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> bool {
     let (was_browsing, was_open) = {
         let mut browser = BROWSER.lock().unwrap();
@@ -835,9 +855,10 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
         (browser.take().is_some(), EDITOR.lock().unwrap().take().is_some())
     };
     if RELOAD.lock().unwrap().is_some() {
-        crate::runtime::macros::replay_preview::request_stop();
+        stop_preview();
     } else {
         crate::runtime::macros::replay_preview::request_close();
+        crate::engine::rr_host::stop_preview();
     }
     PENDING.lock().unwrap().take();
     FILE_NAME.lock().unwrap().take();
@@ -907,13 +928,14 @@ fn apply_action(action: ClipAction) {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
     }
     // Drop the editor lock before opening the naming panel or notifying the game.
-    let (effect, revision, configuration, file) = {
+    let (effect, revision, configuration, file, source) = {
         let mut editor = EDITOR.lock().unwrap();
         let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;
         let configuration=editor.as_ref().and_then(|editor|editor.target().ok().flatten())
             .and_then(Target::configuration);
         let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));
-        (editor.as_mut().map(|editor| editor.on_action(action)), revision, configuration, file)
+        let source = editor.as_ref().and_then(|editor| editor.source.clone());
+        (editor.as_mut().map(|editor| editor.on_action(action)), revision, configuration, file, source)
     };
     // Only a saved file carries identity, and it is always the recorded one: the
     // original kind, plus the exact Mii for a Mii track. A preview is inputs only
@@ -928,10 +950,17 @@ fn apply_action(action: ClipAction) {
     };
     match effect {
         Some(ClipEffect::Preview(recording)) => crate::runtime::macros::replay_preview::request_play(*recording, revision),
-        Some(ClipEffect::StopPreview | ClipEffect::PreviewFile { .. }) => crate::runtime::macros::replay_preview::request_stop(),
+        Some(ClipEffect::PreviewFile { start, end }) => {
+            if let Some((id, player)) = source {
+                TAIL.lock().unwrap().restart();
+                let role = if player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };
+                crate::engine::rr_host::request_preview(&id, role, start, end);
+            }
+        }
+        Some(ClipEffect::StopPreview) => stop_preview(),
         Some(ClipEffect::Close) => close_editor(),
         Some(ClipEffect::Export(recording)) => {
-            crate::runtime::macros::replay_preview::request_stop();
+            stop_preview();
             *HOLD.lock().unwrap() = (0, 0, false);
             if file {
                 name_file(crate::engine::rr_runtime::ClipFile::Macro(recording));
@@ -946,7 +975,7 @@ fn apply_action(action: ClipAction) {
             name_file(crate::engine::rr_runtime::ClipFile::Combo(recording));
         }
         Some(ClipEffect::Error(error)) => {
-            crate::runtime::macros::replay_preview::request_stop();
+            stop_preview();
             notify(error);
         }
         _ => {}
@@ -969,6 +998,10 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     if crate::runtime::macros::named_macros::fighter_prompt_up() { return; }
     if loading() {
         if controller.just_down.b() { cancel_reload(); }
+        return;
+    }
+    if clip_view().is_some_and(|v| v.playing) {
+        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
         return;
     }
     let p = controller.just_down;

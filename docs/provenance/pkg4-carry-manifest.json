@@ -494,7 +494,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "f198c956ee7d85e38c0d79d1041940cc4f01429122c1540eaec21d6809fca5b6",
+   "dest_sha256": "b67bdc54948139bea25fba1e4dc8010975fef69e214f6c56cbee80420ebcf58e",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -534,6 +534,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "old": "    /// The snapshot was not captured at the selected in-point.\n    SnapshotFrame {\n        selected: u32,\n        snapshot: u32,\n    },\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            Self::SnapshotFrame { selected, snapshot } => write!(\n                f,\n                \"start snapshot is for frame {snapshot}, but the selection starts at frame {selected}\"\n            ),\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },
@@ -717,7 +727,7 @@
    "dest": "src/model/macros/window.rs",
    "crate": "macros",
    "src_sha256": "a2318a537296bac67436de8656f07bcd897b2e4fccbd38b101bcd41210b9c58d",
-   "dest_sha256": "448c7de3e47aaf7a888f28e0eca8e317c1a144cbd484a54979025123fe8ce1dd",
+   "dest_sha256": "ca4bcbb67b8493daf8a820a7d16450f3dafdc659333bea8296a59983a3d27d33",
    "edits": [
     {
      "line_patch": [
@@ -777,6 +787,26 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "use crate::engine::macros::recording::{InputFrame, MacroError, MacroRecording, StartState, DEFAULT_FPS};\n",
+     "new": "use crate::engine::macros::recording::{MacroError, DEFAULT_FPS};\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "}\n\n/// Fighter state captured by the runtime at one specific source frame.\n#[derive(Clone, Copy, Debug, PartialEq)]\npub struct FrameSnapshot {\n    pub frame: u32,\n    pub state: StartState,\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    /// Crops the selection of `source` into a new macro with default placement.\n    ///\n    /// Momentum and action state cannot be inferred from inputs, so the caller\n    /// must pass the actual fighter state sampled at the selected start frame,\n    /// even at frame 0 (use `StartState::neutral` there). A snapshot for any\n    /// other frame, such as one left over from an earlier in-point, is refused.\n    pub fn crop(\n        &self,\n        source: &[InputFrame],\n        snapshot: &FrameSnapshot,\n        name: &str,\n        game_version: &str,\n    ) -> Result<MacroRecording, MacroError> {\n        if source.len() != self.total as usize {\n            return Err(MacroError::InvalidWindow(\n                \"source length differs from the window's total\",\n            ));\n        }\n        if snapshot.frame != self.start {\n            return Err(MacroError::SnapshotFrame {\n                selected: self.start,\n                snapshot: snapshot.frame,\n            });\n        }\n        let frames = source[self.start as usize..self.end as usize].to_vec();\n        MacroRecording::new(name, game_version, snapshot.state, frames)\n    }\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "\n#[cfg(test)]\nmod tests;\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },
@@ -815,7 +845,7 @@
    "dest": "src/model/macros/window/tests.rs",
    "crate": "macros",
    "src_sha256": "2dc0eace36a068b95ca9347fa277446b874dcf8c2f69fd5375432464cffd666f",
-   "dest_sha256": "f32dbef1b02748f944188f7a180adb358983d94f2811f9ea2db6c5ee5f70891b",
+   "dest_sha256": "",
    "edits": [
     {
      "table_file": true,
@@ -857,7 +887,8 @@
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
     }
-   ]
+   ],
+   "removed": "F7: remove the obsolete snapshot crop test."
   },
   {
    "src": "training_mod_macros/src/library.rs",
@@ -955,7 +986,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "8692588345f1ecfd561627f59e05821f35aa279fec96acda4fb6cfe8000dec07",
+   "dest_sha256": "b8c235314329819c0cb5177a0dbb8a644c9178949f4ddac171b750ea42c8d9a7",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -1062,6 +1093,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "old": "pub use window::{FrameSnapshot, FrameWindow};\n",
+     "new": "pub use window::FrameWindow;\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "mod test_util;\n\n",
+     "new": "mod test_util;\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },
@@ -1129,7 +1170,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "449bd5ec9dee69c2f2a37b571dcb95b2ecbd2c2e074c90e200c3fff0b1b0501a",
+   "dest_sha256": "cf9ac9e2a9e869d78f674c9bfd2838601c8f61671e1549f477528b61471c0366",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1321,6 +1362,56 @@
      "old": "//! Clip selection. Native input consumption, not rendering, advances the preview.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};\nuse crate::engine::macro_ui::macro_panel::Pad;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Handle { Playhead, In, Out }\n#[derive(Clone, Copy, Debug)]\n",
      "new": "//! Clip selection. Native input consumption, not rendering, advances the preview.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};\nuse crate::engine::macro_ui::macro_panel::Pad;\nuse crate::model::combo_record::UnitKind;\n\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum Handle { Playhead, In, Out }\n#[derive(Clone, Copy, Debug)]\n",
      "reason": "rc.15 shared clip editor consumes the agreed opaque crop-unit API for hit combos and input drills; context supplies labels and default names, with no preview for either kind."
+    },
+    {
+     "old": "    None, StopPreview, Preview(Box<MacroRecording>), Close,\n",
+     "new": "    None, StopPreview, Preview(Box<MacroRecording>), Close,\n    PreviewFile { start: u32, end: u32 },\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),\n",
+     "new": "    Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),\n}\n\n/// Frames the game keeps running after a saved macro's preview took its last input, so the last move is seen finishing.\npub const PREVIEW_TAIL_FRAMES: u64 = 60;\n\n#[derive(Default)]\npub struct PreviewTail { ended: Option<u64> }\n\nimpl PreviewTail {\n    pub const fn new() -> Self { Self { ended: None } }\n    pub fn restart(&mut self) { self.ended = None; }\n    /// `running`: the playback still has frames. `frame`: the game's frame number. True once the tail has passed.\n    pub fn over(&mut self, running: bool, frame: u64) -> bool {\n        if running {\n            self.ended = None;\n            return false;\n        }\n        frame >= self.ended.get_or_insert(frame).saturating_add(PREVIEW_TAIL_FRAMES)\n    }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    if view.playing {\n        return ClipHelp {\n            primary: \"Previewing the selection.\".to_owned(),\n            follow: \"Press X to stop. Press L or R to edit the crop.\".to_owned(),\n            controls,\n            notice: String::new(),\n        };\n    }\n",
+     "new": "",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    pub error: Option<String>,\n}\n\n",
+     "new": "    pub error: Option<String>,\n}\n\nimpl ClipView {\n    /// The page is hidden while a preview plays.\n    pub fn hides_page(&self) -> bool { self.playing }\n}\n\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        self.window.seek(self.window.start());\n        self.handle = Handle::Playhead;\n",
+     "new": "        self.window.seek(self.window.start());\n        self.handle = Handle::Playhead;\n        if matches!(self.file.as_ref(), Some(FileSource::Macro { .. })) {\n            self.playing = true;\n            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end() };\n        }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n",
+     "new": "        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            let macro_file = matches!(e.context(), ClipContext::Macro { .. });\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!(\"preview\") };\n            assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);\n",
+     "new": "            let wanted = match &e.file {\n                Some(FileSource::Macro { recording, .. }) => recording.frames[2..7].to_vec(),\n                _ => e.track().frames[2..7].iter().map(|frame| frame.input).collect(),\n            };\n            let preview = e.on_action(ClipAction::TogglePlay);\n            if macro_file {\n                assert!(matches!(preview, ClipEffect::PreviewFile { start: 2, end: 7 }));\n            } else {\n                let ClipEffect::Preview(preview) = preview else { panic!(\"preview\") };\n                assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);\n            }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            assert_eq!(saved.frames, preview.frames);\n",
+     "new": "            assert_eq!(saved.frames, wanted);\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));\n        }\n    }\n\n",
+     "new": "            assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));\n        }\n    }\n\n    /// A saved macro previews its kept window on the role it was opened for.\n    fn a_saved_macro_previews_its_kept_window_on_its_role() {\n        let mut e = saved_macro(true);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(2));\n        e.on_action(ClipAction::SelectOut);\n        e.on_action(ClipAction::Nudge(-3));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { start: 2, end: 7 }));\n        assert!(e.view().playing && e.view().hides_page());\n        assert_eq!(e.context(), ClipContext::Macro { player: true });\n        assert_eq!(e.view().entry, 0);\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::StopPreview));\n        assert!(!e.view().playing && !e.view().hides_page());\n        e.on_action(ClipAction::TogglePlay);\n        e.preview_progress(u32::MAX);\n        assert!(!e.view().playing);\n    }\n\n    /// The shared editor hides the page for a Vault preview too.\n    fn a_replay_preview_hides_the_page_too() {\n        let mut e = editor();\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));\n        assert!(e.view().hides_page());\n    }\n\n    /// The tail starts when the last input finishes and resets on a restart.\n    fn the_preview_tail_waits_sixty_frames_after_the_last_input() {\n        let mut tail = PreviewTail::new();\n        assert!(!tail.over(true, 100));\n        assert!(!tail.over(false, 110));\n        assert!(!tail.over(false, 169));\n        assert!(tail.over(false, 170));\n        assert!(!tail.over(true, 171));\n        assert!(!tail.over(false, 172));\n        tail.restart();\n        assert!(!tail.over(false, 500));\n        assert!(tail.over(false, 560));\n    }\n\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"a_saved_macro_previews_its_kept_window_on_its_role\", a_saved_macro_previews_its_kept_window_on_its_role as fn()),\n            (\"a_replay_preview_hides_the_page_too\", a_replay_preview_hides_the_page_too as fn()),\n            (\"the_preview_tail_waits_sixty_frames_after_the_last_input\", the_preview_tail_waits_sixty_frames_after_the_last_input as fn()),\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },
@@ -2267,7 +2358,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "b21bc6aa96c5bda42ff199eedb70b368802ea498b161f1912a2e56888b5bd087",
+   "dest_sha256": "57363619e77c8d0a808874ca35bc3468a81007822a604b6c7a8a58553c52220f",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3038,6 +3129,21 @@
      "old": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(module_accessor) {\n        practice::panel_entry(module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
      "new": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {\n        practice::panel_entry_in(context, module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
      "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "    let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();\n",
+     "new": "    let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();\n    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page());\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),\n",
+     "new": "        clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),\n        clip_previewing,\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n",
+     "new": "    let queries = hook_queries();\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },
@@ -3250,7 +3356,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "eac8e282161c72aa261658e41032d494c0f84bed761c7c518e5f7720c212fa87",
+   "dest_sha256": "859fba7b4fefae255df13fa6383e24c2808ccccf7160825a37e043c53c76086a",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -3706,6 +3812,116 @@
      "old": "                    crate::engine::rr_host::bump_catalog();\n",
      "new": "",
      "reason": "rc.15 recording catalog: successful clip saves invalidate through Store, which also reports same-size writes. Remove the second invalidation from the clip editor."
+    },
+    {
+     "old": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle}};\n",
+     "new": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\n",
+     "new": "static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool }\n",
+     "new": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)> }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "/// A saved file uses the Replay window's editor, native CPU preview and keyboard.\npub fn open_file_editor(id: &str, combo: bool) {\n",
+     "new": "/// A saved file uses the Replay window's editor and keyboard.\npub fn open_file_editor(id: &str, combo: bool, player: bool) {\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            .map_err(|error| error.to_string()).and_then(|recording| ClipEditor::macro_file(recording, false))\n",
+     "new": "            .map_err(|error| error.to_string()).and_then(|recording| ClipEditor::macro_file(recording, player))\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false });\n",
+     "new": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)) });\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {\n",
+     "new": "            let source = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.clone());\n            let follow = source.as_ref().and_then(|(id, player)| {\n                matches!(file, crate::engine::rr_runtime::ClipFile::Macro(_))\n                    .then_some((if *player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }, id.as_str()))\n            });\n            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name, follow) {\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "                association,resolved:[None;8],resolve_failed:0,switch:false});\n",
+     "new": "                association,resolved:[None;8],resolve_failed:0,switch:false,source:None});\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "                    crate::runtime::macros::replay_preview::request_stop();\n",
+     "new": "                    stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        // editor shows it paused whichever way the question is answered.\n        crate::runtime::macros::replay_preview::request_stop();\n",
+     "new": "        // editor shows it paused whichever way the question is answered.\n        stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "pub fn suspend_waiting() {\n",
+     "new": "pub fn suspend_waiting() {\n    stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "pub fn discard_waiting() {\n",
+     "new": "pub fn discard_waiting() {\n    stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            }\n        }\n    });\n",
+     "new": "            }\n        }\n    });\n    if let Some(editor) = EDITOR.lock().unwrap().as_mut() {\n        if editor.source.is_some() && editor.view().playing\n            && TAIL.lock().unwrap().over(crate::engine::rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {\n            editor.preview_progress(u32::MAX);\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n        }\n    }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    close_editor_revision(was_loading, None);\n}\n\n",
+     "new": "    close_editor_revision(was_loading, None);\n}\n\nfn stop_preview() {\n    crate::runtime::macros::replay_preview::request_stop();\n    crate::engine::rr_host::stop_preview();\n}\n\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    if RELOAD.lock().unwrap().is_some() {\n        crate::runtime::macros::replay_preview::request_stop();\n",
+     "new": "    if RELOAD.lock().unwrap().is_some() {\n        stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        crate::runtime::macros::replay_preview::request_close();\n",
+     "new": "        crate::runtime::macros::replay_preview::request_close();\n        crate::engine::rr_host::stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    let (effect, revision, configuration, file) = {\n",
+     "new": "    let (effect, revision, configuration, file, source) = {\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        (editor.as_mut().map(|editor| editor.on_action(action)), revision, configuration, file)\n",
+     "new": "        let source = editor.as_ref().and_then(|editor| editor.source.clone());\n        (editor.as_mut().map(|editor| editor.on_action(action)), revision, configuration, file, source)\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        Some(ClipEffect::StopPreview) => crate::runtime::macros::replay_preview::request_stop(),\n",
+     "new": "        Some(ClipEffect::PreviewFile { start, end }) => {\n            if let Some((id, player)) = source {\n                TAIL.lock().unwrap().restart();\n                let role = if player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };\n                crate::engine::rr_host::request_preview(&id, role, start, end);\n            }\n        }\n        Some(ClipEffect::StopPreview) => stop_preview(),\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        Some(ClipEffect::Export(recording)) => {\n            crate::runtime::macros::replay_preview::request_stop();\n",
+     "new": "        Some(ClipEffect::Export(recording)) => {\n            stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "            crate::runtime::macros::replay_preview::request_stop();\n",
+     "new": "            stop_preview();\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "        if controller.just_down.b() { cancel_reload(); }\n        return;\n    }\n",
+     "new": "        if controller.just_down.b() { cancel_reload(); }\n        return;\n    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }\n        return;\n    }\n",
+     "reason": "F7: play saved crop previews on their selected Recording role."
     }
    ]
   },

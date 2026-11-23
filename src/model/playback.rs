@@ -82,9 +82,16 @@ struct Run {
     chain: bool,
     step: usize,
     frame: usize,
+    end: usize,
     /// Passes still to play, including the one in progress. `None` plays until the chord stops it.
     remaining: Option<u32>,
     emitted: bool,
+}
+
+impl Run {
+    fn new(id: &str, chain: bool, remaining: Option<u32>, frames: core::ops::Range<usize>) -> Self {
+        Self { id: IdBuf::copy_from(id), chain, step: 0, frame: frames.start, end: frames.end, remaining, emitted: false }
+    }
 }
 
 /// Player and CPU, independently.
@@ -234,14 +241,7 @@ impl Playback {
         }
         let remaining = passes(book.index.loop_count(role));
         let warp = plan.warp;
-        self.roles[slot] = Some(Run {
-            id: IdBuf::copy_from(id),
-            chain: plan.chain,
-            step: 0,
-            frame: 0,
-            remaining,
-            emitted: false,
-        });
+        self.roles[slot] = Some(Run::new(id, plan.chain, remaining, 0..usize::MAX));
         Effect {
             warp,
             started: true,
@@ -259,14 +259,7 @@ impl Playback {
             self.warps[slot] += 1;
         }
         let warp = plan.warp;
-        self.roles[slot] = Some(Run {
-            id: IdBuf::copy_from(id),
-            chain: plan.chain,
-            step: 0,
-            frame: 0,
-            remaining: Some(1),
-            emitted: false,
-        });
+        self.roles[slot] = Some(Run::new(id, plan.chain, Some(1), 0..usize::MAX));
         Effect {
             warp,
             started: true,
@@ -277,8 +270,14 @@ impl Playback {
     /// Play frames `frames` of one recording once, on `role`, warped to its start save as `play_file` does. A chain, an
     /// unknown id or a window with no frame in the file starts nothing. The role's active id and loop stay as they are.
     pub fn play_range<'a>(&mut self, role: Role, book: &'a Book, id: &str, frames: core::ops::Range<usize>) -> Effect<'a> {
-        let _ = (role, book, id, frames);
-        Effect::default()
+        let Some(recording) = book.recordings.get(id).filter(|recording| {
+            !book.is_chain(id) && frames.start < frames.end && frames.start < recording.frames.len()
+        }) else { return Effect::default() };
+        let warp = recording_warp(recording, &book.saves);
+        let slot = role_slot(role);
+        if warp.is_some() { self.warps[slot] += 1; }
+        self.roles[slot] = Some(Run::new(id, false, Some(1), frames));
+        Effect { warp, started: true, ..Effect::default() }
     }
 
     /// The next frame of `role`, or nothing when that role is idle or has finished its count.
@@ -319,10 +318,11 @@ impl Playback {
                 run.id
             };
             let at = run.frame;
-            let frame = book
-                .recordings
-                .get(step_name.as_str())
-                .and_then(|recording| recording.frames.get(at).copied());
+            let frame = if at < run.end {
+                book.recordings.get(step_name.as_str()).and_then(|recording| recording.frames.get(at).copied())
+            } else {
+                None
+            };
             if let Some(frame) = frame {
                 let recording_id = book
                     .recordings
