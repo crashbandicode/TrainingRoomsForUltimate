@@ -2513,7 +2513,7 @@ approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrato
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196888
+ceiling = 196895
 date = "2026-11-23"
-reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes add 252 counted lines: 196717 measured with them on install 2 a7f7f13b, which alone measures 196465. Install 2 1a0b3a64 measures 196636 and shares no counted file with them: 196636 + 252 = 196888."
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 196895 on install 2 1a0b3a64, which alone measures 196636, so they add 259."
 approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."
