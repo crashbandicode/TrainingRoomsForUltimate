@@ -222,6 +222,7 @@ mod tests {
         assert!(fact.contains("recording_host::cpu_playback_blocks_drill()"));
         assert!(fact.contains("rr_host::previewing()"));
         assert!(fact.contains("PREVIEW_HIDES.load("));
+        assert!(fact.contains("rr_host::player_playback_blocks_preview()"));
     }
 
     fn f9_name_step_truth_table() {
