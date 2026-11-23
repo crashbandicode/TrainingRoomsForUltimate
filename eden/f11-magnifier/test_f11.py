@@ -101,6 +101,28 @@ class Checks(unittest.TestCase):
         self.assertIn("not the held fighter 1", f11.put_back_problem(back, origin, 1))
         self.assertIn("after B", f11.put_back_problem(back, origin, 32))
 
+    def test_a_one_step_x_is_unverified_not_failed_and_anything_else_fails(self):
+        both = f11.ATTACH_CANDIDATES
+        # XPS room, Juggler B (lines 148504 and 155763): the same fighter, y and ground; x one attach step away.
+        origin = {"kind": 32, "x": 0.09103739, "y": 0.010259508, "situation": 0}
+        back = {"kind": 32, "x": 0.091033936, "y": 0.010259508, "situation": 0}
+        verdict, why = f11.put_back_verdict(back, origin, 32, both)
+        self.assertEqual(verdict, "unverified")
+        self.assertIn("['floor_end', 'ledge']", why)
+        self.assertEqual(f11.put_back_verdict(dict(origin), origin, 32, both), ("pass", None))
+        self.assertEqual(f11.put_back_verdict(None, origin, 32, both)[0], "unverified")
+        # Another x, another y, the air or another fighter fails.
+        for wrong in ({**back, "x": 0.0910}, {**back, "y": 0.02}, {**back, "situation": 2}, {**back, "kind": 1}):
+            self.assertEqual(f11.put_back_verdict(wrong, origin, 32, both)[0], "fail", wrong)
+        # A parked x of 45 read back one step lower fits the ledge only: unverified, and it names the reference.
+        parked = {"kind": 32, "x": 45.0, "y": 0.010259508, "situation": 0}
+        verdict, why = f11.put_back_verdict({**parked, "x": f11.attach(45.0, -85.9856)}, parked, 32, both)
+        self.assertEqual(verdict, "unverified")
+        self.assertIn("for ['ledge'] of", why)
+        # The Yoga swap-back is a failure whichever fighter is expected.
+        swap_origin = {"kind": 32, "x": 36.0, "y": 0.010259508, "situation": 0}
+        self.assertEqual(f11.put_back_verdict(f11.put_back(self.YOGA_SWAP, 1), swap_origin, 32, both)[0], "fail")
+
     def test_the_floor_attach_candidates(self):
         candidates = {"floor_end": -79.9856, "ledge": -85.9856}
         # The room's Juggler reading fits both candidates, so that x cannot decide.

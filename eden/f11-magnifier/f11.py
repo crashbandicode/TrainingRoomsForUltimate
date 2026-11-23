@@ -116,6 +116,31 @@ def put_back_problem(body, origin, kind):
     return back_problem(body, origin)
 
 
+ATTACH_CANDIDATES = {"floor_end": -79.9856, "ledge": -85.9856}  # Final Destination's floor, left side
+
+
+def put_back_verdict(body, origin, kind, candidates):
+    """('pass' | 'fail' | 'unverified', why) for a put-back's line. Exact equality passes. One case is unverified,
+    not failed (tr-primary-2, 2026-11-23 22:09:57Z): the same fighter, y and situation, with an x that is exactly
+    the floor-attach value of the origin's x for at least one candidate reference; the why names the candidates that
+    fit, so a read that fits only one of them decides the reference. A missing line is unverified too. Pure."""
+    problem = put_back_problem(body, origin, kind)
+    if problem is None:
+        return "pass", None
+    if body is None:
+        return "unverified", problem
+    try:
+        same = (body["kind"] == kind and _word(body["y"]) == _word(origin["y"])
+                and body["situation"] == origin["situation"])
+        fits = [name for name, a in candidates.items() if _word(attach(origin["x"], a)) == _word(body["x"])]
+    except (KeyError, TypeError, ValueError):
+        return "fail", problem
+    if same and fits:
+        return "unverified", (f"x is the floor-attach value of the origin's x ({_word(origin['x'])} -> "
+                              f"{_word(body['x'])}) for {fits} of {sorted(candidates)}; unverified until the reference is known")
+    return "fail", problem
+
+
 def attach(x, a):
     """The x the floor-attach hypothesis predicts for a body placed at `x` on a floor whose reference is `a`."""
     return _f32(_f32(_f32(x) - _f32(a)) + _f32(a))
@@ -331,10 +356,11 @@ def picker(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", points=(), e
     body["back"] = _await(ctx, mark, lambda lines: put_back(lines, _entry(scene)))
     body["back_still"] = str(ctx.shot(f"{name}-left"))
     edge._close(ctx, scene)
-    back = put_back_problem(body["back"], origin, cpu_kind)
-    if back:
-        problems.append(back)
-    return _finish(ctx, name, body, problems)
+    verdict, why = put_back_verdict(body["back"], origin, cpu_kind, ATTACH_CANDIDATES)
+    body["back_verdict"] = verdict
+    if verdict == "fail":
+        problems.append(why)
+    return _finish(ctx, name, body, problems, [why] if verdict == "unverified" else [])
 
 
 def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6", scene="training", name="swap-back"):
