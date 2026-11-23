@@ -621,6 +621,12 @@ impl RecordingScreens {
         std::mem::replace(&mut self.last_effect, Effect::None)
     }
 
+    /// The page's keyboard is up (a name is being asked for).
+    pub fn naming(&self) -> bool { self.keyboard.is_some() }
+
+    /// The keyboard was cancelled: nothing is made or renamed.
+    pub fn cancel_name(&mut self) -> bool { self.keyboard.take().is_some() }
+
     pub fn loop_of(&self, role: ViewRole) -> LoopMark {
         self.loops[role.index()]
     }
@@ -912,10 +918,10 @@ impl RecordingScreens {
 
     pub fn hint(&self, face: Face) -> &'static str {
         if self.keyboard.is_some() {
-            return "Name it, then confirm. Empty keeps the N name. B confirms empty.";
+            return "Name it, then confirm. Empty keeps the N name. B cancels.";
         }
         if self.picker.is_some() {
-            return "A add number   R remove   B done";
+            return "A add number   R remove   X done   B back";
         }
         if self.file.is_some() && face == Face::Page {
             return "Up/Down move   Left/Right change   A do it   B back";
@@ -1284,7 +1290,7 @@ impl RecordingScreens {
         }
         if self.keyboard.is_some() {
             if button == Button::B {
-                self.submit_name("");
+                self.keyboard = None;
                 return true;
             }
             return false;
@@ -1533,7 +1539,8 @@ impl RecordingScreens {
 
     fn press_picker(&mut self, button: Button, _face: Face) -> bool {
         match button {
-            Button::B => self.finish_picker(),
+            Button::B => self.picker = None,
+            Button::X => self.finish_picker(),
             Button::A => {
                 if let Some(picker) = self.picker.as_mut() {
                     let cursor = picker.cursor;
@@ -1561,7 +1568,7 @@ impl RecordingScreens {
                     picker.cursor = jumped(picker.cursor, picker.ids.len(), button == Button::JumpDown);
                 }
             }
-            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::X | Button::Y => {
+            Button::Left | Button::Right | Button::L | Button::ZR | Button::ZL | Button::Y => {
                 return false;
             }
         }
@@ -2556,6 +2563,165 @@ mod tests {
         menu
     }
 
+    fn f9_new_menu(group: u8, section: u8, label: &str) -> Menu {
+        let mut m = recording_list_menu();
+        for _ in 0..20 {
+            if m.focus() == Some(crate::model::menu::Entry::Group(usize::from(group))) { break; }
+            m.press(Button::JumpDown);
+        }
+        assert_eq!(m.focus(), Some(crate::model::menu::Entry::Group(usize::from(group))));
+        let rows = m.recording().section(Face::Page, group, section).rows;
+        let index = rows.iter().position(|row| row.name == label).unwrap();
+        m.recording_mut().set_cursor(Face::Page, group, section, index);
+        m
+    }
+
+    fn f9_b_backs_out_of_a_new_picker() {
+        for (group, section, label) in [
+            (SAVES_MACROS, 1, "+ New chain"), (COMBOS_SEQ, 0, "+ New sequence"),
+        ] {
+          for numbered in [false, true] {
+            let mut m = f9_new_menu(group, section, label);
+            let count = (m.recording().catalog().macros.len(), m.recording().catalog().sequences.len());
+            let expected_list = m.focus_list().unwrap();
+            let expected_hint = m.recording().hint(Face::Page);
+            m.press(Button::A);
+            assert!(m.recording().picker_open());
+            if numbered { m.press(Button::A); }
+            assert_eq!(m.recording().hint(Face::Page), "A add number   R remove   X done   B back");
+            m.press(Button::B);
+            assert!(!m.recording().picker_open());
+            assert!(!m.recording().naming());
+            assert!(!matches!(m.recording_mut().take_effect(), Effect::Keyboard { .. }));
+            assert_eq!((m.recording().catalog().macros.len(), m.recording().catalog().sequences.len()), count);
+            assert_eq!(m.focus_list(), Some(expected_list));
+            assert_eq!(m.recording().hint(Face::Page), expected_hint);
+          }
+        }
+        for (group, section, label, tab) in [
+            (SAVES_MACROS, 1, "+ New chain", 0), (COMBOS_SEQ, 0, "+ New sequence", 1),
+        ] {
+            for numbered in [false, true] {
+                let mut m = f9_new_menu(group, section, label);
+                m.recording_mut().popup_open = true;
+                m.recording_mut().popup_tab = tab;
+                let index = m.recording().section(Face::Popup, group, section).rows.iter()
+                    .position(|row| row.name == label).unwrap();
+                m.recording_mut().set_cursor(Face::Popup, group, section, index);
+                m.press(Button::A);
+                if numbered { m.press(Button::A); }
+                assert_eq!(m.recording().hint(Face::Popup), "A add number   R remove   X done   B back");
+                m.press(Button::B);
+                assert!(!m.recording().picker_open());
+                assert!(!m.recording().naming());
+                assert!(!matches!(m.recording_mut().take_effect(), Effect::Keyboard { .. }));
+            }
+        }
+    }
+
+    fn f9_x_is_done_and_asks_the_name() {
+        for (group, section, label, header) in [
+            (SAVES_MACROS, 1, "+ New chain", "Name chain"),
+            (COMBOS_SEQ, 0, "+ New sequence", "Name sequence"),
+        ] {
+            for face in [Face::Page, Face::Popup] {
+                for numbered in [false, true] {
+                    let mut m = f9_new_menu(group, section, label);
+                    if face == Face::Popup {
+                        m.recording_mut().popup_open = true;
+                        m.recording_mut().popup_tab = u8::from(group == COMBOS_SEQ);
+                        let index = m.recording().section(face, group, section).rows.iter()
+                            .position(|row| row.name == label).unwrap();
+                        m.recording_mut().set_cursor(face, group, section, index);
+                    }
+                    let counts = (m.recording().catalog().macros.len(), m.recording().catalog().sequences.len());
+                    m.press(Button::A);
+                    if numbered { m.press(Button::A); }
+                    m.press(Button::X);
+                    assert!(matches!(m.recording_mut().take_effect(), Effect::Keyboard { header: h, .. } if h == header));
+                    assert!(m.recording().naming());
+                    m.recording_mut().submit_name("");
+                    let after = (m.recording().catalog().macros.len(), m.recording().catalog().sequences.len());
+                    if group == SAVES_MACROS { assert_eq!(after, (counts.0 + 1, counts.1)); }
+                    else { assert_eq!(after, (counts.0, counts.1 + 1)); }
+                }
+            }
+        }
+    }
+
+    fn f9_b_keeps_the_old_chain_on_edit() {
+        for (group, section, label, edit) in [
+            (SAVES_MACROS, 1, "Corner pressure", "Edit chain"),
+            (COMBOS_SEQ, 0, "Corner to kill", "Edit combos"),
+        ] {
+            let mut m = f9_new_menu(group, section, label);
+            let old_steps = m.recording().catalog().macros.iter().find(|f| f.id == "pressure").unwrap().steps.clone();
+            let old_combos = m.recording().catalog().sequences[0].combos.clone();
+            m.press(Button::A);
+            let index = m.recording().file_rows().iter().position(|row| row.title == edit).unwrap();
+            m.recording_mut().set_file_cursor(index);
+            m.press(Button::A);
+            m.press(Button::R);
+            m.press(Button::A);
+            m.press(Button::R);
+            m.press(Button::B);
+            assert!(!m.recording().picker_open());
+            assert!(!matches!(m.recording_mut().take_effect(), Effect::WriteChainSteps { .. } | Effect::WriteSequenceCombos { .. }));
+            assert_eq!(m.recording().catalog().macros.iter().find(|f| f.id == "pressure").unwrap().steps, old_steps);
+            assert_eq!(m.recording().catalog().sequences[0].combos, old_combos);
+        }
+    }
+
+    fn f9_a_cancelled_name_makes_nothing() {
+        let mut m = f9_new_menu(SAVES_MACROS, 1, "+ New chain");
+        let count = m.recording().catalog().macros.len();
+        m.press(Button::A); m.press(Button::A); m.press(Button::X);
+        let _ = m.recording_mut().take_effect();
+        assert!(m.recording_mut().cancel_name());
+        assert!(!m.recording().naming());
+        assert_eq!(m.recording().catalog().macros.len(), count);
+        m.press(Button::A); m.press(Button::A); m.press(Button::X);
+        let _ = m.recording_mut().take_effect();
+        m.press(Button::B);
+        assert!(!m.recording().naming());
+        assert_eq!(m.recording().catalog().macros.len(), count);
+        let before = m.recording().section_cursor(Face::Page, SAVES_MACROS, 1);
+        m.press(Button::Down);
+        assert_ne!(m.recording().section_cursor(Face::Page, SAVES_MACROS, 1), before);
+        let old = m.recording().catalog().macros[0].name.clone();
+        let index = m.recording().section(Face::Page, SAVES_MACROS, 1).rows.iter().position(|row| row.name == old).unwrap();
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        m.press(Button::A);
+        let rename = m.recording().file_rows().iter().position(|row| row.title == "Rename").unwrap();
+        m.recording_mut().set_file_cursor(rename);
+        m.press(Button::A);
+        assert!(m.recording().naming());
+        assert_eq!(m.recording().hint(Face::Page), "Name it, then confirm. Empty keeps the N name. B cancels.");
+        assert!(m.recording_mut().cancel_name());
+        assert!(!m.recording_mut().cancel_name());
+        assert_eq!(m.recording().catalog().macros[0].name, old);
+        m.press(Button::A);
+        assert!(m.recording().naming());
+        m.press(Button::B);
+        assert!(!m.recording().naming());
+        assert_eq!(m.recording().catalog().macros[0].name, old);
+    }
+
+    fn f9_x_finishes_an_edit() {
+        let mut m = f9_new_menu(SAVES_MACROS, 1, "+ New chain");
+        let index = m.recording().section(Face::Page, SAVES_MACROS, 1).rows.iter()
+            .position(|row| row.name == "Corner pressure").unwrap();
+        m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        m.press(Button::A);
+        let edit = m.recording().file_rows().iter().position(|row| row.title == "Edit chain").unwrap();
+        m.recording_mut().set_file_cursor(edit);
+        m.press(Button::A);
+        for _ in 0..m.recording().picker_rows().len() { m.press(Button::R); m.press(Button::Down); }
+        assert!(m.recording().picker.as_ref().unwrap().values.iter().all(|&value| value == 0));
+        m.press(Button::X);
+        assert!(matches!(m.recording_mut().take_effect(), Effect::WriteChainSteps { steps, .. } if steps.is_empty()));
+    }
+
     fn f2_recording_page_list_wraps() {
         use crate::model::menu::Entry;
         for group in [SAVES_MACROS, COMBOS_SEQ] {
@@ -3015,7 +3181,7 @@ mod tests {
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert!(screens.picker_open());
         assert!(screens.picker_recording_ids().iter().all(|id| id != "pressure"), "a chain is not a step");
-        screens.handle_page(Button::B, true, SAVES_MACROS);
+        screens.handle_page(Button::X, true, SAVES_MACROS);
         assert!(matches!(screens.last_effect(), Effect::Keyboard { header: "Name chain", .. }));
         screens.submit_name("");
         assert!(screens.has_chain_named("Chain 1"));
@@ -3116,7 +3282,7 @@ mod tests {
         screens.handle_page(Button::R, true, COMBOS_SEQ);
         assert_eq!(ranks(&screens), [("Ryu BnB".to_string(), 0), ("Nair loop combo".to_string(), 1)]);
         screens.handle_page(Button::A, true, COMBOS_SEQ);
-        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        screens.handle_page(Button::X, true, COMBOS_SEQ);
         assert_eq!(
             screens.last_effect(),
             &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec!["nairc".into(), "ryu".into()] }
@@ -3129,7 +3295,7 @@ mod tests {
         screens.handle_page(Button::Down, true, COMBOS_SEQ);
         screens.handle_page(Button::R, true, COMBOS_SEQ);
         assert!(ranks(&screens).iter().all(|(_, rank)| *rank == 0), "R removed the last number");
-        screens.handle_page(Button::B, true, COMBOS_SEQ);
+        screens.handle_page(Button::X, true, COMBOS_SEQ);
         assert_eq!(screens.last_effect(), &Effect::WriteSequenceCombos { id: "corner-seq".into(), combos: vec![] });
     }
 
@@ -3273,6 +3439,11 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("f9_b_backs_out_of_a_new_picker", f9_b_backs_out_of_a_new_picker as fn()),
+            ("f9_x_is_done_and_asks_the_name", f9_x_is_done_and_asks_the_name as fn()),
+            ("f9_b_keeps_the_old_chain_on_edit", f9_b_keeps_the_old_chain_on_edit as fn()),
+            ("f9_a_cancelled_name_makes_nothing", f9_a_cancelled_name_makes_nothing as fn()),
+            ("f9_x_finishes_an_edit", f9_x_finishes_an_edit as fn()),
             ("f2_recording_page_list_wraps", f2_recording_page_list_wraps as fn()),
             ("f2_recording_empty_saves_moves_to_macros", f2_recording_empty_saves_moves_to_macros as fn()),
             ("f2_recording_hold_wraps", f2_recording_hold_wraps as fn()),

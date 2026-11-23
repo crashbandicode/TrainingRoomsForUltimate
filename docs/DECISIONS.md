@@ -1829,6 +1829,8 @@ fighter written onto it. The cursor already stops on the readable end of the flo
 - The measurement boot was not flown; the `83eecc32` trace was read again instead.
 - Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
 
+**Rework 2026-11-23.** The Guard the Edge Player inset is 1.25 units. The game's teeter check reaches 1.06 units from the floor end the fighter faces and moves the fighter to 0.96 units from it. A 1.0-unit write rests in teeter, not where Preview shows. The fix boot checks a standing Wait at the written x on both ends.
+
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
 ### Planned tests and proof (not written, not run)
@@ -1899,3 +1901,18 @@ day (ruling of about 12:55Z). The operator may still overrule it.
 After a drill that used its own CPU fighter the room's partner kept the stock CPU type instead of the room's Training
 Partner Behavior. The saved type now follows the fighter swap and goes back to the fighter in the slot at the drill's
 end.
+
+## Recording chain back-out (2026-11-23)
+
+B in the chain picker was "done": on a new chain or sequence it opened the name keyboard, and cancelling that keyboard
+in Training left an unseen name draft open that held both fighters after the Recording menu closed.
+
+- A1 (tr-primary-2's ruling of 16:05Z; it replaces the edge-juggle-sol default of 16:02:42Z, under which B backed out
+  only with nothing numbered): B always backs out. In + New chain, + New sequence, Edit chain and Edit combos, B leaves
+  the picker with no keyboard and nothing saved; an edit keeps the old order. Done is X: it writes an edit, and asks a
+  new chain or sequence for its name. It is X because the menu has no standard done button: A gives a number here, and
+  + is read only by the closed-menu wizards. While the page waits for a name, B cancels it.
+- A2: a cancelled keyboard makes nothing, and the page's name draft is open only while the page waits for it. When the
+  page stops waiting (B, the menu closed or lost), the draft is closed and its keyboard job is retired, also while that
+  keyboard is still up or parked for a waiting room; a late answer from it is dropped. Another owner's keyboard is not
+  touched.

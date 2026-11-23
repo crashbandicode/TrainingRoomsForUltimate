@@ -2497,6 +2497,14 @@ approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 196465
+date = "2026-11-23"
+reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196465 on install 2 dd6aa1de with F9; F9 adds 105 lines."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 196713
 date = "2026-11-23"
 reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196713 on the install 2 head dd6aa1de (F8, F12, F15) it is committed on, with no spare; on 152629cd alone it measured 196673, 353 above that head's 196320."
