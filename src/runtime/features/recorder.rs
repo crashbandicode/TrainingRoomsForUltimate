@@ -519,7 +519,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(_body: Body, facing: i8) {
+unsafe fn chord_step(body: Body, facing: i8) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback) && !hide_cpu::refuses_play();
     let record = chords::consume(Request::InputRecord);
@@ -554,7 +554,7 @@ unsafe fn chord_step(_body: Body, facing: i8) {
             false
         }
     };
-    recording_host::on_chords(record, play_player, playback);
+    recording_host::on_chords(body, record, play_player, playback);
     recording_host::cpu_role_after_chord(facing);
 }
 

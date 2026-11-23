@@ -2445,3 +2445,11 @@ ceiling = 194105
 date = "2026-11-23"
 reason = "Publish the live fighter pose before the Save States gate so a Recording start save uses the current CPU with Save States Off, fixing the combined-run rc15-ib-1f7e0174 defect. Measured normalized implementation 194105, 26 above the previous ceiling 194079, with zero spare."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2; tr-primary-2 goal 2026-11-23 ~03:38Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 194120
+date = "2026-11-23"
+reason = "Read both current role bodies at the Record chord instead of the potentially stale published poses, and restore the Play accessor stores after the Save States gate. Measured normalized implementation 194120, 15 above the previous ceiling 194105, with zero spare."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2; tr-primary-2 Round 2 direction 2026-11-23 after review FAIL 04:24:30Z"

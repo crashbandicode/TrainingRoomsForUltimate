@@ -572,13 +572,11 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     crate::runtime::export::fighter_frame(entry, kind, raw.status, raw.situation, flags, accessor, fighter);
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
-    // The role's own body and its live pose are published before the Save States gate: Record and the recording
-    // worker read them whatever Save States says (combined run rc15-ib-1f7e0174: Off kept the previous CPU).
+    // The role's live pose is published before the Save States gate: the recording worker reads it whatever Save
+    // States says (combined run rc15-ib-1f7e0174: with Off it kept the previous CPU).
     let live = if nana {
         None
     } else {
-        FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
-        FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
         Some((role.index(), crate::engine::rr_host::StartPose {
             fighter_kind: raw.kind,
             situation_kind: raw.situation,
@@ -673,6 +671,10 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
                 n::kirby_copy_setup(accessor, opponent_entry, opponent_kind);
             }
         }
+    }
+    if !nana {
+        FIGHTER_ACC[role.index()].store(accessor, Ordering::Release);
+        FIGHTER_ENTRY[role.index()].store(entry, Ordering::Release);
     }
     // The Pokemon dead test (SPEC-state-01 §3): the one switching frame the plain test misses.
     let switching = is_pokemon_kind(kind)

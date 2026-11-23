@@ -594,6 +594,9 @@ pub struct StartPose {
     pub lr: f32,
 }
 
+/// A role never seen: kind −1.
+const UNSEEN: StartPose = StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
+
 impl StartPose {
     /// The saved record of this pose; a fighter never seen (kind −1) is a never-saved record.
     pub fn saved(self) -> SavedState {
@@ -620,24 +623,27 @@ pub struct RecordStart {
 }
 
 impl RecordStart {
-    /// Both fighters as their latest frames published them (`fighter_frame`), with the speeds the game thread read.
-    pub fn live(speeds: [(f32, f32); 2]) -> Self {
-        Self { poses: [live_pose(0), live_pose(1)], speeds }
+    /// Both role bodies as the game held them at the Record chord (slot 0 Player 1, 1 the CPU): each one's pose and
+    /// summed speed, read from the body then. Never the frame-published pose (`live_pose`): that is the role's last
+    /// published frame, which may be another fighter's. A role without a body is a never-seen pose (kind −1) at rest.
+    pub fn at_chord(bodies: [Option<(StartPose, (f32, f32))>; 2]) -> Self {
+        let bodies = bodies.map(|body| body.unwrap_or((UNSEEN, (0.0, 0.0))));
+        Self { poses: bodies.map(|body| body.0), speeds: bodies.map(|body| body.1) }
     }
 }
 
-/// Each role's fighter as its latest Training frame ran it (`fighter_frame`; kind −1 before one ran): the record chord's
-/// start save and the worker's live pose. Atomics only, so the worker never calls a native.
+/// Each role's fighter as its latest Training frame ran it (`fighter_frame`; kind −1 before one ran): the worker's
+/// live pose. Atomics only, so the worker never calls a native.
 static LIVE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 static LIVE_SIT: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
 /// x, y, percent and facing, as `f32` bits.
 static LIVE_F32: [[AtomicU32; 4]; 2] = [const { [const { AtomicU32::new(0) }; 4] }; 2];
 
 /// One fighter's frame in Training, in the order the frame runs it (`states::on_fighter_frame`): the role's live pose
-/// is published first, whatever Save States says, and only then does Save States Off end the frame. `live` is the
-/// role's slot and pose, `None` for a body that is not the role's own (Nana). Returns whether the save-state step runs
+/// is published for the worker first, whatever Save States says, and only then does Save States Off end the frame. `live`
+/// is the role's slot and pose, `None` for a body that is not the role's own (Nana). Returns whether the save-state step runs
 /// (`save_states`: Save States is On, or a named load holds it open). Combined run rc15-ib-1f7e0174: the pose was
-/// published after the Off return, so with Save States Off a CPU take's start save named the previous CPU.
+/// published after the Off return, so with Save States Off the worker's live pose named the previous CPU.
 pub fn fighter_frame(live: Option<(usize, StartPose)>, save_states: bool) -> bool {
     if let Some((slot, pose)) = live {
         if let (Some(kind), Some(sit), Some(cells)) = (LIVE_KIND.get(slot), LIVE_SIT.get(slot), LIVE_F32.get(slot)) {
@@ -653,11 +659,10 @@ pub fn fighter_frame(live: Option<(usize, StartPose)>, save_states: bool) -> boo
 
 /// A fighter's live pose (`fighter_frame`). Atomics only, no allocation; a slot never seen is kind −1.
 pub fn live_pose(slot: usize) -> StartPose {
-    let unseen = StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
-    let (Some(kind), Some(sit), Some(cells)) = (LIVE_KIND.get(slot), LIVE_SIT.get(slot), LIVE_F32.get(slot)) else { return unseen };
+    let (Some(kind), Some(sit), Some(cells)) = (LIVE_KIND.get(slot), LIVE_SIT.get(slot), LIVE_F32.get(slot)) else { return UNSEEN };
     let kind = kind.load(Ordering::Acquire);
     if kind < 0 {
-        return unseen;
+        return UNSEEN;
     }
     let [x, y, percent, lr] = [0, 1, 2, 3].map(|i: usize| f32::from_bits(cells[i].load(Ordering::Acquire)));
     StartPose { fighter_kind: kind, situation_kind: sit.load(Ordering::Acquire), x, y, percent, lr }
@@ -4290,55 +4295,71 @@ mod tests {
     }
 
     /// Combined run rc15-ib-1f7e0174-yoga-main-1 (rv-integration REVIEW FAIL 2026-11-23 03:32:38Z): with Save States Off
-    /// the fighter frame returned before it published the role's live pose, so a CPU take recorded after a CPU change
-    /// kept the previous CPU (Inkling, its old pose) in the macro's start and in its start save, while the live CPU was
-    /// Pikachu. The frame publishes the live pose whatever Save States says.
-    fn a_take_with_save_states_off_starts_at_the_live_fighters() {
+    /// the fighter frame returned before it published the role's live pose, so the worker's live pose stayed the previous
+    /// CPU's (Inkling) while the live CPU was Pikachu. The frame publishes whatever Save States says.
+    fn the_live_pose_is_published_with_save_states_off() {
         let _hold = hold();
         reset_host();
-        let root = scratch("rec-live-off");
-        // Save States On: Mario and the CPU's Inkling.
         assert!(fighter_frame(Some((0, pose(0, 11.3, -1.0))), true));
         assert!(fighter_frame(Some((1, StartPose { percent: 72.0, ..pose(52, 16.5, 1.0) })), true));
-        // Save States Off, and the CPU becomes Pikachu: every frame from here ends at the Off return.
         let mario = StartPose { percent: 84.3, ..pose(0, 79.9, 1.0) };
         let pikachu = pose(8, 47.95, 1.0);
         assert!(!fighter_frame(Some((0, mario)), false), "Save States Off: the save-state step does not run");
         assert!(!fighter_frame(Some((1, pikachu)), false));
         assert!(!fighter_frame(None, false), "a body that is not the role's own (Nana) publishes nothing");
         assert_eq!([live_pose(0), live_pose(1)], [mario, pikachu], "the live pose is published whatever Save States says");
-        // A CPU take as the runtime drives it: the Record chord (`recording_host::on_chords`), a jab, Record again, and
-        // the worker's pass (`recording_host::service`).
+    }
+
+    /// rv-preview-vis REVIEW FAIL 2026-11-23 04:24:30Z on the same defect: a published pose is the role's last published
+    /// frame, not the fighter standing there now. Record reads both role bodies at its chord (`RecordStart::at_chord`), so
+    /// a CPU take names the live CPU in the macro's start and in its start save even while the published pose is still
+    /// the previous CPU's.
+    fn a_take_starts_at_the_bodies_read_at_the_chord() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("rec-chord-bodies");
+        // The published poses: Mario, and the previous CPU (Inkling) where it last stood.
+        fighter_frame(Some((0, pose(0, 11.3, -1.0))), true);
+        fighter_frame(Some((1, StartPose { percent: 72.0, ..pose(52, 16.5, 1.0) })), true);
+        // The CPU is Pikachu now and no frame of it has published. The Record chord reads the two bodies.
+        let mario = StartPose { percent: 84.3, ..pose(0, 79.9, 1.0) };
+        let pikachu = pose(8, 47.95, -1.0);
         set_record_role(Role::Cpu);
-        note_record_start(RecordStart::live([(0.0, 0.0), (0.4, 0.0)]));
+        note_record_start(RecordStart::at_chord([Some((mario, (0.0, 0.0))), Some((pikachu, (0.4, 0.0)))]));
         on_chords(true, false, false);
         push_capture(ROLE_CPU, InputFrame { buttons: 513, ..InputFrame::default() });
         on_chords(true, false, false);
+        // The worker's pass still holds the published poses.
         let _ = service_at(&root, &none(), "2026-11-23", live_pose(0).saved(), live_pose(1).saved());
         let macros = Library::new(root.join(MACROS_DIR));
         let recording = macros.load(&macros.list().unwrap().entries[0].id).unwrap();
-        assert_eq!((recording.start.fighter_kind, recording.start.speed_x), (8, 0.4), "the macro starts on the live CPU, not the previous one");
+        assert_eq!((recording.start.fighter_kind, recording.start.facing, recording.start.speed_x), (8, -1.0, 0.4), "the macro starts on the live CPU, not the published one");
         let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(recording.start_save.as_deref().expect("a start save")).unwrap();
-        assert_eq!((save.cpu.fighter_kind, save.cpu.x, save.cpu.percent), (8, 47.95, 0.0), "the start save keeps the live CPU and its pose");
+        assert_eq!((save.cpu.fighter_kind, save.cpu.x, save.cpu.percent, save.cpu.lr), (8, 47.95, 0.0, -1.0), "the start save keeps the live CPU and its pose");
         assert_eq!((save.player.fighter_kind, save.player.x, save.player.percent), (0, 79.9, 84.3), "and the live Player 1");
+        let absent = RecordStart::at_chord([None, None]);
+        assert_eq!((absent.poses[0].fighter_kind, absent.poses[1].fighter_kind, absent.speeds), (-1, -1, [(0.0, 0.0); 2]), "a role without a body is a never-seen pose at rest");
     }
 
-    /// The runtime's side of the test above: the fighter frame publishes its body cells and hands its live pose to
-    /// `fighter_frame` before the Save States Off return, keeps no pose of its own, and Record and the worker read
-    /// the host's.
-    fn the_fighter_frame_publishes_before_the_save_states_off_return() {
+    /// The runtime's side of the two tests above: the fighter frame hands its live pose to `fighter_frame` before the
+    /// Save States Off return and keeps no pose of its own; Record reads the two role bodies the chord step resolved,
+    /// not a published pose or accessor.
+    fn the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies() {
+        let body = |src: &'static str, name: &str| {
+            let at = src.find(name).unwrap_or_else(|| panic!("{name}"));
+            &src[at..at + src[at..].find("\n}\n").expect("end of the function")]
+        };
         let states = include_str!("../runtime/features/states.rs");
-        let at = states.find("pub unsafe fn on_fighter_frame(").expect("on_fighter_frame");
-        let frame = &states[at..at + states[at..].find("\n}\n").expect("end of the function")];
-        let off = frame.find("Refused::Off").expect("Save States Off");
-        assert!(frame[..off].contains("FIGHTER_ACC[role.index()].store(accessor"), "missing or out of order: FIGHTER_ACC[role.index()].store(accessor");
-        let mut from = 0;
-        for step in ["FIGHTER_ACC[role.index()].store(accessor", "FIGHTER_ENTRY[role.index()].store(entry", "rr_host::fighter_frame(", "Refused::Off"] {
-            from += frame[from..].find(step).unwrap_or_else(|| panic!("missing or out of order: {step}")) + step.len();
-        }
+        let frame = body(states, "pub unsafe fn on_fighter_frame(");
+        let publish = frame.find("rr_host::fighter_frame(").expect("the frame publishes its live pose");
+        assert!(publish < frame.find("Refused::Off").expect("Save States Off"), "the Off return comes before the publication");
         assert!(!states.contains("LIVE_KIND"), "the save states keep a live pose of their own");
         let host = include_str!("../runtime/features/recording_host.rs");
-        assert!(host.contains("rr_host::RecordStart::live(") && !host.contains("states::live_"), "Record or the worker reads another pose");
+        let start = body(host, "unsafe fn record_start(");
+        assert!(start.contains("rr_host::RecordStart::at_chord(") && start.contains("recorder::body_of(0)"), "Record does not read the bodies:\n{start}");
+        assert!(!start.contains("live_pose") && !start.contains("fighter_accessor("), "Record reads a published pose or accessor:\n{start}");
+        let recorder = include_str!("../runtime/features/recorder.rs");
+        assert!(body(recorder, "unsafe fn chord_step(").contains("recording_host::on_chords(body, "), "the chord step drops the CPU body it resolved");
     }
 
     /// Plays the Player's active macro (recorded with `start`, kept `placement` if any) once and returns the start speed
@@ -4545,8 +4566,9 @@ mod tests {
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),
             ("a_recording_keeps_where_and_how_fast_it_started", a_recording_keeps_where_and_how_fast_it_started as fn()),
-            ("a_take_with_save_states_off_starts_at_the_live_fighters", a_take_with_save_states_off_starts_at_the_live_fighters as fn()),
-            ("the_fighter_frame_publishes_before_the_save_states_off_return", the_fighter_frame_publishes_before_the_save_states_off_return as fn()),
+            ("the_live_pose_is_published_with_save_states_off", the_live_pose_is_published_with_save_states_off as fn()),
+            ("a_take_starts_at_the_bodies_read_at_the_chord", a_take_starts_at_the_bodies_read_at_the_chord as fn()),
+            ("the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies", the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
     }
