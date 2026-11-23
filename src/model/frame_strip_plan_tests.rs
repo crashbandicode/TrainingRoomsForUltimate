@@ -118,6 +118,21 @@ fn marks_take_two_label_boxes_and_lengths_keep_the_rest() {
 }
 
 #[test]
+fn the_bridge_reports_only_the_marks_whose_label_box_exists() {
+    use crate::model::frame_strip::Angle;
+    let mut tracker = Tracker::new();
+    tracker.step(Sample { angle: Some(Angle::Down), active: true, ..attack(Move::SideSmash, 1, 0) }, idle(), NONE);
+    tracker.step(Sample { angle: Some(Angle::Up), active: true, ..attack(Move::SideTilt, 2, 0) }, idle(), NONE);
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(look_at(&seen, at::RUN_LABEL).text, Text::new("↑"), "the newest mark takes the first box");
+    assert_eq!(look_at(&seen, at::RUN_LABEL + 1).text, Text::new("↓"));
+    assert_eq!(aims_drawn(&tracker, [true, true]), [Some(6), Some(2)]);
+    assert_eq!(aims_drawn(&tracker, [false, true]), [Some(6), None], "the newest mark's box is missing");
+    assert_eq!(aims_drawn(&tracker, [true, false]), [Some(2), None], "the older mark's box is missing");
+    assert_eq!(aims_drawn(&tracker, [false, false]), [None; 2]);
+}
+
+#[test]
 fn a_diagonal_is_written_as_its_two_cardinal_arrows() {
     assert_eq!((0..8).map(arrow).collect::<Vec<_>>(), ["→", "↑→", "↑", "↑←", "←", "↓←", "↓", "↓→"]);
     assert!((0..8).flat_map(|dir| arrow(dir).chars()).all(|c| ('\u{2190}'..='\u{2193}').contains(&c)));

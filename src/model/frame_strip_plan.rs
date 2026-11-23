@@ -122,6 +122,12 @@ pub fn aims_shown(tracker: &Tracker) -> [Option<Aim>; 2] {
     [aims.next(), aims.next()]
 }
 
+/// The marks the lane can draw, oldest first, for the bridge. `boxes[n]`: Player 1's `n`th label box exists (the newest mark takes the first).
+pub fn aims_drawn(tracker: &Tracker, _boxes: [bool; 2]) -> [Option<u8>; 2] {
+    let [newest, older] = aims_shown(tracker).map(|aim| aim.map(|aim| aim.dir));
+    [older.or(newest), older.and(newest)]
+}
+
 /// The two move names and their direction marks, fitted to the given capacity.
 pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
     let moves = [link.from, link.to];
