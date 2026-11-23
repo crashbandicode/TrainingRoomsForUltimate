@@ -2533,3 +2533,11 @@ ceiling = 197587
 date = "2026-11-23"
 reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 197587 on install 2 0acfe3a1, which alone measures 197328, so they add 259."
 approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197892
+date = "2026-11-23"
+reason = "F13: a directional special's parts are drill and combo steps: an Aim event per entry into the travel status with the way the fighter went, the second part a step of its own; the last drill step waits for its special to end and a hit link keeps its travel until the heading or the exit; Aim files are versions 3 and 4. Measured 197892 on install 2 a0e9e1cb + F13, 305 above the merged tree's 197587 ceiling."
+approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F13, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
