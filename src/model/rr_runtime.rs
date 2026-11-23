@@ -1121,8 +1121,7 @@ mod tests {
         assert_eq!(screens.catalog().sequences[0].name, "Seq");
         close_overlay(&mut screens);
         open_row(&mut screens, SAVES_MACROS, 1, "+ New chain");
-        screens.handle_page(MenuButton::A, true, SAVES_MACROS);
-        screens.handle_page(MenuButton::B, true, SAVES_MACROS);
+        screens.handle_page(MenuButton::X, true, SAVES_MACROS);
         screens.submit_name("");
         assert!(screens.has_chain_named("Chain 1"));
     }
@@ -1137,8 +1136,7 @@ mod tests {
         assert_eq!(screens.take_effect(), Effect::Keyboard { header: "Name macro", draft: "Nair".into() });
         close_overlay(&mut screens);
         open_row(&mut screens, SAVES_MACROS, 1, "+ New chain");
-        screens.handle_page(MenuButton::A, true, SAVES_MACROS);
-        screens.handle_page(MenuButton::B, true, SAVES_MACROS);
+        screens.handle_page(MenuButton::X, true, SAVES_MACROS);
         assert!(matches!(screens.take_effect(), Effect::Keyboard { header: "Name chain", .. }));
         assert!(!screens.has_chain_named("Chain 1"), "no chain before the name is answered");
         screens.submit_name("");

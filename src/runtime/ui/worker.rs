@@ -400,11 +400,11 @@ fn run() {
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
-        let naming = (OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire))
-            && session.menu.as_ref().is_some_and(|m| m.recording().naming());
-        if crate::runtime::features::recording_host::settle_name(naming) {
+        let shown = OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire);
+        let naming = session.menu.as_ref().is_some_and(|m| m.recording().naming());
+        if crate::runtime::features::recording_host::settle_name(shown && naming) || (naming && !shown) {
             if let Some(menu) = session.menu.as_mut() { menu.recording_mut().cancel_name(); }
-            publish_frame(&session);
+            if shown { publish_frame(&session); }
         }
         if let Some(id) = crate::engine::rr_host::take_saved_drill() { apply_grade_target(Some(&id), Some(crate::engine::library::DrillKind::Combo)); }
         sync_sequence_drill();

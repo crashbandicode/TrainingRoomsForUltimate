@@ -38,7 +38,16 @@ fn member<'a>(text: &'a str, head: &str) -> &'a str {
 fn f9_runtime_name_wiring() {
     let named = src("src/runtime/macros/named_macros.rs");
     let service = item(&named, "pub fn service_keyboard(");
-    assert!(service.contains("external_name_token() == Some(crate::runtime::features::recording_host::NAME_TOKEN)"));
+    assert!(service.contains("NameJob::complete("));
+    assert!(service.contains("job.owner == Some(crate::runtime::features::recording_host::NAME_TOKEN)"));
+    assert!(item(&named, "fn retire_name(").contains("NameJob::retire(&mut pending, keep_waiting)"));
+    let request = item(&named, "fn request_native_name(");
+    assert!(request.contains("external_name_token()") && request.contains("owner"));
+    let discard = item(&named, "pub fn discard_external_name(");
+    assert!(discard.contains("NameJob::retire_owner(&mut pending, token)"));
+    assert!(discard.contains("native_keyboard::interrupt(id)") && discard.contains("ui.on_pad(Pad::Back)"));
+    assert!(!discard.contains("naming_pending") && !discard.contains("{ on_pad("));
+    assert!(!discard.lines().any(|line| line.trim_start().starts_with("on_pad(")));
     let cancelled = service.split_once("KeyboardResult::Cancelled => {").unwrap().1
         .split_once("KeyboardResult::Failed").unwrap().0;
     assert!(cancelled.contains("job.waiting || job.replay || hidden"));
@@ -55,7 +64,7 @@ fn f9_runtime_name_wiring() {
     assert!(settle.contains("discard_external_name(NAME_TOKEN)"));
     let worker = src("src/runtime/ui/worker.rs");
     let run = item(&worker, "fn run()");
-    assert!(run.find("port::worker_tick()").unwrap() < run.find("settle_name(naming)").unwrap());
+    assert!(run.find("port::worker_tick()").unwrap() < run.find("settle_name(shown && naming) || (naming && !shown)").unwrap());
     assert!(run.contains("menu.recording_mut().cancel_name()"));
     assert!(run.contains("publish_frame(&session)"));
 }

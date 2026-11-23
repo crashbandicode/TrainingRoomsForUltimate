@@ -108,8 +108,8 @@ don't turn the page while a file's screen is open.
 
 **The numbered picker** (*+ New chain* and *Edit chain*; *+ New sequence* and *Edit combos* for combos) lists your
 recordings, or your combos (a chain can't hold a chain). A gives the one under the cursor the next number, R takes a
-number off, and B finishes an edit. In a new chain or sequence, B backs out without creating anything if no numbers are set;
-otherwise it asks for a name on the Switch keyboard. An empty name makes it Chain N or Sequence N; cancelling
+number off, X is done, and B backs out: nothing is saved, and an edited chain or sequence keeps its old order. X on a
+new chain or sequence asks for a name on the Switch keyboard. An empty name makes it Chain N or Sequence N; cancelling
 the keyboard makes nothing.
 
 ![Edit chain: the CPU plays Chain 1, the numbered picker takes numbers off and gives them again, the CPU plays the new order](../media/rc14-chain-edit.gif)<br>
@@ -156,7 +156,7 @@ It is shown in the Player view only. The left column shows the number of files, 
 - A on *+ Save last combo…* keeps the last combo the frame strip saw as a new combo and makes it the drill. The Switch
   keyboard asks for a name; an empty name gives it the next Combo N. With no combo on the strip yet, it says so and
   saves nothing.
-- A on *+ New sequence* opens the numbered picker of your combos; B asks for a name if any are numbered. A on a combo or a sequence opens its
+- A on *+ New sequence* opens the numbered picker of your combos, then the name. A on a combo or a sequence opens its
   own screen ([rows above](#a-file-s-own-screen)).
 - X and Y do nothing here. ZR switches to the CPU view, which hides this section.
 
