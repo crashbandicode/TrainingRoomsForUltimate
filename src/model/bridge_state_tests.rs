@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 
 fn eggs_start() -> View<'static> {
@@ -366,4 +367,5 @@ fn a_notice_is_reported_only_while_the_hud_shows_it() {
     }
     assert_eq!(shown(&last, ("Eggs", "Eggs 1")), None, "expired");
     assert_eq!((ack_result(true), ack_result(false)), ("handled", "ignored"));
+}
 }

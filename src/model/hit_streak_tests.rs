@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::{Motion, Streak};
 
 const P1: u32 = 0;
@@ -79,6 +80,7 @@ fn projectile_hit_counts_once() {
     assert_eq!(streak.counts(), (1, 1));
     frame(&mut streak, 0, 0, 1.0, false, &[]);
     assert_eq!(streak.counts(), (1, 1));
+}
 }
 
 #[test]

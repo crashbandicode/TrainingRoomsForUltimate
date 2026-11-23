@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 const RETIRED_COLOURS: u8 = 8;
 use crate::model::hitbox::{self, layout, HandleSet, HurtboxReader, Sphere, KIND_GRAB, KIND_HIT, KIND_HURT};
@@ -635,4 +636,5 @@ fn legend_columns_fit_and_preserve_the_checklist() {
             assert!(colour.encode_utf16().count() + 3 <= 16 && !meaning.is_empty());
         }
     }
+}
 }

@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::tech_launch::Surface;
 use controller::{Controller, Event, Outcome, Setup};
@@ -2419,4 +2420,5 @@ fn speed_refusal_unverified_read_preserves_the_generic_grade() {
             passive_speed: speed, ..s
         }), "Untechable (not counted)");
     }
+}
 }

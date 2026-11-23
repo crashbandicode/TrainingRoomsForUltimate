@@ -1,4 +1,5 @@
 //! Borrowed line snapshots are bound to stage/form/Training receipt lifetimes.
+lib_unit_tests! {
 use super::surface::{Line, Source, StageEpoch, Surfaces, Walk};
 use super::Vec2;
 use crate::model::cpu::role::{RoleTable, Scene};
@@ -71,4 +72,5 @@ fn unchanged_epoch_preserves_discovery_and_begin_preserves_its_binding() {
     assert!(!surfaces.bind(same));
     assert_eq!(surfaces.state, Walk::More);
     assert_eq!(surfaces.lines().next().unwrap().id, 0x1000);
+}
 }

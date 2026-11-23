@@ -192,6 +192,7 @@ impl HydroFlight {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::edge_juggle::perfect::Segment;
 
@@ -331,5 +332,6 @@ mod tests {
         facts.outline = &RING[1..];
         assert!(HydroFlight::start(&facts, sample, Zone::Ledge).is_none());
         assert!(wizard_offset((89, 0)).is_none());
+    }
     }
 }

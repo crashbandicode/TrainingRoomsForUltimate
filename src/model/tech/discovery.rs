@@ -203,6 +203,7 @@ pub struct RayError;
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::tech::surface::Kind;
     fn p(x: f32, y: f32) -> Vec2 {
@@ -394,5 +395,6 @@ mod tests {
             assert_eq!(rays.hit(Line { ends, ..base }, p(0.0, 0.1)), Err(RayError));
             assert_eq!(rays.current(), None);
         }
+    }
     }
 }
