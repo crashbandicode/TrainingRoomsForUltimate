@@ -31,7 +31,7 @@ When `+ Record drill…` stops and the drill is saved, the take's frames are sav
 - **A drill without a take** (recorded before this build, a crop, or one Make combo made) shows `Re-record to preview` as the first line of its CONNECTIONS text, and X does nothing on it. A made drill's source macro can still be played as a macro.
 - **Button:** X, the Crop and Replay preview's button. X in MACROS still cycles the loop; context decides.
 - **What plays:** `rr_host::request_drill_preview(take id, frames)` asks `request_preview` for the whole take once on Player 1 through the Play queue, from where the fighters stand (a take has no start save). No playback code is added.
-- **While it plays:** the menu (or the pop-up) stays open and keeps Player 1's pad, and is not drawn. Only X and B act: they stop the preview and the page returns at once. Without a press the page returns 60 frames after the last input, on the same row.
+- **While it plays:** the menu (or the pop-up) stays open and keeps Player 1's pad, and is not drawn. Only X and B act: they stop the preview, and the page returns once the player has dropped the rest of the take (the same worker pass in practice), so no frame of the take is handed to Player 1 behind a shown page. Without a press the page returns 60 frames after the last input, on the same row.
 - **Not started** (nothing happens) while the shared preview gate says no: practice not ready, a load in flight, a take open, a Play queued or running on Player 1 (it is not replaced), or another preview running.
 - **Hint:** the footer of a previewable drill row names it. Page: `A open   X preview   ZR role   L/R page   B close`. Pop-up: `A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close`.
 - **Bridge:** one line added to `tr.menu/1`, `recording.preview` = `drill` while the preview hides the menu, else empty.
@@ -58,6 +58,7 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - **A drill Make combo made** has no preview in this build. Its source macro holds its inputs, but the file cannot tell a made drill from a crop of one, and keeping a take at Make combo's save is inside the player's code (`finish_make`), which this item does not edit.
 - **A take left without its drill** (the drill file removed by hand on the card) shows up under MACROS with its keyed take name; nothing cleans it up.
 - **A drill save that fails** before the drill file is written deletes the take it just wrote. Once the drill file is written both stay, also when the index update then fails; the drill is then not made the active drill.
+- **After X or B** the page returns when the player reports no run left. Two limits are in the player's code and are not changed here: if the card's recordings cannot be read at that moment, the player clears its preview flag without dropping the frames it had queued; and a frame the pad hook is taking at the instant the queue is dropped is still handed over, within the game frame of the stop.
 - **A drill's own screen and the Crop editor** get no preview key: the key is on the list rows.
 - **The HUD** (frame strip, notices) stays hidden during the preview, as under the Crop editor: the menu still owns the pad.
 
@@ -78,5 +79,6 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - `x_previews_a_drill_that_has_its_take_on_both_faces` (`recording_menu`): a take is in no macro list or picker; the effect with the take's id and frame count on the page and in the pop-up; no effect and the `Re-record to preview` line for a drill without a take (also one with `made_from`, and one whose take file is missing); X in MACROS still cycles the loop; both hints.
 - `a_cropped_made_drill_has_no_preview` (`recording_menu` or where the crop path's test lives): a crop of a drill made from a macro keeps `made_from`, shows `Re-record to preview` and X does nothing.
 - `only_x_and_b_stop_a_drill_preview_and_the_page_returns_after_the_tail` (`drill_preview`).
+- `after_x_or_b_the_page_waits_for_the_player_to_stop_and_skips_the_tail` (`drill_preview`).
 - `the_snapshot_says_a_drill_preview_hides_the_menu` (`bridge_state`).
 - `a_drill_preview_hides_the_open_menu_and_keeps_its_pad` (source test over `runtime/ui/worker.rs`, `tick.rs`, `state.rs`): the effect goes through `rr_host::request_drill_preview` behind the shared gate; `visible` falls with `PREVIEW_HIDES`; a press while hidden reaches nothing but the stop; the worker alone writes the flag, and its pass stops the player when neither the menu nor the pop-up is open.
