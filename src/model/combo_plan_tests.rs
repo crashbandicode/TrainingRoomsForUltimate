@@ -86,6 +86,14 @@ fn texts_name_verdicts_marks_results_and_reasons() {
     assert_eq!(reason_text(&s(Outcome::Completed, 2, false, Some((1, Reason::WrongSpot(None, Spot::Late))))), Text::new("L2 no spot, saved Late"));
 }
 
+#[test]
+fn directional_faults_use_input_step_labels() {
+    let s = |fault| Summary { outcome: Outcome::Completed, graded: 2, true_links: 1, total: 2, clean: false, fault: Some(fault) };
+    assert_eq!(reason_mode(&s((1, Reason::MissingAim(2))), true), Text::new("S2 2nd direction missing"));
+    assert_eq!(reason_mode(&s((0, Reason::WrongAim(1))), true), Text::new("S1 1st direction wrong"));
+    assert_eq!(reason_mode(&s((1, Reason::ExtraAim(2))), true), Text::new("S2 extra 2nd direction"));
+}
+
 // ---- the sequence bar (mockup `r8-sequence-bar`, Q8 A) ---------------------------------------------------------------
 
 fn clean() -> Summary {

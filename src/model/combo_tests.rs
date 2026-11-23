@@ -527,7 +527,7 @@ fn snap_link(frames: &[(MappedInputs, Sample)]) -> LinkRec {
     for &(input, sample) in frames {
         tracker.step(sample, idle(), input);
     }
-    let (events, drift) = events_between(&tracker, 0, tracker.frame(), 0);
+    let (events, drift) = events_between(&tracker, 0, tracker.frame(), 0, false);
     LinkRec {
         from: Move::Aerial,
         to: Move::Aerial,

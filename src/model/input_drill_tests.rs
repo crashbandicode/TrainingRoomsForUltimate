@@ -83,7 +83,7 @@ fn input_attempt_counts_steps_and_drops_late_or_missing_releases() {
     assert!(!helper.results().next().unwrap().clean);
     let want=reference.get(0).unwrap(); let actual=LinkRec { events: retain([Event {kind:Kind::Press(Button::Attack),dir:Dir::Neutral,offset:0}]), ..LinkRec::INPUT };
     assert!(grade(want,&actual).missing().is_none(),"hit-clipped release exemption remains");
-    assert!(grade_mode(want,&actual,true).missing().is_some());
+    assert!(grade_mode(want,&actual,true,false).missing().is_some());
 }
 #[test]
 fn input_schema_crop_and_hit_format_remain_distinct() {
@@ -133,7 +133,7 @@ fn full_capacity_both_kinds_grade_and_seventeenth_refuses() {
     let hit = LinkRec { verdict: Verdict::True(None), ..LinkRec::INPUT };
     let combo = Combo::from_links([hit;LINKS]).unwrap();
     let mut helper=Helper::new(); helper.set_target(Some(combo));
-    for i in 0..LINKS { helper.on_link(hit,i==0,1,&mut Out::default()); }
+    for i in 0..LINKS { helper.on_link(hit,i==0,1,&mut Out::default(),None); }
     assert_eq!(helper.results().next().unwrap().graded,LINKS as u8); assert_eq!((helper.best(),helper.streak()),(LINKS as u8,1));
     let script=(0..LINKS as u32).flat_map(|i| [(i*22,1),(i*22+1,0)]).collect::<Vec<_>>();
     let drill=capture(&script); assert_eq!(drill.len(),LINKS);
