@@ -4723,6 +4723,59 @@ mod tests {
         assert!(take_player_frame().is_none() && !preview_running());
     }
 
+    fn a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out() {
+        use crate::model::bridge_events::{Fed, FedSeen};
+        const N: u32 = 6;
+        fn poll(seen: &mut FedSeen, lines: &mut Vec<(u32, String)>, frame: &mut u32, hides: bool) -> Option<u32> {
+            let now = Fed { p1: fed_frames(Role::Player), cpu: fed_frames(Role::Cpu), preview: preview_running(), hides };
+            let at = *frame;
+            seen.sample(now, |text| { lines.push((at, text.to_owned())); 0 });
+            *frame += 1;
+            take_player_frame().map(|taken| taken.buttons)
+        }
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-fed");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let frames = (1..=N).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let (mut seen, mut lines, mut frame) = (FedSeen::default(), Vec::new(), 100);
+
+        assert!(request_drill_preview(&take, N));
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(fed_frames(Role::Player), 0);
+        for expected in 1..=N {
+            assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
+            assert_eq!(fed_frames(Role::Player), expected);
+        }
+        assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), None);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!preview_running());
+        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(fed_frames(Role::Player), N);
+
+        assert!(request_drill_preview(&take, N));
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(fed_frames(Role::Player), 0);
+        for expected in 1..=3 {
+            assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
+        }
+        stop_preview();
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!preview_running());
+        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(fed_frames(Role::Player), 3);
+        assert_eq!(fed_frames(Role::Cpu), 0);
+
+        let line = |p1: u32, on: bool| format!("fed p1={p1} cpu=0 preview={0} hides={0}", u8::from(on));
+        let mut expected: Vec<(u32, String)> = (0..=N).map(|k| (100 + k, line(k, true))).collect();
+        expected.push((101 + N, line(N, false)));
+        expected.extend((0..3).map(|k| (102 + N + k, line(k, true))));
+        expected.push((105 + N, line(3, false)));
+        assert_eq!(lines, expected);
+    }
+
     fn a_stop_while_the_index_is_unreadable_retires_the_preview_run() {
         let _hold = hold();
         for stop in [true, false] {
@@ -6119,6 +6172,7 @@ mod tests {
             ("a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change",a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change as fn()),
             ("deleting_a_drill_deletes_its_take",deleting_a_drill_deletes_its_take as fn()),
             ("a_recorded_drills_take_previews_on_player_one_through_the_play_queue",a_recorded_drills_take_previews_on_player_one_through_the_play_queue as fn()),
+            ("a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out", a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out as fn()),
             ("a_stop_while_the_index_is_unreadable_retires_the_preview_run", a_stop_while_the_index_is_unreadable_retires_the_preview_run as fn()),
             ("x_during_a_play_on_player_one_starts_no_drill_preview",x_during_a_play_on_player_one_starts_no_drill_preview as fn()),
             ("make_preserves_an_open_record_prefix_and_physical_cstick",make_preserves_an_open_record_prefix_and_physical_cstick as fn()),
