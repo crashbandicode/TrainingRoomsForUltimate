@@ -363,8 +363,13 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
 
 /// A directly recorded input drill (F10): saved as Drill N like a made combo, with the macro file that holds its
 /// take named in the drill's `take`. No source: `made_from` stays empty.
+/// When the save fails the take is deleted, so no `Drill take` is left under MACROS.
 pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, take: String, at: u64) -> Result<String, Error> {
-    save_combo(root, combo, "", recorded_on, Some(take), at)
+    let saved = save_combo(root, combo, "", recorded_on, Some(take.clone()), at);
+    if saved.is_err() {
+        let _ = Library::new(root.join(MACROS_DIR)).delete(&take);
+    }
+    saved
 }
 
 fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, take: Option<String>, at: u64) -> Result<String, Error> {
@@ -984,6 +989,21 @@ mod tests {
             None,
             &[Event::press(Button::Jump, Aim::Neutral, 2)],
         )
+    }
+
+    fn a_failed_drill_save_deletes_its_take() {
+        let root = scratch("failed-drill-save");
+        std::fs::write(root.join("combos"), b"not a directory").unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false).unwrap().unwrap();
+        assert_eq!(macros.list().unwrap().entries.len(), 1);
+        let mut step = LinkRec::INPUT;
+        step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
+        let mut combo = Combo::from_links([step]).unwrap();
+        combo.input_only = true;
+        assert!(save_drill_with_take(&root, &combo, None, take, 1).is_err());
+        assert!(macros.list().unwrap().entries.is_empty());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn record_follows_the_popup_role() {
@@ -1815,6 +1835,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_failed_drill_save_deletes_its_take", a_failed_drill_save_deletes_its_take as fn()),
             ("save_chord_preserves_a_slot_written_after_its_initial_index_read", save_chord_preserves_a_slot_written_after_its_initial_index_read as fn()),
             ("discovery_yields_between_small_batches_and_keeps_menu_input_available", discovery_yields_between_small_batches_and_keeps_menu_input_available as fn()),
             ("a_failed_payload_retries_without_a_signature_change", a_failed_payload_retries_without_a_signature_change as fn()),

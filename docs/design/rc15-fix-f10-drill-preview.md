@@ -57,6 +57,7 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 - **Old recorded drills** have no frames anywhere. Building inputs from their events would not be the recorded inputs (the stick between events was never stored), so they say `Re-record to preview`.
 - **A drill Make combo made** has no preview in this build. Its source macro holds its inputs, but the file cannot tell a made drill from a crop of one, and keeping a take at Make combo's save is inside the player's code (`finish_make`), which this item does not edit.
 - **A take left without its drill** (the drill file removed by hand on the card) shows up under MACROS as `Drill take`; nothing cleans it up.
+- **A drill save that fails** deletes the take it just wrote, so no `Drill take` is left under MACROS. If the drill file was written and only the index update failed, the drill stays without its take and says `Re-record to preview`.
 - **A drill's own screen and the Crop editor** get no preview key: the key is on the list rows.
 - **The HUD** (frame strip, notices) stays hidden during the preview, as under the Crop editor: the menu still owns the pad.
 
@@ -64,6 +65,7 @@ Not touched: `playback.rs`, `recording.rs`, and in `rr_host.rs` everything but t
 
 - `a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change` (`rr_host`, replaces `direct_drill_shares_record_without_macro_or_role_change`): one macro file named `Drill take` with the take's frames, the drill's `take` is its id and its `made_from` stays empty, no save state, no active macro, the Record role unchanged. Red on F7's head.
 - `deleting_a_drill_deletes_its_take` (`rr_host`): the Delete effect on that drill leaves no macro file.
+- `a_failed_drill_save_deletes_its_take` (`rr_runtime`): a failed drill save removes the take it just wrote.
 - `a_recorded_drills_take_previews_on_player_one_through_the_play_queue` (`rr_host`): `request_preview` of the take feeds Player 1's queue exactly the take's frames, and nothing to the CPU's.
 - `a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop` (`combo_record`): the `take` field through the file, a rename and a crop.
 - `x_previews_a_drill_that_has_its_take_on_both_faces` (`recording_menu`): a take is in no macro list or picker; the effect with the take's id and frame count on the page and in the pop-up; no effect and the `Re-record to preview` line for a drill without a take (also one with `made_from`, and one whose take file is missing); X in MACROS still cycles the loop; both hints.
