@@ -190,6 +190,11 @@ unsafe fn travel(accessor: usize, status: i32) -> Option<(f32, f32)> {
     (aim::travel_status(kind) == Some(status)).then(|| (natives::pos_x(accessor), natives::pos_y(accessor)))
 }
 
+unsafe fn aimer(accessor: usize) -> bool {
+    AIM_ON.load(Ordering::Acquire)
+        && p1_fighter(accessor).is_some_and(|kind| aim::travel_status(kind).is_some())
+}
+
 /// Boot: the directional-special position reads' rows passed their guards.
 pub fn set_aim_read(on: bool) {
     AIM_ON.store(on, Ordering::Release);
@@ -339,6 +344,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         attack,
         angle: if p1 && matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle(accessor) } else { None },
         travel: if p1 { travel(accessor, status) } else { None },
+        aimer: p1 && aimer(accessor),
         reaction,
         shielding: ids.shielding(status),
         status,

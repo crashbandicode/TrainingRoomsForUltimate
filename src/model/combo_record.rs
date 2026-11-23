@@ -284,12 +284,12 @@ impl ComboRecord {
         if links.is_empty() || links.len() > LINKS { return Err(key); }
         let mut previous = 0;
         let mut combo = Combo::from_links(links.iter().map(|value| {
-            if !input { return link_of(value); }
+            if !input { return link_of(value, false); }
             let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
             if events.is_empty() || events.len() > STEPS { return Err("events"); }
             let mut link = LinkRec::INPUT;
             for (slot, event) in link.events.iter_mut().zip(events) {
-                let event = parse_event(event.as_object().ok_or("event")?)?;
+                let event = parse_event(event.as_object().ok_or("event")?, false)?;
                 if event.offset < previous { return Err("offset"); }
                 previous = event.offset;
                 *slot = Some(event);
@@ -315,7 +315,7 @@ fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static s
         .ok_or(key)
 }
 
-fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
+fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
     let o = value.as_object().ok_or("link")?;
     let key = |k: &'static str| o.get(k).and_then(Value::as_str).ok_or(k);
     let verdict = o
@@ -360,7 +360,7 @@ fn link_of(value: &Value) -> Result<LinkRec, &'static str> {
             }
             let mut events = [None; STEPS];
             for (slot, event) in events.iter_mut().zip(events_in) {
-                *slot = Some(parse_event(event.as_object().ok_or("event")?)?);
+                *slot = Some(parse_event(event.as_object().ok_or("event")?, aims)?);
             }
             (events, false)
         }
@@ -407,7 +407,7 @@ fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static 
     ))
 }
 
-fn parse_event(event: &Map<String, Value>) -> Result<Event, &'static str> {
+fn parse_event(event: &Map<String, Value>, _aims: bool) -> Result<Event, &'static str> {
     let name = |k: &'static str| event.get(k).and_then(Value::as_str).ok_or(k);
     let dir = dir_of(name("dir")?).ok_or("dir")?;
     let offset = int(event, "offset")?;
@@ -428,6 +428,7 @@ fn event_value(event: Event) -> Value {
         Kind::Press(button) | Kind::Release(button) => value["button"] = json!(button_key(button)),
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
+        Kind::Aim(part) => value["part"] = json!(part),
     }
     value
 }
@@ -515,6 +516,7 @@ fn kind_key(kind: Kind) -> &'static str {
         Kind::Release(_) => "release",
         Kind::CStick => "cstick",
         Kind::Flick(_) => "flick",
+        Kind::Aim(_) => "aim",
     }
 }
 

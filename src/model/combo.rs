@@ -91,6 +91,8 @@ pub enum Kind {
     Release(Button),
     CStick,
     Flick(Flick),
+    /// A part of a directional special took its direction; the part number.
+    Aim(u8),
 }
 
 /// Facing-relative direction. `Side` is only a presses-only file, where left and right are one aim.
@@ -187,9 +189,9 @@ impl LinkRec {
         spot: None,
     };
     /// The follow-up's events from the tracker's snaps in `(after, hit]`. The first 12 are kept.
-    pub fn of(link: &Link, tracker: &Tracker, after: u32) -> LinkRec {
+    pub fn of(link: &Link, tracker: &Tracker, after: u32, aims: bool) -> LinkRec {
         let a1 = link.actionable as i32;
-        let (events, drift) = events_between(tracker, after, link.hit, a1);
+        let (events, drift) = events_between(tracker, after, link.hit, a1, aims);
         LinkRec {
             from: link.from,
             to: link.to,
@@ -301,6 +303,10 @@ impl Combo {
     pub fn links(&self) -> impl Iterator<Item = &LinkRec> {
         self.links[..self.len].iter().flatten()
     }
+
+    pub fn has_aim(&self) -> bool {
+        self.links().any(|link| link.events().any(|event| matches!(event.kind, Kind::Aim(_))))
+    }
 }
 
 /// A reference event's match in an attempt: the attempt's offset minus the reference's, or no such event.
@@ -324,6 +330,7 @@ pub struct Grade {
     pub marks: [Option<Mark>; STEPS],
     /// The attempt's steps no reference step matched.
     pub extra: u8,
+    pub extra_aim: Option<u8>,
     /// The reference link saved a spot and the attempt did not land that one (decision SP4; read only with Match sweet/sour spot On).
     pub wrong_spot: bool,
 }
@@ -372,10 +379,10 @@ impl Grade {
 /// and the old aim. Any other reference matches the next event of the same kind; a different direction is
 /// [`Mark::WrongDir`] and is not skipped. A reference release the attempt has no match for is not graded (rc.12).
 pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
-    grade_mode(reference, attempt, false)
+    grade_mode(reference, attempt, false, reference.events().any(|event| matches!(event.kind, Kind::Aim(_))))
 }
 
-fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade {
+fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, _aims: bool) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
     let mut from = 0;
@@ -415,6 +422,7 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade
         wrong_move: !input_only && attempt.to != reference.to,
         marks,
         extra,
+        extra_aim: None,
         wrong_spot: (!input_only)
             .then_some(reference.spot)
             .flatten()
@@ -459,6 +467,9 @@ pub enum Reason {
     MissingCStick,
     CStickOff(i32),
     WrongDir(Kind),
+    MissingAim(u8),
+    WrongAim(u8),
+    ExtraAim(u8),
 }
 
 /// An attempt's result.
@@ -718,7 +729,7 @@ impl Helper {
         {
             self.capture.last_link = Some(link.hit);
             let after = self.capture.after;
-            let rec = LinkRec::of(&link, tracker, after);
+            let rec = LinkRec::of(&link, tracker, after, true);
             self.capture.after = link.hit;
             let first = self.capture.current.is_empty();
             self.capture.current.push(rec);
@@ -760,7 +771,7 @@ impl Helper {
             self.input.restart();
             self.attempt = None;
         }
-        self.input.step_mode(snap, false);
+        self.input.step_mode(snap, false, self.target.as_ref().is_some_and(Combo::has_aim));
         let Some(start) = self.input.first else {
             return;
         };
@@ -839,7 +850,7 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let g = grade_mode(reference, &rec, target.input_only);
+        let g = grade_mode(reference, &rec, target.input_only, target.has_aim());
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
@@ -890,6 +901,7 @@ fn missing_reason(event: Event) -> Reason {
         Kind::Release(button) => Reason::MissingRelease(button),
         Kind::CStick => Reason::MissingCStick,
         Kind::Flick(flick) => Reason::MissingFlick(flick),
+        Kind::Aim(part) => Reason::MissingAim(part),
     }
 }
 
@@ -899,6 +911,7 @@ fn off_reason(event: Event, delta: i32) -> Reason {
         Kind::Release(button) => Reason::ReleaseOff(button, delta),
         Kind::CStick => Reason::CStickOff(delta),
         Kind::Flick(flick) => Reason::FlickOff(flick, delta),
+        Kind::Aim(part) => Reason::WrongAim(part),
     }
 }
 
@@ -963,6 +976,7 @@ fn events_between(
     after: u32,
     until: u32,
     a1: i32,
+    aims: bool,
 ) -> ([Option<Event>; STEPS], Option<Dir>) {
     let mut prev: Option<Snap> = None;
     let mut timed = [None; STEPS];
@@ -978,7 +992,7 @@ fn events_between(
         }
         let in_range = snap.frame > after && snap.frame <= until;
         if in_range {
-            if push_edges(&mut timed, &mut count, prev, snap) && event_frame_count < STEPS {
+            if push_edges(&mut timed, &mut count, prev, snap, aims) && event_frame_count < STEPS {
                 event_frames[event_frame_count] = snap.frame;
                 event_frame_count += 1;
             }
@@ -1017,6 +1031,7 @@ fn push_edges(
     count: &mut usize,
     prev: Option<Snap>,
     now: Snap,
+    _aims: bool,
 ) -> bool {
     let mut saw = false;
     let prev_buttons = prev.map(|snap| snap.buttons).unwrap_or(0);
@@ -1164,16 +1179,16 @@ impl InputCapture {
         };
     }
     pub fn step(&mut self, snap: Snap) {
-        self.step_mode(snap, true);
+        self.step_mode(snap, true, true);
     }
-    fn step_mode(&mut self, mut snap: Snap, group_idle: bool) {
+    fn step_mode(&mut self, mut snap: Snap, group_idle: bool, aims: bool) {
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
         if self.combo.overflow { return; }
         let mut edges = [None; STEPS];
         let mut count = 0;
-        push_edges(&mut edges, &mut count, self.prev, snap);
+        push_edges(&mut edges, &mut count, self.prev, snap, aims);
         self.prev = Some(snap);
         for event in edges.into_iter().flatten() {
             let start = *self.first.get_or_insert(event.frame);
@@ -1210,3 +1225,7 @@ impl Default for InputCapture {
 #[cfg(test)]
 #[path = "input_drill_tests.rs"]
 mod input_drill_tests;
+
+#[cfg(test)]
+#[path = "aim_steps_tests.rs"]
+mod aim_steps_tests;

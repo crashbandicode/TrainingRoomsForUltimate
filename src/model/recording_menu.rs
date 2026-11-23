@@ -2236,6 +2236,8 @@ fn event_token(event: super::combo::Event) -> String {
         Kind::Flick(Flick::FastFall) => with_dir(event.dir, "flick"),
         Kind::Flick(Flick::Dash) => with_dir(event.dir, "dash"),
         Kind::Flick(Flick::TapJump) => with_dir(event.dir, "tap"),
+        Kind::Aim(1) => "1st".to_string(),
+        Kind::Aim(_) => "2nd".to_string(),
     }
 }
 

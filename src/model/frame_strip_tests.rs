@@ -532,7 +532,7 @@ fn a_link_remembers_the_spot_of_its_follow_up_hit() {
         }
         let link = t.latest_link().expect("the up tilt linked");
         assert_eq!(link.spot, expected, "gained {gained}");
-        assert_eq!(crate::model::combo::LinkRec::of(&link, &t, 0).spot, expected, "the saved link keeps it");
+        assert_eq!(crate::model::combo::LinkRec::of(&link, &t, 0, false).spot, expected, "the saved link keeps it");
     }
 }
 

@@ -83,7 +83,7 @@ fn input_attempt_counts_steps_and_drops_late_or_missing_releases() {
     assert!(!helper.results().next().unwrap().clean);
     let want=reference.get(0).unwrap(); let actual=LinkRec { events: retain([Event {kind:Kind::Press(Button::Attack),dir:Dir::Neutral,offset:0}]), ..LinkRec::INPUT };
     assert!(grade(want,&actual).missing().is_none(),"hit-clipped release exemption remains");
-    assert!(grade_mode(want,&actual,true).missing().is_some());
+    assert!(grade_mode(want,&actual,true,false).missing().is_some());
 }
 #[test]
 fn input_schema_crop_and_hit_format_remain_distinct() {

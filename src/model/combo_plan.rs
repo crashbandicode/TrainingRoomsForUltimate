@@ -44,6 +44,8 @@ pub fn event_label(kind: Kind) -> &'static str {
         Kind::Flick(Flick::FastFall) => "fast-fall",
         Kind::Flick(Flick::Dash) => "dash",
         Kind::Flick(Flick::TapJump) => "tap-jump",
+        Kind::Aim(1) => "1st direction",
+        Kind::Aim(_) => "2nd direction",
     }
 }
 
@@ -158,6 +160,9 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
             if d > 0 { "late" } else { "early" }
         ),
         Reason::WrongDir(kind) => write!(t, "{unit}{n} {} wrong direction", event_label(kind)),
+        Reason::MissingAim(part) => write!(t, "{unit}{n} {} missing", event_label(Kind::Aim(part))),
+        Reason::WrongAim(part) => write!(t, "{unit}{n} {} wrong", event_label(Kind::Aim(part))),
+        Reason::ExtraAim(part) => write!(t, "{unit}{n} extra {}", event_label(Kind::Aim(part))),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
         Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
     };
