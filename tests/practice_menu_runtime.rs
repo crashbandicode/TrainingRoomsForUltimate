@@ -1146,9 +1146,10 @@ fn leaving_the_picker_puts_the_cpu_back_where_it_stood() {
     let scene_end = frame.split_once("if scene::practice_scene().is_none() {").unwrap().1.split_once("return;").unwrap().0;
     assert!(scene_end.contains("engine.preview = None;"));
 }
+
 #[test]
 fn the_original_cpu_comes_back_after_the_picker_put_the_body_back() {
-    // The roster gives the incoming fighter the outgoing bodys place. A picker that holds the drills own fighter at
+    // The roster gives the incoming fighter the outgoing body's place. A picker that holds the drill's own fighter at
     // its picked start puts it back on Player 1s next frame; the original is not asked for before that.
     let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
     let serve = item(&service, "pub(in crate::runtime) fn service_practice_cpu_selection(");
