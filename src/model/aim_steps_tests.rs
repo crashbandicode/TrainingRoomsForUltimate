@@ -264,6 +264,81 @@ fn a_hit_link_waits_for_the_pending_heading() {
     assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Back));
 }
 
+fn travel_hit(helper: &mut Helper) -> (Tracker, Sample, MappedInputs) {
+    let mut tracker = Tracker::new();
+    let hit_cpu = Sample { stop: true, hitstun: true, reaction: Some(20.0), ..Sample::default() };
+    let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
+    let jab = Sample { attack: Some(Move::Jab), status: 0x27, facing: 1, ..Sample::default() };
+    tracker.step(jab, hit_cpu, MappedInputs::NEUTRAL);
+    helper.step(&tracker, Settings::factory());
+    tracker.step(Sample { actionable: true, facing: 1, ..Sample::default() }, stunned_cpu, MappedInputs::NEUTRAL);
+    helper.step(&tracker, Settings::factory());
+    let up_b = MappedInputs { buttons: 2, lstick_y: 127, ..MappedInputs::NEUTRAL };
+    tracker.step(strip_sample(Move::UpSpecial, None, 1), stunned_cpu, up_b);
+    helper.step(&tracker, Settings::factory());
+    let left = MappedInputs { lstick_x: -127, ..MappedInputs::NEUTRAL };
+    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), hit_cpu, left);
+    helper.step(&tracker, Settings::factory());
+    (tracker, hit_cpu, left)
+}
+
+#[test]
+fn a_hit_link_is_not_held_for_a_travel_that_never_moves() {
+    let mut helper = Helper::new();
+    let (mut tracker, cpu, left) = travel_hit(&mut helper);
+    let hit = tracker.latest_link().unwrap().hit;
+    assert_eq!(tracker.frame(), hit);
+    assert!(tracker.aim_pending());
+    assert!(helper.capture.current.is_empty());
+    for elapsed in 1..=6 {
+        tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
+        helper.step(&tracker, Settings::factory());
+        assert!(tracker.aim_pending());
+        if elapsed < 2 {
+            assert!(helper.capture.current.is_empty());
+        } else {
+            assert_eq!(helper.capture.current.len(), 1);
+            let rec = helper.capture.current.get(0).unwrap();
+            assert!(!rec.events().any(|e| matches!(e.kind, Kind::Aim(_))));
+            assert_eq!(helper.capture.last_link, Some(hit));
+        }
+    }
+}
+
+#[test]
+fn a_legacy_combo_grades_the_same_link_one_frame_later() {
+    let mut first_helper = Helper::new();
+    let (mut first, cpu, left) = travel_hit(&mut first_helper);
+    let hit = first.frame();
+    first.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), cpu, left);
+    first_helper.step(&first, Settings::factory());
+    let reference = LinkRec::of(&first.latest_link().unwrap(), &first, first.exchange().1, false);
+    assert!(reference.events().any(|e| e.kind == Kind::Flick(Flick::Dash)));
+    assert!(!reference.events().any(|e| matches!(e.kind, Kind::Aim(_))));
+    let target = Combo::from_links([reference]).unwrap();
+    assert!(!target.has_aim());
+
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    let (mut tracker, cpu, left) = travel_hit(&mut helper);
+    assert_eq!(tracker.frame(), hit);
+    assert!(helper.capture.current.is_empty());
+    assert!(helper.attempt().is_none());
+    tracker.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), cpu, left);
+    let out = helper.step(&tracker, Settings::factory());
+    assert_eq!(tracker.frame(), hit + 1);
+    let actual = LinkRec::of(&tracker.latest_link().unwrap(), &tracker, tracker.exchange().1, false);
+    assert_eq!(actual.events, reference.events);
+    assert!(!actual.events().any(|e| matches!(e.kind, Kind::Aim(_))));
+    assert!(actual.events().any(|e| e.kind == Kind::Flick(Flick::Dash)));
+    let (index, grade) = out.link.expect("legacy link was graded");
+    assert_eq!(index, 0);
+    assert!(grade.clean(1), "{grade:?}");
+    let summary = out.resolved.expect("legacy combo completed");
+    assert!(summary.clean, "{summary:?}");
+    assert_eq!(summary.outcome, Outcome::Completed);
+}
+
 #[test]
 fn aim_files_are_versions_three_and_four_and_old_files_read_as_before() {
     let drill = captured(Some(4), Some(0), true, false, true);

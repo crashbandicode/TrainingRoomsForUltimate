@@ -53,6 +53,8 @@ pub const STEPS: usize = 12;
 /// Presses an older file stores, and the press subset a new file still writes for that reader.
 pub const LEGACY_STEPS: usize = 4;
 pub const RESULTS: usize = 8;
+/// Maximum frames a hit link waits for a travel heading.
+const AIM_WAIT: u32 = 2;
 
 /// A step's aim: the strip's stick bin (0 right, counter-clockwise in eighths) with left and right merged, so the
 /// fighter's facing does not matter.
@@ -731,7 +733,10 @@ impl Helper {
         }
         if let Some(link) = tracker
             .latest_link()
-            .filter(|l| Some(l.hit) != self.capture.last_link && !tracker.aim_pending())
+            .filter(|l| {
+                Some(l.hit) != self.capture.last_link
+                    && (!tracker.aim_pending() || tracker.frame().saturating_sub(l.hit) >= AIM_WAIT)
+            })
         {
             self.capture.last_link = Some(link.hit);
             let after = self.capture.after;
