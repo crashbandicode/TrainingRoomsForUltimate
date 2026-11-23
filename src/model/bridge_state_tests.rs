@@ -49,10 +49,32 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "notice.header=\"Eggs-ercise\"",
         "notice.body=\"Eggs 0   1:00\"",
         "scene=\"training\"",
+        "recording.popup.open=0",
+        "recording.popup.role=\"\"",
+        "recording.page.role=\"\"",
+        "recording.capture.role=\"\"",
         "rows.count=2",
         "rows.complete=1",
         "rows=\"Start\",\"Eggs mode\"",
     ]);
+}
+
+#[test]
+fn the_recording_popup_page_and_capture_report_independent_roles() {
+    let view = View {
+        recording_popup_open: true,
+        recording_popup_role: "cpu",
+        recording_page_role: "player",
+        recording_capture_role: "player",
+        ..View::default()
+    };
+    let mut out = String::new();
+    snapshot(&view, &mut out);
+    assert!(out.contains("\nopen=0\n"));
+    assert!(out.contains("\nrecording.popup.open=1\n"));
+    assert!(out.contains("\nrecording.popup.role=\"cpu\"\n"));
+    assert!(out.contains("\nrecording.page.role=\"player\"\n"));
+    assert!(out.contains("\nrecording.capture.role=\"player\"\n"));
 }
 
 #[test]

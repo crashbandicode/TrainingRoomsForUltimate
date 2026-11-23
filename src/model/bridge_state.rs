@@ -36,6 +36,11 @@ pub struct View<'a> {
     pub ack: u64,
     pub ack_result: &'a str,
     pub scene: &'a str,
+    pub recording_popup_open: bool,
+    pub recording_popup_role: &'a str,
+    pub recording_page_role: &'a str,
+    /// The role of the active capture, empty when there is no take.
+    pub recording_capture_role: &'a str,
     /// The visible rows of the screen showing (optional, sent last).
     pub rows: &'a [&'a str],
     /// The publisher does not list the rows (the v1 limit): `rows.complete=0` whatever `rows` holds.
@@ -70,6 +75,10 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     push_str(out, "notice.header", header);
     push_str(out, "notice.body", body);
     push_str(out, "scene", view.scene);
+    let _ = writeln!(out, "recording.popup.open={}", u8::from(view.recording_popup_open));
+    push_str(out, "recording.popup.role", view.recording_popup_role);
+    push_str(out, "recording.page.role", view.recording_page_role);
+    push_str(out, "recording.capture.role", view.recording_capture_role);
     // The optional rows come last: as many as fit under the bound, and a mark when some did not.
     let mut rows = String::new();
     let mut shown = 0;

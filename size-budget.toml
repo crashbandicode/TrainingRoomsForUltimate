@@ -2405,3 +2405,12 @@ ceiling = 191842
 date = "2026-11-22"
 reason = "The saved pop-up role is adopted at boot (rr_host::adopt_saved_role, called from the menu worker's remember), so the first Record chord after a restart records on the role saved on the card before any menu or pop-up press. Measured normalized implementation 191842, 4 above the item 4 ceiling 191838, with zero spare. The release gate measures NRO and BSS."
 approved_by = "tr-primary-2, 2026-11-22 about 21:41Z: line-count raises are pre-approved under the operator's test flow of 2026-11-22 (artifacts/phase23/TEST-FLOW-2026-11-22.md, point 2), and the fix answers rv-preview-vis's review FAIL of 21:13:19Z; NRO and BSS deltas are reported with READY"
+
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191869
+date = "2026-11-22"
+reason = "Publish Recording pop-up, page and active capture state through tr.menu for the combined run. The bounded fields and tests measure 27 normalized lines over the reviewed Recording role stack."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. TEST-FLOW step 2 requires bridge reads for menu roles and capture state."

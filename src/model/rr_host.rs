@@ -332,6 +332,7 @@ pub fn taking() -> bool {
     CAP_ROLE.load(Ordering::Acquire) != 0 || RECORD_EDGE.load(Ordering::Acquire) != 0
 }
 
+
 pub fn pending() -> bool {
     RECORD_EDGE.load(Ordering::Acquire) != 0
         || PLAY_PLAYER.load(Ordering::Acquire)
@@ -683,6 +684,16 @@ pub fn push_capture(side: u8, frame: InputFrame) {
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn capture_role() -> u8 {
     CAP_ROLE.load(Ordering::Acquire)
+}
+
+/// The active take's role for the bridge, independent of the saved preference.
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn capture_role_key() -> &'static str {
+    match capture_role() {
+        ROLE_PLAYER => ViewRole::Player.diag(),
+        ROLE_CPU => ViewRole::Cpu.diag(),
+        _ => "",
+    }
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
@@ -2434,9 +2445,12 @@ mod tests {
         let root = scratch("cold-role");
         let loaded = crate::model::settings::parse(r#"{"menu":{},"defaults_menu":{},"recording_roles":{"popup":"cpu","page":"player"}}"#);
         adopt_saved_role(&loaded.settings);
+        assert_eq!(capture_role_key(), "");
         on_chords(true, false, false);
         assert_eq!(capture_role(), ROLE_CPU);
+        assert_eq!(capture_role_key(), "cpu");
         assert_cpu_capture_saved(&root);
+        assert_eq!(capture_role_key(), "");
 
         reset_host();
         adopt_saved_role(&loaded.settings);
@@ -2444,6 +2458,7 @@ mod tests {
         adopt_saved_role(&old.settings);
         on_chords(true, false, false);
         assert_eq!(capture_role(), ROLE_PLAYER);
+        assert_eq!(capture_role_key(), "player");
     }
 
     fn press(buttons: u32) -> MappedInputs {
