@@ -29,7 +29,27 @@ fn a_clip_event_is_sent_once_per_change_and_retried_until_it_lands() {
     seen.send(Some(clip()), |_| 1);
     let mut after_change = Vec::new();
     seen.send(None, |s| { after_change.push(s.to_owned()); 0 });
-    assert_eq!(after_change, vec![clip().text(), "clip closed".to_string()]);
+    assert_eq!(after_change, vec!["clip lost=1".to_string(), "clip closed".to_string()]);
+}
+
+#[test]
+fn a_refused_open_and_close_are_reported_as_a_gap_after_the_reopen() {
+    let mut seen = ClipSeen::default();
+    let mut got = Vec::new();
+    seen.send(Some(clip()), |s| { got.push(s.to_owned()); 1 });
+    seen.send(None, |s| { got.push(s.to_owned()); 1 });
+    seen.send(Some(clip()), |s| { got.push(s.to_owned()); 0 });
+    seen.send(Some(clip()), |_| panic!("already sent"));
+    assert_eq!(got, vec![clip().text(), "clip lost=1".to_string(), "clip lost=2".to_string(), clip().text()]);
+
+    let mut seen = ClipSeen::default();
+    seen.send(Some(clip()), |_| 1);
+    let mut calls = 0;
+    seen.send(None, |_| { calls += 1; if calls == 1 { 0 } else { 1 } });
+    let mut got = Vec::new();
+    seen.send(None, |s| { got.push(s.to_owned()); 0 });
+    seen.send(None, |_| panic!("already sent"));
+    assert_eq!(got, vec!["clip closed".to_string()]);
 }
 
 #[test]
