@@ -174,11 +174,7 @@ pub(crate) fn admit(v: View, settled: Option<Commit>) -> Result<usize, &'static 
     Ok(next)
 }
 
-pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {
-    plan_with(v, settled, target, hash, false)
-}
-
-/// `plan`; `again` lifts the same-stage refusal: rc.14's custom stages are all native kind 325, each another layout in
+/// `again` lifts the same-stage refusal: rc.14's custom stages are all native kind 325, each another layout in
 /// the rule.
 fn plan_with(v: View, settled: Option<Commit>, target: u32, hash: u64, again: bool) -> Result<(Commit, [u8; 0xb0]), &'static str> {
     let next = admit(v, settled)?;
@@ -263,7 +259,7 @@ mod tests {
             request_kind:c.target,request_hash:c.hash })
     }
     fn observed_state6_requires_native_readiness_and_exact_allocation_lease_once() {
-        let v=waiting();let(c,_)=plan(v,None,0,0x123456789a).unwrap();
+        let v=waiting();let(c,_)=plan_with(v,None,0,0x123456789a,false).unwrap();
         let (loaded,ready)=loaded(v,c);
         assert!(!complete(loaded,c));
         let mut not_ready=ready;not_ready.native_ready=0;not_ready.ready_bits=1;

@@ -191,9 +191,6 @@ pub(crate) fn installed_target(target: Target) -> Option<Target> {
 pub(crate) fn named_refusal(target: Target) -> Option<&'static str> {
     mii_ordinary_cpu::replay_refusal(named_selection(target))
 }
-pub(crate) fn request_named(target: Target) -> bool {
-    request_with(named_selection(target), request_cpu_kind)
-}
 pub(crate) fn request_named_in(context: &CpuRequestContext, target: Target) -> bool {
     request_with(named_selection(target), |kind| request_cpu_kind_in(context, kind))
 }
@@ -209,9 +206,6 @@ pub(crate) fn ready(target: Target, kind: u32) -> bool {
     } else {
         target.ready(kind, mii_ordinary_cpu::replay_current())
     }
-}
-pub(crate) fn request(target: Target, revision: u64) -> bool {
-    request_with(selected(target, revision), request_cpu_kind)
 }
 pub(crate) fn request_in(context: &CpuRequestContext, target: Target, revision: u64) -> bool {
     request_with(selected(target, revision), |kind| request_cpu_kind_in(context, kind))

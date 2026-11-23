@@ -216,6 +216,8 @@ mod playback_hook;
 mod practice_menu_runtime;
 #[path = "../pristine_load.rs"]
 mod pristine_load;
+#[path = "../release_warnings.rs"]
+mod release_warnings;
 #[path = "../roster_request_handoff.rs"]
 mod roster_request_handoff;
 #[path = "../sav002_load_stops_rr_playback.rs"]

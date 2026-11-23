@@ -10282,7 +10282,7 @@
       "dest": "src/model/stages/practice_stage_request_policy.rs",
       "crate": "root",
       "src_sha256": "f21325a210af687c2c008978356be0f0850b064390c242c8bb2d8ec955d002a6",
-      "dest_sha256": "e71e3bbcbf3ab576c007907986db432156a7526aa4863af1c227be814095f171",
+      "dest_sha256": "503c7299ca84eabf57c999b33c025b7b550c0d8e3cc5fd9e822a30ea1b9e0ea5",
       "widen": true,
       "edits": [
         {
@@ -10355,6 +10355,16 @@
           "old": "        crate::test_table::run(&[\n            (\"alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership\", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),\n",
           "new": "        crate::test_table::run(&[\n            (\"one_custom_stage_goes_to_another_in_place\", one_custom_stage_goes_to_another_in_place as fn()),\n            (\"alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership\", alternate_forms_complete_then_require_a_new_menu_and_preserve_match_cache_ownership as fn()),\n",
           "reason": "rc.14 custom stages (the primary 2026-11-15 ~03:15Z, route and fail-safe guards approved; artifacts/rc14-custom-stages/DESIGN.md \"Runtime as implemented\"): one custom stage to another (both native kind 325) is not refused as the stage already active"
+        },
+        {
+          "old": "pub(crate) fn plan(v: View, settled: Option<Commit>, target: u32, hash: u64) -> Result<(Commit, [u8; 0xb0]), &'static str> {\n    plan_with(v, settled, target, hash, false)\n}\n\n/// `plan`; `again` lifts",
+          "new": "/// `again` lifts",
+          "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; plan has no caller, plan_with is the live path"
+        },
+        {
+          "old": "let v=waiting();let(c,_)=plan(v,None,0,0x123456789a).unwrap();",
+          "new": "let v=waiting();let(c,_)=plan_with(v,None,0,0x123456789a,false).unwrap();",
+          "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; plan has no caller, plan_with is the live path"
         }
       ]
     },
@@ -26544,7 +26554,7 @@
       "dest": "src/runtime/mii/mii_replay.rs",
       "crate": "root",
       "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-      "dest_sha256": "5526c538706af67d3249a6284487a8efc939da4b842324c2fd515e6b41e6e5c9",
+      "dest_sha256": "77e9faa7abd1f196e239f5e751e98766be2c9a84816ddfee5f66e2238710cb4a",
       "edits": [
         {
           "old": "//! Deferred replay resource identity. The existing Training service is the only native seam.\nuse super::*;\nuse std::{\n    collections::VecDeque,\n    sync::{mpsc, Arc},\n};\nuse crate::engine::mii::{\n    draft::Library,\n    lifetime::Configuration,\n    native_values::RowIds,\n    replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},\n};\n\nconst MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;\nstatic WORK: AtomicBool = AtomicBool::new(false);\nstatic STATE: Mutex<State> = Mutex::new(State {\n    pending: VecDeque::new(),\n    inflight: None,\n});\ntype Reply = mpsc::Sender<Result<Configuration, String>>;\nstruct Job {\n    raw: RawMii,\n    selected: Option<(u64, u64, Reply)>,\n}\nstruct Inflight {\n    job: Job,\n    configuration: Configuration,\n    result: mpsc::Receiver<Result<Arc<Library>, String>>,\n}\nstruct State {\n    pending: VecDeque<Job>,\n    inflight: Option<Inflight>,\n}\nfn generation() -> u64 {\n    mii_saved_alpha::current_generation(1)\n}\nfn current(job: &Job) -> bool {\n    job.selected.as_ref().is_none_or(|(epoch, revision, _)| {\n        *epoch == generation() && *revision == crate::runtime::macros::replay_capture::selection_revision()\n    })\n}\nfn finish(job: Job, result: Result<Configuration, String>) {\n    if let Some((_, _, reply)) = job.selected {\n        let _ = reply.send(result);\n    } else if let Err(error) = result {\n        trace!(\"[MiiReplay] deferred import unavailable: {error}; durable raw metadata retained\");\n    }\n}\n\n/// Called only after the companion was committed. This bounded queue is an optimization;\n/// the durable association remains authoritative and selected captures can retry after restart.\npub(crate) fn committed(miis: ReplayMiis) {\n    let mut s = STATE.lock().unwrap();\n    for raw in miis.entries() {\n        if s.pending.len() == MAX_PENDING {\n            break;\n        }\n        s.pending.push_back(Job {\n            raw: *raw,\n            selected: None,\n        });\n    }\n    WORK.store(\n        !s.pending.is_empty() || s.inflight.is_some(),\n        Ordering::Release,\n    );\n}\npub(crate) fn resolve(\n    raw: RawMii,\n    revision: u64,\n) -> Result<mpsc::Receiver<Result<Configuration, String>>, String> {\n    if !mii_ordinary_cpu::enabled() {\n        return Err(\"Replay Mii loading is unavailable in this build\".into());\n    }\n    let (reply, receive) = mpsc::channel();\n    let mut s = STATE.lock().unwrap();\n    if s.pending.len() == MAX_PENDING {\n        return Err(\"Mii import queue is busy; reopen this capture\".into());\n    }\n    s.pending.push_front(Job {\n        raw,\n        selected: Some((generation(), revision, reply)),\n    });\n    WORK.store(true, Ordering::Release);\n    Ok(receive)\n}\npub(crate) fn selected(target: Target, revision: u64) -> Selection {\n    Selection {\n",
@@ -26575,6 +26585,16 @@
           "old": "    }\n}\npub(crate) fn request(target: Target, revision: u64) -> bool {\n    if mii_ordinary_cpu::replay_catalog().is_some() {\n        mii_ordinary_cpu::request_replay(selected(target, revision))\n    } else if target.configuration().is_none() {\n        request_cpu_kind(target.kind())\n    } else {\n        false\n    }\n",
           "new": "    }\n}\npub(crate) fn request(target: Target, revision: u64) -> bool {\n    request_with(selected(target, revision), request_cpu_kind)\n}\npub(crate) fn request_in(context: &CpuRequestContext, target: Target, revision: u64) -> bool {\n    request_with(selected(target, revision), |kind| request_cpu_kind_in(context, kind))\n}\nfn request_with(selection: Selection, ordinary_request: impl FnOnce(u32) -> bool) -> bool {\n    if mii_ordinary_cpu::replay_catalog().is_some() {\n        mii_ordinary_cpu::request_replay(selection)\n    } else if selection.target.configuration().is_none() {\n        ordinary_request(selection.target.kind())\n    } else {\n        false\n    }\n",
           "reason": "RC15 reviewed menu integration (4e972211) composed with accepted-intent API: carry fresh eligibility through Mii readiness; preserve Busy before mutation and propagate consumed loader acceptance. Explicit native-read alias preserves its actual declaring module for the hook audit."
+        },
+        {
+          "old": "pub(crate) fn request_named(target: Target) -> bool {\n    request_with(named_selection(target), request_cpu_kind)\n}\n",
+          "new": "",
+          "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; request_named has no caller, request_named_in is the live path"
+        },
+        {
+          "old": "pub(crate) fn request(target: Target, revision: u64) -> bool {\n    request_with(selected(target, revision), request_cpu_kind)\n}\n",
+          "new": "",
+          "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; request has no caller, request_in is the live path"
         }
       ]
     },
@@ -28911,7 +28931,7 @@
       "dest": "src/runtime/lobby/training/practice.rs",
       "crate": "root",
       "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-      "dest_sha256": "8af588cd1dd1b7cb5840f6ae7876957121f2230a5b1aa08cc1536c39d9b0bd8c",
+      "dest_sha256": "5a4c32399e4236404b5b1d91cd8ec16d98223bbb07b23f0e694a3f7be5a956cc",
       "edits": [
         {
           "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -28997,6 +29017,11 @@
           "old": "}\n\npub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {\n    if !enabled() || !common::is_fighter(module) { return None; }\n    context()?.role(WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,\n        *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID))\n}\n\n",
           "new": "}\n\npub unsafe fn role(module: &BattleObjectModuleAccessor) -> Option<usize> {\n    role_in(context(), module)\n}\npub unsafe fn role_in(current_context: Option<Context>, module: &BattleObjectModuleAccessor) -> Option<usize> {\n    if !enabled_in(current_context) || !common::is_fighter(module) { return None; }\n    current_context?.role(WorkModule::get_int(module as *const _ as *mut BattleObjectModuleAccessor,\n        *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID))\n}\n\n",
           "reason": "RC15 reviewed menu integration (4e972211) composed with accepted-intent API: carry fresh eligibility through Mii readiness; preserve Busy before mutation and propagate consumed loader acceptance. Explicit native-read alias preserves its actual declaring module for the hook audit."
+        },
+        {
+          "old": "pub unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {\n    panel_entry_in(context(), module)\n}\n",
+          "new": "",
+          "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; panel_entry has no caller, panel_entry_in is the live path"
         }
       ]
     },

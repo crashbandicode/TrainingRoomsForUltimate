@@ -45,9 +45,6 @@ pub unsafe fn entry(role: usize) -> Option<usize> {
 
 /// Native Training panels also hold extra CPUs. They have entry receipts for
 /// releasing that stop, but never acquire either save/record slot.
-pub unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {
-    panel_entry_in(context(), module)
-}
 pub unsafe fn panel_entry_in(current_context: Option<Context>, module: &BattleObjectModuleAccessor) -> Option<usize> {
     if !enabled_in(current_context) || !common::is_fighter(module) { return None; }
     let context = current_context?;
