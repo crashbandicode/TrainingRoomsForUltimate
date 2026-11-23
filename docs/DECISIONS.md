@@ -1591,9 +1591,9 @@ placement wizard (hit-streak-sol lane) uses it too.
 The operator, 2026-11-22, verbatim: "I want to add the requirement that the p1 returns to the stage successfully after a
 successful edgeguard for it to count."
 
-**Today.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
+**Before this fix.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
 `src/runtime/features/edge_juggle.rs:2090`; `src/model/edge_juggle.rs:495–502`), wherever Player 1 is. Player 1 is
-read today for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
+read then for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
 scored as the CPU's recovery (`:2095–2100`, `:2104`).
 
 **The rule (A, agreed).**
@@ -1649,6 +1649,10 @@ the Zoom drill and Juggler are not changed.
   event marks the KO; the readers of the sealed rows change with it.
 
 ![GJ1: the KO counts when Player 1 is back on the stage](decisions/gte-next-GJ1-return.png)
+
+Implemented in the fix build of 2026-11-23: trace code 8 marks the CPU KO when Player 1 is not back yet,
+9, 10 and 11 mark the three new results, and 1 marks a secured return. The bridge phase is `return`;
+the new outcome names are `not_counted_p1_ko`, `not_counted_no_return` and `p1_ko`.
 
 ### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
 
