@@ -1761,6 +1761,8 @@ today. The pages stay four: CPU spot, Percent, Player 1, Preview. Code: about �
 | **A** (chosen) | keep the page as it is: D-pad ±1 and ±10 | none. The D-pad's two uses are on different pages |
 | B | make it a menu row, like Guard the Edge's percent | the wizard has 3 pages like Guard the Edge's; about +40 lines and one new saved setting |
 
+**Rework 2026-11-23 (GJ4-8).** The Player cursor returns to the last position with a floor if its move has none underneath. A point whose floor is gone is refused on A; see the [Player cursor rule](design/gj4-8-player-cursor.md).
+
 ![GJ3: the crosshair on Juggler's CPU page](decisions/gte-next-GJ3-juggler-crosshair.png)
 
 ### GJ4 · Player 1's start: two measured defects the crosshair does not remove
