@@ -107,7 +107,8 @@ fn extra_lines_come_after_the_list_and_before_the_rows() {
     assert!(snapshot(&view, &mut out));
     assert!(out.contains("list.value=\">\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
 
-    let extra = format!("place.long=\"{}\"\n", "x".repeat(1500));
+    // Leave room for the fixed fields, but not for either long optional row.
+    let extra = format!("place.long=\"{}\"\n", "x".repeat(MAX / 2));
     let long = "row".repeat(200);
     let rows = [long.as_str(), long.as_str()];
     let view = View { extra: &extra, rows: &rows, ..eggs_start() };
