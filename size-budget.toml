@@ -2457,7 +2457,7 @@ approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Reco
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196422
+ceiling = 196446
 date = "2026-11-23"
-reason = "F9: backing out of a new chain opens no keyboard and no hidden name draft holds the fighters. Measured 196422, 73 above the 196349 ceiling."
-approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z under the operator's measured LOC rule."
+reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196446, 97 above the 196349 ceiling."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."
