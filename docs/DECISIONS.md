@@ -1591,9 +1591,9 @@ placement wizard (hit-streak-sol lane) uses it too.
 The operator, 2026-11-22, verbatim: "I want to add the requirement that the p1 returns to the stage successfully after a
 successful edgeguard for it to count."
 
-**Today.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
+**Before this fix.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
 `src/runtime/features/edge_juggle.rs:2090`; `src/model/edge_juggle.rs:495–502`), wherever Player 1 is. Player 1 is
-read today for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
+read then for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
 scored as the CPU's recovery (`:2095–2100`, `:2104`).
 
 **The rule (A, agreed).**
@@ -1649,6 +1649,10 @@ the Zoom drill and Juggler are not changed.
   event marks the KO; the readers of the sealed rows change with it.
 
 ![GJ1: the KO counts when Player 1 is back on the stage](decisions/gte-next-GJ1-return.png)
+
+Implemented in the fix build of 2026-11-23: trace code 8 marks the CPU KO when Player 1 is not back yet,
+9, 10 and 11 mark the three new results, and 1 marks a secured return. The bridge phase is `return`;
+the new outcome names are `not_counted_p1_ko`, `not_counted_no_return` and `p1_ko`.
 
 ### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
 
@@ -1819,6 +1823,14 @@ fighter written onto it. The cursor already stops on the readable end of the flo
    - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
    - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
 
+**Built 2026-11-23 (fix build).**
+- Placement waits while Player 1 is KO'd and wakes a held CPU if placement restarts.
+- Option B was chosen: both falls came after Ready began, so a pre-Ready correction catches neither, and a correction during Ready cannot distinguish the game's fall from a player's own drop to the ledge. The game's cause is unknown. See [the design](design/gj4-player-start.md).
+- The measurement boot was not flown; the `83eecc32` trace was read again instead.
+- Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
+
+**Rework 2026-11-23.** The Guard the Edge Player inset is 1.25 units. The game's teeter check reaches 1.06 units from the floor end the fighter faces and moves the fighter to 0.96 units from it. A 1.0-unit write rests in teeter, not where Preview shows. The fix boot checks a standing Wait at the written x on both ends.
+
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
 ### Planned tests and proof (not written, not run)
@@ -1870,3 +1882,37 @@ Turning Lobby Practice Off while a drill runs stops it first; the partner gets i
 DOWN's entry picks the missed-tech face from the fighter's pose. On the same frame, immediately after entry,
 the plugin sets the chosen face flag and restarts that face's bound motion when either differs from the choice.
 X selects face up or face down.
+
+## Menu lists (2026-11-23): Up / Down wrap in each list
+
+The operator reported on hardware that the submenu lists, the save states and the macros among them, do not go round
+from one end to the other. The menu's own lists already wrapped, but the Recording page lists moved on at their ends;
+file screens, pickers, saved layouts, Mii lists and the Keep / Switch question stopped there.
+
+Every list's Up / Down wraps through one shared step. On the Recording page each list wraps on its own; an empty list
+passes to the other list. ZL + Up / Down keep D3's section jump, Left / Right switch lists, and L / R turn the page.
+Grids are unchanged. The Recording page's footer names ZL + Up / Down as the way out of a list.
+
+The Recording-page rule was the edge-juggle-sol lane's default (posted 12:53:06Z); tr-primary-2 approved it the same
+day (ruling of about 12:55Z). The operator may still overrule it.
+
+## F15 (2026-11-23): the room's partner type after a drill
+
+After a drill that used its own CPU fighter the room's partner kept the stock CPU type instead of the room's Training
+Partner Behavior. The saved type now follows the fighter swap and goes back to the fighter in the slot at the drill's
+end.
+
+## Recording chain back-out (2026-11-23)
+
+B in the chain picker was "done": on a new chain or sequence it opened the name keyboard, and cancelling that keyboard
+in Training left an unseen name draft open that held both fighters after the Recording menu closed.
+
+- A1 (tr-primary-2's ruling of 16:05Z; it replaces the edge-juggle-sol default of 16:02:42Z, under which B backed out
+  only with nothing numbered): B always backs out. In + New chain, + New sequence, Edit chain and Edit combos, B leaves
+  the picker with no keyboard and nothing saved; an edit keeps the old order. Done is X: it writes an edit, and asks a
+  new chain or sequence for its name. It is X because the menu has no standard done button: A gives a number here, and
+  + is read only by the closed-menu wizards. While the page waits for a name, B cancels it.
+- A2: a cancelled keyboard makes nothing, and the page's name draft is open only while the page waits for it. When the
+  page stops waiting (B, the menu closed or lost), the draft is closed and its keyboard job is retired, also while that
+  keyboard is still up or parked for a waiting room; a late answer from it is dropped. Another owner's keyboard is not
+  touched.

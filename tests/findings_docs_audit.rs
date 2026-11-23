@@ -375,7 +375,7 @@ fn the_runtime_uses_the_close_window_rules() {
 
 use model::frame::{self, Frame, Text};
 use model::menu::options::LOOP_COUNTS;
-use model::menu::table::{Control, ROWS};
+use model::menu::table::{Control, COMBOS_SEQ, ROWS, SAVES_MACROS};
 use model::menu::{Entry, Screen, LOOP_ROW};
 use model::recording_menu::{LoopMark, ViewRole};
 use model::screens::frame_of;
@@ -389,7 +389,11 @@ fn goto_entry(m: &mut Menu, entry: Entry) {
         if m.focus() == Some(entry) {
             return;
         }
-        m.press(Button::Down);
+        m.press(if matches!(m.focus(), Some(Entry::Group(g)) if g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ)) {
+            Button::JumpDown
+        } else {
+            Button::Down
+        });
     }
     panic!("could not focus {entry:?}");
 }

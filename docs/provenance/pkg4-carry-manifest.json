@@ -1465,7 +1465,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "1757e1cccc457318bca5cf1dd1338c75d7966871d5aba268b628c3a2e96e082b",
+   "dest_sha256": "73c255681fe93fef31ecd9993aab4abcb23ace4c685d7e785c271e63ab7c8237",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -2073,6 +2073,16 @@
      "old": "        let draft = NameDraft {\n            name: source.name.clone(),\n            native_cursor: source.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: source.frames.clone(),\n                start: source.start,\n                placement,\n                version: source.game_version.clone(),\n                mii: source.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }",
      "new": "        let draft = NameDraft::from_recording(source, placement)",
      "reason": "rc.15 Phase 3 approved LOW-risk reuse (2026-11-15): share the recording-to-name-draft projection; caller effects and all fields preserved."
+    },
+    {
+     "old": "    use super::*;\n\n",
+     "new": "    use super::*;\n\n    fn f9_the_page_name_draft_never_outlives_its_keyboard() {\n        use crate::model::flow::{name_step, NameStep};\n        let mut ui = MacroUi::new();\n        let token = 1u64 << 62;\n        ui.offer_name(NameContext { token, title: \"Name chain\" }, \"\", \"\");\n        assert!(ui.is_open());\n        assert_eq!(ui.external_name_token(), Some(token));\n        assert_eq!(name_step(true, true, true), NameStep::Nothing);\n        ui.on_pad(Pad::Back);\n        assert!(!ui.is_open());\n        assert_eq!(name_step(true, true, false), NameStep::Cancel);\n        ui.offer_name(NameContext { token, title: \"Name chain\" }, \"\", \"\");\n        assert_eq!(name_step(false, true, true), NameStep::Discard);\n        ui.on_pad(Pad::Back);\n        assert!(!ui.is_open());\n    }\n\n",
+     "reason": "F9: Test the page-owned external name draft lifecycle."
+    },
+    {
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"f9_the_page_name_draft_never_outlives_its_keyboard\", f9_the_page_name_draft_never_outlives_its_keyboard as fn()),\n",
+     "reason": "F9: Test the page-owned external name draft lifecycle."
     }
    ]
   },
@@ -2081,7 +2091,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "1aa73700511b8530f7d52ba543ac3b61131edb6413aeec6e693f1ed92c951163",
+   "dest_sha256": "3774c589c7c291b330e2880e37a15e8435d5c7596529ec7f27477462f5a4cf3e",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -2183,6 +2193,16 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "            Pad::Left | Pad::Up => self.cursor = self.cursor.saturating_sub(1),\n            Pad::Right | Pad::Down => self.cursor = (self.cursor + 1).min(ROWS.len() - 1),\n",
+     "new": "            Pad::Left | Pad::Up => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), false),\n            Pad::Right | Pad::Down => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), true),\n",
+     "reason": "F2: Wrap the fighter question's choices through the shared list step."
+    },
+    {
+     "old": "        }\n    }\n}\n\n",
+     "new": "        }\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    lib_unit_tests! {\n    use super::*;\n\n    #[test]\n    fn f2_fighter_prompt_wraps() {\n        let mut prompt = Prompt::new(Origin::Recording, ViewRole::Cpu, 1, \"Mario\".into(), \"Kirby\".into());\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert_eq!(prompt.on_pad(Pad::Up), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Switch);\n        assert_eq!(prompt.on_pad(Pad::Down), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert_eq!(prompt.on_pad(Pad::Left), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Switch);\n        assert_eq!(prompt.on_pad(Pad::Right), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Keep);\n    }\n    }\n}\n",
+     "reason": "F2: Exercise the fighter question's wrapping choices."
     }
    ]
   },
@@ -2358,7 +2378,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "e46a9bf09fe358519d1cb42689d15dc98fc8780eb05957bdadbb093d48a543d2",
+   "dest_sha256": "597dc98473ebe1c7165185f813804521aa0157908898a77935e88041ee78681b",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3219,6 +3239,66 @@
      "old": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n    pub generation: u32,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
      "new": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
      "reason": "F7: remove unused runtime entry points and fields after preview unification."
+    },
+    {
+     "old": "use crate::runtime::macros::port::sync::*;\n",
+     "new": "use crate::runtime::macros::port::sync::*;\nuse crate::model::flow::{NameJob, NamePhase};\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    lock_read(&UI).external_name_token() == Some(token)\n",
+     "new": "    lock_read(&UI).external_name_token() == Some(token)\n}\n\npub fn confirmed_name_waiting(token: u64) -> bool {\n    lock_read(&CONFIRMED_NAME).as_ref().is_some_and(|found| found.context.token == token)\n}\n\n/// The owner of a caller-owned draft stopped waiting: its keyboard job is retired (a late answer is dropped) and the\n/// draft closes, also while that keyboard is up or parked. Another owner's job and draft are left alone.\npub fn discard_external_name(token: u64) {\n    {\n        let mut pending = NAME_JOB.lock().unwrap();\n        if let Some(id) = NameJob::retire_owner(&mut pending, token) { crate::runtime::mii::native_keyboard::interrupt(id); }\n    }\n    let mut ui = lock_write(&UI);\n    if ui.external_name_token() == Some(token) { ui.on_pad(Pad::Back); }\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "#[derive(Clone, Copy, PartialEq, Eq)]\nenum NamePhase { Active, Closing, Parked, Discarding }\n\n#[derive(Clone, Copy)]\nstruct NameJob { id: u64, generation: u64, replay: bool, waiting: bool, phase: NamePhase }\n\n",
+     "new": "",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    let Some(job) = pending.as_mut() else { return };\n    if job.waiting && keep_waiting && job.phase != NamePhase::Discarding {\n        if job.phase == NamePhase::Parked { return; }\n        job.phase = NamePhase::Closing;\n    } else if job.waiting && job.phase != NamePhase::Parked {\n        job.phase = NamePhase::Discarding;\n    } else {\n        crate::runtime::mii::native_keyboard::interrupt(job.id);\n        pending.take();\n        return;\n    }\n    crate::runtime::mii::native_keyboard::interrupt(job.id);\n",
+     "new": "    if let Some(id) = NameJob::retire(&mut pending, keep_waiting) { crate::runtime::mii::native_keyboard::interrupt(id); }\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    if suspended() || crate::runtime::mii::native_keyboard::busy() || naming_pending() { return; }\n    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title, ui.native_name_allows_empty())\n",
+     "new": "    if suspended() || crate::runtime::mii::native_keyboard::busy() || naming_pending() { return; }\n    let values = {\n        let ui = lock_read(&UI);\n        let title = ui.native_name_title().unwrap_or(MACRO_KEYBOARD_TITLE);\n        ui.name_prompt().zip(ui.native_name_cursor()).map(|(name, cursor)| {\n            (name.to_owned(), cursor, title, ui.native_name_allows_empty(), ui.external_name_token())\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    let Some((initial, cursor, title, allow_empty)) = values else { return };\n",
+     "new": "    let Some((initial, cursor, title, allow_empty, owner)) = values else { return };\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "        phase: NamePhase::Active };\n",
+     "new": "        phase: NamePhase::Active, owner };\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "        let Some(job) = pending.as_mut().filter(|job| job.id == id) else { return };\n        if job.phase == NamePhase::Discarding { pending.take(); return; }\n",
+     "new": "",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "        if job.waiting && !matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled)\n            && (job.phase == NamePhase::Closing || !ready\n                || job.generation != SESSION_GENERATION.load(Ordering::Relaxed)\n                || matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Interrupted)) {\n            job.phase = NamePhase::Parked;\n            return;\n        }\n        pending.take()\n",
+     "new": "        NameJob::complete(&mut pending, id,\n            matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled),\n            matches!(result, crate::runtime::mii::native_keyboard::KeyboardResult::Interrupted),\n            ready, SESSION_GENERATION.load(Ordering::Relaxed))\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    crate::runtime::features::recorder::swallow_p1(15);\n",
+     "new": "    crate::runtime::features::recorder::swallow_p1(15);\n    let hidden = job.owner == Some(crate::runtime::features::recording_host::NAME_TOKEN);\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "            if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }\n",
+     "new": "            if job.waiting || job.replay || hidden { lock_write(&UI).on_pad(Pad::Back); }\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "            notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n",
+     "new": "            if hidden {\n                notify(&format!(\"System keyboard failed ({code:#X})\"));\n                lock_write(&UI).on_pad(Pad::Back);\n            } else {\n                notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n            }\n",
+     "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
     }
    ]
   },

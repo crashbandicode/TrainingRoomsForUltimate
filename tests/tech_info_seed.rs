@@ -113,7 +113,7 @@ fn every_launch_seeds_the_same_stop_input_before_stop_and_status() {
         .find("natives::change_status_force(accessor,fly,false)")
         .unwrap();
     assert!(seed < stop && stop < status);
-    let start = core.find("letbefore=tech_native::damage_info").unwrap();
+    let start = core.find("let_before=tech_native::damage_info").unwrap();
     assert!(
         !core[start..stop].contains("ground_to_air"),
         "seed applies to airborne and grounded starts"

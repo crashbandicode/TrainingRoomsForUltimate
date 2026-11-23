@@ -404,6 +404,12 @@ fn run() {
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        let shown = OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire);
+        let naming = session.menu.as_ref().is_some_and(|m| m.recording().naming());
+        if crate::runtime::features::recording_host::settle_name(shown && naming) || (naming && !shown) {
+            if let Some(menu) = session.menu.as_mut() { menu.recording_mut().cancel_name(); }
+            if shown { publish_frame(&session); }
+        }
         if let Some(id) = crate::engine::rr_host::take_saved_drill() { apply_grade_target(Some(&id), Some(crate::engine::library::DrillKind::Combo)); }
         sync_sequence_drill();
         // The roster's answers to the combo panel's switch at menu close (the game frame ran the request: the lock-free runtime).
@@ -525,6 +531,7 @@ fn publish_bridge_state(s: &mut Session) {
             recording_popup_role,
             recording_page_role,
             recording_capture_role: crate::engine::rr_host::capture_role_key(),
+            recording_indicator: crate::runtime::bridge_state::recording_indicator(now),
             list: &list.id,
             list_count: list.count,
             list_index: list.index,

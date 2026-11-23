@@ -127,6 +127,7 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_state_restored", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_p1_poll", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
+    Boundary { function: "recorder::tint_player", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     // rc.14 Break the Targets' camera: the fixed-camera switch, called from the P1 pass. It needs the
     // camera unit's `change_active_camera` row, so it stands behind its flag (boot sets it from that unit's closure) and a rejected
     // row turns off only this camera, never the hitbox visualizer or Eggs-ercise that the pass belongs to.

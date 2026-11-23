@@ -17,7 +17,7 @@ listed in [the docs index](../README.md).
 This page uses some keys its own way. Its usual footer reads:
 
 ```text
-A open   X loop in MACROS   ZR role   L/R page   B close
+A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close
 ```
 
 On a drill with previewable recorded inputs, it reads:
@@ -64,9 +64,9 @@ the number of files, such as "Save states & Macros (7)".
 
 **How:**
 
-- Up/Down move through a list. Down past the last save goes on into MACROS. Past the top or the bottom of the two lists
-  the cursor moves on to the previous or next line of the page. Left/Right jump between the two lists. ZL + Up/Down move
-  12 rows, stop at the end, then go to the other list and on to the page's next or previous section.
+- Up/Down move through each list and wrap at its ends. If a list is empty, Up or Down moves to the other list.
+  Left/Right jump between the two lists. ZL + Up/Down move 12 rows, stop at the end, then go to the other list and on
+  to the page's next or previous section. L/R turn the page.
 - A opens the file's own screen. A on *+ New chain* opens the numbered picker, where ZL + Up/Down jump 12 rows
   and wrap at the ends.
 - X, with the cursor in MACROS, steps the loop count of the view you're in: ∞, 1, 2, 3, 5, 10. It is the same count
@@ -114,8 +114,9 @@ don't turn the page while a file's screen is open.
 
 **The numbered picker** (*+ New chain* and *Edit chain*; *+ New sequence* and *Edit combos* for combos) lists your
 recordings, or your combos (a chain can't hold a chain). A gives the one under the cursor the next number, R takes a
-number off, B finishes. A new chain or sequence then asks for a name on the Switch keyboard. An empty name makes it
-Chain N or Sequence N.
+number off, X is done, and B backs out: nothing is saved, and an edited chain or sequence keeps its old order. X on a
+new chain or sequence asks for a name on the Switch keyboard. An empty name makes it Chain N or Sequence N; cancelling
+the keyboard makes nothing.
 
 ![Edit chain: the CPU plays Chain 1, the numbered picker takes numbers off and gives them again, the CPU plays the new order](../media/rc14-chain-edit.gif)<br>
 *Chain 1 (Walk, Crouch, P1 jab) played by the CPU; on its own screen, Edit chain opens the picker, whose tiles run A to Z (Crouch, P1 jab, Walk) with their numbers: R takes Walk's and Crouch's numbers off, A numbers Crouch 2 and Walk 3, so the chain reads P1 jab, Crouch, Walk; B finishes and the CPU plays the new order. Eden, rc.14 (untested on hardware).*
@@ -156,8 +157,8 @@ It is shown in the Player view only. The left column shows the number of files, 
 
 **How:**
 
-- Up/Down, Left/Right and ZL + Up/Down move as in Save states & Macros: a jump at a list's end goes to the other
-  list, then to the page's next or previous section.
+- Up/Down wrap within each list, as in Save states & Macros. Left/Right switch lists, and ZL + Up/Down jump to the
+  other list and then to the page's next or previous section after reaching an end.
 - A on *+ Save last combo…* keeps the last combo the frame strip saw as a new combo and makes it the drill. The Switch
   keyboard asks for a name; an empty name gives it the next Combo N. With no combo on the strip yet, it says so and
   saves nothing.

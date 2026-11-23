@@ -65,6 +65,7 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.popup.role=\"\"",
         "recording.page.role=\"\"",
         "recording.capture.role=\"\"",
+        "recording.indicator=\"\"",
         "list=\"rows/22\"",
         "list.count=2",
         "list.index=0",
@@ -102,6 +103,27 @@ fn the_recording_popup_page_and_capture_report_independent_roles() {
     assert!(out.contains("\nrecording.popup.role=\"cpu\"\n"));
     assert!(out.contains("\nrecording.page.role=\"player\"\n"));
     assert!(out.contains("\nrecording.capture.role=\"player\"\n"));
+}
+
+#[test]
+fn the_snapshot_says_which_take_the_hud_shows() {
+    for role in ["player", "cpu", ""] {
+        let view = View { recording_indicator: role, ..View::default() };
+        let mut out = String::new();
+        assert!(snapshot(&view, &mut out));
+        assert!(out.contains(&format!("\nrecording.capture.role=\"\"\nrecording.indicator=\"{role}\"\n")));
+    }
+}
+
+#[test]
+fn the_indicator_is_the_take_the_hud_drew_on_a_fresh_pass() {
+    use crate::model::hud_row::Take;
+    let drew = |take| indicator_stamp(1000, take);
+    assert_eq!(recording_indicator(drew(Some(Take::Player)), 1200, 500), "player");
+    assert_eq!(recording_indicator(drew(Some(Take::Cpu)), 1500, 500), "cpu");
+    assert_eq!(recording_indicator(drew(None), 1000, 500), "", "the pass drew no chip: the stock layout, the menu, no take");
+    assert_eq!(recording_indicator(drew(Some(Take::Player)), 1501, 500), "", "no pass since: a waiting room without the host");
+    assert_eq!(recording_indicator(0, 10, 500), "", "never drawn");
 }
 
 #[test]

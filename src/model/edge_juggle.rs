@@ -17,6 +17,11 @@ mod crosshair_tests;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
+pub const RETURN_FRAMES: u16 = 10 * 60;
+
+/// The game teeters within 1.06 (0.86 + 0.1 + 0.1, GroundModule::is_ottotto) of the floor end it faces, moving
+/// the fighter to 0.96; this inset stays outside that range. See docs/design/gj4-player-start.md.
+pub const PLAYER_INSET: f32 = 1.25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drill {
@@ -186,7 +191,7 @@ impl BehaviorLease {
 }
 
 /// The waiting room has no pause panel: the first training partner's control type is the room's Training Partner
-/// Behavior. Save the room's type once, ask for the stock CPU (type 0), give the saved type back at Stop.
+/// Behavior. Save the room's type, follow a fighter swap while the entry holds the drill's 0, and give it back at Stop.
 #[derive(Default)]
 pub struct PartnerLease(Option<(usize, u8)>);
 
@@ -194,11 +199,20 @@ impl PartnerLease {
     pub const fn new() -> Self { Self(None) }
     pub fn held(&self) -> bool { self.0.is_some() }
 
-    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
-    /// A Control type (0x24) or a fighter no CPU operates is never written.
-    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
-        if self.0.is_some_and(|(old, _)| old != owner) {
+    /// The slot has no fighter this poll: the saved type stays while a drill runs or its borrowed fighter is still to go back.
+    pub fn absent(&mut self, level: Option<u8>, swapping: bool) {
+        if level.is_none() && !swapping {
             self.0 = None;
+        }
+    }
+
+    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
+    /// The saved type follows a fighter swap while the entry holds the drill's 0. Control (0x24) or non-CPU is never written.
+    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
+        if let Some((old, saved)) = self.0 {
+            if old != owner {
+                self.0 = (entry == 0).then_some((owner, saved));
+            }
         }
         if !operation_cpu || entry == 0x24 || ai == 0x24 {
             return None;
@@ -272,6 +286,9 @@ pub enum Outcome {
     ZoomWin,
     ZoomMiss,
     Secured,
+    NotCountedKo,
+    NoReturn,
+    PlayerKo,
     RecoveredAtLedge,
     RecoveredOnStage,
     Unresolved,
@@ -286,6 +303,9 @@ impl Outcome {
             Self::ZoomWin => "zoom_win",
             Self::ZoomMiss => "zoom_miss",
             Self::Secured => "secured",
+            Self::NotCountedKo => "not_counted_p1_ko",
+            Self::NoReturn => "not_counted_no_return",
+            Self::PlayerKo => "p1_ko",
             Self::RecoveredAtLedge => "recovered_at_ledge",
             Self::RecoveredOnStage => "recovered_on_stage",
             Self::Unresolved => "unresolved",
@@ -302,6 +322,10 @@ pub struct Observation {
     pub grounded: bool,
     pub cliff_catch: bool,
     pub hit: bool,
+    /// Player 1 stands on a floor or a platform, or holds a ledge.
+    pub player_back: bool,
+    /// Player 1 is KO'd: Dead, Standby or Rebirth.
+    pub player_ko: bool,
 }
 
 /// Player 1 as the drill reads it around its start write.
@@ -354,14 +378,37 @@ pub enum Phase {
     Place,
     Ready(u16),
     Live,
+    Return(u16),
     Result(Outcome, u16),
     Done,
 }
 
 impl Phase {
+    pub const fn card(self) -> &'static str {
+        match self {
+            Self::Return(_) => "KO · get back to the stage",
+            Self::Result(result, _) => match result {
+                Outcome::ZoomWin => "Win",
+                Outcome::ZoomMiss => "Miss",
+                Outcome::Secured => "Secured",
+                Outcome::NotCountedKo => "Not counted · P1 KO",
+                Outcome::NoReturn => "Not counted · no return",
+                Outcome::PlayerKo => "P1 KO",
+                Outcome::RecoveredAtLedge => "Recovered at the ledge",
+                Outcome::RecoveredOnStage => "Recovered on stage",
+                Outcome::Unresolved => "Unresolved",
+                Outcome::Landed => "Landed",
+                Outcome::GrabbedLedge => "Ledge",
+                Outcome::KnockedOut => "KO",
+            },
+            Self::Done => "Set complete · L+R+A restarts",
+            _ => "",
+        }
+    }
+
     /// Keep stock stick and buttons neutral until the attempt releases the CPU.
     pub fn held_pad(self, buttons: u32) -> Option<perfect::Correction> {
-        matches!(self, Self::Place | Self::Ready(_)).then_some(perfect::Correction {
+        matches!(self, Self::Place | Self::Ready(_) | Self::Return(_)).then_some(perfect::Correction {
             stick: Some([0.0, 0.0]),
             release: buttons & !perfect::FLICK_JUMP,
             ..perfect::Correction::default()
@@ -418,6 +465,8 @@ pub enum PlacementAction {
 #[derive(Clone, Copy, Default)]
 pub struct PlacementFrame {
     pub dead_or_rebirthing: bool,
+    /// Player 1 is KO'd: Dead, Standby or Rebirth.
+    pub player_ko: bool,
     pub grounded: bool,
     pub airborne: bool,
     pub wait: bool,
@@ -427,7 +476,7 @@ pub struct PlacementFrame {
 impl Placement {
     pub fn action(self, frame: PlacementFrame) -> PlacementAction {
         use PlacementAction as A;
-        if frame.dead_or_rebirthing {
+        if frame.dead_or_rebirthing || frame.player_ko {
             return A::RestartPlacement;
         }
         match self {
@@ -490,7 +539,7 @@ impl Session {
     }
 
     pub fn discard_attempt(&mut self) {
-        if matches!(self.phase, Phase::Ready(_) | Phase::Live) {
+        if matches!(self.phase, Phase::Ready(_) | Phase::Live | Phase::Return(_)) {
             self.phase = Phase::Place;
         }
     }
@@ -549,6 +598,19 @@ impl Session {
         self.phase = Phase::Result(outcome, RESULT_FRAMES);
     }
 
+    /// Guard the Edge after the CPU's KO: a KO'd Player 1 is not counted, one that is back secures, else the window runs.
+    fn after_ko(&mut self, observed: Observation, left: u16) {
+        if observed.player_ko {
+            self.finish_attempt(Outcome::NotCountedKo);
+        } else if observed.player_back {
+            self.finish_attempt(Outcome::Secured);
+        } else if left == 0 {
+            self.finish_attempt(Outcome::NoReturn);
+        } else {
+            self.phase = Phase::Return(left);
+        }
+    }
+
     /// The transition to Live is the release frame (time zero).
     pub fn advance_attempt(&mut self, observed: Observation) {
         match self.phase {
@@ -569,7 +631,10 @@ impl Session {
                             dead_or_rebirthing: true,
                             ..
                         },
-                    ) => Outcome::Secured,
+                    ) => {
+                        self.after_ko(observed, RETURN_FRAMES);
+                        return;
+                    }
                     (
                         Drill::GuardEdge,
                         Observation {
@@ -579,6 +644,7 @@ impl Session {
                     (Drill::GuardEdge, Observation { grounded: true, .. }) => {
                         Outcome::RecoveredOnStage
                     }
+                    (Drill::GuardEdge, Observation { player_ko: true, .. }) => Outcome::PlayerKo,
                     (Drill::GuardEdge, _) if self.frames == EDGE_TIMEOUT => Outcome::Unresolved,
                     (
                         Drill::Juggler,
@@ -598,6 +664,7 @@ impl Session {
                 };
                 self.finish_attempt(outcome);
             }
+            Phase::Return(left) => self.after_ko(observed, left - 1),
             Phase::Result(outcome, mut left) => {
                 self.phase = if !result_tick(&mut left, true) || observed.dead_or_rebirthing {
                     Phase::Result(outcome, left)
@@ -616,7 +683,8 @@ impl Session {
     pub fn trace_event(self, before: Phase) -> Option<(u16, u8)> {
         let outcome = match (before, self.phase) {
             (Phase::Ready(_), Phase::Live) => return Some((self.attempts.saturating_add(1), 0)),
-            (Phase::Live, Phase::Result(outcome, _)) => outcome,
+            (Phase::Live, Phase::Return(_)) => return Some((self.attempts.saturating_add(1), 8)),
+            (Phase::Live | Phase::Return(_), Phase::Result(outcome, _)) => outcome,
             _ => return None,
         };
         let code = match outcome {
@@ -627,6 +695,9 @@ impl Session {
             Outcome::Landed => 5,
             Outcome::GrabbedLedge => 6,
             Outcome::KnockedOut => 7,
+            Outcome::NotCountedKo => 9,
+            Outcome::NoReturn => 10,
+            Outcome::PlayerKo => 11,
             Outcome::ZoomWin | Outcome::ZoomMiss => return None,
         };
         Some((self.attempts, code))
@@ -660,6 +731,7 @@ impl Session {
             Phase::Place => ("place", None),
             Phase::Ready(left) => ("ready", Some(u32::from(left))),
             Phase::Live => ("live", None),
+            Phase::Return(left) => ("return", Some(u32::from(left))),
             Phase::Result(_, left) => ("result", Some(u32::from(left))),
             Phase::Done => ("done", None),
         };
@@ -763,12 +835,22 @@ impl Stage {
         clamp_point(point, self.camera)
     }
 
+    pub fn player_x(self, drill: Drill, x: f32) -> f32 {
+        if drill == Drill::Juggler {
+            return x;
+        }
+        let lo = self.ledges[0][0] + PLAYER_INSET;
+        let hi = self.ledges[1][0] - PLAYER_INSET;
+        if lo <= hi {
+            x.clamp(lo, hi)
+        } else {
+            self.ledges[0][0].midpoint(self.ledges[1][0])
+        }
+    }
+
     pub fn player_cursor(self, drill: Drill, point: [f32; 2]) -> Option<[f32; 2]> {
         let [x, y] = self.camera_point(point)?;
-        let x = match drill {
-            Drill::GuardEdge => x.clamp(self.ledges[0][0], self.ledges[1][0]),
-            Drill::Juggler => x,
-        };
+        let x = self.player_x(drill, x);
         Some([x, y])
     }
 
@@ -1208,6 +1290,21 @@ mod tests {
     }
 
     #[test]
+    fn placement_waits_for_a_knocked_out_player() {
+        let cases = [
+            (Placement::ResetResources, PlacementFrame::default(), PlacementAction::ResetResources),
+            (Placement::Grounded, PlacementFrame { grounded: true, wait: true, ..PlacementFrame::default() },
+             PlacementAction::PlaceStart),
+            (Placement::Airborne, PlacementFrame { airborne: true, fall: true, ..PlacementFrame::default() },
+             PlacementAction::HoldStart),
+        ];
+        for (placement, frame, normal) in cases {
+            assert_eq!(placement.action(PlacementFrame { player_ko: true, ..frame }), PlacementAction::RestartPlacement);
+            assert_eq!(placement.action(PlacementFrame { player_ko: false, ..frame }), normal);
+        }
+    }
+
+    #[test]
     fn a_new_session_and_ready_start_a_new_player_allowance() {
         let idle = PlacedPlayer { hit_freeze: false, wait: true };
         let drill = Drill::GuardEdge;
@@ -1262,6 +1359,131 @@ mod tests {
         session
     }
 
+    fn gj1_check(session: &Session, phase: Phase, counts: (u16, u16, u16, u16), card: &str, field_phase: &str, last: &str) {
+        assert_eq!(session.phase, phase);
+        assert_eq!((session.attempts, session.secured, session.streak, session.best_streak), counts);
+        assert_eq!(session.phase.card(), card);
+        let fields = session.practice_fields(None, None);
+        assert_eq!((fields.phase, fields.last_outcome), (field_phase, last));
+    }
+
+    #[test]
+    fn gj1_back_on_ko_frame() {
+        let mut session = release(Drill::GuardEdge, None);
+        session.advance_attempt(Observation { dead_or_rebirthing: true, player_back: true, ..Observation::default() });
+        gj1_check(&session, Phase::Result(Outcome::Secured, RESULT_FRAMES), (1, 1, 1, 1), "Secured", "result", "secured");
+        assert_eq!(session.frames, 1);
+        assert_eq!(session.trace_event(Phase::Live), Some((1, 1)));
+    }
+
+    #[test]
+    fn gj1_air_then_return() {
+        let mut session = release(Drill::GuardEdge, None);
+        for _ in 0..7 { session.advance_attempt(Observation::default()); }
+        session.advance_attempt(Observation { dead_or_rebirthing: true, hit: true, ..Observation::default() });
+        gj1_check(&session, Phase::Return(RETURN_FRAMES), (0, 0, 0, 0), "KO · get back to the stage", "return", "");
+        assert_eq!(session.practice_fields(None, None).remaining_frames, Some(600));
+        assert!(session.phase.held_pad(0).is_some());
+        assert_eq!(session.trace_event(Phase::Live), Some((1, 8)));
+        let frames = session.frames;
+        let hits = session.hits;
+        for _ in 0..30 { session.advance_attempt(Observation { hit: true, ..Observation::default() }); }
+        gj1_check(&session, Phase::Return(RETURN_FRAMES - 30), (0, 0, 0, 0), "KO · get back to the stage", "return", "");
+        assert_eq!((session.frames, session.hits), (frames, hits));
+        let before = session.phase;
+        session.advance_attempt(Observation { player_back: true, ..Observation::default() });
+        gj1_check(&session, Phase::Result(Outcome::Secured, RESULT_FRAMES), (1, 1, 1, 1), "Secured", "result", "secured");
+        assert_eq!(session.frames, frames);
+        let mut bests = [None; 1];
+        assert_eq!(session.record_result(&mut bests, 42), Some(frames));
+        assert_eq!(session.trace_event(before), Some((1, 1)));
+    }
+
+    #[test]
+    fn gj1_player_ko_in_window() {
+        let mut session = release(Drill::GuardEdge, None);
+        for _ in 0..2 {
+            session.advance_attempt(Observation { dead_or_rebirthing: true, player_back: true, ..Observation::default() });
+            for _ in 0..RESULT_FRAMES { session.advance_attempt(Observation::default()); }
+            session.placed();
+            for _ in 0..Drill::GuardEdge.ready_frames() { session.advance_attempt(Observation::default()); }
+        }
+        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        let before = session.phase;
+        session.advance_attempt(Observation { player_ko: true, ..Observation::default() });
+        gj1_check(&session, Phase::Result(Outcome::NotCountedKo, RESULT_FRAMES), (3, 2, 0, 2), "Not counted · P1 KO", "result", "not_counted_p1_ko");
+        assert_eq!(session.record_result(&mut [None; 1], 42), None);
+        assert_eq!(session.trace_event(before), Some((3, 9)));
+    }
+
+    #[test]
+    fn gj1_limit() {
+        for back in [false, true] {
+            let mut session = release(Drill::GuardEdge, None);
+            session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+            for _ in 0..599 { session.advance_attempt(Observation::default()); }
+            gj1_check(&session, Phase::Return(1), (0, 0, 0, 0), "KO · get back to the stage", "return", "");
+            let before = session.phase;
+            session.advance_attempt(Observation { player_back: back, ..Observation::default() });
+            if back {
+                gj1_check(&session, Phase::Result(Outcome::Secured, RESULT_FRAMES), (1, 1, 1, 1), "Secured", "result", "secured");
+                assert_eq!(session.trace_event(before), Some((1, 1)));
+            } else {
+                gj1_check(&session, Phase::Result(Outcome::NoReturn, RESULT_FRAMES), (1, 0, 0, 0), "Not counted · no return", "result", "not_counted_no_return");
+                assert_eq!(session.trace_event(before), Some((1, 10)));
+                assert_eq!(session.record_result(&mut [None; 1], 42), None);
+            }
+            assert_eq!(session.frames, 1);
+        }
+    }
+
+    #[test]
+    fn gj1_player_ko_while_cpu_recovers() {
+        let mut edge = release(Drill::GuardEdge, None);
+        edge.advance_attempt(Observation { player_ko: true, ..Observation::default() });
+        gj1_check(&edge, Phase::Result(Outcome::PlayerKo, RESULT_FRAMES), (1, 0, 0, 0), "P1 KO", "result", "p1_ko");
+        assert_eq!(edge.trace_event(Phase::Live), Some((1, 11)));
+        let mut juggle = release(Drill::Juggler, None);
+        juggle.advance_attempt(Observation { player_ko: true, ..Observation::default() });
+        gj1_check(&juggle, Phase::Live, (0, 0, 0, 0), "", "live", "");
+    }
+
+    #[test]
+    fn gj1_same_frame_priorities() {
+        let mut edge = release(Drill::GuardEdge, None);
+        edge.advance_attempt(Observation { dead_or_rebirthing: true, player_ko: true, player_back: true, ..Observation::default() });
+        gj1_check(&edge, Phase::Result(Outcome::NotCountedKo, RESULT_FRAMES), (1, 0, 0, 0), "Not counted · P1 KO", "result", "not_counted_p1_ko");
+        assert_eq!(edge.trace_event(Phase::Live), Some((1, 9)));
+        let mut recovered = release(Drill::GuardEdge, None);
+        recovered.advance_attempt(Observation { grounded: true, player_ko: true, ..Observation::default() });
+        gj1_check(&recovered, Phase::Result(Outcome::RecoveredOnStage, RESULT_FRAMES), (1, 0, 0, 0), "Recovered on stage", "result", "recovered_on_stage");
+        assert_eq!(recovered.trace_event(Phase::Live), Some((1, 3)));
+    }
+
+    #[test]
+    fn gj1_discard_return() {
+        let mut session = release(Drill::GuardEdge, None);
+        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        gj1_check(&session, Phase::Return(RETURN_FRAMES), (0, 0, 0, 0), "KO · get back to the stage", "return", "");
+        session.discard_attempt();
+        gj1_check(&session, Phase::Place, (0, 0, 0, 0), "", "place", "");
+    }
+
+    #[test]
+    fn gj1_unchanged_juggler_and_labels() {
+        let mut session = release(Drill::Juggler, None);
+        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        gj1_check(&session, Phase::Result(Outcome::KnockedOut, RESULT_FRAMES), (1, 0, 0, 0), "KO", "result", "knocked_out");
+        for (phase, label) in [
+            (Phase::Result(Outcome::ZoomWin, 1), "Win"), (Phase::Result(Outcome::ZoomMiss, 1), "Miss"),
+            (Phase::Result(Outcome::Secured, 1), "Secured"), (Phase::Result(Outcome::RecoveredAtLedge, 1), "Recovered at the ledge"),
+            (Phase::Result(Outcome::RecoveredOnStage, 1), "Recovered on stage"), (Phase::Result(Outcome::Unresolved, 1), "Unresolved"),
+            (Phase::Result(Outcome::Landed, 1), "Landed"), (Phase::Result(Outcome::GrabbedLedge, 1), "Ledge"),
+            (Phase::Result(Outcome::KnockedOut, 1), "KO"), (Phase::Done, "Set complete · L+R+A restarts"),
+            (Phase::Place, ""), (Phase::Ready(1), ""), (Phase::Live, ""),
+        ] { assert_eq!(phase.card(), label); }
+    }
+
     #[test]
     fn edge_free_fall_restores_stock_aerial_jump_reserve() {
         // Stock jump_count_max includes the ground jump. The verified Sheik,
@@ -1297,7 +1519,7 @@ mod tests {
         }
         let live = session.practice_fields(None, None);
         assert_eq!((live.phase, live.attempt_frames), ("live", Some(0)));
-        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        session.advance_attempt(Observation { dead_or_rebirthing: true, player_back: true, ..Observation::default() });
         let result = session.practice_fields(None, Some(1));
         assert_eq!((result.phase, result.last_outcome), ("result", "secured"));
         assert_eq!((result.attempt_frames, result.score, result.attempts), (Some(1), Some(1), Some(1)));
@@ -1315,7 +1537,7 @@ mod tests {
     #[test]
     fn drill_outcome_stays_between_attempts_and_clears_on_restart() {
         let mut session = release(Drill::GuardEdge, None);
-        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        session.advance_attempt(Observation { dead_or_rebirthing: true, player_back: true, ..Observation::default() });
         assert_eq!(session.phase, Phase::Result(Outcome::Secured, RESULT_FRAMES));
         assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
         for _ in 0..RESULT_FRAMES {
@@ -1491,6 +1713,43 @@ mod tests {
     }
 
     #[test]
+    fn the_rooms_type_follows_the_drills_fighter_swap() {
+        for room_type in [1, 0x22] {
+            let mut lease = PartnerLease::new();
+            assert_eq!(lease.step(Some(9), 1, room_type, room_type, true), Some(0));
+            assert_eq!(lease.step(Some(9), 2, 0, 0, true), None);
+            assert!(lease.held());
+            assert_eq!(lease.step(None, 2, 0, 0, true), Some(room_type));
+            assert_eq!(lease.step(None, 3, 0, 0, true), Some(room_type));
+            assert_eq!(lease.step(None, 3, room_type, room_type, true), None);
+            assert!(!lease.held());
+        }
+
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        assert_eq!(lease.step(Some(9), 2, 0x22, 0x22, true), Some(0));
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(0x22));
+
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        assert_eq!(lease.step(Some(9), 2, 0, 1, true), Some(0));
+        assert!(lease.held());
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(1));
+
+        let mut lease = PartnerLease::new();
+        lease.absent(None, false);
+        assert!(!lease.held());
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        lease.absent(Some(9), false);
+        assert!(lease.held());
+        lease.absent(None, true);
+        assert!(lease.held());
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(1));
+        lease.absent(None, false);
+        assert!(!lease.held());
+    }
+
+    #[test]
     fn lobby_practice_off_gives_the_partner_back_first_and_a_departure_writes_nothing() {
         use crate::model::lobby_flag::{self, FlagClock, Scene};
         use crate::model::edge_juggle::picker::{self, Settled, Tick};
@@ -1582,7 +1841,9 @@ mod tests {
             }
             assert!(blocked.held());
             if replaced {
-                assert_eq!(blocked.step(None, 2, 0, 0, true), None);
+                assert_eq!(blocked.step(None, 2, 0, 0, true), Some(7));
+                assert!(blocked.held());
+                assert_eq!(blocked.step(None, 2, 7, 7, true), None);
                 assert!(!blocked.held());
                 let (on, releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
                 assert_eq!((on, releasing, stop), (false, false, false));
@@ -1745,16 +2006,60 @@ mod tests {
             [[-68.0, -4.25], [68.0, -4.25]],
         ).unwrap();
         for side in [-1.0, 1.0] {
-            let lip = [side * 68.0, -4.25];
+            let lip = [side * (68.0 - PLAYER_INSET), -4.25];
             let outside = [side * 130.0, -4.25];
             let cursor = stage.player_cursor(Drill::GuardEdge, outside).unwrap();
             assert_eq!(
                 stage.player_cursor(Drill::GuardEdge, [cursor[0] - side * 2.0, cursor[1]]),
-                Some([side * 66.0, -4.25]),
+                Some([side * (68.0 - PLAYER_INSET - 2.0), -4.25]),
             );
             assert_eq!(cursor, lip);
             assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
         }
+    }
+
+    #[test]
+    fn guard_player_point_stops_outside_the_teeter_range_of_each_floor_end() {
+        // GroundModule::is_ottotto includes two 0.1 margins.
+        const TEETER_RANGE: f32 = 0.86 + 0.1 + 0.1;
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-79.9856, 0.0], [79.9893, 0.0]],
+        ).unwrap();
+        for (outside, inside, expected, literal) in [
+            ([-150.0, 4.0], [-79.9856_f32 + 1.5, 4.0],
+             [-79.9856_f32 + PLAYER_INSET, 4.0], [-79.9856_f32 + 1.25, 4.0]),
+            ([150.0, 4.0], [79.9893_f32 - 1.5, 4.0],
+             [79.9893_f32 - PLAYER_INSET, 4.0], [79.9893_f32 - 1.25, 4.0]),
+        ] {
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, outside), Some(expected));
+            assert_eq!(expected, literal);
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, inside), Some(inside));
+            assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
+        }
+        assert!(std::hint::black_box(PLAYER_INSET > TEETER_RANGE));
+    }
+
+    #[test]
+    fn a_main_floor_narrower_than_two_insets_keeps_the_player_on_its_middle() {
+        let stage = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-0.5, 0.0], [1.0, 0.0]],
+        ).unwrap();
+        for x in [-8.0, 0.0, 8.0] {
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, [x, 0.0]), Some([0.25, 0.0]));
+            assert_eq!(stage.player_cursor(Drill::Juggler, [x, 0.0]), Some([x, 0.0]));
+        }
+        let exactly_two_insets = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-PLAYER_INSET, 0.0], [PLAYER_INSET, 0.0]],
+        ).unwrap();
+        assert_eq!(exactly_two_insets.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([0.0, 0.0]));
+        let wide_enough = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-2.0, 0.0], [2.0, 0.0]],
+        ).unwrap();
+        assert_eq!(wide_enough.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([2.0 - PLAYER_INSET, 0.0]));
     }
 
     #[test]
@@ -1865,7 +2170,7 @@ mod tests {
     #[test]
     fn edge_scores_ko_and_waits_for_respawn() {
         let mut session = release(Drill::GuardEdge, None);
-        let dead = Observation { dead_or_rebirthing: true, ..Observation::default() };
+        let dead = Observation { dead_or_rebirthing: true, player_back: true, ..Observation::default() };
         session.advance_attempt(dead);
         assert_eq!((session.secured, session.attempts, session.streak), (1, 1, 1));
         let bests = &mut [None; 4];

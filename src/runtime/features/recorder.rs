@@ -8,6 +8,7 @@
 //!   Checks the controller is the CPU entry's own (rule R3: never Nana, never an AI-driven P1), starts a
 //!   mash-triggered playback, injects the frame, runs the end-of-run check and the chords, applies the
 //!   phase tint and posts the phase notice.
+//! * `tint_player` (from Player 1's fighter frame, `cpu::fighter_frame`): Player 1's fighter is red while its own take is open.
 //! * `request_playback` / `on_state_restored` / `stop`: the entry points the CPU behaviours, the save
 //!   states and the hubs call.
 //!
@@ -368,7 +369,7 @@ unsafe fn on_ai_frame(ai: usize) {
         mash_start(&settings, key, body, facing);
     }
 
-    let ctx = ControlCtx { facing, shulk_dial: shulk };
+    let ctx = ControlCtx { shulk_dial: shulk };
     let control = if rec().is_named() {
         // Before input 0 of a named playback the layer repositions the CPU (it may stop the playback itself): neutral controls until then.
         let (playing, at_zero) = {
@@ -388,7 +389,7 @@ unsafe fn on_ai_frame(ai: usize) {
         bump(COUNT_INJECT);
         write_controller(controller, write);
     }
-    let role = recording_host::cpu_role_control(&ctx);
+    let role = recording_host::cpu_role_control();
     if let Some(write) = role.write {
         bump(COUNT_INJECT);
         write_controller(controller, write);
@@ -430,7 +431,7 @@ unsafe fn on_ai_frame(ai: usize) {
         }
         None => {}
     }
-    chord_step(body, facing);
+    chord_step(body);
 
     // The phase: tint every frame it lasts, the notice once per change.
     let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
@@ -439,10 +440,8 @@ unsafe fn on_ai_frame(ai: usize) {
         let rec = rec();
         (rec.phase(), rec.length())
     };
-    if let (Some([r, g, b]), blend) = (phase.tint(), MODEL_COLOR_BLEND.load(Ordering::Acquire)) {
-        if blend != UNRESOLVED {
-            natives::set_color_rgb(body.accessor, r, g, b, blend);
-        }
+    if let Some(rgb) = phase.tint() {
+        tint(body.accessor, rgb);
     }
     if LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
@@ -452,6 +451,30 @@ unsafe fn on_ai_frame(ai: usize) {
     bump(COUNT_NOTICE);
     host_cpu(controller);
     report_counts();
+}
+
+/// One frame of a recorded fighter's colour-blend tint: written on every frame it lasts, as the phase tint always was.
+unsafe fn tint(accessor: usize, [r, g, b]: [f32; 3]) {
+    let blend = MODEL_COLOR_BLEND.load(Ordering::Acquire);
+    if blend != UNRESOLVED {
+        natives::set_color_rgb(accessor, r, g, b, blend);
+    }
+}
+
+/// Player 1's fighter frame in a practice scene (`cpu::fighter_frame`, entry 0; Training and the waiting room): on every
+/// frame of Player 1's take (`rr_host::player_tint`) entry 0's active body is the Player role's red, never Nana, as the
+/// CPU's. It does not depend on the CPU's AI frame, which a drill, a placement or Mash Out skips.
+///
+/// # Safety
+/// `accessor` is the live accessor of the entry-0 fighter whose frame just ran.
+pub(crate) unsafe fn tint_player(accessor: usize) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
+    let Some(rgb) = recording_host::player_tint() else { return };
+    if load_consts() && natives::module_accessor(0) == Some(accessor) {
+        tint(accessor, rgb);
+    }
 }
 
 unsafe fn write_controller(controller: usize, write: Inject) {
@@ -481,13 +504,15 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
     let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
-    let term_enabled = if needs {
-        let from = rec().starting_status_of(head);
-        let term = table.get(Recorder::term_for_status(&table, from));
-        term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
-    } else {
-        false
-    };
+    let from = rec().starting_status_of(head);
+    let term_enabled = needs
+        && match Recorder::term_for_status(&table, from) {
+            Some(c) => {
+                let term = table.get(c);
+                term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+            }
+            None => cpu::actionable(body.accessor),
+        };
     let start = rec().mash_should_start(
         settings,
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
@@ -508,7 +533,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(body: Body, facing: i8) {
+unsafe fn chord_step(body: Body) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
@@ -555,7 +580,7 @@ unsafe fn chord_step(body: Body, facing: i8) {
         }
     };
     recording_host::on_chords(body, record, play_player, playback);
-    recording_host::cpu_role_after_chord(facing);
+    recording_host::cpu_role_after_chord();
 }
 
 unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {

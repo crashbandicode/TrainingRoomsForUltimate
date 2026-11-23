@@ -35,6 +35,54 @@ fn member<'a>(text: &'a str, head: &str) -> &'a str {
 }
 
 #[test]
+fn f9_runtime_name_wiring() {
+    let named = src("src/runtime/macros/named_macros.rs");
+    let service = item(&named, "pub fn service_keyboard(");
+    assert!(service.contains("NameJob::complete("));
+    assert!(service.contains("job.owner == Some(crate::runtime::features::recording_host::NAME_TOKEN)"));
+    assert!(item(&named, "fn retire_name(").contains("NameJob::retire(&mut pending, keep_waiting)"));
+    let request = item(&named, "fn request_native_name(");
+    assert!(request.contains("external_name_token()") && request.contains("owner"));
+    let discard = item(&named, "pub fn discard_external_name(");
+    assert!(discard.contains("NameJob::retire_owner(&mut pending, token)"));
+    assert!(discard.contains("native_keyboard::interrupt(id)") && discard.contains("ui.on_pad(Pad::Back)"));
+    assert!(!discard.contains("naming_pending") && !discard.contains("{ on_pad("));
+    assert!(!discard.lines().any(|line| line.trim_start().starts_with("on_pad(")));
+    let cancelled = service.split_once("KeyboardResult::Cancelled => {").unwrap().1
+        .split_once("KeyboardResult::Failed").unwrap().0;
+    assert!(cancelled.contains("job.waiting || job.replay || hidden"));
+    assert!(cancelled.contains("on_pad(Pad::Back)"));
+    let failed = service.split_once("KeyboardResult::Failed(code) => {").unwrap().1
+        .split_once("KeyboardResult::Interrupted").unwrap().0;
+    assert!(failed.contains("if hidden") && failed.contains("on_pad(Pad::Back)"));
+    let host = src("src/runtime/features/recording_host.rs");
+    let apply = item(&host, "fn apply(");
+    assert!(apply.find("offer_external_name_titled(").unwrap() < apply.find("NAME_ASKED.store(true, Ordering::Release)").unwrap());
+    let settle = item(&host, "pub(crate) fn settle_name(");
+    assert!(settle.contains("confirmed_name_waiting(NAME_TOKEN)"));
+    assert!(settle.contains("external_name_open(NAME_TOKEN)"));
+    assert!(settle.contains("discard_external_name(NAME_TOKEN)"));
+    let worker = src("src/runtime/ui/worker.rs");
+    let run = item(&worker, "fn run()");
+    assert!(run.find("port::worker_tick()").unwrap() < run.find("settle_name(shown && naming) || (naming && !shown)").unwrap());
+    assert!(run.contains("menu.recording_mut().cancel_name()"));
+    assert!(run.contains("publish_frame(&session)"));
+}
+
+#[test]
+fn gj1_runtime_return_wiring() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("let p1_situation = natives::situation_kind(p1);"));
+    assert!(frame.contains("(p1_situation == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)))"));
+    let obs = frame.split_once("let obs = Observation {").unwrap().1.split_once("\n    };").unwrap().0;
+    assert!(obs.contains("player_back: p1_situation == konst(C::SituationGround) || p1_situation == konst(C::SituationCliff)"));
+    assert!(obs.contains("player_ko: player_ko(p1)"));
+    assert!(frame.contains("if before == Phase::Live && run.rounds.phase != Phase::Live {\n            run.route_history.complete();"));
+    assert!(item(&runtime, "fn post_notice(").contains("let outcome = phase.card();"));
+}
+
+#[test]
 fn the_role_tabs_draw_the_models_caps() {
     let view = src("src/runtime/ui/view.rs");
     let draw = item(&view, "unsafe fn draw_role_tabs(");
@@ -198,6 +246,8 @@ fn the_drills_run_in_a_waiting_room_against_the_first_training_partner() {
     assert!(partner < panel);
     let step = item(&level, "unsafe fn step_drill_partner(");
     assert!(step.contains("state.drill_partner.step("));
+    assert!(step.contains("state.drill_partner.absent("));
+    assert!(!step.contains("PartnerLease::new()"));
     assert!(step.contains("AI_SET_BEHAVIOR") && step.contains("ENTRY_BEHAVIOR"));
     assert!(!step.contains("PANEL_"));
     assert!(item(&level, "pub(crate) unsafe fn frame(").contains("rules::drill_target("));
@@ -455,10 +505,36 @@ fn a_crosshair_below_a_platform_finds_the_floor_under_it() {
     assert!(floor.contains("if platforms { (y + 1.0).min(top) } else { top }"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let snap = item(&runtime, "unsafe fn snap_player(");
-    assert!(snap.contains("placement::floor_under(p1, [x, y], platforms)"));
+    assert!(snap.contains("let x = stage.player_x(drill, x);"));
+    assert!(snap.contains("placement::floor_under(p1, [x, y], drill == Drill::Juggler)"));
     assert!(!snap.contains("FloorRay::new("));
     assert!(!snap.contains("ray.floor("));
-    assert!(snap.contains("x.clamp(stage.ledges[0][0], stage.ledges[1][0])"));
+    assert!(!snap.contains(".clamp("));
+}
+
+#[test]
+fn edge_juggle_waits_for_a_knocked_out_player() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let ko = item(&runtime, "unsafe fn player_ko(p1: usize) -> bool");
+    for status in ["C::StatusDead", "C::StatusStandby", "C::StatusRebirth"] {
+        assert!(ko.contains(status), "{status}");
+    }
+    assert!(ko.contains(".map(konst)"));
+    assert!(ko.contains("natives::status_kind(p1)"));
+    assert!(ko.contains("!= UNRESOLVED"));
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("player_ko: player_ko(p1),"));
+    let restart = frame.split_once("PlacementAction::RestartPlacement => {").unwrap().1
+        .split_once("PlacementAction::ResetResources =>").unwrap().0;
+    assert!(restart.contains("if held_cpu.take() == Some(body)"));
+    assert!(restart.contains("state::set_sleep(cpu, false);"));
+    assert!(restart.find("state::set_sleep(cpu, false);").unwrap()
+        < restart.find("run.placement = Placement::ResetResources;").unwrap());
+    let model = src("src/model/edge_juggle.rs");
+    let action = item(&model, "pub fn action(self, frame: PlacementFrame)");
+    assert!(action.contains("if frame.dead_or_rebirthing || frame.player_ko"));
+    let ids = src("src/model/cpu/ids.rs");
+    assert!(ids.contains("StatusStandby = \"FIGHTER_STATUS_KIND_STANDBY\","));
 }
 
 #[test]
@@ -663,7 +739,8 @@ fn the_strip_asks_the_shared_wizard_state() {
     let draw = item(&hud, "pub unsafe fn draw(");
     assert!(draw.contains("WIZARDS.hides_strip(owners)"));
     assert!(draw.contains("let menu_open = owners.covers_hud()"));
-    assert!(draw.contains("let chip = (!menu_open"));
+    assert!(draw.contains("let row = (!menu_open).then(|| hud_row::hud_row("));
+    assert!(draw.contains("let chip = row.as_ref().map(|row| hud_row::hud_row_box("));
     assert!(draw.contains("combo::hud_tick(strip_shown"));
     assert!(draw.contains("combo::card(strip_shown)"));
     assert!(draw.contains("strip_shown.then(parry::view)"));

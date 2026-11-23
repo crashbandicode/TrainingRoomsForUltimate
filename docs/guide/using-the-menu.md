@@ -39,7 +39,9 @@ described in [TECHNICAL.md](../TECHNICAL.md).
 
 ## Moving around
 
-- **Up / Down** move one row and wrap from the bottom of the page to the top. Hold either on the D-pad or a stick
+- **Up / Down** move one row and wrap from the bottom of the page to the top, or within a list at its ends. On the
+  Recording page each library list wraps separately; Left / Right switch lists and ZL + Up / Down leave them.
+  Hold either on the D-pad or a stick
   to keep moving: it repeats after a third of a second and speeds up (about 7 rows a second, 12 after one second,
   15 after two). Left / Right repeat from a stick only, at a steady rate.
 - **ZL + Up / Down** jump to the next or previous section (the first row of each group). From the last section

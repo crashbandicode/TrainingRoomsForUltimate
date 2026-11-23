@@ -2457,7 +2457,47 @@ approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Reco
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196357
+ceiling = 196369
 date = "2026-11-23"
-reason = "A directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 196357, 8 above 196349."
-approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+reason = "GJ4 waits for Player 1 to leave KO during placement and insets the Guard the Edge Player point. Measured 196369 at 2c835eb8, 20 over 17060a5e with no spare."
+approved_by = "GJ4 fix-build handoff 2026-11-23, item-specific entry under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196420
+date = "2026-11-23"
+reason = "GJ1: a Guard the Edge KO counts once Player 1 is back on the stage. Measured 196420, 51 above 196369."
+approved_by = "Operator's fix-build order 2026-11-23 ~13:36Z through tr-primary-2, under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196563
+date = "2026-11-23"
+reason = "The Training speed label is lent Player 1's glyph style so 1 Frame names its button, with five guarded rows; the compact HUD row shows REC P1 or REC CPU in the role's colour while a take is open, in Training and waiting rooms, the bridge reports it, and the recorded fighter is tinted in its role's colour. Measured 196563, 214 above 196349."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 items F5 and F3 (fix-round BRIEF.md); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196609
+date = "2026-11-23"
+reason = "Fix round 2026-11-23, integration total after merging F2, F4, GJ4, GJ1 and F5 + F3 on 17060a5e: 196349 - 8 (F2) - 14 (F4) + 20 (GJ4) + 48 (GJ1) + 214 (F5 + F3) = 196609 measured, with no spare. The integrator added no code; each item entry above was measured on its own branch from 17060a5e, so the last item ceiling alone is below the merged count."
+approved_by = "The item entries above, each under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2); fix-round BRIEF.md integration row (tr-primary-2, 2026-11-23): one fix build from 17060a5e, re-totalled once per batch by the integrator tr-practice-state-sol. NRO and BSS are reported with the batch gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196638
+date = "2026-11-23"
+reason = "F12: the roster picker's popup no longer leaves its box on the CONNECTIONS divider pane; the divider has one writer. Measured 196638, 29 above 196609."
+approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-2 (item F12), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196465
+date = "2026-11-23"
+reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196465 on install 2 dd6aa1de with F9; F9 adds 105 lines."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."

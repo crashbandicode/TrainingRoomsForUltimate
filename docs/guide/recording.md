@@ -118,7 +118,8 @@ because the picker lists recordings only.
 
 - **Make one:** + New chain, the last row under MACROS, opens the numbered picker
   ([how it works](../menu/recording.md#a-file-s-own-screen)). It is the Character Cycles picker, except that R can take
-  off the last number, so a chain can end up empty. A on a tile that already has a number does nothing.
+  off the last number, so a chain can end up empty. X is done and asks for a name; B backs out and makes nothing.
+  A on a tile that already has a number does nothing.
 - **Where it starts:** at its first macro's start save. The chain has its own Start save switch, On by default. On
   warps there once when the Play chord starts the chain. Off plays from where the fighters are. The macros inside don't
   use their own start saves, whatever their switches say. If macro 1 has no start save, the chain has none.

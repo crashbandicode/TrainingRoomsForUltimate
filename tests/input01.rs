@@ -17,7 +17,7 @@ fn stick(x: i8, y: i8) -> MappedInputs {
     MappedInputs { lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL }
 }
 
-const CTX: ControlCtx = ControlCtx { facing: 1, shulk_dial: false };
+const CTX: ControlCtx = ControlCtx { shulk_dial: false };
 const POST: PostCtx = PostCtx { facing: 1, queue_head_is_playback: false };
 
 /// One game frame: the CPU control frame, then the post-frame stage.
@@ -134,16 +134,76 @@ fn mirror_multiplier_and_shulk_dial() {
     let mut r = Recorder::new();
     filled(&mut r, 0, &take(&[stick(100, 0)]), 1);
     r.start_playback(0, -1).unwrap();
-    let left = r.control(&ControlCtx { facing: -1, shulk_dial: false }).write.unwrap();
+    let left = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
     assert!(left.stick_x < 0.0, "mirrored");
     r.start_playback(0, -1).unwrap();
-    let dial = r.control(&ControlCtx { facing: -1, shulk_dial: true }).write.unwrap();
+    let dial = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
     assert!(dial.stick_x > 0.0, "Shulk's dial: never mirrored");
     // Recorded facing left, the CPU faces left again: no mirroring.
     filled(&mut r, 1, &take(&[stick(100, 0)]), -1);
     r.start_playback(1, -1).unwrap();
-    assert!(r.control(&ControlCtx { facing: -1, shulk_dial: false }).write.unwrap().stick_x > 0.0);
+    assert!(r.control(&ControlCtx { shulk_dial: false }).write.unwrap().stick_x > 0.0);
     assert_eq!(r.starting_status_of(1), UNRESOLVED);
+}
+
+#[test]
+fn f4_playback_same_start_facing_survives_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, -1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_opposite_start_facing_stays_mirrored_after_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, -80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_turns_only_when_the_recorded_direction_changes() {
+    let mut r = Recorder::new();
+    let frames: Vec<_> = [-80, 80, -80, 80].into_iter().flat_map(|x| [stick(x, 0); 60]).collect();
+    filled(&mut r, 0, &frames, -1);
+    r.start_playback(0, -1).unwrap();
+    let mut facing = -1;
+    let mut turns = 0;
+    let mut mismatches = 0;
+    for hold in [-80i8, 80, -80, 80] {
+        for _ in 0..60 {
+            let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+            if write.stick_x != f32::from(hold) / 120.0 {
+                mismatches += 1;
+            }
+            let next = if write.stick_x > 0.0 { 1 } else { -1 };
+            if next != facing {
+                facing = next;
+                turns += 1;
+            }
+        }
+    }
+    assert_eq!(turns, 3);
+    assert_eq!(mismatches, 0);
+    assert_eq!(r.frame(), 240);
+}
+
+#[test]
+fn f4_playback_shulk_dial_uses_the_recorded_sign() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
 }
 
 #[test]
@@ -207,21 +267,29 @@ fn table() -> Table {
 fn starting_status_to_term() {
     let t = table();
     let cases = [
-        (40, C::TermContAttackAir),
-        (50, C::TermContEscapeAir),
-        (51, C::TermContEscapeAir),
-        (60, C::TermContSpecialHi),
-        (70, C::TermContJumpSquat),
-        (71, C::TermContJumpAerial),
-        (80, C::TermContEscape),
-        (81, C::TermContEscapeF),
-        (82, C::TermContEscapeF),
-        (90, C::TermContCatch),
-        (1234, C::TermContSpecialS),
-        (UNRESOLVED, C::TermContSpecialS),
+        (40, Some(C::TermContAttackAir)),
+        (50, Some(C::TermContEscapeAir)),
+        (51, Some(C::TermContEscapeAir)),
+        (60, Some(C::TermContSpecialHi)),
+        (70, Some(C::TermContJumpSquat)),
+        (71, Some(C::TermContJumpAerial)),
+        (80, Some(C::TermContEscape)),
+        (81, Some(C::TermContEscapeF)),
+        (82, Some(C::TermContEscapeF)),
+        (90, Some(C::TermContCatch)),
+        (1234, None),
+        (UNRESOLVED, None),
     ];
     for (status, term) in cases {
         assert_eq!(Recorder::term_for_status(&t, status), term, "status {status}");
+    }
+}
+
+#[test]
+fn a_start_from_any_other_status_waits_for_the_fighter_to_act() {
+    let t = table();
+    for status in [UNRESOLVED, 0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
+        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
     }
 }
 
@@ -309,16 +377,60 @@ fn session_clear_stops() {
 
 #[test]
 fn phase_notifications() {
-    assert_eq!(Phase::Lockout.tint(), Some([0.0, 0.0, 1.0]));
+    assert_eq!(Phase::Lockout.tint(), Some([1.0, 1.0, 0.0]));
     assert_eq!(Phase::Standby.tint(), Some([1.0, 0.0, 1.0]));
-    assert_eq!(Phase::Recording.tint(), Some([1.0, 0.0, 0.0]));
+    assert_eq!(Phase::Recording.tint(), Some([0.0, 0.0, 1.0]));
     assert_eq!(Phase::Playback.tint(), None);
-    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [148, 176, 255, 255])));
+    assert_eq!(Phase::Idle.tint(), None);
+    assert_eq!(Phase::Lockout.notice(), Some(("Lockout", [255, 224, 112, 255])));
     assert_eq!(Phase::Standby.notice(), Some(("Standby", [255, 156, 255, 255])));
-    assert_eq!(Phase::Recording.notice(), Some(("Recording", [255, 132, 124, 255])));
+    assert_eq!(Phase::Recording.notice(), Some(("Recording", [148, 176, 255, 255])));
     assert_eq!(Phase::Playback.notice(), Some(("Playback", [236, 238, 242, 255])));
     assert_eq!(Phase::Idle.notice(), None);
     assert_eq!(NOTICE_HEADER, "Input Recording");
+}
+
+/// Fix round 2026-11-23, F3: while its take records, a fighter has its role's hue (Player 1 red, the CPU blue); the
+/// CPU's lockout and standby keep hues of their own, and each phase notice has its tint's hue.
+#[test]
+fn a_recorded_fighter_has_its_roles_tint() {
+    assert_eq!((PLAYER_TINT, CPU_TINT), ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0]));
+    assert_eq!(Phase::Recording.tint(), Some(CPU_TINT));
+    assert_eq!((Phase::Lockout.tint(), Phase::Standby.tint()), (Some(LOCKOUT_TINT), Some(STANDBY_TINT)));
+    let tints = [PLAYER_TINT, CPU_TINT, LOCKOUT_TINT, STANDBY_TINT];
+    for (i, tint) in tints.iter().enumerate() {
+        assert!(!tints[i + 1..].contains(tint), "{tint:?} is used twice");
+    }
+    for phase in [Phase::Lockout, Phase::Standby, Phase::Recording] {
+        let (tint, (_, colour)) = (phase.tint().unwrap(), phase.notice().unwrap());
+        let off = (0..3).filter(|&i| tint[i] == 0.0).map(|i| colour[i]).max().unwrap();
+        let on = (0..3).filter(|&i| tint[i] == 1.0).map(|i| colour[i]).min().unwrap();
+        assert!(off < on, "{phase:?}: the notice has its tint's hue");
+    }
+}
+
+/// The CPU's phase tint and Player 1's take tint go through one writer; Player 1's is written to entry 0's active body
+/// from Player 1's own frame in a practice scene (Training and the waiting room).
+#[test]
+fn the_runtime_tints_each_recorded_fighter() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    let body = |source: &'static str, name: &str| {
+        let start = source.find(name).unwrap_or_else(|| panic!("missing {name}"));
+        &source[start..start + source[start..].find("\n}\n").expect("end of function")]
+    };
+    let writer = body(recorder, "unsafe fn tint(accessor: usize");
+    assert!(writer.contains("MODEL_COLOR_BLEND") && writer.contains("natives::set_color_rgb(accessor, r, g, b, blend)"));
+    assert_eq!(recorder.matches("natives::set_color_rgb(").count(), 1, "one writer");
+    assert!(body(recorder, "unsafe fn on_ai_frame(").contains("tint(body.accessor, rgb)"), "the CPU's phase tint");
+    let player = body(recorder, "pub(crate) unsafe fn tint_player(");
+    assert!(player.contains("recording_host::player_tint()"), "only during Player 1's take");
+    assert!(player.contains("ENABLED.load(") && player.contains("load_consts()"), "behind the recorder's guards");
+    assert!(player.contains("natives::module_accessor(0) == Some(accessor)"), "entry 0's active body, never Nana");
+    assert!(player.contains("tint(accessor, rgb)"));
+    let frame = body(include_str!("../src/runtime/features/cpu.rs"), "unsafe fn fighter_frame(");
+    let scene = frame.find("if training && current_frame {").expect("Player 1's practice-scene frame");
+    let call = frame.find("recorder::tint_player(accessor);").expect("Player 1's tint");
+    assert!(scene < call && call < frame.find("if !training {").expect("the CPU's part"), "in Player 1's block");
 }
 
 #[test]
@@ -346,18 +458,16 @@ fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
     assert!(std::mem::size_of::<Recorder>() < 24_000 + 512);
 }
 
-/// Lead decision (2026-11-02): the transition-term ranges are inclusive at both ends (question 3), and
-/// every other starting status keeps the described behaviour, the side-special term, for parity with the
-/// fork. A later change to either is deliberate: this test and docs/test-provenance/package-4.md say so.
+/// The transition-term ranges are inclusive at both ends; other statuses use the actionable check.
 #[test]
-fn other_status_keeps_the_placeholder_term() {
+fn other_status_has_no_specific_transition_term() {
     let t = table();
     for status in [0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
-        assert_eq!(Recorder::term_for_status(&t, status), C::TermContSpecialS, "status {status}");
+        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
     }
     // Both ends of the two ranges are inside them (the half-open upstream ranges left these out).
-    assert_eq!(Recorder::term_for_status(&t, 51), C::TermContEscapeAir);
-    assert_eq!(Recorder::term_for_status(&t, 82), C::TermContEscapeF);
+    assert_eq!(Recorder::term_for_status(&t, 51), Some(C::TermContEscapeAir));
+    assert_eq!(Recorder::term_for_status(&t, 82), Some(C::TermContEscapeF));
 }
 
 /// R2-5 (review R2): a running playback stops on a mash interrupt only when the row is On, and the CPU's view of

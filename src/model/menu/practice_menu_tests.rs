@@ -910,7 +910,7 @@ fn recording_page_role_is_saved_and_restores_its_view() {
     assert_eq!(m.focus(), focus);
     assert!((0..m.entry_count(Page::Recording)).all(|i| m.entry(Page::Recording, i) != Some(Entry::Group(usize::from(table::COMBOS_SEQ)))));
     assert_eq!(frame(m).role_tab, Some(1));
-    m.press(Button::Up);
+    m.press(Button::JumpUp);
     let later_focus = m.focus();
     assert_ne!(later_focus, focus);
     keeper.drop_model(&mut held);
