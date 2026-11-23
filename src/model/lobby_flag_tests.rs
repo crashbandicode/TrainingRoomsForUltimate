@@ -92,17 +92,36 @@ mod tests {
         clock
     }
 
-    fn release_holds_the_room_until_restored_or_the_deadline() {
-        use crate::model::lobby_flag::{release, RELEASE_MS};
-        assert_eq!(release(true, true, true, Some(5), 6), (true, None, false));
-        assert_eq!(release(false, false, true, None, 100), (false, None, false));
-        assert_eq!(release(false, true, false, None, 100), (false, None, false));
-        assert_eq!(release(false, true, true, None, 100), (true, Some(100), true));
-        for now in [101, 100 + RELEASE_MS] {
-            assert_eq!(release(false, true, true, Some(100), now), (true, Some(100), false));
+    fn release_holds_the_room_until_restored() {
+        use crate::model::lobby_flag::release;
+        for was_active in [false, true] {
+            for holds in [false, true] {
+                for releasing in [false, true] {
+                    assert_eq!(release(true, was_active, holds, releasing), (true, false, false));
+                }
+            }
         }
-        assert_eq!(release(false, true, true, Some(100), 101 + RELEASE_MS), (false, None, false));
-        assert_eq!(release(true, true, true, Some(100), 101), (true, None, false));
+        for holds in [false, true] {
+            for releasing in [false, true] {
+                assert_eq!(release(false, false, holds, releasing), (false, false, false));
+            }
+        }
+        for releasing in [false, true] {
+            assert_eq!(release(false, true, false, releasing), (false, false, false));
+        }
+        assert_eq!(release(false, true, true, false), (true, true, true));
+        assert_eq!(release(false, true, true, true), (true, true, false));
+    }
+
+    fn release_remains_requested_while_the_partner_is_held() {
+        let mut releasing = false;
+        for step in 0..100_000 {
+            let (on, next, stop) = crate::model::lobby_flag::release(false, true, true, releasing);
+            assert!(on, "held partner must keep practice requested at step {step}");
+            assert!(next);
+            assert_eq!(stop, step == 0);
+            releasing = next;
+        }
     }
 
     fn battle_from(station: &str, clock: FlagClock) -> Step {
@@ -541,7 +560,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("release_holds_the_room_until_restored_or_the_deadline", release_holds_the_room_until_restored_or_the_deadline as fn()),
+            ("release_holds_the_room_until_restored", release_holds_the_room_until_restored as fn()),
+            ("release_remains_requested_while_the_partner_is_held", release_remains_requested_while_the_partner_is_held as fn()),
             ("a_quickplay_match_suspends_naming_as_a_local_match_does", a_quickplay_match_suspends_naming_as_a_local_match_does as fn()),
             ("no_name_keyboard_reads_the_online_mode", no_name_keyboard_reads_the_online_mode as fn()),
             ("training_behaviour_follows_the_live_scene_at_every_station", training_behaviour_follows_the_live_scene_at_every_station as fn()),

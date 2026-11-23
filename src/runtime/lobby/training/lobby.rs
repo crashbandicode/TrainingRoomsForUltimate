@@ -14,7 +14,7 @@ macro_rules! trace {
 static NATIVE_UI_BUSY: AtomicBool = AtomicBool::new(false);
 static UI_READY: AtomicBool = AtomicBool::new(false);
 static WAS_ACTIVE: AtomicBool = AtomicBool::new(false);
-static RELEASE_SINCE: AtomicU64 = AtomicU64::new(0);
+static RELEASING: AtomicBool = AtomicBool::new(false);
 // Setting-plus-tuple edge for the hazard receipt; UI readiness is not part of it.
 static SEEN_ENTRIES: AtomicU32 = AtomicU32::new(0);
 static LAST_MODE: AtomicU64 = AtomicU64::new(u64::MAX);
@@ -57,7 +57,7 @@ pub fn is_waiting_scene() -> bool {
 }
 
 fn practice_setting(on: bool) -> bool {
-    on || RELEASE_SINCE.load(Ordering::Acquire) != 0
+    on || RELEASING.load(Ordering::Acquire)
 }
 
 pub fn requested() -> bool {
@@ -105,15 +105,13 @@ pub fn update() {
         was_active: WAS_ACTIVE.load(Ordering::Acquire),
     };
     let setting_on = read(&MENU).lobby_practice == OnOff::ON;
-    let (practice_on, since, stop) = if !setting_on && clock.was_active {
+    let (practice_on, releasing, stop) = if !setting_on && clock.was_active {
         let holds = crate::runtime::features::edge_juggle::holds_partner();
-        let now = crate::runtime::clock::uptime_ms().max(1);
-        let since = RELEASE_SINCE.load(Ordering::Acquire);
-        crate::model::lobby_flag::release(setting_on, clock.was_active, holds, (since != 0).then_some(since), now)
+        crate::model::lobby_flag::release(setting_on, clock.was_active, holds, RELEASING.load(Ordering::Acquire))
     } else {
-        (setting_on, None, false)
+        (setting_on, false, false)
     };
-    RELEASE_SINCE.store(since.unwrap_or(0), Ordering::Release);
+    RELEASING.store(releasing, Ordering::Release);
     if stop {
         crate::runtime::features::edge_juggle::stop_for_release();
     }

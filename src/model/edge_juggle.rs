@@ -1300,7 +1300,7 @@ mod tests {
 
     #[test]
     fn lobby_practice_off_gives_the_partner_back_first_and_a_departure_writes_nothing() {
-        use crate::model::lobby_flag::{self, FlagClock, Scene, RELEASE_MS};
+        use crate::model::lobby_flag::{self, FlagClock, Scene};
         use crate::model::edge_juggle::picker::{self, Settled, Tick};
         let room = Scene { initialized: true, melee: 0x0d, mode: 0x0701_0100 };
         let battle = Scene { initialized: true, melee: 0x0e, mode: 0x0701_0101 };
@@ -1318,15 +1318,15 @@ mod tests {
         let mut observed = Some(20);
         let mut selected = Some(20);
         let mut settled = Settled::new(selected);
-        let mut since = None;
+        let mut releasing = false;
         let mut stops = 0;
         let mut behavior_writes = Vec::new();
         let mut fighter_requests = Vec::new();
         let mut ended = false;
-        for now in 100..110 {
+        for tick in 0..10 {
             let holds = selected.is_some() || lease.held() || original.is_some();
-            let (on, next_since, stop) = lobby_flag::release(false, clock.was_active, holds, since, now);
-            since = next_since;
+            let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, holds, releasing);
+            releasing = next_releasing;
             let (next, decision) = lobby_flag::step(clock, Some(room), on);
             clock = next;
             if !decision.active {
@@ -1336,7 +1336,7 @@ mod tests {
             }
             if stop {
                 stops += 1;
-                assert_eq!(now, 100);
+                assert_eq!(tick, 0);
                 selected = None;
             }
             if let Some(value) = lease.step(selected.map(|_| 9), 1, entry, ai, true) {
@@ -1362,11 +1362,11 @@ mod tests {
         assert_eq!(fighter_requests, [10]);
         assert_eq!(original, None);
 
-        for (setting, since) in [(true, None), (false, Some(100))] {
+        for (setting, releasing) in [(true, false), (false, true)] {
             let clock = ready();
             let mut lease = held();
             assert!(lease.held());
-            let (on, _, _) = lobby_flag::release(setting, clock.was_active, true, since, 101);
+            let (on, _, _) = lobby_flag::release(setting, clock.was_active, true, releasing);
             let (_, decision) = lobby_flag::step(clock, Some(battle), on);
             assert!(!decision.active);
             lease = PartnerLease::new();
@@ -1374,24 +1374,36 @@ mod tests {
             let (_, tick) = picker::tick(Settled::new(Some(20)), None, Some(10), false, || false, || Some(20));
             assert_eq!(tick, Tick::Left);
         }
-        let mut replaced = held();
-        assert_eq!(replaced.step(None, 2, 0, 0, true), None);
-        assert!(!replaced.held());
-
-        let mut blocked = held();
-        let mut clock = ready();
-        let mut since = None;
-        for (now, active, stop) in [(100, true, true), (100 + RELEASE_MS, true, false), (101 + RELEASE_MS, false, false)] {
-            let (on, next_since, ask_stop) = lobby_flag::release(false, clock.was_active, blocked.held(), since, now);
-            since = next_since;
-            let (next, decision) = lobby_flag::step(clock, Some(room), on);
-            clock = next;
-            assert_eq!((decision.active, ask_stop), (active, stop));
-            if active {
+        for replaced in [false, true] {
+            let mut blocked = held();
+            let mut clock = ready();
+            let mut releasing = false;
+            for tick in 0..20_001 {
+                let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                releasing = next_releasing;
+                let (next, decision) = lobby_flag::step(clock, Some(room), on);
+                clock = next;
+                assert!(decision.active);
+                assert_eq!(stop, tick == 0);
                 assert_eq!(blocked.step(None, 1, 0, 0, false), None);
+                assert!(blocked.held());
+            }
+            assert!(blocked.held());
+            if replaced {
+                assert_eq!(blocked.step(None, 2, 0, 0, true), None);
+                assert!(!blocked.held());
+                let (on, releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                assert_eq!((on, releasing, stop), (false, false, false));
+                let (_, decision) = lobby_flag::step(clock, Some(room), on);
+                assert!(!decision.active);
+            } else {
+                let (on, _, _) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                let (_, decision) = lobby_flag::step(clock, Some(battle), on);
+                assert!(!decision.active);
+                blocked = PartnerLease::new();
+                assert!(!blocked.held());
             }
         }
-        assert!(blocked.held());
     }
 
     #[test]

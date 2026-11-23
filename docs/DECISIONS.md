@@ -1824,4 +1824,4 @@ Both games are listed and run in a waiting room's practice as in Training; the o
 The room has no pause panel, so while a drill runs the plugin sets that partner's control type to the stock CPU with
 the game's own setter and gives the room's Training Partner Behavior back at Stop, and its level is the drill's.
 The room's L + R + A also restarts the drill's set. Eden rows for both scenes are in the combined run.
-Turning Lobby Practice Off while a drill runs stops it first; the partner gets its behavior and fighter back, then practice ends within 10 seconds.
+Turning Lobby Practice Off while a drill runs stops it first; the partner gets its behavior and fighter back, then practice ends. If the partner cannot be given back, practice stays on in that room until the room ends.

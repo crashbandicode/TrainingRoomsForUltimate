@@ -207,6 +207,9 @@ fn the_bridge_publishes_the_focused_list_and_still_omits_rows() {
 fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
     let lobby = src("src/runtime/lobby/training/lobby.rs");
     let update = item(&lobby, "pub fn update(");
+    assert!(!lobby.contains("uptime_ms"));
+    assert!(!lobby.contains("RELEASE_SINCE"));
+    assert!(!src("src/model/lobby_flag.rs").contains("RELEASE_MS"));
     assert!(update.find("lobby_flag::release(").unwrap() < update.find("lobby_flag::step(").unwrap());
     assert!(update.contains("edge_juggle::stop_for_release()"));
     assert!(item(&lobby, "pub fn requested(").contains("practice_setting("));
