@@ -152,9 +152,9 @@ impl Owners {
     /// says whether it may drive the game's own pause for the apply. While a drill runs it waits for every owner but
     /// the game's pause. After Stop it also runs under the plugin's menu alone, so the CPU is handed back behind the
     /// menu; it never drives the pause there.
-    pub const fn drill_step(self, _running: bool) -> Option<bool> {
+    pub const fn drill_step(self, running: bool) -> Option<bool> {
         let others = self.0 & !Self::VANILLA_PAUSE.0;
-        if others == 0 { Some(true) } else { None }
+        if others == 0 { Some(true) } else if !running && others == Self::MENU.0 { Some(false) } else { None }
     }
 }
 

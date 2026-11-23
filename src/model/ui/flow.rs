@@ -61,8 +61,8 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
 
 /// Whether the open menu holds the fighters that are not Player 1, as its panels hold both: the CPU stands frozen
 /// behind the menu. Not while a preview plays, a save state loads or the recorder is busy: those go on as before.
-pub fn menu_holds_cpu(_open: bool, _previewing: bool, _loading: bool, _recorder: bool) -> bool {
-    false
+pub fn menu_holds_cpu(open: bool, previewing: bool, loading: bool, recorder: bool) -> bool {
+    open && !previewing && !loading && !recorder
 }
 
 /// Whether the menu's own screens are what Player 1's presses reach now, as the worker's `press` routes them: the

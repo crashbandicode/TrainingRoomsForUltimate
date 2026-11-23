@@ -1498,8 +1498,8 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
         && !natives::is_stop(p1)
         && !natives::is_stop(cpu);
     // Observe a live hold even under menus: only an actual native decrease counts.
-    // Setup and the result delay wait for the same input owners as the other games.
-    if covered && !matches!(game.step, Step::Held | Step::Result) {
+    // Setup and the result delay wait for the same input owners as the other games; Restore gives the CPU back and drives nothing.
+    if covered && !matches!(game.step, Step::Held | Step::Result | Step::Restore) {
         drive(MappedInputs::NEUTRAL);
         return;
     }

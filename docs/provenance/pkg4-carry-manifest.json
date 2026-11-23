@@ -2368,7 +2368,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "e46a9bf09fe358519d1cb42689d15dc98fc8780eb05957bdadbb093d48a543d2",
+   "dest_sha256": "e20137c2991e7a0e26120f7e8c7b2b96fbbb824f209aeea075cedb5945f45e2d",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3229,6 +3229,11 @@
      "old": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n    pub generation: u32,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
      "new": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
      "reason": "F7: remove unused runtime entry points and fields after preview unification."
+    },
+    {
+     "old": "    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n",
+     "new": "    let menu_holds_cpu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);\n    let is_player = (queries.replay_loading || menu_holds_cpu)\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;\n    let player = || is_player;\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player())\n        || (menu_holds_cpu && !player());\n",
+     "reason": "F16: Hold non-player fighters with the existing panel owner while the menu is open."
     }
    ]
   },
