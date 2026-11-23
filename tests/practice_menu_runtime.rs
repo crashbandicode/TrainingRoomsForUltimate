@@ -337,6 +337,20 @@ fn the_sample_mailbox_uses_the_models_slot_count() {
 }
 
 #[test]
+fn practice_sample_projection_is_gated_and_stale_posts_are_dropped() {
+    let bridge = src("src/runtime/bridge_state.rs");
+    let capture = item(&bridge, "impl PracticeCapture {");
+    let submit = capture.split("    pub fn submit(").nth(1).unwrap().split("    /// Mash out").next().unwrap();
+    assert!(submit.find("if self.admission != 0 {").unwrap() < submit.find("self.post(false, &sample());").unwrap());
+    let result = capture.split("    pub fn result(").nth(1).unwrap().split("    /// One copy").next().unwrap();
+    assert!(result.find("if self.admission != 0 {").unwrap() < result.find("if let Some(fields) = sample() {").unwrap());
+    assert!(result.contains("self.post(true, &fields);"));
+    let post = capture.split("    #[inline(never)]").nth(1).unwrap();
+    assert!(post.contains("fn post(self, result: bool, fields: &Fields)"));
+    assert!(post.find("activation().0 == self.activation").unwrap() < post.find("PRACTICE.post(").unwrap());
+}
+
+#[test]
 fn a_pending_drill_start_does_not_publish_the_previous_run() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
