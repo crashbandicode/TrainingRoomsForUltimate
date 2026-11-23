@@ -247,6 +247,71 @@ fn an_old_drill_still_resolves_at_its_deadline() {
     assert!(helper.results().next().unwrap().clean);
 }
 
+fn full_step_snap(frame: u32, second: bool) -> Snap {
+    let part = if frame == 16 { 1 } else if frame == 30 && second { 2 } else { 0 };
+    Snap {
+        buttons: if frame < 10 { u32::from(frame % 2 == 0) } else { 2 },
+        lstick_y: if frame >= 10 { 127 } else { 0 },
+        facing: 1,
+        aim: Seen {
+            inside: frame <= 35,
+            part,
+            dir: if part == 1 { Some(4) } else if part == 2 { Some(0) } else { None },
+            facing: 1,
+            age: u8::from(part != 0),
+        },
+        ..Snap::empty(frame)
+    }
+}
+
+fn full_step_reference() -> Combo {
+    let mut capture = InputCapture::new();
+    for frame in 0..=36 {
+        capture.step(full_step_snap(frame, false));
+    }
+    let target = capture.combo;
+    assert_eq!(target.len(), 1);
+    let step = target.get(0).unwrap();
+    assert_eq!(step.events().count(), STEPS);
+    assert_eq!(step.events().last().unwrap().kind, Kind::Aim(1));
+    target
+}
+
+#[test]
+fn a_full_last_step_still_fails_an_extra_second_part() {
+    let mut helper = Helper::new();
+    helper.set_target(Some(full_step_reference()));
+    for frame in 0..=35 {
+        let mut out = Out::default();
+        helper.step_inputs(full_step_snap(frame, true), &mut out);
+        assert!(helper.results().next().is_none(), "resolved inside at frame {frame}");
+        assert_eq!(helper.streak(), 0);
+    }
+    assert_eq!(helper.input.combo.len(), 2);
+    assert!(!helper.input.combo.overflow);
+    assert!(helper.input.combo.get(1).unwrap().events().any(|e| e.kind == Kind::Aim(2)));
+    helper.step_inputs(full_step_snap(36, true), &mut Out::default());
+    let result = helper.results().next().expect("result after the special");
+    assert!(!result.clean, "the second direction must fail a full step");
+    assert_eq!(result.fault, Some((0, Reason::ExtraAim(2))));
+    assert_eq!(helper.streak(), 0);
+}
+
+#[test]
+fn a_full_last_step_without_a_second_part_is_clean() {
+    let mut helper = Helper::new();
+    helper.set_target(Some(full_step_reference()));
+    for frame in 0..=35 {
+        helper.step_inputs(full_step_snap(frame, false), &mut Out::default());
+        assert!(helper.results().next().is_none(), "resolved inside at frame {frame}");
+    }
+    helper.step_inputs(full_step_snap(36, false), &mut Out::default());
+    let result = helper.results().next().expect("result after the special");
+    assert!(result.clean);
+    assert_eq!(result.graded, 1);
+    assert_eq!(helper.streak(), 1);
+}
+
 fn event(kind: Kind, dir: Dir, offset: i32) -> Event { Event { kind, dir, offset } }
 fn link(events: impl IntoIterator<Item = Event>) -> LinkRec {
     LinkRec { to: Move::UpSpecial, verdict: Verdict::True(None), events: retain(events), ..LinkRec::INPUT }
