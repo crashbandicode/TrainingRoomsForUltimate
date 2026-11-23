@@ -2369,7 +2369,7 @@ approved_by = "tr-primary-2, 2026-11-22 14:06:33Z (HANDOFF-PRIMARY-tr-primary-2.
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 192477
+ceiling = 192521
 date = "2026-11-23"
-reason = "tr.practice/1 state publisher for the seven practice games and per-entry CPU AI-think counts on the optional test bridge, in Training and the waiting room, ported from rc15/practice-state (6499f6d4..a77cf970 without the spacing-grade lines). Measured 192477, 798 above the integration ceiling 191679."
+reason = "tr.practice/1 state publisher for the seven practice games and per-entry CPU AI-think counts on the optional test bridge, in Training and the waiting room, ported from rc15/practice-state (6499f6d4..a77cf970 without the spacing-grade lines). Measured 192521, 842 above the integration ceiling 191679."
 approved_by = "tr-primary-2 2026-11-22 ~23:50Z order for the intermediate build (operator ~22:40Z: Eden checks read the bridge); line growth pre-approved under the operator's memory rule, TEST-FLOW-2026-11-22.md point 2; NRO and BSS delta reported with READY"
