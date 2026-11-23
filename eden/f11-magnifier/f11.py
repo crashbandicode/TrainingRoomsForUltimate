@@ -116,6 +116,12 @@ def put_back_problem(body, origin, kind):
     return back_problem(body, origin)
 
 
+def ko_count(body):
+    """The body's KO count, or None when it is missing: the bridge writes -1 for a count it could not read. Pure."""
+    dead = (body or {}).get("dead")
+    return dead if isinstance(dead, int) and not isinstance(dead, bool) and dead >= 0 else None
+
+
 ATTACH_CANDIDATES = {"floor_end": -79.9856, "ledge": -85.9856}  # Final Destination's floor, left side
 
 
@@ -379,7 +385,7 @@ def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6",
     chosen = [int(index == drill_choice) for index in range(len(before))]
     body = {"ident": ident, "scene": scene, "origin": origin, "setting": key, "setting_before": before}
     problems, unverified = [], []
-    if not isinstance(origin.get("dead"), int):
+    if ko_count(origin) is None:
         unverified.append(f"the KO count: none read before the picker: {origin!r}")
     try:
         routes.tr_settings(ctx, values={key: chosen})
@@ -429,9 +435,9 @@ def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6",
         if arrived is not None:
             rest = _fixture(ctx, scene, cpu_kind)
             body["rest"] = rest
-            if not isinstance(rest.get("dead"), int):
+            if ko_count(rest) is None:
                 unverified.append(f"the KO count: none read after the return: {rest!r}")
-            elif isinstance(origin.get("dead"), int) and rest["dead"] != origin["dead"]:
+            elif ko_count(origin) is not None and rest["dead"] != origin["dead"]:
                 problems.append(f"the KO count went from {origin['dead']} to {rest['dead']}")
         body["original_still"] = str(ctx.shot(f"{name}-original"))
     finally:
@@ -466,12 +472,17 @@ def floor_attach(ctx, ident="6", scene="training", cpu=(-100, -20), player=(45, 
     ctx.play(edge.TAP["A"])
     edge.observe(ctx, scene, lambda values: values["game.running"] == "1" and values["notice.body"].startswith("Ready"),
                  "the running drill reached Ready", before, cap=3)
-    stood = _await(ctx, mark, lambda lines: next(
-        (line for line in fighter_lines(lines, 0) if line["situation"] == 0 and line["status"] == 0), None))
+    # Ready is announced after the start's placement, so a fighters read asked for now is caused by it; a Wait line
+    # from before the placement cannot be taken for it (rv-edge-juggle-sol, 2026-11-23 23:32:37Z).
+    run = routes.instance_path(ctx, "bridge_log").parent
+    stood = switch_hw.bridge_state(run, ("fighters",), cap=4)["fighters"].get(0)
+    if stood is not None and not (stood.get("situation") == 0 and stood.get("status") == 0):
+        stood = None
     body = {"ident": ident, "scene": scene, "picked": point, "placed_x": placed, "player_line": stood,
+            "player_lines_since_start": fighter_lines(_lines_since(mark), 0),
             "candidates": {"floor_end": floor_end, "ledge": ledge}}
     if stood is None:
-        verdict, detail = "none", "Player 1 wrote no standing line after the start"
+        verdict, detail = "none", "Player 1 was not standing in the read taken at Ready"
     else:
         verdict, detail = attach_verdict(placed, stood["x"], body["candidates"])
     body["verdict"], body["detail"] = verdict, detail

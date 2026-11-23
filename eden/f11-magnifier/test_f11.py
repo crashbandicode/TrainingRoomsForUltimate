@@ -123,6 +123,11 @@ class Checks(unittest.TestCase):
         swap_origin = {"kind": 32, "x": 36.0, "y": 0.010259508, "situation": 0}
         self.assertEqual(f11.put_back_verdict(f11.put_back(self.YOGA_SWAP, 1), swap_origin, 32, both)[0], "fail")
 
+    def test_a_ko_count_is_a_real_count(self):
+        self.assertEqual((f11.ko_count({"dead": 2}), f11.ko_count({"dead": 0})), (2, 0))
+        for missing in ({"dead": -1}, {"dead": None}, {}, None, {"dead": True}):
+            self.assertIsNone(f11.ko_count(missing), missing)
+
     def test_the_floor_attach_candidates(self):
         candidates = {"floor_end": -79.9856, "ledge": -85.9856}
         # The room's Juggler reading fits both candidates, so that x cannot decide.
