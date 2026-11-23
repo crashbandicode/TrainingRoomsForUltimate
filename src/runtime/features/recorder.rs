@@ -499,7 +499,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
                 let term = table.get(c);
                 term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
             }
-            None => false,
+            None => cpu::actionable(body.accessor),
         }
     } else {
         false

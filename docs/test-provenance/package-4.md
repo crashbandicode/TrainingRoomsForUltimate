@@ -10,7 +10,7 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 | Question | Decision | Where |
 | --- | --- | --- |
 | SPEC-input-01 question 2 (stick scale) | one scale, 1/120, clamped to +/-1; clamped fields drop values below 0.2 | `recording::inject_values`, `injected_stick_values` |
-| SPEC-input-01 question 3 (transition-term ranges) | inclusive at both ends; every other starting status keeps the described behaviour, `CONT_SPECIAL_S`, for parity with the fork | `Recorder::term_for_status`, `starting_status_to_term`, `other_status_keeps_the_placeholder_term` (pins it: a later change is deliberate) |
+| SPEC-input-01 question 3 (transition-term ranges) | inclusive at both ends; the original `CONT_SPECIAL_S` fallback was superseded by the actionable check for other starts in F8 | `Recorder::term_for_status`, `starting_status_to_term`, `other_status_has_no_specific_transition_term` |
 | SPEC-input-01 question 4 (Recording Slot re-read every frame) | latch the slot and the duration at the lockout | `Recorder::start_recording` |
 | End check and tint | run in the AI control hook, directly after the injection (same game frame as the on-frame wrapper) | `runtime/features/recorder.rs` |
 | Replay capture default | the INI is the file of record; absent means off | `model::capture_settings`, menu `Env::default` |
@@ -74,7 +74,7 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 | Shipped NRO writes only its install line | pass | `strings` of the release NRO: no `PracticeRecording` / `standin`; per-event lines and the writer thread exist only in the diag build; the INI is written only on a confirmed shortcut change and created once when absent |
 | No heap in hooks | pass | `heap_allocations=0` at install and after 600-frame reports (s4-01, s4-02) |
 | Eden: claim/release, one per host, profile copy, waits gated, console scan, run.json/memory.peak kept, profile restored | pass | `eden/EDEN-PACKAGE-4.md` |
-| Workarounds | none shipped; open decisions: status names (SPEC-input-02 question 1), `CONT_SPECIAL_S` placeholder (kept by the lead's ruling for parity) |
+| Workarounds | none shipped; open decision: status names (SPEC-input-02 question 1); the `CONT_SPECIAL_S` placeholder was superseded by F8 |
 | Slip | seven builds on the Yoga beside pkg5's Eden (disclosed in `IMPLEMENTATION-PROGRESS-pkg4.md`) (removed after v0.2.0-rc.1; see that tag) |
 
 ## S4-4: named macros, replay store, live capture adapter, replay window (2026-11-02)

@@ -217,8 +217,8 @@ fn starting_status_to_term() {
         (81, Some(C::TermContEscapeF)),
         (82, Some(C::TermContEscapeF)),
         (90, Some(C::TermContCatch)),
-        (1234, Some(C::TermContSpecialS)),
-        (UNRESOLVED, Some(C::TermContSpecialS)),
+        (1234, None),
+        (UNRESOLVED, None),
     ];
     for (status, term) in cases {
         assert_eq!(Recorder::term_for_status(&t, status), term, "status {status}");
@@ -354,14 +354,12 @@ fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
     assert!(std::mem::size_of::<Recorder>() < 24_000 + 512);
 }
 
-/// Lead decision (2026-11-02): the transition-term ranges are inclusive at both ends (question 3), and
-/// every other starting status keeps the described behaviour, the side-special term, for parity with the
-/// fork. A later change to either is deliberate: this test and docs/test-provenance/package-4.md say so.
+/// The transition-term ranges are inclusive at both ends; other statuses use the actionable check.
 #[test]
-fn other_status_keeps_the_placeholder_term() {
+fn other_status_has_no_specific_transition_term() {
     let t = table();
     for status in [0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
-        assert_eq!(Recorder::term_for_status(&t, status), Some(C::TermContSpecialS), "status {status}");
+        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
     }
     // Both ends of the two ranges are inside them (the half-open upstream ranges left these out).
     assert_eq!(Recorder::term_for_status(&t, 51), Some(C::TermContEscapeAir));
