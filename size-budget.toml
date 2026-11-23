@@ -2485,3 +2485,11 @@ ceiling = 196609
 date = "2026-11-23"
 reason = "Fix round 2026-11-23, integration total after merging F2, F4, GJ4, GJ1 and F5 + F3 on 17060a5e: 196349 - 8 (F2) - 14 (F4) + 20 (GJ4) + 48 (GJ1) + 214 (F5 + F3) = 196609 measured, with no spare. The integrator added no code; each item entry above was measured on its own branch from 17060a5e, so the last item ceiling alone is below the merged count."
 approved_by = "The item entries above, each under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2); fix-round BRIEF.md integration row (tr-primary-2, 2026-11-23): one fix build from 17060a5e, re-totalled once per batch by the integrator tr-practice-state-sol. NRO and BSS are reported with the batch gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196572
+date = "2026-11-23"
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 196572."
+approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."

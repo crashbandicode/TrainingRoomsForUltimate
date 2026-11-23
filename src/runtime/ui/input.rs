@@ -89,6 +89,11 @@ pub fn on_p1_poll(holder: usize) {
     adapter.set_jumps(state::JUMPS.load(Ordering::Acquire));
     adapter.set_backlog(worker::input_pending());
     let step = adapter.poll(buttons, style, open || popup, allowed, shortcuts);
+    for end in step.hold_ends.into_iter().flatten() {
+        crate::runtime::bridge_state::note_event(crate::model::bridge_events::Event::Hold {
+            dir: end.dir, polls: end.polls, fires: end.fires, jump: end.jump,
+        });
+    }
     if state::CLOSING.load(Ordering::Acquire) {
         // The close window waits for the buttons held at its first poll (the press that closed it) to be released.
         state::CLOSE_HELD.fetch_and(u32::from(step.held), Ordering::AcqRel);
