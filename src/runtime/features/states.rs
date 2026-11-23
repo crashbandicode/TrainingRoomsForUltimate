@@ -488,7 +488,9 @@ fn begin_temporary(pair: [SavedState; 2]) -> bool {
     .unwrap_or(false)
 }
 
-fn take_named_load() -> bool {
+/// # Safety
+/// A fighter's frame on the game thread, as `on_fighter_frame`.
+unsafe fn take_named_load() -> bool {
     let named = {
         let _take = NAMED_TAKE.lock();
         NAMED_LOAD.take(take_pair)

@@ -11,7 +11,7 @@ pub(super) struct Identity {
     pub(super) miis: [Option<Configuration>; 2],
 }
 
-const NOT_READY: &str = "Wait for both fighters to finish loading";
+const NOT_READY: &str = "Wait for both fighters to finish loading before previewing";
 
 pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     if !practice::enabled() || !practice::owned() {

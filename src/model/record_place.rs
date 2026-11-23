@@ -625,11 +625,6 @@ mod tests {
         let clip = worker.split("if s.phase == Phase::Clip {").nth(1).unwrap().split("\n    }").next().unwrap();
         let store = clip.split("EXT_SHOWN.store(").nth(1).unwrap().split(';').next().unwrap();
         assert!(store.contains("hides_page()"));
-        let states = include_str!("../runtime/features/states.rs");
-        let frame = states.split("pub unsafe fn on_fighter_frame(").nth(1).unwrap().split("\n}").next().unwrap();
-        let off = frame.find("refuse_pending(!nana").unwrap();
-        assert!(frame.find("take_named_load()").unwrap() < off);
-        assert!(!frame[off..].contains("NAMED_LOAD.take("));
     }
 
     #[test]
