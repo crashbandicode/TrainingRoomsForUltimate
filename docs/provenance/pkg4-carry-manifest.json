@@ -3646,7 +3646,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "3c8f3fcdc7793f4d538f1aacf6179913fa5e47439c4cefd6b4c879c4f21aca34",
+   "dest_sha256": "3fcf524a741169ff3b13e744ce6687f6623d61328239a89c22496670ac43ad1e",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4252,6 +4252,11 @@
      "old": "\nfn open_browser(expected_revision: Option<u64>) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    let mut rows = Vec::new();\n",
      "new": "\nfn open_browser(expected_revision: Option<u64>) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    let mut rows = Vec::new();\n",
      "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+    },
+    {
+     "old": "fn capture_ready() -> bool {",
+     "new": "pub(crate) fn capture_ready() -> bool {",
+     "reason": "F10: the Recording menu worker reuses the Crop preview readiness gate for input drill previews."
     }
    ]
   },

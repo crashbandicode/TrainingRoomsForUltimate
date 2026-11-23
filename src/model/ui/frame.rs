@@ -887,9 +887,9 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     }
     // The recording hint replaces the page hint page_frame wrote; appended, the two ran together.
     frame.hint.clear();
-    let _ = frame.hint.write_str(rec.hint(face));
     let group_now = menu.focus().map(group_of);
     let on_library = group_now.is_some_and(|g| g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ));
+    let _ = frame.hint.write_str(rec.hint_at(face, group_now.filter(|_| on_library).map(|group| group as u8)));
     if !(popup || on_library || rec.file_open() || rec.picker_open()) {
         return;
     }
@@ -1224,7 +1224,7 @@ mod tests {
             recorded_on: "Mario".into(),
             span: 25,
         };
-        let combo = |id: &str| ComboFile { input_only: false, id: id.into(), name: id.into(), recorded_on: String::new(), made_from: None, links: Vec::new(), span: 1 };
+        let combo = |id: &str| ComboFile { input_only: false, id: id.into(), name: id.into(), recorded_on: String::new(), made_from: None, take: None, links: Vec::new(), span: 1 };
         let sequence = SequenceFile { id: "q1".into(), name: "Sequence 1".into(), combos: vec!["c1".into()], streak: 0, best: 0 };
         menu.recording_mut().set_catalog(Catalog {
             saves: vec![save],
