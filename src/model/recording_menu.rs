@@ -5,6 +5,7 @@
 //! `model.rs` has no engine module) and it does not touch `recording.rs` or `playback.rs`.
 
 use super::combo::Combo;
+use super::combo_record::is_drill_take_name;
 use super::menu::input::Button;
 use super::menu::table::{COMBOS_SEQ, SAVES_MACROS};
 use super::menu::{jumped, jumped_within, stepped};
@@ -133,6 +134,8 @@ pub enum Effect {
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
     OpenCrop { source: String, combo: bool, player: bool },
+    /// X on a drill that kept its take (F10): the host previews frames `0..frames` of macro `source` on Player 1.
+    PreviewDrill { source: String, frames: u32 },
     DuplicateSave { source: String },
     DeleteSave { source: String },
     /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
@@ -196,6 +199,8 @@ pub struct ComboFile {
     /// The fighter the file says it was recorded on (empty: not recorded).
     pub recorded_on: String,
     pub made_from: Option<String>,
+    /// The macro file that holds this directly recorded drill's owned take.
+    pub take: Option<String>,
     pub links: Vec<String>,
     /// Real links in the combo file. The crop handles step this, not the display lines.
     pub span: u32,
@@ -447,6 +452,9 @@ pub struct RecordingScreens {
     keyboard: Option<Keyboard>,
     overlay_face: Face,
     catalog: Catalog,
+    /// Macros that drills own as their takes (F10), named with the take prefix and key, with their frame counts: taken out of the catalog's macros in
+    /// `set_catalog`, so no list, picker, name or count shows them.
+    takes: Vec<(String, u32)>,
     bound: Option<String>,
     active: [Option<String>; 2],
     loops: [LoopMark; 2],
@@ -509,6 +517,7 @@ impl RecordingScreens {
             keyboard: None,
             overlay_face: Face::Page,
             catalog: Catalog::default(),
+            takes: Vec::new(),
             bound: None,
             active: [None, None],
             loops: [LoopMark::default(), LoopMark::default()],
@@ -559,7 +568,16 @@ impl RecordingScreens {
         self.overlay_open() && self.overlay_face == Face::Page
     }
 
-    pub fn set_catalog(&mut self, catalog: Catalog) {
+    pub fn set_catalog(&mut self, mut catalog: Catalog) {
+        self.takes.clear();
+        catalog.macros.retain(|file| {
+            if is_drill_take_name(&file.name) && catalog.combos.iter().any(|combo| combo.take.as_deref() == Some(file.id.as_str())) {
+                self.takes.push((file.id.clone(), file.span));
+                false
+            } else {
+                true
+            }
+        });
         self.catalog = catalog;
         self.loading = false;
         if self.file.as_ref().is_some_and(|file| !self.has_file(&file.id, file.kind)) {
@@ -916,7 +934,13 @@ impl RecordingScreens {
         self.macro_by_id(id).and_then(|file| file.start_save.as_deref())
     }
 
+    /// Footer for a face without a focused page-library group.
     pub fn hint(&self, face: Face) -> &'static str {
+        self.hint_at(face, None)
+    }
+
+    /// Footer for a face and its focused page-library group, including a drill's available preview.
+    pub fn hint_at(&self, face: Face, page_group: Option<u8>) -> &'static str {
         if self.keyboard.is_some() {
             return "Name it, then confirm. Empty keeps the N name. B cancels.";
         }
@@ -937,8 +961,12 @@ impl RecordingScreens {
                     "A set active   X loop   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
                 }
                 (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                _ if self.drill_take(face, group).is_some() =>
+                    "A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
                 _ => "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
             }
+        } else if page_group.is_some_and(|group| self.drill_take(Face::Page, group).is_some()) {
+            "A open   X preview   ZR role   L/R page   B close"
         } else {
             "A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close"
         }
@@ -1032,10 +1060,11 @@ impl RecordingScreens {
             Button::R => self.set_popup_role(ViewRole::Cpu),
             Button::ZL | Button::ZR => self.toggle_tab(),
             Button::X => {
-                if !self.in_macros(Face::Popup, group) {
+                if self.in_macros(Face::Popup, group) {
+                    self.cycle_x(self.popup_role);
+                } else if !self.preview_drill(Face::Popup, group) {
                     return false;
                 }
-                self.cycle_x(self.popup_role);
             }
             Button::Up => self.nudge_popup(-1),
             Button::Down => self.nudge_popup(1),
@@ -1055,11 +1084,14 @@ impl RecordingScreens {
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
         match button {
             Button::X => {
-                if !(on_library && self.in_macros(Face::Page, group)) {
-                    return PageHit::Ignored;
+                if on_library && self.in_macros(Face::Page, group) {
+                    self.cycle_x(self.page_role);
+                    PageHit::Consumed
+                } else if on_library && group == COMBOS_SEQ && self.preview_drill(Face::Page, group) {
+                    PageHit::Consumed
+                } else {
+                    PageHit::Ignored
                 }
-                self.cycle_x(self.page_role);
-                PageHit::Consumed
             }
             Button::Y | Button::ZL => PageHit::Ignored,
             Button::ZR => {
@@ -1646,6 +1678,25 @@ impl RecordingScreens {
         self.catalog.hot_macros.insert(0, id.to_string());
     }
 
+    /// The take the focused drill row can preview (F10).
+    fn drill_take(&self, face: Face, group: u8) -> Option<(String, u32)> {
+        let item = self.focused(face, group).filter(|item| item.kind == ItemKind::Combo)?;
+        let drill = self.combo_by_id(&item.id).filter(|file| file.input_only)?;
+        self.playable(drill)
+    }
+
+    /// The drill's owned take, when it has frames.
+    fn playable(&self, drill: &ComboFile) -> Option<(String, u32)> {
+        drill.take.as_ref().and_then(|id| self.takes.iter().find(|(take, frames)| take == id && *frames > 0)).cloned()
+    }
+
+    /// X on a drill row: post its preview. False when the row has no take to play.
+    fn preview_drill(&mut self, face: Face, group: u8) -> bool {
+        let Some((source, frames)) = self.drill_take(face, group) else { return false };
+        self.last_effect = Effect::PreviewDrill { source, frames };
+        true
+    }
+
     fn focused(&self, face: Face, group: u8) -> Option<Item> {
         let place = self.place(face, group);
         let items = self.items(face, group, place.section);
@@ -1951,6 +2002,10 @@ impl RecordingScreens {
     fn combo_lines(&self, id: &str) -> Vec<ConnLine> {
         let Some(combo) = self.combo_by_id(id) else { return Vec::new() };
         let mut lines = Vec::new();
+        if combo.input_only && self.playable(combo).is_none() {
+            // restriction: drill-preview-rerecord
+            lines.push(line("Re-record to preview"));
+        }
         // First: the help joins these lines into one, and a long list of links must not push the fighter out (#49).
         if !combo.recorded_on.is_empty() {
             lines.push(line(format!("Recorded on {}", combo.recorded_on)));
@@ -2411,7 +2466,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile { input_only: false,
+            combos: vec![ComboFile { input_only: false, take: None,
                 id: "nairc".into(),
                 name: "Nair loop combo".into(),
                 recorded_on: String::new(),
@@ -3232,7 +3287,7 @@ mod tests {
         let mut screens = screens();
         screens.catalog.combos.insert(
             0,
-            ComboFile { input_only: false,
+            ComboFile { input_only: false, take: None,
                 id: "ryu".into(),
                 name: "Ryu BnB".into(),
                 recorded_on: String::new(),
@@ -3436,6 +3491,138 @@ mod tests {
         assert!(p::conn_y(p::CONN_LINES - 1) - p::CONN_LINE_H / 2.0 >= div.y - div.h / 2.0 && right >= p::CONN_RIGHT);
     }
 
+    fn x_previews_a_drill_that_has_its_take_on_both_faces() {
+        let macro_file = |id: &str, chain: bool, span| MacroFile {
+            id: id.into(), name: id.into(), chain, steps: Vec::new(), start_save: None,
+            start_save_on: true, recorded_on: String::new(), span,
+        };
+        let combo = |id: &str, input_only: bool, made_from: Option<&str>, take: Option<&str>| ComboFile {
+            input_only, id: id.into(), name: id.into(), recorded_on: String::new(),
+            made_from: made_from.map(str::to_string), take: take.map(str::to_string), links: Vec::new(), span: 1,
+        };
+        for face in [Face::Page, Face::Popup] {
+            let mut screens = RecordingScreens::new();
+            let mut own_take = macro_file("t1", false, 25);
+            own_take.name = crate::model::combo_record::drill_take_name(1);
+            let mut bare_take = macro_file("bare", false, 25);
+            bare_take.name = "Drill take".into();
+            screens.set_catalog(Catalog {
+                macros: vec![macro_file("take", false, 40), own_take, bare_take, macro_file("ch", true, 40)],
+                combos: vec![combo("d-own", true, None, Some("t1")), combo("d-made", true, Some("take"), None),
+                    combo("d-old", true, None, None), combo("d-gone", true, Some("nope"), None),
+                    combo("d-chain", true, Some("ch"), None), combo("d-lost", true, None, Some("missing")),
+                    combo("d-fake", true, None, Some("take")),
+                    combo("d-bare", true, None, Some("bare")),
+                    combo("hit", false, Some("take"), None)],
+                ..Catalog::default()
+            });
+            screens.popup_open = true;
+            assert!(screens.catalog().macros.iter().all(|file| file.id != "t1"));
+            assert!(screens.catalog().macros.iter().any(|file| file.id == "take"));
+            assert!(screens.catalog().macros.iter().any(|file| file.id == "bare"));
+            let macros = screens.items(face, SAVES_MACROS, 1);
+            assert!(macros.iter().all(|item| item.id != "t1"));
+            assert!(macros.iter().any(|item| item.id == "take"));
+            assert!(macros.iter().any(|item| item.id == "bare"));
+            screens.open_picker(PickerKind::NewChain, face, None);
+            let picker = screens.picker.as_ref().unwrap();
+            assert!(picker.ids.iter().all(|id| id != "t1"));
+            assert!(picker.ids.iter().any(|id| id == "take"));
+            screens.picker = None;
+            screens.popup_tab = 1;
+            let place = screens.place_mut(face, COMBOS_SEQ);
+            place.section = 1;
+            place.drills = true;
+            let focus = |screens: &mut RecordingScreens, id: &str| {
+                let at = screens.items(face, COMBOS_SEQ, 1).iter().position(|item| item.id == id).unwrap();
+                screens.place_mut(face, COMBOS_SEQ).at[1] = at;
+            };
+            focus(&mut screens, "d-own");
+            assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)), if face == Face::Page {
+                "A open   X preview   ZR role   L/R page   B close"
+            } else {
+                "A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
+            });
+            assert!(!screens.combo_lines("d-own").iter().any(|line| line.text == "Re-record to preview"));
+            if face == Face::Page {
+                assert_eq!(screens.handle_page(Button::X, true, COMBOS_SEQ), PageHit::Consumed);
+            } else {
+                assert!(screens.press_popup_outcome(Button::X));
+            }
+            assert_eq!(screens.take_effect(), Effect::PreviewDrill { source: "t1".into(), frames: 25 });
+            for id in ["d-made", "d-old", "d-gone", "d-chain", "d-lost", "d-fake", "d-bare", ""] {
+                focus(&mut screens, id);
+                if !id.is_empty() {
+                    assert_eq!(screens.combo_lines(id).first().map(|line| line.text.as_str()), Some("Re-record to preview"));
+                }
+                if id == "d-made" {
+                    if face == Face::Page {
+                        assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)), screens.hint(Face::Page));
+                    } else {
+                        assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)),
+                            "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close");
+                    }
+                }
+                if face == Face::Page {
+                    assert_eq!(screens.handle_page(Button::X, true, COMBOS_SEQ), PageHit::Ignored);
+                } else {
+                    assert!(!screens.press_popup_outcome(Button::X));
+                }
+                assert_eq!(screens.take_effect(), Effect::None);
+            }
+            screens.place_mut(face, COMBOS_SEQ).drills = false;
+            focus(&mut screens, "hit");
+            assert!(!screens.combo_lines("hit").iter().any(|line| line.text == "Re-record to preview"));
+            if face == Face::Page {
+                assert_eq!(screens.handle_page(Button::X, true, COMBOS_SEQ), PageHit::Ignored);
+            } else {
+                assert!(!screens.press_popup_outcome(Button::X));
+            }
+            assert_eq!(screens.take_effect(), Effect::None);
+            screens.popup_tab = 0;
+            screens.place_mut(face, SAVES_MACROS).section = 1;
+            let before = screens.loop_of(screens.role(face));
+            if face == Face::Page {
+                assert_eq!(screens.handle_page(Button::X, true, SAVES_MACROS), PageHit::Consumed);
+            } else {
+                assert!(screens.press_popup_outcome(Button::X));
+            }
+            assert_ne!(screens.loop_of(screens.role(face)), before);
+            assert_eq!(screens.take_effect(), Effect::None);
+        }
+    }
+
+    fn a_cropped_made_drill_has_no_preview() {
+        use crate::model::combo::{Aim, Combo, Event, LinkRec};
+        use crate::model::combo_record::ComboRecord;
+        use crate::model::frame_strip::Button as GameButton;
+
+        let mut step = LinkRec::INPUT;
+        step.events[0] = Some(Event::press(GameButton::Jump, Aim::Neutral, 0));
+        let mut inputs = Combo::from_links([step]).unwrap();
+        inputs.input_only = true;
+        let crop = ComboRecord::new("Drill".into(), inputs, None)
+            .with_made_from("source")
+            .crop_units(0, 1).unwrap();
+        assert_eq!(crop.made_from.as_deref(), Some("source"), "the crop keeps its provenance");
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(Catalog {
+            macros: vec![MacroFile { id: "source".into(), name: "Source".into(), chain: false, steps: Vec::new(),
+                start_save: None, start_save_on: true, recorded_on: String::new(), span: 40 }],
+            combos: vec![ComboFile { id: "crop".into(), name: crop.name, input_only: true, recorded_on: String::new(),
+                made_from: crop.made_from, take: crop.take, links: Vec::new(), span: 1 }],
+            ..Catalog::default()
+        });
+        let place = screens.place_mut(Face::Page, COMBOS_SEQ);
+        place.section = 1;
+        place.drills = true;
+        let at = screens.items(Face::Page, COMBOS_SEQ, 1).iter().position(|item| item.id == "crop").unwrap();
+        screens.place_mut(Face::Page, COMBOS_SEQ).at[1] = at;
+        assert_eq!(screens.combo_lines("crop").first().map(|line| line.text.as_str()), Some("Re-record to preview"));
+        assert_eq!(screens.handle_page(Button::X, true, COMBOS_SEQ), PageHit::Ignored);
+        assert_eq!(screens.take_effect(), Effect::None);
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
@@ -3451,6 +3638,8 @@ mod tests {
             ("f2_recording_picker_wrap", f2_recording_picker_wrap as fn()),
             ("popup_background_holds_its_chrome", popup_background_holds_its_chrome as fn()),
             ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
+            ("x_previews_a_drill_that_has_its_take_on_both_faces", x_previews_a_drill_that_has_its_take_on_both_faces as fn()),
+            ("a_cropped_made_drill_has_no_preview", a_cropped_made_drill_has_no_preview as fn()),
             ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
             ("the_lists_say_loading_until_the_catalog_arrives", the_lists_say_loading_until_the_catalog_arrives as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
