@@ -5,14 +5,13 @@ fn hold(polls: u32) -> Event {
 }
 
 fn clip() -> Clip {
-    Clip { ctx: "replay", total: 200, start: 12, end: 157, head: 156, playing: true, handle: "playhead", running: true }
+    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true }
 }
 
 #[test]
-fn clip_text_names_the_window_the_playhead_and_frames_consumed() {
+fn clip_text_names_the_window_and_the_editor_cursor() {
     let c = clip();
-    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 head=156 playing=1 handle=playhead running=1");
-    assert_eq!(c.head - c.start + 1, 145);
+    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1");
 }
 
 #[test]

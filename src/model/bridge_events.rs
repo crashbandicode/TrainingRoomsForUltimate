@@ -33,7 +33,7 @@ pub struct Clip {
     pub total: u32,
     pub start: u32,
     pub end: u32,
-    pub head: u32,
+    pub cursor: u32,
     pub playing: bool,
     pub handle: &'static str,
     pub running: bool,
@@ -41,29 +41,32 @@ pub struct Clip {
 
 impl Clip {
     pub fn text(self) -> String {
-        format!("clip ctx={} total={} in={} out={} head={} playing={} handle={} running={}",
-            self.ctx, self.total, self.start, self.end, self.head, u8::from(self.playing), self.handle, u8::from(self.running))
+        format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={}",
+            self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running))
     }
 }
 
 #[derive(Default)]
 pub struct ClipSeen {
-    last: Option<Clip>,
-    pending: Option<Option<Clip>>,
+    seen: Option<Clip>,
+    unsent: bool,
+    skipped: u32,
 }
 
 impl ClipSeen {
     pub fn send(&mut self, current: Option<Clip>, mut send: impl FnMut(&str) -> i32) {
-        if let Some(pending) = self.pending {
-            let text = pending.map_or_else(|| "clip closed".to_string(), Clip::text);
-            if send(&text) != 0 { return; }
-            self.last = pending;
-            self.pending = None;
+        if current != self.seen {
+            if self.unsent { self.skipped = self.skipped.saturating_add(1); }
+            self.seen = current;
+            self.unsent = true;
         }
-        if current != self.last {
-            let text = current.map_or_else(|| "clip closed".to_string(), Clip::text);
-            if send(&text) == 0 { self.last = current; } else { self.pending = Some(current); }
+        if !self.unsent { return; }
+        if self.skipped != 0 {
+            if send(&format!("clip lost={}", self.skipped)) != 0 { return; }
+            self.skipped = 0;
         }
+        let text = self.seen.map_or_else(|| "clip closed".to_string(), Clip::text);
+        if send(&text) == 0 { self.unsent = false; }
     }
 }
 

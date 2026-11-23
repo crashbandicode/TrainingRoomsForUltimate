@@ -415,7 +415,7 @@ impl Provider {
                     ClipContext::Macro { player: false } => "macro.cpu",
                     ClipContext::Combo { .. } => "combo",
                 },
-                total: view.total, start: view.start, end: view.end, head: view.cursor,
+                total: view.total, start: view.start, end: view.end, cursor: view.cursor,
                 playing: view.playing,
                 handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
                 running: crate::engine::rr_host::preview_running(),
