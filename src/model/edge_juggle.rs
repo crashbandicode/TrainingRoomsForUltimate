@@ -1371,7 +1371,10 @@ mod tests {
         let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60, (0, 0), None).unwrap();
         let mut session = release(Drill::Juggler, Some(1));
         assert_eq!(session.practice_fields(Some(wizard), None).wizard_step, "cpu");
-        wizard.move_cpu(stage, [-150.0, 90.0]);
+        let initial = wizard.cursor();
+        wizard.steer(stage, &btt::Pad { stick: [-1.0, 1.0], ..btt::Pad::default() });
+        let moved = wizard.cursor();
+        assert_ne!(moved, initial);
         wizard.advance();
         wizard.change_percent(10);
         let percent = session.practice_fields(Some(wizard), None);
@@ -1381,7 +1384,7 @@ mod tests {
         wizard.advance();
         let preview = session.practice_fields(Some(wizard), None);
         assert_eq!((preview.wizard_step, preview.wizard_value), ("preview", Some(70)));
-        assert_eq!((preview.wizard_point, preview.wizard_player_point), (Some([-150.0, 90.0]), Some([0.0, 7.0])));
+        assert_eq!((preview.wizard_point, preview.wizard_player_point), (Some(moved), Some([0.0, 7.0])));
 
         session.advance_attempt(Observation { hit: true, ..Observation::default() });
         session.advance_attempt(Observation { grounded: true, ..Observation::default() });
@@ -1396,7 +1399,7 @@ mod tests {
     }
 
     #[test]
-        fn drill_behavior_between_ai_kinds_is_set_directly() {
+    fn drill_behavior_between_ai_kinds_is_set_directly() {
         use BehaviorMenu::Closed;
         let nine = CpuBehavior::stock(9);
         for menu in 0..8u32 {

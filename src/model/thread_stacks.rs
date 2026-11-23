@@ -66,6 +66,7 @@ const KIB: usize = 1024;
 /// The table (one row per `ThreadId`, in its order).
 // rc.15 static-bound refresh: IniWriter/Import/Menu from diag 1d619d6b, ELF6b2b58db (2026-11-15).
 // Menu catalog v2: max of exact release and diag c5a5740c (2026-11-19) for Menu, IniWriter, TraceWriter, Archive, MacroDiag.
+// Intermediate c7c17f3e (2026-11-23): SettingsLoad from diag, Menu from release.
 // Runtime paint marks and stack allocations retain their recorded provenance below.
 pub const THREADS: [ThreadStack; 18] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
@@ -75,7 +76,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // and receipts, diag hook_stats and stack reports
     row(ThreadId::Heartbeat, c"tr-heartbeat", 32 * KIB, 8_096, 11_840, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "diag_log::start_drain_thread::{closure#0}"),
     // settings.json read, recovery and the JSON parse, joined by the boot thread
-    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 7_824, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
+    row(ThreadId::SettingsLoad, c"tr-settings-load", 32 * KIB, 7_840, 9_904, "Eden st-02..st-12, f6-37/sh-01/s6-10", "boot::load_settings_boxed"),
     // save_states.json read and parse, joined by the boot thread
     row(ThreadId::StateLoad, c"tr-state-load", 40 * KIB, 17_424, 18_624, "Eden st-02..st-12", "states::load_file"),
     // save_states.json serialise and atomic replace
@@ -99,7 +100,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
     // rc.7 svc clobbers (2026-11-11): with hos-lock's arbiter calls declaring clobber_abi("C"), values no longer ride in
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 55_344, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_608, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
