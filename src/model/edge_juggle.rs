@@ -1703,6 +1703,43 @@ mod tests {
     }
 
     #[test]
+    fn the_rooms_type_follows_the_drills_fighter_swap() {
+        for room_type in [1, 0x22] {
+            let mut lease = PartnerLease::new();
+            assert_eq!(lease.step(Some(9), 1, room_type, room_type, true), Some(0));
+            assert_eq!(lease.step(Some(9), 2, 0, 0, true), None);
+            assert!(lease.held());
+            assert_eq!(lease.step(None, 2, 0, 0, true), Some(room_type));
+            assert_eq!(lease.step(None, 3, 0, 0, true), Some(room_type));
+            assert_eq!(lease.step(None, 3, room_type, room_type, true), None);
+            assert!(!lease.held());
+        }
+
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        assert_eq!(lease.step(Some(9), 2, 0x22, 0x22, true), Some(0));
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(0x22));
+
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        assert_eq!(lease.step(Some(9), 2, 0, 1, true), Some(0));
+        assert!(lease.held());
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(1));
+
+        let mut lease = PartnerLease::new();
+        lease.absent(None, false);
+        assert!(!lease.held());
+        assert_eq!(lease.step(Some(9), 1, 1, 1, true), Some(0));
+        lease.absent(Some(9), false);
+        assert!(lease.held());
+        lease.absent(None, true);
+        assert!(lease.held());
+        assert_eq!(lease.step(None, 2, 0, 0, true), Some(1));
+        lease.absent(None, false);
+        assert!(!lease.held());
+    }
+
+    #[test]
     fn lobby_practice_off_gives_the_partner_back_first_and_a_departure_writes_nothing() {
         use crate::model::lobby_flag::{self, FlagClock, Scene};
         use crate::model::edge_juggle::picker::{self, Settled, Tick};
@@ -1794,7 +1831,9 @@ mod tests {
             }
             assert!(blocked.held());
             if replaced {
-                assert_eq!(blocked.step(None, 2, 0, 0, true), None);
+                assert_eq!(blocked.step(None, 2, 0, 0, true), Some(7));
+                assert!(blocked.held());
+                assert_eq!(blocked.step(None, 2, 7, 7, true), None);
                 assert!(!blocked.held());
                 let (on, releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
                 assert_eq!((on, releasing, stop), (false, false, false));
