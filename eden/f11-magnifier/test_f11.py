@@ -48,5 +48,17 @@ class Checks(unittest.TestCase):
             self.assertIsNotNone(f11.back_problem(broken, origin))
 
 
+    def test_a_ready_sample_needs_the_selected_cpu_with_x_and_y(self):
+        good = {"kind": 32, "x": -199.9928, "y": -30.619871, "dmg": 100.0}
+        self.assertIsNone(f11.ready_body_problem(good, 32))
+        self.assertIn("not the selected CPU", f11.ready_body_problem({**good, "kind": 0}, 32))
+        self.assertIn("not the selected CPU", f11.ready_body_problem(None, 32))
+        for axis in ("x", "y"):
+            for bad in (None, float("nan"), float("inf"), "1.0", True):
+                self.assertIn(f"no valid {axis}", f11.ready_body_problem({**good, axis: bad}, 32), (axis, bad))
+            missing = {key: value for key, value in good.items() if key != axis}
+            self.assertIn(f"no valid {axis}", f11.ready_body_problem(missing, 32))
+
+
 if __name__ == "__main__":
     unittest.main()

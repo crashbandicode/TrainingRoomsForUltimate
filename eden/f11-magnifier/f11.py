@@ -67,6 +67,19 @@ def back_problem(body, origin):
     return None
 
 
+def ready_body_problem(body, cpu_kind):
+    """Why a Ready sample of the selected CPU is not usable (None: it is): the row's fighter, with x and y both read
+    as finite numbers. The position itself is judged at the release boundary (edge_ready_exact), not here: this
+    sample may fall on either side of the release."""
+    if not isinstance(body, dict) or body.get("kind") != cpu_kind:
+        return f"the Ready sample is not the selected CPU (kind {cpu_kind}): {body!r}"
+    for axis in ("x", "y"):
+        value = body.get(axis)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or abs(value) == float("inf"):
+            return f"the Ready sample has no valid {axis}: {body!r}"
+    return None
+
+
 def _save(ctx, name, body):
     (Path(ctx.row_dir) / f"f11-{name}.json").write_text(json.dumps(body, indent=2) + "\n")
     return body
@@ -249,8 +262,18 @@ def through(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", cpu=(-100, 
     before = edge._read(ctx, scene)
     watch = edge_ready_exact.open_trace(ctx)
     ctx.play(edge.TAP["A"])
-    edge._ready(ctx, scene, before, ident, None, None, None)
-    body["ready"] = edge_ready_exact.check_ready(ctx, scene, point, watch, player[0], cpu[0], 100)["edge_ready_exact"]
+    edge.observe(ctx, scene, lambda values: values["game.running"] == "1" and values["notice.body"].startswith("Ready"),
+                 "the running drill reached Ready", before, cap=3)
+    # One fighters read, required to hold the selected CPU with a valid x and y, and the same sample goes to the
+    # release comparison (rv-edge-juggle-sol, 2026-11-23 19:42:41Z).
+    bodies = switch_hw.bridge_state(routes.instance_path(ctx, "bridge_log").parent, ("fighters",), cap=3)["fighters"]
+    sample = bodies.get(4 if scene == "lobby" else 1)
+    unusable = ready_body_problem(sample, cpu_kind)
+    if unusable:
+        _save(ctx, name, {**body, "ready_sample": sample, "problems": problems + [unusable]})
+        raise RuntimeError(f"{name}: {unusable}")
+    body["ready"] = edge_ready_exact.check_ready(ctx, scene, point, watch, player[0], cpu[0], 100,
+                                                 bodies=bodies)["edge_ready_exact"]
     body["ready"]["practice"] = {key: value for key, value in _practice(ctx, None).items()
                                  if key in ("phase", "step", "wizard.cpu")}
     body["ready"]["still"] = str(ctx.shot(f"{name}-ready"))
