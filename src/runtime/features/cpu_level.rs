@@ -415,12 +415,12 @@ fn poll_drill_locked(base: usize, state: &mut State, quiet: bool) -> bool {
 unsafe fn step_drill_partner(base: usize, state: &mut State, level: Option<u8>) {
     let entry = game::natives::fighter_entry(crate::model::cpu::role::LOBBY_CPU_ENTRY);
     let Some(controller) = field::child(entry, ENTRY_CONTROLLER) else {
-        state.drill_partner = PartnerLease::new();
+        state.drill_partner.absent(level, super::edge_juggle::practice_cpu::restoring());
         DRILL_APPLIED.store(false, Ordering::Release);
         return;
     };
     let Some(ai) = field::child(controller, CONTROLLER_AI) else {
-        state.drill_partner = PartnerLease::new();
+        state.drill_partner.absent(level, super::edge_juggle::practice_cpu::restoring());
         DRILL_APPLIED.store(false, Ordering::Release);
         return;
     };

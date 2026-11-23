@@ -211,6 +211,8 @@ fn the_drills_run_in_a_waiting_room_against_the_first_training_partner() {
     assert!(partner < panel);
     let step = item(&level, "unsafe fn step_drill_partner(");
     assert!(step.contains("state.drill_partner.step("));
+    assert!(step.contains("state.drill_partner.absent("));
+    assert!(!step.contains("PartnerLease::new()"));
     assert!(step.contains("AI_SET_BEHAVIOR") && step.contains("ENTRY_BEHAVIOR"));
     assert!(!step.contains("PANEL_"));
     assert!(item(&level, "pub(crate) unsafe fn frame(").contains("rules::drill_target("));
