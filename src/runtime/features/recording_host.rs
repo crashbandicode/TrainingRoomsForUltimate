@@ -11,12 +11,12 @@ const NAME_TOKEN: u64 = 1 << 62;
 const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
-pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
+pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, play_cpu: bool) {
     // A Record that starts keeps both fighters as they are now: the start save is where the macro starts
     // (RECORDING-REDESIGN, "Start save"), and the macro keeps the recorded role's speed (PLAY-MOMENTUM).
     if record && rr_host::capture_role() == 0 {
-        // SAFETY: the chord step runs on the game thread (the AI epilogue), where the fighters' accessors are live.
-        rr_host::note_record_start(unsafe { record_start() });
+        // SAFETY: the chord step runs on the game thread (the AI epilogue) with the CPU body it resolved this frame.
+        rr_host::note_record_start(unsafe { record_start(cpu) });
     }
     rr_host::on_chords(record, play_player, play_cpu);
 }
@@ -31,27 +31,38 @@ pub fn capturing() -> bool {
     rr_host::capture_role() != 0
 }
 
-/// Both fighters' live pose and summed speed. Atomics and kinetic reads only; no allocation.
+/// Both role bodies as the game holds them at the Record chord: Player 1's (entry 0's active body) and the practice
+/// CPU's (`cpu`, which the chord step resolved). Kind, pose and summed speed are read from the bodies now, never from
+/// a frame-published pose or accessor. Native reads only; no allocation.
 ///
 /// # Safety
-/// Game thread.
-unsafe fn record_start() -> rr_host::RecordStart {
-    rr_host::RecordStart {
-        poses: [super::states::live_pose(0), super::states::live_pose(1)],
-        speeds: [live_speed(0), live_speed(1)],
-    }
+/// Game thread; `cpu` was resolved this frame.
+unsafe fn record_start(cpu: super::recorder::Body) -> rr_host::RecordStart {
+    rr_host::RecordStart::at_chord([live_body(super::recorder::body_of(0)), live_body(Some(cpu))])
 }
 
-/// A fighter's summed speed (`KineticModule::get_sum_speed_x/y`, the named layer's `snapshot_start` reading); at rest
-/// before its first frame. The kinetic rows are the named-macro unit's (R2-1): read only once that unit's closure passed.
+/// A role body's kind, pose and summed speed, read from the game now (`None` without a body). The kind is the fighter
+/// object's, as the save states record it; the speed is `fighter_speed`'s (the named layer's `snapshot_start`
+/// reading), at rest when it is not finite. The kinetic rows are the named-macro unit's (R2-1): read only once that
+/// unit's closure passed.
 ///
 /// # Safety
-/// Game thread.
-unsafe fn live_speed(slot: usize) -> (f32, f32) {
-    let accessor = super::states::fighter_accessor(slot);
-    let (x, y) = fighter_speed(accessor).unwrap_or_default();
+/// Game thread; `body` was resolved this frame.
+unsafe fn live_body(body: Option<super::recorder::Body>) -> Option<(rr_host::StartPose, (f32, f32))> {
+    use crate::runtime::game::natives;
+    let body = body?;
+    let at = body.accessor;
+    let pose = rr_host::StartPose {
+        fighter_kind: ((body.fighter + super::recorder::FIGHTER_KIND_FIELD) as *const i32).read(),
+        situation_kind: natives::situation_kind(at),
+        x: natives::pos_x(at),
+        y: natives::pos_y(at),
+        percent: natives::damage(at, 0),
+        lr: natives::lr(at),
+    };
+    let (x, y) = fighter_speed(at).unwrap_or_default();
     let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
-    (finite(x), finite(y))
+    Some((pose, (finite(x), finite(y))))
 }
 
 /// The named-macro kinetic guards also cover these reads on a current training body.
@@ -206,8 +217,8 @@ pub fn service() {
         }
     }
     take_mismatch_answer();
-    let player = super::states::live_saved(0);
-    let cpu = super::states::live_saved(1);
+    let player = rr_host::live_pose(0).saved();
+    let cpu = rr_host::live_pose(1).saved();
     if player.fighter_kind >= 0 {
         rr_host::set_role_fighter(crate::engine::library::Role::Player, player.fighter_kind);
     }

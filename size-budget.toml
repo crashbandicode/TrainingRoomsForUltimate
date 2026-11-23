@@ -2437,3 +2437,11 @@ ceiling = 194096
 date = "2026-11-23"
 reason = "Guard the Edge and Juggler CPU changes without the pause flash, held list scrolling and Recording section jumps, the shared crosshair and placement helpers, refusal ordering, and waiting-room parity with partner restoration before Lobby Practice turns off. The existing tr.menu test bridge follows the input owner for focused lists. Measured 194096, 526 above the integration ceiling 193570."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2; tr-primary-2 rulings 2026-11-22 19:05:48Z, 19:22:06Z, 20:00:14Z, ~21:20Z and 2026-11-23 02:10:03Z. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 194138
+date = "2026-11-23"
+reason = "Recording reads the current bodies at the Record chord, and the worker refreshes its live pose with Save States Off. Measured 194138, 42 above 194096."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording fix-round item, rv-preview-vis PASS 2026-11-23 05:24:59Z."
