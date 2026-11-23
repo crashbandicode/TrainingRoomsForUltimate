@@ -1525,3 +1525,8 @@ break a target, except under Hits of 12%+). V2.2's on-screen rule stays: targets
 as the default and **Whole stage** as an option. Whole stage lets targets appear anywhere on the stage's floors within
 the stage's range, even off screen, using the player's own camera. It supersedes the on-screen rule for Whole stage only;
 In view keeps the existing behavior. The setting applies on the next Start.
+
+### RR1–RR2 — Recording page role tabs (2026-11-22)
+
+The Recording page shows the pop-up's Player/CPU plate in the same place, with ZR beside it where ZR changes the page
+view. The cap is hidden on a file screen, picker or keyboard. The page view and the pop-up's Record role remain separate.

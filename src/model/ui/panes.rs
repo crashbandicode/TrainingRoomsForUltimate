@@ -247,7 +247,26 @@ pub const ROLE_X: f32 = 600.0;
 pub const ROLE_TAB_W: f32 = 176.0;
 pub const ROLE_H: f32 = 52.0;
 pub const ROLE_CAP: f32 = 40.0;
+pub const ROLE_CAP_ZR: f32 = 56.0;
 pub const ROLE_CAP_X: [f32; 2] = [ROLE_X - ROLE_TAB_W - 40.0, ROLE_X + ROLE_TAB_W + 40.0];
+
+/// Key caps beside the role tabs: L/R in the pop-up, ZR on the page, none while a file or picker owns the buttons.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum RoleKeys {
+    #[default]
+    None,
+    LR,
+    ZR,
+}
+
+pub const fn role_caps(keys: RoleKeys) -> [Option<(&'static [u16], f32)>; 2] {
+    match keys {
+        RoleKeys::None => [None, None],
+        RoleKeys::LR => [Some((&[76], ROLE_CAP)), Some((&[82], ROLE_CAP))],
+        RoleKeys::ZR => [None, Some((&[90, 82], ROLE_CAP_ZR))],
+    }
+}
+
 pub const fn role_tab_x(tab: usize) -> f32 {
     ROLE_X + (tab as f32 - 0.5) * ROLE_TAB_W
 }
@@ -1020,4 +1039,34 @@ pub const fn spec(index: usize) -> Spec {
 #[cfg(test)]
 pub fn specs() -> Vec<Spec> {
     (0..COUNT).map(spec).collect()
+}
+
+#[cfg(test)]
+mod role_tests {
+    lib_unit_tests! {
+    use super::*;
+
+    fn role_caps_reuse_the_two_cap_panes() {
+        assert_eq!(role_caps(RoleKeys::None), [None, None]);
+        assert_eq!(role_caps(RoleKeys::LR), [Some((&[76][..], ROLE_CAP)), Some((&[82][..], ROLE_CAP))]);
+        assert_eq!(role_caps(RoleKeys::ZR), [None, Some((&[90, 82][..], ROLE_CAP_ZR))]);
+        for keys in [RoleKeys::None, RoleKeys::LR, RoleKeys::ZR] {
+            for (i, cap) in role_caps(keys).iter().enumerate() {
+                let Kind::Text { chars, .. } = spec(IDX_ROLE_KEY + i).kind else { panic!("key pane is text") };
+                assert_eq!(chars, 2);
+                if let Some((text, _)) = cap {
+                    assert!(text.len() <= usize::from(chars));
+                }
+            }
+        }
+        let (center, width) = (ROLE_CAP_X[1], ROLE_CAP_ZR);
+        assert!(center - width / 2.0 >= ROLE_X + ROLE_TAB_W + 4.0);
+        assert!(center + width / 2.0 <= PANEL_W / 2.0);
+    }
+
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[("role_caps_reuse_the_two_cap_panes", role_caps_reuse_the_two_cap_panes as fn())]);
+    }
+    }
 }

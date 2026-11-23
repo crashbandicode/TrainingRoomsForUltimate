@@ -228,8 +228,9 @@ pub struct Frame {
     pub conn_count: u8,
     /// What each CONNECTIONS line is in the r8 tree: a kind box (with its pill), a heading, a link, a plain line.
     pub conn_kind: [super::recording_menu::ConnKind; super::panes::CONN_LINES],
-    /// The pop-up's L/R role tabs in the title (r8): 0 Player, 1 CPU. `None` off the pop-up.
+    /// The pop-up's and Recording page's role tabs: 0 Player, 1 CPU.
     pub role_tab: Option<u8>,
+    pub role_keys: super::panes::RoleKeys,
     /// The pop-up's section headers sit on a dark band (r8), with their kind's mark before the name: the floppy for
     /// SAVE STATES, a square for the others.
     pub band: [bool; ROW_LINES],
@@ -330,6 +331,7 @@ impl Frame {
         self.conn_count = 0;
         self.conn_kind = [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES];
         self.role_tab = None;
+        self.role_keys = super::panes::RoleKeys::None;
         self.band = [false; ROW_LINES];
         self.head_tag = [None; 2];
         self.badges = [None; super::panes::BADGES];
@@ -395,6 +397,7 @@ impl Frame {
             conn_count: 0,
             conn_kind: [super::recording_menu::ConnKind::Detail; super::panes::CONN_LINES],
             role_tab: None,
+            role_keys: super::panes::RoleKeys::None,
             band: [false; ROW_LINES],
             head_tag: [None; 2],
             badges: [None; super::panes::BADGES],
@@ -816,8 +819,12 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         // The r8 title: "Recording", with the role in the L/R tabs beside it.
         let _ = frame.crumb.write_str("Recording");
         frame.role_tab = Some(u8::from(rec.role(face) == super::recording_menu::ViewRole::Cpu));
+        frame.role_keys = super::panes::RoleKeys::LR;
         // The page tabs are outlined boxes under the title line; the red tab is the role's.
         frame.tab_boxes = true;
+    } else {
+        frame.role_tab = Some(u8::from(rec.page_role() == super::recording_menu::ViewRole::Cpu));
+        frame.role_keys = if rec.page_overlay_open() { super::panes::RoleKeys::None } else { super::panes::RoleKeys::ZR };
     }
     // The recording hint replaces the page hint page_frame wrote; appended, the two ran together.
     frame.hint.clear();
@@ -1197,7 +1204,75 @@ mod tests {
         let mut page = Frame::new();
         menu.recording_mut().toggle_popup();
         page_frame(&menu, &mut page);
-        assert_eq!(page.role_tab, None, "the page has no role tabs in its title");
+        assert_eq!(page.role_tab, Some(0), "the page has its own Player tab");
+    }
+
+    fn the_recording_page_shows_its_role_like_the_popup() {
+        use super::super::panes::RoleKeys;
+        use crate::model::menu::table::{COMBOS_SEQ, SAVES_MACROS};
+        let mut menu = recording_menu_with_files();
+        let mut f = Frame::new();
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(0), RoleKeys::ZR));
+        menu.press(Button::ZR);
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::ZR));
+        for _ in 0..40 {
+            if menu.focus().is_some_and(|entry| {
+                let group = group_of(entry);
+                group != usize::from(SAVES_MACROS) && group != usize::from(COMBOS_SEQ)
+            }) { break; }
+            menu.press(Button::Down);
+        }
+        let group = group_of(menu.focus().unwrap());
+        assert!(group != usize::from(SAVES_MACROS) && group != usize::from(COMBOS_SEQ));
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::ZR));
+        menu.recording_mut().toggle_popup();
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(0), RoleKeys::LR));
+        menu.recording_mut().toggle_popup();
+        menu.press(Button::R);
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (None, RoleKeys::None));
+    }
+
+    fn a_file_screen_keeps_the_role_tabs_without_the_zr_cap() {
+        use super::super::panes::RoleKeys;
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::{Face, ViewRole};
+        let mut menu = recording_menu_with_files();
+        menu.press(Button::ZR);
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        menu.press(Button::A);
+        assert!(menu.recording().file_open());
+        let mut f = Frame::new();
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::None));
+        menu.press(Button::ZR);
+        assert_eq!(menu.recording().page_role(), ViewRole::Cpu);
+        menu.press(Button::B);
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::ZR));
+        let index = menu.recording().section(Face::Page, SAVES_MACROS, 1).rows.iter()
+            .position(|row| row.name == "+ New chain").unwrap();
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, index);
+        menu.press(Button::A);
+        assert!(menu.recording().picker_open());
+        page_frame(&menu, &mut f);
+        assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::None));
+    }
+
+    fn the_page_tabs_end_left_of_the_role_plate() {
+        use super::super::panes::{ROLE_TAB_W, ROLE_X};
+        let mut menu = Menu::new(Settings::factory(), Env { developer_page: true, ..Env::default() });
+        menu.press(Button::R);
+        menu.press(Button::R);
+        let mut f = Frame::new();
+        page_frame(&menu, &mut f);
+        assert_eq!(f.tab_count, 6);
+        let last = f.tab_slots().into_iter().flatten().next_back().unwrap();
+        assert!(last.left + last.width < ROLE_X - ROLE_TAB_W - 4.0, "last tab ends at {}", last.left + last.width);
     }
 
     fn the_fade_is_logarithmic_from_255_to_0_over_15_frames() {
@@ -1327,6 +1402,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_recording_page_shows_its_role_like_the_popup", the_recording_page_shows_its_role_like_the_popup as fn()),
+            ("a_file_screen_keeps_the_role_tabs_without_the_zr_cap", a_file_screen_keeps_the_role_tabs_without_the_zr_cap as fn()),
+            ("the_page_tabs_end_left_of_the_role_plate", the_page_tabs_end_left_of_the_role_plate as fn()),
             ("a_loading_section_says_so_in_its_header", a_loading_section_says_so_in_its_header as fn()),
             ("list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides", list_text_keeps_a_gap_to_the_outline_and_the_cursor_on_both_sides as fn()),
             ("the_tab_row_has_a_slot_per_named_tab_and_one_active", the_tab_row_has_a_slot_per_named_tab_and_one_active as fn()),

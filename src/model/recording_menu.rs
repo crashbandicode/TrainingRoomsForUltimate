@@ -514,6 +514,11 @@ impl RecordingScreens {
         self.page_role
     }
 
+    /// A file, picker or keyboard opened from the page owns its buttons; ZR does not change the role.
+    pub fn page_overlay_open(&self) -> bool {
+        self.overlay_open() && self.overlay_face == Face::Page
+    }
+
     pub fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
         self.loading = false;
@@ -998,7 +1003,7 @@ impl RecordingScreens {
 
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
     pub fn handle_page(&mut self, button: Button, on_library: bool, group: u8) -> PageHit {
-        if self.overlay_open() && self.overlay_face == Face::Page {
+        if self.page_overlay_open() {
             return if self.press_overlay(button, Face::Page) { PageHit::Consumed } else { PageHit::Ignored };
         }
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }

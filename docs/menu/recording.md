@@ -29,6 +29,9 @@ A open   X loop in MACROS   ZR role   L/R page   B close
 ZR here doesn't change who Record records: the [pop-up](#player-and-cpu) sets that. To put the rows back, use
 [Reset page to defaults](#reset-page-to-defaults).
 
+Player and CPU tabs on the top line show the page's view. The ZR cap appears beside them while ZR changes that view;
+on a file's screen, picker or keyboard the tabs remain without the cap.
+
 ## Save states & Macros
 
 Your save states and your macros, in two lists one above the other, four rows of each at a time. The left column shows
