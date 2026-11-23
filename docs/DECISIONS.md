@@ -1873,8 +1873,8 @@ X selects face up or face down.
 
 ## Menu lists (2026-11-23): Up / Down wrap in each list
 
-The operator reported: "submenus don't seem to loop around, for example save states and macros." The menu's own lists
-already wrapped, but the Recording page lists moved on at their ends; file screens, pickers, saved layouts, Mii lists
+The operator reported on hardware that the submenu lists, the save states and the macros among them, do not go round
+from one end to the other. The menu's own lists already wrapped, but the Recording page lists moved on at their ends; file screens, pickers, saved layouts, Mii lists
 and the Keep / Switch question stopped there.
 
 Every list's Up / Down wraps through one shared step. On the Recording page each list wraps on its own; an empty list
