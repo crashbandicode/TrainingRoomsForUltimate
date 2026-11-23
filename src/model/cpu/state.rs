@@ -436,7 +436,7 @@ impl Cpu {
     pub fn ledge_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool) -> bool {
         let fighter = &self.fighters[key.index()];
         let q = TermQuery { status, term, original };
-        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, self.playback.running, q)
+        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, self.playback, q)
     }
 }
 

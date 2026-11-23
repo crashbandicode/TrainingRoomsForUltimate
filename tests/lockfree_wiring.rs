@@ -51,7 +51,7 @@ fn ordered(src: &str, steps: &[&str]) {
 fn slot_capture_and_library_pad_priority_is_preserved() {
     let recorder = include_str!("../src/runtime/features/recorder.rs");
     ordered(body(recorder, "on_ai_frame"),
-        &["slot_control(shulk)", "cpu_role_control()", "host_cpu(controller)"]);
+        &["slot_control(shulk)", "take_slot_refusal()", "cpu_role_control()", "host_cpu(controller)"]);
     let interrupt = body(recorder, "interrupt_playback");
     ordered(interrupt, &["settings().mash_interrupt && rr_host::slot_stop()", "cpu_playback(false)"]);
     let start = body(recorder, "mash_start");

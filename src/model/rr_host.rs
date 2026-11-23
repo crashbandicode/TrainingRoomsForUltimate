@@ -43,6 +43,7 @@ static SLOT_PREPARED: [AtomicBool; SLOTS] = [const { AtomicBool::new(false) }; S
 static SLOT_RUN: hos_lock::Mutex<SlotRun> = hos_lock::Mutex::new(SlotRun::idle());
 static SLOT_RUNNING: AtomicBool = AtomicBool::new(false);
 static SLOT_OWED: AtomicU8 = AtomicU8::new(0);
+static SLOT_REFUSAL: AtomicBool = AtomicBool::new(false);
 
 pub fn set_slot(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
     if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
@@ -141,6 +142,7 @@ pub fn slot_running() -> bool {
 
 pub fn slot_stop() -> bool {
     let owed = SLOT_OWED.swap(0, Ordering::AcqRel) != 0;
+    SLOT_REFUSAL.store(false, Ordering::Release);
     let mut run = SLOT_RUN.lock();
     let running = run.active() || owed;
     run.stop();
@@ -162,6 +164,10 @@ pub fn slot_phase() -> (Phase, u16) {
 
 pub fn cpu_idle() -> bool { !slot_running() && !cpu_playback_blocks_drill() }
 
+pub fn take_slot_refusal() -> Option<PlayRefusal> {
+    SLOT_REFUSAL.swap(false, Ordering::AcqRel).then_some(PlayRefusal::SlotEmpty)
+}
+
 pub fn slot_control(shulk_dial: bool) -> Option<Inject> {
     let request = SLOT_OWED.load(Ordering::Acquire);
     if request != 0 {
@@ -170,6 +176,10 @@ pub fn slot_control(shulk_dial: bool) -> Option<Inject> {
         let ledge = match request >> 4 { 1 => Some(false), 2 => Some(true), _ => None };
         let (_, meta, len, generation) = slot_snapshot(usize::from(slot))?;
         SLOT_OWED.store(0, Ordering::Release);
+        if len == 0 {
+            SLOT_REFUSAL.store(true, Ordering::Release);
+            return None;
+        }
         start_slot_snapshot(slot, facing, ledge, meta, len, generation).ok()??;
     }
     let mut run = SLOT_RUN.lock();
@@ -192,7 +202,8 @@ static LAST_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
 static CAP_ROLE: AtomicU8 = AtomicU8::new(0);
 static CAP_LEN: AtomicUsize = AtomicUsize::new(0);
 static PLAYED: AtomicU32 = AtomicU32::new(0);
-static FED: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
+static FED: [AtomicU64; 2] = [const { AtomicU64::new(0) }; 2];
+static RUN_GEN: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
 static CAP_FRAMES: [AtomicU64; MAX_FRAMES] = [const { AtomicU64::new(0) }; MAX_FRAMES];
 // Final converted event records only. CAP_FRAMES stays exclusively owned by ordinary Record mechanics.
 static INPUT_MODE: AtomicU8 = AtomicU8::new(0); // bit1 Make, bit2 direct Record; either may overlap another take
@@ -805,10 +816,11 @@ pub fn note_load() {
 /// are owed its playback runs between them too, so a configured Mash asks it to stop (Parry ignores that) instead of
 /// queueing an action on top of the replay (Eden accept-8, 26c93533). Game hooks read this using atomics.
 pub fn cpu_playback(queued: bool) -> PlaybackState {
-    let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0
+    let parry_owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0
         && !RESET_CPU.load(Ordering::Acquire);
-    PlaybackState { running: slot_running() || role_playing(Role::Cpu) || owed,
-        recording: false, standby: false, queued }
+    let owed = SLOT_OWED.load(Ordering::Acquire) != 0;
+    PlaybackState { running: SLOT_RUNNING.load(Ordering::Acquire) || owed || role_playing(Role::Cpu) || parry_owed,
+        owed, recording: false, standby: false, queued }
 }
 
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
@@ -834,7 +846,10 @@ pub fn played_frames() -> u32 {
 
 /// Frames of the role's current (or last) library run that its hook has taken: zero when a run is loaded, then one per delivered frame. Atomic read; slot runs are not counted.
 pub fn fed_frames(role: Role) -> u32 {
-    FED[role_index(role)].load(Ordering::Acquire)
+    let index = role_index(role);
+    let generation = RUN_GEN[index].load(Ordering::Acquire);
+    let fed = FED[index].load(Ordering::Acquire);
+    if (fed >> 32) as u32 == generation { fed as u32 } else { 0 }
 }
 
 pub fn start_gated() -> bool {
@@ -1859,7 +1874,7 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
         drop_frames(role);
     }
     if effect.started {
-        FED[role_index(role)].store(0, Ordering::Release);
+        RUN_GEN[role_index(role)].store(role_frames(role).generation() as u32, Ordering::Release);
     }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
     if let Some((speed, _)) = owed {
@@ -2203,7 +2218,7 @@ fn start_run(
     };
     if effect.started {
         drop_frames(role);
-        FED[role_index(role)].store(0, Ordering::Release);
+        RUN_GEN[role_index(role)].store(role_frames(role).generation() as u32, Ordering::Release);
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
         step_role(root, machine, book, role);
@@ -2389,16 +2404,33 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
 fn take_frame(role: Role) -> Option<InputFrame> {
+    let (frame, generation) = pop_frame(role)?;
+    credit_frame(role, generation);
+    Some(frame)
+}
+
+fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
     if WARP_HOLD.load(Ordering::Acquire) || start_gated() || cut_flag(role).load(Ordering::Acquire)
         || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
     {
         return None;
     }
-    role_frames(role).pop().map(|frame| {
+    role_frames(role).pop_tagged().map(|(frame, generation)| {
         PLAYED.fetch_add(1, Ordering::AcqRel);
-        FED[role_index(role)].fetch_add(1, Ordering::AcqRel);
-        unpack(frame)
+        (unpack(frame), generation)
     })
+}
+
+fn credit_frame(role: Role, generation: usize) {
+    let count = &FED[role_index(role)];
+    let previous = count.load(Ordering::Relaxed);
+    let generation = generation as u32;
+    let next = if (previous >> 32) as u32 == generation {
+        (previous as u32).wrapping_add(1)
+    } else {
+        1
+    };
+    count.store((u64::from(generation) << 32) | u64::from(next), Ordering::Release);
 }
 
 fn role_frames(role: Role) -> &'static FrameQueue {
@@ -2459,6 +2491,7 @@ fn reset_host() {
     CAP_LEN.store(0, Ordering::Release);
     PLAYED.store(0, Ordering::Release);
     for count in &FED { count.store(0, Ordering::Release); }
+    for generation in &RUN_GEN { generation.store(0, Ordering::Release); }
     RECORD_EDGE.store(0, Ordering::Release);
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
@@ -2719,11 +2752,15 @@ mod tests {
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_start_ledge(0, 1, Some(false)), Ok(None));
         assert!(slot_running() && cpu_playback(false).running && !cpu_idle());
+        assert!(cpu_playback(false).owed);
         assert_eq!(slot_control(false), None);
+        assert!(cpu_playback(false).owed);
+        assert_eq!(take_slot_refusal(), None);
         set_slot_data(0, Some(&macro_)).unwrap();
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         for (at, buttons) in [0x10, 0x10, 0, 0, 0, 0x10, 0x20].into_iter().enumerate() {
             assert_eq!(slot_control(false).unwrap().buttons, buttons);
+            assert!(!cpu_playback(false).owed);
             assert_eq!(slot_post(), if at == 6 { Some(0) } else { None });
         }
         assert_eq!(slot_control(false), None);
@@ -2731,10 +2768,14 @@ mod tests {
         assert!(!slot_running());
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_start_ledge(0, -1, None), Ok(None));
+        assert!(cpu_playback(false).owed);
         assert!(slot_stop());
+        assert!(!cpu_playback(false).owed);
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_control(false), None);
         assert!(!slot_running());
+        assert!(!cpu_playback(false).owed);
+        assert_eq!(take_slot_refusal(), None);
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_start_ledge(0, 1, Some(true)), Ok(None));
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
@@ -2753,6 +2794,15 @@ mod tests {
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_control(false), None);
         assert!(!slot_running());
+        assert!(!cpu_playback(false).owed);
+        assert_eq!(take_slot_refusal(), Some(PlayRefusal::SlotEmpty));
+        assert_eq!(take_slot_refusal(), None);
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, 1, Some(false)), Ok(None));
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_control(false), None);
+        slot_stop();
+        assert_eq!(take_slot_refusal(), None);
     }
 
     fn player_playback_blocks_a_drill_preview_without_consuming_its_frame() {
@@ -2772,6 +2822,39 @@ mod tests {
         reset_host();
         assert!(request_drill_preview("other", 3));
         assert!(preview_running());
+    }
+
+    fn a_late_credit_of_the_old_run_is_not_counted_for_the_new_one() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let root = scratch("fed-generation");
+            tick(&root);
+            let frames = (1..=5).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+            let kind = if role == Role::Player { 8 } else { 7 };
+            let recording = MacroRecording::new("Fed", "13.0.5", StartState::neutral(kind, 0, 1.0), frames).unwrap();
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+            let take = || if role == Role::Player { take_player_frame() } else { take_cpu_frame() };
+            request_preview(&id, role, 0, 3);
+            tick(&root);
+            assert_eq!(fed_frames(role), 0);
+            assert_eq!(take().map(|frame| frame.buttons), Some(1));
+            assert_eq!(fed_frames(role), 1);
+            let (old, generation) = pop_frame(role).unwrap();
+            assert_eq!(old.buttons, 2);
+            request_preview(&id, role, 2, 5);
+            tick(&root);
+            assert_eq!(fed_frames(role), 0);
+            credit_frame(role, generation);
+            assert_eq!(fed_frames(role), 0);
+            for (count, buttons) in (1..=3).zip(3..=5) {
+                assert_eq!(take().map(|frame| frame.buttons), Some(buttons));
+                assert_eq!(fed_frames(role), count);
+            }
+            assert!(take().is_none());
+            tick(&root);
+            assert_eq!(fed_frames(role), 3);
+        }
     }
 
     fn a_roles_fed_count_is_the_frames_its_hook_took() {
@@ -5778,6 +5861,7 @@ mod tests {
             ("one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer", one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer as fn()),
             ("player_playback_blocks_a_drill_preview_without_consuming_its_frame", player_playback_blocks_a_drill_preview_without_consuming_its_frame as fn()),
             ("a_roles_fed_count_is_the_frames_its_hook_took", a_roles_fed_count_is_the_frames_its_hook_took as fn()),
+            ("a_late_credit_of_the_old_run_is_not_counted_for_the_new_one", a_late_credit_of_the_old_run_is_not_counted_for_the_new_one as fn()),
             ("a_crop_preview_owes_the_start_speed_as_play_does", a_crop_preview_owes_the_start_speed_as_play_does as fn()),
             ("a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back", a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back as fn()),
             ("a_cpu_crop_preview_holds_right_whatever_the_facing", a_cpu_crop_preview_holds_right_whatever_the_facing as fn()),

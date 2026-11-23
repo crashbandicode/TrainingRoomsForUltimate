@@ -327,6 +327,9 @@ unsafe fn on_ai_frame(ai: usize) {
     }
 
     let control = rr_host::slot_control(shulk);
+    if let Some(refusal) = rr_host::take_slot_refusal() {
+        notices::refuse(refusal.text());
+    }
     if let Some(write) = control {
         bump(COUNT_INJECT);
         write_controller(controller, write);

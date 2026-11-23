@@ -250,6 +250,22 @@ fn cpu03_playback_paths() {
     assert!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false)).playback.is_some());
 }
 
+fn the_climb_stays_denied_while_a_ledge_playback_is_owed() {
+    let s = settings(&[("ledge_state", ledge_row(&[option::PLAYBACK_FIRST as usize])),
+        ("ledge_delay", delay_row(&[0]))]);
+    let (mut cpu, key) = cpu_with(s);
+    let out = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false));
+    assert!(out.playback.is_some());
+    cpu.playback = PlaybackState { running: true, owed: true, ..PlaybackState::default() };
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_ATTACK, true));
+    assert_eq!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 14, false, false)), Default::default());
+    cpu.playback = PlaybackState { running: true, owed: false, ..PlaybackState::default() };
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
+    cpu.playback = PlaybackState::default();
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true));
+}
+
 fn cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge() {
     let playback1 = option::PLAYBACK_FIRST as usize;
     let row = settings(&[("ledge_state", ledge_row(&[playback1 + 1])), ("ledge_delay", delay_row(&[0]))]);
@@ -483,6 +499,7 @@ fn case_table() {
         ("cpu03_buffer_frames", cpu03_buffer_frames as fn()),
         ("cpu03_delay_and_climb_denial", cpu03_delay_and_climb_denial as fn()),
         ("cpu03_playback_paths", cpu03_playback_paths as fn()),
+        ("the_climb_stays_denied_while_a_ledge_playback_is_owed", the_climb_stays_denied_while_a_ledge_playback_is_owed as fn()),
         ("cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge", cpu03_ledge_playback_frame_asks_for_the_slot_on_the_ledge as fn()),
         ("cpu03_post_getup_mash", cpu03_post_getup_mash as fn()),
         ("cpu03_a_playback_case_is_held", cpu03_a_playback_case_is_held as fn()),
