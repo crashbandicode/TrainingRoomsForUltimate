@@ -1,4 +1,9 @@
 {
   "guard": {"points": [[-130, -30], [-200, -30], [-230, 60], [-150, -100]], "expect": ["in_view", "in_view", "magnifier", "magnifier", "magnifier"], "start": [-200, -30], "through": ["magnifier", "magnifier", "magnifier"]},
-  "juggle": {"points": [[0, 100], [-100, 130]], "expect": ["in_view", "in_view", "in_view"]}
+  "juggle": {"points": [[0, 100], [-100, 130]], "expect": ["in_view", "in_view", "in_view"]},
+  "room": {
+    "about": "A waiting room has its own camera. Views as read in rc15-i2-early-e1b5cf15-xps-lobby-1 (Final Destination): the Juggler point (-100, 130) is outside it.",
+    "guard": {"points": [[-130, -30], [-200, -30], [-230, 60], [-150, -100]], "expect": ["in_view", "in_view", "magnifier", "magnifier", "magnifier"]},
+    "juggle": {"points": [[0, 100], [-100, 130]], "expect": ["in_view", "in_view", "magnifier"]}
+  }
 }

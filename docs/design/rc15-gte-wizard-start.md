@@ -61,6 +61,23 @@ The recording start picker keeps its chevron: its spots are clamped to the camer
 
 Eden, 2026-11-23, XPS, card lineup `20261123-1532Z` with the bridge, build `5f9a9916` (run `f11-probe-1`, Final Destination, Player 1 Mario, CPU Zero Suit Samus): the Guard the Edge picker read `in_view` at (-160, -69), (-130, -30) and (-165, -30) and `magnifier` at (-200, -30), (-230, -30), (-230, 60) and (-150, -100), with the CPU on the picked point each time and back at its place after B. Every Juggler point was in view. Not run: a waiting room, another stage, a console.
 
+## 2026-11-23: leaving the picker with the drill's own fighter (F11 follow-up)
+
+A drill can have a CPU fighter of its own (**CPU fighter and mode**). The roster swaps it in for the picker and swaps the Training CPU back when the drill ends. It gives the incoming fighter the outgoing body's place, read when it takes the request.
+
+B on the picker's first page ends the practice game in Player 1's controller poll. The practice CPU service asked for the original fighter at once, before the picker's put-back, which runs after Player 1's own frame. So the original came back at the picked start: off the stage for Guard the Edge, where it had to recover or was KO'd (early install 2 boot, Yoga, run `rc15-i2e-e1b5cf15-yoga-1`, row `f11-t1`: Zero Suit Samus came in at Donkey Kong's held point and was KO'd 164 frames after B). Before F11 no picker moved the body, so the roster handed the original place back.
+
+The service now reads the slot through `picker::observable`. While nothing is selected and a left picker has not let go of the CPU (`edge_juggle::leaving_picker`: B's menu request is still to be taken, or the engine still holds the preview; a busy engine reads as held), the roster is not read and the original is not asked for.
+
+B reopens the menu on Player 1's next poll, and the roster does not change the CPU under an open menu. So after B the drill's fighter stands at the CPU's place under the menu, and the Training CPU returns when the menu closes, as it does after Stop from the menu. The menu request is part of the rule because a request the roster finds already waiting under an open menu is dropped after 180 polls with a notice.
+
+| Requirement | Design | Test |
+| --- | --- | --- |
+| After B the Training CPU is not brought back at the picker's held point | The original is not asked for until the picker has put the body back and let go | `the_original_is_not_asked_for_while_a_picker_holds_the_cpu`, `the_original_cpu_comes_back_after_the_picker_put_the_body_back` |
+| A drill's own choice is still compared while its picker holds it | `picker::observable` asks about the hold only when nothing is selected | `a_selection_is_compared_whatever_the_picker_holds` |
+
+Not changed: stopping a running drill that has its own fighter. The original takes over wherever the drill's fighter is, also at the off-stage start during Ready. Not run in Eden: this change (rows `f11-t4` and `f11-w4` in `eden/f11-magnifier/`).
+
 ## Limits and proof
 
 - That the rewrite keeps Player 1 on its start is not proven. The measuring boot never rewrote. The proof is an Eden run on the built head with Player 1 read at every release.

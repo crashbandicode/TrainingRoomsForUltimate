@@ -52,7 +52,9 @@ pub(in crate::runtime) fn service_practice_cpu_selection() {
     let selected = super::cpu_selection();
     let (next, tick) = picker::tick(settled(), selected, original, scene::practice_scene().is_some(),
         || super::super::practice::active().is_some() && !super::running(),
-        || (!roster::busy() && roster::cpu_reload_ready()).then(roster::cpu_kind).flatten(),
+        || picker::observable(selected, super::leaving_picker, || {
+            (!roster::busy() && roster::cpu_reload_ready()).then(roster::cpu_kind).flatten()
+        }),
     );
     SETTLED.store(next.kind().unwrap_or(NONE), Ordering::Release);
     match tick {

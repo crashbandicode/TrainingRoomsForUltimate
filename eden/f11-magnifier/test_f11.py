@@ -70,5 +70,55 @@ class Checks(unittest.TestCase):
         self.assertFalse(f11.at_rest(standing, {}))
 
 
+    # The bridge's own lines, as recorded (wall times dropped).
+    YOGA_SWAP = [  # early install 2 boot, Yoga, f11-t1: Donkey Kong held, B, Zero Suit Samus back at the held point
+        "[TrainingRooms] cpu_event status entry=1 partner=false status=0 prev=14 situation=0 motion_frame=1 ev=4029 frame=37414",
+        "[Bridge] fighter entry=1 gone ev=4030 frame=37415",
+        "[TrainingRooms] cpu_event role entry=1 partner=false kind=32 lobby=false accessor=0x121c5cf0c0 ev=4032 frame=37416",
+        "[Bridge] fighter entry=1 kind=32 x=-149.9928 y=-100.58487 lr=-1 dmg=0 status=14 situation=2 stock=0 dead=0 item=-1 ev=4036 frame=37417",
+    ]
+    XPS_ROOM = [  # early install 2 boot, XPS room, f11-t1: the partner put back, then running off by itself
+        "[TrainingRooms] cpu_event status entry=4 partner=false status=0 prev=14 situation=0 motion_frame=1 ev=3849 frame=81329",
+        "[Bridge] fighter entry=4 kind=32 x=-36.048977 y=0.010259508 lr=1 dmg=0 status=7 situation=0 stock=0 dead=2 item=-1 ev=3852 frame=81330",
+        "[Bridge] fighter entry=4 kind=32 x=0.09103739 y=0.010259508 lr=1 dmg=0 status=0 situation=0 stock=0 dead=2 item=-1 ev=3857 frame=81359",
+    ]
+
+    def test_the_put_back_is_judged_at_the_first_line_after_its_event(self):
+        origin = {"kind": 32, "x": -36.048977, "y": 0.010259508, "situation": 0}
+        back = f11.put_back(self.XPS_ROOM, 4)
+        self.assertEqual((back["x"], back["status"]), (-36.048977, 7))
+        self.assertIsNone(f11.put_back_problem(back, origin, 32))
+        # The line a second later is where the partner ran to; it is not the put-back.
+        self.assertIsNotNone(f11.back_problem(f11.fighter_lines(self.XPS_ROOM, 4)[-1], origin))
+        self.assertIsNone(f11.put_back(self.XPS_ROOM, 1))
+        self.assertIsNone(f11.put_back(self.XPS_ROOM[:1], 4))
+        self.assertIn("no fighter line", f11.put_back_problem(None, origin, 32))
+
+    def test_the_recorded_swap_back_is_the_red_take(self):
+        origin = {"kind": 32, "x": 36.0, "y": 0.010259508, "situation": 0}
+        back = f11.put_back(self.YOGA_SWAP, 1)
+        # The drill's fighter (kind 1) was gone before it wrote a line: the first line is the original, off the stage.
+        self.assertIn("not the held fighter 1", f11.put_back_problem(back, origin, 1))
+        self.assertIn("after B", f11.put_back_problem(back, origin, 32))
+
+    def test_the_floor_attach_candidates(self):
+        candidates = {"floor_end": -79.9856, "ledge": -85.9856}
+        # The room's Juggler reading fits both candidates, so that x cannot decide.
+        self.assertEqual(f11._word(f11.attach(0.09103739, -79.9856)), "0x3dba7000")
+        self.assertEqual(f11._word(f11.attach(0.09103739, -85.9856)), "0x3dba7000")
+        self.assertEqual(f11.attach_verdict(0.09103739, 0.091033936, candidates)[0], "SETUP")
+        # A whole x of 45 gives the two candidates different words (0x42340000 and 0x4233fffe).
+        self.assertEqual((f11._word(f11.attach(45.0, -79.9856)), f11._word(f11.attach(45.0, -85.9856))),
+                         ("0x42340000", "0x4233fffe"))
+        name, detail = f11.attach_verdict(45.0, f11.attach(45.0, -85.9856), candidates)
+        self.assertEqual((name, detail["read_is_the_placed_word"]), ("ledge", False))
+        # The floor end leaves 45 as placed: the read names it, and says it is also the placed word.
+        name, detail = f11.attach_verdict(45.0, 45.0, candidates)
+        self.assertEqual((name, detail["read_is_the_placed_word"]), ("floor_end", True))
+        self.assertEqual(f11.attach_verdict(45.0, 45.5, candidates)[0], "none")
+        # Left of 42.0144 the candidates agree, as for every origin recorded so far.
+        self.assertEqual(f11.attach_verdict(-40.0, -40.0, candidates)[0], "SETUP")
+
+
 if __name__ == "__main__":
     unittest.main()

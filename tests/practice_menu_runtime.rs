@@ -1147,3 +1147,27 @@ fn leaving_the_picker_puts_the_cpu_back_where_it_stood() {
     let scene_end = frame.split_once("if scene::practice_scene().is_none() {").unwrap().1.split_once("return;").unwrap().0;
     assert!(scene_end.contains("engine.preview = None;"));
 }
+
+#[test]
+fn the_original_cpu_comes_back_after_the_picker_put_the_body_back() {
+    // The roster gives the incoming fighter the outgoing body's place. A picker that holds the drill's own fighter at
+    // its picked start puts it back on Player 1's next frame; the original is not asked for before that.
+    let service = src("src/runtime/features/edge_juggle/practice_cpu.rs");
+    let serve = item(&service, "pub(in crate::runtime) fn service_practice_cpu_selection(");
+    assert!(serve.contains("|| picker::observable(selected, super::leaving_picker, || {"));
+    assert!(serve.contains("(!roster::busy() && roster::cpu_reload_ready()).then(roster::cpu_kind).flatten()"));
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    // A busy engine reads as held: the service asks again on its next tick. B's menu request counts too: the menu
+    // opens on Player 1's next poll, and a request the roster finds waiting under an open menu is dropped with a notice.
+    let leaving = item(&runtime, "fn leaving_picker(");
+    assert!(leaving.contains("BACK.load(Ordering::Acquire) || ENGINE.try_lock().is_none_or(|engine| engine.preview.is_some())"));
+    assert!(item(&runtime, "pub fn take_menu_request(").contains("BACK.swap(false, Ordering::AcqRel)"));
+    // Under the reopened menu the roster is not ready, so the original comes back when the menu closes.
+    let roster = src("src/runtime/roster/character_roster.rs");
+    assert!(item(&roster, "fn cpu_reload_ready_with(").contains("|| menu::captures_input()"));
+    // The engine lets go of the body before it ends the run, so a hold never outlives the frames that take it.
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let ended = frame.split_once("let Some((drill, body)) = drill.zip(body) else {").unwrap().1;
+    assert!(ended.find("engine.wake_cpu(body);").unwrap() < ended.find("ENGINE_ACTIVE.store(false, Ordering::Release);").unwrap());
+    assert!(item(&runtime, "unsafe fn wake_cpu(").contains("self.preview.take()"));
+}
