@@ -2378,7 +2378,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "597dc98473ebe1c7165185f813804521aa0157908898a77935e88041ee78681b",
+   "dest_sha256": "4f38e8dcacc1ed539c69ea2a849092464b49ffe4a9f593fbfc16703a0fe12fb0",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3299,6 +3299,11 @@
      "old": "            notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n",
      "new": "            if hidden {\n                notify(&format!(\"System keyboard failed ({code:#X})\"));\n                lock_write(&UI).on_pad(Pad::Back);\n            } else {\n                notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n            }\n",
      "reason": "F9: Recording name cancellation and discard are token-scoped; the keyboard job is model::flow::NameJob with its owner, retired with a caller-owned draft."
+    },
+    {
+     "old": "    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n",
+     "new": "    let menu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);\n    let player = (queries.replay_loading || menu)\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player)\n        || (menu && !player);\n",
+     "reason": "F16: Hold non-player fighters with the existing panel owner while the menu is open."
     }
    ]
   },

@@ -1220,9 +1220,11 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
     // Keep P1 held while the editor is parked for a CPU reload. The new CPU must
     // remain free to finish its native install and land before preview acquisition.
     let queries = hook_queries();
-    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading
-        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
-            == FighterId::Player as i32);
+    let menu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);
+    let player = (queries.replay_loading || menu)
+        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;
+    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player)
+        || (menu && !player);
     let entry = if hold_panel && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {
         practice::panel_entry_in(context, module_accessor)
     } else { None };
