@@ -19,8 +19,9 @@ const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
 pub const RETURN_FRAMES: u16 = 10 * 60;
 
-/// The game does not hold a fighter on a floor's last point; see docs/design/gj4-player-start.md.
-pub const PLAYER_INSET: f32 = 1.0;
+/// The game teeters within 1.06 (0.86 + 0.1 + 0.1, GroundModule::is_ottotto) of the floor end it faces, moving
+/// the fighter to 0.96; this inset stays outside that range. See docs/design/gj4-player-start.md.
+pub const PLAYER_INSET: f32 = 1.25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drill {
