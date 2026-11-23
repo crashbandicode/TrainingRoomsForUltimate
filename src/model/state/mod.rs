@@ -32,6 +32,7 @@ pub mod place;
 pub mod record;
 pub mod refused;
 pub mod quick_reset;
+pub mod preview;
 #[path = "settings.rs"]
 pub mod settings;
 #[path = "setup.rs"]

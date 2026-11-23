@@ -357,13 +357,8 @@ fn apply(tick: &Tick) {
             crate::runtime::roster::roster_requests::request_player_kind(kind);
         }
     }
-    if let Some(pair) = &tick.warp_home {
-        // The session may have ended since the tick (`drop_preview_home`): nothing is put back then, and nothing lands.
-        if rr_host::preview_away() {
-            super::states::request_named_load((**pair).clone());
-        } else {
-            rr_host::warp_landed();
-        }
+    if let Some(home) = tick.home {
+        super::states::request_preview_home(home);
     }
     if let Some(id) = &tick.warp {
         let root = std::path::Path::new(crate::model::storage::ROOT);

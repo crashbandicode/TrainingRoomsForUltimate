@@ -286,16 +286,21 @@ enum PreviewAsk {
 
 pub const CLIP_ID: &str = "*clip";
 static PREVIEW_CLIP: Mutex<Option<MacroRecording>> = Mutex::new(None);
-struct Home { pair: [SavedState; 2], returning: bool }
-static PREVIEW_HOME: Mutex<Option<Home>> = Mutex::new(None);
-static PREVIEW_AWAY: AtomicBool = AtomicBool::new(false);
+static PREVIEW_AWAY: AtomicU8 = AtomicU8::new(0);
+static PREVIEW_REFUSAL: hos_lock::Mutex<Option<&'static str>> = hos_lock::Mutex::new(None);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HomeWarp {
+    Start { air: bool },
+    Return,
+}
 
 /// What one worker tick asks the Switch wrapper to do.
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
-    /// A Vault preview returns both fighters to its first saved pair through the same named load as `warp`.
-    pub warp_home: Option<Box<[SavedState; 2]>>,
+    /// A Vault clip's preview: the game keeps both fighters as Save reads them when it first starts and loads that pair at the start and for the return.
+    pub home: Option<HomeWarp>,
     /// The playing role and the placement of the file that warps (`warp_pair`).
     pub warp_place: Option<(Role, Placement)>,
     pub notices: Vec<&'static str>,
@@ -351,15 +356,15 @@ pub fn request_clip_preview(recording: MacroRecording) {
 }
 
 /// A Vault clip's preview has the fighters away from where it found them until the return lands.
-pub fn preview_away() -> bool { PREVIEW_AWAY.load(Ordering::Acquire) }
+pub fn preview_away() -> bool { PREVIEW_AWAY.load(Ordering::Acquire) != 0 }
 
 /// The session ended (leaving Training, a hot swap, a lobby change): a Vault clip's fighters are not put back. Atomic write (a game thread calls it).
-pub fn drop_preview_home() { PREVIEW_AWAY.store(false, Ordering::Release); }
+pub fn drop_preview_home() { PREVIEW_AWAY.store(0, Ordering::Release); }
 
-fn preview_home() -> std::sync::MutexGuard<'static, Option<Home>> {
-    let mut home = lock(&PREVIEW_HOME);
-    if !preview_away() { *home = None; }
-    home
+/// The game could not keep or load the home pair for a starting clip preview: the preview does not play. Game thread.
+pub fn preview_refused(text: &'static str) {
+    *PREVIEW_REFUSAL.lock() = Some(text);
+    abort_warp();
 }
 
 /// A preview owns the stage: its run, or the return of a Vault clip's fighters. Atomic reads (a hook may call it).
@@ -397,7 +402,8 @@ pub fn pending() -> bool {
 /// gate (`pending`) and the tick (`service_at`) read the same list; an answered question that `pending` left out was never
 /// applied once migration had finished, so the held play never resumed (rc.5 Fighter Mismatch).
 fn waiting_work() -> bool {
-    previewing() || lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
+    previewing() || PREVIEW_REFUSAL.lock().is_some()
+        || lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
 }
 
 fn playing() -> bool {
@@ -981,6 +987,7 @@ pub fn service_at(
         return tick;
     }
     let Ok(mut book) = load_book(root) else {
+        take_preview_refusal(&mut tick);
         PREVIEW.store(0, Ordering::Release);
         lock(&PREVIEW_ASK).take();
         drop_preview_home();
@@ -1023,7 +1030,7 @@ pub fn service_at(
     if menu_pending() {
         apply_menu(root, machine, &book, &mut tick);
     }
-    drive_preview(root, machine, &book, &player, &cpu, &mut tick);
+    drive_preview(root, machine, &book, &mut tick);
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
     tick
@@ -2004,7 +2011,17 @@ fn start_run(
     effect.started
 }
 
-fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, player: &SavedState, cpu: &SavedState, tick: &mut Tick) {
+fn take_preview_refusal(tick: &mut Tick) {
+    if let Some(text) = PREVIEW_REFUSAL.lock().take() {
+        tick.notices.push(text);
+        PREVIEW_AWAY.store(0, Ordering::Release);
+        PREVIEW.store(0, Ordering::Release);
+        lock(&PREVIEW_CLIP).take();
+    }
+}
+
+fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
+    take_preview_refusal(tick);
     let ask = lock(&PREVIEW_ASK).take();
     let role = match PREVIEW.load(Ordering::Acquire) {
         ROLE_PLAYER => Some(Role::Player),
@@ -2014,18 +2031,10 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, player: &Save
     match ask {
         Some(PreviewAsk::Start { source, role, frames }) => {
             let owed = if source == CLIP_ID {
-                let mut home = preview_home();
-                // Away is raised only with a new home: a session end during this tick is not undone here.
-                if home.is_none() {
-                    *home = Some(Home { pair: [player.clone(), cpu.clone()], returning: false });
-                    PREVIEW_AWAY.store(true, Ordering::Release);
-                }
-                let home = home.as_mut().expect("home");
-                home.returning = false;
-                let mut pair = home.pair.clone();
-                if book.start_state(CLIP_ID).is_some_and(|start| start.situation == SITUATION_AIR)
-                    && pair[1].situation_kind == 0 { pair[1].situation_kind = SITUATION_AIR; }
-                tick.warp_home = Some(Box::new(pair));
+                PREVIEW_AWAY.store(1, Ordering::Release);
+                tick.home = Some(HomeWarp::Start {
+                    air: book.start_state(CLIP_ID).is_some_and(|start| start.situation == SITUATION_AIR),
+                });
                 WARP_HOLD.store(true, Ordering::Release);
                 play_start_speed(book, CLIP_ID, Placement::default())
             } else {
@@ -2042,19 +2051,17 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, player: &Save
                 clear_cut(role);
             }
             PREVIEW.store(0, Ordering::Release);
-            if let Some(home) = preview_home().as_mut().filter(|home| !home.returning) {
-                home.returning = true;
-                tick.warp_home = Some(Box::new(home.pair.clone()));
+            if PREVIEW_AWAY.compare_exchange(1, 2, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+                tick.home = Some(HomeWarp::Return);
                 WARP_HOLD.store(true, Ordering::Release);
             }
         }
         None if role.is_some_and(|role| !role_playing(role)) => PREVIEW.store(0, Ordering::Release),
         None => {}
     }
-    let mut home = preview_home();
-    if home.as_ref().is_some_and(|home| home.returning) && !WARP_HOLD.load(Ordering::Acquire) {
-        *home = None;
-        PREVIEW_AWAY.store(false, Ordering::Release);
+    if !WARP_HOLD.load(Ordering::Acquire)
+        && PREVIEW_AWAY.compare_exchange(2, 0, Ordering::AcqRel, Ordering::Acquire).is_ok()
+    {
         lock(&PREVIEW_CLIP).take();
     }
 }
@@ -2265,8 +2272,8 @@ fn reset_host() {
     *lock(&MENU_EFFECT) = None;
     PREVIEW.store(0, Ordering::Release);
     *lock(&PREVIEW_ASK) = None;
-    *lock(&PREVIEW_HOME) = None;
-    PREVIEW_AWAY.store(false, Ordering::Release);
+    PREVIEW_AWAY.store(0, Ordering::Release);
+    *PREVIEW_REFUSAL.lock() = None;
     *lock(&PREVIEW_CLIP) = None;
     *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
@@ -2449,7 +2456,8 @@ mod tests {
         request_clip_preview(clip);
         let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(preview_away());
-        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert!(land_pair([state(8), state(7)], false));
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
         stop_preview();
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
@@ -2466,22 +2474,21 @@ mod tests {
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
         request_clip_preview(clip.clone());
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert_eq!(tick.warp_home.as_deref(), Some(&[player.clone(), cpu.clone()]));
-        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert!(land_pair([player.clone(), cpu.clone()], false));
         service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(take_cpu_frame().is_some());
         drop_preview_home();
         assert!(!preview_away() && preview_running());
         stop_preview();
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert!(tick.warp_home.is_none());
+        assert!(tick.home.is_none());
         assert!(!previewing() && !pending());
 
         player.x = 90.0; cpu.x = 99.0;
-        let fresh = [player.clone(), cpu.clone()];
         request_clip_preview(clip);
         let tick = service_at(&root, &none(), "2026-11-23", player, cpu);
-        assert_eq!(tick.warp_home.as_deref(), Some(&fresh));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
     }
 
     fn a_crop_preview_owes_the_start_speed_as_play_does() {
@@ -2534,9 +2541,9 @@ mod tests {
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(previewing());
         assert!(tick.warp.is_none());
-        assert_eq!(tick.warp_home.as_deref(), Some(&home));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
         assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
-        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        assert!(land_pair(home.clone(), false));
         let mut received = Vec::new();
         for _ in 0..6 {
             service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
@@ -2550,14 +2557,17 @@ mod tests {
         player.x = 90.0; cpu.x = 99.0;
         request_clip_preview(clip.clone());
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert_eq!(tick.warp_home.as_deref(), Some(&home));
-        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert!(land_pair(home.clone(), false));
         stop_preview();
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert_eq!(tick.warp_home.as_deref(), Some(&home));
+        assert_eq!(tick.home, Some(HomeWarp::Return));
         assert!(preview_away());
         assert!(previewing());
-        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        stop_preview();
+        let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert_eq!(tick.home, None);
+        assert!(land_pair(home, false));
         assert!(previewing());
         service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(!preview_away() && !previewing() && !pending());
@@ -2566,7 +2576,38 @@ mod tests {
         air_clip.start.situation = SITUATION_AIR;
         request_clip_preview(air_clip);
         let tick = service_at(&root, &none(), "2026-11-23", player, cpu);
-        assert_eq!(tick.warp_home.unwrap()[1].situation_kind, SITUATION_AIR);
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: true }));
+    }
+
+    fn a_refused_vault_preview_says_why_and_ends() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("vault-preview-refused");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
+        request_clip_preview(clip);
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert!(take_cpu_frame().is_none());
+        let text = "Let the CPU settle to idle and leave the ledge before previewing";
+        preview_refused(text);
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(tick.notices.contains(&text));
+        assert!(take_cpu_frame().is_none());
+        assert!(!previewing() && !pending());
+
+        reset_host();
+        let root = scratch("vault-preview-refused-bad-index");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
+        request_clip_preview(clip);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        preview_refused(text);
+        std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(tick.notices.contains(&text));
+        assert!(take_cpu_frame().is_none());
+        assert!(!previewing() && !pending());
     }
 
     fn a_cpu_crop_preview_holds_right_whatever_the_facing() {
@@ -5154,6 +5195,7 @@ mod tests {
             ("a_linked_crop_preview_starts_with_save_states_off", a_linked_crop_preview_starts_with_save_states_off as fn()),
             ("a_crop_preview_ends_when_the_library_cannot_be_read", a_crop_preview_ends_when_the_library_cannot_be_read as fn()),
             ("a_session_end_drops_the_preview_home", a_session_end_drops_the_preview_home as fn()),
+            ("a_refused_vault_preview_says_why_and_ends", a_refused_vault_preview_says_why_and_ends as fn()),
             ("a_crop_preview_plays_its_window_on_the_role_through_the_play_queue", a_crop_preview_plays_its_window_on_the_role_through_the_play_queue as fn()),
             ("stopping_a_crop_preview_drops_the_rest", stopping_a_crop_preview_drops_the_rest as fn()),
             ("a_crop_preview_of_a_missing_macro_ends_at_once", a_crop_preview_of_a_missing_macro_ends_at_once as fn()),

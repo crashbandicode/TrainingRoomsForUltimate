@@ -192,7 +192,7 @@ fn the_save_states_take_the_workers_posts_without_its_locks() {
     }
     ordered(body(states, "request_named_load"), &["NAMED_LOAD.post(Some(Box::new(pair)))"]);
     ordered(body(states, "post_bound"), &["BOUND_POST.post(Some(Box::new("]);
-    ordered(body(states, "on_fighter_frame"), &["take_named_load()", "refuse_pending(!nana", "apply_bound_post();"]);
+    ordered(body(states, "on_fighter_frame"), &["take_named_load()", "preview::take_home()", "refuse_pending(!nana", "apply_bound_post();"]);
     ordered(body(states, "take_named_load"), &["NAMED_TAKE.lock()", "NAMED_LOAD.take(take_pair)", "begin_temporary(pair)"]);
     ordered(body(states, "apply_bound_post"), &["BOUND_POST.pending()", "with(|state|", "setup_busy()", "BOUND_POST.take("]);
     ordered(body(states, "clear_session"), &["NAMED_TAKE.lock()", "NAMED_LOAD.discard()"]);

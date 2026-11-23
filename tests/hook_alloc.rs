@@ -25,15 +25,22 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 }
 
 #[test]
-fn preview_ownership_queries_allocate_nothing() {
+fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
+    use model::state::{preview::Checkpoint, record::SavedState};
     let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::StateFrame);
-        for _ in 0..200 {
-            std::hint::black_box(crate::engine::rr_host::preview_running());
-            std::hint::black_box(crate::engine::rr_host::preview_away());
-            std::hint::black_box(crate::engine::rr_host::previewing());
+        let mut checkpoint = Checkpoint::new();
+        for generation in 0..20 {
+            let pair = std::array::from_fn(|role| SavedState {
+                x: 40.0 * (1.0 - 2.0 * role as f32),
+                percent: 15.0,
+                ..SavedState::never_saved()
+            });
+            checkpoint.capture(generation, pair).unwrap();
+            for _ in 0..10 { std::hint::black_box(checkpoint.restore(&generation).unwrap()); }
+            checkpoint.clear();
         }
     }
     assert_eq!(hook_allocations(), before);

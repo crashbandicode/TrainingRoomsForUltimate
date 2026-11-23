@@ -1,7 +1,11 @@
-//! Observe the live pair and its identity for setup operations.
-use super::{Raw, Role};
+//! Clip checkpoints are game-owned values, observed and restored on a fighter callback.
+use super::{Raw, Role, ACTIVE, CONSTS_READY, LOADING};
+use crate::engine::rr_host::HomeWarp;
 use crate::engine::mii::lifetime::Configuration;
+use crate::model::state::{ids::C, preview::{Checkpoint, Error}};
+use crate::runtime::features::recorder;
 use crate::runtime::{game::natives, lobby::training::practice};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct Identity {
@@ -11,7 +15,52 @@ pub(super) struct Identity {
     pub(super) miis: [Option<Configuration>; 2],
 }
 
+static CHECKPOINT: hos_lock::Mutex<Checkpoint<Identity>> = hos_lock::Mutex::new(Checkpoint::new());
+static ASK: AtomicU8 = AtomicU8::new(0);
 const NOT_READY: &str = "Wait for both fighters to finish loading before previewing";
+const CHANGED: &str = "Preview fighters changed; close the editor, let them settle and reopen";
+
+pub(super) fn clear() {
+    ASK.store(0, Ordering::Release);
+    CHECKPOINT.lock().clear();
+}
+
+pub(crate) fn request_home(home: HomeWarp) {
+    let ask = match home {
+        HomeWarp::Start { air: false } => 1,
+        HomeWarp::Start { air: true } => 2,
+        HomeWarp::Return => 3,
+    };
+    ASK.store(ask, Ordering::Release);
+}
+
+pub(super) unsafe fn take_home() -> bool {
+    if LOADING.load(Ordering::Acquire) {
+        return false;
+    }
+    let ask = ASK.swap(0, Ordering::AcqRel);
+    if ask == 0 {
+        return false;
+    }
+    let result = if ask == 3 {
+        let result = request(false, false);
+        CHECKPOINT.lock().clear();
+        result
+    } else {
+        request(true, ask == 2)
+    };
+    match result {
+        Ok(()) => true,
+        Err(text) => {
+            if ask == 3 {
+                crate::engine::rr_host::warp_landed();
+            } else {
+                crate::engine::rr_host::preview_refused(text);
+            }
+            false
+        }
+    }
+}
 
 pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     if !practice::enabled() || !practice::owned() {
@@ -62,4 +111,60 @@ pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
         miis,
     };
     Ok((identity, [player, cpu]))
+}
+
+pub(super) unsafe fn request(start: bool, air: bool) -> Result<(), &'static str> {
+    if !ACTIVE.load(Ordering::Acquire) || !CONSTS_READY.load(Ordering::Acquire) {
+        return Err(NOT_READY);
+    }
+    let (identity, raws) = observe()?;
+    let first = !CHECKPOINT.lock().captured();
+    if first {
+        if !start {
+            return Err("No temporary preview checkpoint is available");
+        }
+        let ready = super::with(|state| {
+            raws.iter().all(|raw| {
+                state.ids.is(C::SituationGround, raw.situation)
+                    || state.ids.is(C::SituationAir, raw.situation)
+            }) && state.ids.is(C::SituationGround, raws[1].situation)
+                && state.ids.is(C::StatusWait, raws[1].status)
+        })
+        .unwrap_or(false);
+        if !ready {
+            return Err("Let the CPU settle to idle and leave the ledge before previewing");
+        }
+        let pair = [super::read_record(&raws[0]), super::read_record(&raws[1])];
+        if observe()?.0 != identity {
+            return Err(CHANGED);
+        }
+        CHECKPOINT.lock().capture(identity, pair).map_err(message)?;
+    }
+    let mut pair = CHECKPOINT.lock().restore(&identity).map_err(message)?;
+    if air {
+        super::with(|state| {
+            if state.ids.is(C::SituationGround, pair[1].situation_kind) {
+                pair[1].situation_kind = state.ids.get(C::SituationAir);
+            }
+        });
+    }
+    let accepted = super::begin_temporary(pair);
+    if !accepted {
+        if first {
+            CHECKPOINT.lock().clear();
+        }
+        return Err("A save or restore is already in progress");
+    }
+    recorder::on_load_request();
+    super::hud_load(0, true);
+    super::hud_load(1, true);
+    Ok(())
+}
+
+fn message(error: Error) -> &'static str {
+    match error {
+        Error::Missing => "No temporary preview checkpoint is available",
+        Error::FightersChanged => CHANGED,
+        Error::OwnedJson => "Preview checkpoint contains worker-owned data",
+    }
 }

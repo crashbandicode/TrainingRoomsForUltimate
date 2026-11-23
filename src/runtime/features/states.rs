@@ -49,6 +49,7 @@ mod preview;
 pub(crate) mod setups;
 pub(crate) use quick_reset::on_input as on_quick_reset_input;
 pub(crate) use quick_reset::request as request_quick_reset;
+pub(crate) use preview::request_home as request_preview_home;
 
 /// Everything the per-frame step owns, behind one lock.
 struct State {
@@ -439,6 +440,7 @@ pub(crate) fn clear_session() {
     with(|_| setups::clear_facts());
     cancel_pending();
     quick_reset::clear();
+    preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     SAVE_IN_FLIGHT.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
@@ -619,7 +621,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     };
     if !crate::engine::rr_host::fighter_frame(live, crate::engine::rr_host::save_state_step(
         ENABLE.load(Ordering::Acquire), TEMPORARY.load(Ordering::Acquire),
-        || !nana && !reset_hub::cpu_operated(fighter) && take_named_load(),
+        || !nana && !reset_hub::cpu_operated(fighter) && (take_named_load() || preview::take_home()),
     )) {
         // rc.12: with Save States Off a Save or Load press is refused once, not kept for when it goes On.
         refuse_pending(!nana && !reset_hub::cpu_operated(fighter), Refused::Off);
