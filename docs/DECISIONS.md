@@ -1893,3 +1893,18 @@ Grids are unchanged. The Recording page's footer names ZL + Up / Down as the way
 
 The Recording-page rule was the edge-juggle-sol lane's default (posted 12:53:06Z); tr-primary-2 approved it the same
 day (ruling of about 12:55Z). The operator may still overrule it.
+
+## The open menu holds the CPU; Stop takes effect behind the menu (2026-11-23)
+
+The menu owned Player 1's input but did not hold the other fighters, so the CPU acted behind it. Stop ended a drill
+at once, but Guard the Edge, Juggler and Mash out could wait for the menu to close before giving the CPU back.
+
+The open menu now uses the panels' special stop on every fighter but Player 1 that the panels hold: the CPU and
+extra CPUs in Training, and the practice partner in a waiting room. Both scenes use the same stop; Training does not
+pause the whole game because the menu's own services, including the keyboard and fighter changes, run on fighter
+frames. Player 1 is not frozen. Fighter changes, save-state loads, recordings, playbacks and previews go on; the
+Recording pop-up and the close window do not hold the CPU.
+
+After Stop, Guard the Edge and Juggler hand the CPU Behavior back under the menu unless the saved behaviour is Control,
+which waits for the close. Mash out restores under the menu; the other games already ended at once. This is built on
+the item owner's default; the operator may overrule it.
