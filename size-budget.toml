@@ -2521,7 +2521,7 @@ approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both pa
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196895
+ceiling = 197257
 date = "2026-11-23"
-reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 196895 on install 2 1a0b3a64, which alone measures 196636, so they add 259."
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 197257 on install 2 e1b5cf15, which alone measures 196998, so they add 259."
 approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."
