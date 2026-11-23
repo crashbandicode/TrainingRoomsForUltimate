@@ -1928,9 +1928,9 @@ The open menu now uses the panels' special stop on every fighter but Player 1 th
 extra CPUs in Training, and the practice partner in a waiting room. Both scenes use the same stop; Training does not
 pause the whole game because the menu's own services, including the keyboard, run on fighter frames. Player 1 is not
 frozen. The hold stands down while something else drives or places the CPU: a preview from any screen (the clip
-editor's, an input drill's), a save-state load, a recording, a macro playing on the CPU (the fact that keeps a drill
-from starting) and a fighter that is loading. A macro playing on Player 1 alone does not lift it. The Recording
-pop-up and the close window do not hold the CPU.
+editor's, an input drill's, through its tail), a save-state load, a recording, a macro playing on the CPU (the fact
+that keeps a drill from starting) and a fighter that is loading. A macro playing on Player 1 alone does not lift it.
+The Recording pop-up and the close window do not hold the CPU.
 
 After Stop, Guard the Edge and Juggler hand the CPU Behavior back under the menu unless the saved behaviour is Control,
 which waits for the close. Mash out stops driving the CPU and gives it up while the menu is open, also when Player 1 is
