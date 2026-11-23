@@ -18,7 +18,7 @@ use super::macros::{InputFrame, Library, MacroRecording, StartState};
 use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
-use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord};
+use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord, DRILL_TAKE_NAME};
 use crate::model::state::record::SavedState;
 
 /// One minute at 60 fps. Five hot macros stay resident.
@@ -233,6 +233,21 @@ pub fn finish_recording(
     })
 }
 
+/// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
+/// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
+/// `None` when no frame is left.
+pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool) -> Result<Option<String>, Error> {
+    if trim {
+        super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
+    }
+    if frames.is_empty() {
+        return Ok(None);
+    }
+    let macros = Library::new(root.join(MACROS_DIR));
+    let recording = MacroRecording::new(DRILL_TAKE_NAME, "13.0.5", start, frames).map_err(record)?;
+    macros.save_new(&recording).map_err(record).map(Some)
+}
+
 pub fn drive_play<'a>(machine: &mut Playback, role: Role, book: &'a Book) -> super::playback::Effect<'a> {
     machine.play_chord(role, book)
 }
@@ -343,18 +358,44 @@ pub struct MakeComboPass {
 
 /// The strip's combo, named Combo N, marked made from `source`. The drill is not written.
 pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
+    save_combo(root, combo, source, recorded_on, None, at)
+}
+
+/// A directly recorded input drill (F10): saved as Drill N like a made combo, with the macro file that holds its
+/// take named in the drill's `take`. No source: `made_from` stays empty.
+pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, take: String, at: u64) -> Result<String, Error> {
+    save_combo(root, combo, "", recorded_on, Some(take), at)
+}
+
+fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, take: Option<String>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let entries = library.list().map_err(record)?.entries;
     let prefix = if combo.input_only { "Drill" } else { "Combo" };
     let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
     let mut made = ComboRecord::new(name, *combo, recorded_on);
     if !source.is_empty() { made = made.with_made_from(source); }
+    if let Some(take) = take { made = made.with_take(take); }
     let id = library.save_new(&made).map_err(record)?;
     RecordingIndex::update(root, |index| {
         index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
         Ok(true)
     })?;
     Ok(id)
+}
+
+/// Delete a combo or drill file. A drill's take (F10) goes with it: nothing else names that macro.
+/// Only a macro named `DRILL_TAKE_NAME`: a file that names any other macro leaves it alone.
+pub fn delete_combo(root: &Path, id: &str) -> bool {
+    let combos = ComboLibrary::new(root.join("combos"));
+    let take = combos.load(id).ok().and_then(|file| file.take);
+    let deleted = combos.delete(id).is_ok();
+    if let Some(take) = take.filter(|_| deleted) {
+        let macros = Library::new(root.join(MACROS_DIR));
+        if macros.load(&take).is_ok_and(|file| file.name == DRILL_TAKE_NAME) {
+            let _ = macros.delete(&take);
+        }
+    }
+    deleted
 }
 
 /// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
@@ -612,6 +653,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                 input_only: file.combo.input_only,
                 recorded_on: file.recorded_on.unwrap_or_default(),
                 made_from: file.made_from,
+                take: file.take,
                 links: crate::model::recording_menu::combo_link_lines(&file.combo),
                 span: file.combo.len() as u32,
             })
@@ -1384,7 +1426,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile { input_only: false,
+            combos: vec![ComboFile { input_only: false, take: None,
                 id: "c1".into(),
                 name: "One".into(),
                 recorded_on: String::new(),

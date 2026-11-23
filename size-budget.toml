@@ -2453,3 +2453,11 @@ ceiling = 196349
 date = "2026-11-23"
 reason = "Recording placement lets players set both fighters' positions, damage and requested start states in Training and waiting rooms. It starts Record or Play after both requested onsets, verifies the chosen missed-tech bound motion and publishes the live samples. Measured 196349, 2211 above 194138."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording placement design and requested onset ruling 2026-11-23 03:50:00Z. Source and exact build passed rv-hit-streak 05:14:23Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196357
+date = "2026-11-23"
+reason = "A directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 196357, 8 above 196349."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."

@@ -22,6 +22,8 @@ pub const MAX_FILE_BYTES: u64 = LINKS as u64 * 4096;
 pub const MAX_NAME_CHARS: usize = 48;
 /// The directory under the data folder.
 pub const DIR: &str = "combos";
+/// The name of a macro file a drill owns as its take (F10). Only a macro with this name that a drill names is hidden from the lists and deleted with the drill.
+pub const DRILL_TAKE_NAME: &str = "Drill take";
 /// Longest file name a shared combo may have, in characters before `.json`.
 pub const MAX_FILE_NAME_CHARS: usize = 64;
 
@@ -81,6 +83,8 @@ pub struct ComboRecord {
     pub recorded_on: Option<String>,
     /// The recording or chain this combo was made from. Absent on a combo saved by hand.
     pub made_from: Option<String>,
+    /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
+    pub take: Option<String>,
     /// The JSON object the record was read from. Writing it back (a rename) changes only `name` (and adds
     /// `schema_version` when the file had none), so fields someone added by hand stay.
     source: Option<Map<String, Value>>,
@@ -89,12 +93,13 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on, &self.made_from)
+        (&self.name, &self.combo, &self.recorded_on, &self.made_from, &self.take)
             == (
                 &other.name,
                 &other.combo,
                 &other.recorded_on,
                 &other.made_from,
+                &other.take,
             )
     }
 }
@@ -156,6 +161,7 @@ impl ComboRecord {
     pub fn unit_count(&self) -> u32 {
         self.combo.len() as u32
     }
+    /// A crop has different inputs, so it does not keep the original drill's take.
     pub fn crop_units(&self, start: u32, end: u32) -> Result<Self, ComboError> {
         if start >= end || end > self.unit_count() {
             return Err(ComboError::Invalid("crop units"));
@@ -179,6 +185,7 @@ impl ComboRecord {
             combo,
             recorded_on,
             made_from: None,
+            take: None,
             source: None,
         }
     }
@@ -186,6 +193,12 @@ impl ComboRecord {
     /// Made from a recording or a chain. The combo file keeps that id.
     pub fn with_made_from(mut self, source: impl Into<String>) -> Self {
         self.made_from = Some(source.into());
+        self
+    }
+
+    /// Give a directly recorded drill ownership of the macro file holding its take.
+    pub fn with_take(mut self, id: impl Into<String>) -> Self {
+        self.take = Some(id.into());
         self
     }
 
@@ -255,6 +268,9 @@ impl ComboRecord {
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
         }
+        if let Some(take) = &self.take {
+            value["take"] = json!(take);
+        }
         value
     }
 
@@ -277,6 +293,7 @@ impl ComboRecord {
         let shown = |key| object.get(key).and_then(Value::as_str).and_then(shown_name);
         let recorded_on = shown("recorded_on");
         let made_from = shown("made_from");
+        let take = object.get("take").and_then(Value::as_str).filter(|id| shareable_id(id)).map(str::to_owned);
         let input = object.get("schema_version").and_then(Value::as_u64) == Some(2);
         if input && object.get("kind").and_then(Value::as_str) != Some("input_drill") { return Err("kind"); }
         let key = if input { "input_steps" } else { "links" };
@@ -303,6 +320,7 @@ impl ComboRecord {
             combo,
             recorded_on,
             made_from,
+            take,
             source: Some(object.clone()),
         })
     }
