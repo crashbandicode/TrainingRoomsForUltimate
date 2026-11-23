@@ -748,7 +748,6 @@ impl Panes {
     unsafe fn draw_conn_div(&self, frame: &Frame) {
         match frame.conn_div() {
             DivWrite::Hide => self.hide(IDX_CONN_DIV),
-            DivWrite::Show => self.show(IDX_CONN_DIV, true),
             DivWrite::Rect([x, y, w, h], color) => self.rect_at(IDX_CONN_DIV, x, y, w, h, color),
         }
     }

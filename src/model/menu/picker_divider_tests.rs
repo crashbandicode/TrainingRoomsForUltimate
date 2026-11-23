@@ -39,7 +39,6 @@ fn div_after(frames: &[Frame]) -> DivPane {
     for f in frames {
         match f.conn_div() {
             DivWrite::Hide => pane.shown = false,
-            DivWrite::Show => pane.shown = true,
             DivWrite::Rect(rect, color) => {
                 pane.shown = true;
                 pane.rect = rect;

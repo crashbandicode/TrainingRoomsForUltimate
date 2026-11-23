@@ -134,8 +134,6 @@ pub enum View {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DivWrite {
     Hide,
-    /// Visibility only: the pane keeps the place and colour of its last write.
-    Show,
     /// Centre and size (`[x, y, w, h]`) and the sRGB colour.
     Rect([f32; 4], [u8; 4]),
 }
@@ -332,7 +330,9 @@ impl Frame {
         if let Some(rect) = self.pop_box() {
             DivWrite::Rect(rect, POP_BOX)
         } else if self.popup && self.view == View::List {
-            DivWrite::Show
+            let div = p::spec(p::IDX_CONN_DIV);
+            let p::Kind::Rect { color } = div.kind else { return DivWrite::Hide };
+            DivWrite::Rect([div.x, div.y, div.w, div.h], color)
         } else {
             DivWrite::Hide
         }
