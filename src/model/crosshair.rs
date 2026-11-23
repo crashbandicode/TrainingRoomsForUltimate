@@ -40,8 +40,12 @@ pub struct Marks {
 }
 
 impl Marks {
-    /// The marks to draw. Stub of 755d9936: the border pointer is drawn wherever the CPU's body is.
-    pub fn shown(self, _cpu_held: bool) -> Self {
+    /// The marks to draw. While the CPU's own body waits at its point the game shows it there, or its magnifier with
+    /// the direction pointer when the point is out of view, so the border pointer is left out.
+    pub fn shown(mut self, cpu_held: bool) -> Self {
+        if cpu_held {
+            self.pointer = None;
+        }
         self
     }
 }
@@ -107,9 +111,14 @@ pub fn preview_step(slot: &mut Option<CpuPreview>, body: u32, origin: impl FnOnc
     slot.as_mut().map_or(PreviewAct::Lift, CpuPreview::act)
 }
 
-/// How the picker's CPU point is shown, for the practice state. Stub of 755d9936: the state does not say.
-pub fn cpu_view(_preview: Option<&CpuPreview>) -> &'static str {
-    ""
+/// How the picker's CPU point is shown, for the practice state: the body is there in view, or the game shows its
+/// magnifier of it; empty when the body is not there.
+pub fn cpu_view(preview: Option<&CpuPreview>) -> &'static str {
+    match preview {
+        None => "",
+        Some(preview) if preview.magnified => "magnifier",
+        Some(_) => "in_view",
+    }
 }
 
 #[cfg(test)]

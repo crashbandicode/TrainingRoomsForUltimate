@@ -65,6 +65,7 @@ pub fn snapshot(game: Option<Game>, fields: Fields, thinks: [u64; CPU_ENTRIES], 
             ("step", fields.step),
             ("wizard.step", fields.wizard_step),
             ("wizard.selection", fields.wizard_selection),
+            ("wizard.cpu", fields.wizard_cpu),
             ("last.outcome", fields.last_outcome),
         ] {
             if !value.is_empty() {
