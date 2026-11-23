@@ -2574,6 +2574,36 @@ mod tests {
         assert_eq!((popup.count, popup.index), (14, Some(0)));
     }
 
+    fn bridge_publishes_the_popup_owner_and_not_the_panel_or_external_screen() {
+        use crate::model::bridge_state::{published_list, ListView};
+        use crate::model::flow::{model_takes_presses, Phase};
+        use crate::model::menu::{Screen, table::Editor};
+        let mut m = menu();
+        let mut catalog = example();
+        catalog.saves.truncate(14);
+        m.recording_mut().set_catalog(catalog);
+        m.on_request(Request::RecordingPopup);
+        let takes = model_takes_presses(false, true, Phase::Menu, false);
+        let view = published_list(Some(&m), takes);
+        assert_eq!((view.id, view.count, view.index), (format!("recording/popup/{SAVES_MACROS}/0"), 14, Some(0)));
+        m.press(Button::Down);
+        assert_eq!(published_list(Some(&m), takes).index, Some(1));
+        assert_eq!(published_list(Some(&m), model_takes_presses(true, false, Phase::Panel, false)), ListView::default());
+        assert_eq!(published_list(Some(&m), model_takes_presses(true, false, Phase::Menu, true)), ListView::default());
+        assert_eq!(published_list(None, true), ListView::default());
+
+        let mut external = menu();
+        while external.page() != Page::FightersStages { external.press(Button::R); }
+        for _ in 0..=external.entry_count(Page::FightersStages) {
+            if external.help_row().is_some_and(|row| row.id == "mii_brawler_config") { break; }
+            external.press(Button::Down);
+        }
+        assert!(external.help_row().is_some_and(|row| row.id == "mii_brawler_config"));
+        external.press(Button::A);
+        assert!(matches!(external.screen(), Some(Screen::External(Editor::MiiList(0)))));
+        assert_eq!(published_list(Some(&external), model_takes_presses(true, false, Phase::Menu, false)), ListView::default());
+    }
+
     fn recording_page_jump_goes_on_past_a_section() {
         use crate::model::menu::Entry;
         let mut m = recording_list_menu();
@@ -3150,6 +3180,7 @@ mod tests {
             ("holding_down_on_the_recording_lists_quickens", holding_down_on_the_recording_lists_quickens as fn()),
             ("recording_page_jump_goes_on_past_a_section", recording_page_jump_goes_on_past_a_section as fn()),
             ("bridge_recording_list_tracks_jumps_and_the_popup", bridge_recording_list_tracks_jumps_and_the_popup as fn()),
+            ("bridge_publishes_the_popup_owner_and_not_the_panel_or_external_screen", bridge_publishes_the_popup_owner_and_not_the_panel_or_external_screen as fn()),
             ("recording_picker_takes_the_list_jump", recording_picker_takes_the_list_jump as fn()),
             ("zl_down_reaches_the_recording_lists_through_the_adapter", zl_down_reaches_the_recording_lists_through_the_adapter as fn()),
             ("x_cycles_the_loop_only_in_macros", x_cycles_the_loop_only_in_macros as fn()),

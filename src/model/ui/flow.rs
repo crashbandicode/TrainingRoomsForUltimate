@@ -59,6 +59,19 @@ pub fn menu_owns_input(open: bool, popup: bool, closing: bool, prompt: bool) -> 
     open || popup || closing || prompt
 }
 
+/// Whether the menu's own screens are what Player 1's presses reach now, as the worker's `press` routes them: the
+/// open menu (not while it waits to close), or the Recording pop-up over the closed menu. Not the layer's panel, the
+/// clip editor or the closed-menu fighter question. An external screen of the open menu (the Mii list) is the
+/// worker's own list: the model reports no focused list for it, so the bridge publishes none there either.
+pub fn model_takes_presses(open: bool, popup: bool, phase: Phase, pending_close: bool) -> bool {
+    match phase {
+        Phase::Clip => false,
+        Phase::Prompt if !open => false,
+        Phase::Panel if open => false,
+        _ => if open { !pending_close } else { popup },
+    }
+}
+
 /// What a close window starts waiting for (SPEC-core-03 §2.3): every action button (A, B, X, Y, L, R, ZL, ZR, the adapter's
 /// logical bits 0–7). Each P1 poll then keeps only the ones still held (`held & poll`), so the window waits for the buttons
 /// held at its first poll, the press that closed it among them. Directions are movement and are not waited for.
@@ -195,6 +208,31 @@ mod tests {
         assert!(!close_done(CLOSE_FRAMES, CLOSE_HELD_START), "a window waits for its first poll");
     }
 
+    fn the_model_list_follows_the_press_owner() {
+        use Phase::*;
+        // The Mii list is an external screen with no model list.
+        for (phase, open, popup, pending, expected) in [
+            (Menu, false, false, false, false), (Menu, false, false, true, false),
+            (Menu, false, true, false, true), (Menu, false, true, true, true),
+            (Menu, true, false, false, true), (Menu, true, false, true, false),
+            (Menu, true, true, false, true), (Menu, true, true, true, false),
+            (Panel, false, false, false, false), (Panel, false, false, true, false),
+            (Panel, false, true, false, true), (Panel, false, true, true, true),
+            (Panel, true, false, false, false), (Panel, true, false, true, false),
+            (Panel, true, true, false, false), (Panel, true, true, true, false),
+            (Clip, false, false, false, false), (Clip, false, false, true, false),
+            (Clip, false, true, false, false), (Clip, false, true, true, false),
+            (Clip, true, false, false, false), (Clip, true, false, true, false),
+            (Clip, true, true, false, false), (Clip, true, true, true, false),
+            (Prompt, false, false, false, false), (Prompt, false, false, true, false),
+            (Prompt, false, true, false, false), (Prompt, false, true, true, false),
+            (Prompt, true, false, false, true), (Prompt, true, false, true, false),
+            (Prompt, true, true, false, true), (Prompt, true, true, true, false),
+        ] {
+            assert_eq!(model_takes_presses(open, popup, phase, pending), expected, "{phase:?} {open} {popup} {pending}");
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -204,6 +242,7 @@ mod tests {
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),
             ("the_pop_ups_close_starts_the_close_window", the_pop_ups_close_starts_the_close_window as fn()),
             ("the_close_window_waits_for_the_buttons_held_when_it_began", the_close_window_waits_for_the_buttons_held_when_it_began as fn()),
+            ("the_model_list_follows_the_press_owner", the_model_list_follows_the_press_owner as fn()),
         ]);
     }
     }

@@ -123,6 +123,11 @@ pub fn list_view(menu: &super::menu::Menu) -> ListView {
     ListView { id: list.id, count: list.count, index: Some(list.index), value }
 }
 
+/// The `list` keys the worker publishes: the model's focused list while the menu's own screens take the presses, else none.
+pub fn published_list(menu: Option<&super::menu::Menu>, model_takes_presses: bool) -> ListView {
+    menu.filter(|_| model_takes_presses).map(list_view).unwrap_or_default()
+}
+
 /// The table header the provider accepts (ssbu-hw-bridge PLUGIN-STATE.md §2): this magic and ABI, exactly the declared
 /// size of the table it knows, one reader, the publish bound, and exactly the contract's eight provider slots.
 pub fn header_usable(magic: u32, abi: u32, struct_size: u32, readers: u32, max_payload: u32, max_providers: u32, table_size: usize) -> bool {

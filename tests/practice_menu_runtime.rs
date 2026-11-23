@@ -197,7 +197,10 @@ fn every_refusal_goes_through_the_queue_s_refusal_post() {
 fn the_bridge_publishes_the_focused_list_and_still_omits_rows() {
     let worker = src("src/runtime/ui/worker.rs");
     let publish = item(&worker, "fn publish_bridge_state(");
-    assert!(publish.contains("map(crate::model::bridge_state::list_view)"));
+    assert!(publish.contains("published_list("));
+    assert!(publish.contains("flow::model_takes_presses("));
+    assert!(publish.contains("POPUP.load("));
+    assert!(!publish.contains("m.filter(|_| open)"));
     for field in ["list: &list.id", "list_count: list.count", "list_index: list.index", "list_value: &list.value", "rows_omitted: true"] {
         assert!(publish.contains(field), "{field}");
     }

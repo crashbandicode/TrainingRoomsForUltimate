@@ -431,7 +431,7 @@ fn publish_bridge_state(s: &mut Session) {
         return;
     }
     let now = crate::runtime::clock::uptime_ms();
-    let Session { bridge, menu, panel, .. } = s;
+    let Session { bridge, menu, panel, phase, pending_close, .. } = s;
     bridge.tick(now, |notice, ack, out| {
         let open = OPEN.load(Ordering::Acquire);
         let m = menu.as_ref();
@@ -459,7 +459,7 @@ fn publish_bridge_state(s: &mut Session) {
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
-        let list = m.filter(|_| open).map(crate::model::bridge_state::list_view).unwrap_or_default();
+        let list = crate::model::bridge_state::published_list(m, flow::model_takes_presses(open, POPUP.load(Ordering::Acquire), *phase, pending_close.is_some()));
         let view = crate::model::bridge_state::View {
             open: open && m.is_some(),
             page: m.map_or("", |m| m.page().id()),
