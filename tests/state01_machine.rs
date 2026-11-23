@@ -684,12 +684,11 @@ fn state01_save_captures_into_the_save_slot_only() {
 #[test]
 fn state01_playback_once() {
     let mut rng = rng();
-    // The recording or playback after a load is package 4's decision (`Recorder::on_state_restored`): the
-    // machine only tells the recorder once, when both records are done.
+    // The machine reports completion once, when both records are done.
     let s = settings();
     let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
     let (player, cpu) = run_ground_load(&mut machine, &s, &mut rng);
-    // The recorder is told once per restore, with whether the CPU was saved on the ledge.
+    // The completion reports whether the CPU was saved on the ledge.
     assert_eq!((player.restored, cpu.restored), (None, Some(false)));
     let mut ledge = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, CLIFF, 7), 0);
     request(&mut ledge, &s, &mut rng);

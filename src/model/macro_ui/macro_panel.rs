@@ -354,7 +354,6 @@ pub struct MacroUi {
     held_save: Option<NameDraft>,
     /// CPU position from the latest save-state restore, before the offset.
     anchor: Option<(f32, f32)>,
-    anchor_generation: Option<u64>,
     edit_anchor: Option<(f32, f32)>,
     pending_kind: Option<i32>,
     claimed: bool,
@@ -376,7 +375,6 @@ impl MacroUi {
             prompt_commit: None,
             held_save: None,
             anchor: None,
-            anchor_generation: None,
             edit_anchor: None,
             pending_kind: None,
             claimed: false,
@@ -393,6 +391,7 @@ impl MacroUi {
         !matches!(self.screen, Screen::Closed)
     }
 
+    #[cfg(test)]
     pub fn playback_allowed(&self) -> bool {
         self.character_ready && !self.is_open() && self.loaded.is_some()
     }
@@ -402,6 +401,7 @@ impl MacroUi {
         self.loaded.as_ref().and_then(|loaded| loaded.id.as_deref())
     }
 
+    #[cfg(test)]
     pub fn loaded_frames(&self) -> Option<&[InputFrame]> {
         self.loaded
             .as_ref()
@@ -415,6 +415,7 @@ impl MacroUi {
             .map(|loaded| loaded.recording.start.facing)
     }
 
+    #[cfg(test)]
     pub fn loaded_start(&self) -> Option<StartState> {
         self.loaded.as_ref().map(|loaded| loaded.recording.start)
     }
@@ -436,6 +437,7 @@ impl MacroUi {
         };
     }
 
+    #[cfg(test)]
     pub fn loaded_placement(&self) -> Option<Placement> {
         self.loaded
             .as_ref()
@@ -593,6 +595,7 @@ impl MacroUi {
     }
 
     /// Opens the save dialog, retaining an exact Mii captured with the take. An empty or fighter-less take is refused.
+    #[cfg(test)]
     pub fn offer_save_with_mii(
         &mut self,
         mut frames: Vec<InputFrame>,
@@ -829,48 +832,6 @@ impl MacroUi {
         }
     }
 
-    /// Absolute CPU position for this restore. The same generation keeps the
-    /// first anchor, so a later call with the already-offset position does not
-    /// add the delta again.
-    pub fn restored_target(
-        &mut self,
-        generation: u64,
-        saved_anchor: (f32, f32),
-    ) -> Option<(f32, f32)> {
-        if self.anchor_generation != Some(generation) {
-            self.anchor = Some(saved_anchor);
-            self.anchor_generation = Some(generation);
-        }
-        let placement = self.loaded.as_ref()?.recording.placement;
-        let anchor = self.anchor?;
-        Some(placement.apply(anchor))
-    }
-
-    /// Airborne recordings retain their situation at a grounded/zero-offset anchor.
-    pub fn restore_in_air(&self) -> bool {
-        self.loaded.as_ref().is_some_and(|loaded| {
-            loaded.recording.start.situation == 2
-                || loaded.recording.start.speed_y != 0.0
-                || loaded.recording.placement.delta_y != 0.0
-        })
-    }
-
-    /// Speeds to apply at playback frame zero, once Wait/Fall is ready.
-    /// AtRest is explicit: drift while the other fighter restores is not retained.
-    pub fn ready_velocity(&self, settled: bool) -> Option<(f32, f32)> {
-        let loaded = self.loaded.as_ref()?;
-        if !settled {
-            return None;
-        }
-        if loaded.recording.placement.momentum == MomentumMode::AtRest {
-            return Some((0.0, 0.0));
-        }
-        Some((
-            loaded.recording.start.speed_x,
-            loaded.recording.start.speed_y,
-        ))
-    }
-
     pub fn marker(&self) -> Option<(f32, f32)> {
         let Screen::Place(draft) = &self.screen else {
             return None;
@@ -955,7 +916,6 @@ impl MacroUi {
         self.emitted = None;
         self.emitted_tick = None;
         self.anchor = None;
-        self.anchor_generation = None;
         self.edit_anchor = None;
     }
 
@@ -1721,6 +1681,7 @@ fn clip_label(label: &str) -> String {
     out
 }
 
+#[cfg(test)]
 fn clip_version(version: &str) -> String {
     let mut out = String::new();
     for ch in version.chars().filter(|ch| !ch.is_control()) {
@@ -1935,9 +1896,8 @@ mod tests {
         let mut ui = MacroUi::new();
         ui.commit_loaded("drill".into(), sample(Placement::default()), Some(0x08)).unwrap();
         assert!(!ui.open_editor(None));
-        ui.restored_target(1, (5.0, 8.0));
         ui.commit_loaded("copy".into(), sample(Placement::default()), Some(0x08)).unwrap();
-        assert!(ui.open_editor(None));
+        assert!(ui.open_editor(Some((5.0, 8.0))));
         assert_eq!(ui.marker(), Some((5.0, 8.0)));
         ui.close_transient();
         assert!(!ui.open_editor(None));
@@ -2006,8 +1966,7 @@ mod tests {
 
     fn save_dialog_placement_round_trip_and_momentum() {
         let mut ui = MacroUi::new();
-        // A restored reference exists even before the first macro is saved.
-        assert!(ui.restored_target(1, (4.0, 8.0)).is_none());
+        ui.anchor = Some((4.0, 8.0));
         ui.offer_save_with_mii(frames(), start(), false, "13.0.5", None);
         ui.on_pad(Pad::Left);
         ui.on_pad(Pad::Confirm);
@@ -2025,23 +1984,6 @@ mod tests {
         assert_eq!(recording.placement.momentum, MomentumMode::AtRest);
         assert_eq!(recording.frames, frames());
         assert_eq!(recording.start.status, 0x22);
-    }
-
-    fn aerial_start_survives_zero_offset_and_rest_mode() {
-        let mut ui = MacroUi::new();
-        let mut recording = sample(Placement::default());
-        recording.start.speed_y = -1.5;
-        ui.commit_loaded("fall".into(), recording.clone(), Some(0x08)).unwrap();
-        assert!(ui.restore_in_air());
-        assert_eq!(ui.ready_velocity(true), Some((0.5, -1.5)));
-        recording.placement.momentum = MomentumMode::AtRest;
-        ui.commit_loaded("rest".into(), recording.clone(), Some(0x08)).unwrap();
-        assert!(ui.restore_in_air());
-        assert_eq!(ui.ready_velocity(true), Some((0.0, 0.0)));
-        recording.start.situation = 0;
-        recording.start.speed_y = 0.0;
-        ui.commit_loaded("ground".into(), recording, Some(0x08)).unwrap();
-        assert!(!ui.restore_in_air());
     }
 
     fn character_request_is_once_and_playback_does_not_double_advance() {
@@ -2064,7 +2006,6 @@ mod tests {
         let duplicate = ui.feed_playback(1);
         assert_eq!(first, duplicate);
         assert_eq!(ui.playback_frame(), 1);
-        ui.restored_target(3, (1.0, 2.0));
         assert_eq!(ui.playback_frame(), 1);
         assert!(ui.feed_playback(1).is_some());
     }
@@ -2403,7 +2344,6 @@ mod tests {
             ("edit_placement_opens_on_the_active_macro_and_writes_that_file", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),
             ("native_checkpoint_survives_repeated_interruption_without_commit", native_checkpoint_survives_repeated_interruption_without_commit as fn()),
             ("save_dialog_placement_round_trip_and_momentum", save_dialog_placement_round_trip_and_momentum as fn()),
-            ("aerial_start_survives_zero_offset_and_rest_mode", aerial_start_survives_zero_offset_and_rest_mode as fn()),
             ("character_request_is_once_and_playback_does_not_double_advance", character_request_is_once_and_playback_does_not_double_advance as fn()),
             ("exact_mii_naming_save_as_and_same_class_ack_keep_identity", exact_mii_naming_save_as_and_same_class_ack_keep_identity as fn()),
             ("numbered_slot_copy_rejects_over_limit_without_truncation", numbered_slot_copy_rejects_over_limit_without_truncation as fn()),

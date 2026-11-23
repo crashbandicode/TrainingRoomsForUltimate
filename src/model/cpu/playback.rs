@@ -9,6 +9,8 @@
 pub struct PlaybackState {
     /// A playback is running on the CPU.
     pub running: bool,
+    /// A ledge playback was asked for and waits for its slot's publication: no input is delivered yet.
+    pub owed: bool,
     /// A recording is being made.
     pub recording: bool,
     /// The recorder is in standby / lockout.

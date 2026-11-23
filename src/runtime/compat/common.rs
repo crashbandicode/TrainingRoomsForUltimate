@@ -12,9 +12,6 @@ use crate::runtime::{game, scene};
 
 pub(crate) use crate::runtime::lobby::game_mode;
 
-/// The game version the plugin is installed for (the version guard installs nothing on any other build): the tag macros and captures carry.
-pub static SMASH_VERSION: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| "13.0.5".to_owned());
-
 /// The fork's `common::consts` (`FighterId`).
 pub mod consts {
     pub use crate::runtime::compat::consts::*;

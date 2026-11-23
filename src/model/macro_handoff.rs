@@ -1,7 +1,7 @@
 //! Design C of the named-macro layer (SPEC-core-01 §4.3, lead ruling 2026-11-02): the panel model has one owner, the menu worker, and
 //! the game-thread hooks never take its locks. What crosses between the two lives here, pure and host-tested:
 //!
-//! * `MacroQueries`: the `Copy` answers the hooks consult every frame (Macro Source, capture/playback state, panel visibility …),
+//! * `MacroQueries`: the `Copy` answers the hooks consult every frame (panel and replay visibility …),
 //!   published by the worker after every model change and read wait-free by the hooks.
 //! * `PlayBuffers<T>`: two frame buffers for named playback. The worker fills the one the hooks are not reading and publishes it; a
 //!   hook reads one frame by value per call and never waits. The worker, which may sleep, waits for the readers of the old buffer to
@@ -17,23 +17,6 @@ use std::sync::atomic::{AtomicU32, AtomicU8, AtomicUsize, Ordering::SeqCst};
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MacroQueries {
     pub session: u64,
-    /// Macro Source is Named Library.
-    pub source_is_named: bool,
-    /// A named macro is loaded and its fighter is ready (the playback chord may start it).
-    pub playback_allowed: bool,
-    pub playback_len: u32,
-    pub playback_facing: f32,
-    pub playback_status: i32,
-    pub playback_generation: u32,
-    pub loaded_matches: bool,
-    pub placement: Option<(f32, f32)>,
-    pub velocity: Option<(f32, f32)>,
-    /// The loaded macro plays on the current CPU whatever its fighter (no recorded-identity gate).
-    pub plays_current: bool,
-    /// The loaded macro's recorded fighter kind (-1: none), for the restore's identity gate.
-    pub loaded_kind: i32,
-    /// The loaded macro was recorded in the air (its restore starts in Fall).
-    pub restore_in_air: bool,
     /// Any panel of the layer is up (library, naming, clip editor, capture browser).
     pub panel_visible: bool,
     /// The clip editor is in the foreground (P1's controls are the editor's).
@@ -76,18 +59,6 @@ impl MacroQueries {
     /// Nothing loaded, nothing visible: what the hooks see before the worker's first publish.
     pub const IDLE: MacroQueries = MacroQueries {
         session: 0,
-        source_is_named: false,
-        playback_allowed: false,
-        playback_len: 0,
-        playback_facing: 1.0,
-        playback_status: 0,
-        playback_generation: 0,
-        loaded_matches: false,
-        placement: None,
-        velocity: None,
-        plays_current: false,
-        loaded_kind: -1,
-        restore_in_air: false,
         panel_visible: false,
         clip_foreground: false,
         clip_editor_open: false,
@@ -99,92 +70,6 @@ impl MacroQueries {
         suspended: false,
         marker: None,
     };
-}
-
-/// One bounded numbered-slot transfer. The worker constructs a request, a game
-/// callback executes it against its Recorder, and the worker consumes the reply.
-/// Both directions use the same fixed payload: no allocation occurs in execute.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SlotTransfer {
-    slot: u8,
-    frames: [crate::model::input_delay::MappedInputs; crate::model::recording::SLOT_FRAMES],
-    len: u16,
-    origin: crate::model::recording::Origin,
-    pub result: SlotResult,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SlotResult {
-    ExportRequest,
-    ImportRequest,
-    Exported,
-    Imported,
-    ExportFailed(crate::model::recording::ExportRefusal),
-    ImportFailed(crate::model::recording::ImportRefusal),
-}
-
-impl SlotTransfer {
-    pub fn export(slot: usize) -> Self {
-        Self {
-            slot: u8::try_from(slot).unwrap_or(u8::MAX),
-            frames: [crate::model::input_delay::MappedInputs::NEUTRAL; crate::model::recording::SLOT_FRAMES],
-            len: 0,
-            origin: crate::model::recording::Origin::NONE,
-            result: SlotResult::ExportRequest,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn import(slot: usize, frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
-        -> Result<Self, crate::model::recording::ImportRefusal>
-    {
-        let mut transfer = Self::export(slot);
-        transfer.fill_import(slot, frames, origin)?;
-        Ok(transfer)
-    }
-
-    /// Initialize the worker-owned transfer in place, avoiding a second full
-    /// payload in Result<Self, _>. Rejections leave the existing transfer intact.
-    pub fn fill_import(&mut self, slot: usize,
-        frames: &[crate::model::input_delay::MappedInputs], origin: crate::model::recording::Origin)
-        -> Result<(), crate::model::recording::ImportRefusal>
-    {
-        use crate::model::recording::{ImportRefusal, SLOTS, SLOT_FRAMES};
-        if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
-        if frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(frames.len())); }
-        self.slot = slot as u8;
-        self.frames.fill(crate::model::input_delay::MappedInputs::NEUTRAL);
-        self.frames[..frames.len()].copy_from_slice(frames);
-        self.len = frames.len() as u16;
-        self.origin = origin;
-        self.result = SlotResult::ImportRequest;
-        Ok(())
-    }
-
-    pub fn execute(&mut self, recorder: &mut crate::model::recording::Recorder) {
-        match self.result {
-            SlotResult::ExportRequest => match recorder.export_slot(self.slot) {
-                Ok((frames, origin)) => {
-                    self.frames[..frames.len()].copy_from_slice(frames);
-                    self.len = frames.len() as u16;
-                    self.origin = origin;
-                    self.result = SlotResult::Exported;
-                }
-                Err(error) => self.result = SlotResult::ExportFailed(error),
-            },
-            SlotResult::ImportRequest => {
-                self.result = match recorder.import_slot(self.slot, &self.frames[..usize::from(self.len)], self.origin) {
-                    Ok(()) => SlotResult::Imported,
-                    Err(error) => SlotResult::ImportFailed(error),
-                };
-            }
-            _ => {}
-        }
-    }
-
-    pub fn exported(&self) -> Option<(&[crate::model::input_delay::MappedInputs], crate::model::recording::Origin)> {
-        (self.result == SlotResult::Exported).then(|| (&self.frames[..usize::from(self.len)], self.origin))
-    }
 }
 
 /// Two frame buffers for playback: the hooks read the published one, the worker fills the other.
@@ -325,68 +210,9 @@ mod tests {
     lib_unit_tests! {
     use super::{MacroQueries, PlayBuffers};
 
-    fn numbered_slot_transfer_preserves_frames_origin_and_refusals() {
-        use super::{SlotTransfer, SlotResult};
-        use crate::model::recording::{Recorder, Origin, ImportRefusal, ExportRefusal, SLOT_FRAMES};
-        use crate::model::input_delay::MappedInputs;
-        let mut recorder = Recorder::new();
-        let mut empty = SlotTransfer::export(2);
-        empty.execute(&mut recorder);
-        assert_eq!(empty.result, SlotResult::ExportFailed(ExportRefusal::NotRecorded));
-        let frame = MappedInputs { lstick_x: -91, rstick_y: 37, ..MappedInputs::NEUTRAL };
-        let frames = [frame, MappedInputs::NEUTRAL, frame];
-        let origin = Origin { facing: -1, status: 42, ..Origin::NONE };
-        let mut import = SlotTransfer::import(2, &frames, origin).unwrap();
-        import.execute(&mut recorder);
-        assert_eq!(import.result, SlotResult::Imported);
-        assert_eq!(SlotTransfer::import(2, &vec![frame; SLOT_FRAMES + 1], origin),
-            Err(ImportRefusal::TooLong(SLOT_FRAMES + 1)));
-        let mut export = SlotTransfer::export(2);
-        export.execute(&mut recorder);
-        assert_eq!(export.exported(), Some((frames.as_slice(), origin)));
-        let mut invalid = SlotTransfer::export(usize::MAX);
-        invalid.execute(&mut recorder);
-        assert_eq!(invalid.result, SlotResult::ExportFailed(ExportRefusal::SlotOutOfRange));
-    }
-
-    fn in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length() {
-        use super::{SlotTransfer, SlotResult};
-        use crate::model::recording::{Recorder, Origin, ImportRefusal, SLOT_FRAMES, SLOTS};
-        use crate::model::input_delay::MappedInputs;
-        let frame = MappedInputs { buttons: 0x1357, lstick_x: -73, rstick_y: 91,
-            ..MappedInputs::NEUTRAL };
-        let frames = vec![frame; SLOT_FRAMES];
-        let origin = Origin { facing: -1, status: 81, ..Origin::NONE };
-        let mut transfer = SlotTransfer::export(0);
-        transfer.fill_import(SLOTS - 1, &frames, origin).unwrap();
-        let before = transfer;
-        assert_eq!(transfer.fill_import(SLOTS, &frames, Origin::NONE), Err(ImportRefusal::SlotOutOfRange));
-        assert_eq!(transfer, before, "rejection must preserve the queued value");
-        assert_eq!(transfer.fill_import(0, &vec![frame; SLOT_FRAMES + 1], Origin::NONE),
-            Err(ImportRefusal::TooLong(SLOT_FRAMES + 1)));
-        assert_eq!(transfer, before);
-        let mut recorder = Recorder::new();
-        transfer.execute(&mut recorder);
-        assert_eq!(transfer.result, SlotResult::Imported);
-        let mut exported = SlotTransfer::export(SLOTS - 1);
-        exported.execute(&mut recorder);
-        assert_eq!(exported.exported(), Some((frames.as_slice(), origin)));
-        // Reuse after a full transfer must not expose its old tail or origin.
-        transfer.fill_import(0, &[MappedInputs::NEUTRAL], Origin::NONE).unwrap();
-        transfer.execute(&mut recorder);
-        let mut short = SlotTransfer::export(0);
-        short.execute(&mut recorder);
-        assert_eq!(short.exported(), Some((&[MappedInputs::NEUTRAL][..], Origin::NONE)));
-        // rc.12 TR1: no frames empties the slot (its macro left it): playback then refuses it.
-        transfer.fill_import(0, &[], Origin::NONE).unwrap();
-        transfer.execute(&mut recorder);
-        assert_eq!(transfer.result, SlotResult::Imported);
-        assert_eq!(recorder.start_playback(0, 1).map(|_| ()), Err(crate::model::recording::PlayRefusal::SlotEmpty));
-    }
-
     fn the_idle_snapshot_has_nothing_loaded_or_visible() {
         let idle = MacroQueries::IDLE;
-        assert!(!idle.source_is_named && !idle.playback_allowed && !idle.panel_visible && idle.loaded_kind == -1);
+        assert!(!idle.panel_visible && !idle.clip_foreground && !idle.naming_pending);
     }
 
     fn a_published_macro_is_read_by_value_and_a_new_one_replaces_it() {
@@ -456,8 +282,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("numbered_slot_transfer_preserves_frames_origin_and_refusals", numbered_slot_transfer_preserves_frames_origin_and_refusals as fn()),
-            ("in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length", in_place_slot_import_is_atomic_on_refusal_and_preserves_full_length as fn()),
             ("the_idle_snapshot_has_nothing_loaded_or_visible", the_idle_snapshot_has_nothing_loaded_or_visible as fn()),
             ("a_published_macro_is_read_by_value_and_a_new_one_replaces_it", a_published_macro_is_read_by_value_and_a_new_one_replaces_it as fn()),
             ("readers_never_see_a_torn_buffer_while_the_worker_republishes", readers_never_see_a_torn_buffer_while_the_worker_republishes as fn()),

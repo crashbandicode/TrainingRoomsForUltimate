@@ -646,8 +646,15 @@ fn an_old_record_trigger_value_does_not_change_what_the_recorder_reads() {
     // `[0,1]` builds exactly the factory recorder, and no load starts the old named capture (deleted with it).
     assert_eq!(recorder_with_trigger([0, 1]), RecorderSettings::factory(), "Save State Load is read again");
     let named = include_str!("../src/runtime/macros/named_macros.rs");
-    let restore = body(named, "begin_restore");
-    assert!(!restore.contains("trigger_save_state") && !named.contains("fn begin_capture"), "the record-on-load start is back:\n{restore}");
+    assert!(!named.contains("fn begin_restore") && !named.contains("fn begin_capture"), "the record-on-load start is back");
+}
+
+#[test]
+fn named_library_does_not_offer_the_retired_slot_copy() {
+    let named = include_str!("../src/runtime/macros/named_macros.rs");
+    let library = body(named, "open_library");
+    assert!(library.contains("\"Named Library\",\n        None,"), "{library}");
+    assert!(!library.contains("Record Slot {}"), "{library}");
 }
 
 /// The runtime half (Switch-only, a source check): the chord step hands the consumed Record chord straight to
