@@ -333,6 +333,8 @@ fn run_inner() {
     // SPEC-input-06 §4: the strip's hitstun-left read is the CPU tech unit's `work_get_float` row; without it a true
     // combo shows no margin and the rest of the strip draws.
     input_display::set_reaction(display_on && capabilities::unit_usable(Feature::CpuTech, &usable));
+    input_display::set_angle_read(display_on && capabilities::unit_usable(Feature::CpuMash, &usable));
+    input_display::set_aim_read(display_on && capabilities::unit_usable(Feature::Recording, &usable));
     // SPEC-input-07 §4: a saved combo's "recorded on" reads P1's fighter with the CPU core's `utility_get_kind` row;
     // without it a save records no fighter and the strip and the helper are unchanged.
     input_display::set_fighter_read(display_on && capabilities::unit_usable(Feature::CpuCore, &usable));

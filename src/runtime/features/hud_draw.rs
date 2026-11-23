@@ -142,8 +142,9 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
 
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
-        let (line, history) = input_display::hud_tick(
-            strip_shown, draw_settings, parry.as_ref(), card.is_some(), |local, look, mut changed| {
+        let labels = [strip[iv::at::RUN_LABEL] != 0, strip[iv::at::RUN_LABEL + 1] != 0];
+        let (line, history, aims) = input_display::hud_tick(
+            strip_shown, draw_settings, parry.as_ref(), card.is_some(), labels, |local, look, mut changed| {
                 // The dedicated 32-unit LINK box is written from the same tracker snapshot below.
                 if local == iv::at::READ_SUB + 1 {
                     changed.text = false;
@@ -151,6 +152,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
                 write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
             },
         );
+        crate::runtime::bridge_state::note_strip_aims(aims);
         if let Some(line) = line {
             let link = strip[iv::at::READ_SUB + 1] as *mut Pane;
             if !link.is_null() {
@@ -167,6 +169,8 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
             let alpha = C.opacity(drop, history, card, anchors.into_iter().flatten().flatten().map(|anchor| anchor.canvas));
             pane::set_alpha(container, alpha);
         }
+    } else {
+        crate::runtime::bridge_state::note_strip_aims([None; 2]);
     }
 }
 

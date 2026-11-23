@@ -250,6 +250,8 @@ static NOTICE_VISIBLE: AtomicBool = AtomicBool::new(false);
 /// The HUD row's last pass (the snapshot's `recording.indicator`): `m::indicator_stamp`, one atomic store from the UI
 /// tick (never a lock), read by the worker; older than `SCENE_FRESH_MS` is gone.
 static RECORDING_INDICATOR: AtomicU64 = AtomicU64::new(0);
+/// The direction marks drawn by the strip's last pass (`m::aims_stamp`).
+static STRIP_AIMS: AtomicU64 = AtomicU64::new(0);
 
 /// The current notice, written by the game thread, read by the worker; whoever finds it busy skips (never waits).
 struct Notice {
@@ -306,6 +308,18 @@ pub fn note_recording_indicator(drawn: Option<crate::model::hud_row::Take>) {
 /// The role of the take the HUD's row drew on its last pass, empty once that pass is stale.
 pub fn recording_indicator(now_ms: u64) -> &'static str {
     m::recording_indicator(RECORDING_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
+}
+
+/// The strip's direction marks on this pass, oldest first.
+pub fn note_strip_aims(drawn: [Option<u8>; 2]) {
+    if FOUND.load(Ordering::Relaxed) {
+        STRIP_AIMS.store(m::aims_stamp(crate::runtime::clock::uptime_ms(), drawn), Ordering::Relaxed);
+    }
+}
+
+/// The strip's direction marks on its last fresh pass, oldest first.
+pub fn strip_aims(now_ms: u64) -> [Option<u8>; 2] {
+    m::strip_aims(STRIP_AIMS.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
 }
 
 /// The notice the HUD draws (game thread). Skipped when the worker is reading it or no bridge was found.

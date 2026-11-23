@@ -2513,6 +2513,14 @@ approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrato
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 197004
+date = "2026-11-23"
+reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. The item is 368 lines: 353 as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head 196320) and 15 for the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists). Measured 196833 on its merge 4e34b3a0 with install 2 d50a0577, 368 above the F9 entry 196465. On this merge with install 2 1a0b3a64 (F11 added, 196636 by the integrator entry above) the total is 196636 + 368 = 197004, the count of this head gate, with no spare."
+approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 196895
 date = "2026-11-23"
 reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 196895 on install 2 1a0b3a64, which alone measures 196636, so they add 259."
