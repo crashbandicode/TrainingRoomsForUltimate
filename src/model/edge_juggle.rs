@@ -1117,36 +1117,18 @@ impl Wizard {
 
     /// The Player page keeps its cursor over a floor: a move with none under it is undone.
     pub fn settle_player(&mut self, mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>) -> bool {
-        match sample(self.cross.at) {
-            Some(p1) => {
-                self.setup.p1 = p1;
-                true
+        let (at, was) = (self.cross.at, self.floor_at);
+        for cursor in [Some(at), Some(was).filter(|_| at != was)].into_iter().flatten() {
+            if let Some(p1) = sample(cursor) {
+                if cursor != at {
+                    self.cross.jump(cursor);
+                }
+                (self.floor_at, self.setup.p1) = (cursor, p1);
+                return true;
             }
-            None => false,
         }
-    }
-
-    pub fn player_floor(
-        &self,
-        stage: Stage,
-        cursor: [f32; 2],
-        confirm: bool,
-        mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>,
-    ) -> Option<[f32; 2]> {
-        sample(cursor).or_else(|| {
-            let previous = self.setup.p1;
-            // A ray at a shared lip can hit the wall. Confirm the displayed
-            // floor point only after its own fresh sample succeeds.
-            if confirm
-                && self.drill == Drill::GuardEdge
-                && cursor[0] != previous[0]
-                && stage.ledges.iter().any(|ledge| cursor[0] == ledge[0])
-            {
-                sample(previous)
-            } else {
-                None
-            }
-        })
+        self.cross.jump(was);
+        false
     }
 
     pub fn change_percent(&mut self, delta: i16) {
@@ -2120,6 +2102,11 @@ mod tests {
         assert_eq!(w.cursor(), [-78.0, 0.0]);
         assert_eq!(w.setup.p1, [-78.0, 0.0]);
         assert!(all_placed);
+        let mut right = w;
+        let right_key = 1 << crate::model::chords::logical::DPAD_RIGHT;
+        assert!(player_frame(&mut right, stage, [0.0; 2], right_key, player_floor_sample));
+        assert_eq!(right.cursor(), [-77.0, 0.0]);
+        assert_eq!(right.setup.p1, [-77.0, 0.0]);
         assert!(player_frame(&mut w, stage, [1.0, 0.0], 0, player_floor_sample));
         assert_eq!(w.cursor(), [-76.0, 0.0]);
         assert_eq!(w.setup.p1, [-76.0, 0.0]);
@@ -2205,36 +2192,6 @@ mod tests {
         assert_eq!(w.cursor(), [-78.0, 0.0]);
         assert_eq!(w.setup.p1, [-78.0, 0.0]);
         assert!(all_placed);
-    }
-
-    #[test]
-    fn edge_player_confirms_the_last_solid_floor_when_the_endpoint_is_a_wall() {
-        let stage = Stage::new(
-            [-180.0, 180.0, 120.0, -90.0],
-            [-160.0, 160.0, 118.0, -80.0],
-            [[-68.0, -4.25], [68.0, -4.25]],
-        ).unwrap();
-        let previous = [-66.140_594, -3.862];
-        let edge = Wizard::new(Drill::GuardEdge, stage, previous, 100, (0, 0), Some(0)).unwrap();
-        let lip = [-68.0, -3.862];
-        let mut queries = Vec::new();
-        assert_eq!(edge.player_floor(stage, lip, true, |point| {
-            queries.push(point);
-            (point == previous).then_some(previous)
-        }), Some(previous));
-        assert_eq!(queries, [lip, previous]);
-        assert!(edge.player_floor(stage, lip, false, |point| {
-            assert_eq!(point, lip, "only fresh confirmation revalidates the prior point");
-            None
-        }).is_none());
-        assert!(edge.player_floor(stage, lip, true, |_| None).is_none());
-        assert!(edge.player_floor(stage, [-60.0, 0.0], true, |point| {
-            (point == previous).then_some(previous)
-        }).is_none(), "a failed interior sample needs a new cursor location");
-        let juggler = Wizard::new(Drill::Juggler, stage, previous, 60, (0, 0), Some(0)).unwrap();
-        assert!(juggler.player_floor(stage, lip, true, |point| {
-            (point == previous).then_some(previous)
-        }).is_none(), "Juggler selects the current platform height");
     }
 
     #[test]
