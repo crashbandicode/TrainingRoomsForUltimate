@@ -68,9 +68,9 @@ pub(crate) mod input {
     }
 }
 
-/// The named layer uses package 3's temporary checkpoint provider.
+/// The preview uses Recording's playback.
 pub(crate) fn install_report() -> &'static str {
-    "preview_restore=temporary_checkpoint"
+    "preview=recording_playback"
 }
 
 /// The fork's `input_record` as the named layer calls the core (SPEC-input-01 section 9), over `features::recorder`.
@@ -83,12 +83,6 @@ pub(crate) mod input_record {
 
     pub(crate) fn is_playback() -> bool {
         recorder::is_playback()
-    }
-
-    /// A clip preview: the recording plays from the layer's buffer, on whichever fighter is on stage.
-    pub(crate) fn playback_preview(started: super::super::named_macros::PlaybackStart) -> bool {
-        crate::runtime::macros::named_macros::begin_preview(started)
-            && recorder::start_named_playback(started.len, started.facing, started.status)
     }
 
     /// The loaded named recording plays (playback_named): false when nothing is loaded or the fighter is not ready.

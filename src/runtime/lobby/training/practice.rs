@@ -89,7 +89,7 @@ pub fn owned() -> bool { OWNED.lock().active() }
 /// Invoked before consumer callbacks and before native entry destruction.
 pub fn retire() {
     let owned = OWNED.lock().retire();
-    if owned || crate::runtime::compat::replay_preview::occupied() || super::recording_or_playback() {
+    if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {
         super::clear_session_state();
     }
 }

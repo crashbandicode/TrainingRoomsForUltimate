@@ -428,7 +428,6 @@ unsafe fn permitted_but_install()->bool {
         && !menu::captures_input() && !lobby::native_ui_busy()
         && !button_config::has_pending_request()
         && !training::save_states::is_loading() && !training::recording_or_playback()
-        && !crate::runtime::compat::replay_preview::occupied()
         && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})
         && !portrait_render_held()
 }

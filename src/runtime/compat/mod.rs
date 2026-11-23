@@ -9,7 +9,6 @@
 pub(crate) mod common;
 pub(crate) mod consts;
 pub(crate) mod menu;
-pub(crate) mod replay_preview;
 pub(crate) mod sync;
 #[cfg(feature = "diag")]
 pub(crate) mod filesystem;

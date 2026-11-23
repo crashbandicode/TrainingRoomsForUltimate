@@ -144,7 +144,6 @@ pub enum Blocker {
     Install,
     SaveState,
     Recording,
-    ReplayPreview,
     Roster,
     /// The role's HUD portrait job holds a helper lease or has its render issued (Eden covrest-12).
     Portrait,
@@ -161,7 +160,6 @@ impl Blocker {
             Blocker::Install => "INSTALL held",
             Blocker::SaveState => "save-state restore",
             Blocker::Recording => "recording or playback",
-            Blocker::ReplayPreview => "replay preview",
             Blocker::Roster => "roster transaction",
             Blocker::Portrait => "portrait render on a helper",
         }
@@ -491,7 +489,7 @@ mod tests {
     fn every_blocker_has_a_distinct_reason() {
         let all = [
             Blocker::Backend, Blocker::ReadyGo, Blocker::Menu, Blocker::NativeUi, Blocker::Shortcut,
-            Blocker::Install, Blocker::SaveState, Blocker::Recording, Blocker::ReplayPreview, Blocker::Roster,
+            Blocker::Install, Blocker::SaveState, Blocker::Recording, Blocker::Roster,
         ];
         for (i, a) in all.iter().enumerate() {
             assert!(!a.reason().is_empty());

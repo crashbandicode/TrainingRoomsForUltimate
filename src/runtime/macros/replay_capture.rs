@@ -182,7 +182,7 @@ fn open_browser(expected_revision: Option<u64>) {
     if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()
         || crate::runtime::lobby::training::recording_or_playback()
         || crate::runtime::macros::save_states::is_loading()
-        || crate::runtime::roster::character_roster::busy() || crate::runtime::macros::replay_preview::occupied() || loading()
+        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()
     {
         notify("Open the replay window in idle practice".into());
         return;
@@ -508,7 +508,7 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
 fn capture_ready() -> bool {
     crate::runtime::ui::facts::fact_practice_enabled() && !crate::runtime::macros::named_macros::suspended()
         && crate::runtime::ui::facts::fact_ready_go() && !crate::runtime::macros::save_states::is_loading()
-        && !crate::runtime::lobby::training::recording_or_playback() && !crate::runtime::macros::replay_preview::occupied()
+        && !crate::runtime::lobby::training::recording_or_playback() && !crate::engine::rr_host::previewing()
 }
 
 /// The existing browser owns this short neutral-input interval. Native controller
@@ -749,7 +749,7 @@ pub fn service_reload() {
         return;
     }
     drop(reload);
-    if crate::runtime::macros::replay_preview::occupied() || !crate::runtime::macros::named_macros::clip_foreground()
+    if crate::engine::rr_host::previewing() || !crate::runtime::macros::named_macros::clip_foreground()
         || !crate::runtime::ui::facts::fact_ready_go() {return;}
     let mut editor=EDITOR.lock().unwrap();
     let Some(active)=editor.as_ref() else {return;};
@@ -779,50 +779,19 @@ pub fn clip_view() -> Option<ClipView> {
     EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())
 }
 
-#[derive(Clone, Copy)]
-enum PreviewNotice {
-    Progress { revision: u64, consumed: u32 },
-    Failed { session: u64, revision: u64, message: &'static str },
-}
-static PREVIEW_NOTICES: hos_lock::Mailbox<PreviewNotice, 16> = hos_lock::Mailbox::new();
-
-pub fn preview_progress(revision: u64, consumed: u32) {
-    PREVIEW_NOTICES.post(PreviewNotice::Progress { revision, consumed });
-    crate::runtime::ui::worker::wake();
-}
-
-pub fn post_preview_failed(message: &'static str) {
-    PREVIEW_NOTICES.post(PreviewNotice::Failed {
-        session: crate::runtime::macros::named_macros::session_revision(),
-        revision: REVISION.load(Ordering::Acquire), message,
-    });
-    crate::runtime::ui::worker::wake();
-}
-
 pub fn worker_preview_notices() {
     service_file_name();
-    PREVIEW_NOTICES.drain(|notice| match notice {
-        PreviewNotice::Progress { revision, consumed } => {
-            if revision == REVISION.load(Ordering::Acquire) {
-                if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.preview_progress(consumed); }
-            }
-        }
-        PreviewNotice::Failed { session, revision, message } => {
-            if session == crate::runtime::macros::named_macros::session_revision()
-                && revision == REVISION.load(Ordering::Acquire) {
-                preview_failed(message);
-            }
-        }
-    });
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
-        if editor.source.is_some() && editor.view().playing
+        if editor.view().playing
             && TAIL.lock().unwrap().over(crate::engine::rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {
-            editor.preview_progress(u32::MAX);
-            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            if crate::engine::rr_host::preview_away() {
+                crate::engine::rr_host::stop_preview();
+            } else {
+                editor.preview_progress(u32::MAX);
+                crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            }
         }
     }
-    let dropped = PREVIEW_NOTICES.take_dropped();
-    if dropped != 0 { println!("[MacroHandoff] preview_notices_dropped={dropped}"); }
 }
 
 pub fn preview_failed(message: &str) {
@@ -841,7 +810,6 @@ fn close_editor_inner(was_loading: bool) {
 }
 
 fn stop_preview() {
-    crate::runtime::macros::replay_preview::request_stop();
     crate::engine::rr_host::stop_preview();
 }
 
@@ -854,12 +822,7 @@ fn close_editor_revision(was_loading: bool, expected_revision: Option<u64>) -> b
         // BROWSER before touching named UI, whose visibility path reads BROWSER.
         (browser.take().is_some(), EDITOR.lock().unwrap().take().is_some())
     };
-    if RELOAD.lock().unwrap().is_some() {
-        stop_preview();
-    } else {
-        crate::runtime::macros::replay_preview::request_close();
-        crate::engine::rr_host::stop_preview();
-    }
+    stop_preview();
     PENDING.lock().unwrap().take();
     FILE_NAME.lock().unwrap().take();
     REVISION.fetch_add(1, Ordering::Relaxed);
@@ -928,14 +891,14 @@ fn apply_action(action: ClipAction) {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
     }
     // Drop the editor lock before opening the naming panel or notifying the game.
-    let (effect, revision, configuration, file, source) = {
+    let (effect, configuration, file, source) = {
         let mut editor = EDITOR.lock().unwrap();
-        let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;
+        REVISION.fetch_add(1, Ordering::Relaxed);
         let configuration=editor.as_ref().and_then(|editor|editor.target().ok().flatten())
             .and_then(Target::configuration);
         let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
-        (editor.as_mut().map(|editor| editor.on_action(action)), revision, configuration, file, source)
+        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source)
     };
     // Only a saved file carries identity, and it is always the recorded one: the
     // original kind, plus the exact Mii for a Mii track. A preview is inputs only
@@ -949,7 +912,13 @@ fn apply_action(action: ClipAction) {
         Ok(recording)
     };
     match effect {
-        Some(ClipEffect::Preview(recording)) => crate::runtime::macros::replay_preview::request_play(*recording, revision),
+        Some(ClipEffect::Preview(recording)) => match recording.validate() {
+            Err(error) => preview_failed(&error.to_string()),
+            Ok(()) => {
+                TAIL.lock().unwrap().restart();
+                crate::engine::rr_host::request_clip_preview(*recording);
+            }
+        },
         Some(ClipEffect::PreviewFile { start, end }) => {
             if let Some((id, player)) = source {
                 TAIL.lock().unwrap().restart();

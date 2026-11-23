@@ -49,7 +49,6 @@ mod preview;
 pub(crate) mod setups;
 pub(crate) use quick_reset::on_input as on_quick_reset_input;
 pub(crate) use quick_reset::request as request_quick_reset;
-pub(crate) use preview::{request as request_preview_restore, finish as finish_preview_restore, end as end_preview_restore};
 
 /// Everything the per-frame step owns, behind one lock.
 struct State {
@@ -440,7 +439,6 @@ pub(crate) fn clear_session() {
     with(|_| setups::clear_facts());
     cancel_pending();
     quick_reset::clear();
-    preview::clear();
     SAVE_REQUEST.store(false, Ordering::Release);
     SAVE_IN_FLIGHT.store(false, Ordering::Release);
     LOAD_REQUEST.store(false, Ordering::Release);
@@ -568,7 +566,6 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     if accessor == 0 {
         return;
     }
-    preview::service_retirement();
     let scene_facts = scene::facts();
     if !crate::model::scene::is_training(scene_facts) {
         // The shared predicate is also false during a hot swap. A suspended
@@ -603,7 +600,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     crate::runtime::export::fighter_frame(entry, kind, raw.status, raw.situation, flags, accessor, fighter);
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
-    // Publish the role's live pose before the Save States Off return, including when a named load starts.
+    // The role's live pose is published before the Save States gate: the recording worker reads it whatever Save
+    // States says (combined run rc15-ib-1f7e0174: with Off it kept the previous CPU).
     let live = if nana {
         None
     } else {

@@ -604,12 +604,21 @@ mod tests {
         assert!(!capture.contains("macro_file(recording, false)"));
         assert!(capture.contains("rr_host::request_preview("));
         assert!(capture.contains("rr_host::stop_preview()"));
-        assert!(capture.contains("request_clip_preview("));
+        let vault = capture.split("Some(ClipEffect::Preview(recording))").nth(1).unwrap()
+            .split("Some(ClipEffect::PreviewFile").next().unwrap();
+        assert!(vault.contains("request_clip_preview("));
         let host = include_str!("../runtime/features/recording_host.rs");
         let apply = host.split("fn apply(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(apply.contains("tick.warp_home") && apply.contains("request_named_load("));
+        let home = apply.split("if let Some(pair) = &tick.warp_home {").nth(1).unwrap().split('}').next().unwrap();
+        assert!(home.contains("request_named_load("));
         let named = include_str!("../runtime/macros/named_macros.rs");
-        assert!(named.contains("rr_host::preview_away()"));
+        let publish = named.split("pub fn publish_queries()").nth(1).unwrap().split("\n}").next().unwrap();
+        let clip_previewing = publish.split("let clip_previewing =").nth(1).unwrap().split(';').next().unwrap();
+        assert!(clip_previewing.contains("rr_host::preview_away()"));
+        let restore = named.split("fn begin_restore()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(restore.find("rr_host::previewing()").unwrap() < restore.find("source_is_named()").unwrap());
+        let clear = named.split("fn clear_session()").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(clear.contains("rr_host::drop_preview_home()"));
         let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(hold.contains("clip_previewing"));
         let worker = include_str!("../runtime/ui/worker.rs");

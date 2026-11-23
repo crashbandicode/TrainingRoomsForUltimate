@@ -606,17 +606,15 @@ fn a_setup_saved_after_a_live_swap_restores_with_the_fighters_on_screen() {
     assert_eq!(prepared.validate(target, &facts(first_body), false), Ok(()), "Y binds without the fighter check");
 }
 
-/// The runtime half (Switch-only, so a source check like `tests/lockfree_wiring.rs`): the identity the Setup library's restore
-/// and the replay preview both check reads each entry's running body.
+/// The Setup library's restore checks the running body (Switch-only source check).
 #[test]
-fn the_setup_restore_and_the_replay_preview_read_the_running_body() {
+fn the_setup_restore_reads_the_running_body() {
     let preview = include_str!("../src/runtime/features/states/preview.rs");
     let observe = body(preview, "observe");
     assert!(observe.contains("natives::entry_active_body(entries[index])"), "observe reads the running body:\n{observe}");
     assert!(!observe.contains("natives::entry_body("), "observe reads the entry's first body again");
     let setups = include_str!("../src/runtime/features/states/setups.rs");
     assert!(body(setups, "service").contains("preview::observe()"), "the restore's facts come from observe");
-    assert!(body(preview, "request").contains("observe()"), "the replay preview's checkpoint comes from observe");
 }
 
 // ---- #26: an old Record trigger value no longer turns off the Record chord ---------------------------------------------
