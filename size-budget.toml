@@ -2505,7 +2505,15 @@ approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196833
+ceiling = 196636
 date = "2026-11-23"
-reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196833 on its merge 4e34b3a0 with the install 2 head d50a0577 (F8, F12, F15, F9, the GJ4 rework), with no spare: 368 above F9's 196465 (the GJ4 rework adds none: its gate measured 196360 on dd6aa1de, as F9's entry gives for dd6aa1de). 353 of the 368 are the item as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head's 196320); 15 are the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists)."
+reason = "Install 2, integration total after merging F8, F12, F15, F9, the GJ4 rework and F11 on 152629cd: 196465 (F9 entry, measured on its merged tree) + 0 (GJ4 rework) + 171 (F11, which dropped its own entry because it fitted under F12 196638 on its base) = 196636 measured on 3aace984, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and F11 reviewed READY (rv-edge-juggle-sol PASS 19:31:37Z and 20:04:20Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197004
+date = "2026-11-23"
+reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. The item is 368 lines: 353 as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head 196320) and 15 for the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists). Measured 196833 on its merge 4e34b3a0 with install 2 d50a0577, 368 above the F9 entry 196465. On this merge with install 2 1a0b3a64 (F11 added, 196636 by the integrator entry above) the total is 196636 + 368 = 197004, the count of this head gate, with no spare."
 approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
