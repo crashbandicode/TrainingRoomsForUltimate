@@ -2521,7 +2521,7 @@ approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both pa
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197256
+ceiling = 197328
 date = "2026-11-23"
-reason = "F13: a directional special's parts are drill and combo steps: an Aim event per entry into the travel status with the way the fighter went, the second part a step of its own; Aim files are versions 3 and 4. Measured 197256 on install 2 e1b5cf15 + F13, 252 above the merged tree's 197004 ceiling."
-approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F13, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+reason = "F10: a directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 197328 on install 2 e1b5cf15 with F10, with no spare: 324 above the last entry's 197004, which F14 measured before GJ4-8 was merged."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."

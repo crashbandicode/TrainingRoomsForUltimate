@@ -3,6 +3,7 @@
 
 pub mod clip_browser;
 pub mod clip_panel;
+pub mod drill_preview;
 pub mod macro_panel;
 #[cfg(test)]
 pub mod replay_panel;
