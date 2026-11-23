@@ -529,7 +529,7 @@ impl Session {
     }
 
     pub fn discard_attempt(&mut self) {
-        if matches!(self.phase, Phase::Place | Phase::Ready(_) | Phase::Live | Phase::Return(_)) {
+        if matches!(self.phase, Phase::Ready(_) | Phase::Live | Phase::Return(_)) {
             self.phase = Phase::Place;
         }
     }
