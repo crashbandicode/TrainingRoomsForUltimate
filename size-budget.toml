@@ -2497,7 +2497,7 @@ approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196344
+ceiling = 196383
 date = "2026-11-23"
-reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 196344, 24 above this branch's measured base 152629cd (196320); its recorded merged ceiling was 196609."
+reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 196383, 23 above the measured merged base dd6aa1de (196360)."
 approved_by = "F16 fix-build handoff 2026-11-23, item-specific entry under the operator's measured LOC rule."

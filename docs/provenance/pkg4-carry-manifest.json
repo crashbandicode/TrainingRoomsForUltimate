@@ -2368,7 +2368,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "e20137c2991e7a0e26120f7e8c7b2b96fbbb824f209aeea075cedb5945f45e2d",
+   "dest_sha256": "5f4c0426455664dcf868868e7303bcf6701027063d5a5a60c5cee878ab812b88",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3232,7 +3232,7 @@
     },
     {
      "old": "    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n",
-     "new": "    let menu_holds_cpu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);\n    let is_player = (queries.replay_loading || menu_holds_cpu)\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;\n    let player = || is_player;\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player())\n        || (menu_holds_cpu && !player());\n",
+     "new": "    let menu = crate::runtime::ui::state::holds_cpu(queries.clip_previewing);\n    let player = (queries.replay_loading || menu)\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID) == FighterId::Player as i32;\n    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading && player)\n        || (menu && !player);\n",
      "reason": "F16: Hold non-player fighters with the existing panel owner while the menu is open."
     }
    ]

@@ -153,7 +153,7 @@ mod tests {
         let named = include_str!("../../runtime/macros/named_macros.rs");
         let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(hold.contains("state::holds_cpu(queries.clip_previewing)"));
-        assert!(hold.contains("!player()"));
+        assert!(hold.contains("menu && !player"));
         assert!(hold.contains("clip_previewing") && hold.contains("replay_loading"));
         let state = include_str!("../../runtime/ui/state.rs");
         let fact = state.split("pub fn holds_cpu(").nth(1).unwrap_or("").split("\n}").next().unwrap();

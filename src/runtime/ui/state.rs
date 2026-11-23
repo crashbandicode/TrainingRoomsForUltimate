@@ -9,11 +9,6 @@ use crate::model::frame::Frame;
 /// The menu owns Player 1's input and is showing (set by the input hook when a chord passes, cleared by
 /// the worker when the menu closes).
 pub static OPEN: AtomicBool = AtomicBool::new(false);
-/// The open menu holds the fighters that are not Player 1 now (`flow::menu_holds_cpu`). Atomic reads only.
-pub fn holds_cpu(previewing: bool) -> bool {
-    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing,
-        crate::runtime::features::states::is_loading(), crate::runtime::features::recorder::recording_or_playback())
-}
 /// The recording pop-up is showing. It does not set `OPEN`: B closes the pop-up and leaves a closed menu closed.
 pub static POPUP: AtomicBool = AtomicBool::new(false);
 /// The input hook saw RecordingPopup. The worker toggles the pop-up and clears this.
@@ -55,6 +50,12 @@ pub static LAYOUT_READY: AtomicBool = AtomicBool::new(false);
 pub static POLLS_AT_TICK: AtomicU32 = AtomicU32::new(0);
 /// How many times the menu's ownership was released because its renderer was lost.
 pub static RELEASES: AtomicU32 = AtomicU32::new(0);
+
+/// The open menu holds the fighters that are not Player 1 now (`flow::menu_holds_cpu`). Atomic reads only.
+pub fn holds_cpu(previewing: bool) -> bool {
+    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing,
+        crate::runtime::features::states::is_loading(), crate::runtime::features::recorder::recording_or_playback())
+}
 
 /// The facts `model::readiness` decides on.
 pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {
