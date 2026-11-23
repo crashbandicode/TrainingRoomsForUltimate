@@ -54,7 +54,9 @@ Game speed shows a small pop-up while the chord is held. In Training it steps th
 practice it offers the same five speeds, only for that practice; a match always starts at normal speed (rc.8; the
 details are under Game speed below).
 
-The first time Training opens on a new install, TrainingRooms also shows six reminders: Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off. The chords in the table stay available.
+The first time Training or a waiting room's practice opens on a new install, TrainingRooms also shows six reminders:
+Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off.
+The chords in the table stay available.
 
 In the menu: L/R change page, ZL + Up/Down jumps to the previous or next section, A edits, Y resets a row, X saves the
 current values as defaults, B goes back. Each page ends with *Reset page to defaults*, which asks first. The menu reopens

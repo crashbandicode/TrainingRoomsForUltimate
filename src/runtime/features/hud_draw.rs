@@ -13,12 +13,14 @@ use hos_lock::Mutex;
 
 use skyline::nn::ui2d::{Layout, Pane};
 
+use crate::model::boot_notices;
 use crate::model::frame_strip_plan::{Changed, Look};
 use crate::model::notice_box;
 use crate::model::notify::TickOut;
 use crate::model::panes::{self as p, cb, iv, strip_layout::C};
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::features::{combo, input_display, notices, parry};
+use crate::runtime::lobby::training;
 use crate::runtime::ui::{pane, tick};
 use crate::runtime::{published, scene};
 
@@ -128,7 +130,12 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let btt = crate::runtime::features::btt::hud();
     let chip = (!menu_open && !btt.as_str().is_empty())
         .then(|| p::btt_hud_box(btt.as_str(), strip_shown, card.is_some()));
-    write_notice(notice, &notices::hud_tick(!waiting && !notice.is_null()), chip, drop);
+    write_notice(
+        notice,
+        &notices::hud_tick(boot_notices::hud_ready(!notice.is_null(), waiting, training::session_open())),
+        chip,
+        drop,
+    );
     write_btt(root, btt.as_str(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
 
     let container = strip[iv::at::CONTAINER] as *mut Pane;

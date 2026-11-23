@@ -46,8 +46,8 @@ The menu opens with **B + D-pad Up**: hold B, then press Up. **Minus** opens it 
 Check these in order:
 
 1. **Are you in Training?** The menu opens in Training, and in a waiting room only while Fighters & Stages › Lobby
-   Practice is On. It is Off at first; while it is Off, the waiting rooms are left to the game. It doesn't open
-   elsewhere.
+   Practice is On. It is On by default, but a saved Off stays Off; while it is Off, the waiting rooms are left to the
+   game. It doesn't open elsewhere.
 2. **Is another menu open?** The menu doesn't open over the game's pause menu, and chords don't fire while the game's own
    menu or the waiting room's menu is open. Close it first.
 3. **Did you hold B first?** Hold one button of a chord, then press the others. A chord fires once per press and holding
@@ -168,8 +168,9 @@ More: [Fighter cycles › What the Loading rows do](fighter-cycles.md#what-the-l
 
 ## Waiting rooms
 
-- **The menu and the chords do nothing in a waiting room.** Fighters & Stages › Lobby Practice is Off at first, and while
-  it is Off TrainingRooms leaves the waiting rooms to the game. Turn it On in Training, before you look for a match.
+- **The menu and the chords do nothing in a waiting room.** Fighters & Stages › Lobby Practice is Off. It is On by
+  default, but a settings file that stores Off keeps it Off, and while it is Off TrainingRooms leaves the waiting rooms
+  to the game. Turn it On in Training, before you look for a match.
 - **The practice stops when the match starts.** Nothing of it is carried into the match: the speed is back to x1, the
   partners' level isn't applied, and the match is played with the fighters you picked for it. If the menu was open, it
   closes, and the changes from that visit are not kept. Back in the same room after the match, your practice fighters

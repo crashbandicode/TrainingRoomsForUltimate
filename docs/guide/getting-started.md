@@ -35,9 +35,9 @@ To update, copy the new `libtraining_rooms.nro` over the old one. Your settings 
 ## First start
 
 1. Open Training from the game's main menu.
-2. The first time Training opens on a new install, six short reminders appear: Welcome, Open Menu, Save State, Load
-   State, Input Record and Input Playback. The five after Welcome show their button chords. A later start leaves them
-   out.
+2. The first time Training or a waiting room's practice opens on a new install, six short reminders appear: Welcome,
+   Open Menu, Save State, Load State, Input Record and Input Playback. The five after Welcome show their button chords.
+   A later start leaves them out.
 3. If the Training Modpack's folder `sd:/ultimate/TrainingModpack/` is on the card, its settings, save states and
    recordings are copied into `sd:/ultimate/TrainingRooms/` once, on the first start. The originals aren't changed.
    (The Modpack's plugin file must still be removed: see above.)
@@ -50,7 +50,7 @@ Hold **B**, then press **D-pad Up**. **Minus** opens it too, until you change Me
 ![B + D-pad Up opens the menu](../media/rc11-permanent-shortcut.gif)<br>
 *B + D-pad Up opens the menu. Eden, rc.11.*
 
-The menu opens in Training, and in a waiting room once Fighters & Stages › Lobby Practice is On (it is Off at first).
+The menu opens in Training, and in a waiting room while Fighters & Stages › Lobby Practice is On (the default).
 More about moving around and changing rows: [Using the menu](using-the-menu.md).
 
 ## A first look around
@@ -78,7 +78,8 @@ you slow the game down with Left and Right ([Game speed](game-speed.md)). Every 
 ![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](../media/rc11-game-speed.gif)<br>
 *The same smash at x1, then at 1/4. Eden, rc.11.*
 
-Waiting for a match? TrainingRooms can run in the waiting rooms too: turn on Fighters & Stages › Lobby Practice first.
+Waiting for a match? TrainingRooms runs in the waiting rooms too, while Fighters & Stages › Lobby Practice is On (the
+default).
 See [Waiting rooms](waiting-rooms.md).
 
 ## Which build you have

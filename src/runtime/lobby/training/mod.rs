@@ -2,6 +2,8 @@
 //! the two carried children (`lobby`, `practice`) and what they reach through their parent. Our code; each item forwards to the clean
 //! room's provider.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 pub(crate) use crate::engine::lobby::practice_policy;
 
 pub(crate) mod character_specific;
@@ -54,6 +56,15 @@ pub(crate) mod input_delay {
     }
 }
 
+/// The room's practice session is open: a session clear has run since the room's practice became active
+/// (`lobby::update` raises the lobby flag, then clears). The HUD posts the first-install notices only then
+/// (`boot_notices::hud_ready`): posted before that clear, they would be emptied unseen.
+static SESSION_OPEN: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn session_open() -> bool {
+    SESSION_OPEN.load(Ordering::Acquire)
+}
+
 /// Every per-session state the plugin keeps ends with the departure from the practice scene (recorder, chords, notices, input
 /// display and the menu session: package 4's `session_clear` runs all of them).
 pub(crate) fn clear_session_state() {
@@ -61,6 +72,7 @@ pub(crate) fn clear_session_state() {
     crate::runtime::features::states::clear_session();
     crate::runtime::features::recorder::session_clear();
     crate::runtime::features::egg_zone::reset();
+    SESSION_OPEN.store(crate::runtime::scene::lobby_active(), Ordering::Release);
 }
 
 /// A recording or a playback is running (package 4's recorder).

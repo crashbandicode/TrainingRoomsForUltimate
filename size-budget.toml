@@ -2405,3 +2405,11 @@ ceiling = 191869
 date = "2026-11-22"
 reason = "Publish Recording pop-up, page and active capture state through tr.menu for the combined run. The bounded fields and tests measure 27 normalized lines over the reviewed Recording role stack."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. TEST-FLOW step 2 requires bridge reads for menu roles and capture state."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191884
+date = "2026-11-22"
+reason = "Lobby Practice is On by default, and the first-install notices also post on the waiting room's HUD once its practice session is open (one flag and one pure rule). Measured normalized implementation 191884, 15 above the integration ceiling 191869, with zero spare. The release gate measures NRO and BSS."
+approved_by = "tr-primary-2, 2026-11-22 23:41:32Z (HANDOFF-PRIMARY-tr-primary-2.md line 1643): the operator's order that Lobby Practice defaults to On, with the first-install notices in the waiting room; the growth is under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2), NRO and BSS reported with READY"

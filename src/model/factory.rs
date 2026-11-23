@@ -155,7 +155,7 @@ pub static DEFS: [Def; COUNT] = [
     // Preload Samples: the fork's id (SPEC-core-02 §2.8 proposed `preload_samples`; see CARRY-OVER.md).
     row!("cycle_preload_measurements", Single, 2, [1]),
     // The fork's own rows: Macro Source (Numbered Slots, Named Library), Fighter Prompt (On),
-    // Player Swapping, Lobby Practice, Training Stage Rotation, Solo Popo (all Off).
+    // Lobby Practice (On, operator 2026-11-22); Player Swapping, Training Stage Rotation, Solo Popo (Off).
     row!("macro_source", Single, 2, [0]),
     row!("fighter_prompt", Single, 2, [0]),
     // Operator 2026-11-07: the combo helper is On by default (stored [1, 0]). Tolerance stays 1 frame,
@@ -164,7 +164,7 @@ pub static DEFS: [Def; COUNT] = [
     row!("combo_tolerance", Single, 3, [1]),
     row!("combo_after", Single, 2, [0]),
     row!("trio_practice", Single, 2, [1]),
-    row!("lobby_practice", Single, 2, [1]),
+    row!("lobby_practice", Single, 2, [0]),
     row!("training_stage_rotation", Single, 2, [1]),
     row!("solo_popo_original", Single, 2, [1]),
     row!("p1_cpu_control", Single, 2, [1]),

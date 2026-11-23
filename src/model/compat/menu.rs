@@ -186,7 +186,7 @@ pub const BASE_MENU: TrainingModpackMenu = TrainingModpackMenu {
     cycle_preload_mii_groups: OnOff::ON,
     fighter_prompt: OnOff::ON,
     macro_source: MacroSource::NUMBERED,
-    lobby_practice: OnOff::OFF,
+    lobby_practice: OnOff::ON,
     training_stage_rotation: OnOff::OFF,
     lobby_stages: LobbyStageOrder::NATIVE,
     trio_practice: OnOff::OFF,
@@ -342,6 +342,25 @@ mod tests {
     use super::*;
     use crate::engine::swap::ordered_roster::{DEFAULT_CPU_ROSTER, DEFAULT_PLAYER_ROSTER};
 
+    fn the_typed_view_reads_lobby_practice_on_unless_stored_off() {
+        assert_eq!(TrainingModpackMenu::default().lobby_practice, OnOff::ON);
+        assert_eq!(BASE_MENU.lobby_practice, OnOff::ON);
+        assert_eq!(TrainingModpackMenu::from_snapshot(&Snapshot::factory()).lobby_practice, OnOff::ON);
+
+        let missing = crate::model::settings::parse("{}");
+        for snapshot in [&missing.settings.menu, &missing.settings.defaults] {
+            assert_eq!(TrainingModpackMenu::from_snapshot(snapshot).lobby_practice, OnOff::ON);
+        }
+
+        let stored = crate::model::settings::parse(
+            r#"{"menu":{"lobby_practice":[0,1]},"defaults_menu":{"lobby_practice":[0,1]}}"#,
+        );
+        assert!(stored.issues.is_empty(), "{:?}", stored.issues);
+        for snapshot in [&stored.settings.menu, &stored.settings.defaults] {
+            assert_eq!(TrainingModpackMenu::from_snapshot(snapshot).lobby_practice, OnOff::OFF);
+        }
+    }
+
     /// Every row-shaped field of the view (`rows()`), whether the settings table defines it (a row) or not (a kept key the
     /// write-back stores in the same shape): a non-factory value in the snapshot reaches the typed view and comes back unchanged.
     /// The Solo Popo cycle rows were the kept keys this missed (Eden s6-04); the test lists the others with them.
@@ -456,6 +475,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_typed_view_reads_lobby_practice_on_unless_stored_off", the_typed_view_reads_lobby_practice_on_unless_stored_off as fn()),
             ("every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key", every_row_shaped_field_reaches_the_view_as_a_row_or_a_kept_key as fn()),
             ("a_committed_snapshot_and_settings_reach_every_typed_view", a_committed_snapshot_and_settings_reach_every_typed_view as fn()),
             ("combined_single_load_and_writeback_match_the_exact_player_cycle_gate", combined_single_load_and_writeback_match_the_exact_player_cycle_gate as fn()),

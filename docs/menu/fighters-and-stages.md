@@ -205,10 +205,10 @@ More: [Stages › Change Stage](../guide/stages.md#change-stage)
 
 On: TrainingRooms runs in the waiting rooms too (local wireless rooms and Quickplay's online waiting room). The menu
 opens there, the chords work, and the CPU page drives the first training partner. Off: the waiting rooms are left to
-the game, and the menu doesn't open there. Turn it On in Training before you go.
+the game, and the menu doesn't open there. A settings file that already stores Off keeps it Off.
 
 - **Values:** On, Off
-- **Default:** Off
+- **Default:** On
 - **How:** A, Left or Right flips it.
 
 ![In a local wireless waiting room: Lobby Practice turned Off in the menu; then B + Up reaches the fighter instead](../media/rc11-lobby-practice.gif)<br>

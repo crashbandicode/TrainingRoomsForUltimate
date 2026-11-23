@@ -15,6 +15,43 @@ fn array(len: usize, selected: usize) -> Value {
 }
 
 #[test]
+fn lobby_practice_is_on_for_a_new_install_and_a_missing_key() {
+    let factory = Settings::factory();
+    assert_eq!(factory.menu.get("lobby_practice").unwrap(), [1, 0]);
+    assert_eq!(factory.defaults.get("lobby_practice").unwrap(), [1, 0]);
+    let old: Value = serde_json::from_str(OLD).unwrap();
+    for snapshot in ["menu", "defaults_menu"] {
+        assert!(old[snapshot].get("lobby_practice").is_none(), "{snapshot}");
+    }
+    for text in ["{}", r#"{"menu": {"lra_reset": [0, 1]}, "defaults_menu": {}}"#, OLD] {
+        let loaded = parse(text);
+        assert!(!loaded.corrupt(), "{:?}", loaded.issues);
+        assert_eq!(loaded.settings.menu.get("lobby_practice").unwrap(), [1, 0]);
+        assert_eq!(loaded.settings.defaults.get("lobby_practice").unwrap(), [1, 0]);
+    }
+    let mixed = parse(r#"{"menu": {"lobby_practice": [0, 1]}, "defaults_menu": {}}"#);
+    assert!(!mixed.corrupt(), "{:?}", mixed.issues);
+    assert_eq!(mixed.settings.menu.get("lobby_practice").unwrap(), [0, 1]);
+    assert_eq!(mixed.settings.defaults.get("lobby_practice").unwrap(), [1, 0]);
+}
+
+#[test]
+fn a_saved_lobby_practice_value_is_kept() {
+    let loaded = parse(r#"{"menu": {"lobby_practice": [0, 1]}, "defaults_menu": {"lobby_practice": [0, 1]}}"#);
+    assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+    assert_eq!(loaded.settings.menu.get("lobby_practice").unwrap(), [0, 1]);
+    assert_eq!(loaded.settings.defaults.get("lobby_practice").unwrap(), [0, 1]);
+    let round_trip = parse(&loaded.settings.to_json());
+    assert_eq!(round_trip.settings.menu.get("lobby_practice").unwrap(), [0, 1]);
+    assert_eq!(round_trip.settings.defaults.get("lobby_practice").unwrap(), [0, 1]);
+
+    let loaded = parse(NEW);
+    assert!(!loaded.corrupt(), "{:?}", loaded.issues);
+    assert_eq!(loaded.settings.menu.get("lobby_practice").unwrap(), [1, 0]);
+    assert_eq!(loaded.settings.defaults.get("lobby_practice").unwrap(), [1, 0]);
+}
+
+#[test]
 fn core04_wire_shape_fixture() {
     // OnOff is [on, off]; Delay is 31 one-hot elements; sliders are [lower, upper].
     let s = Settings::factory();
