@@ -78,7 +78,7 @@ pub struct Now {
     pub facing: i8,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Parts {
     inside: bool,
     count: u8,
