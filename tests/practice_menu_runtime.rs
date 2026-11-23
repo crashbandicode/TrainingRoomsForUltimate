@@ -561,10 +561,11 @@ fn placement_helpers_keep_the_drills_native_write_order() {
     assert_eq!(stand.matches("state::").count(), 1);
     assert!(stand.contains("konst(C::StatusWait)"));
     let lift = item(&helpers, "pub(super) unsafe fn lift(");
-    ordered(lift, &["state::clear_speed_all(", "state::set_pos(", "state::set_lr(",
+    ordered(lift, &["state::clear_speed_all(", "state::init_pos(", "state::set_lr(",
         "state::set_situation_kind("]);
     assert_eq!(lift.matches("state::").count(), 5);
     assert!(lift.contains("konst(C::SituationAir)"));
+    assert!(!lift.contains("state::set_pos("));
     let fall = item(&helpers, "pub(super) unsafe fn fall(");
     ordered(fall, &["state::status_request("]);
     assert_eq!(fall.matches("state::").count(), 1);
