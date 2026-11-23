@@ -435,14 +435,14 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
         return;
     }
     let Some(head) = cpu::mash_head(key) else { return };
+    let Some(take) = rr_host::slot_take(head) else { return };
     let Some(table) = cpu::ids() else { return };
     let status = game::natives::status_kind(body.accessor);
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
     let needs = crate::model::recording::mash_needs_term(idle, settings, Some(head), in_hitstun);
-    let from = rr_host::slot_status(head);
     let term_enabled = needs
-        && match crate::model::recording::term_for_status(&table, from) {
+        && match crate::model::recording::term_for_status(&table, take.status()) {
             Some(c) => {
                 let term = table.get(c);
                 term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
@@ -455,7 +455,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
     );
     let Some(slot) = start else { return };
-    let result = rr_host::slot_start(slot, facing, None);
+    let result = rr_host::slot_start_mash(slot, take, facing);
     match result {
         Ok(Some(started)) => {
             event("playback_mash", "slot", i64::from(started.slot), "frames", i64::from(started.frames));
@@ -524,7 +524,7 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     let catch = ledge && STATUS_CLIFF_CATCH.load(Ordering::Acquire) != UNRESOLVED && cpu_body().is_some_and(|b| {
         game::natives::status_kind(b.accessor) == STATUS_CLIFF_CATCH.load(Ordering::Acquire)
     });
-    let result = rr_host::slot_start(slot, facing, ledge.then_some(catch));
+    let result = rr_host::slot_start_ledge(slot, facing, ledge.then_some(catch));
     match result {
         Ok(Some(started)) => event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames)),
         Ok(None) => {}

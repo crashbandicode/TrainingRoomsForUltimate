@@ -107,12 +107,12 @@ fn playback_slot_start_frames_post_and_stop_allocate_nothing() {
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::RecorderAi);
-        assert!(rr_host::slot_start(0, 1, None).unwrap().is_some());
+        assert!(rr_host::slot_start_mash(0, rr_host::slot_take(0).unwrap(), 1).unwrap().is_some());
         assert_eq!(rr_host::slot_control(false).unwrap().buttons, 1);
         assert_eq!(rr_host::slot_post(), None);
         assert_eq!(rr_host::slot_control(false).unwrap().buttons, 1);
         assert_eq!(rr_host::slot_post(), Some(0));
-        assert!(rr_host::slot_start(0, 1, None).unwrap().is_some());
+        assert!(rr_host::slot_start_mash(0, rr_host::slot_take(0).unwrap(), 1).unwrap().is_some());
         assert!(rr_host::slot_stop());
     }
     assert_eq!(hook_allocations(), before, "slot start, frames, post or stop allocated inside the hook");

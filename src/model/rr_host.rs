@@ -42,6 +42,7 @@ static SLOT_META: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
 static SLOT_PREPARED: [AtomicBool; SLOTS] = [const { AtomicBool::new(false) }; SLOTS];
 static SLOT_RUN: hos_lock::Mutex<SlotRun> = hos_lock::Mutex::new(SlotRun::idle());
 static SLOT_RUNNING: AtomicBool = AtomicBool::new(false);
+static SLOT_OWED: AtomicU8 = AtomicU8::new(0);
 
 pub fn set_slot(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
     if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
@@ -78,28 +79,33 @@ fn set_slot_data(slot: usize, recording: Option<&MacroRecording>) -> Result<(), 
     Ok(())
 }
 
-fn slot_snapshot(slot: usize) -> Option<(u64, usize, u32)> {
+fn slot_snapshot(slot: usize) -> Option<(u32, u64, usize, u32)> {
     let before = SLOT_SEQ[slot].load(Ordering::SeqCst);
     if before & 1 != 0 { return None; }
     let meta = SLOT_META[slot].load(Ordering::SeqCst);
     let len = SLOT_TAPES[slot].len();
     let generation = SLOT_TAPES[slot].generation();
-    (SLOT_SEQ[slot].load(Ordering::SeqCst) == before).then_some((meta, len, generation))
+    (SLOT_SEQ[slot].load(Ordering::SeqCst) == before).then_some((before, meta, len, generation))
 }
 
-pub fn slot_status(slot: u8) -> i32 {
-    let at = usize::from(slot);
-    if at >= SLOTS { return crate::model::cpu::ids::UNRESOLVED; }
-    match slot_snapshot(at) {
-        Some((meta, len, _)) if len != 0 => meta as u32 as i32,
-        _ => crate::model::cpu::ids::UNRESOLVED,
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SlotTake { seq: u32, status: i32 }
+
+impl SlotTake {
+    pub fn status(&self) -> i32 { self.status }
 }
 
-pub fn slot_start(slot: u8, facing: i8, ledge: Option<bool>) -> Result<Option<PlayStart>, PlayRefusal> {
+pub fn slot_take(slot: u8) -> Option<SlotTake> {
     let at = usize::from(slot);
-    if at >= SLOTS { return Err(PlayRefusal::SlotOutOfRange); }
-    let Some((meta, len, generation)) = slot_snapshot(at) else { return Ok(None) };
+    if at >= SLOTS { return Some(SlotTake { seq: 0, status: crate::model::cpu::ids::UNRESOLVED }); }
+    let (seq, meta, len, _) = slot_snapshot(at)?;
+    let status = if len == 0 { crate::model::cpu::ids::UNRESOLVED } else { meta as u32 as i32 };
+    Some(SlotTake { seq, status })
+}
+
+fn start_slot_snapshot(slot: u8, facing: i8, ledge: Option<bool>, meta: u64, len: usize, generation: u32)
+    -> Result<Option<PlayStart>, PlayRefusal>
+{
     if len == 0 { return Err(PlayRefusal::SlotEmpty); }
     let recorded_facing = if meta & (1 << 32) != 0 { -1 } else { 1 };
     *SLOT_RUN.lock() = SlotRun::start(slot, len as u16, recorded_facing, facing, ledge, generation);
@@ -107,11 +113,36 @@ pub fn slot_start(slot: u8, facing: i8, ledge: Option<bool>) -> Result<Option<Pl
     Ok(Some(PlayStart { slot, frames: len as u16 }))
 }
 
-pub fn slot_running() -> bool { SLOT_RUNNING.load(Ordering::Acquire) }
+pub fn slot_start_mash(slot: u8, take: SlotTake, facing: i8) -> Result<Option<PlayStart>, PlayRefusal> {
+    SLOT_OWED.store(0, Ordering::Release);
+    let at = usize::from(slot);
+    if at >= SLOTS { return Err(PlayRefusal::SlotOutOfRange); }
+    let Some((seq, meta, len, generation)) = slot_snapshot(at) else { return Ok(None) };
+    if seq != take.seq { return Ok(None); }
+    start_slot_snapshot(slot, facing, None, meta, len, generation)
+}
+
+pub fn slot_start_ledge(slot: u8, facing: i8, ledge: Option<bool>) -> Result<Option<PlayStart>, PlayRefusal> {
+    SLOT_OWED.store(0, Ordering::Release);
+    let at = usize::from(slot);
+    if at >= SLOTS { return Err(PlayRefusal::SlotOutOfRange); }
+    let Some((_, meta, len, generation)) = slot_snapshot(at) else {
+        let buffer = match ledge { None => 0, Some(false) => 1, Some(true) => 2 };
+        let request = (slot + 1) | (u8::from(facing < 0) << 3) | (buffer << 4);
+        SLOT_OWED.store(request, Ordering::Release);
+        return Ok(None);
+    };
+    start_slot_snapshot(slot, facing, ledge, meta, len, generation)
+}
+
+pub fn slot_running() -> bool {
+    SLOT_RUNNING.load(Ordering::Acquire) || SLOT_OWED.load(Ordering::Acquire) != 0
+}
 
 pub fn slot_stop() -> bool {
+    let owed = SLOT_OWED.swap(0, Ordering::AcqRel) != 0;
     let mut run = SLOT_RUN.lock();
-    let running = run.active();
+    let running = run.active() || owed;
     run.stop();
     SLOT_RUNNING.store(false, Ordering::Release);
     running
@@ -132,6 +163,15 @@ pub fn slot_phase() -> (Phase, u16) {
 pub fn cpu_idle() -> bool { !slot_running() && !cpu_playback_blocks_drill() }
 
 pub fn slot_control(shulk_dial: bool) -> Option<Inject> {
+    let request = SLOT_OWED.load(Ordering::Acquire);
+    if request != 0 {
+        let slot = (request & 7) - 1;
+        let facing = if request & 8 != 0 { -1 } else { 1 };
+        let ledge = match request >> 4 { 1 => Some(false), 2 => Some(true), _ => None };
+        let (_, meta, len, generation) = slot_snapshot(usize::from(slot))?;
+        SLOT_OWED.store(0, Ordering::Release);
+        start_slot_snapshot(slot, facing, ledge, meta, len, generation).ok()??;
+    }
     let mut run = SLOT_RUN.lock();
     if !run.active() { return None; }
     let tape = &SLOT_TAPES[usize::from(run.slot())];
@@ -152,6 +192,7 @@ static LAST_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
 static CAP_ROLE: AtomicU8 = AtomicU8::new(0);
 static CAP_LEN: AtomicUsize = AtomicUsize::new(0);
 static PLAYED: AtomicU32 = AtomicU32::new(0);
+static FED: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
 static CAP_FRAMES: [AtomicU64; MAX_FRAMES] = [const { AtomicU64::new(0) }; MAX_FRAMES];
 // Final converted event records only. CAP_FRAMES stays exclusively owned by ordinary Record mechanics.
 static INPUT_MODE: AtomicU8 = AtomicU8::new(0); // bit1 Make, bit2 direct Record; either may overlap another take
@@ -465,6 +506,12 @@ pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
     PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
 
+pub fn request_drill_preview(source: &str, frames: u32) -> bool {
+    if player_playback_blocks_preview() { return false; }
+    request_preview(source, Role::Player, 0, frames);
+    true
+}
+
 pub fn request_clip_preview(recording: MacroRecording) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
@@ -539,6 +586,10 @@ fn role_playing(role: Role) -> bool {
 /// A queued Play, running Recording-page CPU macro, or its still-live buffered tail.
 pub fn cpu_playback_blocks_drill() -> bool {
     !RESET_CPU.load(Ordering::Acquire) && (PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu))
+}
+
+pub fn player_playback_blocks_preview() -> bool {
+    PLAY_PLAYER.load(Ordering::Acquire) || role_playing(Role::Player)
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -779,6 +830,11 @@ pub fn captured_frames() -> u32 {
 
 pub fn played_frames() -> u32 {
     PLAYED.load(Ordering::Acquire)
+}
+
+/// Frames of the role's current (or last) library run that its hook has taken: zero when a run is loaded, then one per delivered frame. Atomic read; slot runs are not counted.
+pub fn fed_frames(role: Role) -> u32 {
+    FED[role_index(role)].load(Ordering::Acquire)
 }
 
 pub fn start_gated() -> bool {
@@ -1802,6 +1858,9 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
     if effect.stopped || effect.started {
         drop_frames(role);
     }
+    if effect.started {
+        FED[role_index(role)].store(0, Ordering::Release);
+    }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
     if let Some((speed, _)) = owed {
         owe_start_speed(role, Some(speed));
@@ -2144,6 +2203,7 @@ fn start_run(
     };
     if effect.started {
         drop_frames(role);
+        FED[role_index(role)].store(0, Ordering::Release);
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
         step_role(root, machine, book, role);
@@ -2336,6 +2396,7 @@ fn take_frame(role: Role) -> Option<InputFrame> {
     }
     role_frames(role).pop().map(|frame| {
         PLAYED.fetch_add(1, Ordering::AcqRel);
+        FED[role_index(role)].fetch_add(1, Ordering::AcqRel);
         unpack(frame)
     })
 }
@@ -2397,6 +2458,7 @@ fn reset_host() {
     CAP_ROLE.store(0, Ordering::Release);
     CAP_LEN.store(0, Ordering::Release);
     PLAYED.store(0, Ordering::Release);
+    for count in &FED { count.store(0, Ordering::Release); }
     RECORD_EDGE.store(0, Ordering::Release);
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
@@ -2492,6 +2554,10 @@ mod tests {
         cpu_playback(queued)
     }
 
+    fn start_slot(slot: u8, facing: i8) -> Result<Option<PlayStart>, PlayRefusal> {
+        slot_start_mash(slot, slot_take(slot).unwrap(), facing)
+    }
+
     fn a_playback_slot_run_plays_its_macro_through_the_cpu_pad() {
         let _hold = hold();
         reset_host();
@@ -2502,8 +2568,8 @@ mod tests {
         ];
         let macro_ = slot_macro(frames.clone(), -1.0, 31);
         set_slot(0, Some(&macro_)).unwrap();
-        assert_eq!(slot_status(0), 31);
-        assert_eq!(slot_start(0, 1, None), Ok(Some(PlayStart { slot: 0, frames: 3 })));
+        assert_eq!(slot_take(0).unwrap().status(), 31);
+        assert_eq!(start_slot(0, 1), Ok(Some(PlayStart { slot: 0, frames: 3 })));
         assert_eq!(slot_phase(), (Phase::Playback, 3));
         assert!(slot_playback(true).running);
         for (i, frame) in frames.iter().enumerate() {
@@ -2520,7 +2586,7 @@ mod tests {
         reset_host();
         let macro_ = slot_macro(vec![InputFrame::default(); 3], 1.0, 7);
         set_slot(0, Some(&macro_)).unwrap();
-        slot_start(0, 1, None).unwrap().unwrap();
+        start_slot(0, 1).unwrap().unwrap();
         let frame = InputFrame { buttons: 42, ..InputFrame::default() };
         assert_eq!(cpu_controller(|| Some(frame)), Some(inject_values(to_mapped(frame), 1)));
         assert!(!slot_running());
@@ -2543,7 +2609,7 @@ mod tests {
         let old = slot_macro(vec![InputFrame { buttons: 1, ..InputFrame::default() }; 3], 1.0, 7);
         let new = slot_macro(vec![InputFrame { buttons: 2, ..InputFrame::default() }; 3], -1.0, 9);
         set_slot(0, Some(&old)).unwrap();
-        slot_start(0, 1, None).unwrap().unwrap();
+        start_slot(0, 1).unwrap().unwrap();
         assert_eq!(slot_control(false).unwrap().buttons, 1);
         set_slot(0, Some(&new)).unwrap();
         assert!(slot_control(false).is_none());
@@ -2553,14 +2619,14 @@ mod tests {
     fn an_empty_or_long_slot_is_refused() {
         let _hold = hold();
         reset_host();
-        assert_eq!(slot_start(0, 1, None), Err(PlayRefusal::SlotEmpty));
-        assert_eq!(slot_start(5, 1, None), Err(PlayRefusal::SlotOutOfRange));
+        assert_eq!(start_slot(0, 1), Err(PlayRefusal::SlotEmpty));
+        assert_eq!(start_slot(5, 1), Err(PlayRefusal::SlotOutOfRange));
         let old = slot_macro(vec![InputFrame { buttons: 6, ..InputFrame::default() }], 1.0, 7);
         let long = slot_macro(vec![InputFrame::default(); 601], -1.0, 9);
         set_slot(0, Some(&old)).unwrap();
         assert_eq!(set_slot(0, Some(&long)), Err(ImportRefusal::TooLong(601)));
         assert_eq!(set_slot(5, Some(&old)), Err(ImportRefusal::SlotOutOfRange));
-        assert_eq!(slot_start(0, 1, None), Ok(Some(PlayStart { slot: 0, frames: 1 })));
+        assert_eq!(start_slot(0, 1), Ok(Some(PlayStart { slot: 0, frames: 1 })));
         assert_eq!(slot_control(false).unwrap().buttons, 6);
     }
 
@@ -2572,7 +2638,7 @@ mod tests {
             .collect();
         let macro_ = slot_macro(frames, -1.0, 7);
         set_slot(0, Some(&macro_)).unwrap();
-        slot_start(0, -1, None).unwrap().unwrap();
+        start_slot(0, -1).unwrap().unwrap();
         let mut facing = -1;
         let mut turns = 0;
         for i in 0..240 {
@@ -2589,20 +2655,201 @@ mod tests {
         let old = slot_macro(vec![InputFrame { buttons: 1, lstick_x: 80, ..InputFrame::default() }], 1.0, 11);
         let new = slot_macro(vec![InputFrame { buttons: 2, lstick_x: 80, ..InputFrame::default() }], -1.0, 22);
         set_slot(0, Some(&old)).unwrap();
+        let take = slot_take(0).unwrap();
         SLOT_SEQ[0].fetch_add(1, Ordering::AcqRel);
-        assert_eq!(slot_start(0, 1, None), Ok(None));
-        assert_eq!(slot_status(0), crate::model::cpu::ids::UNRESOLVED);
+        assert_eq!(slot_start_mash(0, take, 1), Ok(None));
+        assert_eq!(slot_take(0), None);
         assert!(!slot_running());
         SLOT_META[0].store(22 | (1_u64 << 32), Ordering::SeqCst);
         assert_eq!(SLOT_TAPES[0].frame_at(0), Some(old.frames[0]));
-        assert_eq!(slot_start(0, 1, None), Ok(None));
-        assert_eq!(slot_status(0), crate::model::cpu::ids::UNRESOLVED);
+        assert_eq!(slot_start_mash(0, take, 1), Ok(None));
+        assert_eq!(slot_take(0), None);
         set_slot_data(0, Some(&new)).unwrap();
-        assert_eq!(slot_start(0, 1, None), Ok(None));
+        assert_eq!(slot_start_mash(0, take, 1), Ok(None));
         SLOT_SEQ[0].fetch_add(1, Ordering::Release);
-        assert_eq!(slot_status(0), 22);
-        assert_eq!(slot_start(0, 1, None), Ok(Some(PlayStart { slot: 0, frames: 1 })));
+        assert_eq!(slot_take(0).unwrap().status(), 22);
+        assert_eq!(slot_start_mash(0, take, 1), Ok(None));
+        assert_eq!(start_slot(0, 1), Ok(Some(PlayStart { slot: 0, frames: 1 })));
         assert_eq!(slot_control(false), Some(inject_values(to_mapped(new.frames[0]), -1)));
+    }
+
+    fn a_replaced_take_is_not_started_under_the_old_takes_gate() {
+        use crate::model::cpu::ids::{C, Table};
+        use crate::model::recording::{mash_should_start, term_for_status, MashCtx, RecorderSettings};
+        let _hold = hold();
+        reset_host();
+        let table = Table::with(&[(C::StatusAttackAir, 40)]);
+        let old = slot_macro(vec![InputFrame { buttons: 1, ..InputFrame::default() }], 1.0, 1);
+        let new = slot_macro(vec![InputFrame { buttons: 2, lstick_x: 80, ..InputFrame::default() }], -1.0, 40);
+        set_slot(0, Some(&old)).unwrap();
+        let take = slot_take(0).unwrap();
+        assert_eq!(term_for_status(&table, take.status()), None);
+        let settings = RecorderSettings::factory();
+        let gate = |term_enabled| mash_should_start(true, &settings, &MashCtx {
+            head_slot: Some(0), in_hitstun: false, in_hitstop: false, term_enabled,
+        });
+        assert_eq!(gate(true), Some(0));
+        set_slot(0, Some(&new)).unwrap();
+        assert_eq!(slot_start_mash(0, take, 1), Ok(None));
+        assert!(!slot_running());
+        assert_eq!(slot_control(false), None);
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_take(0), None);
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        let take = slot_take(0).unwrap();
+        assert_eq!(take.status(), 40);
+        assert_eq!(term_for_status(&table, take.status()), Some(C::TermContAttackAir));
+        assert_eq!(gate(false), None);
+        assert!(!slot_running());
+        assert_eq!(slot_control(false), None);
+        assert_eq!(gate(true), Some(0));
+        assert_eq!(slot_start_mash(0, take, 1), Ok(Some(PlayStart { slot: 0, frames: 1 })));
+        assert_eq!(slot_control(false), Some(inject_values(to_mapped(new.frames[0]), -1)));
+    }
+
+    fn one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer() {
+        let _hold = hold();
+        reset_host();
+        let frames = vec![
+            InputFrame { buttons: 0x10, ..InputFrame::default() },
+            InputFrame { buttons: 0x20, ..InputFrame::default() },
+        ];
+        let macro_ = slot_macro(frames, 1.0, 7);
+        set_slot(0, Some(&macro_)).unwrap();
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, 1, Some(false)), Ok(None));
+        assert!(slot_running() && cpu_playback(false).running && !cpu_idle());
+        assert_eq!(slot_control(false), None);
+        set_slot_data(0, Some(&macro_)).unwrap();
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        for (at, buttons) in [0x10, 0x10, 0, 0, 0, 0x10, 0x20].into_iter().enumerate() {
+            assert_eq!(slot_control(false).unwrap().buttons, buttons);
+            assert_eq!(slot_post(), if at == 6 { Some(0) } else { None });
+        }
+        assert_eq!(slot_control(false), None);
+        assert_eq!(slot_post(), None);
+        assert!(!slot_running());
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, -1, None), Ok(None));
+        assert!(slot_stop());
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_control(false), None);
+        assert!(!slot_running());
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, 1, Some(true)), Ok(None));
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        for (at, buttons) in [0x10, 0, 0, 0, 0x10, 0x20].into_iter().enumerate() {
+            assert_eq!(slot_control(false).unwrap().buttons, buttons);
+            assert_eq!(slot_post(), if at == 5 { Some(0) } else { None });
+        }
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, 1, None), Ok(None));
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_control(false).unwrap().buttons, 0x10);
+        assert!(slot_stop());
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(0, 1, Some(true)), Ok(None));
+        set_slot_data(0, None).unwrap();
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_control(false), None);
+        assert!(!slot_running());
+    }
+
+    fn player_playback_blocks_a_drill_preview_without_consuming_its_frame() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-preview-player");
+        let frames = active_plain_macro(&root, Role::Player, 6);
+        on_chords(false, true, false);
+        assert!(player_playback_blocks_preview());
+        assert!(!request_drill_preview("other", 3));
+        assert!(!preview_running());
+        tick(&root);
+        assert!(role_playing(Role::Player));
+        assert!(!request_drill_preview("other", 3));
+        assert!(!preview_running());
+        assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(frames[0]));
+        reset_host();
+        assert!(request_drill_preview("other", 3));
+        assert!(preview_running());
+    }
+
+    fn a_roles_fed_count_is_the_frames_its_hook_took() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let other = if role == Role::Player { Role::Cpu } else { Role::Player };
+            let slot = slot_macro(vec![InputFrame { buttons: 9, ..InputFrame::default() }], 1.0, 1);
+            set_slot(0, Some(&slot)).unwrap();
+            start_slot(0, 1).unwrap().unwrap();
+            assert_eq!(slot_control(false).unwrap().buttons, 9);
+            assert_eq!(slot_post(), Some(0));
+            assert_eq!(fed_frames(role), 0);
+            assert_eq!(fed_frames(other), 0);
+
+            let root = scratch("fed-frames");
+            tick(&root);
+            let frames = (1..=5).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+            let kind = if role == Role::Player { 8 } else { 7 };
+            let recording = MacroRecording::new("Fed", "13.0.5", StartState::neutral(kind, 0, 1.0), frames).unwrap();
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+            let take = || if role == Role::Player { take_player_frame() } else { take_cpu_frame() };
+
+            request_preview(&id, role, 0, 5);
+            tick(&root);
+            assert_eq!(fed_frames(role), 0);
+            for expected in 1..=3 {
+                assert_eq!(take().map(|frame| frame.buttons), Some(expected));
+                assert_eq!(fed_frames(role), expected);
+                assert_eq!(fed_frames(other), 0);
+            }
+            for expected in 4..=5 {
+                assert_eq!(take().map(|frame| frame.buttons), Some(expected));
+            }
+            assert_eq!(fed_frames(role), 5);
+            assert!(take().is_none());
+            tick(&root);
+            assert!(!preview_running());
+            assert!(take().is_none());
+            assert_eq!(fed_frames(role), 5);
+
+            request_preview(&id, role, 1, 4);
+            tick(&root);
+            assert_eq!(fed_frames(role), 0);
+            for expected in 2..=4 {
+                assert_eq!(take().map(|frame| frame.buttons), Some(expected));
+            }
+            assert_eq!(fed_frames(role), 3);
+            tick(&root);
+            assert!(!preview_running());
+            assert!(take().is_none());
+            assert_eq!(fed_frames(role), 3);
+
+            request_preview(&id, role, 0, 5);
+            tick(&root);
+            assert_eq!(fed_frames(role), 0);
+            assert_eq!(take().map(|frame| frame.buttons), Some(1));
+            assert_eq!(fed_frames(role), 1);
+            stop_preview();
+            tick(&root);
+            assert!(!preview_running());
+            assert!(take().is_none());
+            assert_eq!(fed_frames(role), 1);
+            assert_eq!(fed_frames(other), 0);
+
+            if role == Role::Player {
+                RecordingIndex::update(&root, |index| { index.set_active(role, Some(&id), 1)?; Ok(true) }).unwrap();
+                on_chords(false, true, false);
+                tick(&root);
+                assert_eq!(fed_frames(role), 0);
+                for expected in 1..=5 {
+                    assert_eq!(take().map(|frame| frame.buttons), Some(expected));
+                    assert_eq!(fed_frames(role), expected);
+                }
+                assert!(take().is_none());
+                assert_eq!(fed_frames(role), 5);
+            }
+        }
     }
 
     fn a_named_load_is_taken_with_save_states_off() {
@@ -5527,6 +5774,10 @@ mod tests {
             ("an_empty_or_long_slot_is_refused", an_empty_or_long_slot_is_refused as fn()),
             ("the_r4b_holds_turn_three_times_in_a_slot", the_r4b_holds_turn_three_times_in_a_slot as fn()),
             ("a_slot_start_defers_while_its_slot_is_published", a_slot_start_defers_while_its_slot_is_published as fn()),
+            ("a_replaced_take_is_not_started_under_the_old_takes_gate", a_replaced_take_is_not_started_under_the_old_takes_gate as fn()),
+            ("one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer", one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer as fn()),
+            ("player_playback_blocks_a_drill_preview_without_consuming_its_frame", player_playback_blocks_a_drill_preview_without_consuming_its_frame as fn()),
+            ("a_roles_fed_count_is_the_frames_its_hook_took", a_roles_fed_count_is_the_frames_its_hook_took as fn()),
             ("a_crop_preview_owes_the_start_speed_as_play_does", a_crop_preview_owes_the_start_speed_as_play_does as fn()),
             ("a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back", a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back as fn()),
             ("a_cpu_crop_preview_holds_right_whatever_the_facing", a_cpu_crop_preview_holds_right_whatever_the_facing as fn()),

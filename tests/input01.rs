@@ -100,8 +100,8 @@ fn a_slot_plays_every_frame_once() {
 fn playback_refuses_empty_slot() {
     use crate::engine::rr_host;
     rr_host::set_slot(4, None).unwrap();
-    assert_eq!(rr_host::slot_start(4, 1, None), Err(PlayRefusal::SlotEmpty));
-    assert_eq!(rr_host::slot_start(5, 1, None), Err(PlayRefusal::SlotOutOfRange));
+    assert_eq!(rr_host::slot_start_mash(4, rr_host::slot_take(4).unwrap(), 1), Err(PlayRefusal::SlotEmpty));
+    assert_eq!(rr_host::slot_start_mash(5, rr_host::slot_take(5).unwrap(), 1), Err(PlayRefusal::SlotOutOfRange));
 }
 
 #[test]

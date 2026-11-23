@@ -55,8 +55,8 @@ fn slot_capture_and_library_pad_priority_is_preserved() {
     let interrupt = body(recorder, "interrupt_playback");
     ordered(interrupt, &["settings().mash_interrupt && rr_host::slot_stop()", "cpu_playback(false)"]);
     let start = body(recorder, "mash_start");
-    ordered(start, &["rr_host::cpu_idle()", "rr_host::slot_status(head)", "term_for_status(&table, from)",
-        "is_enable_transition_term", "None => cpu::actionable(body.accessor)", "rr_host::slot_start",
+    ordered(start, &["rr_host::cpu_idle()", "rr_host::slot_take(head)", "term_for_status(&table, take.status())",
+        "is_enable_transition_term", "None => cpu::actionable(body.accessor)", "rr_host::slot_start_mash(slot, take, facing)",
         "Ok(Some(started))", "Ok(None) => {}", "Err(refusal)", "cpu::mash_pop(key)"]);
     assert!(!start.contains("SLOT_RUN.lock()"));
 }
