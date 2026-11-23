@@ -18,6 +18,9 @@ mod crosshair_tests;
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
 
+/// The game does not hold a fighter on a floor's last point; see docs/design/gj4-player-start.md.
+pub const PLAYER_INSET: f32 = 1.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drill {
     GuardEdge,
@@ -418,6 +421,8 @@ pub enum PlacementAction {
 #[derive(Clone, Copy, Default)]
 pub struct PlacementFrame {
     pub dead_or_rebirthing: bool,
+    /// Player 1 is KO'd: Dead, Standby or Rebirth.
+    pub player_ko: bool,
     pub grounded: bool,
     pub airborne: bool,
     pub wait: bool,
@@ -427,7 +432,7 @@ pub struct PlacementFrame {
 impl Placement {
     pub fn action(self, frame: PlacementFrame) -> PlacementAction {
         use PlacementAction as A;
-        if frame.dead_or_rebirthing {
+        if frame.dead_or_rebirthing || frame.player_ko {
             return A::RestartPlacement;
         }
         match self {
@@ -763,12 +768,22 @@ impl Stage {
         clamp_point(point, self.camera)
     }
 
+    pub fn player_x(self, drill: Drill, x: f32) -> f32 {
+        if drill == Drill::Juggler {
+            return x;
+        }
+        let lo = self.ledges[0][0] + PLAYER_INSET;
+        let hi = self.ledges[1][0] - PLAYER_INSET;
+        if lo <= hi {
+            x.clamp(lo, hi)
+        } else {
+            self.ledges[0][0].midpoint(self.ledges[1][0])
+        }
+    }
+
     pub fn player_cursor(self, drill: Drill, point: [f32; 2]) -> Option<[f32; 2]> {
         let [x, y] = self.camera_point(point)?;
-        let x = match drill {
-            Drill::GuardEdge => x.clamp(self.ledges[0][0], self.ledges[1][0]),
-            Drill::Juggler => x,
-        };
+        let x = self.player_x(drill, x);
         Some([x, y])
     }
 

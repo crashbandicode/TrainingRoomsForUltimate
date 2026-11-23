@@ -1816,8 +1816,13 @@ fighter written onto it. The cursor already stops on the readable end of the flo
    in play. GJ1 uses the same read. Player 1's percent is left alone, as today.
 3. **The floor's last point,** after the measurement:
    - **A** (recommended): keep it as a start and make it repeat, so every release begins in the edge-teeter wait.
-   - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
+   - **B:** stop the crosshair 1 unit inside the end, so each start is a point inside the floor.
    - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
+
+**Built 2026-11-23 (fix build).**
+- Placement waits while Player 1 is KO'd and wakes a held CPU if placement restarts.
+- Option B was chosen: both falls came after Ready began, so a pre-Ready correction catches neither, and a correction during Ready cannot distinguish the game's fall from a player's own drop to the ledge. The game's cause is unknown. See [the design](design/gj4-player-start.md).
+- The measurement boot was not flown; the `83eecc32` trace was read again instead.
 
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
