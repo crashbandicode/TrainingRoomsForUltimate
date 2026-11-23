@@ -44,6 +44,8 @@ pub fn event_label(kind: Kind) -> &'static str {
         Kind::Flick(Flick::FastFall) => "fast-fall",
         Kind::Flick(Flick::Dash) => "dash",
         Kind::Flick(Flick::TapJump) => "tap-jump",
+        Kind::Aim(1) => "1st direction",
+        Kind::Aim(_) => "2nd direction",
     }
 }
 
@@ -69,7 +71,11 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
             BAD
         }
         Mark::WrongDir => {
-            let _ = write!(t, "{name} wrong direction");
+            let _ = if name.ends_with("direction") {
+                write!(t, "{name} wrong")
+            } else {
+                write!(t, "{name} wrong direction")
+            };
             BAD
         }
     };
@@ -158,6 +164,9 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
             if d > 0 { "late" } else { "early" }
         ),
         Reason::WrongDir(kind) => write!(t, "{unit}{n} {} wrong direction", event_label(kind)),
+        Reason::MissingAim(part) => write!(t, "{unit}{n} {} missing", event_label(Kind::Aim(part))),
+        Reason::WrongAim(part) => write!(t, "{unit}{n} {} wrong", event_label(Kind::Aim(part))),
+        Reason::ExtraAim(part) => write!(t, "{unit}{n} extra {}", event_label(Kind::Aim(part))),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
         Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
     };
