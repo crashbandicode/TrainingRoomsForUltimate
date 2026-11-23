@@ -82,4 +82,20 @@ fn think_counts_are_per_entry_and_offline_admitted() {
     }
     assert_eq!(counts.map(core::sync::atomic::AtomicU64::into_inner), [0, 2, 0, 0, 1, 0, 0, 1]);
 }
+
+#[test]
+fn the_practice_snapshot_carries_the_cpu_view() {
+    let wire = |wizard_cpu| {
+        let mut wire = String::new();
+        let fields = Fields {
+            phase: "wizard", wizard_step: "cpu", wizard_point: Some([-199.0, -8.0]), wizard_cpu, ..Fields::default()
+        };
+        snapshot(Some(Game::GuardEdge), fields, [0; CPU_ENTRIES], &mut wire);
+        wire
+    };
+    for view in ["in_view", "magnifier"] {
+        assert!(wire(view).lines().any(|line| line == format!("wizard.cpu={view}")), "{view}");
+    }
+    assert!(!wire("").contains("wizard.cpu"));
+}
 }

@@ -41,6 +41,26 @@ The wizard records whether the player edited the CPU start. A stick move that ch
 
 The pointer's projection for off-screen points and its look remain unverified until the combined Eden proof.
 
+## 2026-11-23: the CPU waits at its start (fix round, item F11)
+
+The operator's order of 2026-11-23 replaces the border chevron of the two pointer rows above with the game's own off-screen magnifier.
+
+The game shows that magnifier only for a fighter that is itself out of the camera's view: its per-fighter cursor update (`main+0x1556dc0`..`0x1557010` in 13.0.5) asks the fighter's camera module first, and only then `FLAG_LOUPE` or `FLAG_FORCE_LOUPE`. No picker moved a body, so a CPU start outside the picker's Fixed camera had nothing of the game's at it.
+
+While the Guard the Edge or Juggler picker is up, the CPU now waits at its picked start: placed awake with a Fall request for `PREVIEW_SETTLE` frames, then held asleep there, with the placement the drill's own start uses (`model::crosshair::CpuPreview`, `placement::preview`). In view the game draws the CPU under the crosshair; out of view it draws its magnifier with the direction pointer. The chevron stays where the body cannot be held (constants or grants missing) and while the game HUD is off, which hides the magnifier. Leaving the picker without starting puts the CPU back where it stood, except while a save state loads. A started drill wakes it and the existing placement runs unchanged. `tr.practice` reports `wizard.cpu` as `in_view` or `magnifier`; the second is the game's `FLAG_IS_LOUPE` read back.
+
+The recording start picker keeps its chevron: its spots are clamped to the camera's range.
+
+| Requirement | Design | Test |
+| --- | --- | --- |
+| An off-picture CPU start shows the game's magnifier of the CPU instead of the chevron | The picker holds the CPU at the picked point; `Marks::shown` leaves the chevron out while it does | `the_dotted_pointer_is_not_drawn_while_the_cpu_stands_at_its_point`, `the_drill_picker_holds_the_cpu_at_the_picked_point`, `the_picker_places_the_cpu_awake_then_holds_it_asleep` |
+| In the picture the crosshair shows as before | `Marks::shown` changes only the pointer | `the_dotted_pointer_is_not_drawn_while_the_cpu_stands_at_its_point` |
+| The direction stays shown | The game's magnifier carries its pointer; without a held body the chevron remains | `the_dotted_pointer_stays_when_the_cpu_cannot_be_held`, `a_start_outside_the_picture_gets_a_pointer_at_the_border` |
+| Leaving the picker leaves the CPU where it was | `Engine::wake_cpu` ends the preview and writes the origin back | `leaving_the_picker_puts_the_cpu_back_where_it_stood`, `a_new_cpu_body_starts_its_own_preview_from_where_it_stood` |
+| The bridge can tell which is shown | `crosshair::cpu_view` in `tr.practice` | `the_practice_state_says_how_the_cpu_point_is_shown`, `the_practice_snapshot_carries_the_cpu_view` |
+
+Eden, 2026-11-23, XPS, card lineup `20261123-1532Z` with the bridge, build `5f9a9916` (run `f11-probe-1`, Final Destination, Player 1 Mario, CPU Zero Suit Samus): the Guard the Edge picker read `in_view` at (-160, -69), (-130, -30) and (-165, -30) and `magnifier` at (-200, -30), (-230, -30), (-230, 60) and (-150, -100), with the CPU on the picked point each time and back at its place after B. Every Juggler point was in view. Not run: a waiting room, another stage, a console.
+
 ## Limits and proof
 
 - That the rewrite keeps Player 1 on its start is not proven. The measuring boot never rewrote. The proof is an Eden run on the built head with Player 1 read at every release.

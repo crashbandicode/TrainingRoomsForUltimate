@@ -1100,3 +1100,48 @@ fn lucas_missing_special_reach_preserves_the_independent_detour_rule() {
         .expect("guard timing corrections after the independent detour");
     assert!(detour.contains("PerfectRule::Detour"));
 }
+
+#[test]
+fn the_drill_picker_holds_the_cpu_at_the_picked_point() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let picker = frame.split_once("if let Some(wizard) = &mut run.wizard {").expect("the picker branch").1;
+    let (picker, started) = picker
+        .split_once("post_notice(capture, run, best_time(bests, key), best_time(streaks, key));\n        return;\n    }\n")
+        .expect("the picker reports and returns");
+    assert!(picker.contains("run.cpu_view = hold_preview(preview, held_cpu, body, wizard.setup.cpu);"));
+    // A started drill wakes the CPU for the placement that follows.
+    assert!(started.trim_start().starts_with("if preview.take().is_some() && held_cpu.take() == Some(body) {"));
+    let hold = item(&runtime, "unsafe fn hold_preview(");
+    assert!(hold.contains("placement::preview(preview, body.accessor, body.object_id, at) == Some(true)"));
+    assert!(hold.contains("*held_cpu = Some(body);"));
+    assert!(hold.contains("crosshair::cpu_view(preview.as_ref())"));
+    let placement = src("src/runtime/features/placement.rs");
+    let preview = item(&placement, "pub(super) unsafe fn preview(");
+    assert!(preview.contains("crosshair::preview_step("));
+    assert!(preview.find("PreviewAct::Lift").unwrap() < preview.find("lift(body, at").unwrap());
+    assert!(preview.find("PreviewAct::Hold").unwrap() < preview.find("hold(body, at)").unwrap());
+    assert!(preview.contains("konst(C::WorkFlagIsLoupe)") && preview.contains("natives::is_flag(body,"));
+    // The chevron goes while the body is there and the game HUD can show its magnifier; the state says which.
+    assert!(item(&runtime, "pub fn look(").contains("wizard.marks().shown(engine.preview.is_some() && published::hud())"));
+    assert!(item(&runtime, "fn report_drill_state(").contains("fields.wizard_cpu = run.cpu_view;"));
+}
+
+#[test]
+fn leaving_the_picker_puts_the_cpu_back_where_it_stood() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let wake = item(&runtime, "unsafe fn wake_cpu(");
+    assert!(wake.contains("self.preview.take()"), "a wake ends the preview");
+    let ended = wake.split_once("self.preview.take()").unwrap().1;
+    // A loading save state places the fighters itself.
+    assert!(ended.contains("!states::is_loading()"));
+    assert!(ended.contains("placement::restore(current.accessor, preview.origin());"));
+    let placement = src("src/runtime/features/placement.rs");
+    let restore = item(&placement, "pub(super) unsafe fn restore(");
+    assert!(restore.find("origin.grounded").unwrap() < restore.find("stand(body, origin.at, origin.facing)").unwrap());
+    assert!(restore.contains("lift(body, origin.at, origin.facing)") && restore.contains("fall(body)"));
+    // The end of the scene drops the preview with the bodies.
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let scene_end = frame.split_once("if scene::practice_scene().is_none() {").unwrap().1.split_once("return;").unwrap().0;
+    assert!(scene_end.contains("engine.preview = None;"));
+}

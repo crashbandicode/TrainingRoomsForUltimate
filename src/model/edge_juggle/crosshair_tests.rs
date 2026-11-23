@@ -212,6 +212,21 @@ fn edge_and_juggle_wizards_use_the_shared_crosshair() {
 }
 
 #[test]
+fn the_cpu_point_follows_the_crosshair_in_the_cpu_step() {
+    for drill in [Drill::GuardEdge, Drill::Juggler] {
+        let stage = stage();
+        let mut w = wizard(drill, None);
+        assert_eq!(w.setup.cpu, w.cursor(), "{drill:?}");
+        for sample in [pad([-1.0, 0.0], 0), pad([0.0, -1.0], 0), pad([0.0; 2], 1 << DPAD_RIGHT), pad([0.0; 2], 1 << DPAD_UP)] {
+            w.steer(stage, &sample);
+            // The point a picker holds the CPU at is the crosshair's own.
+            assert_eq!(w.setup.cpu, w.cursor(), "{drill:?}");
+            assert_eq!(w.marks().pointer, Some(w.cursor()));
+        }
+    }
+}
+
+#[test]
 fn edge_wizard_look_points_at_the_crosshair() {
     for drill in [Drill::GuardEdge, Drill::Juggler] {
         let mut w = wizard(drill, None);
