@@ -1990,7 +1990,7 @@
    "dest": "src/model/macro_ui/macro_panel/fighter.rs",
    "crate": "tui",
    "src_sha256": "1a4e2da3199c28c0d66ad424b2d6cbdb38b9e9ed283e529dfbc8e29e01b50f69",
-   "dest_sha256": "1aa73700511b8530f7d52ba543ac3b61131edb6413aeec6e693f1ed92c951163",
+   "dest_sha256": "3774c589c7c291b330e2880e37a15e8435d5c7596529ec7f27477462f5a4cf3e",
    "edits": [
     {
      "old": "            Pad::Extra => {}",
@@ -2092,6 +2092,16 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "            Pad::Left | Pad::Up => self.cursor = self.cursor.saturating_sub(1),\n            Pad::Right | Pad::Down => self.cursor = (self.cursor + 1).min(ROWS.len() - 1),\n",
+     "new": "            Pad::Left | Pad::Up => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), false),\n            Pad::Right | Pad::Down => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), true),\n",
+     "reason": "F2: Wrap the fighter question's choices through the shared list step."
+    },
+    {
+     "old": "        }\n    }\n}\n\n",
+     "new": "        }\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    lib_unit_tests! {\n    use super::*;\n\n    #[test]\n    fn f2_fighter_prompt_wraps() {\n        let mut prompt = Prompt::new(Origin::Recording, ViewRole::Cpu, 1, \"Mario\".into(), \"Kirby\".into());\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert_eq!(prompt.on_pad(Pad::Up), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Switch);\n        assert_eq!(prompt.on_pad(Pad::Down), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Keep);\n        assert_eq!(prompt.on_pad(Pad::Left), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Switch);\n        assert_eq!(prompt.on_pad(Pad::Right), Outcome::None);\n        assert_eq!(prompt.choice(), Choice::Keep);\n    }\n    }\n}\n",
+     "reason": "F2: Exercise the fighter question's wrapping choices."
     }
    ]
   },
