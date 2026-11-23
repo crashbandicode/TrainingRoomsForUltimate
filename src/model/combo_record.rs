@@ -22,8 +22,20 @@ pub const MAX_FILE_BYTES: u64 = LINKS as u64 * 4096;
 pub const MAX_NAME_CHARS: usize = 48;
 /// The directory under the data folder.
 pub const DIR: &str = "combos";
-/// The name of a macro file a drill owns as its take (F10). Only a macro with this name that a drill names is hidden from the lists and deleted with the drill.
-pub const DRILL_TAKE_NAME: &str = "Drill take";
+/// The start of the name of a macro file a drill owns as its take (F10). A key of 16 hex digits follows.
+pub const DRILL_TAKE_PREFIX: &str = "Drill take ";
+
+/// A take's name for `key`. The file's id comes from the name, so every take has an id of its own and a drill file
+/// from another card names no take here.
+pub fn drill_take_name(key: u64) -> String {
+    format!("{DRILL_TAKE_PREFIX}{key:016x}")
+}
+
+/// `name` is a take's name: the prefix and exactly 16 lower-case hex digits.
+pub fn is_drill_take_name(name: &str) -> bool {
+    name.strip_prefix(DRILL_TAKE_PREFIX)
+        .is_some_and(|key| key.len() == 16 && key.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+}
 /// Longest file name a shared combo may have, in characters before `.json`.
 pub const MAX_FILE_NAME_CHARS: usize = 64;
 

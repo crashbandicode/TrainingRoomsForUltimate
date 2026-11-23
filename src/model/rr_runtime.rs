@@ -18,7 +18,7 @@ use super::macros::{InputFrame, Library, MacroRecording, StartState};
 use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
-use crate::model::combo_record::{clean_name, default_name, ComboLibrary, ComboRecord, DRILL_TAKE_NAME};
+use crate::model::combo_record::{clean_name, default_name, drill_take_name, is_drill_take_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 
 /// One minute at 60 fps. Five hot macros stay resident.
@@ -236,7 +236,7 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
 /// `None` when no frame is left.
-pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool) -> Result<Option<String>, Error> {
+pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64) -> Result<Option<String>, Error> {
     if trim {
         super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
     }
@@ -244,8 +244,19 @@ pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartSta
         return Ok(None);
     }
     let macros = Library::new(root.join(MACROS_DIR));
-    let recording = MacroRecording::new(DRILL_TAKE_NAME, "13.0.5", start, frames).map_err(record)?;
+    let name = drill_take_name(drill_take_key(&frames, at));
+    let recording = MacroRecording::new(name, "13.0.5", start, frames).map_err(record)?;
     macros.save_new(&recording).map_err(record).map(Some)
+}
+
+/// The key in a take's name: FNV-1a 64 over the take's frames (per frame the buttons little-endian, then the four
+/// stick bytes) and then `at` little-endian. Two takes share a key only with the same frames saved in the same second.
+fn drill_take_key(frames: &[InputFrame], at: u64) -> u64 {
+    frames.iter().flat_map(|frame| frame.buttons.to_le_bytes().into_iter().chain([
+        frame.lstick_x as u8, frame.lstick_y as u8, frame.rstick_x as u8, frame.rstick_y as u8,
+    ])).chain(at.to_le_bytes()).fold(0xcbf29ce484222325u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+    })
 }
 
 pub fn drive_play<'a>(machine: &mut Playback, role: Role, book: &'a Book) -> super::playback::Effect<'a> {
@@ -363,24 +374,26 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
 
 /// A directly recorded input drill (F10): saved as Drill N like a made combo, with the macro file that holds its
 /// take named in the drill's `take`. No source: `made_from` stays empty.
-/// When the save fails the take is deleted, so no `Drill take` is left under MACROS.
+/// If the drill file cannot be written the take is deleted, so no take is left under MACROS. Once the drill file
+/// exists both files stay, also when the index update then fails.
 pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, take: String, at: u64) -> Result<String, Error> {
-    let saved = save_combo(root, combo, "", recorded_on, Some(take.clone()), at);
-    if saved.is_err() {
-        let _ = Library::new(root.join(MACROS_DIR)).delete(&take);
-    }
-    saved
+    save_combo(root, combo, "", recorded_on, Some(take), at)
 }
 
 fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, take: Option<String>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
-    let entries = library.list().map_err(record)?.entries;
+    let cleanup = || {
+        if let Some(take) = take.as_deref() {
+            let _ = Library::new(root.join(MACROS_DIR)).delete(take);
+        }
+    };
+    let entries = library.list().map_err(|err| { cleanup(); record(err) })?.entries;
     let prefix = if combo.input_only { "Drill" } else { "Combo" };
     let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
     let mut made = ComboRecord::new(name, *combo, recorded_on);
     if !source.is_empty() { made = made.with_made_from(source); }
-    if let Some(take) = take { made = made.with_take(take); }
-    let id = library.save_new(&made).map_err(record)?;
+    if let Some(take) = take.as_deref() { made = made.with_take(take); }
+    let id = library.save_new(&made).map_err(|err| { cleanup(); record(err) })?;
     RecordingIndex::update(root, |index| {
         index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
         Ok(true)
@@ -388,15 +401,18 @@ fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<Stri
     Ok(id)
 }
 
-/// Delete a combo or drill file. A drill's take (F10) goes with it: nothing else names that macro.
-/// Only a macro named `DRILL_TAKE_NAME`: a file that names any other macro leaves it alone.
+/// Delete a combo or drill file. A drill's take (F10) goes with it, unless another file still names it.
+/// Only a macro with a take's name: a file that names any other macro leaves it alone.
 pub fn delete_combo(root: &Path, id: &str) -> bool {
     let combos = ComboLibrary::new(root.join("combos"));
     let take = combos.load(id).ok().and_then(|file| file.take);
     let deleted = combos.delete(id).is_ok();
     if let Some(take) = take.filter(|_| deleted) {
         let macros = Library::new(root.join(MACROS_DIR));
-        if macros.load(&take).is_ok_and(|file| file.name == DRILL_TAKE_NAME) {
+        let unreferenced = combos.list().is_ok_and(|listing| listing.skipped.is_empty() && listing.entries.iter().all(|entry| {
+            combos.load(&entry.id).is_ok_and(|file| file.take.as_deref() != Some(take.as_str()))
+        }));
+        if unreferenced && macros.load(&take).is_ok_and(|file| is_drill_take_name(&file.name)) {
             let _ = macros.delete(&take);
         }
     }
@@ -933,7 +949,7 @@ fn record(err: impl ToString) -> Error {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    use super::super::library::{Drill, DrillKind, SEQUENCES_DIR};
+    use super::super::library::{Drill, DrillKind, INDEX_FILE, SEQUENCES_DIR};
     use super::*;
     use crate::model::combo::{Aim, Event, LinkRec};
     use crate::model::frame_strip::{Button, Move, Verdict};
@@ -995,7 +1011,7 @@ mod tests {
         let root = scratch("failed-drill-save");
         std::fs::write(root.join("combos"), b"not a directory").unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
-        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false).unwrap().unwrap();
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
         assert_eq!(macros.list().unwrap().entries.len(), 1);
         let mut step = LinkRec::INPUT;
         step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
@@ -1004,6 +1020,70 @@ mod tests {
         assert!(save_drill_with_take(&root, &combo, None, take, 1).is_err());
         assert!(macros.list().unwrap().entries.is_empty());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn input_drill() -> Combo {
+        let mut step = LinkRec::INPUT;
+        step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
+        let mut combo = Combo::from_links([step]).unwrap();
+        combo.input_only = true;
+        combo
+    }
+
+    fn an_index_failure_after_the_drill_file_keeps_the_pair() {
+        let root = scratch("drill-index-failure");
+        std::fs::create_dir(root.join(INDEX_FILE)).unwrap();
+        let first = vec![frame(1), frame(0)];
+        let second = vec![frame(2), frame(0)];
+        let take1 = save_drill_take(&root, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        assert!(save_drill_with_take(&root, &input_drill(), None, take1.clone(), 1).is_err());
+        let combos = ComboLibrary::new(root.join("combos"));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let entries = combos.list().unwrap().entries;
+        assert_eq!(entries.len(), 1);
+        let drill1 = entries[0].id.clone();
+        assert_eq!(combos.load(&drill1).unwrap().take.as_deref(), Some(take1.as_str()));
+        assert_eq!(macros.load(&take1).unwrap().frames, first);
+        std::fs::remove_dir(root.join(INDEX_FILE)).unwrap();
+        let take2 = save_drill_take(&root, second.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill2 = save_drill_with_take(&root, &input_drill(), None, take2.clone(), 1).unwrap();
+        assert_ne!(take1, take2);
+        assert!(delete_combo(&root, &drill1));
+        assert!(macros.load(&take1).is_err());
+        assert_eq!(macros.load(&take2).unwrap().frames, second);
+        assert_eq!(combos.load(&drill2).unwrap().take.as_deref(), Some(take2.as_str()));
+    }
+
+    fn a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take() {
+        let a = scratch("drill-card-a");
+        let b = scratch("drill-card-b");
+        let first = vec![frame(1), frame(0)];
+        let second = vec![frame(2), frame(0)];
+        let take_a = save_drill_take(&a, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill_a = save_drill_with_take(&a, &input_drill(), None, take_a.clone(), 1).unwrap();
+        let take_b = save_drill_take(&b, second, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill_b = save_drill_with_take(&b, &input_drill(), None, take_b.clone(), 1).unwrap();
+        assert_ne!(take_a, take_b);
+        std::fs::copy(b.join("combos").join(format!("{drill_b}.json")), a.join("combos").join("copied.json")).unwrap();
+        let combos = ComboLibrary::new(a.join("combos"));
+        let macros = Library::new(a.join(MACROS_DIR));
+        assert_eq!(combos.load("copied").unwrap().take.as_deref(), Some(take_b.as_str()));
+        assert!(macros.load(&take_b).is_err());
+        assert!(delete_combo(&a, "copied"));
+        assert_eq!(macros.load(&take_a).unwrap().frames, first);
+        assert_eq!(combos.load(&drill_a).unwrap().take.as_deref(), Some(take_a.as_str()));
+    }
+
+    fn a_take_two_drill_files_name_survives_the_first_delete() {
+        let root = scratch("drill-shared-take");
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
+        std::fs::copy(root.join("combos").join(format!("{drill}.json")), root.join("combos").join("copied.json")).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        assert!(delete_combo(&root, "copied"));
+        assert!(macros.load(&take).is_ok());
+        assert!(delete_combo(&root, &drill));
+        assert!(macros.load(&take).is_err());
     }
 
     fn record_follows_the_popup_role() {
@@ -1836,6 +1916,9 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_failed_drill_save_deletes_its_take", a_failed_drill_save_deletes_its_take as fn()),
+            ("an_index_failure_after_the_drill_file_keeps_the_pair", an_index_failure_after_the_drill_file_keeps_the_pair as fn()),
+            ("a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take", a_drill_file_from_another_card_neither_plays_nor_deletes_the_local_take as fn()),
+            ("a_take_two_drill_files_name_survives_the_first_delete", a_take_two_drill_files_name_survives_the_first_delete as fn()),
             ("save_chord_preserves_a_slot_written_after_its_initial_index_read", save_chord_preserves_a_slot_written_after_its_initial_index_read as fn()),
             ("discovery_yields_between_small_batches_and_keeps_menu_input_available", discovery_yields_between_small_batches_and_keeps_menu_input_available as fn()),
             ("a_failed_payload_retries_without_a_signature_change", a_failed_payload_retries_without_a_signature_change as fn()),

@@ -864,10 +864,10 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
 /// F10: X on a drill row. The take plays once on Player 1 through the Recording player, behind the gate the Crop
 /// preview uses. The menu stays open and keeps Player 1's pad; it is not drawn until the preview ends.
 fn start_drill_preview(source: &str, frames: u32) {
-    if !crate::runtime::macros::replay_capture::capture_ready() {
+    if !crate::runtime::macros::replay_capture::capture_ready()
+        || !crate::engine::rr_host::request_drill_preview(source, frames) {
         return;
     }
-    crate::engine::rr_host::request_preview(source, crate::engine::library::Role::Player, 0, frames);
     PREVIEW_HIDES.store(true, Ordering::Release);
 }
 

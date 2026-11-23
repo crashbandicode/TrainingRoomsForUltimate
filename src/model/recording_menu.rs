@@ -5,7 +5,7 @@
 //! `model.rs` has no engine module) and it does not touch `recording.rs` or `playback.rs`.
 
 use super::combo::Combo;
-use super::combo_record::DRILL_TAKE_NAME;
+use super::combo_record::is_drill_take_name;
 use super::menu::input::Button;
 use super::menu::table::{COMBOS_SEQ, SAVES_MACROS};
 use super::menu::{jumped, jumped_within, stepped};
@@ -452,7 +452,7 @@ pub struct RecordingScreens {
     keyboard: Option<Keyboard>,
     overlay_face: Face,
     catalog: Catalog,
-    /// Macros that drills own as their takes (F10) and named `Drill take`, with their frame counts: taken out of the catalog's macros in
+    /// Macros that drills own as their takes (F10), named with the take prefix and key, with their frame counts: taken out of the catalog's macros in
     /// `set_catalog`, so no list, picker, name or count shows them.
     takes: Vec<(String, u32)>,
     bound: Option<String>,
@@ -571,7 +571,7 @@ impl RecordingScreens {
     pub fn set_catalog(&mut self, mut catalog: Catalog) {
         self.takes.clear();
         catalog.macros.retain(|file| {
-            if file.name == DRILL_TAKE_NAME && catalog.combos.iter().any(|combo| combo.take.as_deref() == Some(file.id.as_str())) {
+            if is_drill_take_name(&file.name) && catalog.combos.iter().any(|combo| combo.take.as_deref() == Some(file.id.as_str())) {
                 self.takes.push((file.id.clone(), file.span));
                 false
             } else {
@@ -3503,22 +3503,27 @@ mod tests {
         for face in [Face::Page, Face::Popup] {
             let mut screens = RecordingScreens::new();
             let mut own_take = macro_file("t1", false, 25);
-            own_take.name = DRILL_TAKE_NAME.into();
+            own_take.name = crate::model::combo_record::drill_take_name(1);
+            let mut bare_take = macro_file("bare", false, 25);
+            bare_take.name = "Drill take".into();
             screens.set_catalog(Catalog {
-                macros: vec![macro_file("take", false, 40), own_take, macro_file("ch", true, 40)],
+                macros: vec![macro_file("take", false, 40), own_take, bare_take, macro_file("ch", true, 40)],
                 combos: vec![combo("d-own", true, None, Some("t1")), combo("d-made", true, Some("take"), None),
                     combo("d-old", true, None, None), combo("d-gone", true, Some("nope"), None),
                     combo("d-chain", true, Some("ch"), None), combo("d-lost", true, None, Some("missing")),
                     combo("d-fake", true, None, Some("take")),
+                    combo("d-bare", true, None, Some("bare")),
                     combo("hit", false, Some("take"), None)],
                 ..Catalog::default()
             });
             screens.popup_open = true;
             assert!(screens.catalog().macros.iter().all(|file| file.id != "t1"));
             assert!(screens.catalog().macros.iter().any(|file| file.id == "take"));
+            assert!(screens.catalog().macros.iter().any(|file| file.id == "bare"));
             let macros = screens.items(face, SAVES_MACROS, 1);
             assert!(macros.iter().all(|item| item.id != "t1"));
             assert!(macros.iter().any(|item| item.id == "take"));
+            assert!(macros.iter().any(|item| item.id == "bare"));
             screens.open_picker(PickerKind::NewChain, face, None);
             let picker = screens.picker.as_ref().unwrap();
             assert!(picker.ids.iter().all(|id| id != "t1"));
@@ -3545,7 +3550,7 @@ mod tests {
                 assert!(screens.press_popup_outcome(Button::X));
             }
             assert_eq!(screens.take_effect(), Effect::PreviewDrill { source: "t1".into(), frames: 25 });
-            for id in ["d-made", "d-old", "d-gone", "d-chain", "d-lost", "d-fake", ""] {
+            for id in ["d-made", "d-old", "d-gone", "d-chain", "d-lost", "d-fake", "d-bare", ""] {
                 focus(&mut screens, id);
                 if !id.is_empty() {
                     assert_eq!(screens.combo_lines(id).first().map(|line| line.text.as_str()), Some("Re-record to preview"));

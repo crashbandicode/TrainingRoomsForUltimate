@@ -69,8 +69,12 @@ mod tests {
         assert!(worker.contains("Effect::PreviewDrill { source, frames } => start_drill_preview(&source, frames)"), "the effect starts the preview");
         let start = body(worker, "fn start_drill_preview(");
         assert!(start.contains("replay_capture::capture_ready()"));
-        assert!(start.contains("rr_host::request_preview(source, crate::engine::library::Role::Player, 0, frames)"));
-        assert!(start.contains("PREVIEW_HIDES.store(true, Ordering::Release)"));
+        assert!(start.contains("|| !crate::engine::rr_host::request_drill_preview(source, frames)"));
+        assert!(!start.contains("rr_host::request_preview("));
+        let request = start.find("request_drill_preview(source, frames)").unwrap();
+        let stop = start[request..].find("return;").unwrap() + request;
+        let hide = start.find("PREVIEW_HIDES.store(true, Ordering::Release)").unwrap();
+        assert!(request < stop && stop < hide);
         let press = body(worker, "fn press(button: Button, s: &mut Session)");
         let hidden = press.find("if PREVIEW_HIDES.load(Ordering::Acquire)").expect("the hidden preview owns presses");
         assert!(hidden < press.find("menu.press_outcome(button)").expect("the menu press"));

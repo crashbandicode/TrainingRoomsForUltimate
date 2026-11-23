@@ -119,7 +119,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire)).ok().flatten()
+    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now()).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -374,6 +374,16 @@ pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
     PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
 
+/// F10: a drill's take previews on Player 1 (`request_preview`), unless Player 1 has a Play queued or running:
+/// that run is not replaced. True when the preview was asked for.
+pub fn request_drill_preview(source: &str, frames: u32) -> bool {
+    if player_playback_blocks_preview() {
+        return false;
+    }
+    request_preview(source, Role::Player, 0, frames);
+    true
+}
+
 pub fn request_clip_preview(recording: MacroRecording) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
@@ -448,6 +458,11 @@ fn role_playing(role: Role) -> bool {
 /// A queued Play, running Recording-page CPU macro, or its still-live buffered tail.
 pub fn cpu_playback_blocks_drill() -> bool {
     !RESET_CPU.load(Ordering::Acquire) && (PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu))
+}
+
+/// A queued Play, a running Recording-page run on Player 1, or its still-live buffered tail.
+pub fn player_playback_blocks_preview() -> bool {
+    PLAY_PLAYER.load(Ordering::Acquire) || role_playing(Role::Player)
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -3847,6 +3862,33 @@ mod tests {
         assert_eq!(fed, file.iter().map(|&b| Some(b)).collect::<Vec<_>>());
     }
 
+    fn x_during_a_play_on_player_one_starts_no_drill_preview() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-preview-play-busy");
+        let file = active_plain_macro(&root, Role::Player, 70);
+        let take = super::super::rr_runtime::save_drill_take(
+            &root, vec![InputFrame { buttons: 90, ..InputFrame::default() }],
+            StartState::neutral(8, 0, 1.0), false, 1,
+        ).unwrap().unwrap();
+        on_chords(false, true, false);
+        assert!(!request_drill_preview(&take, 1), "a queued Play also blocks the preview");
+        tick(&root);
+        tick(&root);
+        tick(&root);
+        assert!(RUN_PLAYER.load(Ordering::Acquire));
+        assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[0]));
+        assert!(!request_drill_preview(&take, 1));
+        assert!(!preview_running());
+        tick(&root);
+        assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[1]));
+        on_chords(false, true, false);
+        tick(&root);
+        assert!(!player_playback_blocks_preview());
+        assert!(request_drill_preview(&take, 1));
+        assert!(preview_running());
+    }
+
     /// The Play chord again stops the run: nothing buffered is fed after the stop.
     fn a_stopped_cpu_run_feeds_nothing_more() {
         let _hold = hold();
@@ -4040,7 +4082,7 @@ mod tests {
         let macros=Library::new(root.join(MACROS_DIR)); let entries=macros.list().unwrap().entries;
         assert_eq!(entries.len(),1, "the drill keeps its take");
         let take=macros.load(&entries[0].id).unwrap();
-        assert_eq!(take.name, "Drill take");
+        assert!(crate::model::combo_record::is_drill_take_name(&take.name));
         assert_eq!(take.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(),[1,0]);
         assert!(take.start_save.is_none());
         assert_eq!(file.take.as_deref(),Some(entries[0].id.as_str()));
@@ -5430,6 +5472,7 @@ mod tests {
             ("a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change",a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change as fn()),
             ("deleting_a_drill_deletes_its_take",deleting_a_drill_deletes_its_take as fn()),
             ("a_recorded_drills_take_previews_on_player_one_through_the_play_queue",a_recorded_drills_take_previews_on_player_one_through_the_play_queue as fn()),
+            ("x_during_a_play_on_player_one_starts_no_drill_preview",x_during_a_play_on_player_one_starts_no_drill_preview as fn()),
             ("make_preserves_an_open_record_prefix_and_physical_cstick",make_preserves_an_open_record_prefix_and_physical_cstick as fn()),
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),
