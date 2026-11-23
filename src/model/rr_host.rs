@@ -881,7 +881,22 @@ pub fn fed_frames(role: Role) -> u32 {
     if (fed >> 32) as u32 == generation { fed as u32 } else { 0 }
 }
 
-pub fn fed_run(role: Role) -> Option<(u32, u32)> { Some((0, fed_frames(role))) }
+fn mark_run(role: Role) {
+    let runs = &RUNS[role_index(role)];
+    runs.fetch_add(1, Ordering::AcqRel);
+    RUN_GEN[role_index(role)].store(role_frames(role).generation() as u32, Ordering::Release);
+    runs.fetch_add(1, Ordering::AcqRel);
+}
+
+/// The role's library run number (loads since boot) and the frames of that run its hook has taken, read together; `None` while a load stores.
+pub fn fed_run(role: Role) -> Option<(u32, u32)> {
+    let runs = &RUNS[role_index(role)];
+    (0..4).find_map(|_| {
+        let before = runs.load(Ordering::Acquire);
+        let frames = fed_frames(role);
+        (before & 1 == 0 && runs.load(Ordering::Acquire) == before).then_some((before >> 1, frames))
+    })
+}
 
 pub fn start_gated() -> bool {
     START_GATE.load(Ordering::Acquire)
@@ -1907,7 +1922,7 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
         drop_frames(role);
     }
     if effect.started {
-        RUN_GEN[role_index(role)].store(role_frames(role).generation() as u32, Ordering::Release);
+        mark_run(role);
     }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
     if let Some((speed, _)) = owed {
@@ -2252,7 +2267,7 @@ fn start_run(
     };
     if effect.started {
         drop_frames(role);
-        RUN_GEN[role_index(role)].store(role_frames(role).generation() as u32, Ordering::Release);
+        mark_run(role);
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
         step_role(root, machine, book, role);

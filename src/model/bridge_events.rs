@@ -81,12 +81,12 @@ pub struct Fed {
 }
 
 pub struct FedText {
-    bytes: [u8; 64],
+    bytes: [u8; 96],
     len: usize,
 }
 
 impl FedText {
-    pub const fn new() -> Self { Self { bytes: [0; 64], len: 0 } }
+    pub const fn new() -> Self { Self { bytes: [0; 96], len: 0 } }
     pub fn as_str(&self) -> &str { core::str::from_utf8(&self.bytes[..self.len]).unwrap_or("") }
 }
 
@@ -111,14 +111,14 @@ pub struct FedSeen {
 }
 
 impl FedSeen {
-    pub fn skip(&mut self) {}
+    pub fn skip(&mut self) { self.late = self.late.saturating_add(1); }
 
     pub fn sample(&mut self, now: Fed, mut send: impl FnMut(&str) -> i32) {
         if now != self.seen {
             self.seen = now;
             self.unsent = true;
         }
-        if !self.unsent { return; }
+        if !self.unsent { self.late = 0; return; }
         if self.late != 0 {
             let mut text = FedText::new();
             let _ = write!(text, "fed lost={}", self.late);
@@ -129,20 +129,21 @@ impl FedSeen {
             self.late = 0;
         }
         let mut text = FedText::new();
-        let _ = write!(text, "fed p1={} cpu={} preview={} hides={}", self.seen.p1, self.seen.cpu, u8::from(self.seen.preview), u8::from(self.seen.hides));
+        let _ = write!(text, "fed p1={} cpu={} run.p1={} run.cpu={} preview={} hides={}", self.seen.p1, self.seen.cpu, self.seen.run[0], self.seen.run[1], u8::from(self.seen.preview), u8::from(self.seen.hides));
         if send(text.as_str()) == 0 { self.unsent = false; } else { self.late = 1; }
     }
 
     pub fn words(self) -> [u64; 3] {
         [u64::from(self.seen.p1) << 32 | u64::from(self.seen.cpu),
-            u64::from(self.late) << 32 | u64::from(self.seen.preview) | u64::from(self.seen.hides) << 1 | u64::from(self.unsent) << 2, 0]
+            u64::from(self.seen.run[0]) << 32 | u64::from(self.seen.run[1]),
+            u64::from(self.late) << 32 | u64::from(self.seen.preview) | u64::from(self.seen.hides) << 1 | u64::from(self.unsent) << 2]
     }
 
     pub fn from_words(words: [u64; 3]) -> Self {
         Self {
-            seen: Fed { p1: (words[0] >> 32) as u32, cpu: words[0] as u32, run: [0, 0], preview: words[1] & 1 != 0, hides: words[1] & 2 != 0 },
-            unsent: words[1] & 4 != 0,
-            late: (words[1] >> 32) as u32,
+            seen: Fed { p1: (words[0] >> 32) as u32, cpu: words[0] as u32, run: [(words[1] >> 32) as u32, words[1] as u32], preview: words[2] & 1 != 0, hides: words[2] & 2 != 0 },
+            unsent: words[2] & 4 != 0,
+            late: (words[2] >> 32) as u32,
         }
     }
 }

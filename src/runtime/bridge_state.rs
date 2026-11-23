@@ -7,7 +7,7 @@
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
 
-use crate::engine::{library::Role, rr_host::fed_frames};
+use crate::engine::{library::Role, rr_host::fed_run};
 use crate::model::bridge_state as m;
 use crate::model::bridge_events::{Clip, ClipSeen, Event, Fed, FedSeen, Outbox};
 use crate::model::menu::table::{Control, Row};
@@ -212,7 +212,7 @@ static FOUND: AtomicBool = AtomicBool::new(false);
 static EVENTS: hos_lock::Mailbox<Event, 8> = hos_lock::Mailbox::new();
 static GAME_EVENT: AtomicUsize = AtomicUsize::new(0);
 static GAME_HANDLE: AtomicI32 = AtomicI32::new(0);
-static FED: [AtomicU64; 2] = [const { AtomicU64::new(0) }; 2];
+static FED: [AtomicU64; 3] = [const { AtomicU64::new(0) }; 3];
 
 pub fn note_fed() {
     if !FOUND.load(Ordering::Relaxed) { return; }
@@ -221,18 +221,21 @@ pub fn note_fed() {
     let handle = GAME_HANDLE.load(Ordering::Relaxed);
     // SAFETY: the bridge keeps this validated C-ABI export for the boot.
     let event: extern "C" fn(i32, *const u8, u32) -> i32 = unsafe { core::mem::transmute(address) };
-    let now = Fed {
-        p1: fed_frames(Role::Player), cpu: fed_frames(Role::Cpu),
-        preview: crate::engine::rr_host::preview_running(),
-        hides: crate::runtime::ui::state::PREVIEW_HIDES.load(Ordering::Acquire),
-    };
-    let before = FedSeen::from_words([FED[0].load(Ordering::Relaxed), FED[1].load(Ordering::Relaxed)]);
+    let before = FedSeen::from_words([FED[0].load(Ordering::Relaxed), FED[1].load(Ordering::Relaxed), FED[2].load(Ordering::Relaxed)]);
     let mut seen = before;
-    seen.sample(now, |text| event(handle, text.as_ptr(), text.len() as u32));
+    match (fed_run(Role::Player), fed_run(Role::Cpu)) {
+        (Some((run_p1, p1)), Some((run_cpu, cpu))) => seen.sample(Fed {
+            p1, cpu, run: [run_p1, run_cpu],
+            preview: crate::engine::rr_host::preview_running(),
+            hides: crate::runtime::ui::state::PREVIEW_HIDES.load(Ordering::Acquire),
+        }, |text| event(handle, text.as_ptr(), text.len() as u32)),
+        _ => seen.skip(),
+    }
     if seen != before {
         let words = seen.words();
         FED[0].store(words[0], Ordering::Relaxed);
         FED[1].store(words[1], Ordering::Relaxed);
+        FED[2].store(words[2], Ordering::Relaxed);
     }
 }
 
