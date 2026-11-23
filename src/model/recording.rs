@@ -376,8 +376,6 @@ pub struct ControlOut {
 /// The CPU facts the control stage needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ControlCtx {
-    /// The CPU's `lr` now (+1 or -1).
-    pub facing: i8,
     /// The CPU is Shulk and his Monado dial is open: no mirroring then.
     pub shulk_dial: bool,
 }
@@ -394,7 +392,6 @@ pub struct CpuRoleDrive {
     mode: Mode,
     possession: Possession,
     lockout: u16,
-    recorded_facing: i8,
     live: MappedInputs,
 }
 
@@ -411,7 +408,7 @@ const fn phase_of(mode: Mode, possession: Possession) -> Phase {
 
 impl CpuRoleDrive {
     pub const fn idle() -> Self {
-        Self { mode: Mode::None, possession: Possession::Player, lockout: 0, recorded_facing: 1, live: MappedInputs::NEUTRAL }
+        Self { mode: Mode::None, possession: Possession::Player, lockout: 0, live: MappedInputs::NEUTRAL }
     }
 
     pub const fn active(&self) -> bool {
@@ -427,20 +424,18 @@ impl CpuRoleDrive {
         self.possession
     }
 
-    /// The record chord. `facing` is the CPU's `lr` (+1 or -1).
-    pub fn begin(&mut self, facing: i8) {
+    /// The record chord.
+    pub fn begin(&mut self) {
         self.mode = Mode::Pause;
         self.possession = Possession::Lockout;
         self.lockout = LOCKOUT_FRAMES;
-        self.recorded_facing = if facing < 0 { -1 } else { 1 };
         self.live = MappedInputs::NEUTRAL;
     }
 
-    pub fn begin_placed(&mut self, facing: i8) {
+    pub fn begin_placed(&mut self) {
         self.mode = Mode::Record;
         self.possession = Possession::Cpu;
         self.lockout = 0;
-        self.recorded_facing = if facing < 0 { -1 } else { 1 };
         self.live = MappedInputs::NEUTRAL;
     }
 
@@ -477,7 +472,7 @@ impl CpuRoleDrive {
     }
 
     /// The CPU control frame after the AI wrote its controls.
-    pub fn control(&mut self, ctx: &ControlCtx) -> ControlOut {
+    pub fn control(&mut self) -> ControlOut {
         let mut out = ControlOut { write: None, hold_cliff_timer: false };
         match self.mode {
             Mode::Pause => {
@@ -489,10 +484,9 @@ impl CpuRoleDrive {
                 }
             }
             Mode::Record => {
-                let mirror = if ctx.shulk_dial { 1 } else { self.recorded_facing * ctx.facing };
                 if matches!(self.possession, Possession::Standby | Possession::Cpu) {
                     out.hold_cliff_timer = self.possession == Possession::Standby;
-                    out.write = Some(inject_values(self.live, mirror));
+                    out.write = Some(inject_values(self.live, 1));
                 }
             }
             Mode::None | Mode::Playback => {}
@@ -798,8 +792,8 @@ impl Recorder {
     }
 
     fn injected(&self, frame: MappedInputs, c: &ControlCtx) -> Inject {
-        // Record mirrors against the facing at the lockout, which is the CPU's own: 1.
-        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * c.facing };
+        // The playback mirror is fixed at start or restore, so a turn does not flip the rest.
+        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * self.current_facing };
         let frame = if self.buffer > 0 && self.buffer <= BUFFER_NEUTRAL_MAX { MappedInputs::NEUTRAL } else { frame };
         inject_values(frame, mirror)
     }

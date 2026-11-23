@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use model::input_delay::MappedInputs;
 use model::recording::*;
 
-const CTX: ControlCtx = ControlCtx { facing: 1, shulk_dial: false };
+const CTX: ControlCtx = ControlCtx { shulk_dial: false };
 const POST: PostCtx = PostCtx { facing: 1, queue_head_is_playback: false };
 
 /// The layer's buffer, as `named_macros` keeps it.
@@ -52,6 +52,22 @@ fn a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy() 
     assert_eq!(Recorder::new().start_named_playback(NAMED_FRAMES + 1, 1, 0, 1), Err(PlayRefusal::NothingLoaded));
 }
 
+fn f4_named_playback_keeps_start_facing_until_the_restore_updates_it() {
+    let mut r = Recorder::new();
+    let layer = Layer::default();
+    for i in 0..4 {
+        layer.store(i, MappedInputs { lstick_x: 80, ..MappedInputs::NEUTRAL });
+    }
+    r.start_named_playback(4, -1, 0, -1).unwrap();
+    for _ in 0..2 {
+        let write = r.control_named(&ControlCtx { shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+    r.set_current_facing(1);
+    let write = r.control_named(&ControlCtx { shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+    assert_eq!(write.stick_x, -80.0 / 120.0);
+}
+
 #[test]
 fn restored_named_playback_finishes_while_drill_is_selected() {
     use model::edge_juggle::drill_owns_pad;
@@ -72,5 +88,6 @@ fn restored_named_playback_finishes_while_drill_is_selected() {
 fn case_table() {
     crate::test_table::run(&[
         ("a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy", a_named_playback_is_mirrored_by_the_recorded_facing_and_refused_while_busy as fn()),
+        ("f4_named_playback_keeps_start_facing_until_the_restore_updates_it", f4_named_playback_keeps_start_facing_until_the_restore_updates_it as fn()),
     ]);
 }

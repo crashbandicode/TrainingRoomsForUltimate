@@ -17,7 +17,7 @@ fn stick(x: i8, y: i8) -> MappedInputs {
     MappedInputs { lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL }
 }
 
-const CTX: ControlCtx = ControlCtx { facing: 1, shulk_dial: false };
+const CTX: ControlCtx = ControlCtx { shulk_dial: false };
 const POST: PostCtx = PostCtx { facing: 1, queue_head_is_playback: false };
 
 /// One game frame: the CPU control frame, then the post-frame stage.
@@ -134,16 +134,76 @@ fn mirror_multiplier_and_shulk_dial() {
     let mut r = Recorder::new();
     filled(&mut r, 0, &take(&[stick(100, 0)]), 1);
     r.start_playback(0, -1).unwrap();
-    let left = r.control(&ControlCtx { facing: -1, shulk_dial: false }).write.unwrap();
+    let left = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
     assert!(left.stick_x < 0.0, "mirrored");
     r.start_playback(0, -1).unwrap();
-    let dial = r.control(&ControlCtx { facing: -1, shulk_dial: true }).write.unwrap();
+    let dial = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
     assert!(dial.stick_x > 0.0, "Shulk's dial: never mirrored");
     // Recorded facing left, the CPU faces left again: no mirroring.
     filled(&mut r, 1, &take(&[stick(100, 0)]), -1);
     r.start_playback(1, -1).unwrap();
-    assert!(r.control(&ControlCtx { facing: -1, shulk_dial: false }).write.unwrap().stick_x > 0.0);
+    assert!(r.control(&ControlCtx { shulk_dial: false }).write.unwrap().stick_x > 0.0);
     assert_eq!(r.starting_status_of(1), UNRESOLVED);
+}
+
+#[test]
+fn f4_playback_same_start_facing_survives_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, -1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_opposite_start_facing_stays_mirrored_after_a_turn() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        assert_eq!(write.stick_x, -80.0 / 120.0);
+    }
+}
+
+#[test]
+fn f4_playback_turns_only_when_the_recorded_direction_changes() {
+    let mut r = Recorder::new();
+    let frames: Vec<_> = [-80, 80, -80, 80].into_iter().flat_map(|x| [stick(x, 0); 60]).collect();
+    filled(&mut r, 0, &frames, -1);
+    r.start_playback(0, -1).unwrap();
+    let mut facing = -1;
+    let mut turns = 0;
+    let mut mismatches = 0;
+    for hold in [-80i8, 80, -80, 80] {
+        for _ in 0..60 {
+            let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+            if write.stick_x != f32::from(hold) / 120.0 {
+                mismatches += 1;
+            }
+            let next = if write.stick_x > 0.0 { 1 } else { -1 };
+            if next != facing {
+                facing = next;
+                turns += 1;
+            }
+        }
+    }
+    assert_eq!(turns, 3);
+    assert_eq!(mismatches, 0);
+    assert_eq!(r.frame(), 240);
+}
+
+#[test]
+fn f4_playback_shulk_dial_uses_the_recorded_sign() {
+    let mut r = Recorder::new();
+    filled(&mut r, 0, &[stick(80, 0); 3], -1);
+    r.start_playback(0, 1).unwrap();
+    for _ in 0..3 {
+        let write = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
+        assert_eq!(write.stick_x, 80.0 / 120.0);
+    }
 }
 
 #[test]
