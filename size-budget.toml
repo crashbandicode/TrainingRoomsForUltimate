@@ -2453,3 +2453,11 @@ ceiling = 196349
 date = "2026-11-23"
 reason = "Recording placement lets players set both fighters' positions, damage and requested start states in Training and waiting rooms. It starts Record or Play after both requested onsets, verifies the chosen missed-tech bound motion and publishes the live samples. Measured 196349, 2211 above 194138."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording placement design and requested onset ruling 2026-11-23 03:50:00Z. Source and exact build passed rv-hit-streak 05:14:23Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196422
+date = "2026-11-23"
+reason = "F9: backing out of a new chain opens no keyboard and no hidden name draft holds the fighters. Measured 196422, 73 above the 196349 ceiling."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z under the operator's measured LOC rule."
