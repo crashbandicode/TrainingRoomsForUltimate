@@ -1894,6 +1894,12 @@ Grids are unchanged. The Recording page's footer names ZL + Up / Down as the way
 The Recording-page rule was the edge-juggle-sol lane's default (posted 12:53:06Z); tr-primary-2 approved it the same
 day (ruling of about 12:55Z). The operator may still overrule it.
 
+## F15 (2026-11-23): the room's partner type after a drill
+
+After a drill that used its own CPU fighter the room's partner kept the stock CPU type instead of the room's Training
+Partner Behavior. The saved type now follows the fighter swap and goes back to the fighter in the slot at the drill's
+end.
+
 ## Recording chain back-out (2026-11-23)
 
 B in the chain picker was "done": on a new chain or sequence it opened the name keyboard, and cancelling that keyboard
