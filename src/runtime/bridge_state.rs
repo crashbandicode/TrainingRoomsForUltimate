@@ -1,14 +1,15 @@
 //! The optional test bridge's state provider (`model::bridge_state`, ssbu-hw-bridge docs/PLUGIN-STATE.md v2.1).
 //! TrainingRooms has no link-time dependency on the bridge: the UI worker looks its table up by name at most once a second
 //! for the first 30 s (`nn::ro::LookupSymbol`), validates it before any call, registers once and keeps that handle for the
-//! boot. Without the bridge the lookups stop at 30 s and every entry point is one relaxed load. Publishing happens on the
+//! boot. Without the bridge the lookups stop at 30 s and every entry point is one relaxed load. Snapshot publishing happens on the
 //! worker only. Game-side notice, zone and practice producers use bounded, nonblocking handoffs.
 
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicUsize, Ordering};
 
+use crate::engine::{library::Role, rr_host::fed_run};
 use crate::model::bridge_state as m;
-use crate::model::bridge_events::{Clip, ClipSeen, Event, Outbox};
+use crate::model::bridge_events::{Clip, ClipSeen, Event, Fed, FedSeen, Outbox};
 use crate::model::menu::table::{Control, Row};
 use crate::model::practice_games::Game;
 use crate::model::practice_state::{self as practice, Fields};
@@ -209,6 +210,34 @@ impl PracticeProvider {
 static ENABLED: AtomicBool = AtomicBool::new(true);
 static FOUND: AtomicBool = AtomicBool::new(false);
 static EVENTS: hos_lock::Mailbox<Event, 8> = hos_lock::Mailbox::new();
+static GAME_EVENT: AtomicUsize = AtomicUsize::new(0);
+static GAME_HANDLE: AtomicI32 = AtomicI32::new(0);
+static FED: [AtomicU64; 3] = [const { AtomicU64::new(0) }; 3];
+
+pub fn note_fed() {
+    if !FOUND.load(Ordering::Relaxed) { return; }
+    let address = GAME_EVENT.load(Ordering::Acquire);
+    if address == 0 { return; }
+    let handle = GAME_HANDLE.load(Ordering::Relaxed);
+    // SAFETY: the bridge keeps this validated C-ABI export for the boot.
+    let event: extern "C" fn(i32, *const u8, u32) -> i32 = unsafe { core::mem::transmute(address) };
+    let before = FedSeen::from_words([FED[0].load(Ordering::Relaxed), FED[1].load(Ordering::Relaxed), FED[2].load(Ordering::Relaxed)]);
+    let mut seen = before;
+    match (fed_run(Role::Player), fed_run(Role::Cpu)) {
+        (Some((run_p1, p1)), Some((run_cpu, cpu))) => seen.sample(Fed {
+            p1, cpu, run: [run_p1, run_cpu],
+            preview: crate::engine::rr_host::preview_running(),
+            hides: crate::runtime::ui::state::PREVIEW_HIDES.load(Ordering::Acquire),
+        }, |text| event(handle, text.as_ptr(), text.len() as u32)),
+        _ => seen.skip(),
+    }
+    if seen != before {
+        let words = seen.words();
+        FED[0].store(words[0], Ordering::Relaxed);
+        FED[1].store(words[1], Ordering::Relaxed);
+        FED[2].store(words[2], Ordering::Relaxed);
+    }
+}
 
 pub fn note_event(event: Event) {
     if FOUND.load(Ordering::Relaxed) {
@@ -416,6 +445,8 @@ impl Provider {
 
     fn events(&mut self, api: &Api, handle: i32, now_ms: u64) {
         let Some(event) = api.event else { return };
+        GAME_HANDLE.store(handle, Ordering::Relaxed);
+        GAME_EVENT.store(event as usize, Ordering::Release);
         EVENTS.drain(|value| self.events.accept(value, now_ms));
         self.events.lost(EVENTS.take_dropped());
         let send = |text: &str| event(handle, text.as_ptr(), text.len() as u32);

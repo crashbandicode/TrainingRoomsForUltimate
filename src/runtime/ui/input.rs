@@ -52,6 +52,7 @@ pub fn reset_session() {
 pub fn on_p1_poll(holder: usize) {
     // Attribution (lead, 2026-11-02): the menu's own allocations inside the P1 hook are charged here.
     let _scope = crate::runtime::alloc::HookScope::enter_hook(crate::runtime::alloc::HookId::MenuInput);
+    crate::runtime::bridge_state::note_fed();
     // SAFETY: `holder` is the controller-holder argument of the game's call; the reads are the record's
     // own fields, guarded against null and misalignment.
     let Some((buttons, style)) = (unsafe { read_record(holder) }) else { return };

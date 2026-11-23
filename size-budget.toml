@@ -2577,7 +2577,23 @@ approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both pa
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 197019
+date = "2026-11-23"
+reason = "The fed line: delivered-frame counts and run loads pushed from Player 1's poll, with the load counter in rr_host.rs. Measured 196714 on install 2 82716623, which alone measures 196550, so it adds 164. Install 2 d46648eb measures 196855 and shares no counted file with it: 196855 + 164 = 197019."
+approved_by = "tr-primary-2's rulings of 2026-11-23 21:50:54Z and 22:00:25Z (fed line) and 22:59:46Z (load counter), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 196873
 date = "2026-11-23"
 reason = "F11 swap-back: Guard the Edge or Juggler with its own CPU fighter, left from the picker with B, asked for the original fighter before the picker had put the held body back, so the original came back at the picked start and could be KO’d. The practice CPU service now waits until the picker has let go and its menu request was taken. Measured 196873 on install 2 d46648eb plus the fix, 18 above 196855."
 approved_by = "tr-primary-2 ruling 2026-11-23 21:46:22Z (build fix/f11-swap-back, target install 2), under the operator’s measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197037
+date = "2026-11-23"
+reason = "Install 2, integration total after merging the fed line beside the F11 swap-back: 196873 (F11 swap-back entry, measured on d46648eb with it) + 164 (fed line, entry above, measured on 82716623 and on d46648eb) = 197037 measured on the merged tree, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and the fed line reviewed READY (rv-preview-vis PASS 23:20:45Z, rv-fusion-g2-3 PASS 23:20:53Z, rv-integration PASS 23:30:39Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
