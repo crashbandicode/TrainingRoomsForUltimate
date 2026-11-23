@@ -416,7 +416,6 @@ pub struct PlaybackStart {
     pub facing: f32,
     pub status: i32,
     pub len: usize,
-    pub generation: u32,
 }
 
 fn notify(message: &str) {
@@ -848,7 +847,7 @@ pub fn begin_playback() -> Option<PlaybackStart> {
     PLAY_GENERATION.store(q.playback_generation, Ordering::Release);
     PLAYING.store(1, Ordering::Release);
     let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,
-        len: q.playback_len as usize, generation: q.playback_generation };
+        len: q.playback_len as usize };
     trace_begin(info.len);
     Some(info)
 }

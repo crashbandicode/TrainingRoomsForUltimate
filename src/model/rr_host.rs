@@ -287,7 +287,11 @@ enum PreviewAsk {
 pub const CLIP_ID: &str = "*clip";
 static PREVIEW_CLIP: Mutex<Option<MacroRecording>> = Mutex::new(None);
 static PREVIEW_AWAY: AtomicU8 = AtomicU8::new(0);
-static PREVIEW_REFUSAL: hos_lock::Mutex<Option<&'static str>> = hos_lock::Mutex::new(None);
+/// Why the game could not start a clip preview (`preview_refused`). One game-thread writer (the frame that took the
+/// ask), one recording-worker reader; neither waits.
+static PREVIEW_REFUSALS: hos_lock::TripleBuffer<(u32, &'static str)> = hos_lock::TripleBuffer::new((0, ""));
+static REFUSAL_SEQ: AtomicU32 = AtomicU32::new(0);
+static REFUSAL_SEEN: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeWarp {
@@ -363,7 +367,8 @@ pub fn drop_preview_home() { PREVIEW_AWAY.store(0, Ordering::Release); }
 
 /// The game could not keep or load the home pair for a starting clip preview: the preview does not play. Game thread.
 pub fn preview_refused(text: &'static str) {
-    *PREVIEW_REFUSAL.lock() = Some(text);
+    let seq = REFUSAL_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
+    PREVIEW_REFUSALS.write((seq, text));
     abort_warp();
 }
 
@@ -402,7 +407,7 @@ pub fn pending() -> bool {
 /// gate (`pending`) and the tick (`service_at`) read the same list; an answered question that `pending` left out was never
 /// applied once migration had finished, so the held play never resumed (rc.5 Fighter Mismatch).
 fn waiting_work() -> bool {
-    previewing() || PREVIEW_REFUSAL.lock().is_some()
+    previewing() || REFUSAL_SEQ.load(Ordering::Acquire) != REFUSAL_SEEN.load(Ordering::Acquire)
         || lock(&DRILL_ASK).is_some() || lock(&MAKE).is_some() || lock(&ANSWER).is_some()
 }
 
@@ -2012,7 +2017,8 @@ fn start_run(
 }
 
 fn take_preview_refusal(tick: &mut Tick) {
-    if let Some(text) = PREVIEW_REFUSAL.lock().take() {
+    let (seq, text) = PREVIEW_REFUSALS.read().0;
+    if REFUSAL_SEEN.swap(seq, Ordering::AcqRel) != seq {
         tick.notices.push(text);
         PREVIEW_AWAY.store(0, Ordering::Release);
         PREVIEW.store(0, Ordering::Release);
@@ -2273,7 +2279,7 @@ fn reset_host() {
     PREVIEW.store(0, Ordering::Release);
     *lock(&PREVIEW_ASK) = None;
     PREVIEW_AWAY.store(0, Ordering::Release);
-    *PREVIEW_REFUSAL.lock() = None;
+    REFUSAL_SEEN.store(REFUSAL_SEQ.load(Ordering::Acquire), Ordering::Release);
     *lock(&PREVIEW_CLIP) = None;
     *lock(&STRIP) = (0, None);
     *lock(&MAKE) = None;
@@ -2595,6 +2601,16 @@ mod tests {
         assert!(tick.notices.contains(&text));
         assert!(take_cpu_frame().is_none());
         assert!(!previewing() && !pending());
+
+        let second = "Second notice";
+        preview_refused(second);
+        assert!(pending());
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(tick.notices.contains(&second));
+        assert!(take_cpu_frame().is_none());
+        assert!(!previewing() && !pending());
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(tick.notices.is_empty());
 
         reset_host();
         let root = scratch("vault-preview-refused-bad-index");

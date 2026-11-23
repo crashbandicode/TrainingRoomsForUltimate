@@ -25,12 +25,8 @@ pub fn try_context() -> Result<Option<Context>, crate::runtime::compat::menu::Me
         mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))
 }
 
-pub fn scene_enabled() -> bool { context().is_some() }
 pub fn enabled() -> bool {
     enabled_in(context())
-}
-pub fn try_enabled() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
-    Ok(enabled_in(try_context()?))
 }
 fn enabled_in(current_context: Option<Context>) -> bool {
     current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()

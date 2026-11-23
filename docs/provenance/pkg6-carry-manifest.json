@@ -29011,7 +29011,7 @@
       "dest": "src/runtime/lobby/training/practice.rs",
       "crate": "root",
       "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-      "dest_sha256": "8fcb0f790b870492559d7ccecb34131dee40e75f992187d8c13e117f3965f0a5",
+      "dest_sha256": "9ec42e7d4772de97e51123f18505f3d0756d126765715387e334fccb5aae424a",
       "edits": [
         {
           "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -29107,6 +29107,11 @@
           "old": "pub fn owned() -> bool { OWNED.lock().active() }\n\n/// Invoked before consumer callbacks and before native entry destruction.\npub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::runtime::compat::replay_preview::occupied() || super::recording_or_playback() {\n        super::clear_session_state();\n    }\n}\n\n/// Once per game frame, from the P1 body's frame callback: retire a lease whose\n",
           "new": "pub fn owned() -> bool { OWNED.lock().active() }\n\n/// Invoked before consumer callbacks and before native entry destruction.\npub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {\n        super::clear_session_state();\n    }\n}\n\n/// Once per game frame, from the P1 body's frame callback: retire a lease whose\n",
           "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+        },
+        {
+          "old": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn scene_enabled() -> bool { context().is_some() }\npub fn enabled() -> bool {\n    enabled_in(context())\n}\npub fn try_enabled() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(enabled_in(try_context()?))\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
+          "new": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn enabled() -> bool {\n    enabled_in(context())\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
+          "reason": "F7: remove unused runtime entry points and fields after preview unification."
         }
       ]
     },

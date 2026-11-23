@@ -2358,7 +2358,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "1e5461a8e5fab5b96b351944c99e6c989c9d0b0f3c923634926a3c48f039df63",
+   "dest_sha256": "e46a9bf09fe358519d1cb42689d15dc98fc8780eb05957bdadbb093d48a543d2",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3209,6 +3209,16 @@
      "old": "    facing: f32,\n    air: Option<bool>,\n}\n\nstatic PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\nstatic PREVIEW_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\n// 0 idle, 1 named, 2 transient preview. Only game callbacks change this.\nstatic PLAYING: AtomicU8 = AtomicU8::new(0);\nstatic PLAY_GENERATION: AtomicU32 = AtomicU32::new(0);\nstatic PREPARED_REVISION: AtomicU64 = AtomicU64::new(u64::MAX);\nstatic RESTORE_ANCHOR: RwLock<Option<(u64, f32, f32)>> = RwLock::new(None);\nstatic RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();\n",
      "new": "    facing: f32,\n    air: Option<bool>,\n}\n\nstatic PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();\n// 0 idle, 1 named. Only game callbacks change this.\nstatic PLAYING: AtomicU8 = AtomicU8::new(0);\nstatic PLAY_GENERATION: AtomicU32 = AtomicU32::new(0);\nstatic PREPARED_REVISION: AtomicU64 = AtomicU64::new(u64::MAX);\nstatic RESTORE_ANCHOR: RwLock<Option<(u64, f32, f32)>> = RwLock::new(None);\nstatic RESTORE_ANCHORS: hos_lock::Mailbox<(u64, f32, f32), 8> = hos_lock::Mailbox::new();\n",
      "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+    },
+    {
+     "old": "    let q = hook_queries();\n    if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }\n    PLAY_GENERATION.store(q.playback_generation, Ordering::Release);\n    PLAYING.store(1, Ordering::Release);\n    let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,\n        len: q.playback_len as usize, generation: q.playback_generation };\n    trace_begin(info.len);\n    Some(info)\n}\n\nfn trace_begin(_len: usize) {\n",
+     "new": "    let q = hook_queries();\n    if !q.playback_allowed || q.playback_len == 0 || PLAY_FRAMES.generation() != q.playback_generation { return None; }\n    PLAY_GENERATION.store(q.playback_generation, Ordering::Release);\n    PLAYING.store(1, Ordering::Release);\n    let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,\n        len: q.playback_len as usize };\n    trace_begin(info.len);\n    Some(info)\n}\n\nfn trace_begin(_len: usize) {\n",
+     "reason": "F7: remove unused runtime entry points and fields after preview unification."
+    },
+    {
+     "old": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n    pub generation: u32,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
+     "new": "#[derive(Clone, Copy)]\npub struct PlaybackStart {\n    pub facing: f32,\n    pub status: i32,\n    pub len: usize,\n}\n\nfn notify(message: &str) {\n    // R5: the queue copies the text into its fixed slot (no heap); the fork's Cow::Owned(to_owned) allocated once per notice in a hook.\n    upsert(\"Named Macro\", message, 180);\n",
+     "reason": "F7: remove unused runtime entry points and fields after preview unification."
     }
    ]
   },

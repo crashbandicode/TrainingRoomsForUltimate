@@ -81,10 +81,6 @@ pub(crate) mod input_record {
         recorder::stop();
     }
 
-    pub(crate) fn is_playback() -> bool {
-        recorder::is_playback()
-    }
-
     /// The loaded named recording plays (playback_named): false when nothing is loaded or the fighter is not ready.
     pub(crate) fn playback_named() -> bool {
         match crate::runtime::macros::named_macros::begin_playback() {
