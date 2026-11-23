@@ -345,9 +345,11 @@ pub(super) fn cpu_selection() -> Option<u32> {
     OPPONENT.read().fighter
 }
 
-/// A picker still holds the CPU's body at its picked start (`Engine::preview`). A busy engine reads as held.
-fn holds_preview() -> bool {
-    ENGINE.try_lock().is_none_or(|engine| engine.preview.is_some())
+/// A left picker has not let go of the CPU yet. Its menu request is still to be taken: the menu opens on Player 1's
+/// next poll, and the roster drops a request it finds waiting under an open menu, with a notice. Or the engine still
+/// holds the body at its picked start (`Engine::preview`); a busy engine reads as held.
+fn leaving_picker() -> bool {
+    BACK.load(Ordering::Acquire) || ENGINE.try_lock().is_none_or(|engine| engine.preview.is_some())
 }
 
 pub unsafe fn controls_cpu(accessor: usize) -> bool {
