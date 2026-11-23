@@ -849,9 +849,6 @@ impl Recorder {
     /// Upstream's side-special placeholder is not enabled for every fighter that can act: Greninja answers
     /// no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23).
     pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
-        if status == UNRESOLVED {
-            return None;
-        }
         if t.is(C::StatusAttackAir, status) {
             Some(C::TermContAttackAir)
         } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {

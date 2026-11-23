@@ -10,7 +10,7 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 | Question | Decision | Where |
 | --- | --- | --- |
 | SPEC-input-01 question 2 (stick scale) | one scale, 1/120, clamped to +/-1; clamped fields drop values below 0.2 | `recording::inject_values`, `injected_stick_values` |
-| SPEC-input-01 question 3 (transition-term ranges) | inclusive at both ends; the original `CONT_SPECIAL_S` fallback was superseded by the actionable check for other starts in F8 | `Recorder::term_for_status`, `starting_status_to_term`, `other_status_has_no_specific_transition_term` |
+| SPEC-input-01 question 3 (transition-term ranges) | inclusive at both ends; mapped statuses use their term, and other starts wait until the fighter can act (`cpu::actionable`). The side-special term is not enabled for every fighter that can act: Greninja answers no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23). | `Recorder::term_for_status`, `starting_status_to_term`, `other_status_has_no_specific_transition_term` |
 | SPEC-input-01 question 4 (Recording Slot re-read every frame) | latch the slot and the duration at the lockout | `Recorder::start_recording` |
 | End check and tint | run in the AI control hook, directly after the injection (same game frame as the on-frame wrapper) | `runtime/features/recorder.rs` |
 | Replay capture default | the INI is the file of record; absent means off | `model::capture_settings`, menu `Env::default` |
