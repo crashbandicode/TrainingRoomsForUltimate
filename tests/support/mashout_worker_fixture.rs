@@ -46,7 +46,12 @@ mod runtime {
                     return;
                 }
                 if let Some(fields) = sample() {
-                    crate::RESULTS.lock().unwrap().push((self.activation, fields));
+                    let mut queue = crate::RESULTS.lock().unwrap();
+                    if queue.len() < crate::model::practice_state::SAMPLE_SLOTS {
+                        queue.push((self.activation, fields, true));
+                    } else {
+                        crate::REFUSED.fetch_add(1, Ordering::Relaxed);
+                    }
                 }
             }
         }
@@ -73,7 +78,8 @@ static SWITCH_AFTER_DRAIN: AtomicU64 = AtomicU64::new(0);
 static ACTIVATION: AtomicU64 = AtomicU64::new(0);
 static OWNER_GENERATION: AtomicU64 = AtomicU64::new(0);
 static OWNER_ACTIVATION: AtomicU64 = AtomicU64::new(0);
-static RESULTS: std::sync::Mutex<Vec<(u64, model::practice_state::Fields)>> = std::sync::Mutex::new(Vec::new());
+static REFUSED: AtomicU64 = AtomicU64::new(0);
+static RESULTS: std::sync::Mutex<Vec<(u64, model::practice_state::Fields, bool)>> = std::sync::Mutex::new(Vec::new());
 #[allow(dead_code)]
 fn result_owner() -> Option<(u64, u64)> {
     let generation = OWNER_GENERATION.load(Ordering::Acquire);
@@ -163,6 +169,7 @@ mod worker {
             SWITCH_AFTER_DRAIN.store(0, Ordering::Relaxed);
             ACTIVATION.store(0, Ordering::Relaxed);
             own_result(0, 0);
+            REFUSED.store(0, Ordering::Relaxed);
             RESULTS.lock().unwrap().clear();
             EVENTS.0.lock().unwrap().clear();
             REPLIES.0.lock().unwrap().clear();
@@ -215,6 +222,61 @@ mod worker {
             queue(Event::Observe(5, epoch, bounds.fastest, true));
             service();
             assert_eq!(WORKER.lock().session.phase(), Phase::Done);
+        }
+        fn drain(overlay: &mut crate::model::practice_state::Fields) -> usize {
+            let mut results = 0;
+            for (activation, fields, is_result) in std::mem::take(&mut *RESULTS.lock().unwrap()) {
+                if is_result && activation == ACTIVATION.load(Ordering::Acquire) {
+                    *overlay = fields;
+                    results += 1;
+                }
+            }
+            results
+        }
+        #[test]
+        fn a_grade_refused_by_a_full_box_is_posted_again() {
+            use crate::model::practice_state::{Fields, SAMPLE_SLOTS};
+            use crate::model::tech::session::Grade;
+            reset();
+            ACTIVATION.store(1, Ordering::Release);
+            own_result(5, 1);
+            queue(Event::Setup(5, "Mash out · Setting up"));
+            service();
+
+            let mut overlay = Fields::default();
+            queue(Event::TechGrade(5, Grade::Perfect(Some(2)), None, 3));
+            service();
+            assert_eq!(drain(&mut overlay), 1);
+            assert_eq!((overlay.last_outcome, overlay.best), ("perfect", Some(3)));
+
+            queue(Event::TechGrade(5, Grade::Missed, None, 4));
+            service();
+            assert_eq!(drain(&mut overlay), 1, "a grade with room arrives on the first tick");
+            assert_eq!((overlay.last_outcome, overlay.best), ("missed", Some(4)));
+
+            queue(Event::TechGrade(5, Grade::Perfect(Some(2)), None, 3));
+            service();
+            assert_eq!(drain(&mut overlay), 1);
+            assert_eq!(overlay.last_outcome, "perfect");
+            {
+                let mut mailbox = RESULTS.lock().unwrap();
+                for _ in 0..SAMPLE_SLOTS {
+                    mailbox.push((1, Fields { phase: "result", ..Fields::default() }, false));
+                }
+            }
+            queue(Event::TechGrade(5, Grade::Missed, None, 4));
+            service();
+            assert_eq!(REFUSED.load(Ordering::Relaxed), 1);
+            assert_eq!(drain(&mut overlay), 0);
+            assert_eq!(overlay.last_outcome, "perfect");
+            service();
+            assert_eq!(drain(&mut overlay), 1, "the refused grade is posted on the next tick");
+            assert_eq!((overlay.last_outcome, overlay.best), ("missed", Some(4)));
+
+            own_result(6, 1);
+            queue(Event::Setup(6, "Mash out · Setting up"));
+            service();
+            assert_eq!(drain(&mut overlay), 0, "the previous generation must not be reposted");
         }
         #[test]
         fn a_new_activation_does_not_inherit_the_previous_done_grade() {

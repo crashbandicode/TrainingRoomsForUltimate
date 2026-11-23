@@ -290,7 +290,7 @@ fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
 
 #[test]
 fn actual_runtime_worker_native_epoch_admission_and_bests() {
-    run_worker_fixture("worker", false);
+    run_worker_fixture("worker", None);
 }
 
 #[test]
@@ -302,10 +302,15 @@ fn a_new_activation_does_not_inherit_the_previous_done_grade() {
     for site in sites {
         assert!(runtime[site..].trim_start().starts_with("own_result(game.generation);"));
     }
-    run_worker_fixture("worker-practice", true);
+    run_worker_fixture("worker-practice", Some("worker::epoch_tests::a_new_activation_does_not_inherit_the_previous_done_grade"));
 }
 
-fn run_worker_fixture(label: &str, practice_only: bool) {
+#[test]
+fn a_grade_refused_by_a_full_box_is_posted_again() {
+    run_worker_fixture("worker-refused", Some("worker::epoch_tests::a_grade_refused_by_a_full_box_is_posted_again"));
+}
+
+fn run_worker_fixture(label: &str, only: Option<&str>) {
     let runtime = include_str!("../src/runtime/features/mashout.rs");
     let run = include_str!("../src/model/mashout/run.rs");
     let practice = include_str!("../src/model/practice_games.rs");
@@ -392,7 +397,8 @@ fn run_worker_fixture(label: &str, practice_only: bool) {
         fixture = fixture.replace(&format!("{marker}\n"), &format!("{source}\n"));
     }
     let practice = "worker::epoch_tests::a_new_activation_does_not_inherit_the_previous_done_grade";
-    let args = if practice_only { ["--exact", practice] } else { ["--skip", practice] };
+    let refused = "worker::epoch_tests::a_grade_refused_by_a_full_box_is_posted_again";
+    let args = if let Some(test) = only { vec!["--exact", test] } else { vec!["--skip", practice, "--skip", refused] };
     run_fixture_with_args(fixture, label, &args);
 }
 

@@ -351,6 +351,18 @@ fn practice_sample_projection_is_gated_and_stale_posts_are_dropped() {
 }
 
 #[test]
+fn the_row_121_grade_is_held_by_the_worker_and_reposted() {
+    let worker = src("src/runtime/features/mashout/worker.rs");
+    let arm = &worker[worker.find("Event::TechGrade(generation, grade, kind, best) => {").unwrap()..];
+    let arm = &arm[..arm.find("Event::Cancel(").unwrap()];
+    assert!(arm.contains("worker.tech_grade = Some((generation, grade, best));"));
+    assert!(!arm.contains(".result("));
+    let tail = &worker[worker.find("worker.session.finish();").unwrap()..];
+    let held = tail.find("Some((generation, grade, best)) if generation == worker.generation =>").unwrap();
+    assert!(held < tail.find("owned(generation).result(").unwrap());
+}
+
+#[test]
 fn a_pending_drill_start_does_not_publish_the_previous_run() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
