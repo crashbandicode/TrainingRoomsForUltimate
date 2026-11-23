@@ -207,39 +207,12 @@ def through(ctx, ident="6", scene="training", cpu=(-100, -20), player=(-40, 0), 
             "still": str(ctx.shot(f"{name}-ready"))}
         if body["ready"]["practice"].get("wizard.cpu"):
             problems.append(f"a running drill still reports wizard.cpu: {body['ready']['practice']}")
-        _save(ctx, name, body)  # the observations are kept before the tail that puts the game back
-        body["tail"] = _stop_and_close(ctx, scene, ident)
+        # The observations are kept before the tail that puts the game back. Stop and the close run once: a failure
+        # of either in a one-Eden boot is a finding (tr-primary-2, 2026-11-23 19:26:28Z), not something to retry.
+        _save(ctx, name, body)
+        edge._stop(ctx, scene, ident)
+        edge._close(ctx, scene)
     return _finish(ctx, name, body, problems)
-
-
-def _stop_and_close(ctx, scene, ident):
-    """Stop the running drill and close the menu. In f11-probe-1 each failed once with a second Eden on the host
-    (a Stop press without effect during a presentation stall; a close on an inactive ssbu.ui read), so each gets one
-    more try, and the tries are recorded."""
-    tail = {"stop_tries": 0, "close_tries": 0}
-    for attempt in (1, 2):
-        tail["stop_tries"] = attempt
-        try:
-            edge._stop(ctx, scene, ident)
-            break
-        except RuntimeError as error:
-            tail[f"stop_error_{attempt}"] = repr(error)[:240]
-            if attempt == 2:
-                raise
-            time.sleep(3.0)
-    for attempt in (1, 2):
-        tail["close_tries"] = attempt
-        try:
-            edge._close(ctx, scene)
-            break
-        except RuntimeError as error:
-            tail[f"close_error_{attempt}"] = repr(error)[:240]
-            if edge._read(ctx, scene)["values"].get("open") == "0":
-                break
-            if attempt == 2:
-                raise
-            time.sleep(3.0)
-    return tail
 
 
 def fullscreen(ctx):
