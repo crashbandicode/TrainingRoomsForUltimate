@@ -2493,3 +2493,11 @@ ceiling = 196638
 date = "2026-11-23"
 reason = "F12: the roster picker's popup no longer leaves its box on the CONNECTIONS divider pane; the divider has one writer. Measured 196638, 29 above 196609."
 approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-2 (item F12), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196713
+date = "2026-11-23"
+reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196713 on the install 2 head dd6aa1de (F8, F12, F15) it is committed on, with no spare; on 152629cd alone it measured 196673, 353 above that head's 196320."
+approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."

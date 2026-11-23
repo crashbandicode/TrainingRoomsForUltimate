@@ -5,7 +5,7 @@
 
 use core::fmt::Write as _;
 
-use super::frame_strip::{Cell, Link, Tracker, Verdict, WINDOW};
+use super::frame_strip::{Aim, Cell, Link, Move, Tracker, Verdict, WINDOW};
 use super::panes::strip_layout::{LayoutSpec, Place, strip::StripSpec};
 #[cfg(test)]
 use super::panes::strip_layout::C;
@@ -55,6 +55,15 @@ impl Text {
     pub fn units(&self) -> &[u16] {
         &self.units[..usize::from(self.len)]
     }
+
+    fn from_units(units: &[u16]) -> Text {
+        let mut text = Text::EMPTY;
+        for &unit in units.iter().take(TEXT_UNITS) {
+            text.units[usize::from(text.len)] = unit;
+            text.len += 1;
+        }
+        text
+    }
 }
 
 impl core::fmt::Write for Text {
@@ -92,13 +101,46 @@ impl LinkLine {
     }
 }
 
+/// The game's font has cardinal arrows, but not diagonal arrows.
+pub const fn arrow(dir: u8) -> &'static str {
+    match dir {
+        0 => "→",
+        1 => "↑→",
+        2 => "↑",
+        3 => "↑←",
+        4 => "←",
+        5 => "↓←",
+        6 => "↓",
+        7 => "↓→",
+        _ => "",
+    }
+}
+
+/// The newest two direction marks visible on the strip.
+pub fn aims_shown(tracker: &Tracker) -> [Option<Aim>; 2] {
+    let mut aims = tracker.aims().filter(|aim| tracker.columns().any(|column| column.frame == aim.frame));
+    [aims.next(), aims.next()]
+}
+
+/// The two move names and their direction marks, fitted to the given capacity.
+pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
+    let moves = [link.from, link.to];
+    let names = core::array::from_fn::<_, 2, _>(|i| link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]).name());
+    let arrows = link.shown.map(|shown| shown.dirs.map(|dir| dir.map_or("", arrow)));
+    let space = |s: &str| if s.is_empty() { "" } else { " " };
+    let loose = [names[0], space(arrows[0][0]), arrows[0][0], space(arrows[0][1]), arrows[0][1], " > ",
+                 names[1], space(arrows[1][0]), arrows[1][0], space(arrows[1][1]), arrows[1][1]];
+    let tight = [names[0], "", arrows[0][0], "", arrows[0][1], ">", names[1], "", arrows[1][0], "", arrows[1][1]];
+    let parts = if loose.iter().map(|s| s.encode_utf16().count()).sum::<usize>() <= capacity { loose } else { tight };
+    LinkLine::from_units(parts.into_iter().flat_map(str::encode_utf16))
+}
+
 pub fn folded_link(link: &Link) -> LinkLine {
     let verdict = if matches!(link.verdict, Verdict::True(_)) { "TRUE" } else { "DROP" };
-    LinkLine::from_units(
-        [verdict, " · ", link.from.name(), " > ", link.to.name()]
-            .into_iter()
-            .flat_map(str::encode_utf16),
-    )
+    let prefix = [verdict, " · "];
+    let capacity = LINK_UNITS as usize - prefix.iter().map(|s| s.encode_utf16().count()).sum::<usize>();
+    let moves = link_moves(link, capacity);
+    LinkLine::from_units(prefix.into_iter().flat_map(str::encode_utf16).chain(moves.units().iter().copied()))
 }
 
 /// What one pane shows.
@@ -186,6 +228,7 @@ struct Content<'a> {
     history: bool,
     cells: bool,
     tracker: &'a Tracker,
+    aims: [Option<Aim>; 2],
     frames: [u32; WINDOW],
     /// Left-stick bin in each slot, `None` for a neutral frame or a slot with no column.
     sticks: [Option<u8>; WINDOW],
@@ -250,7 +293,7 @@ impl<'a> Content<'a> {
                 }
             }
         }
-        Self { spec, history, cells, tracker, frames, sticks, first_slot, runs, spots, parry }
+        Self { spec, history, cells, tracker, aims: aims_shown(tracker), frames, sticks, first_slot, runs, spots, parry }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -286,7 +329,17 @@ impl<'a> Content<'a> {
             }
             i if (RUN_LABEL..RUN_LABEL + 2 * RUN_LABELS).contains(&i) => {
                 let (lane, n) = ((i - RUN_LABEL) / RUN_LABELS, (i - RUN_LABEL) % RUN_LABELS);
-                match self.runs[lane].iter().flatten().filter_map(|run| self.run_label(lane, run).map(|label| (run, label))).nth(n) {
+                let aims = if lane == 0 { self.aims } else { [None; 2] };
+                let count = aims.iter().flatten().count();
+                if n < count {
+                    let Some(aim) = aims[n] else { return Look::HIDDEN };
+                    let Some(slot) = self.slot(aim.frame).filter(|slot| *slot < WINDOW as f32) else { return Look::HIDDEN };
+                    let slot = slot as usize;
+                    let cell = self.runs[0].iter().flatten().find(|run| run.slot <= slot && slot < run.slot + run.len).map(|run| run.cell);
+                    let color = if matches!(cell, Some(Cell::Startup | Cell::Hitlag)) { INK } else { TEXT };
+                    return Look::label(self.spec.lane_run(0, slot, 1, true), Text::new(arrow(aim.dir)), color);
+                }
+                match self.runs[lane].iter().flatten().filter_map(|run| self.run_label(lane, run).map(|label| (run, label))).nth(n - count) {
                     Some((run, (text, color))) => Look::label(self.spec.lane_run(lane, run.slot, run.len, true), text, color),
                     None => Look::HIDDEN,
                 }
@@ -463,8 +516,7 @@ impl<'a> Content<'a> {
             (1, _) => Look::label(place, label, INK),
             (_, None) => Look::HIDDEN,
             (_, Some(link)) => {
-                let mut t = Text::EMPTY;
-                let _ = write!(t, "{} > {}", link.from.name(), link.to.name());
+                let t = Text::from_units(link_moves(&link, TEXT_UNITS).units());
                 Look::label(place, t, TEXT)
             }
         }

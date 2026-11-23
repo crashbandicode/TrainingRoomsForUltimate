@@ -99,6 +99,37 @@ impl Move {
     }
 }
 
+/// The angle of a side tilt or side smash.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Angle {
+    Up,
+    Down,
+}
+
+impl Angle {
+    /// The screen-direction stick bin.
+    pub const fn dir(self) -> u8 {
+        match self {
+            Self::Up => 2,
+            Self::Down => 6,
+        }
+    }
+}
+
+/// The angle named by a side attack's motion.
+pub fn angle_of(motion: u64) -> Option<Angle> {
+    use super::hash40::hash40;
+    const S3_HI: u64 = hash40("attack_s3_hi");
+    const S4_HI: u64 = hash40("attack_s4_hi");
+    const S3_LW: u64 = hash40("attack_s3_lw");
+    const S4_LW: u64 = hash40("attack_s4_lw");
+    match motion {
+        S3_HI | S4_HI => Some(Angle::Up),
+        S3_LW | S4_LW => Some(Angle::Down),
+        _ => None,
+    }
+}
+
 /// What the runtime read from one fighter on one frame.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Sample {
@@ -112,6 +143,10 @@ pub struct Sample {
     pub active: bool,
     /// P1 only: the status is an attack, and which.
     pub attack: Option<Move>,
+    /// P1 only: the angle of a side attack.
+    pub angle: Option<Angle>,
+    /// P1 only: its position during a directional special's travel status.
+    pub travel: Option<(f32, f32)>,
     /// The CPU only, in hitstun: the hitstun frames left (`None` when it could not be read).
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
@@ -317,6 +352,23 @@ pub enum Verdict {
     Drop(i32),
 }
 
+/// Direction marks kept by the strip.
+pub const AIMS: usize = 4;
+
+/// A direction on the frame a move began.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Aim {
+    pub frame: u32,
+    pub dir: u8,
+}
+
+/// A move's displayed name and its directions in order.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Shown {
+    pub of: Option<Move>,
+    pub dirs: [Option<u8>; 2],
+}
+
 /// One follow-up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Link {
@@ -334,6 +386,7 @@ pub struct Link {
     pub window: Option<(u32, u32)>,
     pub from: Move,
     pub to: Move,
+    pub shown: [Shown; 2],
     /// The spot the follow-up hit landed (rc.14, SP4), `None` when it could not be told.
     pub spot: Option<Spot>,
 }
@@ -396,6 +449,7 @@ struct Hit {
     on_shield: bool,
     action: u32,
     mv: Move,
+    shown: Shown,
     spot: Option<Spot>,
     /// P1's and the CPU's first actionable frames after it.
     p1_free: Option<u32>,
@@ -410,6 +464,13 @@ pub struct Tracker {
     head: usize,
     presses: [Option<Press>; PRESSES],
     press_head: usize,
+    aims: [Option<Aim>; AIMS],
+    aim_head: usize,
+    angle: Option<Angle>,
+    travel: bool,
+    aim_from: Option<(u32, (f32, f32))>,
+    shown: Shown,
+    base: Option<Move>,
     history: [Option<Link>; HISTORY],
     advantage: Option<Advantage>,
     frame: u32,
@@ -465,6 +526,13 @@ impl Tracker {
             head: 0,
             presses: [None; PRESSES],
             press_head: 0,
+            aims: [None; AIMS],
+            aim_head: 0,
+            angle: None,
+            travel: false,
+            aim_from: None,
+            shown: Shown { of: None, dirs: [None; 2] },
+            base: None,
             history: [None; HISTORY],
             advantage: None,
             frame: 0,
@@ -504,6 +572,11 @@ impl Tracker {
         (0..MARKS).filter_map(move |i| self.marks[(self.mark_head + MARKS - 1 - i) % MARKS])
     }
 
+    /// The direction marks, newest first.
+    pub fn aims(&self) -> impl Iterator<Item = Aim> + '_ {
+        (0..AIMS).filter_map(move |i| self.aims[(self.aim_head + AIMS - 1 - i) % AIMS])
+    }
+
     pub fn tags(&self) -> impl Iterator<Item = &Tag> + '_ {
         (0..TAGS).filter_map(move |i| self.tags[(self.tag_head + TAGS - 1 - i) % TAGS].as_ref())
     }
@@ -511,6 +584,19 @@ impl Tracker {
     fn push_tag(&mut self, lane: u8, grade: Grade) {
         self.tags[self.tag_head] = Some(Tag { frame: self.frame, lane, grade });
         self.tag_head = (self.tag_head + 1) % TAGS;
+    }
+
+    fn push_aim(&mut self, frame: u32, dir: u8) {
+        let slot = usize::from(self.shown.dirs[0].is_some());
+        self.shown.dirs[slot] = Some(dir);
+        self.aims[self.aim_head] = Some(Aim { frame, dir });
+        self.aim_head = (self.aim_head + 1) % AIMS;
+        if let Some(hit) = self.last_hit.as_mut().filter(|hit| hit.action == self.action) {
+            hit.shown = self.shown;
+        }
+        if let Some(link) = self.history[0].as_mut().filter(|link| link.hit >= frame) {
+            link.shown[1] = self.shown;
+        }
     }
 
     /// The frames stepped since the last clear.
@@ -637,6 +723,15 @@ impl Tracker {
                     && !p1.stop)
         });
         if p1_busy && (self.p1_was_actionable || restarted) {
+            if self.p1_was_actionable {
+                self.base = None;
+            } else if self.action_move != Move::Other {
+                self.base = Some(self.action_move);
+            }
+            if !(self.travel && p1.travel.is_some()) {
+                self.shown = Shown::default();
+            }
+            self.angle = None;
             self.action = self.action.wrapping_add(1);
             self.action_start = frame;
             self.active_seen = false;
@@ -644,6 +739,28 @@ impl Tracker {
         }
         if p1_busy && self.action_move == Move::Other {
             self.action_move = p1.attack.unwrap_or(Move::Other);
+        }
+        if p1.angle != self.angle {
+            self.angle = p1.angle;
+            if let Some(angle) = p1.angle {
+                self.push_aim(frame, angle.dir());
+            }
+        }
+        let entered = p1.travel.is_some() && !self.travel;
+        if entered {
+            self.aim_from = p1.travel.map(|pos| (frame, pos));
+            if self.action_move == Move::Other {
+                self.shown.of = self.base;
+            }
+        } else if p1.travel.is_none() {
+            self.aim_from = None;
+        }
+        self.travel = p1.travel.is_some();
+        if let (Some((at, from)), Some(pos)) = (self.aim_from, p1.travel) {
+            if let Some(dir) = super::aim::heading(pos.0 - from.0, pos.1 - from.1) {
+                self.aim_from = None;
+                self.push_aim(at, dir);
+            }
         }
         self.p1_was_actionable = p1.actionable || p1.hitstun || p1.shieldstun;
         self.p1_status = p1.status;
@@ -819,6 +936,7 @@ impl Tracker {
                 window,
                 from: prev.mv,
                 to: self.action_move,
+                shown: [prev.shown, self.shown],
                 spot,
             };
             self.history.copy_within(0..HISTORY - 1, 1);
@@ -830,6 +948,7 @@ impl Tracker {
             on_shield,
             action: self.action,
             mv: self.action_move,
+            shown: self.shown,
             spot,
             p1_free: None,
             cpu_free: None,

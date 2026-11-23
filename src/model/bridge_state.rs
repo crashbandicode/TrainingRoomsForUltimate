@@ -50,6 +50,8 @@ pub struct View<'a> {
     pub recording_capture_role: &'a str,
     /// The role of the take the HUD's row drew on its last pass, empty when it drew none or that pass is stale.
     pub recording_indicator: &'a str,
+    /// The strip's last drawn direction marks, oldest first.
+    pub strip_aims: [Option<u8>; 2],
     pub list: &'a str,
     pub list_count: usize,
     pub list_index: Option<usize>,
@@ -206,6 +208,16 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     push_str(out, "recording.page.role", view.recording_page_role);
     push_str(out, "recording.capture.role", view.recording_capture_role);
     push_str(out, "recording.indicator", view.recording_indicator);
+    out.push_str("strip.aims=\"");
+    let mut separator = "";
+    for dir in view.strip_aims.into_iter().flatten() {
+        if let Some(name) = ["R", "UR", "U", "UL", "L", "DL", "D", "DR"].get(usize::from(dir)) {
+            out.push_str(separator);
+            out.push_str(name);
+            separator = " ";
+        }
+    }
+    out.push_str("\"\n");
     push_str(out, "list", view.list);
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
@@ -324,6 +336,21 @@ pub fn recording_indicator(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static s
         2 => super::hud_row::Take::Cpu.key(),
         _ => "",
     }
+}
+
+/// A HUD pass and its direction marks, oldest first.
+pub fn aims_stamp(now_ms: u64, drawn: [Option<u8>; 2]) -> u64 {
+    let nibble = |dir: Option<u8>| u64::from(dir.filter(|dir| *dir < 8).map_or(0, |dir| dir + 1));
+    (now_ms << 8) | nibble(drawn[0]) | (nibble(drawn[1]) << 4)
+}
+
+/// The direction marks on a fresh HUD pass, oldest first.
+pub fn strip_aims(stamp: u64, now_ms: u64, fresh_ms: u64) -> [Option<u8>; 2] {
+    if stamp == 0 || now_ms.saturating_sub(stamp >> 8) > fresh_ms {
+        return [None; 2];
+    }
+    let dir = |nibble: u64| (1..=8).contains(&nibble).then(|| (nibble - 1) as u8);
+    [dir(stamp & 15), dir((stamp >> 4) & 15)]
 }
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {
