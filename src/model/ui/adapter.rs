@@ -106,6 +106,22 @@ fn directions(buttons: u32) -> ([bool; 4], [bool; 4]) {
 
 const DIRECTION_BUTTONS: [Button; 4] = [Button::Up, Button::Right, Button::Down, Button::Left];
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Direction { Up, Right, Down, Left }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HoldEnd {
+    pub dir: Direction,
+    pub polls: u32,
+    pub fires: u32,
+    pub jump: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct HoldCount { polls: u32, fires: u32, jump: bool }
+
+const DIRECTIONS: [Direction; 4] = [Direction::Up, Direction::Right, Direction::Down, Direction::Left];
+
 /// Chord-order bits of the logical buttons the menu reads.
 const A: u16 = 1 << 0;
 const B: u16 = 1 << 1;
@@ -132,6 +148,7 @@ pub struct Step {
     /// Release-only polls must reach an active physical chord capture too.
     pub changed: bool,
     pub presses: [Option<Button>; 14],
+    pub hold_ends: [Option<HoldEnd>; 4],
 }
 
 impl Step {
@@ -156,6 +173,7 @@ pub struct Adapter {
     stick: [bool; 4],
     repeat: [HoldRepeat; 4],
     stale: [bool; 4],
+    holds: [HoldCount; 4],
     backlog: bool,
     zl_used: bool,
     /// The screen showing takes no jumps (`Menu::takes_jumps` false, set by the runtime before each poll).
@@ -165,7 +183,7 @@ pub struct Adapter {
 impl Adapter {
     pub const fn new() -> Adapter {
         Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4],
-            stale: [false; 4], backlog: false, zl_used: false, no_jumps: false }
+            stale: [false; 4], holds: [HoldCount { polls: 0, fires: 0, jump: false }; 4], backlog: false, zl_used: false, no_jumps: false }
     }
 
     /// Whether the screen showing takes ZL + Up / Down as jumps (`Menu::takes_jumps`). Where it does not, ZL is its
@@ -206,6 +224,13 @@ impl Adapter {
                 let vertical = i % 2 == 0;
                 let held = dpad[i] || stick[i];
                 self.stale[i] &= held;
+                if held && !self.stale[i] {
+                    self.holds[i].polls = self.holds[i].polls.saturating_add(1);
+                } else if !held && self.holds[i].polls != 0 {
+                    let count = self.holds[i];
+                    step.hold_ends[i] = Some(HoldEnd { dir: DIRECTIONS[i], polls: count.polls, fires: count.fires, jump: count.jump });
+                    self.holds[i] = HoldCount::default();
+                }
                 // Up and Down repeat from the d-pad or a stick and quicken, steadily while a jump is held. Left and Right
                 // change values: a stick repeats them steadily, the d-pad presses on its edge only. A direction held since
                 // before the menu took input does not repeat until it is released.
@@ -213,6 +238,10 @@ impl Adapter {
                 let repeat = self.repeat[i].frame(!self.stale[i] && if vertical { held } else { stick[i] }, pace, !self.backlog);
                 if (dpad[i] && !self.dpad[i]) || (stick[i] && !self.stick[i]) || repeat {
                     let button = DIRECTION_BUTTONS[i];
+                    if held && !self.stale[i] {
+                        self.holds[i].fires = self.holds[i].fires.saturating_add(1);
+                        self.holds[i].jump |= vertical && zl_held && jumps;
+                    }
                     step.push(match button {
                         Button::Up if zl_held && jumps => Button::JumpUp,
                         Button::Down if zl_held && jumps => Button::JumpDown,
@@ -237,6 +266,7 @@ impl Adapter {
                 self.zl_used = false;
             }
         } else {
+            self.holds = [HoldCount::default(); 4];
             self.stale = [0, 1, 2, 3].map(|i| dpad[i] || stick[i]);
             for repeat in &mut self.repeat {
                 repeat.reset();
@@ -255,6 +285,7 @@ impl Adapter {
 
     /// Forget what was held: the menu just opened or closed, so the press that did it is not read again.
     pub fn resync(&mut self, buttons: u32, style: Style) {
+        self.holds = [HoldCount::default(); 4];
         self.logical = logical(buttons, style);
         let (dpad, stick) = directions(buttons);
         self.stale = [0, 1, 2, 3].map(|i| dpad[i] || stick[i]);
@@ -442,6 +473,48 @@ mod tests {
         }
     }
 
+    fn a_released_hold_reports_its_polls_fires_and_jump() {
+        let mut a = Adapter::new();
+        let held = mask(&[bit::ZL, bit::DPAD_DOWN]);
+        for _ in 0..52 {
+            assert!(a.poll(held, Style::Pro, true, true, NO_SHORTCUTS).hold_ends.iter().all(Option::is_none));
+        }
+        let end = a.poll(1 << bit::ZL, Style::Pro, true, true, NO_SHORTCUTS).hold_ends[2].unwrap();
+        assert_eq!(end, HoldEnd { dir: Direction::Down, polls: 52, fires: 3, jump: true });
+
+        let mut a = Adapter::new();
+        let mut repeat = HoldRepeat::new();
+        let expected = 1 + (1..30).filter(|_| repeat.frame(true, Pace::Quickening, true)).count() as u32;
+        for _ in 0..30 {
+            a.poll(1 << bit::DPAD_DOWN, Style::Pro, true, true, NO_SHORTCUTS);
+        }
+        let end = a.poll(0, Style::Pro, true, true, NO_SHORTCUTS).hold_ends[2].unwrap();
+        assert_eq!(end, HoldEnd { dir: Direction::Down, polls: 30, fires: expected, jump: false });
+    }
+
+    fn a_hold_that_began_before_the_menu_took_input_reports_nothing() {
+        let mut a = Adapter::new();
+        a.poll(1 << bit::DPAD_DOWN, Style::Pro, false, true, NO_SHORTCUTS);
+        for _ in 0..30 { a.poll(1 << bit::DPAD_DOWN, Style::Pro, true, true, NO_SHORTCUTS); }
+        assert!(a.poll(0, Style::Pro, true, true, NO_SHORTCUTS).hold_ends.iter().all(Option::is_none));
+        a.poll(1 << bit::DPAD_DOWN, Style::Pro, true, true, NO_SHORTCUTS);
+        a.resync(1 << bit::DPAD_DOWN, Style::Pro);
+        assert!(a.poll(0, Style::Pro, true, true, NO_SHORTCUTS).hold_ends.iter().all(Option::is_none));
+        a.poll(1 << bit::DPAD_DOWN, Style::Pro, true, true, NO_SHORTCUTS);
+        assert!(a.poll(0, Style::Pro, false, true, NO_SHORTCUTS).hold_ends.iter().all(Option::is_none));
+    }
+
+    fn two_directions_released_on_one_poll_both_report() {
+        let mut a = Adapter::new();
+        for _ in 0..5 {
+            a.poll(mask(&[bit::DPAD_UP, bit::DPAD_RIGHT]), Style::Pro, true, true, NO_SHORTCUTS);
+        }
+        let ends = a.poll(0, Style::Pro, true, true, NO_SHORTCUTS).hold_ends;
+        assert_eq!(ends[0], Some(HoldEnd { dir: Direction::Up, polls: 5, fires: 1, jump: false }));
+        assert_eq!(ends[1], Some(HoldEnd { dir: Direction::Right, polls: 5, fires: 1, jump: false }));
+        assert_eq!((ends[2], ends[3]), (None, None));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -455,6 +528,9 @@ mod tests {
             ("a_release_restarts_the_hold", a_release_restarts_the_hold as fn()),
             ("repeats_wait_for_the_worker", repeats_wait_for_the_worker as fn()),
             ("a_direction_held_while_the_menu_was_closed_does_not_repeat", a_direction_held_while_the_menu_was_closed_does_not_repeat as fn()),
+            ("a_released_hold_reports_its_polls_fires_and_jump", a_released_hold_reports_its_polls_fires_and_jump as fn()),
+            ("a_hold_that_began_before_the_menu_took_input_reports_nothing", a_hold_that_began_before_the_menu_took_input_reports_nothing as fn()),
+            ("two_directions_released_on_one_poll_both_report", two_directions_released_on_one_poll_both_report as fn()),
         ]);
     }
     }

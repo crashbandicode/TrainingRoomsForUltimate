@@ -8,6 +8,7 @@ use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::model::bridge_state as m;
+use crate::model::bridge_events::{Clip, ClipSeen, Event, Outbox};
 use crate::model::menu::table::{Control, Row};
 use crate::model::practice_games::Game;
 use crate::model::practice_state::{self as practice, Fields};
@@ -207,6 +208,13 @@ impl PracticeProvider {
 /// Off once the lookup window ended without a bridge (or its table was unusable): every entry point returns at once.
 static ENABLED: AtomicBool = AtomicBool::new(true);
 static FOUND: AtomicBool = AtomicBool::new(false);
+static EVENTS: hos_lock::Mailbox<Event, 8> = hos_lock::Mailbox::new();
+
+pub fn note_event(event: Event) {
+    if FOUND.load(Ordering::Relaxed) {
+        EVENTS.post(event);
+    }
+}
 /// The zone editor's state: written by the game thread under the editor's own lock, read by the worker.
 static ZONE: m::ZoneCell = m::ZoneCell::new();
 
@@ -370,6 +378,8 @@ pub struct Provider {
     publisher: m::Publisher,
     snapshot: String,
     notice: (String, String),
+    events: Outbox,
+    clip: ClipSeen,
 }
 
 impl Provider {
@@ -391,6 +401,7 @@ impl Provider {
         if let (Some(practice), Some(register)) = (&mut self.practice, api.register_provider) {
             practice.poll_practice(now_ms, register, publish);
         }
+        self.events(api, self.handle, now_ms);
         read_notice(&mut self.notice.0, &mut self.notice.1);
         let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
         let notice = shown.map_or((String::new(), String::new()), |(h, b)| (h.to_string(), b.to_string()));
@@ -401,6 +412,30 @@ impl Provider {
         }
         let result = publish(self.handle, self.snapshot.as_ptr(), self.snapshot.len() as u32);
         self.publisher.published(self.snapshot.as_bytes(), result);
+    }
+
+    fn events(&mut self, api: &Api, handle: i32, now_ms: u64) {
+        let Some(event) = api.event else { return };
+        EVENTS.drain(|value| self.events.accept(value, now_ms));
+        self.events.lost(EVENTS.take_dropped());
+        let send = |text: &str| event(handle, text.as_ptr(), text.len() as u32);
+        self.events.flush(now_ms, send);
+        let clip = crate::runtime::macros::replay_capture::clip_view().map(|view| {
+            use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
+            Clip {
+                ctx: match view.context {
+                    ClipContext::Replay { .. } => "replay",
+                    ClipContext::Macro { player: true } => "macro.p1",
+                    ClipContext::Macro { player: false } => "macro.cpu",
+                    ClipContext::Combo { .. } => "combo",
+                },
+                total: view.total, start: view.start, end: view.end, cursor: view.cursor,
+                playing: view.playing,
+                handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
+                running: crate::engine::rr_host::preview_running(),
+            }
+        });
+        self.clip.send(clip, send);
     }
 
     fn lookup(&mut self) {
