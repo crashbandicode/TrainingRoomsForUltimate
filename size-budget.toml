@@ -2597,3 +2597,11 @@ ceiling = 197037
 date = "2026-11-23"
 reason = "Install 2, integration total after merging the fed line beside the F11 swap-back: 196873 (F11 swap-back entry, measured on d46648eb with it) + 164 (fed line, entry above, measured on 82716623 and on d46648eb) = 197037 measured on the merged tree, with no spare. The integrator added no code."
 approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and the fed line reviewed READY (rv-preview-vis PASS 23:20:45Z, rv-fusion-g2-3 PASS 23:20:53Z, rv-integration PASS 23:30:39Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197039
+date = "2026-11-23"
+reason = "F16 follow-up: a macro playing on Player 1 also lifts the menu's hold on the CPU. Measured 197039, 2 above the measured base 71158421 (197037)."
+approved_by = "tr-primary-2 ruling 2026-11-23 20:02:57Z (add the Player-role line if the fact exists); not merged until tr-primary-2 rules on the build it goes into."
