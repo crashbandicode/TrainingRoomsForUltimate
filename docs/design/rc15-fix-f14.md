@@ -51,15 +51,17 @@ stick sample did not give the direction Fox, Falco and Wolf flew. The travel cou
 The tracker retains four `Aim { frame, dir }` marks. An angle transition marks the swing frame. A travel entry
 remembers its frame and position; the first later position at least one unit away supplies its nearest eight-way
 heading, marked on the entry frame. A motion restart inside travel is not another entry and keeps its name and
-directions. A travel that does not move produces no mark. A hit or link made before the heading is known takes it when
-it is. Each action retains up to two directions and, for a recognized fighter-owned
+directions. A travel that does not move produces no mark. A hit and a link hold a copy of their move's name and
+directions; a direction that arrives later (a heading known after the hit, a second part) reaches every copy of that
+move, and no other move's. Each action retains up to two directions and, for a recognized fighter-owned
 travel, the preceding special's name. Display fields do not change `Move`, action splitting, `Link.from`, `Link.to`,
 or verdicts.
 
 The newest two visible marks take the first two Player 1 lane label boxes, centred on their own frame. Startup and
 hitlag use dark ink; other cells use light text. Existing run labels take the remaining boxes, and the CPU lane is
 unchanged. LAST and folded LINK append arrows to names. A line that does not fit drops spaces around `>` and before
-the arrows. The bridge publishes `strip.aims` in drawn order, oldest first, and clears stale or hidden passes.
+the arrows. The bridge publishes `strip.aims`, oldest first: only marks whose label box exists in the layout, and
+nothing on a stale or hidden pass.
 
 Chips, the stick row, combo grading, saved combos, the drill list, pane capacities and the layout archive are
 unchanged. No hook or native site is added; the angle and fighter reads use existing guarded rows.
@@ -78,7 +80,9 @@ Host checks: `angle_of_reads_the_angled_side_animations`,
 `heading_bins_a_movement_to_the_nearest_of_eight_directions`, `the_travel_statuses_are_the_traces`,
 `each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved`,
 `a_link_keeps_both_moves_directions_and_the_special_a_travel_continues`,
+`a_second_part_reaches_the_link_its_special_already_made`,
 `the_lane_draws_each_mark_on_its_frame_in_a_label_box`, `marks_take_two_label_boxes_and_lengths_keep_the_rest`,
+`the_bridge_reports_only_the_marks_whose_label_box_exists`,
 `a_diagonal_is_written_as_its_two_cardinal_arrows`, `the_last_row_and_the_link_line_name_the_direction_beside_the_move`,
 `a_long_pair_of_moves_drops_its_spaces_to_fit`, `strip_aims_reports_the_marks_drawn_on_the_last_pass`,
 `the_runtime_reads_the_angle_and_the_travel_behind_their_gates`.

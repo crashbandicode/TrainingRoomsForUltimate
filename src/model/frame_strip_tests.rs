@@ -720,6 +720,43 @@ fn a_link_keeps_both_moves_directions_and_the_special_a_travel_continues() {
     assert_eq!(linked_special(false).latest_link().map(|l| l.shown[1]), Some(Shown::default()));
 }
 
+fn a_second_part_reaches_the_link_its_special_already_made() {
+    use crate::model::frame_strip_plan::{folded_link, link_moves, TEXT_UNITS};
+    let stun = || Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
+    let text = |line: crate::model::frame_strip_plan::LinkLine| String::from_utf16(line.units()).unwrap();
+    // Frame 35: the travel is entered and hits, so Jab links into it before any direction is known.
+    let mut tracker = linked_special(true);
+    // 36..=38 travel 1 goes left; 39..=41 the status between the parts; 42..=43 travel 2 goes right.
+    for (motion, x) in [(1.0, -11.0), (2.0, -22.0), (3.0, -33.0)] {
+        tracker.step(Sample { active: true, travel: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), NONE);
+    }
+    for motion in 0..3 {
+        tracker.step(attack(Move::Other, 4, motion as f32), stun(), NONE);
+    }
+    for (motion, x) in [(0.0, -33.0), (1.0, -22.0)] {
+        tracker.step(Sample { active: true, travel: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), NONE);
+    }
+    let both = Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] };
+    assert_eq!(tracker.aims().collect::<Vec<_>>(), vec![Aim { frame: 42, dir: 0 }, Aim { frame: 35, dir: 4 }]);
+    let link = tracker.latest_link().expect("the jab linked into the special");
+    assert_eq!((link.from, link.to, link.shown), (Move::Jab, Move::Other, [Shown::default(), both]));
+    assert_eq!(text(link_moves(&link, TEXT_UNITS)), "Jab > Up B ← →");
+    assert_eq!(text(folded_link(&link)), "TRUE · Jab > Up B ← →");
+    // An unrelated move with a direction of its own alters neither name; when it hits, the special keeps both arrows as the link's first move.
+    tracker.step(idle(), stun(), NONE);
+    for motion in 0..3 {
+        tracker.step(Sample { angle: Some(Angle::Up), ..attack(Move::SideTilt, 5, motion as f32) }, stun(), NONE);
+    }
+    assert_eq!(tracker.aims().next(), Some(Aim { frame: 45, dir: 2 }));
+    assert_eq!(tracker.latest_link().map(|l| l.shown), Some([Shown::default(), both]));
+    tracker.step(Sample { active: true, angle: Some(Angle::Up), ..attack(Move::SideTilt, 5, 3.0) },
+                 Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
+    let links: Vec<_> = tracker.history().map(|l| (l.from, l.to, l.shown)).collect();
+    assert_eq!(links[0], (Move::Other, Move::SideTilt, [both, Shown { of: None, dirs: [Some(2), None] }]));
+    assert_eq!(links[1], (Move::Jab, Move::Other, [Shown::default(), both]));
+    assert_eq!(text(link_moves(&tracker.latest_link().unwrap(), TEXT_UNITS)), "Up B ← → > Side tilt ↑");
+}
+
 fn the_runtime_reads_the_angle_and_the_travel_behind_their_gates() {
     let input = include_str!("../runtime/features/input_display.rs");
     assert!(input.contains("static ANGLE_ON: AtomicBool"));
@@ -742,6 +779,8 @@ fn the_runtime_reads_the_angle_and_the_travel_behind_their_gates() {
     assert!(boot.contains("set_aim_read(display_on && capabilities::unit_usable(Feature::Recording, &usable))"));
     let hud = include_str!("../runtime/features/hud_draw.rs");
     assert!(hud.contains("bridge_state::note_strip_aims(aims)") && hud.contains("bridge_state::note_strip_aims([None; 2])"));
+    assert!(hud.contains("let labels = [strip[iv::at::RUN_LABEL] != 0, strip[iv::at::RUN_LABEL + 1] != 0];"));
+    assert!(input.contains("aims_drawn(&tracker, labels)") && !input.contains("aims_shown("));
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -784,6 +823,7 @@ fn case_table() {
         ("the_travel_statuses_are_the_traces", the_travel_statuses_are_the_traces as fn()),
         ("each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved", each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved as fn()),
         ("a_link_keeps_both_moves_directions_and_the_special_a_travel_continues", a_link_keeps_both_moves_directions_and_the_special_a_travel_continues as fn()),
+        ("a_second_part_reaches_the_link_its_special_already_made", a_second_part_reaches_the_link_its_special_already_made as fn()),
         ("the_runtime_reads_the_angle_and_the_travel_behind_their_gates", the_runtime_reads_the_angle_and_the_travel_behind_their_gates as fn()),
     ]);
 }

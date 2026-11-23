@@ -2497,7 +2497,15 @@ approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196713
+ceiling = 196465
 date = "2026-11-23"
-reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196713 on the install 2 head dd6aa1de (F8, F12, F15) it is committed on, with no spare; on 152629cd alone it measured 196673, 353 above that head's 196320."
+reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196465 on install 2 dd6aa1de with F9; F9 adds 105 lines."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196833
+date = "2026-11-23"
+reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. Measured 196833 on its merge 4e34b3a0 with the install 2 head d50a0577 (F8, F12, F15, F9, the GJ4 rework), with no spare: 368 above F9's 196465 (the GJ4 rework adds none: its gate measured 196360 on dd6aa1de, as F9's entry gives for dd6aa1de). 353 of the 368 are the item as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head's 196320); 15 are the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists)."
 approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
