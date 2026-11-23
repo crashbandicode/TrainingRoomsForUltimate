@@ -11,7 +11,7 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, MAX_FRAMES};
+use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
@@ -89,8 +89,15 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let take = converted_input(mode).expect("observed take").capture; INPUT_MODE.fetch_and(!mode, Ordering::AcqRel);
     if take.combo.overflow { tick.notices.push(DRILL_CAPACITY); return; }
     if take.combo.is_empty() { tick.notices.push(super::rr_runtime::EMPTY_RECORDING); return; }
-    let recorded_on = if activate { take_record_start().map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty()) } else { None };
-    if let Ok(id) = save_made_combo(root, &take.combo, source, recorded_on, unix_now()) {
+    let start = if activate { take_record_start() } else { None };
+    let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
+    // F10: a directly recorded drill owns the macro file holding its take.
+    let kept = if activate { keep_drill_take(root, start) } else { None };
+    let saved = match kept {
+        Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, kept, unix_now()),
+        None => save_made_combo(root, &take.combo, source, recorded_on, unix_now()),
+    };
+    if let Ok(id) = saved {
         if activate {
             let _ = RecordingIndex::update(root, |index| {
                 index.set_drill(Some(Drill { kind: DrillKind::Combo, id: id.clone() }), unix_now())?;
@@ -100,6 +107,19 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
         }
         tick.diags.push(format!("screen=input-drill saved={id} steps={}", take.combo.len()));
     }
+}
+
+/// The frames of a direct drill take as a macro (`save_drill_take`), with the start the Record chord posted. `None`
+/// when nothing could be kept: the drill is saved all the same, without a preview.
+fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
+    let (_, frames) = taken_frames();
+    let state = start.map_or_else(StartState::default, |s| StartState {
+        situation: s.poses[0].situation_kind,
+        speed_x: s.speeds[0].0,
+        speed_y: s.speeds[0].1,
+        ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
+    });
+    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now()).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -354,6 +374,16 @@ pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
     PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
 
+/// F10: a drill's take previews on Player 1 (`request_preview`), unless Player 1 has a Play queued or running:
+/// that run is not replaced. True when the preview was asked for.
+pub fn request_drill_preview(source: &str, frames: u32) -> bool {
+    if player_playback_blocks_preview() {
+        return false;
+    }
+    request_preview(source, Role::Player, 0, frames);
+    true
+}
+
 pub fn request_clip_preview(recording: MacroRecording) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
@@ -428,6 +458,11 @@ fn role_playing(role: Role) -> bool {
 /// A queued Play, running Recording-page CPU macro, or its still-live buffered tail.
 pub fn cpu_playback_blocks_drill() -> bool {
     !RESET_CPU.load(Ordering::Acquire) && (PLAY_CPU.load(Ordering::Acquire) || role_playing(Role::Cpu))
+}
+
+/// A queued Play, a running Recording-page run on Player 1, or its still-live buffered tail.
+pub fn player_playback_blocks_preview() -> bool {
+    PLAY_PLAYER.load(Ordering::Acquire) || role_playing(Role::Player)
 }
 
 fn run_flag(role: Role) -> &'static AtomicBool {
@@ -1868,6 +1903,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             tick.keyboard = Some(KeyboardOffer { header, draft });
         }
         Effect::OpenCrop { .. } => {} // The menu worker opens the shared clip editor.
+        Effect::PreviewDrill { .. } => {} // The menu worker starts the preview (F10).
         Effect::MakeCombo { source, chain } => {
             begin_make(root, machine, book, &source, chain, tick)
         }
@@ -1930,7 +1966,7 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
     let deleted = match kind {
         FileKind::Macro => Library::new(root.join(MACROS_DIR)).delete(id).is_ok(),
         FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
-        FileKind::Combo => ComboLibrary::new(root.join("combos")).delete(id).is_ok(),
+        FileKind::Combo => super::rr_runtime::delete_combo(root, id),
         FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
     };
     if !deleted {
@@ -3826,6 +3862,33 @@ mod tests {
         assert_eq!(fed, file.iter().map(|&b| Some(b)).collect::<Vec<_>>());
     }
 
+    fn x_during_a_play_on_player_one_starts_no_drill_preview() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("drill-preview-play-busy");
+        let file = active_plain_macro(&root, Role::Player, 70);
+        let take = super::super::rr_runtime::save_drill_take(
+            &root, vec![InputFrame { buttons: 90, ..InputFrame::default() }],
+            StartState::neutral(8, 0, 1.0), false, 1,
+        ).unwrap().unwrap();
+        on_chords(false, true, false);
+        assert!(!request_drill_preview(&take, 1), "a queued Play also blocks the preview");
+        tick(&root);
+        tick(&root);
+        tick(&root);
+        assert!(RUN_PLAYER.load(Ordering::Acquire));
+        assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[0]));
+        assert!(!request_drill_preview(&take, 1));
+        assert!(!preview_running());
+        tick(&root);
+        assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[1]));
+        on_chords(false, true, false);
+        tick(&root);
+        assert!(!player_playback_blocks_preview());
+        assert!(request_drill_preview(&take, 1));
+        assert!(preview_running());
+    }
+
     /// The Play chord again stops the run: nothing buffered is fed after the stop.
     fn a_stopped_cpu_run_feeds_nothing_more() {
         let _hold = hold();
@@ -4008,18 +4071,92 @@ mod tests {
         assert_eq!(file.made_from.as_deref(),Some(source.as_str())); assert!(RecordingIndex::load(&root).unwrap().drill().is_none());
     }
 
-    fn direct_drill_shares_record_without_macro_or_role_change() {
-        let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu);
+    fn a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change() {
+        let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu); set_record_trim(false);
         post_effect(Effect::RecordDrill); note_record_start(RecordStart { poses:[pose(0,0.0,1.0),pose(7,5.0,-1.0)], speeds:[(0.0,0.0);2] }); on_chords(true,false,false); assert_eq!(capture_role(),ROLE_PLAYER);
         for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },false); }
-        on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7));
+        on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7)); set_record_trim(true);
         let id=take_saved_drill().unwrap(); assert!(take_saved_drill().is_none());
         assert_eq!(RecordingIndex::load(&root).unwrap().drill().unwrap().id,id);
-        let file=ComboLibrary::new(root.join("combos")).load(&id).unwrap(); assert!(file.made_from.is_none()); assert_eq!(file.recorded_on.as_deref(),Some("Mario"));
-        assert!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.is_empty());
+        let file=ComboLibrary::new(root.join("combos")).load(&id).unwrap(); assert_eq!(file.recorded_on.as_deref(),Some("Mario"));
+        let macros=Library::new(root.join(MACROS_DIR)); let entries=macros.list().unwrap().entries;
+        assert_eq!(entries.len(),1, "the drill keeps its take");
+        let take=macros.load(&entries[0].id).unwrap();
+        assert!(crate::model::combo_record::is_drill_take_name(&take.name));
+        assert_eq!(take.frames.iter().map(|f| f.buttons).collect::<Vec<_>>(),[1,0]);
+        assert!(take.start_save.is_none());
+        assert_eq!(file.take.as_deref(),Some(entries[0].id.as_str()));
+        assert_eq!(file.made_from, None);
+        assert!(RecordingIndex::load(&root).unwrap().active(Role::Player).is_none());
         assert!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.is_empty());
         on_chords(true,false,false); assert_eq!(capture_role(),ROLE_CPU,"one-shot does not change ordinary Record role");
         CAP_ROLE.store(0,Ordering::Release);
+    }
+
+    fn a_recorded_drills_take_previews_on_player_one_through_the_play_queue() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("direct-drill-preview");
+        set_record_role(Role::Cpu);
+        set_record_trim(false);
+        post_effect(Effect::RecordDrill);
+        note_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+        on_chords(true, false, false);
+        for (f, b) in [1, 0].into_iter().enumerate() {
+            let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
+            unsafe { on_player_poll(&mut input); }
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, false);
+        }
+        on_chords(true, false, false);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        set_record_trim(true);
+        let drill = ComboLibrary::new(root.join("combos")).load(&take_saved_drill().unwrap()).unwrap();
+        let source = drill.take.unwrap();
+        request_preview(&source, Role::Player, 0, 2);
+        assert!(preview_running());
+        let mut frames = Vec::new();
+        for _ in 0..3 {
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert!(take_cpu_frame().is_none());
+            if let Some(frame) = take_player_frame() { frames.push(frame.buttons); }
+        }
+        assert_eq!(frames, [1, 0]);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(take_player_frame().is_none() && !preview_running());
+    }
+
+    fn deleting_a_drill_deletes_its_take() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("delete-direct-drill");
+        set_record_trim(false);
+        post_effect(Effect::RecordDrill);
+        note_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+        on_chords(true, false, false);
+        for (f, b) in [1, 0].into_iter().enumerate() {
+            let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
+            unsafe { on_player_poll(&mut input); }
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, false);
+        }
+        on_chords(true, false, false);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        set_record_trim(true);
+        let id = take_saved_drill().unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let combo = ComboLibrary::new(root.join("combos")).load(&id).unwrap().combo;
+        assert_eq!(macros.list().unwrap().entries.len(), 1);
+        post_effect(Effect::DeleteFile { kind: crate::model::recording_menu::FileKind::Combo, id: id.clone() });
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(ComboLibrary::new(root.join("combos")).load(&id).is_err());
+        assert!(macros.list().unwrap().entries.is_empty());
+
+        let ordinary = one_macro(&root, "Ordinary macro", 1, 8, None);
+        let fake = crate::model::combo_record::ComboRecord::new("Other drill".into(), combo, None).with_take(&ordinary);
+        let fake_id = ComboLibrary::new(root.join("combos")).save_new(&fake).unwrap();
+        post_effect(Effect::DeleteFile { kind: crate::model::recording_menu::FileKind::Combo, id: fake_id.clone() });
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(ComboLibrary::new(root.join("combos")).load(&fake_id).is_err());
+        assert!(macros.load(&ordinary).is_ok());
     }
 
 
@@ -5332,7 +5469,10 @@ mod tests {
             ("a_record_writes_before_migration_when_the_slot_image_is_absent", a_record_writes_before_migration_when_the_slot_image_is_absent as fn()),
             ("make_combo_plays_the_named_file_and_keeps_the_drill", make_combo_plays_the_named_file_and_keeps_the_drill as fn()),
             ("make_combo_failures_notice_and_open_the_keyboard_online", make_combo_failures_notice_and_open_the_keyboard_online as fn()),
-            ("direct_drill_shares_record_without_macro_or_role_change",direct_drill_shares_record_without_macro_or_role_change as fn()),
+            ("a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change",a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change as fn()),
+            ("deleting_a_drill_deletes_its_take",deleting_a_drill_deletes_its_take as fn()),
+            ("a_recorded_drills_take_previews_on_player_one_through_the_play_queue",a_recorded_drills_take_previews_on_player_one_through_the_play_queue as fn()),
+            ("x_during_a_play_on_player_one_starts_no_drill_preview",x_during_a_play_on_player_one_starts_no_drill_preview as fn()),
             ("make_preserves_an_open_record_prefix_and_physical_cstick",make_preserves_an_open_record_prefix_and_physical_cstick as fn()),
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),

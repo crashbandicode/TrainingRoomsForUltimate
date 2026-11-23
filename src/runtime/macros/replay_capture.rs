@@ -505,7 +505,7 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
     }
 }
 
-fn capture_ready() -> bool {
+pub(crate) fn capture_ready() -> bool {
     crate::runtime::ui::facts::fact_practice_enabled() && !crate::runtime::macros::named_macros::suspended()
         && crate::runtime::ui::facts::fact_ready_go() && !crate::runtime::macros::save_states::is_loading()
         && !crate::runtime::lobby::training::recording_or_playback() && !crate::engine::rr_host::previewing()

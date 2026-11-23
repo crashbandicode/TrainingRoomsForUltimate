@@ -71,10 +71,21 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "list.count=2",
         "list.index=0",
         "list.value=\">\"",
+        "recording.preview=\"\"",
         "rows.count=2",
         "rows.complete=1",
         "rows=\"Start\",\"Eggs mode\"",
     ]);
+}
+
+#[test]
+fn the_snapshot_says_a_drill_preview_hides_the_menu() {
+    for role in ["drill", ""] {
+        let view = View { recording_preview: role, ..View::default() };
+        let mut out = String::new();
+        assert!(snapshot(&view, &mut out));
+        assert!(out.contains(&format!("\nrecording.preview=\"{role}\"\n")));
+    }
 }
 
 #[test]
@@ -143,7 +154,7 @@ fn extra_lines_come_after_the_list_and_before_the_rows() {
     let view = View { extra: "place.first=1\nplace.role=\"cpu\"\n", ..eggs_start() };
     let mut out = String::new();
     assert!(snapshot(&view, &mut out));
-    assert!(out.contains("list.value=\">\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
+    assert!(out.contains("list.value=\">\"\nrecording.preview=\"\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
 
     // Leave room for the fixed fields, but not for either long optional row.
     let extra = format!("place.long=\"{}\"\n", "x".repeat(MAX / 2));
