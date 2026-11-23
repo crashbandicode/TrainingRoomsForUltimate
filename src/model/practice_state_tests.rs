@@ -43,6 +43,14 @@ fn idle_and_starting_have_no_stale_game_fields() {
 }
 
 #[test]
+fn practice_publishes_in_training_and_the_waiting_room() {
+    for scene in ["training", "lobby"] {
+        assert_eq!(published_activation(scene, || (7, Some(Game::Parry))), (7, Some(Game::Parry)));
+    }
+    assert_eq!(published_activation("", || panic!("no live layout must not read activation")), (0, None));
+}
+
+#[test]
 fn think_counts_are_per_entry_and_offline_admitted() {
     let counts = core::array::from_fn::<_, CPU_ENTRIES, _>(|_| core::sync::atomic::AtomicU64::new(0));
     assert_eq!(think_entry(0, Some(1), |_| panic!("Off cannot inspect the other CPU entries")), None);
@@ -58,4 +66,3 @@ fn think_counts_are_per_entry_and_offline_admitted() {
     assert_eq!(counts.map(core::sync::atomic::AtomicU64::into_inner), [0, 2, 0, 0, 1, 0, 0, 1]);
 }
 }
-

@@ -6,6 +6,11 @@ pub const SCHEMA_ID: u32 = 2;
 pub const SCHEMA_VERSION: u32 = 1;
 pub const CPU_ENTRIES: usize = 8;
 
+/// The activation the poll publishes: the live practice layout's own, none without one.
+pub fn published_activation(scene: &str, activation: impl FnOnce() -> (u64, Option<Game>)) -> (u64, Option<Game>) {
+    if scene == "training" { activation() } else { (0, None) }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Fields {
     pub phase: &'static str,
@@ -110,4 +115,3 @@ pub fn think_entry(admission: u64, primary_match: Option<i32>, mut matches: impl
 #[cfg(test)]
 #[path = "practice_state_tests.rs"]
 mod tests;
-

@@ -322,6 +322,14 @@ fn zone_overlay_uses_dark_backing_for_live_and_inset_guides() {
 }
 
 #[test]
+fn cpu_think_counts_follow_the_hooks_training_or_lobby_gate() {
+    let recorder = src("src/runtime/features/recorder.rs");
+    assert!(recorder.contains("note_ai_think(matched.map(|body| body.entry_id), |entry| {"));
+    assert!(recorder.contains("native_training && owns_controller(natives::fighter_entry(entry))"));
+    assert!(!recorder.contains("if native_training {"));
+}
+
+#[test]
 fn location_editors_use_one_camera_and_cpu_session() {
     let camera = src("src/runtime/features/btt_camera.rs");
     let frame = item(&camera, "pub(super) fn update_placement(");

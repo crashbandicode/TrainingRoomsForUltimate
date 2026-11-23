@@ -2,7 +2,7 @@
 //! TrainingRooms has no link-time dependency on the bridge: the UI worker looks its table up by name at most once a second
 //! for the first 30 s (`nn::ro::LookupSymbol`), validates it before any call, registers once and keeps that handle for the
 //! boot. Without the bridge the lookups stop at 30 s and every entry point is one relaxed load. Publishing happens on the
-//! worker only; the game thread's one call (`note_notice`) never waits (it skips when the reader holds the notice).
+//! worker only. Game-side notice and practice producers use bounded, nonblocking handoffs.
 
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -162,12 +162,7 @@ impl PracticeProvider {
         if admission == 0 {
             return;
         }
-        // Offline menu admission can keep the bridge On after the Training view ends.
-        let (activation, game) = if scene(now_ms) == "training" {
-            crate::runtime::features::practice::activation()
-        } else {
-            (0, None)
-        };
+        let (activation, game) = practice::published_activation(scene(now_ms), crate::runtime::features::practice::activation);
         if admission != self.admission || activation != self.activation {
             self.admission = admission;
             self.activation = activation;
