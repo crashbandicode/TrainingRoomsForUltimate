@@ -198,6 +198,28 @@
       ]
     },
     {
+      "id": "r02",
+      "start": "training",
+      "end": "training",
+      "role": "setup",
+      "start_gate": "loaded",
+      "on_failure": "stop",
+      "steps": [
+        {
+          "run": "routes:reach_training",
+          "args": {
+            "p1": "Mario",
+            "cpu": "Zero Suit Samus",
+            "stage": "Final Destination"
+          },
+          "reason": "the rows name the CPU kind their gravity belongs to (32); a profile can come up with another CPU (f11-proof-1 on the Yoga: kind 75)"
+        },
+        {
+          "run": "routes:tr_idle"
+        }
+      ]
+    },
+    {
       "id": "f11-t1",
       "start": "training",
       "end": "training",

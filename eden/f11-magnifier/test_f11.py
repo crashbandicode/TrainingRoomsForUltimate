@@ -60,5 +60,15 @@ class Checks(unittest.TestCase):
             self.assertIn(f"no valid {axis}", f11.ready_body_problem(missing, 32))
 
 
+    def test_rest_is_two_equal_grounded_reads(self):
+        standing = {"x": 36.0, "y": 0.010259508, "situation": 0}
+        self.assertTrue(f11.at_rest(dict(standing), standing))
+        airborne = {"x": -10.52223, "y": 15.195398, "situation": 2}  # the first f11-t3 of f11-proof-1
+        self.assertFalse(f11.at_rest(dict(airborne), airborne))
+        self.assertFalse(f11.at_rest({**standing, "x": 36.01}, standing))
+        self.assertFalse(f11.at_rest({**standing, "y": None}, standing))
+        self.assertFalse(f11.at_rest(standing, {}))
+
+
 if __name__ == "__main__":
     unittest.main()

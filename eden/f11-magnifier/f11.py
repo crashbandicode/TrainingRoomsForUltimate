@@ -92,12 +92,33 @@ def _cpu_body(ctx, scene):
     return {key: body.get(key) for key in ("kind", "x", "y", "situation", "status", "dmg")}
 
 
-def _fixture(ctx, scene, cpu_kind):
-    """The CPU before the picker; its kind must be the one the row's gravity belongs to."""
-    origin = _cpu_body(ctx, scene)
-    if origin.get("kind") != cpu_kind:
-        raise RuntimeError(f"FIXTURE: the CPU's kind is {origin.get('kind')!r}; this row's gravity is for kind {cpu_kind}")
-    return origin
+def at_rest(body, earlier):
+    """Two fighters reads in a row show the CPU standing still: grounded, with the same x and y words. Pure."""
+    try:
+        now = [_word(body["x"]), _word(body["y"]), body["situation"]]
+        before = [_word(earlier["x"]), _word(earlier["y"]), earlier["situation"]]
+    except (KeyError, TypeError, ValueError):
+        return False
+    return now == before and body["situation"] == 0
+
+
+def _fixture(ctx, scene, cpu_kind, cap=10):
+    """The CPU before the picker: the fighter the row's gravity belongs to, standing still. A CPU that is in the air
+    when the picker opens is put back at that air point by B and falls, so its place after B is not the read before
+    (f11-proof-1, first f11-t3: read at y 15.2 right after the row before had stopped its drill). The row waits for
+    rest; a CPU that does not come to rest within `cap` seconds is a fixture error."""
+    until, earlier = time.monotonic() + cap, None
+    while True:
+        ctx.check_stop()
+        body = _cpu_body(ctx, scene)
+        if body.get("kind") != cpu_kind:
+            raise RuntimeError(f"FIXTURE: the CPU's kind is {body.get('kind')!r}; this row's gravity is for kind {cpu_kind}")
+        if earlier is not None and at_rest(body, earlier):
+            return body
+        if time.monotonic() > until:
+            raise RuntimeError(f"FIXTURE: the CPU did not come to rest within {cap} s: {body!r}")
+        earlier = body
+        time.sleep(0.5)
 
 
 def _practice(ctx, step, cap=6, cpu=None):
