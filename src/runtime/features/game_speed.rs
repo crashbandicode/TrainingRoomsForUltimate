@@ -40,6 +40,10 @@ static TRAINING_WANTED: AtomicU32 = AtomicU32::new(0);
 static MODE_PENDING: AtomicU32 = AtomicU32::new(0);
 /// The speed the open pop-up shows, 0 while closed: the next step goes from it.
 static SHOWN: AtomicU32 = AtomicU32::new(0);
+/// Player 1's controller style at its last poll (`on_hold`), 0 before the first: the label's glyph style comes from it.
+static STYLE: AtomicU32 = AtomicU32::new(0);
+/// The label's rows (`rules::LABEL_ROWS`) passed at boot: 1 Frame's text call is lent Player 1's glyph style only then.
+static LABEL: AtomicBool = AtomicBool::new(false);
 /// The waiting-room practice's speed; x1 at each new practice session.
 static LOBBY_WANTED: AtomicU32 = AtomicU32::new(Speed::X1 as u32);
 /// The lobby's slot: Player 1's frame and the waiting area's update (game threads), `try_lock`.
@@ -76,7 +80,9 @@ pub(crate) fn init() {
     }
     let frame = crate::runtime::seams::seam_install::gate("speed_frame", &lobby_rules::FRAME_ROWS, false);
     ONE_FRAME.store(frame, Ordering::Release);
-    crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] game_speed installed={rows} one_frame={frame}"));
+    let label = crate::runtime::seams::seam_install::gate("speed_label", &rules::LABEL_ROWS, false);
+    LABEL.store(label, Ordering::Release);
+    crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] game_speed installed={rows} one_frame={frame} label={label}"));
 }
 
 /// Training's pause menu, or `None` while its chain is not readable.
@@ -119,6 +125,7 @@ fn show(speed: Speed, style: u32) {
 /// What P1's poll did to the hold (`chords::on_poll`, after the detector let go of its lock). `style` is P1's controller
 /// style (the pop-up's glyphs). Atomics and the notice mailbox only.
 pub(crate) fn on_hold(event: HoldEvent, style: u32) {
+    STYLE.store(style, Ordering::Relaxed);
     if event == HoldEvent::Idle || event == HoldEvent::Held {
         return;
     }
@@ -204,7 +211,18 @@ pub(crate) unsafe fn training_tick() {
     field::write_unchecked::<u32>(menu, write.field, write.value);
     // SAFETY: `game_speed.speed_text` passed its guard: `0x1bbbd30(menu, value, pane)`, as the setter calls it.
     let text: unsafe extern "C" fn(usize, u32, usize) = std::mem::transmute(base + native::SPEED_TEXT_FN);
+    // 1 Frame's label names the step button from the menu's glyph style, which the game sets only when its own menu opens
+    // (`speed_label.*`): lend it Player 1's for this call and put back what the game had.
+    let lend = rules::label_lend(write.value, STYLE.load(Ordering::Relaxed), LABEL.load(Ordering::Acquire));
+    let kept = lend.map(|glyph| {
+        let kept = field::read_unchecked::<u32>(menu, rules::GLYPH_STYLE);
+        field::write_unchecked::<u32>(menu, rules::GLYPH_STYLE, glyph);
+        kept
+    });
     text(menu, write.value, menu + write.text_pane);
+    if let Some(kept) = kept {
+        field::write_unchecked::<u32>(menu, rules::GLYPH_STYLE, kept);
+    }
     hud_icon(base, menu, write.value);
     MODE_PENDING.store(write.value, Ordering::Release);
     #[cfg(feature = "diag")]

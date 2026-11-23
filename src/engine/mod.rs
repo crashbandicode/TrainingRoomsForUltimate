@@ -52,6 +52,9 @@ mod lobby_speed_rows_tests;
 #[cfg(test)]
 #[path = "../model/speed_frame_rows_tests.rs"]
 mod speed_frame_rows_tests;
+#[cfg(test)]
+#[path = "../model/speed_label_rows_tests.rs"]
+mod speed_label_rows_tests;
 #[cfg(any(test, target_os = "switch"))]
 #[path = "../model/swap/mod.rs"]
 pub mod swap;

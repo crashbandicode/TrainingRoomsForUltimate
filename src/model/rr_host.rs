@@ -26,6 +26,8 @@ use crate::model::frame_strip::Snap;
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
+#[cfg(any(test, target_os = "switch"))]
+use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
@@ -808,6 +810,24 @@ pub(crate) fn capture_role_key() -> &'static str {
         ROLE_CPU => ViewRole::Cpu.diag(),
         _ => "",
     }
+}
+
+/// The open take for the HUD's row (`hud_row`), independent of the saved preference.
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn capture_take() -> Option<Take> {
+    match capture_role() {
+        ROLE_PLAYER => Some(Take::Player),
+        ROLE_CPU => Some(Take::Cpu),
+        _ => None,
+    }
+}
+
+/// Player 1's fighter tint for this frame: the Player role's while Player 1's take is open, from the Record chord
+/// that opens it to the one that closes it (Player 1's take has no lockout or standby). The CPU's take tints the CPU
+/// by its phase instead (`cpu_role_phase`, `Phase::tint`).
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn player_tint() -> Option<[f32; 3]> {
+    (capture_take() == Some(Take::Player)).then_some(crate::model::recording::PLAYER_TINT)
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
@@ -2581,6 +2601,39 @@ mod tests {
         on_chords(true, false, false);
         assert_eq!(capture_role(), ROLE_PLAYER);
         assert_eq!(capture_role_key(), "player");
+    }
+
+    fn the_open_take_is_the_capture_role() {
+        let _hold = hold();
+        reset_host();
+        assert_eq!(capture_take(), None);
+        on_chords(true, false, false);
+        assert_eq!(capture_take(), Some(Take::Player));
+        assert_eq!(capture_take().map_or("", Take::key), capture_role_key());
+        on_chords(true, false, false);
+        assert_eq!(capture_take(), None);
+        reset_host();
+        set_record_role(Role::Cpu);
+        on_chords(true, false, false);
+        assert_eq!(capture_take(), Some(Take::Cpu));
+        assert_eq!(capture_take().map_or("", Take::key), capture_role_key());
+        reset_host();
+    }
+
+    fn player_one_is_tinted_only_during_its_own_take() {
+        let _hold = hold();
+        reset_host();
+        assert_eq!(player_tint(), None);
+        on_chords(true, false, false);
+        assert_eq!(player_tint(), Some(crate::model::recording::PLAYER_TINT));
+        on_chords(true, false, false);
+        assert_eq!(player_tint(), None);
+        reset_host();
+        set_record_role(Role::Cpu);
+        on_chords(true, false, false);
+        assert_eq!(capture_take(), Some(Take::Cpu));
+        assert_eq!(player_tint(), None);
+        reset_host();
     }
 
     fn press(buttons: u32) -> MappedInputs {
@@ -4832,6 +4885,8 @@ mod tests {
             ("a_frame_past_the_resident_minute_comes_from_the_window", a_frame_past_the_resident_minute_comes_from_the_window as fn()),
             ("record_follows_the_published_cpu_role", record_follows_the_published_cpu_role as fn()),
             ("a_cold_start_records_on_the_saved_popup_role", a_cold_start_records_on_the_saved_popup_role as fn()),
+            ("the_open_take_is_the_capture_role", the_open_take_is_the_capture_role as fn()),
+            ("player_one_is_tinted_only_during_its_own_take", player_one_is_tinted_only_during_its_own_take as fn()),
             ("cpu_role_lockout_or_standby_press_is_not_stored", cpu_role_lockout_or_standby_press_is_not_stored as fn()),
             ("cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu", cpu_role_record_stores_the_jab_and_plays_it_on_the_cpu as fn()),
             ("f4_cpu_role_record_write_matches_playback_of_the_stored_frame", f4_cpu_role_record_write_matches_playback_of_the_stored_frame as fn()),

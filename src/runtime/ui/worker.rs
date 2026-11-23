@@ -520,6 +520,7 @@ fn publish_bridge_state(s: &mut Session) {
             recording_popup_role,
             recording_page_role,
             recording_capture_role: crate::engine::rr_host::capture_role_key(),
+            recording_indicator: crate::runtime::bridge_state::recording_indicator(now),
             list: &list.id,
             list_count: list.count,
             list_index: list.index,

@@ -247,8 +247,38 @@ pub struct TrainingWrite {
 
 /// `PauseMenu+0xb54`, the Speed item's value.
 pub const SPEED_FIELD: usize = 0xb54;
+/// The Training pause menu's `+0x30`: the glyph style of the controller that opened it last, 0 before any open
+/// (`speed_label.style_store`). Value 2's label reads it (`speed_label.frame_text`).
+pub const GLYPH_STYLE: usize = 0x30;
 /// `PauseMenu+0x538`, the Speed row's value pane (the text `0x1bbbd30` writes).
 pub const SPEED_TEXT_PANE: usize = 0x538;
+
+/// The rows the label's lend relies on (`rows_speed_label`). They gate only the lend: without them the label is written
+/// as before, and the bind and 1 Frame do not depend on them.
+pub const LABEL_ROWS: [&str; 5] = [
+    "speed_label.frame_text",
+    "speed_label.frame_set",
+    "speed_label.style_source",
+    "speed_label.style_store",
+    "speed_label.glyph_styles",
+];
+
+/// The glyph style the game keeps for a controller style (`speed_label.glyph_styles`, as its menu open derives it):
+/// 1..=6 as they are, the GameCube pad (7) 6, none (0) for any other.
+pub const fn glyph_style(controller_style: u32) -> u32 {
+    match controller_style {
+        1..=6 => controller_style,
+        7 => 6,
+        _ => 0,
+    }
+}
+
+/// What the text call is lent: Player 1's glyph style for 1 Frame, whose label names the step button. Nothing for the
+/// other speeds (their labels take no argument), without the rows, or for a style without a glyph style.
+pub fn label_lend(value: u32, controller_style: u32, rows: bool) -> Option<u32> {
+    let glyph = glyph_style(controller_style);
+    (rows && value == Speed::OneFrame.value() && glyph != 0).then_some(glyph)
+}
 
 /// The native addresses the runtime forms, each decoded from the guarded words by the host tests.
 pub mod native {

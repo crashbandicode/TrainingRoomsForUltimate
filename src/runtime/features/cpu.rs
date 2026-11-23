@@ -594,6 +594,8 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
             crate::runtime::features::input_display::sample_frame(accessor);
             PLAYER_X.store(natives::pos_x(accessor).to_bits(), Ordering::Relaxed);
             mash_player_position(accessor);
+            // Fix round 2026-11-23, F3: Player 1's fighter is red while its own take is open.
+            recorder::tint_player(accessor);
         }
         return;
     }

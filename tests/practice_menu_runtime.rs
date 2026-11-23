@@ -702,7 +702,8 @@ fn the_strip_asks_the_shared_wizard_state() {
     let draw = item(&hud, "pub unsafe fn draw(");
     assert!(draw.contains("WIZARDS.hides_strip(owners)"));
     assert!(draw.contains("let menu_open = owners.covers_hud()"));
-    assert!(draw.contains("let chip = (!menu_open"));
+    assert!(draw.contains("let row = (!menu_open).then(|| hud_row::hud_row("));
+    assert!(draw.contains("let chip = row.as_ref().map(|row| hud_row::hud_row_box("));
     assert!(draw.contains("combo::hud_tick(strip_shown"));
     assert!(draw.contains("combo::card(strip_shown)"));
     assert!(draw.contains("strip_shown.then(parry::view)"));
