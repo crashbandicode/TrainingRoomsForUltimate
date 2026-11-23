@@ -709,9 +709,10 @@ fn press(button: Button, s: &mut Session) {
         return;
     }
     if PREVIEW_HIDES.load(Ordering::Acquire) {
-        // F10: the hidden menu takes nothing but the preview's stop (X or B), as the Crop editor does.
+        // F10: the hidden menu takes nothing but the preview's stop (X or B), as the Crop editor does. The page comes
+        // back from `sync_drill_preview` once the player has dropped the rest of the take, not here.
         if s.drill_preview.press(button) == Step::Stop {
-            end_drill_preview(s, true);
+            crate::engine::rr_host::stop_preview();
         }
         return;
     }
@@ -872,8 +873,8 @@ fn start_drill_preview(source: &str, frames: u32) {
     PREVIEW_HIDES.store(true, Ordering::Release);
 }
 
-/// Every worker pass while a drill preview hides the menu: the page returns once the take and its tail are over, or
-/// at once (and the player stops) when neither the menu nor the pop-up is open any more.
+/// Every worker pass while a drill preview hides the menu: the page returns once the take and its tail are over, on
+/// the pass after an X or B stop has taken effect, or at once (and the player stops) when neither menu nor pop-up is open.
 fn sync_drill_preview(s: &mut Session) {
     if !PREVIEW_HIDES.load(Ordering::Acquire) {
         return;
@@ -885,11 +886,12 @@ fn sync_drill_preview(s: &mut Session) {
     }
 }
 
-/// Show the page again; `stop` also drops the rest of the take.
+/// Show the page again; `stop` also drops the rest of the take (a closed menu or a session reset, where no page is shown behind it).
 fn end_drill_preview(s: &mut Session, stop: bool) {
     if !PREVIEW_HIDES.swap(false, Ordering::AcqRel) {
         return;
     }
+    s.drill_preview = DrillPreview::new();
     if stop {
         crate::engine::rr_host::stop_preview();
     }

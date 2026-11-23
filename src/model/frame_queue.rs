@@ -48,6 +48,10 @@ impl FrameQueue {
         self.generation_start.store(tail, Ordering::Release);
     }
 
+    pub fn generation(&self) -> usize {
+        self.generation_start.load(Ordering::Acquire)
+    }
+
     /// Append the run's next frame. A full queue keeps every published frame.
     pub fn push(&self, word: u64) -> bool {
         let tail = self.tail.load(Ordering::Relaxed);
@@ -61,6 +65,10 @@ impl FrameQueue {
 
     /// Take the oldest live frame once. Retry only when a clear invalidates the slot.
     pub fn pop(&self) -> Option<u64> {
+        self.pop_tagged().map(|(word, _)| word)
+    }
+
+    pub fn pop_tagged(&self) -> Option<(u64, usize)> {
         let head = self.head.load(Ordering::Relaxed);
         loop {
             let generation = self.generation_start.load(Ordering::Acquire);
@@ -70,7 +78,7 @@ impl FrameQueue {
             }
             if let Some(word) = self.read_live(at, generation) {
                 self.head.store(at.wrapping_add(1), Ordering::Release);
-                return Some(word);
+                return Some((word, generation));
             }
         }
     }
@@ -150,6 +158,19 @@ mod tests {
         assert_eq!(q.pop(), None);
     }
 
+    fn popped_frames_carry_the_generation_they_were_pushed_under() {
+        let q = FrameQueue::new();
+        let first = q.generation();
+        assert!(q.push(10));
+        assert_eq!(q.pop_tagged(), Some((10, first)));
+        q.clear();
+        let second = q.generation();
+        assert_ne!(first, second);
+        assert!(q.push(20));
+        assert_eq!(q.pop_tagged(), Some((20, second)));
+        assert_eq!(q.pop_tagged(), None);
+    }
+
     fn an_interrupted_pop_rejects_the_reused_slot() {
         let q = FrameQueue::new();
         for i in 0..AHEAD as u64 {
@@ -204,6 +225,7 @@ mod tests {
             ("frames_come_out_once_in_order", frames_come_out_once_in_order as fn()),
             ("a_full_queue_refuses_and_wraps_in_order", a_full_queue_refuses_and_wraps_in_order as fn()),
             ("clear_drops_the_buffered_frames", clear_drops_the_buffered_frames as fn()),
+            ("popped_frames_carry_the_generation_they_were_pushed_under", popped_frames_carry_the_generation_they_were_pushed_under as fn()),
             ("an_interrupted_pop_rejects_the_reused_slot", an_interrupted_pop_rejects_the_reused_slot as fn()),
             ("the_producer_and_consumer_keep_every_frame_in_order", the_producer_and_consumer_keep_every_frame_in_order as fn()),
         ]);

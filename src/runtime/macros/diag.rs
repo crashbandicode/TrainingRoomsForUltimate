@@ -29,7 +29,6 @@ struct Command {
 }
 
 static PENDING: Mutex<Option<Command>> = Mutex::new(None);
-static SAVE_NAME: Mutex<Option<(u64, Command)>> = Mutex::new(None);
 static STARTED: AtomicBool = AtomicBool::new(false);
 /// The layer's step in progress (`macros::step`) and the count of CPU-body frames the layer finished: the watchdog's two facts.
 pub(crate) static STEP: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
@@ -40,7 +39,6 @@ pub(crate) fn frame_done() {
     FRAMES.fetch_add(1, Ordering::Relaxed);
 }
 
-const SAVE_SLOT: u8 = 1;
 const OPEN_LIBRARY: u8 = 2;
 const PAD: u8 = 3;
 const VIEW: u8 = 4;
@@ -49,7 +47,6 @@ const NAME: u8 = 6;
 const REPLAY_WINDOW: u8 = 7;
 const CLIP: u8 = 8;
 const LIST_CAPTURES: u8 = 9;
-const EXPORT_SLOT: u8 = 10;
 const OPEN_PLACEMENT: u8 = 11;
 const AUDIT_CAPTURES: u8 = 12;
 
@@ -64,16 +61,6 @@ fn parse(line: &str) -> Option<Command> {
         command.len = n;
     };
     match verb {
-        "save_slot" => {
-            command.kind = SAVE_SLOT;
-            command.number = words.next()?.parse().ok()?;
-            let rest: Vec<&str> = words.collect();
-            set_text(&rest.join(" "), &mut command);
-        }
-        "export_slot" => {
-            command.kind = EXPORT_SLOT;
-            command.number = words.next()?.parse().ok()?;
-        }
         "open_library" => {
             command.kind = OPEN_LIBRARY;
             command.number = words.next()?.parse().ok()?;
@@ -186,42 +173,13 @@ fn clip_of(name: &str, number: i32) -> Option<ClipAction> {
 
 /// Execute UI/file work on its production owner, without excluding any hook allocations.
 pub(crate) fn run_pending() {
-    {
-        let mut pending = SAVE_NAME.lock();
-        if pending.as_ref().is_some_and(|(session, _)| *session != named_macros::session_revision()) {
-            pending.take();
-            diagnostic(format_args!("[NamedMacroDiag] save_slot cancelled_session"));
-        }
-        if pending.is_some() { return; }
-    }
     let Some(command) = PENDING.lock().take() else { return };
     run(command);
-}
-
-/// Called on the worker after the game-owned slot has answered its copy request.
-pub(crate) fn slot_export_complete(success: bool) {
-    let Some((session, command)) = SAVE_NAME.lock().take() else { return; };
-    if session != named_macros::session_revision() { return; }
-    if success {
-        let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
-        named_macros::diag_confirm_name(text);
-        diagnostic(format_args!("[NamedMacroDiag] save_slot slot={} name={text:?}", command.number));
-    } else {
-        diagnostic(format_args!("[NamedMacroDiag] save_slot refused slot={}", command.number));
-    }
 }
 
 fn run(command: Command) {
     let text = std::str::from_utf8(&command.text[..command.len]).unwrap_or("");
     match command.kind {
-        SAVE_SLOT => {
-            *SAVE_NAME.lock() = Some((named_macros::session_revision(), command));
-            named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));
-        }
-        EXPORT_SLOT => {
-            named_macros::diag_export_slot(usize::try_from(command.number).unwrap_or(0));
-            diagnostic(format_args!("[NamedMacroDiag] export_slot slot={}", command.number));
-        }
         OPEN_LIBRARY => {
             named_macros::open_library(usize::try_from(command.number).ok());
             diagnostic(format_args!("[NamedMacroDiag] open_library slot={}", command.number));

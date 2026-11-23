@@ -396,20 +396,18 @@ fn poll_drill_locked(base: usize, state: &mut State, quiet: bool) -> bool {
         return false;
     }
     let owners = crate::runtime::published::input_owners();
-    if owners.bits() & !Owners::VANILLA_PAUSE.bits() != 0
-        || super::states::is_loading()
-        || crate::runtime::roster::character_roster::busy()
-    {
+    let Some(pause) = owners.drill_step(level.is_some()).filter(|_| !super::states::is_loading()
+        && !crate::runtime::roster::character_roster::busy()) else {
         DRILL_APPLIED.store(false, Ordering::Release);
         return false;
-    }
+    };
     if scene == Some(crate::model::scene::Scene::Lobby) {
         // SAFETY: the P1 controller poll in waiting-room practice owns the live partner entry.
         unsafe { step_drill_partner(base, state, level) };
         return false;
     }
     // SAFETY: the P1 controller poll in native Training owns the live panel and entry.
-    unsafe { step_drill_panel(base, state, level, owners.contains(Owners::VANILLA_PAUSE), quiet) }
+    unsafe { step_drill_panel(base, state, level, owners.contains(Owners::VANILLA_PAUSE), quiet && pause) }
 }
 
 /// The waiting room has no pause panel: save the first partner's Training Partner Behavior type, ask for stock CPU,

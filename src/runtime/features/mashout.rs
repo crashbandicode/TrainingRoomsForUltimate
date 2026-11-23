@@ -1236,7 +1236,11 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
     {
         game.fail("Fighter changed · no grade");
     }
-    if !matches!(game.step, Step::Off | Step::Reload | Step::Restore) {
+    // A stopped game owns nothing while the menu is open, also while Player 1 is still held: the menu's hold keeps
+    // the CPU where it is. From the close on, Release keeps the CPU neutral until that hold has ended.
+    if config.is_none() && crate::runtime::ui::menu_app::active() {
+        OWN_CPU.store(0, Ordering::Release);
+    } else if !matches!(game.step, Step::Off | Step::Reload | Step::Restore) {
         CPU_ENTRY.store(cpu_entry, Ordering::Release);
         OWN_CPU.store(cpu, Ordering::Release);
     }
@@ -1498,8 +1502,8 @@ unsafe fn frame_game(fighter: usize, game: &mut Game) {
         && !natives::is_stop(p1)
         && !natives::is_stop(cpu);
     // Observe a live hold even under menus: only an actual native decrease counts.
-    // Setup and the result delay wait for the same input owners as the other games.
-    if covered && !matches!(game.step, Step::Held | Step::Result) {
+    // Setup and the result delay wait for the same input owners as the other games; Restore gives the CPU back and drives nothing.
+    if covered && !matches!(game.step, Step::Held | Step::Result | Step::Restore) {
         drive(MappedInputs::NEUTRAL);
         return;
     }

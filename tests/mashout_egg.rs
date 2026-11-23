@@ -248,7 +248,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
             "// COVERED",
             block(
                 runtime,
-                "if covered && !matches!(game.step, Step::Held | Step::Result)",
+                "if covered && !matches!(game.step, Step::Held | Step::Result | Step::Restore)",
             )
             .to_string(),
         ),

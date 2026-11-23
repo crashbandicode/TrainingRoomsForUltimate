@@ -2332,7 +2332,9 @@ fn no_engine_lock_a_game_hook_waits_on_is_held_by_a_plugin_thread() {
     // The frame queues the CPU's playback view reads (`role_playing`, from `ai_epilogue` and the command-flag hook through
     // `rr_host::cpu_playback`). The other engine locks this graph newly sees (compat logging's LINES, rr_host's RECORD_START
     // and START_SPEED) predate the parry change and are reported to the primary for a ruling (2026-11-18 PARRY READY).
-    let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES") || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")).collect();
+    let queues: Vec<&String> = problems.iter().filter(|p| p.starts_with("engine/rr_host.rs::CPU_FRAMES")
+        || p.starts_with("engine/rr_host.rs::PLAYER_FRAMES")
+        || p.starts_with("engine/rr_host.rs::SLOT_RUN")).collect();
     assert!(queues.is_empty(), "a game entry waits on a playback frame queue the menu worker fills:\n{}", queues.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n"));
 }
 

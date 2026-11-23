@@ -4,7 +4,7 @@
 //! those names (package 6's shims, extended in place), and `port` holds what depends on a package that is not merged yet.
 //!
 //! This module is also the carried files' `super::`: the fork's `training` module names they reach through their parent
-//! (`practice`, `lobby`, `input_record`, `save_states`, `frame_counter`) are re-exported here.
+//! (`practice`, `lobby`, `save_states`) are re-exported here.
 
 // The carried files print their event lines with `println!`: inside this module that is the plugin's diagnostics ring (no Skyline logger,
 // no allocation), by textual macro scope, so the carried text stays as it is.
@@ -24,10 +24,8 @@ pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
 pub(crate) mod replay_store;
 
-// The fork's `training` names the carried files reach through `super::`: package 6's practice session and lobby facade, the recorder
-// (`port::input_record`) and the save-state flag of package 3.
+// The fork's `training` names the carried files reach through `super::`.
 pub(crate) use crate::runtime::lobby::training::{lobby, practice};
-pub(crate) use port::input_record;
 
 /// Package 3's save-state facade.
 pub(crate) mod save_states {
@@ -44,11 +42,6 @@ static READY: AtomicBool = AtomicBool::new(false);
 
 pub(crate) fn ready() -> bool {
     READY.load(Ordering::Acquire)
-}
-
-/// Macro Source is the Named Library and the layer is installed.
-pub(crate) fn named_active() -> bool {
-    ready() && named_macros::source_is_named()
 }
 
 /// Boot: the replay-capture preference and writer, the named library's selected macro, the capture adapter's guards and hooks (the seam
@@ -74,7 +67,7 @@ pub(crate) fn install(rows_ok: bool) -> (bool, bool) {
 }
 
 /// One fighter's frame, before the game's own on-frame function (the shared per-fighter wrapper): the capture observers sample the state
-/// the game is about to advance, and the CPU body's preview and named-start observers run.
+/// the game is about to advance.
 ///
 /// # Safety
 /// `fighter` is the live fighter object the game is running a frame of.
@@ -88,12 +81,6 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
     step(12);
     replay_capture::before_frame(fighter);
     step(13);
-    if let Some(module) = fighter.battle_object.module_accessor.as_mut() {
-        if crate::runtime::features::recorder::is_primary_cpu_body(module) {
-            step(14);
-            named_macros::observe_playback_before(module);
-        }
-    }
     step(0);
 }
 
@@ -118,8 +105,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
         }
         step(24);
         if crate::runtime::features::recorder::is_primary_cpu_body(module) {
-            step(25);
-            named_macros::observe_playback_start(module);
             step(27);
             named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
@@ -140,7 +125,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
             named_macros::service_character_request();
             crate::runtime::features::recording_host::service_switch_request();
             replay_capture::service_reload_request();
-            port::slots::service_slot_request();
         }
     }
     step(0);

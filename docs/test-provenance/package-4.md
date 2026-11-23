@@ -25,7 +25,7 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 | IN01 neutral rules, crop, bounds, empty slot | `neutral_frame_rules`, `crop_trims_trailing_neutral`, `frame_bounds_store_and_play_full_length`, `playback_refuses_empty_slot` | pass |
 | IN01 chord pick, mirror, Shulk dial, stick values, R6 | `playback_slot_pick_and_lockout_refusal`, `mirror_multiplier_and_shulk_dial`, `injected_stick_values`, `control_write_touches_only_verified_fields` | pass |
 | IN01 ledge buffer, hitstun timing, term table | `ledge_buffer_schedule`, `hitstun_timing_modes`, `starting_status_to_term` | pass |
-| IN01 loop, mash interrupt, save-state triggers, per-slot origin, stop, notices, named contract, size | `loop_restarts_playback`, `mash_interrupt_stops`, `save_state_triggers_once`, `per_slot_origin`, `session_clear_stops`, `phase_notifications`, `named_contract_export_import_refusals`, `recorder_state_is_the_24000_byte_slot_table_and_a_little_more` | pass |
+| IN01 Playback Slot run, mash interrupt, stop, notices, import refusals | `a_playback_slot_plays_once`, `mash_interrupt_stops`, `session_clear_stops`, `phase_notifications`, `named_contract_export_import_refusals` | See F7b precheck |
 | IN01 B4, N4 rows | N4 `override_playback_default_off`; B4 is a runtime check (`RecordRefusal::P1DrivenByAi`) | N4 host, B4 Eden (see EDEN-PACKAGE-4.md) |
 | IN02 mode rules, binning, icons, fade, ring, counts | `difference_rules_smash_raw_status`, `bin_stick_values`, `icon_order_and_colours`, `frame_count_cap_99`, `frame_counts_count_in_game_frames_not_polls`, `fade_alpha_curve`, `ring_rotation_physical_index` | pass |
 | IN02 renderer plan: hidden, refresh, registration, cache, budget, no heap | `hidden_under_menus`, `refresh_after_hide_and_reregister`, `unchanged_held_input_writes_nothing`, `rapid_changes_write_only_the_new_row_and_moves`, `bench_counts` | pass |
@@ -81,7 +81,7 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 
 | Requirement | Host test | Eden row (label) |
 | --- | --- | --- |
-| Named lockout, capture from frame 0, buffer read-back, stop chord, named playback, mirroring, maximum length | `tests/input_named.rs` (8) | s4-04 named rows |
+| Playback Slot frames and fixed-start mirroring | `tests/input01.rs`, `rr_host` slot case table | F7b-1–4 NOT FLOWN |
 | The carried macros crate and panel models keep their tests (library, recording, window, move crop, capture archive, shared capture, macro panel, clip panel) | `cargo test --lib engine::macros engine::macro_ui` | - |
 | The vendored match-data crate's own tests | `cargo test --manifest-path crates/smash-match-data/Cargo.toml` (22) | - |
 | Carried files equal the manifest, ledger generated | `tests/carry_pkg4.rs` | - |
@@ -89,7 +89,6 @@ Replay A/B with the desync detector and the two-console online rows are not run 
 | Stick direction bits of the controller record | `tests/input04.rs` `the_button_set_reads_the_dpad_and_both_sticks_digital_directions` | - |
 | Typed menu rows fighter_prompt, macro_source | `compat::menu` test `the_macro_rows_follow_the_snapshot_and_default_to_ask_and_numbered_slots` | - |
 | HUD plan diag line is coalesced | `model::input_display::plan_log_gate_tests` (3) | R5 delta in s4-04 |
-| Save slot to library writes the slot's frames; load follows selected.txt | `named_macros` / `Library` (carried tests) | s4-04 |
 | Live capture adapter installs only on guards and capture on | seam table tests (package 6) | s4-03: `guarded live adapter ready capture=on save=entry` |
 | Replay window lists a capture and crops a macro | carried `ClipEditor` / `SharedCaptureArchive` tests | s4-04 (seeded fork capture) |
 

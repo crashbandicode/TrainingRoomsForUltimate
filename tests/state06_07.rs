@@ -575,16 +575,15 @@ fn parry_reset_does_not_run_on_a_cpu_transform_init() {
 
 #[test]
 fn recording_survives_a_cpu_transform_init() {
-    use model::recording::{Mode, Recorder};
+    use model::recording::SlotRun;
     let owed = settled_owed();
-    let mut recorder = Recorder::new();
-    recorder.start_named_playback(20, 1, 0, 1).unwrap();
-    assert_eq!(recorder.mode(), Mode::Playback);
+    let mut recorder = SlotRun::start(0, 20, 1, 1, None, 0);
+    assert!(recorder.active());
     if owed.take(true, true, false, 1) { recorder.stop(); }
-    assert_eq!(recorder.mode(), Mode::Playback);
+    assert!(recorder.active());
     owed.owe();
     if owed.take(true, true, false, 1) { recorder.stop(); }
-    assert_eq!(recorder.mode(), Mode::None);
+    assert!(!recorder.active());
     let hub = include_str!("../src/runtime/hub.rs");
     assert!(hub.contains("recorder::on_reset(cause)"));
     let runtime = include_str!("../src/runtime/features/recorder.rs");
