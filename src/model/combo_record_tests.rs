@@ -44,6 +44,37 @@ fn a_record_round_trips_through_its_json() {
     assert_eq!(back, rec);
 }
 
+fn a_takes_name_is_the_prefix_and_sixteen_hex_digits() {
+    let name = drill_take_name(0x1f);
+    assert_eq!(name, "Drill take 000000000000001f");
+    assert!(is_drill_take_name(&name));
+    for invalid in ["Drill take", "Drill take 1f", "Drill take 000000000000001F",
+        "Drill take 000000000000001g", "Macro 1"] {
+        assert!(!is_drill_take_name(invalid));
+    }
+}
+
+fn a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop() {
+    let mut step = LinkRec::INPUT;
+    step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
+    let mut combo = Combo::from_links([step]).unwrap();
+    combo.input_only = true;
+    let drill = ComboRecord::new("Drill 1".into(), combo, None).with_take("drill-take");
+    let value = drill.to_value();
+    assert_eq!(value["take"], "drill-take");
+    let mut renamed = ComboRecord::from_value(&value).unwrap();
+    assert_eq!(renamed.take.as_deref(), Some("drill-take"));
+    renamed.name = "Renamed".into();
+    assert_eq!(renamed.to_value()["take"], "drill-take");
+    assert_eq!(renamed.crop_units(0, 1).unwrap().take, None);
+    assert!(record("Hit combo").to_value().get("take").is_none());
+    for bad in [json!("../other"), json!(42), json!("")] {
+        let mut invalid = value.clone();
+        invalid["take"] = bad;
+        assert_eq!(ComboRecord::from_value(&invalid).unwrap().take, None);
+    }
+}
+
 /// Decision SP4: a link's spot is one optional field; an older file, and a word this build does not know, read as no spot.
 fn a_links_spot_is_saved_and_an_older_file_reads_as_none() {
     use crate::model::spots::Spot;
@@ -102,6 +133,8 @@ fn the_library_saves_lists_renames_deletes_and_selects() {
 fn case_table() {
     crate::test_table::run(&[
         ("a_record_round_trips_through_its_json", a_record_round_trips_through_its_json as fn()),
+        ("a_takes_name_is_the_prefix_and_sixteen_hex_digits", a_takes_name_is_the_prefix_and_sixteen_hex_digits as fn()),
+        ("a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop", a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop as fn()),
         ("a_links_spot_is_saved_and_an_older_file_reads_as_none", a_links_spot_is_saved_and_an_older_file_reads_as_none as fn()),
         ("the_library_saves_lists_renames_deletes_and_selects", the_library_saves_lists_renames_deletes_and_selects as fn()),
     ]);

@@ -56,6 +56,8 @@ pub struct View<'a> {
     pub list_count: usize,
     pub list_index: Option<usize>,
     pub list_value: &'a str,
+    /// What hides the menu while it stays open: `drill` during an input drill's preview (F10), else empty.
+    pub recording_preview: &'a str,
     pub extra: &'a str,
     /// The visible rows of the screen showing (optional, sent last).
     pub rows: &'a [&'a str],
@@ -222,6 +224,7 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
     push_str(out, "list.value", view.list_value);
+    push_str(out, "recording.preview", view.recording_preview);
     out.push_str(view.extra);
     // The optional rows come last: as many as fit under the bound, and a mark when some did not.
     let mut rows = String::new();

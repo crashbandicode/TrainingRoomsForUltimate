@@ -14,15 +14,21 @@ listed in [the docs index](../README.md).
 
 ![The pop-up and the page side by side: both show the same two lists, the hot five and CONNECTIONS; A acts at once in the pop-up and opens the file's own screen on the page](../diagrams/recording-page-popup.png)
 
-This page uses some keys its own way. Its footer reads:
+This page uses some keys its own way. Its usual footer reads:
 
 ```text
 A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close
 ```
 
+On a drill with previewable recorded inputs, it reads:
+
+```text
+A open   X preview   ZR role   L/R page   B close
+```
+
 | Key | What it does here |
 | --- | --- |
-| X | Steps the loop count while the cursor is in MACROS. It never saves your defaults or resets a row on this page. |
+| X | Steps the loop count in MACROS, or previews a drill's available recorded inputs on Player 1. It never saves your defaults or resets a row on this page. |
 | Y | Nothing. |
 | ZR | Switches between the Player view and the CPU view. The CPU view hides Combos & Sequences, and the green active macro, Set active and [Loop](#loop) are then the CPU's. A file's own screen names the view in its title: "Recording (CPU view) > …". |
 
