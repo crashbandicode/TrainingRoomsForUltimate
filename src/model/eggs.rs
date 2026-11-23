@@ -41,9 +41,7 @@ pub const HEADER: &str = "Eggs-ercise";
 pub const OFF: u8 = 0;
 pub const TIMED: u8 = 1;
 /// `10 targets`, `20 targets` (SPEC V2.4): the clock counts up and stops at the Nth target (`goal`).
-#[cfg(test)]
 pub const TEN: u8 = 2;
-#[cfg(test)]
 pub const TWENTY: u8 = 3;
 pub const FREE: u8 = 4;
 /// The `eggsercise_break` row's options: what breaks an egg (D3 b: any attack by default; projectiles never).
