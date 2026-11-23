@@ -3,8 +3,8 @@ use super::*;
 
 #[test]
 fn the_sample_mailbox_is_sized_to_one_poll_of_the_busiest_game() {
-    // BTT posts once per fighter pass and P1 input poll for two frames.
-    assert_eq!(SAMPLE_SLOTS, 2 * 2 + 1);
+    // BTT with Ice Climbers: two fighter passes and one P1 input poll per frame, for the two frames between drains.
+    assert_eq!(SAMPLE_SLOTS, (2 + 1) * 2);
 }
 
 #[test]
