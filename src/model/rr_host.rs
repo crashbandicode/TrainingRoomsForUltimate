@@ -26,7 +26,7 @@ use crate::model::frame_strip::Snap;
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
-use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
+use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -435,22 +435,22 @@ pub fn adopt_saved_role(settings: &crate::model::settings::Settings) {
 }
 
 /// After the record chord updates `CAP_ROLE`. A CPU-role start enters lockout. A stop leaves it.
-pub fn cpu_role_after_chord(facing: i8) {
+pub fn cpu_role_after_chord() {
     let mut drive = CPU_DRIVE.lock();
     let role = CAP_ROLE.load(Ordering::Acquire);
     if drive.active() && role == 0 {
         drive.stop();
         CPU_ROLE_ON.store(false, Ordering::Release);
     } else if role == ROLE_CPU && !drive.active() {
-        drive.begin(facing);
+        drive.begin();
         CPU_ROLE_ON.store(true, Ordering::Release);
     }
 }
 
-pub fn cpu_role_begin_placed(facing: i8) {
+pub fn cpu_role_begin_placed() {
     let mut drive = CPU_DRIVE.lock();
     if CAP_ROLE.load(Ordering::Acquire) == ROLE_CPU && !drive.active() {
-        drive.begin_placed(facing);
+        drive.begin_placed();
         CPU_ROLE_ON.store(true, Ordering::Release);
     }
 }
@@ -484,11 +484,11 @@ pub fn to_mapped(f: InputFrame) -> MappedInputs {
 }
 
 /// The CPU control frame of a CPU-role recording. `write` is what replaces the AI's controls.
-pub fn cpu_role_control(ctx: &ControlCtx) -> ControlOut {
+pub fn cpu_role_control() -> ControlOut {
     if !CPU_ROLE_ON.load(Ordering::Acquire) {
         return ControlOut { write: None, hold_cliff_timer: false };
     }
-    CPU_DRIVE.lock().control(ctx)
+    CPU_DRIVE.lock().control()
 }
 
 pub fn cpu_role_phase() -> Option<Phase> {
@@ -2607,7 +2607,7 @@ mod tests {
         let mut out = press(buttons);
         assert!(cpu_role_poll(&mut out));
         assert_eq!(out, MappedInputs::NEUTRAL);
-        cpu_role_control(&ControlCtx { facing: 1, shulk_dial: false }).write.map(|write| write.buttons)
+        cpu_role_control().write.map(|write| write.buttons)
     }
 
     fn f4_cpu_role_record_write_matches_playback_of_the_stored_frame() {
@@ -2616,7 +2616,7 @@ mod tests {
         let root = scratch("f4-cpu-stick");
         cpu_menu_role();
         on_chords(true, false, false);
-        cpu_role_after_chord(-1);
+        cpu_role_after_chord();
         let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
             assert!(drive_cpu(1).is_none());
@@ -2630,7 +2630,7 @@ mod tests {
         assert_eq!(CAP_LEN.load(Ordering::Acquire), 1);
         let stored = unpack(CAP_FRAMES[0].load(Ordering::Acquire));
         assert_eq!(stored, to_frame(input));
-        let write = cpu_role_control(&ControlCtx { facing: 1, shulk_dial: false }).write.unwrap();
+        let write = cpu_role_control().write.unwrap();
         assert_eq!(write.stick_x, playback_controller(stored).stick_x);
     }
 
@@ -2640,7 +2640,7 @@ mod tests {
         let root = scratch("cpu-lockout");
         cpu_menu_role();
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         let _ = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
             assert!(drive_cpu(1).is_none());
@@ -2651,7 +2651,7 @@ mod tests {
             assert_eq!(cpu_role_phase(), Some(Phase::Standby));
         }
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         let _stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.is_empty());
     }
@@ -2662,7 +2662,7 @@ mod tests {
         let root = scratch("cpu-jab");
         cpu_menu_role();
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         let started = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(started.diags.iter().any(|line| line.contains("role=cpu") && line.contains("recording=1")));
         for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
@@ -2679,7 +2679,7 @@ mod tests {
         assert_eq!(drove, jab);
         assert_eq!(cpu_role_phase(), Some(Phase::Recording));
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         assert!(cpu_role_phase().is_none());
         let stopped = service_at(&root, &none(), "2026-11-07", state(13), state(7));
         assert!(stopped.diags.iter().any(|line| line.contains("recording=0")));
@@ -3401,7 +3401,7 @@ mod tests {
         let root = scratch("player-jab");
         player_menu_role();
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         assert!(cpu_role_phase().is_none());
         let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7));
         let frames = [1u32, 36_872, 36_872, 36_872, 33_281];
@@ -3411,7 +3411,7 @@ mod tests {
             assert_eq!(out.buttons, buttons);
         }
         on_chords(true, false, false);
-        cpu_role_after_chord(1);
+        cpu_role_after_chord();
         let _ = service_at(&root, &none(), "2026-11-07", state(8), state(7));
         let macros = Library::new(root.join(MACROS_DIR));
         let listed = macros.list().unwrap();

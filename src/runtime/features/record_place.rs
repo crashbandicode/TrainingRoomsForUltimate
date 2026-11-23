@@ -329,11 +329,10 @@ unsafe fn give_live(start: &Start) {
                 pose.percent = plan.percent.unwrap_or(pose.percent);
                 pose.start_state = plan.state;
             }
-            let facing = recorder::facing_of(poses[1].lr);
             rr_host::set_record_role(if *recorded == Who::Cpu { Role::Cpu } else { Role::Player });
             rr_host::note_record_start(rr_host::RecordStart { poses, speeds: [(0.0, 0.0); 2] });
             rr_host::on_chords(true, false, false);
-            rr_host::cpu_role_begin_placed(facing);
+            rr_host::cpu_role_begin_placed();
             notices::clear(NOTICE);
             announce(false);
         }

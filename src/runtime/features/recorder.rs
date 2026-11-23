@@ -396,7 +396,7 @@ unsafe fn on_ai_frame(ai: usize) {
         bump(COUNT_INJECT);
         write_controller(controller, write);
     }
-    let role = recording_host::cpu_role_control(&ctx);
+    let role = recording_host::cpu_role_control();
     if let Some(write) = role.write {
         bump(COUNT_INJECT);
         write_controller(controller, write);
@@ -441,7 +441,7 @@ unsafe fn on_ai_frame(ai: usize) {
         }
         None => {}
     }
-    chord_step(body, facing);
+    chord_step(body);
 
     // The phase: tint every frame it lasts, the notice once per change.
     let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
@@ -519,7 +519,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(body: Body, facing: i8) {
+unsafe fn chord_step(body: Body) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
@@ -566,7 +566,7 @@ unsafe fn chord_step(body: Body, facing: i8) {
         }
     };
     recording_host::on_chords(body, record, play_player, playback);
-    recording_host::cpu_role_after_chord(facing);
+    recording_host::cpu_role_after_chord();
 }
 
 unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
