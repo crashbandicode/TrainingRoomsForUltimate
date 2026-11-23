@@ -2497,6 +2497,14 @@ approved_by = "Operator's fix-build order 2026-11-23 ~16:35Z through tr-primary-
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 196465
+date = "2026-11-23"
+reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196465 on install 2 dd6aa1de with F9; F9 adds 105 lines."
+approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 196383
 date = "2026-11-23"
 reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 196383, 23 above the measured merged base dd6aa1de (196360)."

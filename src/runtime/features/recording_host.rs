@@ -1,13 +1,16 @@
 //! Switch side of the recording worker. Decisions live in `engine::rr_host`, which the host tests compile.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
+use crate::model::flow::{self, NameStep};
 use crate::model::input_delay::MappedInputs;
 use crate::runtime::macros::named_macros::fighter_label;
 
-const NAME_TOKEN: u64 = 1 << 62;
+pub(crate) const NAME_TOKEN: u64 = 1 << 62;
+static NAME_ASKED: AtomicBool = AtomicBool::new(false);
 const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
@@ -384,6 +387,7 @@ fn apply(tick: &Tick) {
             &offer.draft,
             "Name",
         );
+        NAME_ASKED.store(true, Ordering::Release);
     }
     emit(&tick.diags);
 }
@@ -425,5 +429,17 @@ fn emit(lines: &[String]) {
 }
 
 pub(crate) fn take_typed_name() -> Option<String> {
-    crate::runtime::macros::named_macros::take_confirmed_name_for(NAME_TOKEN)
+    let name = crate::runtime::macros::named_macros::take_confirmed_name_for(NAME_TOKEN);
+    if name.is_some() { NAME_ASKED.store(false, Ordering::Release); }
+    name
+}
+
+/// One worker pass over the page's name draft (`flow::name_step`). True: the page's keyboard was cancelled.
+pub(crate) fn settle_name(page: bool) -> bool {
+    use crate::runtime::macros::named_macros;
+    let asked = NAME_ASKED.load(Ordering::Acquire) && !named_macros::confirmed_name_waiting(NAME_TOKEN);
+    let step = flow::name_step(page, asked, named_macros::external_name_open(NAME_TOKEN));
+    if !page || step == NameStep::Cancel { NAME_ASKED.store(false, Ordering::Release); }
+    if step == NameStep::Discard { named_macros::discard_external_name(NAME_TOKEN); }
+    step == NameStep::Cancel
 }

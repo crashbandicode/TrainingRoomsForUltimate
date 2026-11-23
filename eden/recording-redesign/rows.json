@@ -2529,7 +2529,7 @@
       ],
       "source": "RR-3 requirement trace (A1, A9); LANE-GROK-RECORDING-REDESIGN-REPORT.md lines 197, 203",
       "host": "surface",
-      "expect": "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, B is done; the chain picker lists recordings only",
+      "expect": "the numbered picker works as Character Cycles: A gives the next number, R removes and later numbers close up, A on a numbered tile does nothing, R on the last remaining number does nothing, X is done, B backs out; the chain picker lists recordings only",
       "timed": false,
       "build": "release",
       "on": "surface-a",

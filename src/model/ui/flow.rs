@@ -52,6 +52,64 @@ pub enum Step {
     HidePrompt,
 }
 
+/// What the worker does about the Recording page's name draft on one pass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NameStep { Nothing, Cancel, Discard }
+
+/// `page`: the page's keyboard is up. `asked`: its offer reached the layer and no answer is waiting to be taken.
+/// `draft`: the layer's draft for it is open. An open draft holds both fighters and is never drawn for this page,
+/// so it may be open only while the page waits for it.
+pub const fn name_step(page: bool, asked: bool, draft: bool) -> NameStep {
+    match (page, asked, draft) {
+        (true, true, false) => NameStep::Cancel,
+        (false, _, true) => NameStep::Discard,
+        _ => NameStep::Nothing,
+    }
+}
+
+/// Where the named layer's one system-keyboard job stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NamePhase { Active, Closing, Parked, Discarding }
+
+/// The named layer's one system-keyboard job. `owner`: the token of the caller-owned draft it names, if any.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NameJob { pub id: u64, pub generation: u64, pub replay: bool, pub waiting: bool, pub phase: NamePhase, pub owner: Option<u64> }
+
+impl NameJob {
+    /// Retire the slot's job. `Some(id)`: interrupt that keyboard. A waiting job stays until its keyboard has closed
+    /// (`Closing`: parked then; `Discarding`: dropped then); any other job leaves at once.
+    pub fn retire(slot: &mut Option<Self>, keep_waiting: bool) -> Option<u64> {
+        let job = slot.as_mut()?;
+        let id = job.id;
+        if job.waiting && keep_waiting && job.phase != NamePhase::Discarding {
+            if job.phase == NamePhase::Parked { return None; }
+            job.phase = NamePhase::Closing;
+        } else if job.waiting && job.phase != NamePhase::Parked {
+            job.phase = NamePhase::Discarding;
+        } else {
+            *slot = None;
+        }
+        Some(id)
+    }
+
+    /// The owner of a caller-owned draft is gone: its job never comes back. Another owner's job is left alone.
+    pub fn retire_owner(slot: &mut Option<Self>, owner: u64) -> Option<u64> {
+        if slot.is_some_and(|job| job.owner == Some(owner)) { Self::retire(slot, false) } else { None }
+    }
+
+    /// Keyboard `id` closed. `Some`: the job whose answer is applied. `None`: a stale id, a discarded job (dropped
+    /// here) or a waiting job parked for later.
+    pub fn complete(slot: &mut Option<Self>, id: u64, cancelled: bool, interrupted: bool, ready: bool, generation: u64) -> Option<Self> {
+        let job = slot.as_mut().filter(|job| job.id == id)?;
+        if job.phase == NamePhase::Discarding { *slot = None; return None; }
+        if job.waiting && !cancelled && (job.phase == NamePhase::Closing || !ready || job.generation != generation || interrupted) {
+            job.phase = NamePhase::Parked;
+            return None;
+        }
+        slot.take()
+    }
+}
+
 /// Whether the menu side still owns Player 1's input (the `Owners::MENU` bit): the open menu, its closing frames, the
 /// pop-up, or the closed-menu fighter question. Releasing on any one of them alone handed the question's presses to the
 /// match and let the frame strip draw over it (rc.5 XPS proof).
@@ -162,6 +220,94 @@ mod tests {
         assert!(fact.contains("recorder::recording_or_playback()"));
     }
 
+    fn f9_name_step_truth_table() {
+        for (page, asked, draft, expected) in [
+            (false, false, false, NameStep::Nothing), (false, false, true, NameStep::Discard),
+            (false, true, false, NameStep::Nothing), (false, true, true, NameStep::Discard),
+            (true, false, false, NameStep::Nothing), (true, false, true, NameStep::Nothing),
+            (true, true, false, NameStep::Cancel), (true, true, true, NameStep::Nothing),
+        ] { assert_eq!(name_step(page, asked, draft), expected); }
+    }
+
+    fn f9_job(waiting: bool, phase: NamePhase, owner: Option<u64>) -> NameJob {
+        NameJob { id: 19, generation: 7, replay: false, waiting, phase, owner }
+    }
+
+    fn f9_owner_loss_retires_the_keyboard_job() {
+        use crate::engine::macro_ui::macro_panel::{MacroUi, NameContext, Pad};
+        let token = 1u64 << 62;
+        for (waiting, phase, remaining) in [
+            (false, NamePhase::Active, None),
+            (true, NamePhase::Active, Some(NamePhase::Discarding)),
+            (true, NamePhase::Closing, Some(NamePhase::Discarding)),
+            (true, NamePhase::Parked, None),
+        ] {
+            let mut ui = MacroUi::new();
+            ui.offer_name(NameContext { token, title: "Name chain" }, "", "");
+            assert!(ui.is_open());
+            assert_eq!(ui.external_name_token(), Some(token));
+            assert_eq!(name_step(false, true, true), NameStep::Discard);
+            let mut slot = Some(f9_job(waiting, phase, Some(token)));
+            assert_eq!(NameJob::retire_owner(&mut slot, token), Some(19));
+            assert_eq!(slot.map(|job| job.phase), remaining);
+            ui.on_pad(Pad::Back);
+            assert!(!ui.is_open());
+            assert_eq!(ui.external_name_token(), None);
+            assert_eq!(NameJob::complete(&mut slot, 19, false, false, true, 7), None);
+            assert_eq!(slot, None);
+        }
+    }
+
+    fn f9_another_owners_job_is_left_alone() {
+        let token = 1u64 << 62;
+        for owner in [None, Some(token + 1)] {
+            for phase in [NamePhase::Active, NamePhase::Closing, NamePhase::Parked, NamePhase::Discarding] {
+                let mut slot = Some(f9_job(true, phase, owner));
+                let before = slot;
+                assert_eq!(NameJob::retire_owner(&mut slot, token), None);
+                assert_eq!(slot, before);
+            }
+        }
+    }
+
+    fn f9_name_job_retire_and_complete_rules() {
+        use NamePhase::*;
+        for (waiting, phase, keep, result, after) in [
+            (true, Active, true, Some(19), Some(Closing)),
+            (true, Parked, true, None, Some(Parked)),
+            (true, Discarding, true, Some(19), Some(Discarding)),
+            (true, Active, false, Some(19), Some(Discarding)),
+            (true, Closing, false, Some(19), Some(Discarding)),
+            (true, Parked, false, Some(19), None),
+            (false, Active, false, Some(19), None),
+            (false, Active, true, Some(19), None),
+        ] {
+            let mut slot = Some(f9_job(waiting, phase, None));
+            assert_eq!(NameJob::retire(&mut slot, keep), result);
+            assert_eq!(slot.map(|job| job.phase), after);
+        }
+        let original = Some(f9_job(true, Active, None));
+        let mut slot = original;
+        assert_eq!(NameJob::complete(&mut slot, 20, false, false, true, 7), None);
+        assert_eq!(slot, original);
+        for (waiting, phase, cancelled, interrupted, ready, generation, consumed, after) in [
+            (true, Discarding, false, false, true, 7, false, None),
+            (true, Closing, false, false, true, 7, false, Some(Parked)),
+            (true, Active, false, false, false, 7, false, Some(Parked)),
+            (true, Active, false, false, true, 8, false, Some(Parked)),
+            (true, Active, false, true, true, 7, false, Some(Parked)),
+            (true, Closing, true, false, true, 7, true, None),
+            (true, Active, false, false, true, 7, true, None),
+            (false, Active, false, false, false, 8, true, None),
+        ] {
+            let job = f9_job(waiting, phase, None);
+            let mut slot = Some(job);
+            assert_eq!(NameJob::complete(&mut slot, 19, cancelled, interrupted, ready, generation),
+                if consumed { Some(job) } else { None });
+            assert_eq!(slot.map(|job| job.phase), after);
+        }
+    }
+
     fn seen(menu_open: bool, panel_visible: bool, clip_visible: bool) -> Seen {
         Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible, prompt_visible: false }
     }
@@ -268,6 +414,10 @@ mod tests {
         crate::test_table::run(&[
             ("the_open_menu_holds_the_cpu", the_open_menu_holds_the_cpu as fn()),
             ("the_cpu_hold_is_wired", the_cpu_hold_is_wired as fn()),
+            ("f9_name_step_truth_table", f9_name_step_truth_table as fn()),
+            ("f9_owner_loss_retires_the_keyboard_job", f9_owner_loss_retires_the_keyboard_job as fn()),
+            ("f9_another_owners_job_is_left_alone", f9_another_owners_job_is_left_alone as fn()),
+            ("f9_name_job_retire_and_complete_rules", f9_name_job_retire_and_complete_rules as fn()),
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
             ("clip_sync_outlives_menu_on_both_entry_routes", clip_sync_outlives_menu_on_both_entry_routes as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),

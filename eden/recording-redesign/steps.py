@@ -398,9 +398,8 @@ def open_library_item(ctx, macros, downs=0):
 
     Right swaps columns and copies the source index. The macro column lists files
     first and "+ New chain" last, so a saves index that is not 0 lands on New chain.
-    A there opens the chain picker. B finishes that picker and opens the Name chain
-    keyboard; another B creates the chain. Neither B backs out, so this route never
-    presses B on an unopened file. It resets the saves index to 0, swaps, and presses
+    A there opens the chain picker. X finishes it and opens the Name chain keyboard;
+    B backs out of the picker and cancels the name. This route resets the saves index to 0, swaps, and presses
     A only once the macro column shows a file.
     """
     open_menu(ctx)
@@ -922,7 +921,7 @@ def _open_file_row(ctx, title, downs=0):
 
     `downs` picks a later macro. A chain file has no Crop row. Close that file and open
     the next library item. B is safe here because the file screen is already open;
-    B on the New-chain picker would create a chain instead.
+    B on the New-chain picker backs out instead.
     """
     offset, current = open_library_item(ctx, True, downs)
     last = current
@@ -1317,7 +1316,7 @@ def rr_chords(ctx):
 
 
 def rr_picker(ctx):
-    """The numbered picker matches Character Cycles: A, R, A-on-numbered, R-on-last, B."""
+    """The numbered picker matches Character Cycles: A, R, A-on-numbered, R-on-last, X."""
     settle(ctx)
     open_menu(ctx)
     for _ in range(6):
@@ -1328,7 +1327,7 @@ def rr_picker(ctx):
     ctx.shot('picker-numbered')
     press(ctx, 'r', 0.6)              # R removes; later numbers close up
     ctx.shot('picker-removed')
-    press(ctx, 'b', 0.6)              # B is done
+    press(ctx, 'x', 0.6)              # X is done
     close_menu(ctx)
     return save(ctx, 'picker', {'shots': 'picker-*.png'})
 
