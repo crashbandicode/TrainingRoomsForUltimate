@@ -39,6 +39,79 @@ pub struct Marks {
     pub pointer: Option<[f32; 2]>,
 }
 
+impl Marks {
+    /// The marks to draw. Stub of 755d9936: the border pointer is drawn wherever the CPU's body is.
+    pub fn shown(self, _cpu_held: bool) -> Self {
+        self
+    }
+}
+
+/// Frames a picker places the CPU awake at its point, with a Fall request, before it holds it asleep there (the
+/// drill's own start: place, request Fall, hold).
+pub const PREVIEW_SETTLE: u8 = 4;
+
+/// Where a body stood before a picker moved it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Origin {
+    pub at: [f32; 2],
+    pub grounded: bool,
+    pub facing: f32,
+}
+
+/// What a picker does with the CPU's body on one frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PreviewAct {
+    /// Place it in the air at the point and request Fall.
+    Lift,
+    /// Hold it asleep at the point.
+    Hold,
+}
+
+/// A picker's hold on the CPU: the body itself waits at its start point. In view the game draws it under the
+/// crosshair; out of view the game draws its own magnifier of it, with the direction pointer, at the screen edge.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CpuPreview {
+    body: u32,
+    origin: Origin,
+    frames: u8,
+    /// The game's own `FLAG_IS_LOUPE` of the body, read back after this frame's write.
+    pub magnified: bool,
+}
+
+impl CpuPreview {
+    pub const fn body(&self) -> u32 {
+        self.body
+    }
+
+    /// Where the body stood when the picker took it: where it goes back when the picker is left.
+    pub const fn origin(&self) -> Origin {
+        self.origin
+    }
+
+    fn act(&mut self) -> PreviewAct {
+        if self.frames < PREVIEW_SETTLE {
+            self.frames += 1;
+            PreviewAct::Lift
+        } else {
+            PreviewAct::Hold
+        }
+    }
+}
+
+/// One frame of a picker's CPU preview: a preview starts for `body` when none runs for it (`origin` is read then),
+/// and the frame's act is returned.
+pub fn preview_step(slot: &mut Option<CpuPreview>, body: u32, origin: impl FnOnce() -> Origin) -> PreviewAct {
+    if slot.is_none_or(|preview| preview.body != body) {
+        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, magnified: false });
+    }
+    slot.as_mut().map_or(PreviewAct::Lift, CpuPreview::act)
+}
+
+/// How the picker's CPU point is shown, for the practice state. Stub of 755d9936: the state does not say.
+pub fn cpu_view(_preview: Option<&CpuPreview>) -> &'static str {
+    ""
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -111,6 +184,66 @@ mod tests {
     fn crosshair_look_is_the_cursor_picture() {
         let cursor = Crosshair::new([3.5, -8.0]);
         assert_eq!(cursor.look(), ([3.5, -8.0], EggLook { picture: EggPicture::Cursor, ..EGG_WHOLE }));
+    }
+
+    fn origin(x: f32) -> Origin {
+        Origin { at: [x, 0.0], grounded: true, facing: 1.0 }
+    }
+
+    #[test]
+    fn the_picker_places_the_cpu_awake_then_holds_it_asleep() {
+        let mut slot = None;
+        let acts: Vec<_> = (0..PREVIEW_SETTLE + 6).map(|_| preview_step(&mut slot, 7, || origin(3.0))).collect();
+        let settle = usize::from(PREVIEW_SETTLE);
+        assert!(acts[..settle].iter().all(|act| *act == PreviewAct::Lift));
+        assert!(acts[settle..].iter().all(|act| *act == PreviewAct::Hold));
+        assert_eq!(slot.unwrap().origin(), origin(3.0));
+    }
+
+    #[test]
+    fn a_new_cpu_body_starts_its_own_preview_from_where_it_stood() {
+        let mut slot = None;
+        for _ in 0..PREVIEW_SETTLE + 2 {
+            preview_step(&mut slot, 7, || origin(3.0));
+        }
+        // The origin is read once, when the picker takes the body.
+        assert_eq!(preview_step(&mut slot, 7, || panic!("the same body keeps its origin")), PreviewAct::Hold);
+        assert_eq!(preview_step(&mut slot, 9, || origin(-40.0)), PreviewAct::Lift);
+        let preview = slot.unwrap();
+        assert_eq!((preview.body(), preview.origin()), (9, origin(-40.0)));
+    }
+
+    /// The operator's picture: the CPU start of Guard the Edge at (-199, -8), left of the Fixed camera's view.
+    fn picker_marks() -> Marks {
+        let mut looks = [None; btt::LOOKS];
+        looks[0] = Some(([-199.0, -8.0], EGG_WHOLE));
+        looks[btt::LOOKS - 1] = Some(Crosshair::new([-199.0, -8.0]).look());
+        Marks { looks, pointer: Some([-199.0, -8.0]) }
+    }
+
+    #[test]
+    fn the_dotted_pointer_is_not_drawn_while_the_cpu_stands_at_its_point() {
+        let marks = picker_marks();
+        let shown = marks.shown(true);
+        assert_eq!(shown.pointer, None);
+        // The crosshair and the start mark are the picker's own and stay.
+        assert_eq!(shown.looks, marks.looks);
+    }
+
+    #[test]
+    fn the_dotted_pointer_stays_when_the_cpu_cannot_be_held() {
+        let marks = picker_marks();
+        assert_eq!(marks.shown(false), marks);
+    }
+
+    #[test]
+    fn the_practice_state_says_how_the_cpu_point_is_shown() {
+        assert_eq!(cpu_view(None), "");
+        let mut slot = None;
+        preview_step(&mut slot, 7, || origin(3.0));
+        assert_eq!(cpu_view(slot.as_ref()), "in_view");
+        slot.as_mut().unwrap().magnified = true;
+        assert_eq!(cpu_view(slot.as_ref()), "magnifier");
     }
     }
 }
