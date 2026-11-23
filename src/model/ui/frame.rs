@@ -9,6 +9,7 @@ use super::recording_menu::{Face, Floppy, RecordingScreens};
 
 use super::menu::table::{Control, Editor, Info, GROUPS, ROWS};
 use super::menu::{group_of, Entry, Grey, Menu, RowValue, LOOP_ROW};
+use super::panes as p;
 use super::panes::{text_width, GROUPS as GROUP_LINES, ROWS as ROW_LINES, TABS};
 
 /// Fixed-capacity UTF-16 text: what a text pane's buffer holds. Writing past the capacity cuts the text.
@@ -127,6 +128,22 @@ pub enum View {
     /// The replay window's clip editor: its text lines over a timeline (the crop window and the playhead).
     Clip,
 }
+
+/// What a frame writes to the CONNECTIONS divider's pane (`panes::IDX_CONN_DIV`). The roster grid's popup has no box pane of its own
+/// and draws its box on this pane, so every write states the pane's whole look: a write that only showed it would show the last popup's box.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DivWrite {
+    Hide,
+    /// Visibility only: the pane keeps the place and colour of its last write.
+    Show,
+    /// Centre and size (`[x, y, w, h]`) and the sRGB colour.
+    Rect([f32; 4], [u8; 4]),
+}
+
+/// The roster popup's box colour.
+pub const POP_BOX: [u8; 4] = [24, 24, 30, 255];
+/// The roster popup's line height.
+pub const POP_LINE_H: f32 = 46.0;
 
 /// The delay popup's range control: two handles on a bar over the row's value set.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -279,6 +296,48 @@ impl MarkIcon {
 }
 
 impl Frame {
+    /// A tile's width and height on the current grid.
+    pub fn tile_cell(&self) -> (f32, f32) {
+        let (cols, rows) = (f32::from(self.tile_cols.max(1)), f32::from(self.tile_rows.max(1)));
+        ((p::ROW_RIGHT - p::ROW_LEFT) / cols, p::TILE_AREA_H / rows)
+    }
+
+    /// The centre of tile `i`.
+    pub fn tile_centre(&self, i: usize) -> (f32, f32) {
+        let (cell_w, cell_h) = self.tile_cell();
+        let per_row = usize::from(self.tile_cols.max(1));
+        let (c, r) = (i % per_row, i / per_row);
+        // The roster's short last row sits centred under the full rows (the character select's own layout).
+        let count = usize::from(self.tile_count);
+        let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
+        let shift = if self.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
+        (p::ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
+    }
+
+    /// The roster popup's box over its chip (`[x, y, w, h]`), `None` when no popup is up.
+    pub fn pop_box(&self) -> Option<[f32; 4]> {
+        let anchor = self.pop.anchor.filter(|_| self.view == View::Tiles && self.pop.count > 0)?;
+        let count = usize::from(self.pop.count).min(p::CONN_LINES);
+        let (cx, cy) = self.tile_centre(usize::from(anchor));
+        // Sized to its widest line (`PopView::width`), at most the grid's width.
+        let (w, h) = (self.pop.width().min(p::ROW_RIGHT - p::ROW_LEFT), count as f32 * POP_LINE_H + 24.0);
+        // Over the chip: the box's top at the chip's centre, kept inside the grid area.
+        let x = cx.clamp(p::ROW_LEFT + w / 2.0, p::ROW_RIGHT - w / 2.0);
+        let y = (cy - h / 2.0 + 20.0).clamp(-300.0 + h / 2.0, 330.0 - h / 2.0);
+        Some([x, y, w, h])
+    }
+
+    /// This frame's write to the divider pane: the popup's box, else the divider as the pane table has it, else hidden.
+    pub fn conn_div(&self) -> DivWrite {
+        if let Some(rect) = self.pop_box() {
+            DivWrite::Rect(rect, POP_BOX)
+        } else if self.popup && self.view == View::List {
+            DivWrite::Show
+        } else {
+            DivWrite::Hide
+        }
+    }
+
     /// Reuse a frame in place. Constructing a whole temporary on each nested
     /// screen path exhausted the menu thread's stack when the roster grew.
     pub fn reset(&mut self) {
