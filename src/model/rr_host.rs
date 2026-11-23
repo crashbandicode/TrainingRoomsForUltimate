@@ -2861,8 +2861,14 @@ mod tests {
         assert_eq!(slot_start_ledge(request.slot, 1, Some(false)), Ok(None));
         assert!(!cpu.ledge_transition_term(key, 41, 7, true, slot_owed()));
         assert!(cpu.ledge_transition_term(key, 41, 7, true, false));
-        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        // The AI frame caches the owed start; a cancel before the next one must release the climb at once.
+        cpu.playback = cpu_playback(false);
+        assert!(cpu.playback.owed);
+        assert!(!cpu.ledge_transition_term(key, 41, 7, true, slot_owed()));
         slot_stop();
+        assert!(cpu.playback.owed && !slot_owed());
+        assert!(cpu.ledge_transition_term(key, 41, 7, true, slot_owed()));
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
     }
 
     fn a_late_credit_of_the_old_run_is_not_counted_for_the_new_one() {

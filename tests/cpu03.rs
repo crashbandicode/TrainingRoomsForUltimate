@@ -257,9 +257,11 @@ fn the_climb_stays_denied_while_a_ledge_playback_is_owed() {
     let out = cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 13, false, false));
     assert!(out.playback.is_some());
     cpu.playback = PlaybackState { running: true, owed: true, ..PlaybackState::default() };
-    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, false));
-    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_ATTACK, true, false));
+    assert!(!cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, true));
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_ATTACK, true, true));
     assert_eq!(cpu.frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 14, false, false)), Default::default());
+    // Cancelled before the next AI frame: the cache still says owed, the live bit does not.
+    assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, false));
     cpu.playback = PlaybackState { running: true, owed: false, ..PlaybackState::default() };
     assert!(cpu.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, false));
     cpu.playback = PlaybackState::default();

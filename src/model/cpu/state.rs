@@ -436,7 +436,8 @@ impl Cpu {
     pub fn ledge_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool, owed: bool) -> bool {
         let fighter = &self.fighters[key.index()];
         let q = TermQuery { status, term, original };
-        let playback = PlaybackState { owed: self.playback.owed || owed, running: self.playback.running || owed, ..self.playback };
+        // The live bit decides: the cached state trails a request and a cancel until the next AI frame.
+        let playback = PlaybackState { owed, running: self.playback.running || owed, ..self.playback };
         fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, playback, q)
     }
 }
