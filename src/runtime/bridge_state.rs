@@ -48,7 +48,7 @@ struct PracticeSample {
     result: bool,
 }
 
-static PRACTICE: hos_lock::Mailbox<PracticeSample, 8> = hos_lock::Mailbox::new();
+static PRACTICE: hos_lock::Mailbox<PracticeSample, { practice::SAMPLE_SLOTS }> = hos_lock::Mailbox::new();
 
 fn practice_admission() -> u64 {
     let address = ADMISSION.load(Ordering::Acquire);

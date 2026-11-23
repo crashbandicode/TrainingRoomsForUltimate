@@ -330,6 +330,13 @@ fn cpu_think_counts_follow_the_hooks_training_or_lobby_gate() {
 }
 
 #[test]
+fn the_sample_mailbox_uses_the_models_slot_count() {
+    let bridge = src("src/runtime/bridge_state.rs");
+    assert!(bridge.contains("Mailbox<PracticeSample, { practice::SAMPLE_SLOTS }>"));
+    assert!(!bridge.contains("Mailbox<PracticeSample, 8>"));
+}
+
+#[test]
 fn a_pending_drill_start_does_not_publish_the_previous_run() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
