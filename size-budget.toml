@@ -2505,6 +2505,14 @@ approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 196636
+date = "2026-11-23"
+reason = "Install 2, integration total after merging F8, F12, F15, F9, the GJ4 rework and F11 on 152629cd: 196465 (F9 entry, measured on its merged tree) + 0 (GJ4 rework) + 171 (F11, which dropped its own entry because it fitted under F12 196638 on its base) = 196636 measured on 3aace984, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and F11 reviewed READY (rv-edge-juggle-sol PASS 19:31:37Z and 20:04:20Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 196489
 date = "2026-11-23"
 reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 196489, 24 above the measured merged base a7f7f13b (196465)."

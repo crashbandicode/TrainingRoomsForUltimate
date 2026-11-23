@@ -1829,6 +1829,8 @@ fighter written onto it. The cursor already stops on the readable end of the flo
 - The measurement boot was not flown; the `83eecc32` trace was read again instead.
 - Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
 
+**Rework 2026-11-23.** The Guard the Edge Player inset is 1.25 units. The game's teeter check reaches 1.06 units from the floor end the fighter faces and moves the fighter to 0.96 units from it. A 1.0-unit write rests in teeter, not where Preview shows. The fix boot checks a standing Wait at the written x on both ends.
+
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
 ### Planned tests and proof (not written, not run)
