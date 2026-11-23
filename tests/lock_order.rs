@@ -2090,6 +2090,17 @@ fn frame_fact_publication_defers_busy_before_any_mutation() {
 }
 
 #[test]
+fn panel_hold_uses_the_explicit_context_entry() {
+    let graph = runtime_graph();
+    let found = graph.find("named_macros::hold_panel_fighter");
+    assert_eq!(found.len(), 1);
+    let body = &graph.funcs[found[0]].body;
+    let expected = callgraph::lex("practice::panel_entry_in(context, module_accessor)");
+    assert!(body.windows(expected.len()).any(|window| window == expected));
+    assert!(!calls(body).iter().any(|call| call.segments.last().is_some_and(|name| name == "panel_entry")));
+}
+
+#[test]
 fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
     let mut graph = runtime_graph();
     let one = |g: &Graph, key: &str| {
