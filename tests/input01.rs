@@ -17,19 +17,9 @@ fn stick(x: i8, y: i8) -> MappedInputs {
     MappedInputs { lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL }
 }
 
-const CTX: ControlCtx = ControlCtx { shulk_dial: false };
-const POST: PostCtx = PostCtx { facing: 1, queue_head_is_playback: false };
-
-/// One game frame: the CPU control frame, then the post-frame stage.
-fn frame(r: &mut Recorder) -> (ControlOut, PostOut) {
-    let control = r.control(&CTX);
-    let post = r.post_frame(&POST);
-    (control, post)
-}
-
-/// rc.12 TR1/TR2: a Playback Slot is filled by copying a library macro into it (nothing records into one).
-fn filled(r: &mut Recorder, slot: u8, frames: &[MappedInputs], facing: i8) {
-    r.import_slot(slot, frames, Origin { facing, status: UNRESOLVED, start: StartSnapshot::NONE }).unwrap();
+fn frame(run: &mut SlotRun, frames: &[MappedInputs]) -> (Option<Inject>, Option<u8>) {
+    let control = run.control(false, |i| frames.get(usize::from(i)).copied());
+    (control, run.post())
 }
 
 /// 60 frames: `head` and then neutral.
@@ -66,17 +56,14 @@ fn menu_defaults_match_spec() {
     assert_eq!(s, RecorderSettings::factory());
     assert_eq!((s.crop, s.mash_interrupt), (true, true));
     assert_eq!(s.hitstun, HitstunTiming::HitstunEnds);
-    assert!(s.save_state_slots.is_empty());
 }
 
 #[test]
 fn settings_rows_are_read() {
     let mut snap = Snapshot::factory();
     snap.set("hitstun_playback", &[0, 0, 1]).unwrap();
-    snap.set("save_state_playback", &[0, 3, 0, 0, 2]).unwrap();
     let s = RecorderSettings::from_snapshot(&snap);
     assert_eq!(s.hitstun, HitstunTiming::HitstopBegins);
-    assert_eq!(s.save_state_slots.0, [0, 3, 0, 0, 2]);
 }
 
 #[test]
@@ -92,35 +79,29 @@ fn neutral_frame_rules() {
 
 #[test]
 fn a_slot_plays_every_frame_once() {
-    let mut r = Recorder::new();
     // Frame k is distinguishable: the jump bit and the stick x.
     let frames: Vec<_> = (0..60).map(|k| MappedInputs { buttons: 0x4, lstick_x: k + 1, ..MappedInputs::NEUTRAL }).collect();
-    filled(&mut r, 0, &frames, 1);
-    assert_eq!(r.frames(0).unwrap().len(), 60);
-    // Playback plays every stored frame, one per control frame.
-    r.start_playback(0, 1).unwrap();
+    let mut r = SlotRun::start(0, 60, 1, 1, None, 7);
     let mut played = Vec::new();
     for _ in 0..60 {
-        let (control, post) = frame(&mut r);
-        played.push(control.write.unwrap());
-        if post.ended.is_some() {
-            assert_eq!(post.ended, Some(Ended::Played { slot: 0 }));
+        let (control, post) = frame(&mut r, &frames);
+        played.push(control.unwrap());
+        if post.is_some() {
+            assert_eq!(post, Some(0));
             break;
         }
     }
     assert_eq!(played.len(), 60);
-    assert_eq!(r.mode(), Mode::None);
+    assert!(!r.active());
     assert_eq!(played[59].stick_x, 60.0 / 120.0);
 }
 
 #[test]
 fn playback_refuses_empty_slot() {
-    let mut r = Recorder::new();
-    assert_eq!(r.start_playback(0, 1), Err(PlayRefusal::SlotEmpty), "never filled");
-    assert_eq!(r.start_playback(5, 1), Err(PlayRefusal::SlotOutOfRange));
-    assert_eq!(Recorder::resolve_chords(true, true), ChordAction::Playback);
-    assert_eq!(Recorder::resolve_chords(true, false), ChordAction::Record);
-    assert_eq!(Recorder::resolve_chords(false, false), ChordAction::None);
+    use crate::engine::rr_host;
+    rr_host::set_slot(4, None).unwrap();
+    assert_eq!(rr_host::slot_start(4, 1, None), Err(PlayRefusal::SlotEmpty));
+    assert_eq!(rr_host::slot_start(5, 1, None), Err(PlayRefusal::SlotOutOfRange));
 }
 
 #[test]
@@ -131,55 +112,45 @@ fn mirror_multiplier_and_shulk_dial() {
     // The vertical axis is never mirrored.
     assert_eq!(inject_values(f, -1).stick_y, -60.0 / 120.0);
     // Through the recorder: recorded facing 1, the CPU now faces left.
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &take(&[stick(100, 0)]), 1);
-    r.start_playback(0, -1).unwrap();
-    let left = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+    let mut r = SlotRun::start(0, 60, 1, -1, None, 0);
+    let left = r.control(false, |_| Some(stick(100, 0))).unwrap();
     assert!(left.stick_x < 0.0, "mirrored");
-    r.start_playback(0, -1).unwrap();
-    let dial = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
+    r = SlotRun::start(0, 60, 1, -1, None, 0);
+    let dial = r.control(true, |_| Some(stick(100, 0))).unwrap();
     assert!(dial.stick_x > 0.0, "Shulk's dial: never mirrored");
     // Recorded facing left, the CPU faces left again: no mirroring.
-    filled(&mut r, 1, &take(&[stick(100, 0)]), -1);
-    r.start_playback(1, -1).unwrap();
-    assert!(r.control(&ControlCtx { shulk_dial: false }).write.unwrap().stick_x > 0.0);
-    assert_eq!(r.starting_status_of(1), UNRESOLVED);
+    r = SlotRun::start(1, 60, -1, -1, None, 0);
+    assert!(r.control(false, |_| Some(stick(100, 0))).unwrap().stick_x > 0.0);
 }
 
 #[test]
 fn f4_playback_same_start_facing_survives_a_turn() {
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &[stick(80, 0); 3], -1);
-    r.start_playback(0, -1).unwrap();
+    let mut r = SlotRun::start(0, 3, -1, -1, None, 0);
     for _ in 0..3 {
-        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        let write = r.control(false, |_| Some(stick(80, 0))).unwrap();
         assert_eq!(write.stick_x, 80.0 / 120.0);
     }
 }
 
 #[test]
 fn f4_playback_opposite_start_facing_stays_mirrored_after_a_turn() {
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &[stick(80, 0); 3], -1);
-    r.start_playback(0, 1).unwrap();
+    let mut r = SlotRun::start(0, 3, -1, 1, None, 0);
     for _ in 0..3 {
-        let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+        let write = r.control(false, |_| Some(stick(80, 0))).unwrap();
         assert_eq!(write.stick_x, -80.0 / 120.0);
     }
 }
 
 #[test]
 fn f4_playback_turns_only_when_the_recorded_direction_changes() {
-    let mut r = Recorder::new();
     let frames: Vec<_> = [-80, 80, -80, 80].into_iter().flat_map(|x| [stick(x, 0); 60]).collect();
-    filled(&mut r, 0, &frames, -1);
-    r.start_playback(0, -1).unwrap();
+    let mut r = SlotRun::start(0, frames.len() as u16, -1, -1, None, 0);
     let mut facing = -1;
     let mut turns = 0;
     let mut mismatches = 0;
     for hold in [-80i8, 80, -80, 80] {
         for _ in 0..60 {
-            let write = r.control(&ControlCtx { shulk_dial: false }).write.unwrap();
+            let write = r.control(false, |i| frames.get(usize::from(i)).copied()).unwrap();
             if write.stick_x != f32::from(hold) / 120.0 {
                 mismatches += 1;
             }
@@ -193,15 +164,14 @@ fn f4_playback_turns_only_when_the_recorded_direction_changes() {
     assert_eq!(turns, 3);
     assert_eq!(mismatches, 0);
     assert_eq!(r.frame(), 240);
+    assert_eq!(r.post(), Some(0));
 }
 
 #[test]
 fn f4_playback_shulk_dial_uses_the_recorded_sign() {
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &[stick(80, 0); 3], -1);
-    r.start_playback(0, 1).unwrap();
+    let mut r = SlotRun::start(0, 3, -1, 1, None, 0);
     for _ in 0..3 {
-        let write = r.control(&ControlCtx { shulk_dial: true }).write.unwrap();
+        let write = r.control(true, |_| Some(stick(80, 0))).unwrap();
         assert_eq!(write.stick_x, 80.0 / 120.0);
     }
 }
@@ -229,20 +199,18 @@ fn control_write_touches_only_verified_fields() {
 
 #[test]
 fn ledge_buffer_schedule() {
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &take(&[press(0x10), press(0x20)]), 1);
-    r.playback_ledge(0, 1, false).unwrap();
+    let frames = take(&[press(0x10), press(0x20)]);
+    let mut r = SlotRun::start(0, 60, 1, 1, Some(false), 0);
     let mut seq = Vec::new();
     for _ in 0..9 {
-        seq.push(r.control(&CTX).write.unwrap().buttons);
+        seq.push(r.control(false, |i| frames.get(usize::from(i)).copied()).unwrap().buttons);
     }
     // Frame 0 twice, neutral three times, frame 0 once more, then frame 1 onward.
     assert_eq!(seq, [0x10, 0x10, 0, 0, 0, 0x10, 0x20, 0, 0]);
-    r.stop();
-    r.playback_ledge(0, 1, true).unwrap();
+    r = SlotRun::start(0, 60, 1, 1, Some(true), 0);
     let mut seq = Vec::new();
     for _ in 0..7 {
-        seq.push(r.control(&CTX).write.unwrap().buttons);
+        seq.push(r.control(false, |i| frames.get(usize::from(i)).copied()).unwrap().buttons);
     }
     assert_eq!(seq, [0x10, 0, 0, 0, 0x10, 0x20, 0]);
 }
@@ -281,7 +249,7 @@ fn starting_status_to_term() {
         (UNRESOLVED, None),
     ];
     for (status, term) in cases {
-        assert_eq!(Recorder::term_for_status(&t, status), term, "status {status}");
+        assert_eq!(term_for_status(&t, status), term, "status {status}");
     }
 }
 
@@ -289,90 +257,80 @@ fn starting_status_to_term() {
 fn a_start_from_any_other_status_waits_for_the_fighter_to_act() {
     let t = table();
     for status in [UNRESOLVED, 0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
-        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
+        assert_eq!(term_for_status(&t, status), None, "status {status}");
     }
 }
 
 #[test]
 fn hitstun_timing_modes() {
-    let r = Recorder::new();
     let mut s = RecorderSettings::factory();
     let ctx = |head: Option<u8>, hitstun: bool, hitstop: bool, term: bool| MashCtx { head_slot: head, in_hitstun: hitstun, in_hitstop: hitstop, term_enabled: term };
     // No queued playback: nothing starts.
-    assert_eq!(r.mash_should_start(&s, &ctx(None, false, false, true)), None);
+    assert_eq!(mash_should_start(true, &s, &ctx(None, false, false, true)), None);
     // Not in hitstun: the derived term decides.
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(2), false, false, true)), Some(2));
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(2), false, false, false)), None);
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(2), false, false, true)), Some(2));
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(2), false, false, false)), None);
     // In hitstun, As Hitstun Ends: the term.
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(1), true, true, false)), None);
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(1), true, true, true)), Some(1));
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(1), true, true, false)), None);
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(1), true, true, true)), Some(1));
     // As Hitstop Ends: when not in hitstop.
     s.hitstun = HitstunTiming::HitstopEnds;
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(1), true, true, true)), None);
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(1), true, false, false)), Some(1));
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(1), true, true, true)), None);
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(1), true, false, false)), Some(1));
     // As Hitstop Begins: at once.
     s.hitstun = HitstunTiming::HitstopBegins;
-    assert_eq!(r.mash_should_start(&s, &ctx(Some(1), true, true, false)), Some(1));
+    assert_eq!(mash_should_start(true, &s, &ctx(Some(1), true, true, false)), Some(1));
     // The term is asked only where it decides.
-    assert!(!r.mash_needs_term(&s, Some(1), true));
-    assert!(r.mash_needs_term(&s, Some(1), false));
+    assert!(!mash_needs_term(true, &s, Some(1), true));
+    assert!(mash_needs_term(true, &s, Some(1), false));
     s.hitstun = HitstunTiming::HitstunEnds;
-    assert!(r.mash_needs_term(&s, Some(1), true));
-    assert!(!r.mash_needs_term(&s, None, true));
+    assert!(mash_needs_term(true, &s, Some(1), true));
+    assert!(!mash_needs_term(true, &s, None, true));
+    assert!(!mash_needs_term(false, &s, Some(1), true));
+    assert_eq!(mash_should_start(false, &s, &ctx(Some(1), true, true, true)), None);
 }
 
 /// rc.12 TR1: a Playback Slot (copied from a library macro) plays once per trigger. The old loop read `playback_loop`,
 /// a row the Loop list no longer writes (#15), so an old On replayed every mash and ledge playback for ever.
 #[test]
 fn a_playback_slot_plays_once() {
-    let mut r = Recorder::new();
-    r.import_slot(0, &[press(1); 3], model::recording::Origin::NONE).unwrap();
-    r.start_playback(0, 1).unwrap();
+    let frames = [press(1); 3];
+    let mut r = SlotRun::start(0, 3, 1, 1, None, 0);
     for _ in 0..3 {
-        assert_eq!(r.mode(), Mode::Playback);
-        frame(&mut r);
+        assert!(r.active());
+        frame(&mut r, &frames);
     }
     for _ in 0..6 {
-        frame(&mut r);
-        assert_eq!(r.mode(), Mode::None, "played once");
+        assert_eq!(frame(&mut r, &frames), (None, None));
+        assert!(!r.active(), "played once");
     }
-    // An empty copy (its macro left the slot) empties it.
-    r.import_slot(0, &[], model::recording::Origin::NONE).unwrap();
-    assert_eq!(r.start_playback(0, 1), Err(PlayRefusal::SlotEmpty));
 }
 
 #[test]
 fn mash_interrupt_stops() {
     let mut s = RecorderSettings::factory();
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &[press(1); 30], 1);
-    r.start_playback(0, 1).unwrap();
-    frame(&mut r);
+    let frames = [press(1); 30];
+    let mut r = SlotRun::start(0, 30, 1, 1, None, 0);
+    frame(&mut r, &frames);
     s.mash_interrupt = false;
-    assert!(!r.interrupt_on_mash(&s));
-    assert_eq!(r.mode(), Mode::Playback);
+    if s.mash_interrupt { r.stop(); }
+    assert!(r.active());
     s.mash_interrupt = true;
-    assert!(r.interrupt_on_mash(&s));
-    assert_eq!((r.mode(), r.possession(), r.frame()), (Mode::None, Possession::Player, 0));
-    // The mash queue head is popped when a run ends.
-    r.start_playback(0, 1).unwrap();
+    if s.mash_interrupt { r.stop(); }
+    assert!(!r.active());
+    r = SlotRun::start(0, 30, 1, 1, None, 0);
     let mut popped = false;
     for _ in 0..40 {
-        r.control(&CTX);
-        popped |= r.post_frame(&PostCtx { facing: 1, queue_head_is_playback: true }).pop_mash;
+        popped |= frame(&mut r, &frames).1 == Some(0);
     }
     assert!(popped);
 }
 
 #[test]
 fn session_clear_stops() {
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &take(&[press(1)]), 1);
-    r.start_playback(0, 1).unwrap();
+    let mut r = SlotRun::start(0, 60, 1, 1, None, 0);
     r.stop();
-    assert_eq!((r.mode(), r.possession(), r.phase()), (Mode::None, Possession::Player, Phase::Idle));
-    let ps = r.playback_state(false);
-    assert!(!ps.running && !ps.standby);
+    assert!(!r.active());
 }
 
 #[test]
@@ -435,27 +393,15 @@ fn the_runtime_tints_each_recorded_fighter() {
 
 #[test]
 fn named_contract_export_import_refusals() {
-    let mut r = Recorder::new();
-    assert_eq!(r.export_slot(0).unwrap_err().message(), "Record into this slot first");
-    assert_eq!(r.export_slot(9).unwrap_err().message(), "Record Slot is out of range");
-    assert_eq!(r.import_slot(9, &[press(1)], Origin::NONE).unwrap_err().message(), "No such Playback Slot. Nothing was changed.");
-    let long = vec![press(1); 601];
+    use crate::engine::macros::{InputFrame, MacroRecording, StartState};
+    use crate::engine::rr_host;
+    let long = MacroRecording::new("Long", "13.0.5", StartState::neutral(7, 0, 1.0),
+        vec![InputFrame::default(); 601]).unwrap();
+    assert_eq!(rr_host::set_slot(9, Some(&long)).unwrap_err().message(), "No such Playback Slot. Nothing was changed.");
     assert_eq!(
-        r.import_slot(0, &long, Origin::NONE).unwrap_err().message(),
+        rr_host::set_slot(3, Some(&long)).unwrap_err().message(),
         "This macro is 601 frames; a Playback Slot holds 600. Crop it first."
     );
-    assert!(!r.is_recorded(0), "nothing changed");
-    r.import_slot(2, &[press(1), press(2)], Origin { facing: -1, status: 3, start: StartSnapshot::NONE }).unwrap();
-    let (frames, origin) = r.export_slot(2).unwrap();
-    assert_eq!((frames.len(), origin.facing, origin.status), (2, -1, 3));
-    assert!(r.start_playback(2, 1).is_ok());
-}
-
-#[test]
-fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
-    // 5 slots x 600 frames x 8 bytes, statically allocated (SPEC-input-01 §3.2, §8).
-    assert_eq!(SLOTS * SLOT_FRAMES * std::mem::size_of::<MappedInputs>(), 24_000);
-    assert!(std::mem::size_of::<Recorder>() < 24_000 + 512);
 }
 
 /// The transition-term ranges are inclusive at both ends; other statuses use the actionable check.
@@ -463,11 +409,11 @@ fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
 fn other_status_has_no_specific_transition_term() {
     let t = table();
     for status in [0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
-        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
+        assert_eq!(term_for_status(&t, status), None, "status {status}");
     }
     // Both ends of the two ranges are inside them (the half-open upstream ranges left these out).
-    assert_eq!(Recorder::term_for_status(&t, 51), Some(C::TermContEscapeAir));
-    assert_eq!(Recorder::term_for_status(&t, 82), Some(C::TermContEscapeF));
+    assert_eq!(term_for_status(&t, 51), Some(C::TermContEscapeAir));
+    assert_eq!(term_for_status(&t, 82), Some(C::TermContEscapeF));
 }
 
 /// R2-5 (review R2): a running playback stops on a mash interrupt only when the row is On, and the CPU's view of
@@ -475,22 +421,20 @@ fn other_status_has_no_specific_transition_term() {
 #[test]
 fn r2_5_mash_interrupt_stops_a_running_playback_only_when_enabled() {
     let mut s = RecorderSettings::factory();
-    let mut r = Recorder::new();
-    filled(&mut r, 0, &take(&[press(1); 30]), 1);
-    r.start_playback(0, 1).unwrap();
-    frame(&mut r);
-    assert!(r.playback_state(false).running);
+    let frames = take(&[press(1); 30]);
+    let mut r = SlotRun::start(0, 60, 1, 1, None, 0);
+    frame(&mut r, &frames);
+    assert!(r.active());
     s.mash_interrupt = false;
-    assert!(!r.interrupt_on_mash(&s));
-    assert!(r.playback_state(false).running, "continues while the row is Off");
-    frame(&mut r);
-    assert_eq!(r.mode(), Mode::Playback);
+    if s.mash_interrupt { r.stop(); }
+    assert!(r.active(), "continues while the row is Off");
+    frame(&mut r, &frames);
+    assert!(r.active());
     s.mash_interrupt = true;
-    assert!(r.interrupt_on_mash(&s));
-    assert!(!r.playback_state(false).running, "the CPU no longer sees a playback");
-    // Nothing is injected on the next frame: the recorder is idle.
-    let (control, _) = frame(&mut r);
-    assert!(control.write.is_none());
+    if s.mash_interrupt { r.stop(); }
+    assert!(!r.active(), "the CPU no longer sees a playback");
+    let (control, _) = frame(&mut r, &frames);
+    assert!(control.is_none());
 }
 
 /// B4 (decided 2026-11-01, SPEC-input-01 question 7 / SPEC-cpu-01 question 7): while an AI — the pilot or

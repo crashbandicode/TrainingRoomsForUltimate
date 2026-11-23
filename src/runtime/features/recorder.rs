@@ -1,7 +1,7 @@
 //! The input recorder, the runtime half (SPEC-input-01): the glue between the game and
 //! `model::recording`.
 //!
-//! Three entry points, one per stage of the model:
+//! Entry points:
 //! * `on_p1_poll` (from the P1 input poll, after the input delay): stores the frame while recording
 //!   and neutralises P1's output while the recorder owns P1.
 //! * `on_ai_frame` (the inline hook at the AI control function's epilogue): the CPU's control frame.
@@ -9,8 +9,7 @@
 //!   mash-triggered playback, injects the frame, runs the end-of-run check and the chords, applies the
 //!   phase tint and posts the phase notice.
 //! * `tint_player` (from Player 1's fighter frame, `cpu::fighter_frame`): Player 1's fighter is red while its own take is open.
-//! * `request_playback` / `on_state_restored` / `stop`: the entry points the CPU behaviours, the save
-//!   states and the hubs call.
+//! * `request_playback` / `stop`: the entry points the CPU behaviours and hubs call.
 //!
 //! Contract (as the CPU runtime's): game reads happen with no lock held (a game call can re-enter one
 //! of this plugin's hooks), the model is called under one short lock, the answer is applied after the
@@ -24,10 +23,10 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, Ordering};
 
-use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use super::recording_host;
+use crate::engine::rr_host;
 
 use crate::model::chords::Request;
 use crate::model::cpu::facts::PlaybackStart;
@@ -35,10 +34,7 @@ use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::cpu::role::FighterKey;
 use crate::model::cpu::status;
 use crate::model::input_delay::{MappedInputs, Owners};
-use crate::model::recording::{
-    record_chord, ControlCtx, ControlOut, Ended, Inject, MashCtx, Mode, Phase, PostCtx, RecordRefusal, Recorder,
-    RecorderSettings,
-};
+use crate::model::recording::{record_chord, Inject, MashCtx, Phase, RecordRefusal, RecorderSettings};
 use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, hide_cpu, input_display, notices, states};
@@ -47,48 +43,9 @@ use crate::runtime::macros::named_macros;
 use crate::runtime::{published, scene};
 use crate::runtime::ui::pilot_export;
 
-static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
-
-/// Recording or playing back now, published by every taker of `REC` when it lets go (stream/sync slice 3): the question the menu
-/// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
-static ACTIVE: AtomicBool = AtomicBool::new(false);
-#[cfg(feature = "diag")]
-static DIAG_PHASE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
-
-/// `REC`, held; dropping it publishes `ACTIVE` while the lock is still held, so the flag never trails the recorder.
-struct RecGuard(hos_lock::MutexGuard<'static, Recorder>);
-
-impl core::ops::Deref for RecGuard {
-    type Target = Recorder;
-    fn deref(&self) -> &Recorder {
-        &self.0
-    }
-}
-
-impl core::ops::DerefMut for RecGuard {
-    fn deref_mut(&mut self) -> &mut Recorder {
-        &mut self.0
-    }
-}
-
-impl Drop for RecGuard {
-    fn drop(&mut self) {
-        ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
-        #[cfg(feature = "diag")]
-        DIAG_PHASE.store(match self.0.phase() {
-            Phase::Idle => 0, Phase::Lockout => 1, Phase::Standby => 2,
-            Phase::Recording => 3, Phase::Playback => 4,
-        }, Ordering::Release);
-    }
-}
-
-fn rec() -> RecGuard {
-    RecGuard(REC.lock())
-}
-
 /// The recorder's hook was installed with every row of its closure (`model::capabilities`, review R2-1): until
-/// boot says so, the entry points the other features call (`on_p1_poll`, `request_playback`,
-/// `on_state_restored`) do nothing and read no native.
+/// boot says so, the entry points the other features call (`on_p1_poll`, `request_playback`)
+/// do nothing and read no native.
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Boot: the recorder's closure passed its guards and `ai_epilogue` is installed.
@@ -271,7 +228,7 @@ pub unsafe fn on_p1_poll(out: *mut MappedInputs) {
     if recording_host::cpu_role_poll(out) {
         return;
     }
-    if rec().mode() == Mode::None {
+    if !rr_host::slot_running() {
         recording_host::on_player_poll(out);
     }
 }
@@ -369,23 +326,8 @@ unsafe fn on_ai_frame(ai: usize) {
         mash_start(&settings, key, body, facing);
     }
 
-    let ctx = ControlCtx { shulk_dial: shulk };
-    let control = if rec().is_named() {
-        // Before input 0 of a named playback the layer repositions the CPU (it may stop the playback itself): neutral controls until then.
-        let (playing, at_zero) = {
-            let rec = rec();
-            (rec.mode() == Mode::Playback, rec.frame() == 0)
-        };
-        let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-        if playing && at_zero && !named_macros::prepare_playback_start(module) {
-            ControlOut { write: Some(crate::model::recording::Inject::NEUTRAL), hold_cliff_timer: false }
-        } else {
-            rec().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)))
-        }
-    } else {
-        rec().control(&ctx)
-    };
-    if let Some(write) = control.write {
+    let control = rr_host::slot_control(shulk);
+    if let Some(write) = control {
         bump(COUNT_INJECT);
         write_controller(controller, write);
     }
@@ -395,7 +337,7 @@ unsafe fn on_ai_frame(ai: usize) {
         write_controller(controller, write);
     }
     // Aerial Drift: on the mashed aerial's airborne frames the rolled drift holds the stick x the AI just wrote.
-    if let (None, None, Some(key)) = (control.write, role.write, key) {
+    if let (None, None, Some(key)) = (control, role.write, key) {
         let cpu_x = game::natives::pos_x(body.accessor);
         if let Some(drift) = cpu::aerial_drift(key, cpu_x, f32::from(facing)) {
             let stick = drift.unwrap_or(0.0) as i64;
@@ -406,7 +348,7 @@ unsafe fn on_ai_frame(ai: usize) {
             }
         }
     }
-    if control.hold_cliff_timer || role.hold_cliff_timer {
+    if role.hold_cliff_timer {
         let rest = INT_CLIFF_REST.load(Ordering::Acquire);
         if rest != UNRESOLVED
             && game::natives::status_kind(body.accessor) == STATUS_CLIFF_WAIT.load(Ordering::Acquire)
@@ -417,19 +359,13 @@ unsafe fn on_ai_frame(ai: usize) {
     }
 
     let queue_head = key.and_then(cpu::mash_head);
-    let post = rec().post_frame(&PostCtx { facing, queue_head_is_playback: queue_head.is_some() });
-    if post.pop_mash {
-        if let Some(key) = key {
-            cpu::mash_pop(key);
+    if let Some(slot) = rr_host::slot_post() {
+        event("playback_complete", "slot", i64::from(slot), "", 0);
+        if queue_head.is_some() {
+            if let Some(key) = key {
+                cpu::mash_pop(key);
+            }
         }
-    }
-    match post.ended {
-        Some(Ended::Played { slot }) => event("playback_complete", "slot", i64::from(slot), "", 0),
-        Some(Ended::NamedPlayed) => {
-            event("named_playback_complete", "", 0, "", 0);
-            named_macros::end_playback();
-        }
-        None => {}
     }
     chord_step(body);
 
@@ -437,8 +373,7 @@ unsafe fn on_ai_frame(ai: usize) {
     let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
         (phase, 0)
     } else {
-        let rec = rec();
-        (rec.phase(), rec.length())
+        rr_host::slot_phase()
     };
     if let Some(rgb) = phase.tint() {
         tint(body.accessor, rgb);
@@ -446,7 +381,7 @@ unsafe fn on_ai_frame(ai: usize) {
     if LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
     }
-    let state = recording_host::cpu_playback(rec().playback_state(queue_head.is_some()));
+    let state = recording_host::cpu_playback(queue_head.is_some());
     cpu::set_playback(state);
     bump(COUNT_NOTICE);
     host_cpu(controller);
@@ -495,7 +430,8 @@ unsafe fn host_cpu(controller: usize) {
 }
 
 unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, facing: i8) {
-    if rec().mode() != Mode::None {
+    let idle = rr_host::cpu_idle();
+    if !idle {
         return;
     }
     let Some(head) = cpu::mash_head(key) else { return };
@@ -503,27 +439,28 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let status = game::natives::status_kind(body.accessor);
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
-    let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
-    let from = rec().starting_status_of(head);
+    let needs = crate::model::recording::mash_needs_term(idle, settings, Some(head), in_hitstun);
+    let from = rr_host::slot_status(head);
     let term_enabled = needs
-        && match Recorder::term_for_status(&table, from) {
+        && match crate::model::recording::term_for_status(&table, from) {
             Some(c) => {
                 let term = table.get(c);
                 term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
             }
             None => cpu::actionable(body.accessor),
         };
-    let start = rec().mash_should_start(
+    let start = crate::model::recording::mash_should_start(
+        idle,
         settings,
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
     );
     let Some(slot) = start else { return };
-    let result = rec().start_playback(slot, facing);
+    let result = rr_host::slot_start(slot, facing, None);
     match result {
-        Ok(started) => {
-            rec().note_mash_started();
+        Ok(Some(started)) => {
             event("playback_mash", "slot", i64::from(started.slot), "frames", i64::from(started.frames));
         }
+        Ok(None) => {}
         Err(refusal) => {
             // The queue would ask again every frame: drop the head and say why.
             cpu::mash_pop(key);
@@ -587,9 +524,10 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     let catch = ledge && STATUS_CLIFF_CATCH.load(Ordering::Acquire) != UNRESOLVED && cpu_body().is_some_and(|b| {
         game::natives::status_kind(b.accessor) == STATUS_CLIFF_CATCH.load(Ordering::Acquire)
     });
-    let result = if ledge { rec().playback_ledge(slot, facing, catch) } else { rec().start_playback(slot, facing) };
+    let result = rr_host::slot_start(slot, facing, ledge.then_some(catch));
     match result {
-        Ok(started) => event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames)),
+        Ok(Some(started)) => event("playback_shortcut", "slot", i64::from(started.slot), "frames", i64::from(started.frames)),
+        Ok(None) => {}
         Err(refusal) => notices::refuse(refusal.text()),
     }
 }
@@ -609,37 +547,6 @@ unsafe fn record_refusal() -> Option<RecordRefusal> {
     )
 }
 
-// ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
-
-/// Game callback only: numbered-slot transfer executes without heap work.
-pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
-    transfer.execute(&mut rec());
-}
-
-/// The layer's playback (`playback_named`): `frames` frames of its buffer, started on the CPU now.
-pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) -> bool {
-    // SAFETY: called on the game thread with live fighters.
-    unsafe {
-        let Some(body) = cpu_body() else { return false };
-        if !load_consts() {
-            return false;
-        }
-        let facing = facing_of(natives::lr(body.accessor));
-        let frames = u16::try_from(frames).unwrap_or(u16::MAX);
-        let result = rec().start_named_playback(frames, facing_of(recorded_facing), status, facing);
-        match result {
-            Ok(started) => {
-                event("named_playback", "frames", i64::from(started.frames), "", 0);
-                true
-            }
-            Err(refusal) => {
-                notices::refuse(refusal.text());
-                false
-            }
-        }
-    }
-}
-
 /// The CPU's fighter kind now (diag lines of the named layer's roster row).
 #[cfg(feature = "diag")]
 pub fn cpu_kind() -> Option<i32> {
@@ -650,20 +557,7 @@ pub fn cpu_kind() -> Option<i32> {
 /// the shipped NRO).
 #[cfg(feature = "diag")]
 pub fn phase() -> Phase {
-    match DIAG_PHASE.load(Ordering::Acquire) {
-        1 => Phase::Lockout, 2 => Phase::Standby, 3 => Phase::Recording,
-        4 => Phase::Playback, _ => Phase::Idle,
-    }
-}
-
-/// The recorder's frame index (the named layer's diag lines).
-pub fn frame() -> usize {
-    usize::from(rec().frame())
-}
-
-/// The facing the layer restored a pose with (the next playback mirrors against it).
-pub fn set_current_facing(facing: f32) {
-    rec().set_current_facing(facing_of(facing));
+    recording_host::cpu_role_phase().unwrap_or_else(|| rr_host::slot_phase().0)
 }
 
 /// P1's next `frames` polls read as neutral (see `SWALLOW`).
@@ -689,51 +583,9 @@ pub fn request_playback(start: PlaybackStart) {
     }
 }
 
-/// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4). A load starts neither a recording nor a slot
-/// playback (revision 8.2): only the named layer follows up. Package 3 calls it once per restore.
-pub fn on_state_restored() {
-    if !ENABLED.load(Ordering::Acquire) {
-        return;
-    }
-    if crate::runtime::macros::named_active() {
-        // The named layer owns the restore's follow-up.
-        let _scope = HookScope::enter_hook(HookId::NamedRestore);
-        // SAFETY: both fighters were just restored.
-        unsafe {
-            remember_named_pose();
-            named_macros::service_restore();
-        }
-    }
-}
-
-/// The CPU's restored pose for the named layer's input 0 (SPEC-input-01 section 9). Package 3's restore has placed both fighters when
-/// `on_state_restored` runs, so the CPU's position now is the saved anchor: the loaded macro's placement offset applies to it, the
-/// facing is the restored one, and the situation decides the start status (ground: Wait, or Fall for a macro recorded in the air; air:
-/// Fall; any other situation, a ledge, has no pose and the layer refuses with its idle/fall notice). Without this the layer has no pose
-/// at input 0 and refuses every named playback ("Restore the Training setup again", sync-01).
-///
-/// # Safety
-/// Both fighters were just restored.
-unsafe fn remember_named_pose() {
-    use smash::lib::lua_const::{SITUATION_KIND_AIR, SITUATION_KIND_GROUND};
-    let Some(body) = cpu_body() else { return };
-    let (x, y) = (game::natives::pos_x(body.accessor), game::natives::pos_y(body.accessor));
-    let (x, y) = named_macros::restored_target(x, y).unwrap_or((x, y));
-    let situation = game::natives::situation_kind(body.accessor);
-    let air = if situation == *SITUATION_KIND_GROUND {
-        Some(named_macros::restore_in_air())
-    } else if situation == *SITUATION_KIND_AIR {
-        Some(true)
-    } else {
-        None
-    };
-    let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-    named_macros::remember_restore_pose(module, x, y, natives::lr(body.accessor), air);
-}
-
 /// The recorder is in a phase other than Idle (the record lockout, standby, recording or a playback).
 pub fn recording_or_playback() -> bool {
-    ACTIVE.load(Ordering::Acquire) || recording_host::taking()
+    rr_host::slot_running() || recording_host::taking()
 }
 
 pub(super) fn busy_for_drill() -> bool {
@@ -760,14 +612,9 @@ pub fn interrupt_playback() {
         return;
     }
     recording_host::note_mash();
-    let settings = settings();
-    let (stopped, state) = {
-        let mut rec = rec();
-        let stopped = rec.interrupt_on_mash(&settings);
-        (stopped, rec.playback_state(false))
-    };
+    let stopped = settings().mash_interrupt && rr_host::slot_stop();
     // The CPU sees the playback gone before the next injection, also when only the Recording page's run stopped (REC-027).
-    cpu::set_playback(recording_host::cpu_playback(state));
+    cpu::set_playback(recording_host::cpu_playback(false));
     if stopped {
         // The same bookkeeping as `stop`.
         LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
@@ -775,25 +622,19 @@ pub fn interrupt_playback() {
         event("playback_interrupt", "mash", 1, "", 0);
     }
 }
-/// `stop_playback`: a save-state load request, a mash interrupt, the session end, a hot swap, a reset
-/// (decision B8), the named layer.
+/// A save-state load request, mash interrupt, session end, hot swap or reset (decision B8).
 pub fn stop() {
-    let mode = rec().mode();
-    event("recorder_stop", "mode", mode as i64, "", 0);
-    rec().stop();
-    named_macros::cancel_motion();
+    event("recorder_stop", "running", i64::from(rr_host::slot_running()), "", 0);
+    rr_host::slot_stop();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     notices::post_phase(Phase::Idle, 0);
 }
 
-/// A save-state load was accepted (package 3): everything stops, and the named layer plans what the restore will start (a record or a
-/// playback after both fighters are back).
+/// A save-state load was accepted (package 3).
 pub fn on_load_request() {
     stop();
     // SAV-002: the Recording pages macros play in rr_host, which stop does not reach.
     recording_host::note_load();
-    let _scope = HookScope::enter_hook(HookId::NamedRestore);
-    named_macros::begin_restore();
 }
 
 /// The Training reset hub's step: the L+R+A reset stops the recorder (decision B8).
@@ -805,7 +646,7 @@ pub fn on_reset(cause: crate::model::input_delay::Clear) {
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
     super::record_place::session_clear();
-    rec().stop();
+    rr_host::slot_stop();
     named_macros::clear_session();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     chords::session_clear();

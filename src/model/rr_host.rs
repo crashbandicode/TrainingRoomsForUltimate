@@ -27,7 +27,7 @@ use crate::model::input_delay::MappedInputs;
 #[cfg(any(test, target_os = "switch"))]
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
-use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SLOTS};
+use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -36,19 +36,114 @@ const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
 
 static SLOT_SEQ: [AtomicU32; SLOTS] = [const { AtomicU32::new(0) }; SLOTS];
+static SLOT_TAPES: [crate::model::macro_handoff::PlayBuffers<InputFrame>; SLOTS] =
+    [const { crate::model::macro_handoff::PlayBuffers::new() }; SLOTS];
+static SLOT_META: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
+static SLOT_PREPARED: [AtomicBool; SLOTS] = [const { AtomicBool::new(false) }; SLOTS];
+static SLOT_RUN: hos_lock::Mutex<SlotRun> = hos_lock::Mutex::new(SlotRun::idle());
+static SLOT_RUNNING: AtomicBool = AtomicBool::new(false);
 
-pub fn set_slot(_slot: usize, _recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> { Ok(()) }
-fn set_slot_data(_slot: usize, _recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> { Ok(()) }
-pub fn slot_status(_slot: u8) -> i32 { crate::model::cpu::ids::UNRESOLVED }
-pub fn slot_start(_slot: u8, _facing: i8, _ledge: Option<bool>) -> Result<Option<PlayStart>, PlayRefusal> {
-    Err(PlayRefusal::SlotEmpty)
+pub fn set_slot(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
+    if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
+    if let Some(recording) = recording {
+        if recording.frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(recording.frames.len())); }
+    }
+    SLOT_SEQ[slot].fetch_add(1, Ordering::SeqCst);
+    let result = set_slot_data(slot, recording);
+    SLOT_SEQ[slot].fetch_add(1, Ordering::SeqCst);
+    result
 }
-pub fn slot_running() -> bool { false }
-pub fn slot_stop() -> bool { false }
-pub fn slot_post() -> Option<u8> { None }
-pub fn slot_phase() -> (Phase, u16) { (Phase::Idle, 0) }
-pub fn cpu_idle() -> bool { true }
-pub fn slot_control(_shulk_dial: bool) -> Option<Inject> { None }
+
+fn set_slot_data(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
+    if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
+    if let Some(recording) = recording {
+        if recording.frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(recording.frames.len())); }
+    }
+    let tape = &SLOT_TAPES[slot];
+    // SAFETY: the recording worker is the single slot publisher.
+    unsafe {
+        if !SLOT_PREPARED[slot].load(Ordering::Acquire) {
+            tape.prepare(SLOT_FRAMES);
+            SLOT_PREPARED[slot].store(true, Ordering::Release);
+        }
+        if let Some(recording) = recording.filter(|r| !r.frames.is_empty()) {
+            let facing = u64::from(recording.start.facing < 0.0);
+            let status = u64::from(recording.start.status as u32);
+            SLOT_META[slot].store(status | facing << 32, Ordering::SeqCst);
+            tape.fill(&recording.frames);
+        } else {
+            tape.retract();
+        }
+    }
+    Ok(())
+}
+
+fn slot_snapshot(slot: usize) -> Option<(u64, usize, u32)> {
+    let before = SLOT_SEQ[slot].load(Ordering::SeqCst);
+    if before & 1 != 0 { return None; }
+    let meta = SLOT_META[slot].load(Ordering::SeqCst);
+    let len = SLOT_TAPES[slot].len();
+    let generation = SLOT_TAPES[slot].generation();
+    (SLOT_SEQ[slot].load(Ordering::SeqCst) == before).then_some((meta, len, generation))
+}
+
+pub fn slot_status(slot: u8) -> i32 {
+    let at = usize::from(slot);
+    if at >= SLOTS { return crate::model::cpu::ids::UNRESOLVED; }
+    match slot_snapshot(at) {
+        Some((meta, len, _)) if len != 0 => meta as u32 as i32,
+        _ => crate::model::cpu::ids::UNRESOLVED,
+    }
+}
+
+pub fn slot_start(slot: u8, facing: i8, ledge: Option<bool>) -> Result<Option<PlayStart>, PlayRefusal> {
+    let at = usize::from(slot);
+    if at >= SLOTS { return Err(PlayRefusal::SlotOutOfRange); }
+    let Some((meta, len, generation)) = slot_snapshot(at) else { return Ok(None) };
+    if len == 0 { return Err(PlayRefusal::SlotEmpty); }
+    let recorded_facing = if meta & (1 << 32) != 0 { -1 } else { 1 };
+    *SLOT_RUN.lock() = SlotRun::start(slot, len as u16, recorded_facing, facing, ledge, generation);
+    SLOT_RUNNING.store(true, Ordering::Release);
+    Ok(Some(PlayStart { slot, frames: len as u16 }))
+}
+
+pub fn slot_running() -> bool { SLOT_RUNNING.load(Ordering::Acquire) }
+
+pub fn slot_stop() -> bool {
+    let mut run = SLOT_RUN.lock();
+    let running = run.active();
+    run.stop();
+    SLOT_RUNNING.store(false, Ordering::Release);
+    running
+}
+
+pub fn slot_post() -> Option<u8> {
+    let mut run = SLOT_RUN.lock();
+    let ended = run.post();
+    SLOT_RUNNING.store(run.active(), Ordering::Release);
+    ended
+}
+
+pub fn slot_phase() -> (Phase, u16) {
+    let run = SLOT_RUN.lock();
+    if run.active() { (Phase::Playback, run.length()) } else { (Phase::Idle, 0) }
+}
+
+pub fn cpu_idle() -> bool { !slot_running() && !cpu_playback_blocks_drill() }
+
+pub fn slot_control(shulk_dial: bool) -> Option<Inject> {
+    let mut run = SLOT_RUN.lock();
+    if !run.active() { return None; }
+    let tape = &SLOT_TAPES[usize::from(run.slot())];
+    let generation = run.generation();
+    let out = run.control(shulk_dial, |index| {
+        if tape.generation() != generation { return None; }
+        let frame = tape.frame_at(usize::from(index));
+        (tape.generation() == generation).then_some(frame).flatten().map(to_mapped)
+    });
+    SLOT_RUNNING.store(run.active(), Ordering::Release);
+    out
+}
 
 static RECORD_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
 /// Ask before switching fighter (published with the settings): Off keeps the current fighter for every question here.
@@ -579,7 +674,10 @@ pub(crate) fn cpu_controller(take_frame: impl FnOnce() -> Option<InputFrame>) ->
     }
     // Sample ownership before the pop: the worker can enqueue the tail and end the run concurrently.
     let running = RUN_CPU.load(Ordering::Acquire);
-    take_frame().map(playback_controller).or_else(|| {
+    take_frame().map(|frame| {
+        slot_stop();
+        playback_controller(frame)
+    }).or_else(|| {
         (running && !CUT_CPU.load(Ordering::Acquire)).then_some(Inject::NEUTRAL)
     })
 }
@@ -655,10 +753,11 @@ pub fn note_load() {
 /// library macro playing on the CPU counted as a running playback. A parry practice plays pass by pass: while passes
 /// are owed its playback runs between them too, so a configured Mash asks it to stop (Parry ignores that) instead of
 /// queueing an action on top of the replay (Eden accept-8, 26c93533). Game hooks read this using atomics.
-pub fn cpu_playback(recorder: PlaybackState) -> PlaybackState {
+pub fn cpu_playback(queued: bool) -> PlaybackState {
     let owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0
         && !RESET_CPU.load(Ordering::Acquire);
-    PlaybackState { running: recorder.running || role_playing(Role::Cpu) || owed, ..recorder }
+    PlaybackState { running: slot_running() || role_playing(Role::Cpu) || owed,
+        recording: false, standby: false, queued }
 }
 
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
@@ -2283,6 +2382,11 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 #[cfg(test)]
 fn reset_host() {
+    slot_stop();
+    for tape in &SLOT_TAPES {
+        // SAFETY: host tests serialize the single publisher.
+        unsafe { tape.retract(); }
+    }
     for seq in &SLOT_SEQ { seq.store(0, Ordering::Release); }
     INPUT_MODE.store(0, Ordering::Release); DRILL_ARMED.store(false, Ordering::Release); for p in &INPUT_POLLS { p.store(0, Ordering::Release); } for e in &INPUT_EPOCH { e.store(0, Ordering::Release); } *INPUT_STATE.lock() = [InputTake::EMPTY; 2]; for p in &INPUT_RESULT { p.write(InputTake::EMPTY); } *lock(&SAVED_DRILL) = None;
     SLOTS_DIRTY.store(1, Ordering::Release);
@@ -2385,7 +2489,7 @@ mod tests {
     }
 
     fn slot_playback(queued: bool) -> PlaybackState {
-        cpu_playback(PlaybackState { running: false, recording: false, standby: false, queued })
+        cpu_playback(queued)
     }
 
     fn a_playback_slot_run_plays_its_macro_through_the_cpu_pad() {
@@ -2489,6 +2593,10 @@ mod tests {
         assert_eq!(slot_start(0, 1, None), Ok(None));
         assert_eq!(slot_status(0), crate::model::cpu::ids::UNRESOLVED);
         assert!(!slot_running());
+        SLOT_META[0].store(22 | (1_u64 << 32), Ordering::SeqCst);
+        assert_eq!(SLOT_TAPES[0].frame_at(0), Some(old.frames[0]));
+        assert_eq!(slot_start(0, 1, None), Ok(None));
+        assert_eq!(slot_status(0), crate::model::cpu::ids::UNRESOLVED);
         set_slot_data(0, Some(&new)).unwrap();
         assert_eq!(slot_start(0, 1, None), Ok(None));
         SLOT_SEQ[0].fetch_add(1, Ordering::Release);
@@ -3547,9 +3655,9 @@ mod tests {
         let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
         assert!(!RUN_CPU.load(Ordering::Acquire) && role_frames(Role::Cpu).is_empty(), "between the passes");
         assert_eq!(PARRY_PASSES.load(Ordering::Acquire), 1, "pass 2 is owed");
-        assert!(cpu_playback(PlaybackState::default()).running, "the CPU still sees the practice's playback running");
+        assert!(cpu_playback(false).running, "the CPU still sees the practice's playback running");
         set_parry(false);
-        assert!(!cpu_playback(PlaybackState::default()).running, "Parry Off ends it");
+        assert!(!cpu_playback(false).running, "Parry Off ends it");
         reset_host();
     }
 
@@ -3573,7 +3681,7 @@ mod tests {
         assert!(s.playback_mash, "Mash interrupts playback is On");
         let mash_now = || {
             let mut mash = Mash::new();
-            let ctx = BufferContext { playback: cpu_playback(PlaybackState::default()) };
+            let ctx = BufferContext { playback: cpu_playback(false) };
             let out = mash.buffer_menu_mash(&s, &mut Rng::new(7), ctx, Some(Action::JUMP));
             (out, mash.queue.is_empty())
         };
@@ -3612,7 +3720,7 @@ mod tests {
         let owed_after_start = PARRY_PASSES.load(Ordering::Acquire);
         let after_start = mash_now();
         RUN_CPU.store(false, Ordering::Release);
-        let running_after_end = cpu_playback(PlaybackState::default()).running;
+        let running_after_end = cpu_playback(false).running;
         reset_host();
 
         assert_eq!(during_restart, Some((Buffered::StopPlayback, true)), "during final pass preparation");
@@ -3693,8 +3801,7 @@ mod tests {
         on_chords(false, false, true);
         assert!(cpu_playback_blocks_drill(), "a pending Play has priority over drill Start");
         tick(&root);
-        let legacy = crate::model::recording::Recorder::new();
-        assert_eq!(legacy.phase(), crate::model::recording::Phase::Idle);
+        assert_eq!(slot_phase(), (Phase::Idle, 0));
         assert!(!taking(), "fighter-mismatch busy excludes library playback");
         assert!(RUN_CPU.load(Ordering::Acquire));
         assert!(cpu_playback_blocks_drill(), "Start must yield while a library macro owns the CPU");
@@ -3743,21 +3850,19 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("cpu-mash");
-        let idle = PlaybackState::default();
         active_plain_macro(&root, Role::Cpu, 30);
-        assert!(!cpu_playback(idle).running, "nothing plays yet");
+        assert!(!cpu_playback(false).running, "nothing plays yet");
         on_chords(false, false, true);
         tick(&root);
         assert!(take_cpu_frame().is_some());
-        let seen = cpu_playback(idle);
+        let seen = cpu_playback(false);
         assert!(seen.possesses_cpu(), "the CPU's library run is a running playback: {seen:?}");
         assert!(!covered_setting_applies(seen, false));
-        let recording = PlaybackState { recording: true, ..idle };
-        assert!(cpu_playback(recording).recording, "the recorder's own state is kept");
+        assert!(!cpu_playback(false).recording, "slot playback does not report a recording");
         note_mash();
         tick(&root);
         assert!(take_cpu_frame().is_none(), "the mash stopped the CPU's run");
-        assert!(!cpu_playback(idle).running);
+        assert!(!cpu_playback(false).running);
     }
 
     /// SAV-002 (p3-rec-xps-6 rows 20/21): a save-state load stops both roles' runs and starts nothing; a Play's own warp
@@ -3766,7 +3871,6 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("load-stops");
-        let idle = PlaybackState::default();
         active_plain_macro(&root, Role::Cpu, 30);
         on_chords(false, false, true);
         tick(&root);
@@ -3777,7 +3881,7 @@ mod tests {
         let t = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(t.diags.iter().any(|l| l == "screen=playback load=1"), "{:?}", t.diags);
         assert!(take_cpu_frame().is_none(), "the load stopped the CPU's run");
-        assert!(!cpu_playback(idle).running && !playing());
+        assert!(!cpu_playback(false).running && !playing());
         // A Play pressed with the load in the same tick starts nothing.
         on_chords(false, false, true);
         note_load();
@@ -3798,17 +3902,16 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("cpu-mash-now");
-        let idle = PlaybackState::default();
         active_plain_macro(&root, Role::Cpu, 30);
         on_chords(false, false, true);
         tick(&root);
-        assert!(cpu_playback(idle).running, "the CPU's run plays");
+        assert!(cpu_playback(false).running, "the CPU's run plays");
         note_mash();
-        assert!(!cpu_playback(idle).running, "the CPU sees its macro stopped at once, so its mash can act in the trigger");
+        assert!(!cpu_playback(false).running, "the CPU sees its macro stopped at once, so its mash can act in the trigger");
         assert!(take_cpu_frame().is_none(), "no further macro frame reaches the CPU");
         // Astra 08:38Z: a worker already inside step_role publishes its frame after the mash cut the run.
         publish(Role::Cpu, InputFrame { buttons: 99, ..InputFrame::default() });
-        assert!(take_cpu_frame().is_none() && !cpu_playback(idle).running, "an in-flight producer cannot refill a cut run");
+        assert!(take_cpu_frame().is_none() && !cpu_playback(false).running, "an in-flight producer cannot refill a cut run");
     }
 
     /// A live frame for either role reaches the hook on this tick while the worker holds the playback machine.

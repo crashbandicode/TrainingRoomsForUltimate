@@ -52,6 +52,13 @@ fn slot_capture_and_library_pad_priority_is_preserved() {
     let recorder = include_str!("../src/runtime/features/recorder.rs");
     ordered(body(recorder, "on_ai_frame"),
         &["slot_control(shulk)", "cpu_role_control()", "host_cpu(controller)"]);
+    let interrupt = body(recorder, "interrupt_playback");
+    ordered(interrupt, &["settings().mash_interrupt && rr_host::slot_stop()", "cpu_playback(false)"]);
+    let start = body(recorder, "mash_start");
+    ordered(start, &["rr_host::cpu_idle()", "rr_host::slot_status(head)", "term_for_status(&table, from)",
+        "is_enable_transition_term", "None => cpu::actionable(body.accessor)", "rr_host::slot_start",
+        "Ok(Some(started))", "Ok(None) => {}", "Err(refusal)", "cpu::mash_pop(key)"]);
+    assert!(!start.contains("SLOT_RUN.lock()"));
 }
 
 /// Step 2a: a settings publish (the menu worker's commit, the diag reload) only notes the roster's re-plan and the preload
