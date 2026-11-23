@@ -456,6 +456,8 @@ Player 1's crosshair chooses a point on the main floor.
 While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
 is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
 out of the setup puts the CPU back where it stood. (Eden, 2026-11-23; untested on hardware.)
+If the drill has a CPU fighter of its own, **B** puts that fighter at the CPU's place, and the Training CPU returns
+when you close the menu. (Not run in Eden yet.)
 
 Juggler has four pages: CPU spot, Percent, Player 1 start, then Preview. Its CPU and Player 1 pages use the same
 crosshair controls; the Player 1 start can be on a floor or platform. The Percent page still uses the D-pad to change

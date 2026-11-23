@@ -2565,3 +2565,11 @@ ceiling = 197637
 date = "2026-11-23"
 reason = "Install 2, integration total after merging the F10 stop follow-ups: 197615 (integrator entry above, measured with F16 and the bridge event lines) + 22 (F10 stop follow-ups, entry above, measured on a0e9e1cb) = 197637 measured on the merged tree, with no spare. The integrator added no code."
 approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and the F10 stop follow-ups reviewed READY (rv-preview-vis PASS 21:41:06Z and 21:59:34Z, rv-fusion-g2-3 PASS 21:37:30Z and 21:59:59Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197655
+date = "2026-11-23"
+reason = "F11 swap-back: Guard the Edge or Juggler with its own CPU fighter, left from the picker with B, asked for the original fighter before the picker had put the held body back, so the original came back at the picked start and could be KO’d. The practice CPU service now waits until the picker has let go and its menu request was taken. Measured 197655 on install 2 64a7c06b plus the fix, 18 above 197637."
+approved_by = "tr-primary-2 ruling 2026-11-23 21:46:22Z (build fix/f11-swap-back, target install 2), under the operator’s measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the gate."

@@ -6,7 +6,7 @@
   "on_failure": "continue",
   "recover": [
     {
-      "run": "routes:tr_idle"
+      "run": "f11.py:recover"
     }
   ],
   "gates": {
@@ -324,6 +324,52 @@
               "in_view",
               "in_view",
               "in_view"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-t4",
+      "start": "training",
+      "end": "training",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:swap_back",
+          "args": {
+            "cpu_kind": 32,
+            "drill_kind": 1,
+            "drill_choice": 2,
+            "drill_gravity": 0.085,
+            "ident": "6",
+            "name": "guard-swap-back"
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-t5",
+      "start": "training",
+      "end": "training",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:floor_attach",
+          "args": {
+            "ident": "6",
+            "name": "floor-attach",
+            "cpu": [
+              -100,
+              -20
+            ],
+            "player": [
+              45,
+              0
             ]
           }
         }

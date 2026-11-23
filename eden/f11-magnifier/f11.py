@@ -80,6 +80,85 @@ def ready_body_problem(body, cpu_kind):
     return None
 
 
+FIGHTER_LINE = re.compile(r"\[Bridge\] fighter entry=(\d+) kind=(-?\d+) x=(\S+) y=(\S+) lr=\S+ dmg=\S+ status=(-?\d+) "
+                          r"situation=(-?\d+) stock=-?\d+ dead=(-?\d+) ")
+
+
+def fighter_lines(lines, entry):
+    """The bridge's own fighter lines of one entry, in order, as the bodies the checks compare."""
+    found = []
+    for line in lines:
+        match = FIGHTER_LINE.search(line)
+        if match and int(match.group(1)) == entry:
+            kind, x, y, status, situation, dead = match.group(2, 3, 4, 5, 6, 7)
+            found.append({"kind": int(kind), "x": float(x), "y": float(y), "status": int(status),
+                          "situation": int(situation), "dead": int(dead), "line": line.strip()[:200]})
+    return found
+
+
+def put_back(lines, entry):
+    """Where the put-back left the body: the entry's first fighter line after the put-back's status event (Wait from
+    Fall, grounded). Judged there, not a second later, when a CPU may have moved by itself (tr-primary-2, 2026-11-23
+    22:09:57Z). None while either line is still to come. Pure."""
+    event = re.compile(rf"cpu_event status entry={entry} .*status=0 prev=14 situation=0 ")
+    at = next((index for index, line in enumerate(lines) if event.search(line)), None)
+    if at is None:
+        return None
+    return next(iter(fighter_lines(lines[at + 1:], entry)), None)
+
+
+def put_back_problem(body, origin, kind):
+    """Why the put-back's line is not the fighter `kind` standing at the origin (None: it is). Pure; no tolerance."""
+    if body is None:
+        return "no fighter line followed a put-back event"
+    if body.get("kind") != kind:
+        return f"the first line after the put-back is kind {body.get('kind')!r}, not the held fighter {kind}: {body!r}"
+    return back_problem(body, origin)
+
+
+def attach(x, a):
+    """The x the floor-attach hypothesis predicts for a body placed at `x` on a floor whose reference is `a`."""
+    return _f32(_f32(_f32(x) - _f32(a)) + _f32(a))
+
+
+def attach_verdict(placed, read, candidates):
+    """Which of `candidates` ({name: a}) explains the x read after a floor placement at `placed`: (name, detail).
+    ('SETUP', why) when this x gives the candidates the same word; ('none', why) when no candidate fits the read.
+    The detail says whether the fitting word is also the placed word: such a read tells the candidates apart but
+    does not show an attach by itself (at a whole x from 43 to 48 the floor end leaves x as placed)."""
+    words = {name: _word(attach(placed, a)) for name, a in candidates.items()}
+    if len(set(words.values())) != len(words):
+        return "SETUP", f"x {placed!r} does not tell the candidates apart: {words}"
+    fits = [name for name, word in words.items() if word == _word(read)]
+    if not fits:
+        return "none", f"read {_word(read)} {read!r}; placed {_word(placed)}; candidates {words}"
+    return fits[0], {"words": words, "placed": _word(placed), "read": _word(read),
+                     "read_is_the_placed_word": _word(read) == _word(placed)}
+
+
+def _log_mark(ctx):
+    log = Path(routes.instance_path(ctx, "bridge_log"))
+    return log, log.stat().st_size
+
+
+def _lines_since(mark):
+    log, offset = mark
+    with log.open("rb") as handle:
+        handle.seek(offset)
+        return handle.read().decode(errors="replace").splitlines()
+
+
+def _await(ctx, mark, find, cap=4.0):
+    """`find(lines since the mark)` once it is not None, or None after `cap` seconds."""
+    until = time.monotonic() + cap
+    while True:
+        ctx.check_stop()
+        found = find(_lines_since(mark))
+        if found is not None or time.monotonic() > until:
+            return found
+        time.sleep(0.1)
+
+
 def _save(ctx, name, body):
     (Path(ctx.row_dir) / f"f11-{name}.json").write_text(json.dumps(body, indent=2) + "\n")
     return body
@@ -89,7 +168,11 @@ def _cpu_body(ctx, scene):
     run = routes.instance_path(ctx, "bridge_log").parent
     bodies = switch_hw.bridge_state(run, ("fighters",), cap=4)["fighters"]
     body = bodies.get(4 if scene == "lobby" else 1, {})
-    return {key: body.get(key) for key in ("kind", "x", "y", "situation", "status", "dmg")}
+    return {key: body.get(key) for key in ("kind", "x", "y", "situation", "status", "dmg", "dead")}
+
+
+def _entry(scene):
+    return 4 if scene == "lobby" else 1
 
 
 def at_rest(body, earlier):
@@ -239,15 +322,116 @@ def picker(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", points=(), e
         held = held_problem(s["cpu_body"], _published(s), cpu_gravity)
         if held:
             problems.append(f"{s['name']}: {held}")
+    mark = _log_mark(ctx)
     edge._press(ctx, scene, "B", open="1")
-    time.sleep(1.0)
-    body["back"] = _cpu_body(ctx, scene)
+    body["back"] = _await(ctx, mark, lambda lines: put_back(lines, _entry(scene)))
     body["back_still"] = str(ctx.shot(f"{name}-left"))
     edge._close(ctx, scene)
-    back = back_problem(body["back"], origin)
+    back = put_back_problem(body["back"], origin, cpu_kind)
     if back:
         problems.append(back)
     return _finish(ctx, name, body, problems)
+
+
+def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6", scene="training", name="swap-back"):
+    """Row f11-t4: a drill with its own CPU fighter, its picker, B. The drill's fighter must be put back where the
+    CPU stood, and the original fighter must come back there, standing, with its KO count unchanged.
+
+    `drill_choice`: the fighter's index in the drill's fighter setting (0 is Current CPU); `drill_kind` and
+    `drill_gravity`: that fighter's kind and one gravity step, for the held check. The setting is put back at the end.
+    Red take: early install 2 boot, Yoga, f11-t1 (the first line after the put-back was the original, at the held
+    point, in the air; it was KO'd).
+    """
+    key = "edge_cpu_fighter" if ident == "6" else "juggle_cpu_fighter"
+    entry = _entry(scene)
+    origin = _fixture(ctx, scene, cpu_kind)
+    before = list(routes._current_settings(ctx, 8)["menu"][key])
+    chosen = [int(index == drill_choice) for index in range(len(before))]
+    body = {"ident": ident, "scene": scene, "origin": origin, "setting": key, "setting_before": before}
+    problems = []
+    try:
+        routes.tr_settings(ctx, values={key: chosen})
+        if list(routes._current_settings(ctx, 8)["menu"][key]) != chosen:
+            raise RuntimeError(f"SETUP: {key} did not read back choice {drill_choice}")
+        state = edge._setup(ctx, scene, ident)
+        seen = _observe(ctx, scene, state, f"{name}-held")
+        body["seen"] = [seen]
+        if seen["cpu_body"].get("kind") != drill_kind:
+            raise RuntimeError(f"SETUP: the picker holds kind {seen['cpu_body'].get('kind')!r}, not the drill's {drill_kind}")
+        held = held_problem(seen["cpu_body"], _published(seen), drill_gravity)
+        if held or seen.get("problem"):
+            problems.append(f"{seen['name']}: {held or seen['problem']}")
+        mark = _log_mark(ctx)
+        edge._press(ctx, scene, "B", open="1")
+        body["back"] = _await(ctx, mark, lambda lines: put_back(lines, entry))
+        back = put_back_problem(body["back"], origin, drill_kind)
+        if back:
+            problems.append(back)
+        body["back_still"] = str(ctx.shot(f"{name}-menu"))
+        # The roster does not change the CPU under the open menu: the original comes back once it is closed.
+        edge._close(ctx, scene)
+        arrived = _await(ctx, mark, lambda lines: next(
+            (line for line in fighter_lines(lines, entry) if line["kind"] == cpu_kind), None), cap=12.0)
+        last = [line for line in fighter_lines(_lines_since(mark), entry) if line["kind"] == drill_kind][-1:]
+        body["original"], body["drill_last"] = arrived, (last[0] if last else None)
+        if arrived is None:
+            problems.append(f"the original fighter (kind {cpu_kind}) did not come back within 12 s of the menu closing")
+        else:
+            took = back_problem(arrived, last[0]) if last else "no line of the drill's fighter after B"
+            if took:
+                problems.append(f"the original did not take the drill fighter's place: {took}")
+            if scene == "training" and back_problem(arrived, origin):
+                problems.append(f"the original came back away from the CPU's place: {back_problem(arrived, origin)}")
+            rest = _fixture(ctx, scene, cpu_kind)
+            body["rest"] = rest
+            if rest.get("dead") != origin.get("dead"):
+                problems.append(f"the KO count went from {origin.get('dead')!r} to {rest.get('dead')!r}")
+        body["original_still"] = str(ctx.shot(f"{name}-original"))
+    finally:
+        _save(ctx, name, {**body, "problems": problems})
+        routes.tr_settings(ctx, values={key: before})
+        if list(routes._current_settings(ctx, 8)["menu"][key]) != before:
+            raise RuntimeError(f"SETUP: {key} was not put back")
+    return _finish(ctx, name, body, problems)
+
+
+def floor_attach(ctx, ident="6", scene="training", cpu=(-100, -20), player=(45, 0), floor_end=-79.9856,
+                 ledge=-85.9856, name="floor-attach"):
+    """Row f11-t5, the deciding row for the one-step x after a put-back (tr-primary-2, 2026-11-23 22:09:57Z).
+
+    Hypothesis: a body placed on a floor gets x = f32(f32(x - a) + a) for a reference `a` at the floor's left side.
+    The readings so far do not tell the floor's end from the ledge. No flown tool parks a room partner at a chosen x,
+    so this row uses the same placement call on Player 1 (the drill's start stands Player 1 on the picked Player
+    point). At a whole x from 43 to 48 the ledge gives the word one step below and the floor end leaves x as placed.
+    The row records which one Player 1's first standing line after the start has; it fails only when neither fits.
+    It tells the two candidates apart. It does not test the hypothesis against "no attach at all": that rests on
+    the room's Juggler reading, where x did change.
+    """
+    state = edge._move(ctx, scene, edge._setup(ctx, scene, ident), tuple(cpu))
+    state = edge._move(ctx, scene, edge._select(ctx, scene, ident, 2), tuple(player))
+    edge._select(ctx, scene, ident, 3)
+    point = edge_ready_exact.save_picked(ctx, keep=False)
+    placed = float(point["p1"][0])
+    before = edge._read(ctx, scene)
+    mark = _log_mark(ctx)
+    ctx.play(edge.TAP["A"])
+    edge.observe(ctx, scene, lambda values: values["game.running"] == "1" and values["notice.body"].startswith("Ready"),
+                 "the running drill reached Ready", before, cap=3)
+    stood = _await(ctx, mark, lambda lines: next(
+        (line for line in fighter_lines(lines, 0) if line["situation"] == 0 and line["status"] == 0), None))
+    body = {"ident": ident, "scene": scene, "picked": point, "placed_x": placed, "player_line": stood,
+            "candidates": {"floor_end": floor_end, "ledge": ledge}}
+    if stood is None:
+        verdict, detail = "none", "Player 1 wrote no standing line after the start"
+    else:
+        verdict, detail = attach_verdict(placed, stood["x"], body["candidates"])
+    body["verdict"], body["detail"] = verdict, detail
+    _save(ctx, name, body)
+    edge._stop(ctx, scene, ident)
+    edge._close(ctx, scene)
+    if verdict in ("SETUP", "none"):
+        raise RuntimeError(f"{name}: {verdict}: {detail}")
+    return {"verdict": verdict, "placed_x": placed, "read_x": stood["x"], "words": detail}
 
 
 def through(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", cpu=(-100, -20), player=(-40, 0), expect=None,

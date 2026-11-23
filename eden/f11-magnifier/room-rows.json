@@ -1,0 +1,165 @@
+{
+  "about": "F11 rows for a waiting room: splice into a room flight after its own entry. The first partner must be Zero Suit Samus (kind 32); the rows stop as a fixture error otherwise.",
+  "rows": [
+    {
+      "id": "f11-w1",
+      "start": "lobby",
+      "end": "lobby",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:picker",
+          "args": {
+            "cpu_kind": 32,
+            "cpu_gravity": 0.12,
+            "scene": "lobby",
+            "ident": "6",
+            "name": "guard",
+            "points": [
+              [
+                -130,
+                -30
+              ],
+              [
+                -200,
+                -30
+              ],
+              [
+                -230,
+                60
+              ],
+              [
+                -150,
+                -100
+              ]
+            ],
+            "expect": [
+              "in_view",
+              "in_view",
+              "magnifier",
+              "magnifier",
+              "magnifier"
+            ]
+          }
+        }
+      ],
+      "recover": [
+        {
+          "run": "f11.py:recover",
+          "args": {
+            "scene": "lobby"
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-w3",
+      "start": "lobby",
+      "end": "lobby",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:picker",
+          "args": {
+            "cpu_kind": 32,
+            "cpu_gravity": 0.12,
+            "scene": "lobby",
+            "ident": "7",
+            "name": "juggle",
+            "points": [
+              [
+                0,
+                100
+              ],
+              [
+                -100,
+                130
+              ]
+            ],
+            "expect": [
+              "in_view",
+              "in_view",
+              "magnifier"
+            ]
+          }
+        }
+      ],
+      "recover": [
+        {
+          "run": "f11.py:recover",
+          "args": {
+            "scene": "lobby"
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-w4",
+      "start": "lobby",
+      "end": "lobby",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:swap_back",
+          "args": {
+            "cpu_kind": 32,
+            "drill_kind": 1,
+            "drill_choice": 2,
+            "drill_gravity": 0.085,
+            "scene": "lobby",
+            "ident": "6",
+            "name": "guard-swap-back"
+          }
+        }
+      ],
+      "recover": [
+        {
+          "run": "f11.py:recover",
+          "args": {
+            "scene": "lobby"
+          }
+        }
+      ]
+    },
+    {
+      "id": "f11-w5",
+      "start": "lobby",
+      "end": "lobby",
+      "role": "test",
+      "start_gate": "loaded",
+      "on_failure": "continue",
+      "steps": [
+        {
+          "run": "f11.py:floor_attach",
+          "args": {
+            "scene": "lobby",
+            "ident": "6",
+            "name": "floor-attach",
+            "cpu": [
+              -100,
+              -20
+            ],
+            "player": [
+              45,
+              0
+            ]
+          }
+        }
+      ],
+      "recover": [
+        {
+          "run": "f11.py:recover",
+          "args": {
+            "scene": "lobby"
+          }
+        }
+      ]
+    }
+  ]
+}
