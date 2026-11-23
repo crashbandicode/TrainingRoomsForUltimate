@@ -2517,3 +2517,51 @@ ceiling = 197004
 date = "2026-11-23"
 reason = "F14: a direction mark on the move in the frame strip: an angled side tilt or side smash from its animation name, each entry into a directional special's travel status with the way the fighter moved (model::aim, the ten fighters of the F13 trace), drawn in the lane's existing label boxes and beside the move's name in LAST and LINK, with the bridge line strip.aims. The item is 368 lines: 353 as first reviewed (196713 on dd6aa1de, 196673 on 152629cd against that head 196320) and 15 for the two review fixes (a later direction reaches every copy of its move; the bridge reports only marks whose label box exists). Measured 196833 on its merge 4e34b3a0 with install 2 d50a0577, 368 above the F9 entry 196465. On this merge with install 2 1a0b3a64 (F11 added, 196636 by the integrator entry above) the total is 196636 + 368 = 197004, the count of this head gate, with no spare."
 approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F14, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197328
+date = "2026-11-23"
+reason = "F10: a directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 197328 on install 2 e1b5cf15 with F10, with no spare: 324 above the last entry's 197004, which F14 measured before GJ4-8 was merged."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197356
+date = "2026-11-23"
+reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 197356, 28 above the measured merged base 0acfe3a1 (197328)."
+approved_by = "F16 fix-build handoff 2026-11-23, item-specific entry under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197587
+date = "2026-11-23"
+reason = "Bridge event lines for menu holds, clip state, and waiting-room panel changes. Measured 197587 on install 2 0acfe3a1, which alone measures 197328, so they add 259."
+approved_by = "tr-primary-2's bridge-gaps brief, 2026-11-23 ~17:58Z (the operator's standing rule that the bridge is the go-to for test checks and bridge additions are welcome); operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197609
+date = "2026-11-23"
+reason = "F10 stop follow-ups: after X or B the drill preview's page returns once the player has stopped, and a preview's run ends with its queued frames dropped when the card's recordings cannot be read. They add 22 lines: 197350 measured on 0dde6d65 (install 2 0acfe3a1 with both) against 197328 there. 197587 (install 2 a0e9e1cb) + 22 = 197609 on this head, with no spare."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10; reviews rv-preview-vis 21:16:20Z and 21:37:25Z, rv-fusion-g2-3 21:16:27Z and 21:37:30Z; tr-primary-2 ruling 21:40:48Z (F10 makes the read-error change in rr_host.rs); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197615
+date = "2026-11-23"
+reason = "Install 2, integration total after merging F16 beside the bridge event lines: 197587 (bridge entry, measured on 0acfe3a1 plus the bridge lines) + 28 (F16, entry above, measured on 0acfe3a1) = 197615 measured on the merged tree, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and F16 reviewed READY (rv-edge-juggle-sol PASS 22:04:25Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197637
+date = "2026-11-23"
+reason = "Install 2, integration total after merging the F10 stop follow-ups: 197615 (integrator entry above, measured with F16 and the bridge event lines) + 22 (F10 stop follow-ups, entry above, measured on a0e9e1cb) = 197637 measured on the merged tree, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and the F10 stop follow-ups reviewed READY (rv-preview-vis PASS 21:41:06Z and 21:59:34Z, rv-fusion-g2-3 PASS 21:37:30Z and 21:59:59Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."

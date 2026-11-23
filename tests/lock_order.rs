@@ -105,6 +105,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
          which takes no lock",
     ),
     ("press", &["editor", "list", "m"], PANELS),
+    ("press", &["drill_preview"], "engine::macro_ui::drill_preview::DrillPreview::press is pure and takes no lock"),
     ("view", &["bundle", "editor", "extras", "ui"], PANELS),
     ("target", &["active", "cycle", "editor", "proof"], "combos::Ui::target is private to ui/combos.rs"),
     ("target", &["GRADER"], "Grader::target is a lock-free model ring enqueue"),

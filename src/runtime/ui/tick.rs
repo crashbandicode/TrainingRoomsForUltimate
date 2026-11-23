@@ -146,7 +146,8 @@ pub unsafe fn tick(layout: *mut Layout, registration: bool) {
             alpha = if ext || popup { 255 } else { fade_alpha(count) };
         }
     }
-    let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire);
+    // An input drill's preview hides the menu and the pop-up while it plays (F10).
+    let visible = showing && !PAUSE_ACTIVE.load(Ordering::Acquire) && !state::PREVIEW_HIDES.load(Ordering::Acquire);
     MENU_SHOWN.store(visible, Ordering::Release);
     // The zone editor's crop window (design 3) is drawn on the menu's own rectangles while the menu is closed.
     let editing = !visible && !PAUSE_ACTIVE.load(Ordering::Acquire) && crate::runtime::features::egg_zone::wizard_active();

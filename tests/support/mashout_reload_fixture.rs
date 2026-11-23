@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 static OWN_CPU: AtomicUsize = AtomicUsize::new(0);
 static CPU_ENTRY: AtomicUsize = AtomicUsize::new(0);
 static ACCESSOR: AtomicUsize = AtomicUsize::new(0);
@@ -16,6 +16,17 @@ static P1_STOP: AtomicBool = AtomicBool::new(false);
 static CPU_STOP: AtomicBool = AtomicBool::new(false);
 static LINKED: AtomicBool = AtomicBool::new(false);
 static REQUEST_COUNT: AtomicUsize = AtomicUsize::new(0);
+static DRIVEN: AtomicUsize = AtomicUsize::new(0);
+static GENERATION: AtomicU64 = AtomicU64::new(5);
+static MENU_OPEN: AtomicBool = AtomicBool::new(false);
+struct MappedInputs;
+impl MappedInputs {
+    const NEUTRAL: Self = MappedInputs;
+}
+fn drive(_: MappedInputs) {
+    DRIVEN.fetch_add(1, Ordering::Relaxed);
+}
+fn own_result(_: u64) {}
 mod worker {
     pub enum Event {
         Cancel(u64),
@@ -63,6 +74,13 @@ mod natives {
     }
 }
 mod runtime {
+    pub mod ui {
+        pub mod menu_app {
+            pub fn active() -> bool {
+                crate::MENU_OPEN.load(crate::Ordering::Relaxed)
+            }
+        }
+    }
     pub mod roster {
         pub mod character_roster {
             pub fn cpu_reload_ready() -> bool {
@@ -81,6 +99,7 @@ enum Step {
     Off,
     Choose,
     Reload,
+    Release,
     Restore,
     Place,
     Entering,
@@ -101,6 +120,12 @@ struct Game {
     continued: usize,
     original: Option<u32>,
     restore_requested: bool,
+    config: Option<()>,
+    roll: Option<()>,
+    clock: Option<()>,
+    hero: Option<()>,
+    trail_magic: Option<()>,
+    prep_damage: Option<()>,
 }
 impl Game {
     fn new() -> Self {
@@ -117,6 +142,12 @@ impl Game {
             continued: 0,
             original: Some(4),
             restore_requested: false,
+            config: Some(()),
+            roll: None,
+            clock: None,
+            hero: None,
+            trail_magic: None,
+            prep_damage: None,
         }
     }
     fn fail(&mut self, text: &'static str) {
@@ -188,6 +219,36 @@ unsafe fn actual_restore(game: &mut Game, released: bool, cpu_entry: usize) {
         _ => (),
     }
 }
+unsafe fn actual_covered_restore(game: &mut Game, covered: bool, released: bool, cpu_entry: usize) {
+    let (p1, cpu) = (11, 22);
+    let status = if released { 0 } else { 5 };
+    let mut ids = [0u32; 16];
+    ids[15] = 127;
+    let linked = LINKED.load(Ordering::Relaxed);
+    let released = released && CPU_STATUS.load(Ordering::Relaxed) == 0;
+    // COVERED
+    match game.step {
+        // RESTORE
+        _ => (),
+    }
+}
+unsafe fn actual_stop_frame(game: &mut Game, config: Option<()>, covered: bool, released: bool, cpu_entry: usize) {
+    let (p1, cpu) = (11, 22);
+    let status = if released { 0 } else { 5 };
+    let mut ids = [0u32; 16];
+    ids[15] = 127;
+    let linked = LINKED.load(Ordering::Relaxed);
+    let released = released && CPU_STATUS.load(Ordering::Relaxed) == 0;
+    let restart = game.config != config;
+    // RESTART
+    // OWNERSHIP
+    // COVERED
+    match game.step {
+        // RELEASE_ARMS
+        // RESTORE
+        _ => (),
+    }
+}
 fn reset() {
     OWN_CPU.store(22, Ordering::Relaxed);
     CPU_ENTRY.store(99, Ordering::Relaxed);
@@ -204,6 +265,142 @@ fn reset() {
         value.store(false, Ordering::Relaxed);
     }
     REQUEST_COUNT.store(0, Ordering::Relaxed);
+    DRIVEN.store(0, Ordering::Relaxed);
+    GENERATION.store(5, Ordering::Relaxed);
+    MENU_OPEN.store(false, Ordering::Relaxed);
+}
+#[test]
+fn stop_during_a_hold_under_the_menu_gives_up_the_cpu_and_releases_after_the_close() {
+    reset();
+    let mut body = [0u32, 0, 0, 66];
+    BODY.store(body.as_ptr() as usize, Ordering::Relaxed);
+    let mut g = Game::at(Step::Held);
+    g.original = Some(34);
+    MENU_OPEN.store(true, Ordering::Relaxed);
+    LINKED.store(true, Ordering::Relaxed);
+    CPU_STOP.store(true, Ordering::Relaxed);
+    READY.store(false, Ordering::Relaxed);
+    ACCEPT.store(true, Ordering::Relaxed);
+    unsafe { actual_stop_frame(&mut g, None, true, false, 1); }
+    assert_eq!(g.step, Step::Release);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 0);
+    assert_eq!(g.config, None);
+    for _ in 0..2 {
+        unsafe { actual_stop_frame(&mut g, None, true, false, 1); }
+    }
+    assert_eq!(g.step, Step::Release);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 0);
+
+    MENU_OPEN.store(false, Ordering::Relaxed);
+    CPU_STOP.store(false, Ordering::Relaxed);
+    unsafe { actual_stop_frame(&mut g, None, true, false, 1); }
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 22);
+    assert_eq!(g.step, Step::Release);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 0);
+    unsafe { actual_stop_frame(&mut g, None, false, false, 1); }
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 22);
+    assert_eq!(g.step, Step::Release);
+
+    LINKED.store(false, Ordering::Relaxed);
+    READY.store(true, Ordering::Relaxed);
+    unsafe { actual_stop_frame(&mut g, None, false, true, 1); }
+    assert_eq!(g.step, Step::Restore);
+    unsafe { actual_stop_frame(&mut g, None, false, true, 1); }
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
+    assert_eq!(REQUESTED.load(Ordering::Relaxed), 34);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 1);
+    body[3] = 34;
+    std::hint::black_box(&body);
+    unsafe { actual_stop_frame(&mut g, None, false, true, 1); }
+    assert_eq!(g.step, Step::Off);
+    assert_eq!(TEMP_KIND.load(Ordering::Relaxed), u32::MAX);
+}
+#[test]
+fn stop_during_a_hold_without_the_menu_keeps_the_cpu_neutral_until_release() {
+    reset();
+    let mut g = Game::at(Step::Held);
+    LINKED.store(true, Ordering::Relaxed);
+    MENU_OPEN.store(false, Ordering::Relaxed);
+    unsafe { actual_stop_frame(&mut g, None, false, false, 1); }
+    assert_eq!(g.step, Step::Release);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 22);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+}
+#[test]
+fn a_running_game_keeps_its_cpu_under_the_menu() {
+    reset();
+    let mut g = Game::at(Step::Held);
+    MENU_OPEN.store(true, Ordering::Relaxed);
+    unsafe { actual_stop_frame(&mut g, Some(()), true, false, 1); }
+    assert_eq!(g.step, Step::Held);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 22);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 0);
+}
+#[test]
+fn stop_under_the_menu_gives_up_the_cpu_and_asks_for_the_borrowed_fighter_at_the_close() {
+    reset();
+    let mut body = [0u32, 0, 0, 66];
+    BODY.store(body.as_ptr() as usize, Ordering::Relaxed);
+    let mut game = Game::at(Step::Restore);
+    game.original = Some(34);
+    CPU_STOP.store(true, Ordering::Relaxed);
+    READY.store(false, Ordering::Relaxed);
+    ACCEPT.store(true, Ordering::Relaxed);
+    for _ in 0..3 {
+        unsafe { actual_covered_restore(&mut game, true, true, 1); }
+    }
+    assert_eq!(DRIVEN.load(Ordering::Relaxed), 0);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
+    assert_eq!(REVOKED.load(Ordering::Relaxed), 3);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 0);
+    assert_eq!(game.step, Step::Restore);
+    assert!(!game.restore_requested);
+    assert_eq!(game.failed, None);
+
+    CPU_STOP.store(false, Ordering::Relaxed);
+    READY.store(true, Ordering::Relaxed);
+    unsafe { actual_covered_restore(&mut game, false, true, 1); }
+    assert_eq!(REQUESTED.load(Ordering::Relaxed), 34);
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 1);
+    assert!(game.restore_requested);
+    assert_eq!(TEMP_KIND.load(Ordering::Relaxed), 34);
+    unsafe { actual_covered_restore(&mut game, false, true, 1); }
+    assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 1);
+    body[3] = 34;
+    std::hint::black_box(&body);
+    unsafe { actual_covered_restore(&mut game, false, true, 1); }
+    assert_eq!(game.step, Step::Off);
+    assert_eq!(TEMP_KIND.load(Ordering::Relaxed), u32::MAX);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+}
+#[test]
+fn stop_under_the_menu_ends_a_drill_that_borrowed_no_fighter_at_once() {
+    reset();
+    let mut game = Game::at(Step::Restore);
+    game.original = None;
+    CPU_STOP.store(true, Ordering::Relaxed);
+    READY.store(false, Ordering::Relaxed);
+    unsafe { actual_covered_restore(&mut game, true, true, 1); }
+    assert_eq!(game.step, Step::Off);
+    assert_eq!(CANCELLED.load(Ordering::Relaxed), 1);
+    assert_eq!(DRIVEN.load(Ordering::Relaxed), 0);
+    assert_eq!(OWN_CPU.load(Ordering::Relaxed), 0);
+}
+#[test]
+fn setup_steps_stay_neutral_under_the_menu() {
+    for step in [Step::Choose, Step::Reload, Step::Place, Step::Entering] {
+        reset();
+        let mut game = Game::at(step);
+        unsafe { actual_covered_restore(&mut game, true, true, 1); }
+        assert_eq!(DRIVEN.load(Ordering::Relaxed), 1);
+        assert_eq!(game.step, step);
+        assert_eq!(REQUEST_COUNT.load(Ordering::Relaxed), 0);
+        assert_eq!(OWN_CPU.load(Ordering::Relaxed), 22);
+    }
 }
 #[test]
 fn reload_missing_cpu_waits_and_revokes() {

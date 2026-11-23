@@ -24,6 +24,10 @@ pub static CLOSE_HELD: AtomicU32 = AtomicU32::new(0);
 pub static CLOSE_FADES: AtomicBool = AtomicBool::new(true);
 /// The menu is on screen this frame (the HUD layouts hide while it is, SPEC-core-05 §2).
 pub static MENU_SHOWN: AtomicBool = AtomicBool::new(false);
+/// An input drill's take previews under the open menu or pop-up (F10): the tick does not draw them, and the worker
+/// gives Player 1's presses to the preview alone. Set and cleared by the worker.
+/// A lost renderer leaves it to the worker's next pass, which also stops the player.
+pub static PREVIEW_HIDES: AtomicBool = AtomicBool::new(false);
 /// A panel the menu does not own is on screen with the menu closed (the replay window's clip editor): the tick draws the frame.
 pub static EXT_SHOWN: AtomicBool = AtomicBool::new(false);
 /// The layer's fighter question is up with the menu closed (`flow::Phase::Prompt`): the tick draws the worker's frame and the
@@ -50,6 +54,14 @@ pub static LAYOUT_READY: AtomicBool = AtomicBool::new(false);
 pub static POLLS_AT_TICK: AtomicU32 = AtomicU32::new(0);
 /// How many times the menu's ownership was released because its renderer was lost.
 pub static RELEASES: AtomicU32 = AtomicU32::new(0);
+
+/// The open menu holds the fighters that are not Player 1 now (`flow::menu_holds_cpu`). Atomic reads only.
+pub fn holds_cpu(previewing: bool) -> bool {
+    use crate::runtime::features::{recorder, recording_host, states};
+    let previewing = previewing || PREVIEW_HIDES.load(Ordering::Acquire) || crate::engine::rr_host::previewing();
+    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing, states::is_loading(),
+        recorder::recording_or_playback() || recording_host::cpu_playback_blocks_drill())
+}
 
 /// The facts `model::readiness` decides on.
 pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {

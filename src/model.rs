@@ -284,6 +284,8 @@ pub mod owned_ring;
 pub mod state_export;
 #[path = "model/bridge_state.rs"]
 pub mod bridge_state;
+#[path = "model/bridge_events.rs"]
+pub mod bridge_events;
 #[path = "model/settings_request.rs"]
 pub mod settings_request;
 

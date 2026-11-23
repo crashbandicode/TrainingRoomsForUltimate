@@ -11,7 +11,8 @@ use crate::model::frame::Frame;
 use crate::model::menu::grid::ConsoleMode;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::editors::clip::clip_frame;
-use crate::model::flow::{self, Phase, Seen, Step};
+use crate::model::flow::{self, Phase, Seen};
+use crate::engine::macro_ui::drill_preview::{DrillPreview, Step};
 use crate::model::menu::input::Button;
 use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};
@@ -24,7 +25,7 @@ use crate::runtime::published;
 use crate::runtime::macros::{named_macros, replay_capture};
 use crate::runtime::ui::{combos, external, layouts, requests};
 use crate::model::input_delay::Owners;
-use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PROMPT};
+use crate::runtime::ui::state::{CLOSE_COUNT, CLOSE_FADES, CLOSE_HELD, CLOSING, EXT_SHOWN, FRAME, FRAME_SEQ, JUMPS, LAYOUT_READY, OPEN, POPUP, POPUP_REQ, PREVIEW_HIDES, PROMPT};
 use crate::model::storage::ROOT;
 use crate::engine::rr_runtime::{apply_catalog, apply_index, CatalogCache, MenuIndex};
 use crate::engine::stages::stage_forms::Selection;
@@ -328,6 +329,8 @@ struct Session {
     index_watch: crate::model::recording_menu::CatalogWatch,
     recording_index: MenuIndex,
     follow_drill: bool,
+    /// The preview's button routing and post-play tail while the menu stays hidden.
+    drill_preview: DrillPreview,
     /// The card's recording catalog, kept across menu opens (menu-speed fix, Switch 2026-11-19): built after boot and
     /// after each TR file change a file per worker pass, so a menu open takes it without reading the card.
     catalog: CatalogCache,
@@ -359,6 +362,7 @@ impl Session {
     }
 
     fn watching(&self) -> bool {
+        if PREVIEW_HIDES.load(Ordering::Acquire) { return true; }
         if self.setups.watching() { return true; }
         if self.pending_close.is_some() { return true; }
         self.phase != Phase::Menu || self.menu.as_ref().is_some_and(|m| matches!(m.screen(), Some(Screen::External(Editor::MiiList(_)))))
@@ -430,6 +434,7 @@ fn run() {
             }
         }
         sync_panels(&mut session);
+        sync_drill_preview(&mut session);
         let developer_pending = developer_reload.step();
         #[cfg(feature = "diag")]
         crate::runtime::stall_watch::worker_step(0);
@@ -532,6 +537,7 @@ fn publish_bridge_state(s: &mut Session) {
             list_count: list.count,
             list_index: list.index,
             list_value: &list.value,
+            recording_preview: if PREVIEW_HIDES.load(Ordering::Acquire) { "drill" } else { "" },
             extra: &extra,
             rows_omitted: true,
             ..Default::default()
@@ -544,6 +550,7 @@ fn sync_input_generation(s: &mut Session) {
     let generation = INPUT.generation();
     if generation != s.input_generation {
         s.input_generation = generation;
+        end_drill_preview(s, true);
         s.keeper.drop_model(&mut s.menu);
         s.catalog_watch = s.catalog_watch.on_menu_dropped();
         s.index_watch = s.index_watch.on_menu_dropped();
@@ -573,6 +580,7 @@ fn sync_input_generation(s: &mut Session) {
 
 fn handle(event: Event, s: &mut Session) {
     if event == Event::Open {
+        end_drill_preview(s, true);
         crate::engine::rr_host::arm_drill_record(false);
         s.stage_context = crate::runtime::lobby::practice_stage_request::menu_context();
         s.stage_close = None;
@@ -698,6 +706,14 @@ fn press(button: Button, s: &mut Session) {
         // The fighter question owns Player 1 until it is answered (A), cancelled (B) or retired.
         external::press_panel(button);
         sync_panels(s);
+        return;
+    }
+    if PREVIEW_HIDES.load(Ordering::Acquire) {
+        // F10: the hidden menu takes nothing but the preview's stop (X or B), as the Crop editor does. The page comes
+        // back from `sync_drill_preview` once the player has dropped the rest of the take, not here.
+        if s.drill_preview.press(button) == Step::Stop {
+            crate::engine::rr_host::stop_preview();
+        }
         return;
     }
     if s.menu.is_none() || s.phase == Phase::Clip || (!open && !popup) {
@@ -842,8 +858,44 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         Effect::OpenCrop { source, combo, player } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
+        Effect::PreviewDrill { source, frames } => start_drill_preview(&source, frames),
         effect => rr_host::post_effect_at(effect, Some(version)),
     }
+}
+
+/// F10: X on a drill row. The take plays once on Player 1 through the Recording player, behind the gate the Crop
+/// preview uses. The menu stays open and keeps Player 1's pad; it is not drawn until the preview ends.
+fn start_drill_preview(source: &str, frames: u32) {
+    if !crate::runtime::macros::replay_capture::capture_ready()
+        || !crate::engine::rr_host::request_drill_preview(source, frames) {
+        return;
+    }
+    PREVIEW_HIDES.store(true, Ordering::Release);
+}
+
+/// Every worker pass while a drill preview hides the menu: the page returns once the take and its tail are over, on
+/// the pass after an X or B stop has taken effect, or at once (and the player stops) when neither menu nor pop-up is open.
+fn sync_drill_preview(s: &mut Session) {
+    if !PREVIEW_HIDES.load(Ordering::Acquire) {
+        return;
+    }
+    let gone = !(OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire));
+    let frame = crate::runtime::ui::facts::fact_frame_number();
+    if gone || s.drill_preview.pass(crate::engine::rr_host::preview_running(), frame) == Step::Done {
+        end_drill_preview(s, gone);
+    }
+}
+
+/// Show the page again; `stop` also drops the rest of the take (a closed menu or a session reset, where no page is shown behind it).
+fn end_drill_preview(s: &mut Session, stop: bool) {
+    if !PREVIEW_HIDES.swap(false, Ordering::AcqRel) {
+        return;
+    }
+    s.drill_preview = DrillPreview::new();
+    if stop {
+        crate::engine::rr_host::stop_preview();
+    }
+    publish_frame(s);
 }
 
 fn recording_drill_kind(menu: &Menu, drill: Option<&str>) -> Option<crate::engine::library::DrillKind> {
@@ -1129,8 +1181,8 @@ fn sync_panels(s: &mut Session) {
     let (phase, step) = flow::next(s.phase, seen);
     s.phase = phase;
     match step {
-        Step::Nothing => {}
-        Step::CloseLayer => {
+        flow::Step::Nothing => {}
+        flow::Step::CloseLayer => {
             // The menu lost its renderer or the session ended: the layer's panel goes with it.
             external::close_panel();
             s.setups.leave_panel();
@@ -1138,7 +1190,7 @@ fn sync_panels(s: &mut Session) {
             s.layouts.leave_panel();
             s.panel = None;
         }
-        Step::PopRow => {
+        flow::Step::PopRow => {
             s.setups.leave_panel();
             s.combos.leave_panel();
             s.layouts.leave_panel();
@@ -1148,7 +1200,7 @@ fn sync_panels(s: &mut Session) {
                 if matches!(m.screen(), Some(Screen::External(_))) { m.press(Button::B); }
             }
         }
-        Step::HandOverToClip => {
+        flow::Step::HandOverToClip => {
             // The capture browser opened a clip: the editor reads Player 1 itself, so the menu closes and the editor draws alone.
             s.panel = None;
             if let Some(m) = s.menu.as_mut() {
@@ -1159,12 +1211,12 @@ fn sync_panels(s: &mut Session) {
             );
             if s.pending_close.is_some() { return; }
         }
-        Step::HideClip => {
+        flow::Step::HideClip => {
             EXT_SHOWN.store(false, Ordering::Release);
             let seq = FRAME_SEQ.fetch_add(1, Ordering::Release) + 1;
             diagnostic(format_args!("[UiClipFrame] hidden seq={seq}"));
         }
-        Step::ShowPrompt => {
+        flow::Step::ShowPrompt => {
             // The frame is built from a menu model (its panel frame); a closed menu has none, so open one as the pop-up does.
             if s.menu.is_none() {
                 let settings = SETTINGS.lock().clone().unwrap_or_else(Settings::factory);
@@ -1174,7 +1226,7 @@ fn sync_panels(s: &mut Session) {
             PROMPT.store(true, Ordering::Release);
             diagnostic(format_args!("[Ui] fighter prompt shown"));
         }
-        Step::HidePrompt => {
+        flow::Step::HidePrompt => {
             hide_prompt();
             diagnostic(format_args!("[Ui] fighter prompt closed"));
         }

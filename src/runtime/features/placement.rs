@@ -28,10 +28,11 @@ pub(super) unsafe fn stand(body: usize, at: [f32; 2], facing: f32) {
     state::status_request(body, konst(C::StatusWait));
 }
 
-/// Place in the air; the caller has checked the constants and grants and requests the status.
+/// Place in the air; the caller has checked the constants and grants and requests the status. `init_pos`, as
+/// `ground`: a fighter standing on a platform keeps its ground contact through `set_pos` and is pulled back onto it.
 pub(super) unsafe fn lift(body: usize, [x, y]: [f32; 2], facing: f32) {
     state::clear_speed_all(body);
-    state::set_pos(body, &state::Vector3f { x, y, z: 0.0 });
+    state::init_pos(body, &state::Vector3f { x, y, z: 0.0 });
     state::set_lr(body, facing);
     state::set_situation_kind(body, konst(C::SituationAir));
 }
