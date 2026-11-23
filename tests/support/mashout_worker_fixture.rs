@@ -162,6 +162,7 @@ mod worker {
                 origin: SeedOrigin::Export,
                 seed: None,
                 session: Run::new(),
+                tech_grade: None,
                 shown: crate::model::storage::FixedPath::new(),
             };
             EPOCH.store(1, Ordering::Relaxed);
