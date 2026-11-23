@@ -41,6 +41,10 @@ pub(super) fn switching() -> bool {
     SWITCHING.load(Ordering::Acquire)
 }
 
+pub(super) fn restoring() -> bool {
+    ORIGINAL.load(Ordering::Acquire) != NONE
+}
+
 /// Only the game frame calls the roster. The picker publishes its selection through the active drill.
 pub(in crate::runtime) fn service_practice_cpu_selection() {
     let original = ORIGINAL.load(Ordering::Relaxed);

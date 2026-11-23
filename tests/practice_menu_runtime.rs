@@ -124,7 +124,7 @@ fn the_drills_run_in_a_waiting_room_against_the_first_training_partner() {
     assert!(!picker.contains("is_native_training"));
 
     let level = src("src/runtime/features/cpu_level.rs");
-    let poll = item(&level, "pub(super) fn poll_drill(");
+    let poll = item(&level, "fn poll_drill_locked(");
     assert!(poll.contains("scene::practice_scene()"));
     let partner = poll.find("step_drill_partner(").unwrap();
     let panel = poll.find("step_drill_panel(").unwrap();
@@ -201,6 +201,27 @@ fn the_bridge_publishes_the_focused_list_and_still_omits_rows() {
     for field in ["list: &list.id", "list_count: list.count", "list_index: list.index", "list_value: &list.value", "rows_omitted: true"] {
         assert!(publish.contains(field), "{field}");
     }
+}
+
+#[test]
+fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
+    let lobby = src("src/runtime/lobby/training/lobby.rs");
+    let update = item(&lobby, "pub fn update(");
+    assert!(update.find("lobby_flag::release(").unwrap() < update.find("lobby_flag::step(").unwrap());
+    assert!(update.contains("edge_juggle::stop_for_release()"));
+    assert!(item(&lobby, "pub fn requested(").contains("practice_setting("));
+    assert!(item(&lobby, "pub fn try_requested(").contains("practice_setting("));
+    let edge = src("src/runtime/features/edge_juggle.rs");
+    let holds = item(&edge, "pub(crate) fn holds_partner(");
+    for term in ["wanted().is_some()", "ENGINE_ACTIVE.load(", "super::cpu_level::partner_held()", "practice_cpu::restoring()"] {
+        assert!(holds.contains(term), "{term}");
+    }
+    let level = src("src/runtime/features/cpu_level.rs");
+    assert_eq!(level.matches("DRILL_PARTNER_HELD.store(").count(), 1);
+    let poll = item(&level, "fn poll_drill_locked(");
+    let branch = &poll[poll.find("if scene.is_none() {").unwrap()..poll.find("let level =").unwrap()];
+    assert!(branch.contains("PartnerLease::new()"));
+    assert!(!branch.contains("set_behavior") && !branch.contains("write_unchecked"));
 }
 
 #[test]

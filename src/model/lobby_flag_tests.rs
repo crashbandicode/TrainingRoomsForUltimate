@@ -92,6 +92,19 @@ mod tests {
         clock
     }
 
+    fn release_holds_the_room_until_restored_or_the_deadline() {
+        use crate::model::lobby_flag::{release, RELEASE_MS};
+        assert_eq!(release(true, true, true, Some(5), 6), (true, None, false));
+        assert_eq!(release(false, false, true, None, 100), (false, None, false));
+        assert_eq!(release(false, true, false, None, 100), (false, None, false));
+        assert_eq!(release(false, true, true, None, 100), (true, Some(100), true));
+        for now in [101, 100 + RELEASE_MS] {
+            assert_eq!(release(false, true, true, Some(100), now), (true, Some(100), false));
+        }
+        assert_eq!(release(false, true, true, Some(100), 101 + RELEASE_MS), (false, None, false));
+        assert_eq!(release(true, true, true, Some(100), 101), (true, None, false));
+    }
+
     fn battle_from(station: &str, clock: FlagClock) -> Step {
         let (_, decision) = step(clock, Some(BATTLE), true);
         assert_eq!(
@@ -528,6 +541,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("release_holds_the_room_until_restored_or_the_deadline", release_holds_the_room_until_restored_or_the_deadline as fn()),
             ("a_quickplay_match_suspends_naming_as_a_local_match_does", a_quickplay_match_suspends_naming_as_a_local_match_does as fn()),
             ("no_name_keyboard_reads_the_online_mode", no_name_keyboard_reads_the_online_mode as fn()),
             ("training_behaviour_follows_the_live_scene_at_every_station", training_behaviour_follows_the_live_scene_at_every_station as fn()),

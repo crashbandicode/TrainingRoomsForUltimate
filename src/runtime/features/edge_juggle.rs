@@ -306,6 +306,14 @@ fn wanted() -> Option<Drill> {
         .filter(|_| scene::practice_scene().is_some())
 }
 
+pub(crate) fn holds_partner() -> bool {
+    wanted().is_some() || ENGINE_ACTIVE.load(Ordering::Acquire) || super::cpu_level::partner_held() || practice_cpu::restoring()
+}
+
+pub(crate) fn stop_for_release() {
+    if let Some(drill) = wanted() { practice::finish(drill.game()); }
+}
+
 pub(super) fn running() -> bool {
     wanted().is_some()
 }

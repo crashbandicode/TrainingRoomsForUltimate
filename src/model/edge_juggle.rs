@@ -1299,6 +1299,102 @@ mod tests {
     }
 
     #[test]
+    fn lobby_practice_off_gives_the_partner_back_first_and_a_departure_writes_nothing() {
+        use crate::model::lobby_flag::{self, FlagClock, Scene, RELEASE_MS};
+        use crate::model::edge_juggle::picker::{self, Settled, Tick};
+        let room = Scene { initialized: true, melee: 0x0d, mode: 0x0701_0100 };
+        let battle = Scene { initialized: true, melee: 0x0e, mode: 0x0701_0101 };
+        let ready = || FlagClock { last_key: lobby_flag::scene_key(room), ui_ready: true, was_active: true };
+        let held = || {
+            let mut lease = PartnerLease::new();
+            assert_eq!(lease.step(Some(9), 1, 7, 7, true), Some(0));
+            lease
+        };
+        let mut clock = ready();
+        let mut lease = held();
+        let mut entry = 0;
+        let mut ai = 0;
+        let mut original = Some(10);
+        let mut observed = Some(20);
+        let mut selected = Some(20);
+        let mut settled = Settled::new(selected);
+        let mut since = None;
+        let mut stops = 0;
+        let mut behavior_writes = Vec::new();
+        let mut fighter_requests = Vec::new();
+        let mut ended = false;
+        for now in 100..110 {
+            let holds = selected.is_some() || lease.held() || original.is_some();
+            let (on, next_since, stop) = lobby_flag::release(false, clock.was_active, holds, since, now);
+            since = next_since;
+            let (next, decision) = lobby_flag::step(clock, Some(room), on);
+            clock = next;
+            if !decision.active {
+                assert!(!holds && !stop);
+                ended = true;
+                break;
+            }
+            if stop {
+                stops += 1;
+                assert_eq!(now, 100);
+                selected = None;
+            }
+            if let Some(value) = lease.step(selected.map(|_| 9), 1, entry, ai, true) {
+                behavior_writes.push(value);
+                entry = value;
+                ai = value;
+            }
+            let (next, tick) = picker::tick(settled, selected, original, true, || false, || observed);
+            settled = next;
+            if let Tick::Serve { target, observed: seen, step } = tick {
+                if step.request {
+                    fighter_requests.push(target);
+                    observed = Some(target);
+                } else if seen.is_some() && selected.is_none() {
+                    original = None;
+                }
+            }
+        }
+        assert!(ended);
+        assert_eq!(stops, 1);
+        assert_eq!(behavior_writes, [7]);
+        assert!(!lease.held());
+        assert_eq!(fighter_requests, [10]);
+        assert_eq!(original, None);
+
+        for (setting, since) in [(true, None), (false, Some(100))] {
+            let clock = ready();
+            let mut lease = held();
+            assert!(lease.held());
+            let (on, _, _) = lobby_flag::release(setting, clock.was_active, true, since, 101);
+            let (_, decision) = lobby_flag::step(clock, Some(battle), on);
+            assert!(!decision.active);
+            lease = PartnerLease::new();
+            assert!(!lease.held());
+            let (_, tick) = picker::tick(Settled::new(Some(20)), None, Some(10), false, || false, || Some(20));
+            assert_eq!(tick, Tick::Left);
+        }
+        let mut replaced = held();
+        assert_eq!(replaced.step(None, 2, 0, 0, true), None);
+        assert!(!replaced.held());
+
+        let mut blocked = held();
+        let mut clock = ready();
+        let mut since = None;
+        for (now, active, stop) in [(100, true, true), (100 + RELEASE_MS, true, false), (101 + RELEASE_MS, false, false)] {
+            let (on, next_since, ask_stop) = lobby_flag::release(false, clock.was_active, blocked.held(), since, now);
+            since = next_since;
+            let (next, decision) = lobby_flag::step(clock, Some(room), on);
+            clock = next;
+            assert_eq!((decision.active, ask_stop), (active, stop));
+            if active {
+                assert_eq!(blocked.step(None, 1, 0, 0, false), None);
+            }
+        }
+        assert!(blocked.held());
+    }
+
+    #[test]
     fn a_drill_between_ai_kinds_never_asks_for_the_pause() {
         // The game as the drill's poll sees it, and one poll written the way `step_drill_panel` composes the model.
         struct Game { panel: CpuBehavior, entry: u8, ai: u8, cpu: bool }

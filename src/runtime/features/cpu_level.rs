@@ -77,6 +77,7 @@ const NOTICE_FRAMES: u16 = 240;
 static BASE: AtomicUsize = AtomicUsize::new(0);
 static DRILL_BEHAVIOR: AtomicBool = AtomicBool::new(false);
 static DRILL_APPLIED: AtomicBool = AtomicBool::new(false);
+static DRILL_PARTNER_HELD: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn install_drill_behavior() -> bool {
     use crate::runtime::seams::seam_install::gate;
@@ -359,6 +360,10 @@ pub(super) fn drill_applied() -> bool {
     DRILL_APPLIED.load(Ordering::Acquire)
 }
 
+pub(super) fn partner_held() -> bool {
+    DRILL_PARTNER_HELD.load(Ordering::Acquire)
+}
+
 pub(super) fn drill_started() {
     DRILL_APPLIED.store(false, Ordering::Release);
 }
@@ -371,6 +376,12 @@ pub(super) fn poll_drill(quiet: bool) -> bool {
     }
     let Some(base) = base() else { return false };
     let Some(mut state) = STATE.try_lock() else { return false };
+    let result = poll_drill_locked(base, &mut state, quiet);
+    DRILL_PARTNER_HELD.store(state.drill_partner.held(), Ordering::Release);
+    result
+}
+
+fn poll_drill_locked(base: usize, state: &mut State, quiet: bool) -> bool {
     let scene = crate::runtime::scene::practice_scene();
     if scene.is_none() {
         state.drill_behavior = BehaviorLease::new();
@@ -394,11 +405,11 @@ pub(super) fn poll_drill(quiet: bool) -> bool {
     }
     if scene == Some(crate::model::scene::Scene::Lobby) {
         // SAFETY: the P1 controller poll in waiting-room practice owns the live partner entry.
-        unsafe { step_drill_partner(base, &mut state, level) };
+        unsafe { step_drill_partner(base, state, level) };
         return false;
     }
     // SAFETY: the P1 controller poll in native Training owns the live panel and entry.
-    unsafe { step_drill_panel(base, &mut state, level, owners.contains(Owners::VANILLA_PAUSE), quiet) }
+    unsafe { step_drill_panel(base, state, level, owners.contains(Owners::VANILLA_PAUSE), quiet) }
 }
 
 /// The waiting room has no pause panel: save the first partner's Training Partner Behavior type, ask for stock CPU,
