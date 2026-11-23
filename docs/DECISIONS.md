@@ -1826,14 +1826,17 @@ fighter written onto it. The cursor already stops on the readable end of the flo
 
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
-### Planned tests and proof (not written, not run)
+### Planned tests and proof
+
+GJ1–GJ3 are recorded here as planned at this base. GJ4's host tests are in its [built design](design/gj4-player-start.md);
+its Eden proof remains pending.
 
 | Operator clause | Design | Planned test |
 | --- | --- | --- |
 | Player 1 returns to the stage successfully after a successful edgeguard for it to count | GJ1 rule A: the return window, the 10 s limit, a Player 1 KO or the limit is a miss | model tests of the session for each of the five card texts; a source test of the two native reads |
 | Use the same crosshair as Break the Targets instead of picking a quadrant | GJ2: one crosshair page with the shared controls; side, ledge and upper or lower read from the point | model tests of the allowed region, the two side defaults, the remembered start and the bests' bucket |
 | For Juggler, reuse the same crosshair when selecting the CPU's area | GJ3: the shared controls and picture on Juggler's CPU page | a model test of the D-pad step on that page |
-| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the lip start after the measurement | model tests of the wait; the fix for the floor's last point gets its tests after the measurement |
+| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the inset start | model and source tests named in the built design |
 
 The Eden proof of each uses the bridge lineup (tr-primary-2 ledger, 2026-11-22 17:09:54Z) and playbook `b49b4e1` or
 later.
