@@ -24,8 +24,12 @@ fn release_dead_code_stays_removed() {
         failures.push("ev::COUNT changed".to_owned());
     }
     let launch = include_str!("../src/runtime/features/tech_launch_native.rs");
-    if !launch.contains("// The diag launcher (tech_spike) reads these payloads; the product launcher reads only Stop.\n#[cfg_attr(not(feature = \"diag\"), allow(dead_code))]\npub(super) enum Moment") {
-        failures.push("Moment is missing its reason and narrow allow".to_owned());
+    if launch.contains("allow(") {
+        failures.push("tech_launch_native has a lint allow".to_owned());
+    }
+    let moments = launch.split_once("pub(super) enum Moment {").and_then(|(_, rest)| rest.split_once("\n}")).map_or("", |(body, _)| body);
+    if moments.matches("#[cfg(feature = \"diag\")]").count() != 8 || moments.contains("#[cfg(feature = \"diag\")]\n    Stop") || !moments.contains("\n    Stop {") {
+        failures.push("Moment's diag-only moments are not all gated, or Stop is gated".to_owned());
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
