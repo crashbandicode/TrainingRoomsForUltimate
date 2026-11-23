@@ -2036,7 +2036,7 @@ mod tests {
             assert_eq!(stage.player_cursor(Drill::GuardEdge, inside), Some(inside));
             assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
         }
-        assert!(PLAYER_INSET > TEETER_RANGE);
+        assert!(std::hint::black_box(PLAYER_INSET > TEETER_RANGE));
     }
 
     #[test]
