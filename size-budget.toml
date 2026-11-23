@@ -2453,3 +2453,11 @@ ceiling = 194120
 date = "2026-11-23"
 reason = "Read both current role bodies at the Record chord instead of the potentially stale published poses, and restore the Play accessor stores after the Save States gate. Measured normalized implementation 194120, 15 above the previous ceiling 194105, with zero spare."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2; tr-primary-2 Round 2 direction 2026-11-23 after review FAIL 04:24:30Z"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 194121
+date = "2026-11-23"
+reason = "The Recording unit declares damage_of in CROSS_NEEDS: its Record chord now reads the percent of both role bodies directly. Measured normalized implementation 194121, 1 above the previous ceiling 194120, with zero spare."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2; tr-primary-2 goal 2026-11-23 ~03:38Z"
