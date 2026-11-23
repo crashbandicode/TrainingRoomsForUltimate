@@ -298,6 +298,7 @@ impl FloatFlight {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::edge_juggle::perfect::{Segment, JUMP, SPECIAL};
 
@@ -577,6 +578,7 @@ mod tests {
                 }
             }
         }
+    }
     }
     }
 }

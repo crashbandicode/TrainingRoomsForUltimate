@@ -91,6 +91,8 @@ pub enum Kind {
     Release(Button),
     CStick,
     Flick(Flick),
+    /// A part of a directional special took its direction; the part number.
+    Aim(u8),
 }
 
 /// Facing-relative direction. `Side` is only a presses-only file, where left and right are one aim.
@@ -187,9 +189,9 @@ impl LinkRec {
         spot: None,
     };
     /// The follow-up's events from the tracker's snaps in `(after, hit]`. The first 12 are kept.
-    pub fn of(link: &Link, tracker: &Tracker, after: u32) -> LinkRec {
+    pub fn of(link: &Link, tracker: &Tracker, after: u32, aims: bool) -> LinkRec {
         let a1 = link.actionable as i32;
-        let (events, drift) = events_between(tracker, after, link.hit, a1);
+        let (events, drift) = events_between(tracker, after, link.hit, a1, aims);
         LinkRec {
             from: link.from,
             to: link.to,
@@ -301,6 +303,10 @@ impl Combo {
     pub fn links(&self) -> impl Iterator<Item = &LinkRec> {
         self.links[..self.len].iter().flatten()
     }
+
+    pub fn has_aim(&self) -> bool {
+        self.links().any(|link| link.events().any(|event| matches!(event.kind, Kind::Aim(_))))
+    }
 }
 
 /// A reference event's match in an attempt: the attempt's offset minus the reference's, or no such event.
@@ -324,6 +330,7 @@ pub struct Grade {
     pub marks: [Option<Mark>; STEPS],
     /// The attempt's steps no reference step matched.
     pub extra: u8,
+    pub extra_aim: Option<u8>,
     /// The reference link saved a spot and the attempt did not land that one (decision SP4; read only with Match sweet/sour spot On).
     pub wrong_spot: bool,
 }
@@ -364,6 +371,7 @@ impl Grade {
         !self.wrong_move
             && self.missing().is_none()
             && self.wrong_dir().is_none()
+            && self.extra_aim.is_none()
             && self.worst(tolerance).is_none()
     }
 }
@@ -372,10 +380,10 @@ impl Grade {
 /// and the old aim. Any other reference matches the next event of the same kind; a different direction is
 /// [`Mark::WrongDir`] and is not skipped. A reference release the attempt has no match for is not graded (rc.12).
 pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
-    grade_mode(reference, attempt, false)
+    grade_mode(reference, attempt, false, reference.events().any(|event| matches!(event.kind, Kind::Aim(_))))
 }
 
-fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade {
+fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
     let mut from = 0;
@@ -397,7 +405,7 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade
                 from = i + 1;
                 let got = attempt.events[i].unwrap();
                 if reference.presses_only || got.dir == want.dir {
-                    Mark::At(got.offset - want.offset)
+                    Mark::At(if aims && matches!(want.kind, Kind::Aim(_)) { 0 } else { got.offset - want.offset })
                 } else {
                     Mark::WrongDir
                 }
@@ -415,6 +423,12 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool) -> Grade
         wrong_move: !input_only && attempt.to != reference.to,
         marks,
         extra,
+        extra_aim: aims.then(|| attempt.events.iter().enumerate().find_map(|(i, event)| {
+            match event {
+                Some(Event { kind: Kind::Aim(part), .. }) if !used[i] => Some(*part),
+                _ => None,
+            }
+        })).flatten(),
         wrong_spot: (!input_only)
             .then_some(reference.spot)
             .flatten()
@@ -459,6 +473,9 @@ pub enum Reason {
     MissingCStick,
     CStickOff(i32),
     WrongDir(Kind),
+    MissingAim(u8),
+    WrongAim(u8),
+    ExtraAim(u8),
 }
 
 /// An attempt's result.
@@ -575,6 +592,8 @@ struct Capture {
     current: Combo,
     previous: Combo,
     last_link: Option<u32>,
+    held: Option<Link>,
+    graded: Option<u32>,
     frame: u32,
 }
 
@@ -603,6 +622,8 @@ impl Helper {
                 current: Combo::EMPTY,
                 previous: Combo::EMPTY,
                 last_link: None,
+                held: None,
+                graded: None,
                 frame: 0,
             },
             seen: 0,
@@ -702,6 +723,9 @@ impl Helper {
         let input_only = self.target.as_ref().is_some_and(|t| t.input_only);
         let (exchange, first_hit) = tracker.exchange();
         if exchange != self.capture.exchange {
+            if let Some(held) = self.capture.held.take() {
+                self.take_link(held, tracker, self.capture.exchange, &mut out);
+            }
             if !input_only {
                 self.resolve_open(Outcome::Stopped, &mut out);
             }
@@ -711,20 +735,24 @@ impl Helper {
             self.capture.current = Combo::EMPTY;
             self.capture.exchange = exchange;
             self.capture.after = first_hit;
+            self.capture.graded = None;
         }
-        if let Some(link) = tracker
-            .latest_link()
-            .filter(|l| Some(l.hit) != self.capture.last_link)
-        {
-            self.capture.last_link = Some(link.hit);
-            let after = self.capture.after;
-            let rec = LinkRec::of(&link, tracker, after);
-            self.capture.after = link.hit;
-            let first = self.capture.current.is_empty();
-            self.capture.current.push(rec);
-            self.seen = self.seen.wrapping_add(1);
-            if !input_only {
-                self.on_link(rec, first, exchange, &mut out);
+        if let Some(link) = tracker.latest_link().filter(|l| Some(l.hit) != self.capture.last_link) {
+            if let Some(held) = self.capture.held.filter(|held| held.hit != link.hit) {
+                self.capture.held = None;
+                self.take_link(held, tracker, exchange, &mut out);
+            }
+            let aims = self.target.as_ref().is_some_and(Combo::has_aim);
+            if !input_only && !aims && self.capture.graded != Some(link.hit) {
+                let rec = LinkRec::of(&link, tracker, self.capture.after, false);
+                self.capture.graded = Some(link.hit);
+                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out, None);
+            }
+            if tracker.aim_pending().is_some_and(|entry| entry <= link.hit) {
+                self.capture.held = Some(link);
+            } else {
+                self.capture.held = None;
+                self.take_link(link, tracker, exchange, &mut out);
             }
         }
         if input_only {
@@ -737,7 +765,7 @@ impl Helper {
             }
             return out;
         }
-        if !tracker.exchange_open() {
+        if !tracker.exchange_open() && self.capture.held.is_none() {
             self.resolve_open(Outcome::Stopped, &mut out);
             if self.pending_load {
                 self.pending_load = false;
@@ -745,6 +773,18 @@ impl Helper {
             }
         }
         out
+    }
+
+    fn take_link(&mut self, link: Link, tracker: &Tracker, exchange: u32, out: &mut Out) {
+        self.capture.last_link = Some(link.hit);
+        let rec = LinkRec::of(&link, tracker, self.capture.after, true);
+        self.capture.after = link.hit;
+        let first = self.capture.current.is_empty();
+        self.capture.current.push(rec);
+        self.seen = self.seen.wrapping_add(1);
+        if self.target.as_ref().is_some_and(|target| !target.input_only && target.has_aim()) {
+            self.on_link(rec, first, exchange, out, None);
+        }
     }
 
     fn step_inputs(&mut self, snap: Snap, out: &mut Out) {
@@ -760,7 +800,7 @@ impl Helper {
             self.input.restart();
             self.attempt = None;
         }
-        self.input.step_mode(snap, false);
+        self.input.step_mode(snap, false, self.target.as_ref().is_some_and(Combo::has_aim));
         let Some(start) = self.input.first else {
             return;
         };
@@ -768,10 +808,13 @@ impl Helper {
             self.attempt = Some(Attempt::new(start, false));
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
-            let reference = self.target.as_ref().unwrap().get(attempt.len).copied().unwrap();
+            let target = self.target.as_ref().unwrap();
+            let aims = target.has_aim();
+            let last = attempt.len + 1 == target.len();
+            let reference = target.get(attempt.len).copied().unwrap();
             let deadline =
                 reference.events().last().unwrap().offset + i32::from(self.settings.tolerance);
-            if (snap.frame - start) < deadline as u32 {
+            if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
                 break;
             }
             let actual = self
@@ -780,7 +823,13 @@ impl Helper {
                 .get(attempt.len)
                 .copied()
                 .unwrap_or(LinkRec::INPUT);
-            self.on_link(actual, false, start, out);
+            let later = if aims && last {
+                self.input.combo.links().skip(attempt.len + 1).flat_map(LinkRec::events)
+                    .find_map(|event| match event.kind { Kind::Aim(part) => Some(part), _ => None })
+            } else {
+                None
+            };
+            self.on_link(actual, false, start, out, later);
             if self
                 .attempt
                 .is_some_and(|a| a.open() && a.len == self.input.combo.len())
@@ -803,7 +852,7 @@ impl Helper {
         };
     }
 
-    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out) {
+    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out, extra: Option<u8>) {
         let Some(target) = self.target.as_ref().filter(|_| self.settings.on) else {
             return;
         };
@@ -839,7 +888,8 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let g = grade_mode(reference, &rec, target.input_only);
+        let mut g = grade_mode(reference, &rec, target.input_only, target.has_aim());
+        g.extra_aim = g.extra_aim.or(extra);
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
@@ -890,6 +940,7 @@ fn missing_reason(event: Event) -> Reason {
         Kind::Release(button) => Reason::MissingRelease(button),
         Kind::CStick => Reason::MissingCStick,
         Kind::Flick(flick) => Reason::MissingFlick(flick),
+        Kind::Aim(part) => Reason::MissingAim(part),
     }
 }
 
@@ -899,6 +950,7 @@ fn off_reason(event: Event, delta: i32) -> Reason {
         Kind::Release(button) => Reason::ReleaseOff(button, delta),
         Kind::CStick => Reason::CStickOff(delta),
         Kind::Flick(flick) => Reason::FlickOff(flick, delta),
+        Kind::Aim(part) => Reason::WrongAim(part),
     }
 }
 
@@ -918,8 +970,15 @@ fn summarize(
         || grades().find_map(|(i, g)| Some((i as u8, missing_reason(event(g, g.missing()?)?))));
     let wrong_dir = || {
         grades()
-            .find_map(|(i, g)| Some((i as u8, Reason::WrongDir(event(g, g.wrong_dir()?)?.kind))))
+            .find_map(|(i, g)| {
+                let kind = event(g, g.wrong_dir()?)?.kind;
+                Some((i as u8, match kind {
+                    Kind::Aim(part) => Reason::WrongAim(part),
+                    _ => Reason::WrongDir(kind),
+                }))
+            })
     };
+    let extra_aim = || grades().find_map(|(i, g)| g.extra_aim.map(|part| (i as u8, Reason::ExtraAim(part))));
     let off = || {
         grades().find_map(|(i, g)| {
             let (step, delta) = g.worst(tolerance)?;
@@ -953,6 +1012,7 @@ fn summarize(
             .or_else(wrong_spot)
             .or_else(missing)
             .or_else(wrong_dir)
+            .or_else(extra_aim)
             .or_else(off),
     }
 }
@@ -963,6 +1023,7 @@ fn events_between(
     after: u32,
     until: u32,
     a1: i32,
+    aims: bool,
 ) -> ([Option<Event>; STEPS], Option<Dir>) {
     let mut prev: Option<Snap> = None;
     let mut timed = [None; STEPS];
@@ -973,12 +1034,14 @@ fn events_between(
     let mut drift_order = [0u8; 8];
     let mut drift_seen = 0usize;
     for snap in tracker.snaps() {
-        if snap.frame > until {
+        if snap.frame > until && !aims {
             break;
         }
         let in_range = snap.frame > after && snap.frame <= until;
         if in_range {
-            if push_edges(&mut timed, &mut count, prev, snap) && event_frame_count < STEPS {
+            let mut physical = snap;
+            physical.aim.part = 0;
+            if push_edges(&mut timed, &mut count, prev, physical, aims) && event_frame_count < STEPS {
                 event_frames[event_frame_count] = snap.frame;
                 event_frame_count += 1;
             }
@@ -990,6 +1053,16 @@ fn events_between(
                 )) {
                     note_drift(&mut drift_counts, &mut drift_order, &mut drift_seen, index);
                 }
+            }
+        }
+        if aims && snap.aim.part != 0 {
+            let entry = snap.frame.saturating_sub(u32::from(snap.aim.age));
+            if entry > after && entry <= until {
+                insert_timed(&mut timed, &mut count, Timed {
+                    kind: Kind::Aim(snap.aim.part),
+                    dir: facing_dir(snap.aim.dir, snap.aim.facing),
+                    frame: entry,
+                });
             }
         }
         prev = Some(snap);
@@ -1017,6 +1090,7 @@ fn push_edges(
     count: &mut usize,
     prev: Option<Snap>,
     now: Snap,
+    aims: bool,
 ) -> bool {
     let mut saw = false;
     let prev_buttons = prev.map(|snap| snap.buttons).unwrap_or(0);
@@ -1031,14 +1105,16 @@ fn push_edges(
             push_timed(out, count, Kind::Release(button), left, now.frame);
         }
     }
-    if prev_x.abs() < DASH_STICK_X
+    if !(aims && now.aim.inside)
+        && prev_x.abs() < DASH_STICK_X
         && now_x.abs() >= DASH_STICK_X
         && super::frame_strip::flick_fresh(0, DASH_FLICK_X)
     {
         saw = true;
         push_timed(out, count, Kind::Flick(Flick::Dash), left, now.frame);
     }
-    if !held(prev_buttons, FLICK_JUMP)
+    if !(aims && now.aim.inside)
+        && !held(prev_buttons, FLICK_JUMP)
         && held(now.buttons, FLICK_JUMP)
         && now_y >= JUMP_STICK_Y
         && super::frame_strip::flick_fresh(0, JUMP_FLICK_Y)
@@ -1046,7 +1122,8 @@ fn push_edges(
         saw = true;
         push_timed(out, count, Kind::Flick(Flick::TapJump), left, now.frame);
     }
-    if prev_y > DIVE_CONT
+    if !(aims && now.aim.inside)
+        && prev_y > DIVE_CONT
         && now_y <= DIVE_CONT
         && now.airborne
         && super::frame_strip::flick_fresh(0, DIVE_FLICK)
@@ -1065,6 +1142,9 @@ fn push_edges(
             push_timed(out, count, Kind::Press(button), left, now.frame);
         }
     }
+    if aims && now.aim.part != 0 {
+        push_timed(out, count, Kind::Aim(now.aim.part), facing_dir(now.aim.dir, now.aim.facing), now.frame);
+    }
     saw
 }
 
@@ -1082,6 +1162,18 @@ fn push_timed(
     if *count < STEPS {
         out[*count] = Some(Timed { kind, dir, frame });
         *count += 1;
+    }
+}
+
+fn insert_timed(out: &mut [Option<Timed>; STEPS], count: &mut usize, event: Timed) {
+    let at = (0..*count).find(|&i| out[i].is_some_and(|other| other.frame > event.frame)).unwrap_or(*count);
+    if at < STEPS {
+        let end = (*count).min(STEPS - 1);
+        for i in (at..end).rev() {
+            out[i + 1] = out[i];
+        }
+        out[at] = Some(event);
+        *count = (*count + 1).min(STEPS);
     }
 }
 
@@ -1164,16 +1256,16 @@ impl InputCapture {
         };
     }
     pub fn step(&mut self, snap: Snap) {
-        self.step_mode(snap, true);
+        self.step_mode(snap, true, true);
     }
-    fn step_mode(&mut self, mut snap: Snap, group_idle: bool) {
+    fn step_mode(&mut self, mut snap: Snap, group_idle: bool, aims: bool) {
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
         if self.combo.overflow { return; }
         let mut edges = [None; STEPS];
         let mut count = 0;
-        push_edges(&mut edges, &mut count, self.prev, snap);
+        push_edges(&mut edges, &mut count, self.prev, snap, aims);
         self.prev = Some(snap);
         for event in edges.into_iter().flatten() {
             let start = *self.first.get_or_insert(event.frame);
@@ -1182,7 +1274,10 @@ impl InputCapture {
                 .links()
                 .last()
                 .is_none_or(|l| l.events().count() == STEPS);
+            let next_part = matches!(event.kind, Kind::Aim(2..))
+                && self.combo.links().last().is_some_and(|link| link.events().next().is_some());
             if (full
+                || next_part
                 || (group_idle
                     && self
                         .last
@@ -1210,3 +1305,7 @@ impl Default for InputCapture {
 #[cfg(test)]
 #[path = "input_drill_tests.rs"]
 mod input_drill_tests;
+
+#[cfg(test)]
+#[path = "aim_steps_tests.rs"]
+mod aim_steps_tests;

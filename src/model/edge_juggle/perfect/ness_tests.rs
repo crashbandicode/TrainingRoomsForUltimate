@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::edge_juggle::perfect::{Segment, JUMP, SPECIAL};
 
@@ -334,4 +335,5 @@ fn ness_keeps_the_spent_jump_and_replans_at_cast_against_live_p1() {
     let no_thunder = ThunderBeat { can_thunder: false, ..cast };
     let mut invalid = ThunderReturn::start(&facts, start, true).unwrap();
     assert!(invalid.step(no_thunder, moving_guarder).is_none());
+}
 }

@@ -41,3 +41,90 @@ pub fn heading(dx: f32, dy: f32) -> Option<u8> {
         }
     })
 }
+
+/// What the strip knows about Player 1's directional special on one frame (F13).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Seen {
+    /// Player 1 is in a tabled special: from its start status to the end of its own statuses.
+    pub inside: bool,
+    /// 1 or 2 on the one frame that part's direction became known, else 0.
+    pub part: u8,
+    /// That part's direction (a `bin_stick` bin, screen directions); `None` when it did not move.
+    pub dir: Option<u8>,
+    /// Player 1's facing when the special began.
+    pub facing: i8,
+    /// Frames since that part's travel began.
+    pub age: u8,
+}
+
+impl Seen {
+    pub const NONE: Seen = Seen { inside: false, part: 0, dir: None, facing: 0, age: 0 };
+}
+
+/// One frame of Player 1 for [`Parts::step`].
+#[derive(Clone, Copy, Debug)]
+pub struct Now {
+    /// The fighter is in the table.
+    pub aimer: bool,
+    /// The status is the up special's start.
+    pub start: bool,
+    /// The status is the start or one of the fighter's own.
+    pub special: bool,
+    /// The status is the travel status, and it was entered on this frame.
+    pub travel: bool,
+    pub entered: bool,
+    /// The direction the strip marked on this frame, if it did.
+    pub aimed: Option<u8>,
+    pub facing: i8,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Parts {
+    inside: bool,
+    count: u8,
+    pending: u8,
+    age: u8,
+    facing: i8,
+}
+
+impl Parts {
+    pub const fn new() -> Self {
+        Self { inside: false, count: 0, pending: 0, age: 0, facing: 0 }
+    }
+
+    pub fn step(&mut self, now: Now) -> Seen {
+        if !now.aimer || !(now.special || now.travel) {
+            let seen = if self.pending != 0 {
+                Seen { inside: false, part: self.pending, dir: None, facing: self.facing, age: self.age }
+            } else {
+                Seen::NONE
+            };
+            *self = Self::new();
+            return seen;
+        }
+        if !self.inside {
+            if !(now.start || now.travel) {
+                return Seen::NONE;
+            }
+            self.inside = true;
+            self.facing = now.facing;
+        }
+        if now.entered && self.count < 2 && self.pending == 0 {
+            self.count += 1;
+            self.pending = self.count;
+            self.age = 0;
+        }
+        let mut seen = Seen { inside: true, facing: self.facing, ..Seen::NONE };
+        if self.pending != 0 {
+            if now.aimed.is_some() || !now.travel {
+                seen.part = self.pending;
+                seen.dir = now.aimed;
+                seen.age = self.age;
+                self.pending = 0;
+            } else {
+                self.age = self.age.saturating_add(1);
+            }
+        }
+        seen
+    }
+}

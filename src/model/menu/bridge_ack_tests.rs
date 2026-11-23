@@ -1,5 +1,6 @@
 //! The bridge state's `ack.result`: `Menu::press_outcome` reports whether the arm that took the press acted.
 
+lib_unit_tests! {
 use super::*;
 
 fn menu() -> Menu {
@@ -56,4 +57,5 @@ fn left_right_and_y_on_the_trailing_reset_entry_are_ignored() {
     assert!(!m.press_outcome(Button::Right));
     assert!(!m.press_outcome(Button::Y), "nothing to reset");
     assert!(matches!(m.focus(), Some(Entry::ResetPage(_))), "the focus stayed");
+}
 }

@@ -247,6 +247,7 @@ mod tests;
 
 #[cfg(test)]
 mod egg_pending_tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -282,5 +283,6 @@ mod egg_pending_tests {
         streak.miss();
         streak.recover();
         assert_eq!(streak.counts(), (0, 1));
+    }
     }
 }
