@@ -467,7 +467,7 @@ pub unsafe fn on_frame(body: &mut smash::app::BattleObjectModuleAccessor) {
     let ui_blocked = crate::runtime::lobby::training::lobby::native_ui_busy()
         || crate::runtime::lobby::training::save_states::is_loading()
         || crate::runtime::lobby::training::recording_or_playback()
-        || crate::runtime::compat::replay_preview::occupied();
+        || crate::engine::rr_host::previewing();
     let blocked = if ui_blocked { Some("ui") } else { crate::runtime::roster::character_roster::preload_blocked_reason() };
     #[cfg(feature = "diag")]
     note_blocked(blocked);

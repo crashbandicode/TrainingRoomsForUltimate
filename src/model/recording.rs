@@ -674,7 +674,7 @@ impl Recorder {
 
     // ---- starting and stopping -----------------------------------------------------------------
 
-    /// The named layer's playback (`playback_named`, `playback_preview`): `frames` frames from the layer's buffer, mirrored by the
+    /// The named layer's playback (`playback_named`): `frames` frames from the layer's buffer, mirrored by the
     /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
     pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
         match self.mode {

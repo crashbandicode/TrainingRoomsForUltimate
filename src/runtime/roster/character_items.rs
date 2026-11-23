@@ -70,7 +70,6 @@ unsafe fn permitted() -> bool {
     common::is_training_mode() && common::is_ready_go()
         && !crate::runtime::roster::character_roster::busy() && !training::lobby::native_ui_busy()
         && !training::save_states::is_loading() && !training::recording_or_playback()
-        && !crate::runtime::compat::replay_preview::occupied()
 }
 
 /// Invoked for every A press, including selecting the already-checked item.

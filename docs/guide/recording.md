@@ -206,9 +206,9 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
 
 - L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves.
-- A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays.
+- A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
 - A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame.
-- X previews a macro's kept inputs on the CPU, including a Player 1 macro.
+- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. The page hides during preview and returns about a second after the last input; X or B stops it early.
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 

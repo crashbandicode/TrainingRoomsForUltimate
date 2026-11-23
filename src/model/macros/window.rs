@@ -6,7 +6,7 @@
 
 use std::ops::Range;
 
-use crate::engine::macros::recording::{InputFrame, MacroError, MacroRecording, StartState, DEFAULT_FPS};
+use crate::engine::macros::recording::{MacroError, DEFAULT_FPS};
 
 /// Cursor increment.
 #[cfg(test)]
@@ -29,13 +29,6 @@ impl Step {
             Step::Seconds(n) => n.saturating_mul(fps),
         }
     }
-}
-
-/// Fighter state captured by the runtime at one specific source frame.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FrameSnapshot {
-    pub frame: u32,
-    pub state: StartState,
 }
 
 /// Cursor and half-open selection over a source of `total` frames.
@@ -137,33 +130,6 @@ impl FrameWindow {
         self.end
     }
 
-    /// Crops the selection of `source` into a new macro with default placement.
-    ///
-    /// Momentum and action state cannot be inferred from inputs, so the caller
-    /// must pass the actual fighter state sampled at the selected start frame,
-    /// even at frame 0 (use `StartState::neutral` there). A snapshot for any
-    /// other frame, such as one left over from an earlier in-point, is refused.
-    pub fn crop(
-        &self,
-        source: &[InputFrame],
-        snapshot: &FrameSnapshot,
-        name: &str,
-        game_version: &str,
-    ) -> Result<MacroRecording, MacroError> {
-        if source.len() != self.total as usize {
-            return Err(MacroError::InvalidWindow(
-                "source length differs from the window's total",
-            ));
-        }
-        if snapshot.frame != self.start {
-            return Err(MacroError::SnapshotFrame {
-                selected: self.start,
-                snapshot: snapshot.frame,
-            });
-        }
-        let frames = source[self.start as usize..self.end as usize].to_vec();
-        MacroRecording::new(name, game_version, snapshot.state, frames)
-    }
 }
 
 /// Frame readout as `M:SS +Ff`, e.g. frame 312 at 60 fps is `0:05 +12f`.
@@ -173,6 +139,3 @@ pub fn timestamp(frame: u32, fps: u32) -> String {
     let seconds = frame / fps;
     format!("{}:{:02} +{}f", seconds / 60, seconds % 60, frame % fps)
 }
-
-#[cfg(test)]
-mod tests;

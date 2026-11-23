@@ -331,11 +331,6 @@ pub enum MacroError {
     /// Every candidate id derived from the name is already taken.
     NoFreeId,
     InvalidWindow(&'static str),
-    /// The snapshot was not captured at the selected in-point.
-    SnapshotFrame {
-        selected: u32,
-        snapshot: u32,
-    },
     Parse(serde_json::Error),
     Io(io::Error),
 }
@@ -363,10 +358,6 @@ impl fmt::Display for MacroError {
             Self::NotFound(id) => write!(f, "no macro with id {id:?}"),
             Self::NoFreeId => write!(f, "no free macro id for this name"),
             Self::InvalidWindow(why) => write!(f, "invalid window: {why}"),
-            Self::SnapshotFrame { selected, snapshot } => write!(
-                f,
-                "start snapshot is for frame {snapshot}, but the selection starts at frame {selected}"
-            ),
             Self::Parse(err) => write!(f, "malformed macro file: {err}"),
             Self::Io(err) => write!(f, "i/o error: {err}"),
         }

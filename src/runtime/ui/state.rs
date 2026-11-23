@@ -63,6 +63,7 @@ pub fn readiness_facts(polls: u32) -> crate::model::readiness::Facts {
         closing,
         owns_input: owner || closing || OPEN.load(Ordering::Acquire),
         polls_since_tick: polls.wrapping_sub(POLLS_AT_TICK.load(Ordering::Acquire)),
+        clip: crate::runtime::macros::named_macros::hook_queries().clip_editor_open,
     }
 }
 

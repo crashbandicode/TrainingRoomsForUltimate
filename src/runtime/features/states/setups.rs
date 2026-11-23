@@ -272,7 +272,7 @@ pub(super) unsafe fn service() {
         })
         .unwrap_or(Err(Refusal::Ownership.message()))?;
         // Save setup here: both running bodies, read with Save's own reader and kept only if the same fighters (stage,
-        // exact Miis) are still there after the read, as the preview checkpoint keeps its live pair. No slot is written.
+        // exact Miis) are still there after the read. No slot is written.
         if let (Action::Snapshot { pair, miis, here: true }, Some((identity, raws))) = (&mut job.action, &observed) {
             *pair = [super::read_record(&raws[0]), super::read_record(&raws[1])];
             *miis = identity.miis;

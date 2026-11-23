@@ -20,7 +20,6 @@ pub(crate) mod live_replay;
 pub(crate) mod named_macros;
 pub(crate) mod port;
 pub(crate) mod identity;
-pub(crate) mod replay_preview;
 pub(crate) mod replay_move_start;
 pub(crate) mod replay_capture;
 pub(crate) mod replay_store;
@@ -30,25 +29,9 @@ pub(crate) mod replay_store;
 pub(crate) use crate::runtime::lobby::training::{lobby, practice};
 pub(crate) use port::input_record;
 
-/// Package 3's save-state facade, including its game-owned temporary preview checkpoint.
+/// Package 3's save-state facade.
 pub(crate) mod save_states {
-    pub(crate) use crate::runtime::features::states::cancel_pending;
     pub(crate) use crate::runtime::lobby::training::save_states::is_loading;
-
-    /// Capture the live pair once, then reuse it for native preview start/stop.
-    /// # Safety
-    /// Only the existing primary-CPU game callback may request native restoration.
-    pub(crate) unsafe fn request_preview_restore(start: bool) -> Result<(), &'static str> {
-        crate::runtime::features::states::request_preview_restore(start)
-    }
-
-    pub(crate) fn finish_preview_restore(editor_open: bool) {
-        crate::runtime::features::states::finish_preview_restore(editor_open);
-    }
-
-    pub(crate) fn end_preview_restore() {
-        crate::runtime::features::states::end_preview_restore();
-    }
 }
 
 use crate::runtime::alloc::{HookId, HookScope};
@@ -109,8 +92,6 @@ pub(crate) unsafe fn frame_before(fighter: usize) {
         if crate::runtime::features::recorder::is_primary_cpu_body(module) {
             step(14);
             named_macros::observe_playback_before(module);
-            step(15);
-            replay_preview::before_frame(module);
         }
     }
     step(0);
@@ -139,8 +120,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
         if crate::runtime::features::recorder::is_primary_cpu_body(module) {
             step(25);
             named_macros::observe_playback_start(module);
-            step(26);
-            replay_preview::after_frame(module);
             step(27);
             named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
@@ -188,8 +167,7 @@ pub(crate) fn after_layout_draw() {
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.
 pub(crate) fn sync_owner() {
     use crate::model::input_delay::Owners;
-    let held = replay_capture::panel_visible() || replay_capture::browser_visible()
-        || (replay_preview::occupied() && !replay_preview::recovery_available());
+    let held = replay_capture::panel_visible() || replay_capture::browser_visible();
     // The editor parked on its own load (a recorded Mii's import, then the CPU's install) keeps P1 neutral but must
     // not hold the gates that load waits on (#68).
     let loading = replay_capture::loading();

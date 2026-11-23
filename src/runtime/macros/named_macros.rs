@@ -404,8 +404,7 @@ struct RestorePose {
 }
 
 static PLAY_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();
-static PREVIEW_FRAMES: crate::model::macro_handoff::PlayBuffers<InputFrame> = crate::model::macro_handoff::PlayBuffers::new();
-// 0 idle, 1 named, 2 transient preview. Only game callbacks change this.
+// 0 idle, 1 named. Only game callbacks change this.
 static PLAYING: AtomicU8 = AtomicU8::new(0);
 static PLAY_GENERATION: AtomicU32 = AtomicU32::new(0);
 static PREPARED_REVISION: AtomicU64 = AtomicU64::new(u64::MAX);
@@ -417,7 +416,6 @@ pub struct PlaybackStart {
     pub facing: f32,
     pub status: i32,
     pub len: usize,
-    pub generation: u32,
 }
 
 fn notify(message: &str) {
@@ -493,6 +491,8 @@ pub fn publish_queries() {
     };
     let loaded_matches = plays_current || target.is_some_and(|target| exact_target_ready(target, cpu_kind()));
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
+    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page())
+        || crate::engine::rr_host::preview_away();
     QUERIES.publish(crate::model::macro_handoff::MacroQueries {
         session: session_revision(),
         source_is_named: source_is_named(),
@@ -506,6 +506,7 @@ pub fn publish_queries() {
         restore_in_air, panel_visible: panel_visible(),
         clip_foreground: clip_foreground(), naming_pending: naming_pending(),
         clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),
+        clip_previewing,
         replay_loading: crate::runtime::macros::replay_capture::loading(), browser_pending, browser_release,
         suspended: suspended(), marker,
     });
@@ -846,37 +847,18 @@ pub fn begin_playback() -> Option<PlaybackStart> {
     PLAY_GENERATION.store(q.playback_generation, Ordering::Release);
     PLAYING.store(1, Ordering::Release);
     let info = PlaybackStart { facing: q.playback_facing, status: q.playback_status,
-        len: q.playback_len as usize, generation: q.playback_generation };
-    trace_begin(info.len, false);
+        len: q.playback_len as usize };
+    trace_begin(info.len);
     Some(info)
 }
 
-/// Worker only: prepare a transient preview without changing the named selection.
-pub fn prepare_preview(recording: &MacroRecording) -> PlaybackStart {
-    // SAFETY: request_play runs on the menu worker, the sole preview-buffer writer.
-    let generation = unsafe { PREVIEW_FRAMES.fill(&recording.frames) };
-    PlaybackStart { facing: recording.start.facing, status: recording.start.status,
-        len: recording.frames.len(), generation }
-}
-
-/// Game callback only: the requested preview is still the prepared one.
-pub fn begin_preview(info: PlaybackStart) -> bool {
-    if PREVIEW_FRAMES.generation() != info.generation { return false; }
-    PLAY_GENERATION.store(info.generation, Ordering::Release);
-    PLAYING.store(2, Ordering::Release);
-    PLAYBACK_START_WAITS.store(0, Ordering::Relaxed);
-    PLAYBACK_START_PENDING.store(true, Ordering::Relaxed);
-    trace_begin(info.len, true);
-    true
-}
-
-fn trace_begin(_len: usize, _preview: bool) {
+fn trace_begin(_len: usize) {
     #[cfg(feature = "named-input-trace")]
     {
         TRACE_WRITES.store(0, Ordering::Relaxed);
         TRACE_OBSERVATIONS.store(0, Ordering::Relaxed);
         let run = TRACE_RUN.fetch_add(1, Ordering::Relaxed) + 1;
-        println!("[NamedTrace] begin run={} len={} preview={}", run, _len, _preview);
+        println!("[NamedTrace] begin run={} len={}", run, _len);
     }
 }
 
@@ -916,7 +898,7 @@ pub fn clear_session() {
     crate::runtime::macros::replay_capture::owns_close_input(false, false);
     GENERATION.fetch_add(1, Ordering::Relaxed);
     SESSION_GENERATION.fetch_add(1, Ordering::Relaxed);
-    crate::runtime::macros::replay_preview::clear_session();
+    crate::engine::rr_host::drop_preview_home();
     post_lifecycle(Lifecycle::Clear { keep: suspended() });
     cancel_motion();
     RESTORING.store(false, Ordering::Relaxed);
@@ -930,7 +912,7 @@ pub fn begin_restore() {
     RESTORE_POSITION_WAITS.store(0, Ordering::Relaxed);
     GENERATION.fetch_add(1, Ordering::Relaxed);
     RESTORING.store(true, Ordering::Relaxed);
-    if crate::runtime::macros::replay_preview::occupied() {
+    if crate::engine::rr_host::previewing() {
         RESTORE_ACTION.store(0, Ordering::Relaxed);
     } else if source_is_named() && RESTORE_ACTION.load(Ordering::Relaxed) == 0 {
         let settings = crate::runtime::features::recorder::settings();
@@ -946,12 +928,6 @@ pub unsafe fn service_restore() {
         return;
     }
     RESTORING.store(false, Ordering::Relaxed);
-    if crate::runtime::macros::replay_preview::occupied() {
-        RESTORE_ACTION.store(0, Ordering::Relaxed);
-        // Native preview starts after this callback and still needs this target
-        // at input zero, after BOTH fighters have completed restoration.
-        return;
-    }
     match RESTORE_ACTION.swap(0, Ordering::Relaxed) {
         2 => {
             if super::input_record::playback_named() {
@@ -976,8 +952,7 @@ pub fn remember_restore_pose(
     facing: f32,
     air: Option<bool>,
 ) {
-    if crate::runtime::macros::replay_preview::start_context().is_some()
-        || (source_is_named() && loaded_fighter_matches() && !crate::runtime::macros::replay_preview::occupied()) {
+    if source_is_named() && loaded_fighter_matches() {
         *lock_write(&RESTORE_POSE) = Some(RestorePose {
             object: module_accessor.battle_object_id,
             address: module_accessor as *mut BattleObjectModuleAccessor as usize,
@@ -995,7 +970,7 @@ pub unsafe fn prepare_playback_start(module_accessor: &mut BattleObjectModuleAcc
     if !PLAYBACK_START_PENDING.load(Ordering::Relaxed) {
         return true;
     }
-    if !crate::runtime::macros::replay_preview::occupied() && source_is_named() && !loaded_fighter_matches() {
+    if source_is_named() && !loaded_fighter_matches() {
         super::input_record::stop_playback();
         notify("Wait for the exact macro fighter before playback");
         return false;
@@ -1102,7 +1077,7 @@ pub unsafe fn observe_playback_start(module_accessor: &mut BattleObjectModuleAcc
 }
 
 pub fn restored_target(x: f32, y: f32) -> Option<(f32, f32)> {
-    if crate::runtime::macros::replay_preview::occupied() { return None; }
+    if crate::engine::rr_host::previewing() { return None; }
     let q = hook_queries();
     if q.panel_visible || !q.source_is_named || !q.loaded_matches { return None; }
     let generation = GENERATION.load(Ordering::Relaxed);
@@ -1127,9 +1102,6 @@ fn loaded_fighter_matches() -> bool {
 
 /// Recorded aerial motion must survive even at zero vertical offset.
 pub fn restore_in_air() -> bool {
-    if crate::runtime::macros::replay_preview::occupied() {
-        return crate::runtime::macros::replay_preview::start_context().is_some_and(|start| start.situation == *SITUATION_KIND_AIR);
-    }
     source_is_named() && loaded_fighter_matches()
         && hook_queries().restore_in_air
 }
@@ -1148,16 +1120,12 @@ unsafe fn apply_ready_speed(
     module_accessor: &mut BattleObjectModuleAccessor,
     air: bool,
 ) {
-    let (x, y, facing) = if let Some(start) = crate::runtime::macros::replay_preview::start_context() {
-        (start.speed_x, start.speed_y, start.facing)
-    } else {
-        if crate::runtime::macros::replay_preview::occupied() || !source_is_named() || hook_queries().panel_visible || !loaded_fighter_matches() {
-            return;
-        }
-        let q = hook_queries();
-        let Some((x, y)) = q.velocity else { return; };
-        (x, y, q.playback_facing)
-    };
+    if !source_is_named() || hook_queries().panel_visible || !loaded_fighter_matches() {
+        return;
+    }
+    let q = hook_queries();
+    let Some((x, y)) = q.velocity else { return; };
+    let facing = q.playback_facing;
     // Match the recorder's facing-relative input transform; placement remains a
     // world-unit delta from the already mirrored save-state anchor.
     let x = x * facing * PostureModule::lr(module_accessor);
@@ -1252,11 +1220,11 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
     let found = owned.iter().position(|&(object, address, _)| object == id && address == pointer);
     // Keep P1 held while the editor is parked for a CPU reload. The new CPU must
     // remain free to finish its native install and land before preview acquisition.
-    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading
+    let queries = hook_queries();
+    let hold_panel = (queries.panel_visible && !queries.clip_previewing) || (queries.replay_loading
         && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)
             == FighterId::Player as i32);
-    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)
-        && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {
+    let entry = if hold_panel && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {
         practice::panel_entry_in(context, module_accessor)
     } else { None };
     if let Some(entry) = entry {
@@ -1454,7 +1422,7 @@ pub fn frame_for(index: usize) -> Option<MappedInputs> {
     let frame = if source == 0 {
         None
     } else {
-        let buffers = if source == 1 { &PLAY_FRAMES } else { &PREVIEW_FRAMES };
+        let buffers = &PLAY_FRAMES;
         let generation = PLAY_GENERATION.load(Ordering::Acquire);
         if buffers.generation() != generation { return None; }
         let frame = buffers.frame_at(index);

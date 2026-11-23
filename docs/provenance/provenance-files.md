@@ -567,7 +567,7 @@
 | `src/process_memory.rs` | ours-new | 33 |  |  |  |  |
 | `src/replay_capture.rs` | ours-new | 983 |  |  |  |  |
 | `src/replay_move_start.rs` | ours-new | 45 |  |  |  |  |
-| `src/replay_preview.rs` | ours-new | 229 |  |  |  |  |
+| `src/replay_preview.rs` | ours-new | 229 |  |  | Retired by F7; Recording playback owns preview. |  |
 | `src/replay_store.rs` | ours-new | 296 |  |  |  |  |
 | `src/source_capacity_probe.rs` | ours-new | 1784 |  |  |  |  |
 | `src/source_descriptor.rs` | ours-new | 120 |  |  |  |  |

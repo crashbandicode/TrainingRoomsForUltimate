@@ -358,6 +358,9 @@ fn apply(tick: &Tick) {
             crate::runtime::roster::roster_requests::request_player_kind(kind);
         }
     }
+    if let Some(home) = tick.home {
+        super::states::request_preview_home(home);
+    }
     if let Some(id) = &tick.warp {
         let root = std::path::Path::new(crate::model::storage::ROOT);
         let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(

@@ -82,9 +82,16 @@ struct Run {
     chain: bool,
     step: usize,
     frame: usize,
+    end: usize,
     /// Passes still to play, including the one in progress. `None` plays until the chord stops it.
     remaining: Option<u32>,
     emitted: bool,
+}
+
+impl Run {
+    fn new(id: &str, chain: bool, remaining: Option<u32>, frames: core::ops::Range<usize>) -> Self {
+        Self { id: IdBuf::copy_from(id), chain, step: 0, frame: frames.start, end: frames.end, remaining, emitted: false }
+    }
 }
 
 /// Player and CPU, independently.
@@ -234,14 +241,7 @@ impl Playback {
         }
         let remaining = passes(book.index.loop_count(role));
         let warp = plan.warp;
-        self.roles[slot] = Some(Run {
-            id: IdBuf::copy_from(id),
-            chain: plan.chain,
-            step: 0,
-            frame: 0,
-            remaining,
-            emitted: false,
-        });
+        self.roles[slot] = Some(Run::new(id, plan.chain, remaining, 0..usize::MAX));
         Effect {
             warp,
             started: true,
@@ -259,19 +259,25 @@ impl Playback {
             self.warps[slot] += 1;
         }
         let warp = plan.warp;
-        self.roles[slot] = Some(Run {
-            id: IdBuf::copy_from(id),
-            chain: plan.chain,
-            step: 0,
-            frame: 0,
-            remaining: Some(1),
-            emitted: false,
-        });
+        self.roles[slot] = Some(Run::new(id, plan.chain, Some(1), 0..usize::MAX));
         Effect {
             warp,
             started: true,
             ..Effect::default()
         }
+    }
+
+    /// Play frames `frames` of one recording once, on `role`, warped to its start save as `play_file` does. A chain, an
+    /// unknown id or a window with no frame in the file starts nothing. The role's active id and loop stay as they are.
+    pub fn play_range<'a>(&mut self, role: Role, book: &'a Book, id: &str, frames: core::ops::Range<usize>) -> Effect<'a> {
+        let Some(recording) = book.recordings.get(id).filter(|recording| {
+            !book.is_chain(id) && frames.start < frames.end && frames.start < recording.frames.len()
+        }) else { return Effect::default() };
+        let warp = recording_warp(recording, &book.saves);
+        let slot = role_slot(role);
+        if warp.is_some() { self.warps[slot] += 1; }
+        self.roles[slot] = Some(Run::new(id, false, Some(1), frames));
+        Effect { warp, started: true, ..Effect::default() }
     }
 
     /// The next frame of `role`, or nothing when that role is idle or has finished its count.
@@ -312,10 +318,11 @@ impl Playback {
                 run.id
             };
             let at = run.frame;
-            let frame = book
-                .recordings
-                .get(step_name.as_str())
-                .and_then(|recording| recording.frames.get(at).copied());
+            let frame = if at < run.end {
+                book.recordings.get(step_name.as_str()).and_then(|recording| recording.frames.get(at).copied())
+            } else {
+                None
+            };
             if let Some(frame) = frame {
                 let recording_id = book
                     .recordings
@@ -501,10 +508,47 @@ mod tests {
         assert_eq!(machine.step(Role::Cpu, &book).unwrap().frame.buttons, 7);
     }
 
+    /// A range plays just its selected frames once and clamps its end.
+    fn play_range_plays_only_its_window_once() {
+        let mut book = Book::new(RecordingIndex::fresh());
+        book.add_recording("m", recording("M", &[1, 2, 3, 4, 5, 6], Some("s"), true));
+        book.add_save("s");
+        let mut machine = Playback::new();
+        assert_eq!(machine.play_range(Role::Player, &book, "m", 2..5), Effect { warp: Some("s"), started: true, ..Effect::default() });
+        for (index, buttons) in [(2, 3), (3, 4), (4, 5)] {
+            let frame = machine.step(Role::Player, &book).unwrap();
+            assert_eq!((frame.frame_index, frame.frame.buttons), (index, buttons));
+        }
+        assert!(machine.step(Role::Player, &book).is_none());
+        assert!(!machine.playing(Role::Player));
+        assert_eq!(machine.warps(Role::Player), 1);
+        assert!(machine.play_range(Role::Player, &book, "m", 4..99).started);
+        for (index, buttons) in [(4, 5), (5, 6)] {
+            let frame = machine.step(Role::Player, &book).unwrap();
+            assert_eq!((frame.frame_index, frame.frame.buttons), (index, buttons));
+        }
+        assert!(machine.step(Role::Player, &book).is_none());
+        assert!(!machine.playing(Role::Player));
+    }
+
+    /// Chains, missing files and empty windows never start a range.
+    fn play_range_refuses_a_chain_and_an_empty_window() {
+        let mut book = Book::new(RecordingIndex::fresh());
+        book.add_recording("m", recording("M", &[1, 2, 3, 4, 5, 6], None, true));
+        book.add_chain("chain", Chain::new("Chain", vec!["m".into()]).unwrap());
+        let mut machine = Playback::new();
+        for (id, range) in [("chain", 0..3), ("m", 3..3), ("m", 9..12), ("missing", 0..3)] {
+            assert_eq!(machine.play_range(Role::Player, &book, id, range), Effect::default());
+            assert!(!machine.playing(Role::Player));
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("play_range_plays_only_its_window_once", play_range_plays_only_its_window_once as fn()),
+            ("play_range_refuses_a_chain_and_an_empty_window", play_range_refuses_a_chain_and_an_empty_window as fn()),
             ("the_play_chord_with_no_active_macro_does_nothing", the_play_chord_with_no_active_macro_does_nothing as fn()),
         ]);
     }

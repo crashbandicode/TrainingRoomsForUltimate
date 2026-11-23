@@ -2081,8 +2081,6 @@ fn frame_fact_publication_defers_busy_before_any_mutation() {
         "frame facts must use the preflight context and active values");
     assert!(one("named_macros::hold_panel_fighter").starts_with(&callgraph::lex("let Ok(context) = practice::try_context() else { return; };")),
         "panel contention must defer before stop-owner changes");
-    assert!(one("replay_preview::after_frame").starts_with(&callgraph::lex("let Ok(enabled) = practice::try_enabled() else { return; };")),
-        "preview contention must defer before session changes");
     for key in ["named_macros::service_character_request", "replay_capture::service_reload_request", "recording_host::service_switch_request"] {
         assert!(one(key).starts_with(&callgraph::lex("let Ok(context) = crate::runtime::roster::character_roster::try_cpu_request_context() else { return; };")),
             "{key}: Busy must return before any request drain or result publication");
@@ -2131,7 +2129,6 @@ fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
     graph.funcs[facts].body = original;
     for (key, safe, blocking) in [
         ("named_macros::hold_panel_fighter", "panel_entry_in", "role"),
-        ("replay_preview::after_frame", "try_enabled", "enabled"),
         ("replay_capture::browser_needs_native_update", "role_in", "role"),
         ("mii_backend::ready_with", "current_with", "current"),
     ] {
