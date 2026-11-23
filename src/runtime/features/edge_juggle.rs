@@ -1592,9 +1592,8 @@ unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {
-    let platforms = drill == Drill::Juggler;
-    let x = if platforms { x } else { x.clamp(stage.ledges[0][0], stage.ledges[1][0]) };
-    placement::floor_under(p1, [x, y], platforms)
+    let x = stage.player_x(drill, x);
+    placement::floor_under(p1, [x, y], drill == Drill::Juggler)
 }
 
 /// Give the native fighter scripts one grounded transition before a new fall.
@@ -1623,6 +1622,14 @@ unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool 
     state::set_situation_kind(cpu, ground);
     state::status_request(cpu, wait);
     true
+}
+
+unsafe fn player_ko(p1: usize) -> bool {
+    let status = natives::status_kind(p1);
+    [C::StatusDead, C::StatusStandby, C::StatusRebirth]
+        .map(konst)
+        .into_iter()
+        .any(|id| id != UNRESOLVED && status == id)
 }
 
 unsafe fn placed_player(p1: usize) -> PlacedPlayer {
@@ -2146,13 +2153,19 @@ pub unsafe fn frame(fighter: usize) {
         }
         let frame = PlacementFrame {
             dead_or_rebirthing,
+            player_ko: player_ko(p1),
             grounded: situation == ground,
             airborne: situation == air,
             wait: status == wait,
             fall: status == fall,
         };
         match run.placement.action(frame) {
-            PlacementAction::RestartPlacement => run.placement = Placement::ResetResources,
+            PlacementAction::RestartPlacement => {
+                if held_cpu.take() == Some(body) {
+                    state::set_sleep(cpu, false);
+                }
+                run.placement = Placement::ResetResources;
+            }
             PlacementAction::ResetResources => {
                 if reset_recovery_resources(p1, cpu, run.stage) {
                     run.placement = Placement::Grounded;

@@ -1819,6 +1819,12 @@ fighter written onto it. The cursor already stops on the readable end of the flo
    - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
    - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
 
+**Built 2026-11-23 (fix build).**
+- Placement waits while Player 1 is KO'd and wakes a held CPU if placement restarts.
+- Option B was chosen: both falls came after Ready began, so a pre-Ready correction catches neither, and a correction during Ready cannot distinguish the game's fall from a player's own drop to the ledge. The game's cause is unknown. See [the design](design/gj4-player-start.md).
+- The measurement boot was not flown; the `83eecc32` trace was read again instead.
+- Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
+
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
 ### Planned tests and proof (not written, not run)

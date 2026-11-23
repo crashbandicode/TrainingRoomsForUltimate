@@ -211,6 +211,7 @@ game_constants! {
     StatusAttackDash = "FIGHTER_STATUS_KIND_ATTACK_DASH",
     StatusAttackAir = "FIGHTER_STATUS_KIND_ATTACK_AIR",
     StatusDead = "FIGHTER_STATUS_KIND_DEAD",
+    StatusStandby = "FIGHTER_STATUS_KIND_STANDBY",
     StatusRebirth = "FIGHTER_STATUS_KIND_REBIRTH",
     StatusFall = "FIGHTER_STATUS_KIND_FALL",
     StatusFallAerial = "FIGHTER_STATUS_KIND_FALL_AERIAL",
