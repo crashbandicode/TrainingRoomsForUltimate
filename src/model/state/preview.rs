@@ -92,11 +92,36 @@ mod tests {
         assert_eq!(checkpoint.restore(&identity).unwrap(), pair(-9.0));
     }
 
+    fn a_full_pair_comes_back_at_the_start_the_finish_and_a_stop_and_a_retired_home_gives_nothing() {
+        use crate::model::state::held_item::HeldItem;
+        use crate::model::state::record::{Charge, Steve};
+        let mut checkpoint = Checkpoint::new();
+        let identity = ([100usize, 200], [7, 8], 8);
+        let mut full = pair(42.0);
+        full[0].steve = Some(Steve {
+            mat_iron: 12, mat_diamond: 4, pick_mat: 4, pick_durability: 31.5,
+            ..Steve::START
+        });
+        full[0].held_item = Some(HeldItem::Item {
+            choice: 29, variation: 7, lifetime: 100, lifetime_max: 600, fuse: -1, fuse_max: -1,
+        });
+        full[1].charge = Charge { int_x: Some(17), float_x: Some(3.5), has_charge: Some(true), ..Charge::default() };
+        checkpoint.capture(identity, full.clone()).unwrap();
+        for _ in 0..3 {
+            assert_eq!(checkpoint.restore(&identity).unwrap(), full);
+        }
+        let different = ([100usize, 201], [7, 8], 8);
+        assert_eq!(checkpoint.restore(&different), Err(Error::FightersChanged));
+        checkpoint.clear();
+        assert_eq!(checkpoint.restore(&identity), Err(Error::Missing));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("restarts_crop_edits_and_stop_keep_first_checkpoint_until_close", restarts_crop_edits_and_stop_keep_first_checkpoint_until_close as fn()),
+            ("a_full_pair_comes_back_at_the_start_the_finish_and_a_stop_and_a_retired_home_gives_nothing", a_full_pair_comes_back_at_the_start_the_finish_and_a_stop_and_a_retired_home_gives_nothing as fn()),
         ]);
     }
     }

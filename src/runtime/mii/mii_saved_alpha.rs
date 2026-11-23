@@ -280,7 +280,6 @@ unsafe fn permitted(i:usize) -> bool {
         && !INSTALL.active()
         && !training::save_states::is_loading()
         && !training::recording_or_playback()
-        && !crate::runtime::compat::replay_preview::occupied()
 }
 
 pub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {

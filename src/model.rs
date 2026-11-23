@@ -214,6 +214,11 @@ pub mod frame;
 pub mod screens;
 #[path = "model/ui/panes.rs"]
 pub mod panes;
+#[path = "model/ui/hud_row.rs"]
+pub mod hud_row;
+#[cfg(test)]
+#[path = "model/ui/hud_row_tests.rs"]
+mod hud_row_tests;
 #[path = "model/version.rs"]
 pub mod version;
 #[path = "model/thread_stacks.rs"]

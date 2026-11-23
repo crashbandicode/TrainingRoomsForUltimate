@@ -65,7 +65,7 @@ pub use live_frame::{CaptureBreak, LiveFrame, LiveInput, LiveSession, LiveTrack,
 pub use recording::{InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};
 #[cfg(test)]
 pub use recording::{DEFAULT_FPS, SCHEMA_VERSION};
-pub use window::{FrameSnapshot, FrameWindow};
+pub use window::FrameWindow;
 #[cfg(test)]
 pub use window::{timestamp, Step};
 pub use replay::{ReplayFrame, ReplaySession, ReplayTrack};
@@ -76,4 +76,3 @@ pub use shared_capture::SharedCaptureArchive;
 
 #[cfg(test)]
 mod test_util;
-

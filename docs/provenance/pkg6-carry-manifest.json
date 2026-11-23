@@ -379,7 +379,7 @@
       "dest": "src/model/seams/native_seams/mod.rs",
       "crate": "consts",
       "src_sha256": "9c16e57af94e9f6424c92a5bd3de8df64508eb3cda01ff7c4eb9c1054c8338e3",
-      "dest_sha256": "219399a87a0bab99761fbe2dfaed6ae12cfb1f3b869a2f5e0c08f56117133c9a",
+      "dest_sha256": "00946e628d53d6bb3d8296dccd6e9e1af3884b85445596edd476093c06ff9b8d",
       "edits": [
         {
           "old": "        first.then_some(seam.offset)\n    })\n}\n\n/// The 64-byte comparison of one site.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub enum GuardOutcome {\n    /// Identical to 13.0.5.\n    Stock,\n    /// Only Skyline hook shapes differ. `at` is the byte offset of the first; `usable` applies the\n    /// kind's rule (false: another plugin owns the words we would replace or rely on).\n    HookedByOther { at: usize, usable: bool },\n    /// A `Sharing::EntryOrBody` entry row whose entry another plugin's far jump owns, with the body\n    /// after it stock: usable, through the body site (`entry_or_body_outcome`).\n    Shared,\n    /// A change that is not a hook: the site is left alone.\n    Foreign { first_diff: usize },\n}\n\nimpl GuardOutcome {\n    pub const fn usable(self) -> bool {\n        match self {\n            GuardOutcome::Stock | GuardOutcome::Shared => true,\n            GuardOutcome::HookedByOther { usable, .. } => usable,\n            GuardOutcome::Foreign { .. } => false,\n        }\n    }\n\n    /// The install line's word for the outcome.\n    pub const fn code(self) -> &'static str {\n        match self {\n            GuardOutcome::Stock => \"stock\",\n            GuardOutcome::HookedByOther { usable: true, .. } => \"other\",\n            GuardOutcome::HookedByOther { usable: false, .. } => \"occupied\",\n            GuardOutcome::Shared => \"shared\",\n            GuardOutcome::Foreign { .. } => \"foreign\",\n        }\n    }\n}\n\nconst WORDS: usize = GUARD_BYTES / 4;\nconst NOP: u32 = 0xd503_201f;\nconst LDR_X17_LITERAL_8: u32 = 0x5800_0051;\nconst BR_X17: u32 = 0xd61f_0220;\nconst B_MASK: u32 = 0xfc00_0000;\nconst B_OPCODE: u32 = 0x1400_0000;\n\nfn words(bytes: &[u8; GUARD_BYTES]) -> [u32; WORDS] {\n    let mut out = [0u32; WORDS];\n    for (i, word) in out.iter_mut().enumerate() {\n        *word = u32::from_le_bytes([bytes[4 * i], bytes[4 * i + 1], bytes[4 * i + 2], bytes[4 * i + 3]]);\n    }\n    out\n}\n\n/// Length in words of a Skyline hook shape starting at word `i` (cut at the end of the window).\nfn hook_shape(actual: &[u32; WORDS], i: usize) -> Option<usize> {\n    let at = |k: usize| actual.get(i + k).copied();\n    let len = if at(0) == Some(NOP) && at(1) == Some(LDR_X17_LITERAL_8) && at(2) == Some(BR_X17) {\n        5\n    } else if at(0) == Some(LDR_X17_LITERAL_8) && at(1) == Some(BR_X17) {\n        4\n    } else if actual[i] & B_MASK == B_OPCODE {\n        1\n    } else {\n        return None;\n    };\n    Some(len.min(WORDS - i))\n}\n\n/// Whether a hook shape at word `word` takes words this kind needs as they are.\nconst fn blocks(kind: SeamKind, word: usize) -> bool {\n    match kind {\n        SeamKind::Hook { .. } => word < HOOK_SPAN_WORDS,\n        SeamKind::Called => false,\n        SeamKind::Relied => word == 0,\n    }\n}\n\n/// Compare a site's 64 bytes now (`actual`) with its 13.0.5 bytes (`expected`).\npub fn guard_outcome(expected: &[u8; GUARD_BYTES], actual: &[u8; GUARD_BYTES], kind: SeamKind) -> GuardOutcome {\n    let expected = words(expected);\n    let actual = words(actual);\n    let mut first_hook = None;\n    let mut usable = true;\n    let mut i = 0;\n    while i < WORDS {\n        if actual[i] == expected[i] {\n            i += 1;\n            continue;\n        }\n        let Some(len) = hook_shape(&actual, i) else {\n            return GuardOutcome::Foreign { first_diff: 4 * i };\n        };\n        first_hook.get_or_insert(4 * i);\n        // A shape that starts inside the span also covers every word it spans.\n        if (i..i + len).any(|w| blocks(kind, w)) {\n            usable = false;\n        }\n        i += len;\n    }\n    match first_hook {\n        None => GuardOutcome::Stock,\n        Some(at) => GuardOutcome::HookedByOther { at, usable },\n    }\n}\n",
@@ -664,6 +664,21 @@
           "old": "    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS,\n",
           "new": "    rows_game_speed::ROWS, rows_lobby_speed::ROWS, rows_module_pins::ROWS, rows_custom_stages::ROWS, rows_speed_frame::ROWS,\n",
           "reason": "rc.15 1 Frame on the game speed bind: register the speed_frame guard rows (docs/design/rc15-speed-frame.md)"
+        },
+        {
+          "old": "pub mod rows_speed_frame;\n",
+          "new": "pub mod rows_speed_frame;\npub mod rows_speed_label;\n",
+          "reason": "F5, fix round 2026-11-23: register the guarded Training speed-label glyph-style rows."
+        },
+        {
+          "old": "const TABLES: [&[Seam]; 18] = [",
+          "new": "const TABLES: [&[Seam]; 19] = [",
+          "reason": "F5, fix round 2026-11-23: register the guarded Training speed-label glyph-style rows."
+        },
+        {
+          "old": "rows_module_pins::ROWS, rows_custom_stages::ROWS, rows_speed_frame::ROWS,\n];",
+          "new": "rows_module_pins::ROWS, rows_custom_stages::ROWS, rows_speed_frame::ROWS,\n    rows_speed_label::ROWS,\n];",
+          "reason": "F5, fix round 2026-11-23: register the guarded Training speed-label glyph-style rows."
         }
       ]
     },
@@ -1571,7 +1586,7 @@
       "dest": "src/model/swap/source_load.rs",
       "crate": "consts",
       "src_sha256": "96037cc4840bc01c6dd2466b9ddbe751e790404a324af9d65d6ac6c58205bf6f",
-      "dest_sha256": "b15f2dc48ce419f32c022c4be140df6a54d32489155991033c0ef78af3ec88c0",
+      "dest_sha256": "a23ccefc1a44fbfa945bb90eb91a0483902133f950a775a746f2770c6556abf5",
       "edits": [
         {
           "old": "pub enum Blocker {\n    Backend,\n    ReadyGo,\n    Menu,\n    NativeUi,\n    Shortcut,\n    Install,\n    SaveState,\n    Recording,\n    ReplayPreview,\n    Roster,\n}\n\nimpl Blocker {\n    pub fn reason(self) -> &'static str {\n        match self {\n            Blocker::Backend => \"Mii backend not ready\",\n            Blocker::ReadyGo => \"match not at ready-go\",\n            Blocker::Menu => \"menu captures input\",\n            Blocker::NativeUi => \"native UI busy\",\n            Blocker::Shortcut => \"another shortcut pending\",\n            Blocker::Install => \"INSTALL held\",\n            Blocker::SaveState => \"save-state restore\",\n            Blocker::Recording => \"recording or playback\",\n            Blocker::ReplayPreview => \"replay preview\",\n            Blocker::Roster => \"roster transaction\",\n        }\n    }\n}\n\n/// Once-per-change note for one queued request: the same request waiting on the same blocker on every\n/// callback is noted once; a different blocker or request is noted again; no blocker re-arms it.\n#[derive(Clone, Copy, Debug, PartialEq, Eq)]\npub struct Waiting<R> {\n    last: Option<(R, Blocker)>,\n}\n\nimpl<R: Copy + PartialEq> Waiting<R> {\n    pub const fn new() -> Self {\n        Self { last: None }\n    }\n\n    /// `Some(blocker)` when this callback's (request, blocker) differs from the last one noted.\n    pub fn note(&mut self, request: R, blocker: Option<Blocker>) -> Option<Blocker> {\n        let now = blocker.map(|blocker| (request, blocker));\n        if now == self.last {\n            return None;\n        }\n        self.last = now;\n        blocker\n    }\n}\n\nimpl<R: Copy + PartialEq> Default for Waiting<R> {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    /// M5c's rule",
@@ -1588,6 +1603,21 @@
           ],
           "macro": "lib_unit_tests",
           "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+        },
+        {
+          "old": "    }\n\n    fn every_blocker_has_a_distinct_reason() {\n        let all = [\n            Blocker::Backend, Blocker::ReadyGo, Blocker::Menu, Blocker::NativeUi, Blocker::Shortcut,\n            Blocker::Install, Blocker::SaveState, Blocker::Recording, Blocker::ReplayPreview, Blocker::Roster,\n        ];\n        for (i, a) in all.iter().enumerate() {\n            assert!(!a.reason().is_empty());\n            for b in &all[i + 1..] {\n                assert_ne!(a.reason(), b.reason());\n",
+          "new": "    }\n\n    fn every_blocker_has_a_distinct_reason() {\n        let all = [\n            Blocker::Backend, Blocker::ReadyGo, Blocker::Menu, Blocker::NativeUi, Blocker::Shortcut,\n            Blocker::Install, Blocker::SaveState, Blocker::Recording, Blocker::Roster,\n        ];\n        for (i, a) in all.iter().enumerate() {\n            assert!(!a.reason().is_empty());\n            for b in &all[i + 1..] {\n                assert_ne!(a.reason(), b.reason());\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+        },
+        {
+          "old": "            Blocker::NativeUi => \"native UI busy\",\n            Blocker::Shortcut => \"another shortcut pending\",\n            Blocker::Install => \"INSTALL held\",\n            Blocker::SaveState => \"save-state restore\",\n            Blocker::Recording => \"recording or playback\",\n            Blocker::ReplayPreview => \"replay preview\",\n            Blocker::Roster => \"roster transaction\",\n            Blocker::Portrait => \"portrait render on a helper\",\n        }\n    }\n}\n",
+          "new": "            Blocker::NativeUi => \"native UI busy\",\n            Blocker::Shortcut => \"another shortcut pending\",\n            Blocker::Install => \"INSTALL held\",\n            Blocker::SaveState => \"save-state restore\",\n            Blocker::Recording => \"recording or playback\",\n            Blocker::Roster => \"roster transaction\",\n            Blocker::Portrait => \"portrait render on a helper\",\n        }\n    }\n}\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+        },
+        {
+          "old": "    NativeUi,\n    Shortcut,\n    Install,\n    SaveState,\n    Recording,\n    ReplayPreview,\n    Roster,\n    /// The role's HUD portrait job holds a helper lease or has its render issued (Eden covrest-12).\n    Portrait,\n}\n\n",
+          "new": "    NativeUi,\n    Shortcut,\n    Install,\n    SaveState,\n    Recording,\n    Roster,\n    /// The role's HUD portrait job holds a helper lease or has its render issued (Eden covrest-12).\n    Portrait,\n}\n\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -11190,7 +11220,7 @@
       "dest": "src/runtime/seams/seam_install.rs",
       "crate": "root",
       "src_sha256": "8c81d985258c0189ec1161fdc60efe573952596c55325cce07fbe9dc8c7503cd",
-      "dest_sha256": "5b068ff78b6d122171e206b38be4b643ca6ba53ef9c3966dc7f704a74949b9f9",
+      "dest_sha256": "54ca6ec9422c3bc7f802d64e5a77bc86b2029af05765df8c93562379e205e144",
       "edits": [
         {
           "old": "use crate::model;\n",
@@ -11326,6 +11356,11 @@
           "old": "    \"game_speed\",\n",
           "new": "    \"game_speed\",\n    // rc.15 1 Frame: the entry hold is installed and the Training resume calls the pause sync only when every row is stock.\n    \"speed_frame\",\n",
           "reason": "rc.15 1 Frame on the game speed bind: publish the speed_frame guard group through the existing seam gate as authoritative"
+        },
+        {
+          "old": "    \"speed_frame\",\n",
+          "new": "    \"speed_frame\",\n    \"speed_label\",\n",
+          "reason": "F5, fix round 2026-11-23: register the guarded Training speed-label glyph-style rows."
         }
       ]
     },
@@ -11413,7 +11448,7 @@
       "dest": "src/runtime/p1/cpu_pilot.rs",
       "crate": "root",
       "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-      "dest_sha256": "28fe6b3ee42e727e30a66a7e9bbff512b951b622b7edee162159aec0e7dc7763",
+      "dest_sha256": "1925470d6f81aaaf888dcb9f63544ee51ef37ffc011a97659660b1bc19fdb463",
       "edits": [
         {
           "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
@@ -11629,6 +11664,11 @@
           "old": "fn clear_output() {\n",
           "new": "/// The fallback is emitting P1's input now (B4's `p1_driven_by_ai`): lock-free, readable from a game hook. False while it\n/// is off, not installed, or paused for a menu, a recording or a playback.\npub(crate) fn emitting() -> bool {\n    installed() && EMITTING.load(Ordering::Acquire)\n}\n\nfn clear_output() {\n",
           "reason": "rc.14 recfix (Eden rc.13 g5-rc13-xps-1, gif-lane-5): `emitting()` added: the fallback arms the AI and hands back its decision as P1's mapped input without leaving an operation-CPU change, so B4's `p1_driven_by_ai` (`model::recording`, Record, Play on Player 1 and Quick Reset) asks the fallback itself whether it is emitting P1's input now (`EMITTING`, lock-free; false while Off, or paused for a menu, a recording or a playback)."
+        },
+        {
+          "old": "}\n\nfn menu_busy() -> bool {\n    crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)\n        || crate::runtime::compat::replay_preview::occupied()\n        || crate::runtime::lobby::training::recording_or_playback()\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n",
+          "new": "}\n\nfn menu_busy() -> bool {\n    crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)\n        || crate::runtime::lobby::training::recording_or_playback()\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -14379,7 +14419,7 @@
       "dest": "src/runtime/roster/cycle_preload.rs",
       "crate": "root",
       "src_sha256": "ec95b169b5ec06064bc45222a48e3f7ab72a94db32bf9d3c3b619e87e50caac3",
-      "dest_sha256": "239baa44ec93fa43629a40d40b02e8da64fa94bebc2ca76c684e2f7db3be28d5",
+      "dest_sha256": "da6ce4d4ca12052ab7862f6222bba62abffca00d026b918581d761da534562b8",
       "edits": [
         {
           "old": "    let roster = if role == 0 {\n        menu.player_roster.fighters()\n    } else {\n        menu.cpu_roster.fighters()\n    };\n    let preferences = crate::runtime::compat::common::menu::mii_preferences();\n",
@@ -14600,6 +14640,11 @@
           "old": "        let mut text = crate::model::storage::FixedPath::<96>::new();\n",
           "new": "        let mut text = crate::model::storage::FixedPath::<{ crate::engine::preload::cycle_preload_policy::TEXT_MAX }>::new();\n",
           "reason": "rc15 ready-fighters-shortfall (operator 2026-11-20 ~01:22Z: 'yes add the ready fighters fix to this build'; review-menu-astra 03:35Z, 04:44Z, 06:07Z): body_bank::cycle_demand counts what the cycles need and which fighters (picks; a pair is one) stay cold by the planner's own placement over the admitted whole numbered order (by slot) of each role that cycles, beside the groups it keeps, from a snapshot recomputed only when it changes; the Fighters notice says 'Ready Fighters 8/9: 1 stays cold' and is raised again when R, N or cold changes."
+        },
+        {
+          "old": "    // The UI gates defer every load and are visible operations. `preload_blocked` also holds\n    // speculation behind the preloader's own helper and hat loads, which never pause the notice.\n    let ui_blocked = crate::runtime::lobby::training::lobby::native_ui_busy()\n        || crate::runtime::lobby::training::save_states::is_loading()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::compat::replay_preview::occupied();\n    let blocked = if ui_blocked { Some(\"ui\") } else { crate::runtime::roster::character_roster::preload_blocked_reason() };\n    #[cfg(feature = \"diag\")]\n    note_blocked(blocked);\n    if blocked.is_some() {\n        poll_status(true, ui_blocked || crate::runtime::roster::character_roster::notice_blocked(), None);\n",
+          "new": "    // The UI gates defer every load and are visible operations. `preload_blocked` also holds\n    // speculation behind the preloader's own helper and hat loads, which never pause the notice.\n    let ui_blocked = crate::runtime::lobby::training::lobby::native_ui_busy()\n        || crate::runtime::lobby::training::save_states::is_loading()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::engine::rr_host::previewing();\n    let blocked = if ui_blocked { Some(\"ui\") } else { crate::runtime::roster::character_roster::preload_blocked_reason() };\n    #[cfg(feature = \"diag\")]\n    note_blocked(blocked);\n    if blocked.is_some() {\n        poll_status(true, ui_blocked || crate::runtime::roster::character_roster::notice_blocked(), None);\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -14642,7 +14687,7 @@
       "dest": "src/runtime/roster/kirby_hats.rs",
       "crate": "root",
       "src_sha256": "3e2e73f9157b54434492472cf64ae8993af5f508e47fbc67c944667da95d6f52",
-      "dest_sha256": "d1f0b0d344020674a6b20ed3f15e8c84bd5b863926ac8a4417b0911176de09d7",
+      "dest_sha256": "c95a88c99350be22e019e3bf1a0d0b269775e837dfa4d9ff4dfafc5e4574a8a6",
       "edits": [
         {
           "old": "fn notice(role: usize, text: String) {",
@@ -14897,6 +14942,11 @@
           "old": "            pending.leases_released = true;\n            match sources::prepare(role, pending.kind,\n",
           "new": "            pending.leases_released = true;\n            // SOL-R23: the native copy reads this kind's hat pair for this Kirby with no null check; wait until it exists.\n            use crate::model::kirby_copy_pair::{copy_ready, PAIR_KINDS};\n            let kind = pending.kind;\n            if !copy_ready(kind, PAIR_KINDS.contains(&kind).then(|| copy_pair(body, kind)).flatten()) {\n                state.pending = Some(pending);\n                return;\n            }\n            match sources::prepare(role, pending.kind,\n",
           "reason": "SOL-R23 (kh2-repro-xps-1, 2026-11-17): copy_setup reads the copied kind's native hat pair for this Kirby with no null check (main+0x6de830 -> vtbl[0x58] main+0x491e00); after the quiet preload released the pair while slot 7 stayed a ready Falco source, a hat request jumped to 0. on_frame reads the pair (model::kirby_copy_pair) before the lease and the copy and keeps the request pending without it (the existing timeout ends it). Part 2: the gate."
+        },
+        {
+          "old": "        && !menu::captures_input()\n        && !training::lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n}\n\nunsafe fn role_body(role: usize) -> Option<*mut app::BattleObjectModuleAccessor> {\n    let body = try_get_module_accessor(if role == 0 {\n        FighterId::Player\n",
+          "new": "        && !menu::captures_input()\n        && !training::lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n}\n\nunsafe fn role_body(role: usize) -> Option<*mut app::BattleObjectModuleAccessor> {\n    let body = try_get_module_accessor(if role == 0 {\n        FighterId::Player\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -14905,7 +14955,7 @@
       "dest": "src/runtime/roster/character_items.rs",
       "crate": "root",
       "src_sha256": "b0679903a58021f041bec47d30926f946fc6ef8dbfb679574fd12e597ab78933",
-      "dest_sha256": "1123cdcd39e8d88b1d6219e400dcec9053b3b284797a5f91569e510d057bff54",
+      "dest_sha256": "0b743ab90bed6e4f72ccb3435144d7136777dbbf3a37a52cb786fc827671410f",
       "edits": [
         {
           "old": "const LEGACY_INDICES: [usize; 38] = [\n    4, 15, 5, 6, 7, 8, 9, 10, 0, 1, 12, 13, 14, 16,\n    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 2, 3, 11, 40, 41, 42, 43, 44,\n];",
@@ -15015,6 +15065,11 @@
           "old": "let item = &ALL_CHAR_ITEMS[*LEGACY_INDICES.get(choice)?];",
           "new": "let item = ALL_CHAR_ITEMS.get(choice)?;",
           "reason": "rc.13 (the operator 11-14: \"Wario's bike should be one of the character items we can spawn\"): Wario's bike (ITEM_KIND_WARIOBIKE, needs Wario's data) is appended to the Give item list as choice 38, so every older saved choice keeps its index; the identity position map goes, the table is indexed by the choice"
+        },
+        {
+          "old": "\nunsafe fn permitted() -> bool {\n    common::is_training_mode() && common::is_ready_go()\n        && !crate::runtime::roster::character_roster::busy() && !training::lobby::native_ui_busy()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n}\n\n/// Invoked for every A press, including selecting the already-checked item.\npub unsafe fn request(choice: usize) {\n    if spec(choice).is_none() || !permitted() {\n",
+          "new": "\nunsafe fn permitted() -> bool {\n    common::is_training_mode() && common::is_ready_go()\n        && !crate::runtime::roster::character_roster::busy() && !training::lobby::native_ui_busy()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n}\n\n/// Invoked for every A press, including selecting the already-checked item.\npub unsafe fn request(choice: usize) {\n    if spec(choice).is_none() || !permitted() {\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -15023,7 +15078,7 @@
       "dest": "src/runtime/roster/character_sources.rs",
       "crate": "root",
       "src_sha256": "6c3fe37031f02ee3c3891943600223546804839ee1ee6af103346710f4fb1514",
-      "dest_sha256": "d8c53eb4f213dba5628b91addb3521a97395ced0d02e8310050f090807dc3b90",
+      "dest_sha256": "d63252823064b757e03f8c05bf77079281c3efa5cc7e138225ccd2538c6a0792",
       "edits": [
         {
           "delete_from": "/// Skip plugin automations for an owned helper body.",
@@ -17576,6 +17631,11 @@
           "old": "    // rc.14 creation-hold: the refused extra stays offered, so its preflight runs again and a pass clears the hold.\n    creation::held_allowance(allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
           "new": "    (allowance,state.creation_hold.filter(|(epoch,_)|state.book.is_current(*epoch)).map(|(_,position)|usize::from(position)))\n",
           "reason": "rc.14 creation-hold borrow: rc.14 creation-hold: entry 3's borrow keeps waiting only for the created entries before a refused one (ended_allowance), as before the fix"
+        },
+        {
+          "old": "    if INSTALL.active() { Some(\"another source install\") }\n    else if !crate::runtime::compat::common::is_ready_go() { Some(\"ready-go\") }\n    else if super::lobby::native_ui_busy() { Some(\"native UI\") }\n    else if super::training::save_states::is_loading() { Some(\"save-state restore\") }\n    else if super::training::recording_or_playback() { Some(\"recording or playback\") }\n    else if crate::runtime::compat::replay_preview::occupied() { Some(\"replay preview\") }\n    else { None }\n}\n\npub unsafe fn portrait_admission_blocker() -> Option<&'static str> {\n    admission_blocker()\n",
+          "new": "    if INSTALL.active() { Some(\"another source install\") }\n    else if !crate::runtime::compat::common::is_ready_go() { Some(\"ready-go\") }\n    else if super::lobby::native_ui_busy() { Some(\"native UI\") }\n    else if super::training::save_states::is_loading() { Some(\"save-state restore\") }\n    else if super::training::recording_or_playback() { Some(\"recording or playback\") }\n    else if crate::engine::rr_host::previewing() { Some(\"replay preview\") }\n    else { None }\n}\n\npub unsafe fn portrait_admission_blocker() -> Option<&'static str> {\n    admission_blocker()\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -22748,7 +22808,7 @@
       "dest": "src/runtime/mii/mii_auto_init.rs",
       "crate": "root",
       "src_sha256": "93ef4e97fdb8e90947145a77aa5ce39440bf6996d832804cabe76739be9e88fb",
-      "dest_sha256": "27ea3275ea940d4b73a5773a30fbd20b2166304df88dc5c5da9e201273cab125",
+      "dest_sha256": "5bec81316978f1771b7750860e5fc5ae246c80e3c85526b639febc90abf93bd5",
       "edits": [
         {
           "old": "//! Current combined alpha: one shared catalog read, then current-callback capture.\nuse super::*;\nuse std::sync::Arc;\nuse crate::engine::mii::{\n    auto_init::{self, Initialization, Token},\n    catalog_request::Kind,\n    inventory::Snapshot,\n",
@@ -22774,6 +22834,11 @@
           "old": "        );\n    }\n}\n\npub(super) fn deliver(token: Token, catalog: Arc<Snapshot>) {\n    let mut s = STATE.lock().unwrap();\n    if s.init.reading() == Some(token) {\n        s.held = Some((token, catalog));\n    }\n}\n\npub(super) fn abandon(token: Token) {\n    let mut s = STATE.lock().unwrap();\n    if s.held.as_ref().is_some_and(|(started, _)| *started == token) {\n        s.held = None;\n    }\n    let _ = s.init.finish(token, current_token(), false);\n    PENDING.store(s.init.pending(), Ordering::Release);\n",
           "new": "        );\n    }\n}\n\npub(super) fn deliver(token: Token, catalog: Arc<Snapshot>) {\n    let mut s = STATE.lock();\n    if s.init.reading() == Some(token) {\n        s.held = Some((token, catalog));\n    }\n}\n\npub(super) fn abandon(token: Token) {\n    let mut s = STATE.lock();\n    if s.held.as_ref().is_some_and(|(started, _)| *started == token) {\n        s.held = None;\n    }\n    let _ = s.init.finish(token, current_token(), false);\n    PENDING.store(s.init.pending(), Ordering::Release);\n",
           "reason": "R5 cold scene owner locks use existing const hos_lock mutex instead of lazy heap-backed Switch pthread mutex. Audited owner/entry contracts in pkg6-owner-locks.md; same guard extents, exclusion, non-reentrancy and try_lock refusal. Probe readers only adapt parent guard API. Release panic=abort; no boot warming or counter exemption."
+        },
+        {
+          "old": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n        && STATES.iter().all(|s| {\n            let s = s.lock();\n            s.active.is_none() && s.pending.is_none()\n        })\n}\n",
+          "new": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n        && STATES.iter().all(|s| {\n            let s = s.lock();\n            s.active.is_none() && s.pending.is_none()\n        })\n}\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -23742,7 +23807,7 @@
       "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
       "crate": "root",
       "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-      "dest_sha256": "81091c54ab875eb6ba4484422c79ee5f3c27767fcf2c56904b14ad2aca7fe3bc",
+      "dest_sha256": "ed4e7edda55bc3caef066c069a8de96a2540a303e27337040a55ef54ba5c545f",
       "edits": [
         {
           "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -24740,6 +24805,11 @@
           "old": "//! INSTALL submission and phase-time publication are distinct commits.\nuse super::*;\nuse std::sync::Arc;\nuse hos_lock::Mutex as OwnerMutex;\nuse std::convert::TryInto;\nuse crate::engine::mii::{\n",
           "new": "//! INSTALL submission and phase-time publication are distinct commits.\nuse super::*;\nuse std::sync::Arc;\nuse crate::engine::mii::ordinary_player::{cpu_receipt,expiry_notice,persists_selection,Requester};\nuse hos_lock::Mutex as OwnerMutex;\nuse std::convert::TryInto;\nuse crate::engine::mii::{\n",
           "reason": "rc15/mashout integration (merge of main af72b7ba): Mash out + CPU-receipt owner on the LEAD-1 Admission API"
+        },
+        {
+          "old": "    else if lobby::native_ui_busy() {Some(Blocker::NativeUi)}\n    else if button_config::has_pending_request() {Some(Blocker::Shortcut)}\n    else if install && INSTALL.active() {Some(Blocker::Install)}\n    else if training::save_states::is_loading() {Some(Blocker::SaveState)}\n    else if training::recording_or_playback() {Some(Blocker::Recording)}\n    else if crate::runtime::compat::replay_preview::occupied() {Some(Blocker::ReplayPreview)}\n    else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}\n    else if portrait_render_held() {Some(Blocker::Portrait)}\n    else {None}\n}\n/// The CPU's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\n",
+          "new": "    else if lobby::native_ui_busy() {Some(Blocker::NativeUi)}\n    else if button_config::has_pending_request() {Some(Blocker::Shortcut)}\n    else if install && INSTALL.active() {Some(Blocker::Install)}\n    else if training::save_states::is_loading() {Some(Blocker::SaveState)}\n    else if training::recording_or_playback() {Some(Blocker::Recording)}\n    else if !STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()}) {Some(Blocker::Roster)}\n    else if portrait_render_held() {Some(Blocker::Portrait)}\n    else {None}\n}\n/// The CPU's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -25658,7 +25728,7 @@
       "dest": "src/runtime/mii/mii_ordinary_player.rs",
       "crate": "root",
       "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-      "dest_sha256": "0c600c7a28ba9410ec44a833bbdcbc1914b130e38d365f782c37bc50607b20ec",
+      "dest_sha256": "ccb0020ac93ad71620bce7683946d53f46cc69173c31a34d904c9a4bbdad8710",
       "edits": [
         {
           "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -26546,6 +26616,11 @@
           "old": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    if !s.busy() && (s.request.is_none() || replace_restore) && request.is_some() {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
           "new": "    let manual_direct=user_request && matches!(selection,Selection::Direct(_));\n    // Before INSTALL begins, an explicit pick supersedes a pending lobby restore.\n    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
           "reason": "rc15/mashout integration (merge of main af72b7ba): Mash out + CPU-receipt owner on the LEAD-1 Admission API"
+        },
+        {
+          "old": "    if super::mii_ordinary_cpu::writers_reserved(0,0) {return false;}\n    mii_backend::ready() && crate::runtime::compat::common::is_ready_go()\n        && !menu::captures_input() && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n        && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})\n        && !portrait_render_held()\n}\n/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\nfn portrait_render_held()->bool {\n",
+          "new": "    if super::mii_ordinary_cpu::writers_reserved(0,0) {return false;}\n    mii_backend::ready() && crate::runtime::compat::common::is_ready_go()\n        && !menu::captures_input() && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n        && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})\n        && !portrait_render_held()\n}\n/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\nfn portrait_render_held()->bool {\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -26554,7 +26629,7 @@
       "dest": "src/runtime/mii/mii_replay.rs",
       "crate": "root",
       "src_sha256": "2ff322e3ec71d67c29d255957d3c737af2e18a53bf72c2a98da78a70044ce9cb",
-      "dest_sha256": "77e9faa7abd1f196e239f5e751e98766be2c9a84816ddfee5f66e2238710cb4a",
+      "dest_sha256": "5a3448d439d96f38c3c551811c4b25233a6a5c89d6cd96206981ef70610b16e6",
       "edits": [
         {
           "old": "//! Deferred replay resource identity. The existing Training service is the only native seam.\nuse super::*;\nuse std::{\n    collections::VecDeque,\n    sync::{mpsc, Arc},\n};\nuse crate::engine::mii::{\n    draft::Library,\n    lifetime::Configuration,\n    native_values::RowIds,\n    replay::{RawMii, ReplayMiis, Selection, SelectionSource, Target},\n};\n\nconst MAX_PENDING: usize = crate::engine::macros::MAX_RETAINED_CAPTURES * 8;\nstatic WORK: AtomicBool = AtomicBool::new(false);\nstatic STATE: Mutex<State> = Mutex::new(State {\n    pending: VecDeque::new(),\n    inflight: None,\n});\ntype Reply = mpsc::Sender<Result<Configuration, String>>;\nstruct Job {\n    raw: RawMii,\n    selected: Option<(u64, u64, Reply)>,\n}\nstruct Inflight {\n    job: Job,\n    configuration: Configuration,\n    result: mpsc::Receiver<Result<Arc<Library>, String>>,\n}\nstruct State {\n    pending: VecDeque<Job>,\n    inflight: Option<Inflight>,\n}\nfn generation() -> u64 {\n    mii_saved_alpha::current_generation(1)\n}\nfn current(job: &Job) -> bool {\n    job.selected.as_ref().is_none_or(|(epoch, revision, _)| {\n        *epoch == generation() && *revision == crate::runtime::macros::replay_capture::selection_revision()\n    })\n}\nfn finish(job: Job, result: Result<Configuration, String>) {\n    if let Some((_, _, reply)) = job.selected {\n        let _ = reply.send(result);\n    } else if let Err(error) = result {\n        trace!(\"[MiiReplay] deferred import unavailable: {error}; durable raw metadata retained\");\n    }\n}\n\n/// Called only after the companion was committed. This bounded queue is an optimization;\n/// the durable association remains authoritative and selected captures can retry after restart.\npub(crate) fn committed(miis: ReplayMiis) {\n    let mut s = STATE.lock().unwrap();\n    for raw in miis.entries() {\n        if s.pending.len() == MAX_PENDING {\n            break;\n        }\n        s.pending.push_back(Job {\n            raw: *raw,\n            selected: None,\n        });\n    }\n    WORK.store(\n        !s.pending.is_empty() || s.inflight.is_some(),\n        Ordering::Release,\n    );\n}\npub(crate) fn resolve(\n    raw: RawMii,\n    revision: u64,\n) -> Result<mpsc::Receiver<Result<Configuration, String>>, String> {\n    if !mii_ordinary_cpu::enabled() {\n        return Err(\"Replay Mii loading is unavailable in this build\".into());\n    }\n    let (reply, receive) = mpsc::channel();\n    let mut s = STATE.lock().unwrap();\n    if s.pending.len() == MAX_PENDING {\n        return Err(\"Mii import queue is busy; reopen this capture\".into());\n    }\n    s.pending.push_front(Job {\n        raw,\n        selected: Some((generation(), revision, reply)),\n    });\n    WORK.store(true, Ordering::Release);\n    Ok(receive)\n}\npub(crate) fn selected(target: Target, revision: u64) -> Selection {\n    Selection {\n",
@@ -26595,6 +26670,11 @@
           "old": "pub(crate) fn request(target: Target, revision: u64) -> bool {\n    request_with(selected(target, revision), request_cpu_kind)\n}\n",
           "new": "",
           "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; request has no caller, request_in is the live path"
+        },
+        {
+          "old": "    if !state.queue.has_work() { return; }\n    // No native row scans until the original gameplay and transaction gates permit them.\n    if !crate::runtime::compat::common::is_ready_go() || INSTALL.active() || menu::captures_input()\n        || lobby::native_ui_busy() || button_config::has_pending_request()\n        || training::save_states::is_loading() || training::recording_or_playback()\n        || crate::runtime::compat::replay_preview::occupied() || !mii_backend::ready()\n        || !(ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some()) { return; }\n    let Some(catalog) = mii_ordinary_cpu::replay_catalog() else { return; };\n    let Ok(player) = mii_ordinary_player::library_catalog() else { return; };\n    let Ok(cpu) = mii_ordinary_cpu::library_catalog() else { return; };\n    let Some(work) = state.queue.take_next() else { return; };\n",
+          "new": "    if !state.queue.has_work() { return; }\n    // No native row scans until the original gameplay and transaction gates permit them.\n    if !crate::runtime::compat::common::is_ready_go() || INSTALL.active() || menu::captures_input()\n        || lobby::native_ui_busy() || button_config::has_pending_request()\n        || training::save_states::is_loading() || training::recording_or_playback()\n        || !mii_backend::ready()\n        || !(ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some()) { return; }\n    let Some(catalog) = mii_ordinary_cpu::replay_catalog() else { return; };\n    let Ok(player) = mii_ordinary_player::library_catalog() else { return; };\n    let Ok(cpu) = mii_ordinary_cpu::library_catalog() else { return; };\n    let Some(work) = state.queue.take_next() else { return; };\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -26603,7 +26683,7 @@
       "dest": "src/runtime/mii/mii_saved_alpha.rs",
       "crate": "root",
       "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-      "dest_sha256": "747607355d014f4554e562c8a524033cb67d83d50856528d394cb4cf97e3b711",
+      "dest_sha256": "4ad47187565cd475bf2d5185bde414b7373681ce7be38743d1485e7a206e4e20",
       "edits": [
         {
           "old": "pub(super) fn init(base: usize) {",
@@ -26938,6 +27018,11 @@
           "old": "        && matches!(selection, Selection::Cycle)\n        && owner.state.phase() == Phase::Ready\n        && (owner.cycled\n            || setting(&MENU)\n                .player_roster\n                .fighters()\n                .iter()\n",
           "new": "        && matches!(selection, Selection::Cycle)\n        && owner.state.phase() == Phase::Ready\n        && (owner.cycled\n            || read_menu()\n                .player_roster\n                .fighters()\n                .iter()\n",
           "reason": "RC15 reviewed menu integration (4e972211) composed with accepted-intent API: carry fresh eligibility through Mii readiness; preserve Busy before mutation and propagate consumed loader acceptance. Explicit native-read alias preserves its actual declaring module for the hook audit."
+        },
+        {
+          "old": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n}\n\npub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {\n    // Already-owned Training fallback work still receives its departure callback.\n    let i=match owner {0=>0,1|4=>1,_=>return false};\n",
+          "new": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n}\n\npub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {\n    // Already-owned Training fallback work still receives its departure callback.\n    let i=match owner {0=>0,1|4=>1,_=>return false};\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
         }
       ]
     },
@@ -28946,7 +29031,7 @@
       "dest": "src/runtime/lobby/training/practice.rs",
       "crate": "root",
       "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-      "dest_sha256": "5a4c32399e4236404b5b1d91cd8ec16d98223bbb07b23f0e694a3f7be5a956cc",
+      "dest_sha256": "9ec42e7d4772de97e51123f18505f3d0756d126765715387e334fccb5aae424a",
       "edits": [
         {
           "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -29037,6 +29122,16 @@
           "old": "pub unsafe fn panel_entry(module: &BattleObjectModuleAccessor) -> Option<usize> {\n    panel_entry_in(context(), module)\n}\n",
           "new": "",
           "reason": "rc15 item 7b (operator-approved 2026-11-22 14:02Z, relayed by tr-primary-2 ~23:48Z): release-build dead_code warning; panel_entry has no caller, panel_entry_in is the live path"
+        },
+        {
+          "old": "pub fn owned() -> bool { OWNED.lock().active() }\n\n/// Invoked before consumer callbacks and before native entry destruction.\npub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::runtime::compat::replay_preview::occupied() || super::recording_or_playback() {\n        super::clear_session_state();\n    }\n}\n\n/// Once per game frame, from the P1 body's frame callback: retire a lease whose\n",
+          "new": "pub fn owned() -> bool { OWNED.lock().active() }\n\n/// Invoked before consumer callbacks and before native entry destruction.\npub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {\n        super::clear_session_state();\n    }\n}\n\n/// Once per game frame, from the P1 body's frame callback: retire a lease whose\n",
+          "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+        },
+        {
+          "old": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn scene_enabled() -> bool { context().is_some() }\npub fn enabled() -> bool {\n    enabled_in(context())\n}\npub fn try_enabled() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(enabled_in(try_context()?))\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
+          "new": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn enabled() -> bool {\n    enabled_in(context())\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
+          "reason": "F7: remove unused runtime entry points and fields after preview unification."
         }
       ]
     },

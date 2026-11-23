@@ -25,6 +25,7 @@ struct World {
     owners: Owners,
     polls: u32,
     polls_at_tick: u32,
+    clip: bool,
     adapter: Adapter,
 }
 
@@ -37,6 +38,7 @@ impl World {
             closing: self.closing,
             owns_input: self.owners.contains(Owners::MENU) || self.closing || self.open,
             polls_since_tick: self.polls.wrapping_sub(self.polls_at_tick),
+            clip: self.clip,
         }
     }
 
@@ -136,6 +138,20 @@ fn a_layout_destroyed_with_the_menu_open_is_noticed_by_the_input_hook_alone() {
         world.poll(0);
     }
     assert!(world.p1_free() && !world.open);
+}
+
+/// F7 (R7 repro 2026-11-23): the menu chord opened the menu under the crop editor, and neither took a press after that.
+#[test]
+fn the_menu_does_not_open_over_the_clip_editor() {
+    let mut world = World { installed: true, clip: true, ..World::default() };
+    world.tick(true);
+    for _ in 0..3 {
+        world.chord();
+        assert!(world.p1_free() && !world.open, "the clip editor keeps Player 1");
+    }
+    world.clip = false;
+    world.chord();
+    assert!(world.open && !world.p1_free());
 }
 
 #[test]

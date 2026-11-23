@@ -129,10 +129,19 @@ pub enum Possession {
     Cpu,
 }
 
-/// Light notice-body colours for the recording phases. Each clears 4.5:1 on `panes::NOTICE_PLATE`.
-pub const LOCKOUT_COLOR: [u8; 4] = [148, 176, 255, 255];
+/// Light notice-body colours for the recording phases. Each clears 4.5:1 on `panes::NOTICE_PLATE` and has its phase's
+/// tint hue: yellow, magenta, and the CPU's blue.
+pub const LOCKOUT_COLOR: [u8; 4] = [255, 224, 112, 255];
 pub const STANDBY_COLOR: [u8; 4] = [255, 156, 255, 255];
-pub const RECORDING_COLOR: [u8; 4] = [255, 132, 124, 255];
+pub const RECORDING_COLOR: [u8; 4] = [148, 176, 255, 255];
+
+/// The colour-blend tints of a recorded fighter (fix round 2026-11-23, F3). While its take records, a fighter has its
+/// role's hue, the roster's scheme the HUD row's chip uses (`hud_row`): Player 1 red, the CPU blue. The CPU's two
+/// phases before its take records keep hues of their own: lockout yellow (it was blue until then), standby magenta.
+pub const PLAYER_TINT: [f32; 3] = [1.0, 0.0, 0.0];
+pub const CPU_TINT: [f32; 3] = [0.0, 0.0, 1.0];
+pub const LOCKOUT_TINT: [f32; 3] = [1.0, 1.0, 0.0];
+pub const STANDBY_TINT: [f32; 3] = [1.0, 0.0, 1.0];
 
 /// The phase the player sees: the tint and the HUD notice (SPEC-input-01 §2.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -146,19 +155,19 @@ pub enum Phase {
 
 impl Phase {
     /// The colour-blend tint of the CPU model while the phase lasts (every frame of lockout, standby
-    /// and recording).
+    /// and recording). Player 1's own take tints Player 1 (`PLAYER_TINT`, `rr_host::player_tint`).
     pub const fn tint(self) -> Option<[f32; 3]> {
         match self {
-            Phase::Lockout => Some([0.0, 0.0, 1.0]),
-            Phase::Standby => Some([1.0, 0.0, 1.0]),
-            Phase::Recording => Some([1.0, 0.0, 0.0]),
+            Phase::Lockout => Some(LOCKOUT_TINT),
+            Phase::Standby => Some(STANDBY_TINT),
+            Phase::Recording => Some(CPU_TINT),
             _ => None,
         }
     }
 
     /// The notice body and its RGBA text colour; the header is `NOTICE_HEADER`.
-    /// The colours are light enough to clear 4.5:1 on the dark notice plate. The hue stays
-    /// blue, magenta, and red for lockout, standby, and recording.
+    /// The colours are light enough to clear 4.5:1 on the dark notice plate. The hue
+    /// stays each phase's tint: yellow, magenta, and blue for lockout, standby, and recording.
     pub const fn notice(self) -> Option<(&'static str, [u8; 4])> {
         match self {
             Phase::Lockout => Some(("Lockout", LOCKOUT_COLOR)),
@@ -376,8 +385,6 @@ pub struct ControlOut {
 /// The CPU facts the control stage needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ControlCtx {
-    /// The CPU's `lr` now (+1 or -1).
-    pub facing: i8,
     /// The CPU is Shulk and his Monado dial is open: no mirroring then.
     pub shulk_dial: bool,
 }
@@ -394,7 +401,6 @@ pub struct CpuRoleDrive {
     mode: Mode,
     possession: Possession,
     lockout: u16,
-    recorded_facing: i8,
     live: MappedInputs,
 }
 
@@ -411,7 +417,7 @@ const fn phase_of(mode: Mode, possession: Possession) -> Phase {
 
 impl CpuRoleDrive {
     pub const fn idle() -> Self {
-        Self { mode: Mode::None, possession: Possession::Player, lockout: 0, recorded_facing: 1, live: MappedInputs::NEUTRAL }
+        Self { mode: Mode::None, possession: Possession::Player, lockout: 0, live: MappedInputs::NEUTRAL }
     }
 
     pub const fn active(&self) -> bool {
@@ -427,20 +433,18 @@ impl CpuRoleDrive {
         self.possession
     }
 
-    /// The record chord. `facing` is the CPU's `lr` (+1 or -1).
-    pub fn begin(&mut self, facing: i8) {
+    /// The record chord.
+    pub fn begin(&mut self) {
         self.mode = Mode::Pause;
         self.possession = Possession::Lockout;
         self.lockout = LOCKOUT_FRAMES;
-        self.recorded_facing = if facing < 0 { -1 } else { 1 };
         self.live = MappedInputs::NEUTRAL;
     }
 
-    pub fn begin_placed(&mut self, facing: i8) {
+    pub fn begin_placed(&mut self) {
         self.mode = Mode::Record;
         self.possession = Possession::Cpu;
         self.lockout = 0;
-        self.recorded_facing = if facing < 0 { -1 } else { 1 };
         self.live = MappedInputs::NEUTRAL;
     }
 
@@ -477,7 +481,7 @@ impl CpuRoleDrive {
     }
 
     /// The CPU control frame after the AI wrote its controls.
-    pub fn control(&mut self, ctx: &ControlCtx) -> ControlOut {
+    pub fn control(&mut self) -> ControlOut {
         let mut out = ControlOut { write: None, hold_cliff_timer: false };
         match self.mode {
             Mode::Pause => {
@@ -489,10 +493,9 @@ impl CpuRoleDrive {
                 }
             }
             Mode::Record => {
-                let mirror = if ctx.shulk_dial { 1 } else { self.recorded_facing * ctx.facing };
                 if matches!(self.possession, Possession::Standby | Possession::Cpu) {
                     out.hold_cliff_timer = self.possession == Possession::Standby;
-                    out.write = Some(inject_values(self.live, mirror));
+                    out.write = Some(inject_values(self.live, 1));
                 }
             }
             Mode::None | Mode::Playback => {}
@@ -532,7 +535,7 @@ pub struct MashCtx {
     pub head_slot: Option<u8>,
     pub in_hitstun: bool,
     pub in_hitstop: bool,
-    /// The transition term of `Recorder::term_for_slot(head)` is enabled on the CPU (the runtime asks
+    /// The mapped term is enabled, or, for any other start, the fighter can act (the runtime asks
     /// only when `Recorder::mash_needs_term` says so).
     pub term_enabled: bool,
 }
@@ -671,7 +674,7 @@ impl Recorder {
 
     // ---- starting and stopping -----------------------------------------------------------------
 
-    /// The named layer's playback (`playback_named`, `playback_preview`): `frames` frames from the layer's buffer, mirrored by the
+    /// The named layer's playback (`playback_named`): `frames` frames from the layer's buffer, mirrored by the
     /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
     pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
         match self.mode {
@@ -798,8 +801,8 @@ impl Recorder {
     }
 
     fn injected(&self, frame: MappedInputs, c: &ControlCtx) -> Inject {
-        // Record mirrors against the facing at the lockout, which is the CPU's own: 1.
-        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * c.facing };
+        // The playback mirror is fixed at start or restore, so a turn does not flip the rest.
+        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * self.current_facing };
         let frame = if self.buffer > 0 && self.buffer <= BUFFER_NEUTRAL_MAX { MappedInputs::NEUTRAL } else { frame };
         inject_values(frame, mirror)
     }
@@ -844,43 +847,40 @@ impl Recorder {
 
     // ---- the mash trigger (§5.4) ---------------------------------------------------------------
 
-    /// The transition term that says the CPU can act again, derived from the slot's starting status.
-    /// Ranges are inclusive at both ends (question 3 recommendation; upstream's half-open ranges left
-    /// `ESCAPE_AIR_SLIDE` and `ESCAPE_B` in the "anything else" case). Anything else falls to the
-    /// side-special term, upstream's acknowledged placeholder (open: needs a design decision).
-    pub fn term_for_status(t: &Table, status: i32) -> C {
-        if status == UNRESOLVED {
-            return C::TermContSpecialS;
-        }
+    /// The mapped transition term for a slot's starting status; ranges are inclusive at both ends.
+    /// Anything else has no single term: wait until the fighter can act (`cpu::actionable`, SPEC-cpu-07 §3).
+    /// Upstream's side-special placeholder is not enabled for every fighter that can act: Greninja answers
+    /// no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23).
+    pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
         if t.is(C::StatusAttackAir, status) {
-            C::TermContAttackAir
+            Some(C::TermContAttackAir)
         } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {
-            C::TermContEscapeAir
+            Some(C::TermContEscapeAir)
         } else if t.is(C::StatusSpecialHi, status) {
-            C::TermContSpecialHi
+            Some(C::TermContSpecialHi)
         } else if t.is(C::StatusJumpSquat, status) {
-            C::TermContJumpSquat
+            Some(C::TermContJumpSquat)
         } else if t.is(C::StatusJumpAerial, status) {
-            C::TermContJumpAerial
+            Some(C::TermContJumpAerial)
         } else if t.is(C::StatusEscape, status) {
-            C::TermContEscape
+            Some(C::TermContEscape)
         } else if t.within(C::StatusEscapeF, C::StatusEscapeB, status) {
-            C::TermContEscapeF
+            Some(C::TermContEscapeF)
         } else if t.is(C::StatusCatch, status) {
-            C::TermContCatch
+            Some(C::TermContCatch)
         } else {
-            C::TermContSpecialS
+            None
         }
     }
 
-    /// The starting status of `slot` (from its origin), for `term_for_status`.
+    /// The starting status of `slot`, for its mapped term or, for any other start, whether the fighter can act.
     pub fn starting_status_of(&self, slot: u8) -> i32 {
         self.origin.get(usize::from(slot)).map_or(UNRESOLVED, |o| o.status)
     }
 
-    /// Whether the mash trigger evaluation needs the transition term of the queue head asked from the
-    /// game (only then is the call made): the recorder is idle, the head is a playback, and the timing
-    /// depends on the term (every case but hitstun with a hitstop timing).
+    /// Whether the mash trigger evaluation needs the mapped term or, for any other start, whether the
+    /// fighter can act: the recorder is idle, the head is a playback, and the timing depends on the
+    /// check (every case but hitstun with a hitstop timing).
     pub fn mash_needs_term(&self, s: &RecorderSettings, head: Option<u8>, in_hitstun: bool) -> bool {
         self.mode == Mode::None && head.is_some() && !(in_hitstun && s.hitstun != HitstunTiming::HitstunEnds)
     }

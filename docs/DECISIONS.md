@@ -1591,9 +1591,9 @@ placement wizard (hit-streak-sol lane) uses it too.
 The operator, 2026-11-22, verbatim: "I want to add the requirement that the p1 returns to the stage successfully after a
 successful edgeguard for it to count."
 
-**Today.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
+**Before this fix.** The attempt is Secured on the frame the CPU is KO'd (its status is Dead or Rebirth,
 `src/runtime/features/edge_juggle.rs:2090`; `src/model/edge_juggle.rs:495–502`), wherever Player 1 is. Player 1 is
-read today for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
+read then for one thing only: while it holds a ledge, the CPU's catch of that same ledge is a trump and is not
 scored as the CPU's recovery (`:2095–2100`, `:2104`).
 
 **The rule (A, agreed).**
@@ -1649,6 +1649,10 @@ the Zoom drill and Juggler are not changed.
   event marks the KO; the readers of the sealed rows change with it.
 
 ![GJ1: the KO counts when Player 1 is back on the stage](decisions/gte-next-GJ1-return.png)
+
+Implemented in the fix build of 2026-11-23: trace code 8 marks the CPU KO when Player 1 is not back yet,
+9, 10 and 11 mark the three new results, and 1 marks a secured return. The bridge phase is `return`;
+the new outcome names are `not_counted_p1_ko`, `not_counted_no_return` and `p1_ko`.
 
 ### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
 
@@ -1818,6 +1822,12 @@ fighter written onto it. The cursor already stops on the readable end of the flo
    - **A** (recommended): keep it as a start and make it repeat, so every release begins in the edge-teeter wait.
    - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
    - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
+
+**Built 2026-11-23 (fix build).**
+- Placement waits while Player 1 is KO'd and wakes a held CPU if placement restarts.
+- Option B was chosen: both falls came after Ready began, so a pre-Ready correction catches neither, and a correction during Ready cannot distinguish the game's fall from a player's own drop to the ledge. The game's cause is unknown. See [the design](design/gj4-player-start.md).
+- The measurement boot was not flown; the `83eecc32` trace was read again instead.
+- Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
 
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 

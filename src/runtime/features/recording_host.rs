@@ -178,6 +178,7 @@ unsafe fn set_normal_speed(module: *mut smash::app::BattleObjectModuleAccessor, 
 }
 
 pub use rr_host::{cpu_playback, cpu_playback_blocks_drill, cpu_role_after_chord, cpu_role_control, cpu_role_phase, note_load, note_mash};
+pub(crate) use rr_host::player_tint;
 
 /// # Safety
 /// `out` is null or the live mapped-input record for this poll.
@@ -359,6 +360,9 @@ fn apply(tick: &Tick) {
         }) {
             crate::runtime::roster::roster_requests::request_player_kind(kind);
         }
+    }
+    if let Some(home) = tick.home {
+        super::states::request_preview_home(home);
     }
     if let Some(id) = &tick.warp {
         let root = std::path::Path::new(crate::model::storage::ROOT);

@@ -8,20 +8,89 @@ use crate::engine;
 use model::hook_stats::{hook_allocations, HookId, HookScope};
 
 #[test]
+fn f4_cpu_role_live_input_does_not_depend_on_facing_or_dial() {
+    use model::input_delay::MappedInputs;
+    use model::recording::{CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
+
+    for hold in [80, -80] {
+        let mut drive = CpuRoleDrive::idle();
+        drive.begin_placed();
+        let input = MappedInputs { buttons: 42, lstick_x: hold, ..MappedInputs::NEUTRAL };
+        let mut player = input;
+        assert_eq!(drive.poll(&mut player), Some(input));
+        assert_eq!(player, MappedInputs::NEUTRAL);
+        let write = drive.control().write.unwrap();
+        assert_eq!(write.stick_x, f32::from(hold) / 120.0);
+        assert_eq!(write.clamped_x, f32::from(hold) / 120.0);
+        assert_eq!(write.buttons, 42);
+    }
+
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin();
+    for _ in 0..LOCKOUT_FRAMES {
+        let mut player = MappedInputs { buttons: 42, ..MappedInputs::NEUTRAL };
+        assert_eq!(drive.poll(&mut player), None);
+        assert_eq!(player, MappedInputs::NEUTRAL);
+        let out = drive.control();
+        assert!(out.write.is_none());
+        assert!(out.hold_cliff_timer);
+    }
+    assert_eq!(drive.phase(), Phase::Standby);
+    let mut player = MappedInputs { buttons: FLICK_JUMP, lstick_x: 20, ..MappedInputs::NEUTRAL };
+    assert_eq!(drive.poll(&mut player), None);
+    assert_eq!(player, MappedInputs::NEUTRAL);
+    let out = drive.control();
+    assert!(out.hold_cliff_timer);
+    let write = out.write.unwrap();
+    assert_eq!(write.stick_x, 20.0 / 120.0);
+    assert_eq!(write.clamped_x, 0.0);
+    assert_eq!(write.buttons, FLICK_JUMP);
+}
+
+#[test]
+fn f4_cpu_role_held_stick_turns_only_on_direction_change() {
+    use model::input_delay::MappedInputs;
+    use model::recording::CpuRoleDrive;
+
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin_placed();
+    let mut facing = -1;
+    let mut turns = 0;
+    let mut mismatches = 0;
+    for hold in [80, -80] {
+        for _ in 0..60 {
+            let mut player = MappedInputs { lstick_x: hold, ..MappedInputs::NEUTRAL };
+            assert!(drive.poll(&mut player).is_some());
+            let write = drive.control().write.unwrap();
+            if write.stick_x != f32::from(hold) / 120.0 {
+                mismatches += 1;
+            }
+            let next = if write.stick_x > 0.0 { 1 } else { -1 };
+            if next != facing {
+                turns += 1;
+                facing = next;
+            }
+        }
+    }
+    assert_eq!(turns, 2);
+    assert_eq!(mismatches, 0);
+}
+
+#[test]
 fn placed_cpu_recording_has_no_lockout_or_standby() {
     use model::input_delay::MappedInputs;
-    use model::recording::{ControlCtx, CpuRoleDrive, Phase};
+    use model::recording::{CpuRoleDrive, Phase};
     let mut drive = CpuRoleDrive::idle();
-    drive.begin_placed(-1);
+    drive.begin_placed();
     assert_eq!(drive.phase(), Phase::Recording);
     let first = MappedInputs { buttons: 42, lstick_x: 60, ..MappedInputs::NEUTRAL };
     let mut player = first;
     assert_eq!(drive.poll(&mut player), Some(first));
     assert_eq!(player, MappedInputs::NEUTRAL);
-    let cpu = drive.control(&ControlCtx { facing: -1, shulk_dial: false });
+    let cpu = drive.control();
     assert_eq!(cpu.write.unwrap().buttons, 42);
     assert!(!cpu.hold_cliff_timer);
-    drive.begin_placed(1);
+    drive.begin_placed();
     let mut neutral = MappedInputs::NEUTRAL;
     assert_eq!(drive.poll(&mut neutral), Some(MappedInputs::NEUTRAL));
 }
@@ -90,11 +159,10 @@ fn playback_makes_no_hook_allocations() {
 #[test]
 fn cpu_role_record_and_playback_frames_allocate_nothing() {
     use model::input_delay::MappedInputs;
-    use model::recording::{inject_values, ControlCtx, CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
+    use model::recording::{inject_values, CpuRoleDrive, Phase, FLICK_JUMP, LOCKOUT_FRAMES};
 
     let mut drive = CpuRoleDrive::idle();
-    drive.begin(1);
-    let ctx = ControlCtx { facing: 1, shulk_dial: false };
+    drive.begin();
     let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
@@ -103,16 +171,16 @@ fn cpu_role_record_and_playback_frames_allocate_nothing() {
         for _ in 0..LOCKOUT_FRAMES {
             let mut out = MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL };
             std::hint::black_box(drive.poll(&mut out));
-            std::hint::black_box(drive.control(&ctx).write);
+            std::hint::black_box(drive.control().write);
         }
         let mut baseline = MappedInputs { buttons: FLICK_JUMP, ..MappedInputs::NEUTRAL };
         std::hint::black_box(drive.poll(&mut baseline));
-        std::hint::black_box(drive.control(&ctx).write);
+        std::hint::black_box(drive.control().write);
         let jab = [36_872u32, 36_872, 36_872, 33_281];
         for buttons in jab {
             let mut out = MappedInputs { buttons, ..MappedInputs::NEUTRAL };
             let stored = drive.poll(&mut out).unwrap_or(MappedInputs::NEUTRAL);
-            let write = drive.control(&ctx).write;
+            let write = drive.control().write;
             let playback = inject_values(stored, 1);
             std::hint::black_box((write, playback.buttons));
         }
@@ -127,21 +195,19 @@ fn cpu_role_record_and_playback_frames_allocate_nothing() {
 #[test]
 fn the_cpu_role_drive_lock_allocates_nothing_in_recorder_ai() {
     use engine::library::Role;
-    use model::recording::ControlCtx;
 
     let _turn = crate::allocation::hook_counter_turn();
     let before = hook_allocations();
     {
         let _scope = HookScope::enter_hook(HookId::RecorderAi);
-        engine::rr_host::cpu_role_after_chord(1);
+        engine::rr_host::cpu_role_after_chord();
         engine::rr_host::set_record_role(Role::Cpu);
         engine::rr_host::on_chords(true, false, false);
-        engine::rr_host::cpu_role_after_chord(1);
-        let ctx = ControlCtx { facing: 1, shulk_dial: false };
-        std::hint::black_box(engine::rr_host::cpu_role_control(&ctx));
+        engine::rr_host::cpu_role_after_chord();
+        std::hint::black_box(engine::rr_host::cpu_role_control());
         std::hint::black_box(engine::rr_host::cpu_role_phase());
         engine::rr_host::on_chords(true, false, false);
-        engine::rr_host::cpu_role_after_chord(1);
+        engine::rr_host::cpu_role_after_chord();
         engine::rr_host::set_record_role(Role::Player);
     }
     assert_eq!(hook_allocations(), before, "the AI hook's CPU-role lock allocated");

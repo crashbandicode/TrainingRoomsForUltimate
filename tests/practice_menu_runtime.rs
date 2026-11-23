@@ -70,6 +70,19 @@ fn f9_runtime_name_wiring() {
 }
 
 #[test]
+fn gj1_runtime_return_wiring() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("let p1_situation = natives::situation_kind(p1);"));
+    assert!(frame.contains("(p1_situation == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)))"));
+    let obs = frame.split_once("let obs = Observation {").unwrap().1.split_once("\n    };").unwrap().0;
+    assert!(obs.contains("player_back: p1_situation == konst(C::SituationGround) || p1_situation == konst(C::SituationCliff)"));
+    assert!(obs.contains("player_ko: player_ko(p1)"));
+    assert!(frame.contains("if before == Phase::Live && run.rounds.phase != Phase::Live {\n            run.route_history.complete();"));
+    assert!(item(&runtime, "fn post_notice(").contains("let outcome = phase.card();"));
+}
+
+#[test]
 fn the_role_tabs_draw_the_models_caps() {
     let view = src("src/runtime/ui/view.rs");
     let draw = item(&view, "unsafe fn draw_role_tabs(");
@@ -490,10 +503,36 @@ fn a_crosshair_below_a_platform_finds_the_floor_under_it() {
     assert!(floor.contains("if platforms { (y + 1.0).min(top) } else { top }"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let snap = item(&runtime, "unsafe fn snap_player(");
-    assert!(snap.contains("placement::floor_under(p1, [x, y], platforms)"));
+    assert!(snap.contains("let x = stage.player_x(drill, x);"));
+    assert!(snap.contains("placement::floor_under(p1, [x, y], drill == Drill::Juggler)"));
     assert!(!snap.contains("FloorRay::new("));
     assert!(!snap.contains("ray.floor("));
-    assert!(snap.contains("x.clamp(stage.ledges[0][0], stage.ledges[1][0])"));
+    assert!(!snap.contains(".clamp("));
+}
+
+#[test]
+fn edge_juggle_waits_for_a_knocked_out_player() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let ko = item(&runtime, "unsafe fn player_ko(p1: usize) -> bool");
+    for status in ["C::StatusDead", "C::StatusStandby", "C::StatusRebirth"] {
+        assert!(ko.contains(status), "{status}");
+    }
+    assert!(ko.contains(".map(konst)"));
+    assert!(ko.contains("natives::status_kind(p1)"));
+    assert!(ko.contains("!= UNRESOLVED"));
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("player_ko: player_ko(p1),"));
+    let restart = frame.split_once("PlacementAction::RestartPlacement => {").unwrap().1
+        .split_once("PlacementAction::ResetResources =>").unwrap().0;
+    assert!(restart.contains("if held_cpu.take() == Some(body)"));
+    assert!(restart.contains("state::set_sleep(cpu, false);"));
+    assert!(restart.find("state::set_sleep(cpu, false);").unwrap()
+        < restart.find("run.placement = Placement::ResetResources;").unwrap());
+    let model = src("src/model/edge_juggle.rs");
+    let action = item(&model, "pub fn action(self, frame: PlacementFrame)");
+    assert!(action.contains("if frame.dead_or_rebirthing || frame.player_ko"));
+    let ids = src("src/model/cpu/ids.rs");
+    assert!(ids.contains("StatusStandby = \"FIGHTER_STATUS_KIND_STANDBY\","));
 }
 
 #[test]
@@ -698,7 +737,8 @@ fn the_strip_asks_the_shared_wizard_state() {
     let draw = item(&hud, "pub unsafe fn draw(");
     assert!(draw.contains("WIZARDS.hides_strip(owners)"));
     assert!(draw.contains("let menu_open = owners.covers_hud()"));
-    assert!(draw.contains("let chip = (!menu_open"));
+    assert!(draw.contains("let row = (!menu_open).then(|| hud_row::hud_row("));
+    assert!(draw.contains("let chip = row.as_ref().map(|row| hud_row::hud_row_box("));
     assert!(draw.contains("combo::hud_tick(strip_shown"));
     assert!(draw.contains("combo::card(strip_shown)"));
     assert!(draw.contains("strip_shown.then(parry::view)"));

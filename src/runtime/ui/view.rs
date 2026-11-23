@@ -5,17 +5,14 @@ use skyline::nn::ui2d::Pane;
 
 use crate::model::effect_chips::Placement;
 use crate::model::egg_zone::{CropRect, CROP_RECTS};
-use crate::model::frame::{Frame, Tone, View, POP_PAD};
+use crate::model::frame::{DivWrite, Frame, Tone, View, POP_LINE_H, POP_PAD};
+use crate::model::hud_row;
 use crate::model::menu::options::DIRECTIONS;
 use crate::model::menu::CHIP_POS;
 use crate::model::screens::{TILE_GREYED, TILE_HIDDEN};
 use crate::model::panes as p;
-use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CHIP_LAYERS, CHIP_SIZE, CONN_BOXES, CONN_BOX_H, CONN_INDENT, CONN_LEFT, CONN_LINES, CONN_RIGHT, CONN_STEM_X, CONN_TREE, CRUMB_Y, CURSOR_WHITE, GREEN_ROW, GROUPS, GROUP_X, HEAD_MARK_X, HEAD_SQ, HIGHLIGHT, IDX_BADGE, IDX_BADGE_NUM, IDX_BG, IDX_CHIP, IDX_CHIP_BADGE, IDX_CHIP_HI, IDX_CHIP_LABEL, IDX_CHIP_NEEDLE, IDX_CONN, IDX_CONN_BOX, IDX_CONN_DIV, IDX_CONN_HEAD, IDX_CONN_PILL, IDX_CONN_PILL_TEXT, IDX_CONN_TREE, IDX_CRUMB, IDX_CURSOR, IDX_DIVIDER, IDX_GREEN, IDX_GROUP_HI, IDX_HAIRLINE, IDX_HEAD_SQ, IDX_HELP, IDX_HINT, IDX_ITEM_ICON, IDX_OUTLINE, IDX_ROLE, IDX_ROLE_BG, IDX_ROLE_CAP, IDX_ROLE_HI, IDX_ROLE_KEY, IDX_ROW, IDX_ROW_HI, IDX_SEP, IDX_SUB, IDX_TAB_BOX, IDX_TAB_HI, IDX_TILE, IDX_TILE_BADGE, IDX_TILE_HI, IDX_TILE_LABEL, IDX_TILE_SOLO, IDX_TILE_STRIPE, IDX_TITLE, ITEM_ICONS, KIND_COMBO, KIND_MACRO, KIND_SEQUENCE, MENU_COUNT, PANEL_H, PANEL_W, PILL_H, POP_TAB_Y, ROLE_CAP, ROLE_CAP_X, ROLE_H, ROLE_TAB_W, ROLE_X, ROWS, ROW_FIRST_Y, ROW_H, ROW_LEFT, ROW_RIGHT, RULE, SUB_DROP, SUB_RISE, TAB_BOXES, TAB_BOX_W, TAB_H, TAB_Y, TEXT, TEXT_DIM, TEXT_OFF, TEXT_ON, TILES, TILE_AREA_H, VALUE_DROP};
+use crate::model::panes::{ACCENT, ACCENT_RING, BADGE_W, BADGE_X, BAND, CHIPS, CHIP_LAYERS, CHIP_SIZE, CONN_BOXES, CONN_BOX_H, CONN_INDENT, CONN_LEFT, CONN_LINES, CONN_RIGHT, CONN_STEM_X, CONN_TREE, CRUMB_Y, CURSOR_WHITE, GREEN_ROW, GROUPS, GROUP_X, HEAD_MARK_X, HEAD_SQ, HIGHLIGHT, IDX_BADGE, IDX_BADGE_NUM, IDX_BG, IDX_CHIP, IDX_CHIP_BADGE, IDX_CHIP_HI, IDX_CHIP_LABEL, IDX_CHIP_NEEDLE, IDX_CONN, IDX_CONN_BOX, IDX_CONN_DIV, IDX_CONN_HEAD, IDX_CONN_PILL, IDX_CONN_PILL_TEXT, IDX_CONN_TREE, IDX_CRUMB, IDX_CURSOR, IDX_DIVIDER, IDX_GREEN, IDX_GROUP_HI, IDX_HAIRLINE, IDX_HEAD_SQ, IDX_HELP, IDX_HINT, IDX_ITEM_ICON, IDX_OUTLINE, IDX_ROLE, IDX_ROLE_BG, IDX_ROLE_CAP, IDX_ROLE_HI, IDX_ROLE_KEY, IDX_ROW, IDX_ROW_HI, IDX_SEP, IDX_SUB, IDX_TAB_BOX, IDX_TAB_HI, IDX_TILE, IDX_TILE_BADGE, IDX_TILE_HI, IDX_TILE_LABEL, IDX_TILE_SOLO, IDX_TILE_STRIPE, IDX_TITLE, ITEM_ICONS, KIND_COMBO, KIND_MACRO, KIND_SEQUENCE, MENU_COUNT, PANEL_H, PANEL_W, PILL_H, POP_TAB_Y, ROLE_CAP, ROLE_CAP_X, ROLE_H, ROLE_TAB_W, ROLE_X, ROWS, ROW_FIRST_Y, ROW_H, ROW_LEFT, ROW_RIGHT, RULE, SUB_DROP, SUB_RISE, TAB_BOXES, TAB_BOX_W, TAB_H, TAB_Y, TEXT, TEXT_DIM, TEXT_OFF, TEXT_ON, TILES, VALUE_DROP};
 
-/// The fork's role colours (`src/training/ui/roster_grid.rs:9-10`): the roster grid's Player and CPU badges, stripes,
-/// Solo Popo markers and cursor tint.
-const PLAYER: [u8; 4] = [255, 83, 92, 255];
-const CPU: [u8; 4] = [75, 164, 255, 255];
 use crate::runtime::ui::pane;
 use crate::model::frame::Text;
 
@@ -270,6 +267,7 @@ impl Panes {
         self.show(IDX_DIVIDER, !frame.popup);
         self.draw_chrome(frame);
         self.draw_connections(frame);
+        self.draw_conn_div(frame);
         self.text(IDX_HELP, frame.help[0].units(), TEXT);
         self.text(IDX_HELP + 1, frame.help[1].units(), TEXT);
         self.text(IDX_HINT, frame.hint.units(), TEXT_DIM);
@@ -380,7 +378,6 @@ impl Panes {
     unsafe fn draw_connections(&self, frame: &Frame) {
         use crate::model::recording_menu::{ConnKind, FileTag};
         let shown = frame.popup && frame.view == View::List;
-        self.show(IDX_CONN_DIV, shown);
         let x = (CONN_LEFT + CONN_RIGHT) / 2.0;
         let w = CONN_RIGHT - CONN_LEFT;
         if shown && !frame.conn_head.is_empty() {
@@ -655,8 +652,8 @@ impl Panes {
             self.hide(IDX_ITEM_ICON + i);
         }
         let shown = frame.view == View::Tiles;
-        let (cell_w, cell_h) = tile_cell(frame);
-        let centre = |i: usize| tile_centre(frame, i);
+        let (cell_w, cell_h) = frame.tile_cell();
+        let centre = |i: usize| frame.tile_centre(i);
         for i in 0..TILES {
             if !shown || i >= usize::from(frame.tile_count) || frame.tile_state[i] == TILE_HIDDEN {
                 self.hide(IDX_TILE + i);
@@ -711,7 +708,7 @@ impl Panes {
             let (x, y) = centre(usize::from(frame.tile_focus));
             // The fork's cursor tint (roster_grid.rs:279-291): the active cell's highlight takes the
             // editing role's colour at alpha 80, so the same-role order badge stays legible over it.
-            let [r, g, b, _] = [PLAYER, CPU][usize::from(frame.tile_cpu)];
+            let [r, g, b, _] = [hud_row::PLAYER_COLOR, hud_row::CPU_COLOR][usize::from(frame.tile_cpu)];
             let tint = [ACCENT, [r, g, b, 80]][usize::from(frame.tile_roster_grid)];
             self.rect_at(IDX_TILE_HI, x, y, cell_w + 2.0, cell_h + 2.0, tint);
         } else {
@@ -728,7 +725,7 @@ impl Panes {
         let roster = frame.view == View::Tiles && frame.tile_roster_grid;
         let count = usize::from(frame.tile_count);
         let ic = (0..count).find(|i| roster && frame.tile_n[*i] == 0x4b);
-        for (r, (side, colour)) in [(-1.0, PLAYER), (1.0, CPU)].into_iter().enumerate() {
+        for (r, (side, colour)) in [(-1.0, hud_row::PLAYER_COLOR), (1.0, hud_row::CPU_COLOR)].into_iter().enumerate() {
             for i in 0..TILES {
                 let on = roster && i < count && frame.tile_state[i] != TILE_HIDDEN;
                 let ((x, y), b, at) = (centre(i), &frame.tile_badges[r][i], r * TILES + i);
@@ -747,39 +744,19 @@ impl Panes {
     }
 }
 
-/// A tile's width and height on the current grid.
-fn tile_cell(frame: &Frame) -> (f32, f32) {
-    let (cols, rows) = (f32::from(frame.tile_cols.max(1)), f32::from(frame.tile_rows.max(1)));
-    ((ROW_RIGHT - ROW_LEFT) / cols, TILE_AREA_H / rows)
-}
-
-/// The centre of tile `i`.
-fn tile_centre(frame: &Frame, i: usize) -> (f32, f32) {
-    let (cell_w, cell_h) = tile_cell(frame);
-    let per_row = usize::from(frame.tile_cols.max(1));
-    let (c, r) = (i % per_row, i / per_row);
-    // The roster's short last row sits centred under the full rows (the character select's own layout).
-    let count = usize::from(frame.tile_count);
-    let last_len = count - (count.saturating_sub(1) / per_row) * per_row;
-    let shift = if frame.tile_centre_last && r == count.saturating_sub(1) / per_row { (per_row - last_len) as f32 / 2.0 } else { 0.0 };
-    (ROW_LEFT + (c as f32 + shift + 0.5) * cell_w, 320.0 - (r as f32 + 0.5) * cell_h)
-}
-
-/// Mash out's popup: its box and lines over the chip (the recording pop-up's CONNECTIONS panes, unused on a grid).
-const POP_LINE_H: f32 = 46.0;
-
 impl Panes {
+    unsafe fn draw_conn_div(&self, frame: &Frame) {
+        match frame.conn_div() {
+            DivWrite::Hide => self.hide(IDX_CONN_DIV),
+            DivWrite::Rect([x, y, w, h], color) => self.rect_at(IDX_CONN_DIV, x, y, w, h, color),
+        }
+    }
+
+    /// Mash out's popup: its box and lines over the chip (the recording pop-up's CONNECTIONS panes, unused on a grid).
     unsafe fn draw_mashout_pop(&self, frame: &Frame) {
-        let Some(anchor) = frame.pop.anchor.filter(|_| frame.view == View::Tiles && frame.pop.count > 0) else { return };
+        let Some([x, y, w, h]) = frame.pop_box() else { return };
         let count = usize::from(frame.pop.count).min(CONN_LINES);
-        let (cx, cy) = tile_centre(frame, usize::from(anchor));
-        // Sized to its widest line (`PopView::width`), at most the grid's width.
-        let (w, h) = (frame.pop.width().min(ROW_RIGHT - ROW_LEFT), count as f32 * POP_LINE_H + 24.0);
-        // Over the chip: the box's top at the chip's centre, kept inside the grid area.
-        let x = cx.clamp(ROW_LEFT + w / 2.0, ROW_RIGHT - w / 2.0);
-        let y = (cy - h / 2.0 + 20.0).clamp(-300.0 + h / 2.0, 330.0 - h / 2.0);
         let top = y + h / 2.0 - 12.0 - POP_LINE_H / 2.0;
-        self.rect_at(IDX_CONN_DIV, x, y, w, h, [24, 24, 30, 255]);
         for i in 0..count {
             let line_y = top - i as f32 * POP_LINE_H;
             let focused = i == usize::from(frame.pop.focus);

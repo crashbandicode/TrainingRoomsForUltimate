@@ -289,7 +289,7 @@ pub(super) unsafe fn service(entry: *const u8, owner: u32) {
     if !crate::runtime::compat::common::is_ready_go() || INSTALL.active() || menu::captures_input()
         || lobby::native_ui_busy() || button_config::has_pending_request()
         || training::save_states::is_loading() || training::recording_or_playback()
-        || crate::runtime::compat::replay_preview::occupied() || !mii_backend::ready()
+        || !mii_backend::ready()
         || !(ready_single_mii(entry, owner).is_some() || ready_forms(entry, owner).is_some()) { return; }
     let Some(catalog) = mii_ordinary_cpu::replay_catalog() else { return; };
     let Ok(player) = mii_ordinary_player::library_catalog() else { return; };

@@ -526,6 +526,7 @@ fn publish_bridge_state(s: &mut Session) {
             recording_popup_role,
             recording_page_role,
             recording_capture_role: crate::engine::rr_host::capture_role_key(),
+            recording_indicator: crate::runtime::bridge_state::recording_indicator(now),
             list: &list.id,
             list_count: list.count,
             list_index: list.index,
@@ -837,8 +838,8 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
-        Effect::OpenCrop { source, combo } => {
-            crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
+        Effect::OpenCrop { source, combo, player } => {
+            crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
         effect => rr_host::post_effect_at(effect, Some(version)),
     }
@@ -1178,7 +1179,7 @@ fn sync_panels(s: &mut Session) {
         }
     }
     if s.phase == Phase::Clip {
-        EXT_SHOWN.store(true, Ordering::Release);
+        EXT_SHOWN.store(!crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page()), Ordering::Release);
     }
     if open || s.phase == Phase::Clip || s.phase == Phase::Prompt {
         publish_frame(s);

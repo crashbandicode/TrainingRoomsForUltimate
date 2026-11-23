@@ -8,6 +8,7 @@
 //!   Checks the controller is the CPU entry's own (rule R3: never Nana, never an AI-driven P1), starts a
 //!   mash-triggered playback, injects the frame, runs the end-of-run check and the chords, applies the
 //!   phase tint and posts the phase notice.
+//! * `tint_player` (from Player 1's fighter frame, `cpu::fighter_frame`): Player 1's fighter is red while its own take is open.
 //! * `request_playback` / `on_state_restored` / `stop`: the entry points the CPU behaviours, the save
 //!   states and the hubs call.
 //!
@@ -42,7 +43,7 @@ use crate::model::sites_pkg4;
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::features::{chords, cpu, hide_cpu, input_display, notices, states};
 use crate::runtime::game::{self, natives};
-use crate::runtime::macros::{named_macros, replay_preview};
+use crate::runtime::macros::named_macros;
 use crate::runtime::{published, scene};
 use crate::runtime::ui::pilot_export;
 
@@ -51,7 +52,6 @@ static REC: Mutex<Recorder> = Mutex::new(Recorder::new());
 /// Recording or playing back now, published by every taker of `REC` when it lets go (stream/sync slice 3): the question the menu
 /// worker and package 6's practice provider ask, answered without `REC`, which the game's hooks take.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
-static PLAYBACK: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "diag")]
 static DIAG_PHASE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
 
@@ -74,7 +74,6 @@ impl core::ops::DerefMut for RecGuard {
 impl Drop for RecGuard {
     fn drop(&mut self) {
         ACTIVE.store(self.0.phase() != Phase::Idle, Ordering::Release);
-        PLAYBACK.store(self.0.is_playback(), Ordering::Release);
         #[cfg(feature = "diag")]
         DIAG_PHASE.store(match self.0.phase() {
             Phase::Idle => 0, Phase::Lockout => 1, Phase::Standby => 2,
@@ -370,7 +369,7 @@ unsafe fn on_ai_frame(ai: usize) {
         mash_start(&settings, key, body, facing);
     }
 
-    let ctx = ControlCtx { facing, shulk_dial: shulk };
+    let ctx = ControlCtx { shulk_dial: shulk };
     let control = if rec().is_named() {
         // Before input 0 of a named playback the layer repositions the CPU (it may stop the playback itself): neutral controls until then.
         let (playing, at_zero) = {
@@ -378,16 +377,10 @@ unsafe fn on_ai_frame(ai: usize) {
             (rec.mode() == Mode::Playback, rec.frame() == 0)
         };
         let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-        // A clip preview emits only while its session owns this CPU and the clip is in the foreground (SPEC-input-01 section 9).
-        let preview_blocked = playing && replay_preview::occupied() && !replay_preview::can_emit(module);
-        if preview_blocked || (playing && at_zero && !named_macros::prepare_playback_start(module)) {
+        if playing && at_zero && !named_macros::prepare_playback_start(module) {
             ControlOut { write: Some(crate::model::recording::Inject::NEUTRAL), hold_cliff_timer: false }
         } else {
-            let out = rec().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)));
-            if playing && replay_preview::occupied() {
-                replay_preview::progress(rec().frame().into());
-            }
-            out
+            rec().control_named(&ctx, &|index| named_macros::frame_for(usize::from(index)))
         }
     } else {
         rec().control(&ctx)
@@ -396,7 +389,7 @@ unsafe fn on_ai_frame(ai: usize) {
         bump(COUNT_INJECT);
         write_controller(controller, write);
     }
-    let role = recording_host::cpu_role_control(&ctx);
+    let role = recording_host::cpu_role_control();
     if let Some(write) = role.write {
         bump(COUNT_INJECT);
         write_controller(controller, write);
@@ -435,13 +428,10 @@ unsafe fn on_ai_frame(ai: usize) {
         Some(Ended::NamedPlayed) => {
             event("named_playback_complete", "", 0, "", 0);
             named_macros::end_playback();
-            if replay_preview::occupied() {
-                replay_preview::complete();
-            }
         }
         None => {}
     }
-    chord_step(body, facing);
+    chord_step(body);
 
     // The phase: tint every frame it lasts, the notice once per change.
     let (phase, length) = if let Some(phase) = recording_host::cpu_role_phase() {
@@ -450,10 +440,8 @@ unsafe fn on_ai_frame(ai: usize) {
         let rec = rec();
         (rec.phase(), rec.length())
     };
-    if let (Some([r, g, b]), blend) = (phase.tint(), MODEL_COLOR_BLEND.load(Ordering::Acquire)) {
-        if blend != UNRESOLVED {
-            natives::set_color_rgb(body.accessor, r, g, b, blend);
-        }
+    if let Some(rgb) = phase.tint() {
+        tint(body.accessor, rgb);
     }
     if LAST_PHASE.swap(phase as u8, Ordering::AcqRel) != phase as u8 {
         notices::post_phase(phase, length);
@@ -463,6 +451,30 @@ unsafe fn on_ai_frame(ai: usize) {
     bump(COUNT_NOTICE);
     host_cpu(controller);
     report_counts();
+}
+
+/// One frame of a recorded fighter's colour-blend tint: written on every frame it lasts, as the phase tint always was.
+unsafe fn tint(accessor: usize, [r, g, b]: [f32; 3]) {
+    let blend = MODEL_COLOR_BLEND.load(Ordering::Acquire);
+    if blend != UNRESOLVED {
+        natives::set_color_rgb(accessor, r, g, b, blend);
+    }
+}
+
+/// Player 1's fighter frame in a practice scene (`cpu::fighter_frame`, entry 0; Training and the waiting room): on every
+/// frame of Player 1's take (`rr_host::player_tint`) entry 0's active body is the Player role's red, never Nana, as the
+/// CPU's. It does not depend on the CPU's AI frame, which a drill, a placement or Mash Out skips.
+///
+/// # Safety
+/// `accessor` is the live accessor of the entry-0 fighter whose frame just ran.
+pub(crate) unsafe fn tint_player(accessor: usize) {
+    if !ENABLED.load(Ordering::Acquire) {
+        return;
+    }
+    let Some(rgb) = recording_host::player_tint() else { return };
+    if load_consts() && natives::module_accessor(0) == Some(accessor) {
+        tint(accessor, rgb);
+    }
 }
 
 unsafe fn write_controller(controller: usize, write: Inject) {
@@ -492,13 +504,15 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
     let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
-    let term_enabled = if needs {
-        let from = rec().starting_status_of(head);
-        let term = table.get(Recorder::term_for_status(&table, from));
-        term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
-    } else {
-        false
-    };
+    let from = rec().starting_status_of(head);
+    let term_enabled = needs
+        && match Recorder::term_for_status(&table, from) {
+            Some(c) => {
+                let term = table.get(c);
+                term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+            }
+            None => cpu::actionable(body.accessor),
+        };
     let start = rec().mash_should_start(
         settings,
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
@@ -519,7 +533,7 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 }
 
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
-unsafe fn chord_step(body: Body, facing: i8) {
+unsafe fn chord_step(body: Body) {
     let play_player = chords::consume(Request::PlayPlayer);
     let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
@@ -566,7 +580,7 @@ unsafe fn chord_step(body: Body, facing: i8) {
         }
     };
     recording_host::on_chords(body, record, play_player, playback);
-    recording_host::cpu_role_after_chord(facing);
+    recording_host::cpu_role_after_chord();
 }
 
 unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
@@ -597,15 +611,12 @@ unsafe fn record_refusal() -> Option<RecordRefusal> {
 
 // ---- the named layer's core entry points (SPEC-input-01 section 9) -----------------------------------------
 
-/// Published alongside ACTIVE when the game releases its recorder guard.
-pub(crate) fn is_playback() -> bool { PLAYBACK.load(Ordering::Acquire) }
-
 /// Game callback only: numbered-slot transfer executes without heap work.
 pub(crate) fn transfer_slot(transfer: &mut crate::model::macro_handoff::SlotTransfer) {
     transfer.execute(&mut rec());
 }
 
-/// The layer's playback (`playback_named`, `playback_preview`): `frames` frames of its buffer, started on the CPU now.
+/// The layer's playback (`playback_named`): `frames` frames of its buffer, started on the CPU now.
 pub fn start_named_playback(frames: usize, recorded_facing: f32, status: i32) -> bool {
     // SAFETY: called on the game thread with live fighters.
     unsafe {
@@ -679,20 +690,19 @@ pub fn request_playback(start: PlaybackStart) {
 }
 
 /// Both fighters finished restoring after a save-state load (SPEC-input-01 §6.4). A load starts neither a recording nor a slot
-/// playback (revision 8.2): only the named layer and a clip preview follow up. Package 3 calls it once per restore.
+/// playback (revision 8.2): only the named layer follows up. Package 3 calls it once per restore.
 pub fn on_state_restored() {
     if !ENABLED.load(Ordering::Acquire) {
         return;
     }
-    if crate::runtime::macros::named_active() || (crate::runtime::macros::ready() && replay_preview::occupied()) {
-        // The named layer owns the restore's follow-up (a named record or playback, or a clip preview's start).
+    if crate::runtime::macros::named_active() {
+        // The named layer owns the restore's follow-up.
         let _scope = HookScope::enter_hook(HookId::NamedRestore);
         // SAFETY: both fighters were just restored.
         unsafe {
             remember_named_pose();
             named_macros::service_restore();
         }
-        return;
     }
 }
 

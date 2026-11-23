@@ -12,7 +12,27 @@ pub enum ClipAction {
 }
 pub enum ClipEffect {
     None, StopPreview, Preview(Box<MacroRecording>), Close,
+    PreviewFile { start: u32, end: u32 },
     Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),
+}
+
+/// Frames the game keeps running after a saved macro's preview took its last input, so the last move is seen finishing.
+pub const PREVIEW_TAIL_FRAMES: u64 = 60;
+
+#[derive(Default)]
+pub struct PreviewTail { ended: Option<u64> }
+
+impl PreviewTail {
+    pub const fn new() -> Self { Self { ended: None } }
+    pub fn restart(&mut self) { self.ended = None; }
+    /// `running`: the playback still has frames. `frame`: the game's frame number. True once the tail has passed.
+    pub fn over(&mut self, running: bool, frame: u64) -> bool {
+        if running {
+            self.ended = None;
+            return false;
+        }
+        frame >= self.ended.get_or_insert(frame).saturating_add(PREVIEW_TAIL_FRAMES)
+    }
 }
 
 /// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).
@@ -90,14 +110,6 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     let controls = format!("{}{}A save. B close.",
         if view.context.fighters() { "D-pad Up/Down: fighter. " } else { "" },
         if view.context.preview() { "X preview. " } else { "" });
-    if view.playing {
-        return ClipHelp {
-            primary: "Previewing the selection.".to_owned(),
-            follow: "Press X to stop. Press L or R to edit the crop.".to_owned(),
-            controls,
-            notice: String::new(),
-        };
-    }
     let (primary, follow) = match view.handle {
         Handle::Out => (
             "End selected. Hold Left or Right to move it.".to_owned(),
@@ -238,6 +250,11 @@ pub struct ClipView {
     pub truncated: bool,
     pub source_name: String,
     pub error: Option<String>,
+}
+
+impl ClipView {
+    /// The page is hidden while a preview plays.
+    pub fn hides_page(&self) -> bool { self.playing }
 }
 
 pub struct ClipEditor {
@@ -414,6 +431,10 @@ impl ClipEditor {
         self.pause();
         self.window.seek(self.window.start());
         self.handle = Handle::Playhead;
+        if matches!(self.file.as_ref(), Some(FileSource::Macro { .. })) {
+            self.playing = true;
+            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end() };
+        }
         match self.export_selection("Preview") {
             Ok(recording) => {
                 self.playing = true;
@@ -625,18 +646,67 @@ mod tests {
 
     fn replay_and_saved_macro_controls_have_parity() {
         for mut e in [editor(), saved_macro(false), saved_macro(true)] {
+            let macro_file = matches!(e.context(), ClipContext::Macro { .. });
             e.on_action(ClipAction::SelectIn);
             e.on_action(ClipAction::Nudge(2));
             e.on_action(ClipAction::SelectOut);
             e.on_action(ClipAction::Nudge(-3));
             assert_eq!((e.view().start, e.view().end), (2, 7));
-            let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!("preview") };
-            assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);
+            let wanted = match &e.file {
+                Some(FileSource::Macro { recording, .. }) => recording.frames[2..7].to_vec(),
+                _ => e.track().frames[2..7].iter().map(|frame| frame.input).collect(),
+            };
+            let preview = e.on_action(ClipAction::TogglePlay);
+            if macro_file {
+                assert!(matches!(preview, ClipEffect::PreviewFile { start: 2, end: 7 }));
+            } else {
+                let ClipEffect::Preview(preview) = preview else { panic!("preview") };
+                assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);
+            }
             e.on_action(ClipAction::TogglePlay);
             let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!("export") };
-            assert_eq!(saved.frames, preview.frames);
+            assert_eq!(saved.frames, wanted);
             assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));
         }
+    }
+
+    /// A saved macro previews its kept window on the role it was opened for.
+    fn a_saved_macro_previews_its_kept_window_on_its_role() {
+        let mut e = saved_macro(true);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(2));
+        e.on_action(ClipAction::SelectOut);
+        e.on_action(ClipAction::Nudge(-3));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { start: 2, end: 7 }));
+        assert!(e.view().playing && e.view().hides_page());
+        assert_eq!(e.context(), ClipContext::Macro { player: true });
+        assert_eq!(e.view().entry, 0);
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::StopPreview));
+        assert!(!e.view().playing && !e.view().hides_page());
+        e.on_action(ClipAction::TogglePlay);
+        e.preview_progress(u32::MAX);
+        assert!(!e.view().playing);
+    }
+
+    /// The shared editor hides the page for a Vault preview too.
+    fn a_replay_preview_hides_the_page_too() {
+        let mut e = editor();
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        assert!(e.view().hides_page());
+    }
+
+    /// The tail starts when the last input finishes and resets on a restart.
+    fn the_preview_tail_waits_sixty_frames_after_the_last_input() {
+        let mut tail = PreviewTail::new();
+        assert!(!tail.over(true, 100));
+        assert!(!tail.over(false, 110));
+        assert!(!tail.over(false, 169));
+        assert!(tail.over(false, 170));
+        assert!(!tail.over(true, 171));
+        assert!(!tail.over(false, 172));
+        tail.restart();
+        assert!(!tail.over(false, 500));
+        assert!(tail.over(false, 560));
     }
 
     fn combo_editor() -> ClipEditor {
@@ -848,6 +918,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_saved_macro_previews_its_kept_window_on_its_role", a_saved_macro_previews_its_kept_window_on_its_role as fn()),
+            ("a_replay_preview_hides_the_page_too", a_replay_preview_hides_the_page_too as fn()),
+            ("the_preview_tail_waits_sixty_frames_after_the_last_input", the_preview_tail_waits_sixty_frames_after_the_last_input as fn()),
             ("replay_and_saved_macro_controls_have_parity", replay_and_saved_macro_controls_have_parity as fn()),
             ("combo_clip_handles_snap_to_whole_links", combo_clip_handles_snap_to_whole_links as fn()),
             ("combo_clip_has_no_preview_action_or_help", combo_clip_has_no_preview_action_or_help as fn()),

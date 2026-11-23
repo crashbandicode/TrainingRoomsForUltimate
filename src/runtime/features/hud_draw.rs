@@ -15,6 +15,7 @@ use skyline::nn::ui2d::{Layout, Pane};
 
 use crate::model::boot_notices;
 use crate::model::frame_strip_plan::{Changed, Look};
+use crate::model::hud_row;
 use crate::model::notice_box;
 use crate::model::notify::TickOut;
 use crate::model::panes::{self as p, cb, iv, strip_layout::C};
@@ -128,15 +129,16 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         None
     };
     let btt = crate::runtime::features::btt::hud();
-    let chip = (!menu_open && !btt.as_str().is_empty())
-        .then(|| p::btt_hud_box(btt.as_str(), strip_shown, card.is_some()));
+    let row = (!menu_open).then(|| hud_row::hud_row(crate::engine::rr_host::capture_take(), btt.as_str())).flatten();
+    let chip = row.as_ref().map(|row| hud_row::hud_row_box(row, strip_shown, card.is_some()));
     write_notice(
         notice,
         &notices::hud_tick(boot_notices::hud_ready(!notice.is_null(), waiting, training::session_open())),
         chip,
         drop,
     );
-    write_btt(root, btt.as_str(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
+    let drawn = write_btt(root, row.as_ref(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
+    crate::runtime::bridge_state::note_recording_indicator(drawn);
 
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
@@ -270,24 +272,32 @@ unsafe fn place(target: *mut Pane, [x, y, w, h]: [f32; 4], shown: bool) {
     }
 }
 
-// Compact BTT HUD: existing builders/target material, independent of the transient notice queue.
-unsafe fn write_btt(root: *mut Pane, body: &str, chip: Option<[f32; 4]>) {
+/// The compact HUD row (`model::hud_row`): Break the Targets' line or the recording indicator. Existing builders and the
+/// target's material, independent of the transient notice queue. Returns the take it drew: none while the row is hidden
+/// or the layout has no such row (the stock layout), so the bridge never names a chip that is not on screen.
+unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option<[f32; 4]>) -> Option<hud_row::Take> {
     let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());
-    if container.is_null() { return; }
+    if container.is_null() { return None; }
     pane::set_visible(container, chip.is_some());
-    let Some([x, y, w, _]) = chip else { return };
+    let (Some(row), Some([x, y, w, _])) = (row, chip) else { return None };
     pane::set_pos(container, x, y);
     let plate = find(container, p::IDX_BTT + 1);
     if !plate.is_null() {
         pane::set_pos(plate, w / 2.0, 0.0);
         pane::set_width(plate, w);
     }
+    let picture = find(container, p::IDX_BTT + 2);
+    if !picture.is_null() {
+        pane::set_rect_color(picture, p::linear(row.chip));
+    }
     let text = find(container, p::IDX_BTT + 3);
     if !text.is_null() {
         pane::set_pos(text, 52.0 + (w - 64.0) / 2.0, 0.0);
         pane::set_width(text, w - 64.0);
         let mut buffer = [0; crate::model::notify::BODY_MAX];
-        let n = crate::model::boot_notices::notice_units(body, &mut buffer);
+        let n = crate::model::boot_notices::notice_units(row.text.as_str(), &mut buffer);
         pane::set_text(text, &buffer[..n]);
+        pane::set_text_color(text, p::linear(row.color));
     }
+    row.take.filter(|_| !picture.is_null() && !text.is_null())
 }

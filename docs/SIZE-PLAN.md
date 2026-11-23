@@ -164,6 +164,8 @@ operator decide whether it counts.
 
 **Release dead-code warnings at `bf836c8` (103, integrator-3's `/tmp/integrator3/warns-release2.tsv`):**
 
+The `replay_preview.rs` warning below is historical: F7 retired that file in favor of Recording playback.
+
 | File (count) | Class |
 | --- | --- |
 | `runtime/macros/port.rs` (24), `named_macros.rs` (4), `replay_preview.rs` (7) | waiting: stream/pkg4 wiring and ui-screens (the roster cycle now exists, so the `port.rs:72-139` stubs can go when wired); `Legacy`/`has_captured_frame`/`frame_at`/`capture_active`/`playback_active`/`using_frames` are truly dead |

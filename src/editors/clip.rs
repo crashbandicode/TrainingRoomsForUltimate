@@ -50,8 +50,8 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
     }
     push(frame, "Crop window", &window, Tone::Normal);
     let mut head = String::new();
-    let _ = write!(head, "{}{}", view.cursor, if view.playing { "  playing" } else { "" });
-    push(frame, "Playhead", &head, if view.playing { Tone::On } else { Tone::Normal });
+    let _ = write!(head, "{}", view.cursor);
+    push(frame, "Playhead", &head, Tone::Normal);
     if view.truncated {
         push(frame, "This capture is partial", "", Tone::Dim);
     }
@@ -97,18 +97,11 @@ mod tests {
         }
     }
 
-    fn a_playing_preview_and_a_refusal_show_in_the_frame() {
+    fn a_preview_refusal_shows_in_the_frame() {
         let mut v = view();
-        v.playing = true;
         v.truncated = false;
         v.previous_available = false;
         let mut f = Frame::new();
-        clip_frame(&v, "Pikachu", 0, &mut f);
-        assert_eq!(f.rows[2].value.string_lossy(), "300  playing");
-        assert_eq!(f.rows[2].value_tone, Tone::On);
-        assert!(f.clip.playing);
-        assert_eq!(f.help[0].string_lossy(), "Previewing the selection.");
-        v.playing = false;
         v.error = Some("Native preview is unavailable until the preview restore is provided".into());
         clip_frame(&v, "Pikachu", 0, &mut f);
         assert!(f.help[0].string_lossy().starts_with("Native preview is unavailable"), "{:?}", f.help[0]);
@@ -138,7 +131,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn", the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn as fn()),
-            ("a_playing_preview_and_a_refusal_show_in_the_frame", a_playing_preview_and_a_refusal_show_in_the_frame as fn()),
+            ("a_preview_refusal_shows_in_the_frame", a_preview_refusal_shows_in_the_frame as fn()),
             ("a_held_scrub_names_its_speed", a_held_scrub_names_its_speed as fn()),
         ]);
     }
