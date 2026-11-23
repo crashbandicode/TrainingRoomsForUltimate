@@ -494,8 +494,13 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
     let term_enabled = if needs {
         let from = rec().starting_status_of(head);
-        let term = table.get(Recorder::term_for_status(&table, from));
-        term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+        match Recorder::term_for_status(&table, from) {
+            Some(c) => {
+                let term = table.get(c);
+                term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+            }
+            None => false,
+        }
     } else {
         false
     };

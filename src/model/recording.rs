@@ -848,28 +848,28 @@ impl Recorder {
     /// Ranges are inclusive at both ends (question 3 recommendation; upstream's half-open ranges left
     /// `ESCAPE_AIR_SLIDE` and `ESCAPE_B` in the "anything else" case). Anything else falls to the
     /// side-special term, upstream's acknowledged placeholder (open: needs a design decision).
-    pub fn term_for_status(t: &Table, status: i32) -> C {
+    pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
         if status == UNRESOLVED {
-            return C::TermContSpecialS;
+            return Some(C::TermContSpecialS);
         }
         if t.is(C::StatusAttackAir, status) {
-            C::TermContAttackAir
+            Some(C::TermContAttackAir)
         } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {
-            C::TermContEscapeAir
+            Some(C::TermContEscapeAir)
         } else if t.is(C::StatusSpecialHi, status) {
-            C::TermContSpecialHi
+            Some(C::TermContSpecialHi)
         } else if t.is(C::StatusJumpSquat, status) {
-            C::TermContJumpSquat
+            Some(C::TermContJumpSquat)
         } else if t.is(C::StatusJumpAerial, status) {
-            C::TermContJumpAerial
+            Some(C::TermContJumpAerial)
         } else if t.is(C::StatusEscape, status) {
-            C::TermContEscape
+            Some(C::TermContEscape)
         } else if t.within(C::StatusEscapeF, C::StatusEscapeB, status) {
-            C::TermContEscapeF
+            Some(C::TermContEscapeF)
         } else if t.is(C::StatusCatch, status) {
-            C::TermContCatch
+            Some(C::TermContCatch)
         } else {
-            C::TermContSpecialS
+            Some(C::TermContSpecialS)
         }
     }
 

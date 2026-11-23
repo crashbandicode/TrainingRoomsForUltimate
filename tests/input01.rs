@@ -207,21 +207,29 @@ fn table() -> Table {
 fn starting_status_to_term() {
     let t = table();
     let cases = [
-        (40, C::TermContAttackAir),
-        (50, C::TermContEscapeAir),
-        (51, C::TermContEscapeAir),
-        (60, C::TermContSpecialHi),
-        (70, C::TermContJumpSquat),
-        (71, C::TermContJumpAerial),
-        (80, C::TermContEscape),
-        (81, C::TermContEscapeF),
-        (82, C::TermContEscapeF),
-        (90, C::TermContCatch),
-        (1234, C::TermContSpecialS),
-        (UNRESOLVED, C::TermContSpecialS),
+        (40, Some(C::TermContAttackAir)),
+        (50, Some(C::TermContEscapeAir)),
+        (51, Some(C::TermContEscapeAir)),
+        (60, Some(C::TermContSpecialHi)),
+        (70, Some(C::TermContJumpSquat)),
+        (71, Some(C::TermContJumpAerial)),
+        (80, Some(C::TermContEscape)),
+        (81, Some(C::TermContEscapeF)),
+        (82, Some(C::TermContEscapeF)),
+        (90, Some(C::TermContCatch)),
+        (1234, Some(C::TermContSpecialS)),
+        (UNRESOLVED, Some(C::TermContSpecialS)),
     ];
     for (status, term) in cases {
         assert_eq!(Recorder::term_for_status(&t, status), term, "status {status}");
+    }
+}
+
+#[test]
+fn a_start_from_any_other_status_waits_for_the_fighter_to_act() {
+    let t = table();
+    for status in [UNRESOLVED, 0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
+        assert_eq!(Recorder::term_for_status(&t, status), None, "status {status}");
     }
 }
 
@@ -353,11 +361,11 @@ fn recorder_state_is_the_24000_byte_slot_table_and_a_little_more() {
 fn other_status_keeps_the_placeholder_term() {
     let t = table();
     for status in [0, 1, 39, 41, 49, 52, 61, 79, 83, 91, 100_000] {
-        assert_eq!(Recorder::term_for_status(&t, status), C::TermContSpecialS, "status {status}");
+        assert_eq!(Recorder::term_for_status(&t, status), Some(C::TermContSpecialS), "status {status}");
     }
     // Both ends of the two ranges are inside them (the half-open upstream ranges left these out).
-    assert_eq!(Recorder::term_for_status(&t, 51), C::TermContEscapeAir);
-    assert_eq!(Recorder::term_for_status(&t, 82), C::TermContEscapeF);
+    assert_eq!(Recorder::term_for_status(&t, 51), Some(C::TermContEscapeAir));
+    assert_eq!(Recorder::term_for_status(&t, 82), Some(C::TermContEscapeF));
 }
 
 /// R2-5 (review R2): a running playback stops on a mash interrupt only when the row is On, and the CPU's view of
