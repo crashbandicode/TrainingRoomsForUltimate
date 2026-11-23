@@ -185,6 +185,68 @@ fn an_old_drill_grades_as_before() {
     assert_eq!(run(old, Some(4), Some(0), false, false).fault, Some((0, Reason::MissingFlick(Flick::Dash))));
 }
 
+#[test]
+fn a_one_zip_drill_fails_a_two_zip_attempt_with_no_later_input() {
+    let target = captured(Some(4), None, true, false, true);
+    assert_eq!(target.len(), 1);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    helper.settings = Settings { load_after: true, ..Settings::factory() };
+    for frame in 0..=35 {
+        let mut out = Out::default();
+        helper.step_inputs(script(frame, Some(4), Some(0), true, false), &mut out);
+        assert!(helper.results().next().is_none(), "resolved inside at frame {frame}");
+        assert_eq!(helper.streak(), 0);
+        assert!(!out.load && !helper.pending_load, "load requested inside at frame {frame}");
+    }
+    let mut out = Out::default();
+    helper.step_inputs(script(36, Some(4), Some(0), true, false), &mut out);
+    let result = *helper.results().next().expect("result after leaving the special");
+    assert!(!result.clean);
+    assert_eq!(result.fault, Some((0, Reason::ExtraAim(2))));
+    assert_eq!(helper.streak(), 0);
+}
+
+#[test]
+fn a_one_zip_drill_is_clean_only_after_the_special_ends() {
+    let target = captured(Some(4), None, true, false, true);
+    assert_eq!(target.len(), 1);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    helper.settings = Settings { load_after: true, ..Settings::factory() };
+    for frame in 0..=35 {
+        let mut out = Out::default();
+        helper.step_inputs(script(frame, Some(4), None, true, false), &mut out);
+        assert!(helper.results().next().is_none(), "resolved inside at frame {frame}");
+        assert_eq!(helper.streak(), 0);
+        assert!(!out.load && !helper.pending_load, "load requested inside at frame {frame}");
+    }
+    let mut out = Out::default();
+    helper.step_inputs(script(36, Some(4), None, true, false), &mut out);
+    let result = *helper.results().next().expect("result after leaving the special");
+    assert!(result.clean);
+    assert_eq!(result.graded, 1);
+    assert_eq!(helper.streak(), 1);
+}
+
+#[test]
+fn an_old_drill_still_resolves_at_its_deadline() {
+    let target = captured(Some(4), None, true, false, false);
+    assert!(!target.has_aim());
+    let deadline = target.get(0).unwrap().events().last().unwrap().offset as u32 + 1;
+    assert!(deadline < 36);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    for frame in 0..=deadline {
+        let mut out = Out::default();
+        let snap = script(frame, Some(4), Some(0), true, false);
+        assert!(snap.aim.inside);
+        helper.step_inputs(snap, &mut out);
+        assert_eq!(helper.results().next().is_some(), frame == deadline, "frame {frame}");
+    }
+    assert!(helper.results().next().unwrap().clean);
+}
+
 fn event(kind: Kind, dir: Dir, offset: i32) -> Event { Event { kind, dir, offset } }
 fn link(events: impl IntoIterator<Item = Event>) -> LinkRec {
     LinkRec { to: Move::UpSpecial, verdict: Verdict::True(None), events: retain(events), ..LinkRec::INPUT }
@@ -264,7 +326,7 @@ fn a_hit_link_waits_for_the_pending_heading() {
     assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Back));
 }
 
-fn travel_hit(helper: &mut Helper) -> (Tracker, Sample, MappedInputs) {
+fn travel_hit_out(helper: &mut Helper, pending: bool) -> (Tracker, Sample, MappedInputs, Out) {
     let mut tracker = Tracker::new();
     let hit_cpu = Sample { stop: true, hitstun: true, reaction: Some(20.0), ..Sample::default() };
     let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
@@ -277,32 +339,106 @@ fn travel_hit(helper: &mut Helper) -> (Tracker, Sample, MappedInputs) {
     tracker.step(strip_sample(Move::UpSpecial, None, 1), stunned_cpu, up_b);
     helper.step(&tracker, Settings::factory());
     let left = MappedInputs { lstick_x: -127, ..MappedInputs::NEUTRAL };
-    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), hit_cpu, left);
-    helper.step(&tracker, Settings::factory());
-    (tracker, hit_cpu, left)
+    tracker.step(strip_sample(Move::Other, pending.then_some((0.0, 0.0)), 1), hit_cpu, left);
+    let out = helper.step(&tracker, Settings::factory());
+    (tracker, hit_cpu, left, out)
+}
+
+fn travel_hit(helper: &mut Helper) -> (Tracker, Sample, MappedInputs) {
+    let (tracker, cpu, left, _) = travel_hit_out(helper, true);
+    (tracker, cpu, left)
+}
+
+fn legacy_hit_reference() -> LinkRec {
+    let mut helper = Helper::new();
+    let (tracker, _, _) = travel_hit(&mut helper);
+    LinkRec::of(&tracker.latest_link().unwrap(), &tracker, tracker.exchange().1, false)
 }
 
 #[test]
-fn a_hit_link_is_not_held_for_a_travel_that_never_moves() {
-    let mut helper = Helper::new();
-    let (mut tracker, cpu, left) = travel_hit(&mut helper);
-    let hit = tracker.latest_link().unwrap().hit;
-    assert_eq!(tracker.frame(), hit);
-    assert!(tracker.aim_pending());
-    assert!(helper.capture.current.is_empty());
-    for elapsed in 1..=6 {
-        tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
-        helper.step(&tracker, Settings::factory());
-        assert!(tracker.aim_pending());
-        if elapsed < 2 {
-            assert!(helper.capture.current.is_empty());
-        } else {
-            assert_eq!(helper.capture.current.len(), 1);
-            let rec = helper.capture.current.get(0).unwrap();
-            assert!(!rec.events().any(|e| matches!(e.kind, Kind::Aim(_))));
-            assert_eq!(helper.capture.last_link, Some(hit));
+fn a_hit_keeps_a_direction_that_arrives_three_frames_later() {
+    for (x, dir) in [(-11.0, Dir::Back), (11.0, Dir::Forward)] {
+        for aim_target in [false, true] {
+            let mut helper = Helper::new();
+            if aim_target {
+                let mut reference = legacy_hit_reference();
+                *reference.events.iter_mut().find(|slot| slot.is_none()).unwrap() =
+                    Some(event(Kind::Aim(1), dir, 0));
+                helper.set_target(Some(Combo::from_links([reference]).unwrap()));
+            }
+            let (mut tracker, cpu, left) = travel_hit(&mut helper);
+            let hit = tracker.frame();
+            for elapsed in 1..=2 {
+                tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
+                helper.step(&tracker, Settings::factory());
+                assert!(helper.capture.current.is_empty(), "link taken before heading at +{elapsed}");
+            }
+            tracker.step(strip_sample(Move::Other, Some((x, 0.0)), 1), cpu, left);
+            helper.step(&tracker, Settings::factory());
+            assert_eq!(tracker.frame(), hit + 3);
+            let rec = helper.capture.current.get(0).expect("link captured with heading");
+            assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == dir));
         }
     }
+}
+
+#[test]
+fn a_hit_keeps_a_travel_that_exits_without_moving() {
+    let mut helper = Helper::new();
+    let (mut tracker, cpu, left) = travel_hit(&mut helper);
+    for _ in 0..4 {
+        tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
+        helper.step(&tracker, Settings::factory());
+        assert!(helper.capture.current.is_empty(), "stationary travel is still pending");
+    }
+    tracker.step(strip_sample(Move::Other, None, 1), cpu, left);
+    helper.step(&tracker, Settings::factory());
+    let rec = helper.capture.current.get(0).expect("link captured on travel exit");
+    assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Neutral));
+}
+
+#[test]
+fn a_legacy_combo_is_graded_on_the_hit_frame() {
+    let reference = legacy_hit_reference();
+    assert!(reference.events().any(|e| e.kind == Kind::Flick(Flick::Dash)));
+    let target = Combo::from_links([reference]).unwrap();
+    assert!(!target.has_aim());
+    let mut baseline = Helper::new();
+    baseline.set_target(Some(target));
+    let (_, _, _, baseline_out) = travel_hit_out(&mut baseline, false);
+    let (baseline_index, baseline_grade) = baseline_out.link.expect("baseline graded on hit");
+    assert_eq!(baseline_index, 0);
+    assert!(baseline_grade.clean(1));
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    let (tracker, _, _, out) = travel_hit_out(&mut helper, true);
+    assert!(tracker.aim_pending());
+    let (index, grade) = out.link.expect("legacy target graded on hit while travel is pending");
+    assert_eq!(index, 0);
+    assert_eq!(grade, baseline_grade);
+    assert!(grade.clean(1));
+}
+
+#[test]
+fn a_newer_link_does_not_wait_behind_a_held_one() {
+    let mut helper = Helper::new();
+    let (mut tracker, hit_cpu, left) = travel_hit(&mut helper);
+    let first = tracker.latest_link().unwrap();
+    let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
+    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), stunned_cpu, left);
+    helper.step(&tracker, Settings::factory());
+    assert!(helper.capture.current.is_empty());
+    let tilt = Sample { attack: Some(Move::UpTilt), status: 0x2b, facing: 1, ..Sample::default() };
+    let attack = MappedInputs { buttons: 1, lstick_y: 127, ..MappedInputs::NEUTRAL };
+    tracker.step(tilt, hit_cpu, attack);
+    let second = tracker.latest_link().unwrap();
+    assert_ne!(first.hit, second.hit);
+    helper.step(&tracker, Settings::factory());
+    assert_eq!(helper.capture.current.len(), 2);
+    let a = helper.capture.current.get(0).unwrap();
+    let b = helper.capture.current.get(1).unwrap();
+    assert_eq!((a.from, a.to), (first.from, first.to));
+    assert_eq!((b.from, b.to), (second.from, second.to));
 }
 
 #[test]
