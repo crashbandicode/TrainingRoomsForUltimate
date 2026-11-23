@@ -2400,6 +2400,9 @@ mod mashout_picker_tests;
 #[cfg(test)]
 #[path = "practice_picker_tests.rs"]
 mod practice_picker_tests;
+#[cfg(test)]
+#[path = "picker_divider_tests.rs"]
+mod picker_divider_tests;
 
 #[cfg(test)]
 #[path = "navigation_tests.rs"]
