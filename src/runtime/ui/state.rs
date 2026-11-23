@@ -58,8 +58,8 @@ pub static RELEASES: AtomicU32 = AtomicU32::new(0);
 /// The open menu holds the fighters that are not Player 1 now (`flow::menu_holds_cpu`). Atomic reads only.
 pub fn holds_cpu(previewing: bool) -> bool {
     use crate::runtime::features::{recorder, recording_host, states};
-    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing, states::is_loading(),
-        recorder::recording_or_playback() || recording_host::cpu_playback_blocks_drill())
+    crate::model::flow::menu_holds_cpu(OPEN.load(Ordering::Acquire), previewing || crate::engine::rr_host::previewing(),
+        states::is_loading(), recorder::recording_or_playback() || recording_host::cpu_playback_blocks_drill())
 }
 
 /// The facts `model::readiness` decides on.

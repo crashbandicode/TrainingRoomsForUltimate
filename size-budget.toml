@@ -2529,7 +2529,7 @@ approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197024
+ceiling = 197354
 date = "2026-11-23"
-reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 197024, 26 above the measured merged base e1b5cf15 (196998)."
+reason = "F16: the open menu holds non-player fighters and Stop hands drill CPU behaviour back under the menu. Measured 197354, 26 above the measured merged base 0acfe3a1 (197328)."
 approved_by = "F16 fix-build handoff 2026-11-23, item-specific entry under the operator's measured LOC rule."
