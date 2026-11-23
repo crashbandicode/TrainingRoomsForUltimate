@@ -746,7 +746,7 @@ impl Helper {
             if !input_only && !aims && self.capture.graded != Some(link.hit) {
                 let rec = LinkRec::of(&link, tracker, self.capture.after, false);
                 self.capture.graded = Some(link.hit);
-                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out);
+                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out, None);
             }
             if tracker.aim_pending().is_some_and(|entry| entry <= link.hit) {
                 self.capture.held = Some(link);
@@ -783,7 +783,7 @@ impl Helper {
         self.capture.current.push(rec);
         self.seen = self.seen.wrapping_add(1);
         if self.target.as_ref().is_some_and(|target| !target.input_only && target.has_aim()) {
-            self.on_link(rec, first, exchange, out);
+            self.on_link(rec, first, exchange, out, None);
         }
     }
 
@@ -817,23 +817,19 @@ impl Helper {
             if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
                 break;
             }
-            let mut actual = self
+            let actual = self
                 .input
                 .combo
                 .get(attempt.len)
                 .copied()
                 .unwrap_or(LinkRec::INPUT);
-            if aims && last {
-                for event in self.input.combo.links().skip(attempt.len + 1).flat_map(LinkRec::events)
-                    .filter(|event| matches!(event.kind, Kind::Aim(_)))
-                {
-                    let Some(slot) = actual.events.iter_mut().find(|slot| slot.is_none()) else {
-                        break;
-                    };
-                    *slot = Some(event);
-                }
-            }
-            self.on_link(actual, false, start, out);
+            let later = if aims && last {
+                self.input.combo.links().skip(attempt.len + 1).flat_map(LinkRec::events)
+                    .find_map(|event| match event.kind { Kind::Aim(part) => Some(part), _ => None })
+            } else {
+                None
+            };
+            self.on_link(actual, false, start, out, later);
             if self
                 .attempt
                 .is_some_and(|a| a.open() && a.len == self.input.combo.len())
@@ -856,7 +852,7 @@ impl Helper {
         };
     }
 
-    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out) {
+    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out, extra: Option<u8>) {
         let Some(target) = self.target.as_ref().filter(|_| self.settings.on) else {
             return;
         };
@@ -892,7 +888,8 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let g = grade_mode(reference, &rec, target.input_only, target.has_aim());
+        let mut g = grade_mode(reference, &rec, target.input_only, target.has_aim());
+        g.extra_aim = g.extra_aim.or(extra);
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
