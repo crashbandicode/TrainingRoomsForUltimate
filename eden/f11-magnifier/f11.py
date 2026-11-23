@@ -141,11 +141,13 @@ def _log_mark(ctx):
     return log, log.stat().st_size
 
 
-def _lines_since(mark):
+def _lines_since(mark, until=None):
+    """The log's lines after `mark`, up to the later mark `until` when given."""
     log, offset = mark
     with log.open("rb") as handle:
         handle.seek(offset)
-        return handle.read().decode(errors="replace").splitlines()
+        data = handle.read() if until is None else handle.read(max(0, until[1] - offset))
+    return data.decode(errors="replace").splitlines()
 
 
 def _await(ctx, mark, find, cap=4.0):
@@ -292,11 +294,13 @@ def _published(seen):
     return None if None in point else point
 
 
-def _finish(ctx, name, body, problems):
-    body["problems"] = problems
+def _finish(ctx, name, body, problems, unverified=()):
+    """`problems`: clauses that failed. `unverified`: clauses whose witness is missing; they are not failures of the
+    product, and the row does not pass either."""
+    body["problems"], body["unverified"] = problems, list(unverified)
     _save(ctx, name, body)
-    if problems:
-        raise RuntimeError(f"{name}: {problems}")
+    if problems or unverified:
+        raise RuntimeError(f"{name}: FAILED {problems}; UNVERIFIED {list(unverified)}")
     return {key: body[key] for key in ("origin", "back") if key in body} | {
         "seen": [(s["name"], s["wizard"].get("wizard.cpu"), s["cpu_body"].get("x"), s["cpu_body"].get("y"))
                  for s in body.get("seen", [])]}
@@ -348,7 +352,9 @@ def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6",
     before = list(routes._current_settings(ctx, 8)["menu"][key])
     chosen = [int(index == drill_choice) for index in range(len(before))]
     body = {"ident": ident, "scene": scene, "origin": origin, "setting": key, "setting_before": before}
-    problems = []
+    problems, unverified = [], []
+    if not isinstance(origin.get("dead"), int):
+        unverified.append(f"the KO count: none read before the picker: {origin!r}")
     try:
         routes.tr_settings(ctx, values={key: chosen})
         if list(routes._current_settings(ctx, 8)["menu"][key]) != chosen:
@@ -363,41 +369,58 @@ def swap_back(ctx, cpu_kind, drill_kind, drill_choice, drill_gravity, ident="6",
             problems.append(f"{seen['name']}: {held or seen['problem']}")
         mark = _log_mark(ctx)
         edge._press(ctx, scene, "B", open="1")
+        # The put-back is read before the menu is closed.
         body["back"] = _await(ctx, mark, lambda lines: put_back(lines, entry))
-        back = put_back_problem(body["back"], origin, drill_kind)
-        if back:
-            problems.append(back)
+        if body["back"] is None:
+            unverified.append("the put-back: no fighter line followed a put-back event within 4 s of B")
+        else:
+            back = put_back_problem(body["back"], origin, drill_kind)
+            if back:
+                problems.append(back)
         body["back_still"] = str(ctx.shot(f"{name}-menu"))
-        # The roster does not change the CPU under the open menu: the original comes back once it is closed.
+        # The close is the boundary: the roster does not change the CPU under the open menu, so the original must
+        # not be in the slot before it and its first body is read after it.
+        close = _log_mark(ctx)
+        under_menu = [line for line in fighter_lines(_lines_since(mark, close), entry) if line["kind"] == cpu_kind]
+        body["under_menu"] = under_menu[:1]
+        if under_menu:
+            problems.append(f"the original fighter was in the slot before the menu closed: {under_menu[0]}")
         edge._close(ctx, scene)
-        arrived = _await(ctx, mark, lambda lines: next(
+        arrived = _await(ctx, close, lambda lines: next(
             (line for line in fighter_lines(lines, entry) if line["kind"] == cpu_kind), None), cap=12.0)
         last = [line for line in fighter_lines(_lines_since(mark), entry) if line["kind"] == drill_kind][-1:]
         body["original"], body["drill_last"] = arrived, (last[0] if last else None)
         if arrived is None:
-            problems.append(f"the original fighter (kind {cpu_kind}) did not come back within 12 s of the menu closing")
+            unverified.append(f"the original's return: no line of kind {cpu_kind} within 12 s of the menu closing")
+        elif not last:
+            unverified.append("the original's place: the drill's fighter wrote no line after B to compare it with")
         else:
-            took = back_problem(arrived, last[0]) if last else "no line of the drill's fighter after B"
+            took = back_problem(arrived, last[0])
             if took:
                 problems.append(f"the original did not take the drill fighter's place: {took}")
             if scene == "training" and back_problem(arrived, origin):
                 problems.append(f"the original came back away from the CPU's place: {back_problem(arrived, origin)}")
+        if arrived is not None:
             rest = _fixture(ctx, scene, cpu_kind)
             body["rest"] = rest
-            if rest.get("dead") != origin.get("dead"):
-                problems.append(f"the KO count went from {origin.get('dead')!r} to {rest.get('dead')!r}")
+            if not isinstance(rest.get("dead"), int):
+                unverified.append(f"the KO count: none read after the return: {rest!r}")
+            elif isinstance(origin.get("dead"), int) and rest["dead"] != origin["dead"]:
+                problems.append(f"the KO count went from {origin['dead']} to {rest['dead']}")
         body["original_still"] = str(ctx.shot(f"{name}-original"))
     finally:
-        _save(ctx, name, {**body, "problems": problems})
+        _save(ctx, name, {**body, "problems": problems, "unverified": unverified})
         routes.tr_settings(ctx, values={key: before})
         if list(routes._current_settings(ctx, 8)["menu"][key]) != before:
             raise RuntimeError(f"SETUP: {key} was not put back")
-    return _finish(ctx, name, body, problems)
+    return _finish(ctx, name, body, problems, unverified)
 
 
 def floor_attach(ctx, ident="6", scene="training", cpu=(-100, -20), player=(45, 0), floor_end=-79.9856,
-                 ledge=-85.9856, name="floor-attach"):
-    """Row f11-t5, the deciding row for the one-step x after a put-back (tr-primary-2, 2026-11-23 22:09:57Z).
+                 ledge=-85.9856, name="p1-placement-control"):
+    """A CONTROL on Player 1's placement (rows f11-c5 and f11-wc5). It is not the deciding row for the room's
+    one-step x after a put-back: that row parks the partner and leaves the Juggler picker with B, and is not written
+    (tr-primary-2, 2026-11-23 23:12:40Z). This control's result does not verify that clause.
 
     Hypothesis: a body placed on a floor gets x = f32(f32(x - a) + a) for a reference `a` at the floor's left side.
     The readings so far do not tell the floor's end from the ledge. No flown tool parks a room partner at a chosen x,
