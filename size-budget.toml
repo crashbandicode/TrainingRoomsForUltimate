@@ -2573,3 +2573,11 @@ ceiling = 196855
 date = "2026-11-23"
 reason = "F13: a directional special's parts are drill and combo steps: an Aim event per entry into the travel status with the way the fighter went, the second part a step of its own; the last drill step waits for its special to end and a hit link keeps its travel until the heading or the exit; Aim files are versions 3 and 4. Measured 196855 on install 2 82716623 + F13, 782 below the merged tree's 197637 ceiling."
 approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F13, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197019
+date = "2026-11-23"
+reason = "The fed line: delivered-frame counts and run loads pushed from Player 1's poll, with the load counter in rr_host.rs. Measured 196714 on install 2 82716623, which alone measures 196550, so it adds 164. Install 2 d46648eb measures 196855 and shares no counted file with it: 196855 + 164 = 197019."
+approved_by = "tr-primary-2's rulings of 2026-11-23 21:50:54Z and 22:00:25Z (fed line) and 22:59:46Z (load counter), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
