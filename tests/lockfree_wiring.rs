@@ -61,6 +61,14 @@ fn slot_capture_and_library_pad_priority_is_preserved() {
     assert!(!start.contains("SLOT_RUN.lock()"));
 }
 
+#[test]
+fn the_ledge_query_reads_live_owed_before_locking_the_cpu() {
+    let cpu = include_str!("../src/runtime/features/cpu.rs");
+    ordered(body(cpu, "cpu_transition_term_hook"),
+        &["let owed = crate::engine::rr_host::slot_owed();",
+            "with(|cpu| cpu.ledge_transition_term(key, status, term, original, owed))"]);
+}
+
 /// Step 2a: a settings publish (the menu worker's commit, the diag reload) only notes the roster's re-plan and the preload
 /// planner's reset; the game frame (`lobby::update`, the input poll and the fighter frame on MainThread) runs both, in the order the
 /// publish made them, before the scene clock. No plugin thread reaches either, so the roster's, the planner's and the sources' locks

@@ -433,10 +433,11 @@ impl Cpu {
     }
 
     /// The transition-term hook for the body `key`: the answer the hook returns.
-    pub fn ledge_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool) -> bool {
+    pub fn ledge_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool, owed: bool) -> bool {
         let fighter = &self.fighters[key.index()];
         let q = TermQuery { status, term, original };
-        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, self.playback, q)
+        let playback = PlaybackState { owed: self.playback.owed || owed, running: self.playback.running || owed, ..self.playback };
+        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, playback, q)
     }
 }
 

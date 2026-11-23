@@ -136,8 +136,11 @@ pub fn slot_start_ledge(slot: u8, facing: i8, ledge: Option<bool>) -> Result<Opt
     start_slot_snapshot(slot, facing, ledge, meta, len, generation)
 }
 
+/// A ledge playback was asked for and waits for its slot's publication. Atomic read (the transition-term hook asks it).
+pub fn slot_owed() -> bool { SLOT_OWED.load(Ordering::Acquire) != 0 }
+
 pub fn slot_running() -> bool {
-    SLOT_RUNNING.load(Ordering::Acquire) || SLOT_OWED.load(Ordering::Acquire) != 0
+    SLOT_RUNNING.load(Ordering::Acquire) || slot_owed()
 }
 
 pub fn slot_stop() -> bool {
@@ -843,7 +846,7 @@ pub fn note_load() {
 pub fn cpu_playback(queued: bool) -> PlaybackState {
     let parry_owed = PARRY.load(Ordering::Acquire) && PARRY_PASSES.load(Ordering::Acquire) > 0
         && !RESET_CPU.load(Ordering::Acquire);
-    let owed = SLOT_OWED.load(Ordering::Acquire) != 0;
+    let owed = slot_owed();
     PlaybackState { running: SLOT_RUNNING.load(Ordering::Acquire) || owed || role_playing(Role::Cpu) || parry_owed,
         owed, recording: false, standby: false, queued }
 }
@@ -2777,6 +2780,7 @@ mod tests {
         set_slot(0, Some(&macro_)).unwrap();
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_start_ledge(0, 1, Some(false)), Ok(None));
+        assert!(slot_owed());
         assert!(slot_running() && cpu_playback(false).running && !cpu_idle());
         assert!(cpu_playback(false).owed);
         assert_eq!(slot_control(false), None);
@@ -2786,6 +2790,7 @@ mod tests {
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         for (at, buttons) in [0x10, 0x10, 0, 0, 0, 0x10, 0x20].into_iter().enumerate() {
             assert_eq!(slot_control(false).unwrap().buttons, buttons);
+            assert!(!slot_owed());
             assert!(!cpu_playback(false).owed);
             assert_eq!(slot_post(), if at == 6 { Some(0) } else { None });
         }
@@ -2796,6 +2801,7 @@ mod tests {
         assert_eq!(slot_start_ledge(0, -1, None), Ok(None));
         assert!(cpu_playback(false).owed);
         assert!(slot_stop());
+        assert!(!slot_owed());
         assert!(!cpu_playback(false).owed);
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_control(false), None);
@@ -2820,6 +2826,7 @@ mod tests {
         SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
         assert_eq!(slot_control(false), None);
         assert!(!slot_running());
+        assert!(!slot_owed());
         assert!(!cpu_playback(false).owed);
         assert_eq!(take_slot_refusal(), Some(PlayRefusal::SlotEmpty));
         assert_eq!(take_slot_refusal(), None);
@@ -2829,6 +2836,33 @@ mod tests {
         assert_eq!(slot_control(false), None);
         slot_stop();
         assert_eq!(take_slot_refusal(), None);
+    }
+
+    fn a_deferred_ledge_request_denies_an_immediate_climb_query() {
+        use crate::model::cpu::{facts::FrameFacts, ids::{C, Table}, ledge::{option, BUFFER_PLAYBACK_FRAME},
+            role::FighterKey, settings::CpuSettings, state::Cpu, status::Situation};
+        use crate::model::settings::Snapshot;
+        let _hold = hold();
+        reset_host();
+        let mut settings = Snapshot::factory();
+        let mut ledge = vec![0; 10];
+        ledge[option::PLAYBACK_FIRST as usize] = 1;
+        settings.set("ledge_state", ledge).unwrap();
+        let mut delay = vec![0; 31];
+        delay[0] = 1;
+        settings.set("ledge_delay", delay).unwrap();
+        let mut cpu = Cpu::new(CpuSettings::from_snapshot(&settings), 77);
+        cpu.ids = Table::with(&[(C::StatusCliffWait, 41), (C::StatusCliffCatch, 40), (C::TermContCliffClimb, 7)]);
+        let key = FighterKey::new(1, false).unwrap();
+        cpu.fighters[key.index()].pending = 0;
+        let request = cpu.frame(key, &FrameFacts { status: 41, prev_status: 40, situation: Situation::Cliff,
+            motion_frame: BUFFER_PLAYBACK_FRAME, ..FrameFacts::default() }).playback.unwrap();
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        assert_eq!(slot_start_ledge(request.slot, 1, Some(false)), Ok(None));
+        assert!(!cpu.ledge_transition_term(key, 41, 7, true, slot_owed()));
+        assert!(cpu.ledge_transition_term(key, 41, 7, true, false));
+        SLOT_SEQ[0].fetch_add(1, Ordering::SeqCst);
+        slot_stop();
     }
 
     fn a_late_credit_of_the_old_run_is_not_counted_for_the_new_one() {
@@ -5967,6 +6001,7 @@ mod tests {
             ("a_slot_start_defers_while_its_slot_is_published", a_slot_start_defers_while_its_slot_is_published as fn()),
             ("a_replaced_take_is_not_started_under_the_old_takes_gate", a_replaced_take_is_not_started_under_the_old_takes_gate as fn()),
             ("one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer", one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer as fn()),
+            ("a_deferred_ledge_request_denies_an_immediate_climb_query", a_deferred_ledge_request_denies_an_immediate_climb_query as fn()),
             ("a_roles_fed_count_is_the_frames_its_hook_took", a_roles_fed_count_is_the_frames_its_hook_took as fn()),
             ("a_late_credit_of_the_old_run_is_not_counted_for_the_new_one", a_late_credit_of_the_old_run_is_not_counted_for_the_new_one as fn()),
             ("a_crop_preview_owes_the_start_speed_as_play_does", a_crop_preview_owes_the_start_speed_as_play_does as fn()),
