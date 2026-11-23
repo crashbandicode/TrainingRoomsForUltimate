@@ -370,7 +370,7 @@ unsafe fn on_ai_frame(ai: usize) {
         mash_start(&settings, key, body, facing);
     }
 
-    let ctx = ControlCtx { facing, shulk_dial: shulk };
+    let ctx = ControlCtx { shulk_dial: shulk };
     let control = if rec().is_named() {
         // Before input 0 of a named playback the layer repositions the CPU (it may stop the playback itself): neutral controls until then.
         let (playing, at_zero) = {

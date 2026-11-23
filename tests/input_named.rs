@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use model::input_delay::MappedInputs;
 use model::recording::*;
 
-const CTX: ControlCtx = ControlCtx { facing: 1, shulk_dial: false };
+const CTX: ControlCtx = ControlCtx { shulk_dial: false };
 const POST: PostCtx = PostCtx { facing: 1, queue_head_is_playback: false };
 
 /// The layer's buffer, as `named_macros` keeps it.
@@ -59,12 +59,12 @@ fn f4_named_playback_keeps_start_facing_until_the_restore_updates_it() {
         layer.store(i, MappedInputs { lstick_x: 80, ..MappedInputs::NEUTRAL });
     }
     r.start_named_playback(4, -1, 0, -1).unwrap();
-    for facing in [-1, 1] {
-        let write = r.control_named(&ControlCtx { facing, shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+    for _ in 0..2 {
+        let write = r.control_named(&ControlCtx { shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
         assert_eq!(write.stick_x, 80.0 / 120.0);
     }
     r.set_current_facing(1);
-    let write = r.control_named(&ControlCtx { facing: -1, shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
+    let write = r.control_named(&ControlCtx { shulk_dial: false }, &|i| layer.at(i)).write.unwrap();
     assert_eq!(write.stick_x, -80.0 / 120.0);
 }
 
@@ -75,7 +75,7 @@ fn f4_named_restore_updates_the_mirror_without_a_live_turn() {
         layer.store(i, MappedInputs { lstick_x: 80, ..MappedInputs::NEUTRAL });
     }
     r.start_named_playback(2, -1, 0, -1).unwrap();
-    let ctx = ControlCtx { facing: -1, shulk_dial: false };
+    let ctx = ControlCtx { shulk_dial: false };
     assert_eq!(r.control_named(&ctx, &|i| layer.at(i)).write.unwrap().stick_x, 80.0 / 120.0);
     r.set_current_facing(1);
     assert_eq!(r.control_named(&ctx, &|i| layer.at(i)).write.unwrap().stick_x, -80.0 / 120.0);

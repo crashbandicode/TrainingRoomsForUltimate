@@ -376,8 +376,6 @@ pub struct ControlOut {
 /// The CPU facts the control stage needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ControlCtx {
-    /// The CPU's `lr` now (+1 or -1).
-    pub facing: i8,
     /// The CPU is Shulk and his Monado dial is open: no mirroring then.
     pub shulk_dial: bool,
 }
@@ -794,8 +792,8 @@ impl Recorder {
     }
 
     fn injected(&self, frame: MappedInputs, c: &ControlCtx) -> Inject {
-        // Record mirrors against the facing at the lockout, which is the CPU's own: 1.
-        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * c.facing };
+        // The playback mirror is fixed at start or restore, so a turn does not flip the rest.
+        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * self.current_facing };
         let frame = if self.buffer > 0 && self.buffer <= BUFFER_NEUTRAL_MAX { MappedInputs::NEUTRAL } else { frame };
         inject_values(frame, mirror)
     }
