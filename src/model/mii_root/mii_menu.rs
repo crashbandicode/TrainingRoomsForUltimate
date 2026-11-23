@@ -54,11 +54,39 @@ mod connected_editor_tests {
         assert!(!menu.alpha_cpu_cycle(MiiClass::Swordfighter.kind()));
     }
 
+    fn f2_mii_list_wrap_and_page_clamp() {
+        let preferences = Preferences::default();
+        let context = Context {
+            epoch: 9,
+            original: PlayerOrigin::NotMii,
+            active: Active { player: selection::PlayerLive::NotMii, cpu: None },
+            cpu_original: None,
+        };
+        let mut menu = CatalogMenu::new(catalog(), context, &preferences).unwrap();
+        menu.open_list(MiiClass::Swordfighter, &preferences);
+        let count = menu.rows.len() + usize::from(menu.editor_available);
+        assert!(count > 1);
+        menu.cursor = 0;
+        menu.step(-1);
+        assert_eq!(menu.cursor, count - 1);
+        menu.step(1);
+        assert_eq!(menu.cursor, 0);
+        menu.step(crate::model::panes::ROWS as isize);
+        assert_eq!(menu.cursor, count - 1);
+        menu.step(crate::model::panes::ROWS as isize);
+        assert_eq!(menu.cursor, count - 1);
+        menu.step(-(crate::model::panes::ROWS as isize));
+        assert_eq!(menu.cursor, 0);
+        menu.step(-(crate::model::panes::ROWS as isize));
+        assert_eq!(menu.cursor, 0);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("waiting_catalog_exposes_seed_without_fighter_role_permissions", waiting_catalog_exposes_seed_without_fighter_role_permissions as fn()),
+            ("f2_mii_list_wrap_and_page_clamp", f2_mii_list_wrap_and_page_clamp as fn()),
         ]);
     }
     }
@@ -271,7 +299,11 @@ impl CatalogMenu {
         if self.editor_only { return; }
         let count = if self.role.is_some() { self.rows.len() + usize::from(self.list_mode && self.editor_available) } else { 2 + usize::from(self.editor_available) };
         if count != 0 {
-            self.cursor = self.cursor.saturating_add_signed(delta).min(count - 1);
+            self.cursor = if delta == 1 || delta == -1 {
+                crate::model::menu::stepped(self.cursor, count, delta > 0)
+            } else {
+                self.cursor.saturating_add_signed(delta).min(count - 1)
+            };
         }
     }
 

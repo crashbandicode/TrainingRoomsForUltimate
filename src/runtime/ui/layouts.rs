@@ -191,10 +191,9 @@ impl Ui {
     /// The list takes Up, Down, A and B itself (one row a step, as Recording's lists); a file's own screen and its question
     /// are the panel's, and B there steps back one pane.
     pub fn press(&mut self, button: Button) {
-        let last = self.rows.len().saturating_sub(1);
         match (&self.pane, button) {
-            (Some(Pane::List), Button::Up) => self.cursor = self.cursor.saturating_sub(1),
-            (Some(Pane::List), Button::Down) => self.cursor = (self.cursor + 1).min(last),
+            (Some(Pane::List), Button::Up) => self.cursor = crate::model::menu::stepped(self.cursor, self.rows.len(), false),
+            (Some(Pane::List), Button::Down) => self.cursor = crate::model::menu::stepped(self.cursor, self.rows.len(), true),
             (Some(Pane::List), Button::A) => {
                 if let Some(Err(why)) = self.rows.get(self.cursor).map(|r| r.0.clone()).map(|id| self.show(Pane::Own(id))) {
                     self.note(&why);

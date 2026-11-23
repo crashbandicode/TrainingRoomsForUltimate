@@ -29095,7 +29095,7 @@
       "dest": "src/model/mii_root/mii_menu.rs",
       "crate": "tui",
       "src_sha256": "94d7a41fe2ff5d3c4dcaed6ff0e87df4c96d64bd927a99e4550a198784cb761c",
-      "dest_sha256": "6c02ff59a254e1f67da9cdf4013f5b8166c5a9dd5ef0d2e0cc8839b2cc30d8bd",
+      "dest_sha256": "2bd3caf2ed8e838f1ccf5e6205716bf771f4b7d495eb92821a58a1a495e491ff",
       "edits": [
         {
           "old": "use {crate::macro_panel, crate::StatefulTable, crate::SubMenu, crate::SubMenuType, crate::engine::compat::grid::NX_SUBMENU_COLUMNS, crate::NX_SUBMENU_ROWS};",
@@ -29375,6 +29375,21 @@
             ]
           ],
           "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+        },
+        {
+          "old": "        assert!(!menu.alpha_cpu_cycle(MiiClass::Swordfighter.kind()));\n    }\n\n",
+          "new": "        assert!(!menu.alpha_cpu_cycle(MiiClass::Swordfighter.kind()));\n    }\n\n    fn f2_mii_list_wrap_and_page_clamp() {\n        let preferences = Preferences::default();\n        let context = Context {\n            epoch: 9,\n            original: PlayerOrigin::NotMii,\n            active: Active { player: selection::PlayerLive::NotMii, cpu: None },\n            cpu_original: None,\n        };\n        let mut menu = CatalogMenu::new(catalog(), context, &preferences).unwrap();\n        menu.open_list(MiiClass::Swordfighter, &preferences);\n        let count = menu.rows.len() + usize::from(menu.editor_available);\n        assert!(count > 1);\n        menu.cursor = 0;\n        menu.step(-1);\n        assert_eq!(menu.cursor, count - 1);\n        menu.step(1);\n        assert_eq!(menu.cursor, 0);\n        menu.step(crate::model::panes::ROWS as isize);\n        assert_eq!(menu.cursor, count - 1);\n        menu.step(crate::model::panes::ROWS as isize);\n        assert_eq!(menu.cursor, count - 1);\n        menu.step(-(crate::model::panes::ROWS as isize));\n        assert_eq!(menu.cursor, 0);\n        menu.step(-(crate::model::panes::ROWS as isize));\n        assert_eq!(menu.cursor, 0);\n    }\n\n",
+          "reason": "F2: Exercise Mii list wrap and preserve page-step clamping."
+        },
+        {
+          "old": "            (\"waiting_catalog_exposes_seed_without_fighter_role_permissions\", waiting_catalog_exposes_seed_without_fighter_role_permissions as fn()),\n",
+          "new": "            (\"waiting_catalog_exposes_seed_without_fighter_role_permissions\", waiting_catalog_exposes_seed_without_fighter_role_permissions as fn()),\n            (\"f2_mii_list_wrap_and_page_clamp\", f2_mii_list_wrap_and_page_clamp as fn()),\n",
+          "reason": "F2: Exercise Mii list wrap and preserve page-step clamping."
+        },
+        {
+          "old": "            self.cursor = self.cursor.saturating_add_signed(delta).min(count - 1);\n",
+          "new": "            self.cursor = if delta == 1 || delta == -1 {\n                crate::model::menu::stepped(self.cursor, count, delta > 0)\n            } else {\n                self.cursor.saturating_add_signed(delta).min(count - 1)\n            };\n",
+          "reason": "F2: Wrap Mii list single steps while retaining clamped page steps."
         }
       ]
     },

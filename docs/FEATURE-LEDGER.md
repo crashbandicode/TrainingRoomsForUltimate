@@ -7,6 +7,8 @@ primary's 2026-11-12 13:35Z and 17:49Z orders. The rows up to #92 are the record
 section at the end, Eden-tested and untested on hardware.
 Rows #1-#73 are the rc.3-to-rc.6 features of `RC5-TEST-COVERAGE-AUDIT.md`, #74-#79 the features added on
 2026-11-09, #80-#92 the rc.8 to rc.11 features, and #93-#111 the rc.13 features.
+Row #27 quotes the footer visible in its rc.6 recording; the current Recording page footer also names
+`ZL+Up/Down section`.
 
 - **Eden verified:** each feature's newest run first.
   - **rc.11:** the rows on the final `0c628724` (diag `bd0bc61b`, the rc.10 ship set, GDB stub on): worker A's

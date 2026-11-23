@@ -101,8 +101,8 @@ impl Prompt {
 
     pub fn on_pad(&mut self, pad: Pad) -> Outcome {
         match pad {
-            Pad::Left | Pad::Up => self.cursor = self.cursor.saturating_sub(1),
-            Pad::Right | Pad::Down => self.cursor = (self.cursor + 1).min(ROWS.len() - 1),
+            Pad::Left | Pad::Up => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), false),
+            Pad::Right | Pad::Down => self.cursor = crate::model::menu::stepped(self.cursor, ROWS.len(), true),
             Pad::Confirm => return Outcome::Chose(self.choice()),
             Pad::Back => return Outcome::Cancelled,
             Pad::Extra | Pad::Rename => {}
@@ -134,3 +134,23 @@ impl Prompt {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    lib_unit_tests! {
+    use super::*;
+
+    #[test]
+    fn f2_fighter_prompt_wraps() {
+        let mut prompt = Prompt::new(Origin::Recording, ViewRole::Cpu, 1, "Mario".into(), "Kirby".into());
+        assert_eq!(prompt.choice(), Choice::Keep);
+        assert_eq!(prompt.on_pad(Pad::Up), Outcome::None);
+        assert_eq!(prompt.choice(), Choice::Switch);
+        assert_eq!(prompt.on_pad(Pad::Down), Outcome::None);
+        assert_eq!(prompt.choice(), Choice::Keep);
+        assert_eq!(prompt.on_pad(Pad::Left), Outcome::None);
+        assert_eq!(prompt.choice(), Choice::Switch);
+        assert_eq!(prompt.on_pad(Pad::Right), Outcome::None);
+        assert_eq!(prompt.choice(), Choice::Keep);
+    }
+    }
+}

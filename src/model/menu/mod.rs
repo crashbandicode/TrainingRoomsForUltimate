@@ -407,6 +407,17 @@ pub(crate) fn group_of(entry: Entry) -> usize {
     }
 }
 
+/// A list cursor after Up / Down: one entry further, wrapping from the last entry to the first and back.
+pub(crate) fn stepped(cursor: usize, len: usize, forward: bool) -> usize {
+    let Some(last) = len.checked_sub(1) else { return 0 };
+    match (cursor.min(last), forward) {
+        (at, true) if at == last => 0,
+        (at, true) => at + 1,
+        (0, false) => last,
+        (at, false) => at - 1,
+    }
+}
+
 /// A list cursor one window further, stopping at an end; None when already there or the list is empty.
 pub(crate) fn jumped_within(cursor: usize, len: usize, forward: bool) -> Option<usize> {
     let last = len.checked_sub(1)?;
@@ -1299,8 +1310,8 @@ impl Menu {
         };
         let screen = |cursor: usize| Screen::Rows { group, cursor };
         match button {
-            Button::Up => self.top(screen((cursor + len - 1) % len)),
-            Button::Down => self.top(screen((cursor + 1) % len)),
+            Button::Up => self.top(screen(stepped(cursor, len, false))),
+            Button::Down => self.top(screen(stepped(cursor, len, true))),
             Button::JumpUp | Button::JumpDown => self.top(screen(jumped(cursor, len, button == Button::JumpDown))),
             Button::Left | Button::Right => self.cycle(row, button == Button::Right),
             Button::A => self.activate(row),
@@ -1365,14 +1376,6 @@ impl Menu {
                 super::recording_menu::PageHit::Close => { self.closed = true; return; }
                 super::recording_menu::PageHit::Consumed => {
                     self.clamp_cursor();
-                    return;
-                }
-                super::recording_menu::PageHit::LeaveUp => {
-                    self.move_cursor(false);
-                    return;
-                }
-                super::recording_menu::PageHit::LeaveDown => {
-                    self.move_cursor(true);
                     return;
                 }
                 super::recording_menu::PageHit::Ignored => {
@@ -1749,8 +1752,8 @@ impl Menu {
     fn press_list(&mut self, button: Button, row: usize, cursor: usize) {
         let len = self.option_count(row);
         match button {
-            Button::Up => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + len - 1) % len, false) }),
-            Button::Down => self.top(Screen::List { row, cursor: self.offered_from(row, (cursor + 1) % len, true) }),
+            Button::Up => self.top(Screen::List { row, cursor: self.offered_from(row, stepped(cursor, len, false), false) }),
+            Button::Down => self.top(Screen::List { row, cursor: self.offered_from(row, stepped(cursor, len, true), true) }),
             Button::JumpUp | Button::JumpDown => {
                 let down = button == Button::JumpDown;
                 self.top(Screen::List { row, cursor: self.offered_from(row, jumped(cursor, len, down), down) })
@@ -1800,8 +1803,8 @@ impl Menu {
         let len = self.option_count(row);
         let id = ROWS[row].id;
         match button {
-            Button::Up => self.top(Screen::Checklist { row, cursor: (cursor + len - 1) % len }),
-            Button::Down => self.top(Screen::Checklist { row, cursor: (cursor + 1) % len }),
+            Button::Up => self.top(Screen::Checklist { row, cursor: stepped(cursor, len, false) }),
+            Button::Down => self.top(Screen::Checklist { row, cursor: stepped(cursor, len, true) }),
             Button::JumpUp | Button::JumpDown => self.top(Screen::Checklist { row, cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => self.toggle_entry(id, super::legend::option_slot(id, cursor)),
             Button::ZL => self.all_or_none(id),
@@ -1824,8 +1827,7 @@ impl Menu {
                     let amount = RANGE_FAST;
                     self.move_handle(range_id, cursor - len, if forward { -(amount as isize) } else { amount as isize });
                 } else {
-                    let count = len + 2;
-                    let next = if forward { (cursor + 1) % count } else { (cursor + count - 1) % count };
+                    let next = stepped(cursor, len + 2, forward);
                     self.top(screen(next, false));
                 }
             }
@@ -1999,8 +2001,8 @@ impl Menu {
     fn press_swap_groups(&mut self, button: Button, cursor: usize) {
         let len = SWAP_GROUP_IDS.len();
         match button {
-            Button::Up => self.top(Screen::SwapGroups { cursor: (cursor + len - 1) % len }),
-            Button::Down => self.top(Screen::SwapGroups { cursor: (cursor + 1) % len }),
+            Button::Up => self.top(Screen::SwapGroups { cursor: stepped(cursor, len, false) }),
+            Button::Down => self.top(Screen::SwapGroups { cursor: stepped(cursor, len, true) }),
             Button::JumpUp | Button::JumpDown => self.top(Screen::SwapGroups { cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => {
                 if self.swap_entry_grey(cursor).is_none() {
@@ -2019,8 +2021,8 @@ impl Menu {
         let id = SITUATIONS[situation].1;
         let screen = |situation: usize, cursor: usize| Screen::Overrides { situation, cursor };
         match button {
-            Button::Up => self.top(screen(situation, (cursor + len - 1) % len)),
-            Button::Down => self.top(screen(situation, (cursor + 1) % len)),
+            Button::Up => self.top(screen(situation, stepped(cursor, len, false))),
+            Button::Down => self.top(screen(situation, stepped(cursor, len, true))),
             Button::JumpUp | Button::JumpDown => self.top(screen(situation, jumped(cursor, len, button == Button::JumpDown))),
             Button::Left if cursor == 0 => self.top(screen((situation + SITUATIONS.len() - 1) % SITUATIONS.len(), 0)),
             Button::Right if cursor == 0 => self.top(screen((situation + 1) % SITUATIONS.len(), 0)),
@@ -2042,8 +2044,8 @@ impl Menu {
     fn press_chords(&mut self, button: Button, cursor: usize) {
         let len = CHORD_ROWS.len();
         match button {
-            Button::Up => self.top(Screen::Chords { cursor: (cursor + len - 1) % len }),
-            Button::Down => self.top(Screen::Chords { cursor: (cursor + 1) % len }),
+            Button::Up => self.top(Screen::Chords { cursor: stepped(cursor, len, false) }),
+            Button::Down => self.top(Screen::Chords { cursor: stepped(cursor, len, true) }),
             Button::JumpUp | Button::JumpDown => self.top(Screen::Chords { cursor: jumped(cursor, len, button == Button::JumpDown) }),
             Button::A => {
                 let captured = Chord::from_row(self.get(CHORD_ROWS[cursor].1));
@@ -2266,8 +2268,8 @@ impl Menu {
         let (count, grabs) = (lines.len().max(1), moves::GRAB_LABELS.len());
         let Some(line) = lines.get(pop.cursor).copied() else { return self.mashout_pop = None };
         match button {
-            Button::Up => pop.cursor = (pop.cursor + count - 1) % count,
-            Button::Down => pop.cursor = (pop.cursor + 1) % count,
+            Button::Up => pop.cursor = stepped(pop.cursor, count, false),
+            Button::Down => pop.cursor = stepped(pop.cursor, count, true),
             Button::Left if line.grab => pop.grab = (pop.grab + grabs - 1) % grabs,
             Button::Right if line.grab => pop.grab = (pop.grab + 1) % grabs,
             Button::A => {

@@ -181,6 +181,17 @@ fn section_starts(m: &Menu, page: Page) -> Vec<usize> {
 }
 
 #[test]
+fn f2_stepped() {
+    for (cursor, len, forward, expected) in [
+        (0, 5, false, 4), (4, 5, true, 0), (2, 5, true, 3), (2, 5, false, 1),
+        (7, 5, true, 0), (7, 5, false, 3), (0, 1, true, 0), (0, 1, false, 0),
+        (3, 0, true, 0), (3, 0, false, 0),
+    ] {
+        assert_eq!(stepped(cursor, len, forward), expected, "{cursor}, {len}, {forward}");
+    }
+}
+
+#[test]
 fn a_list_jump_inside_a_list_stops_at_its_ends() {
     assert_eq!(jumped_within(0, 0, false), None);
     assert_eq!(jumped_within(0, 0, true), None);
