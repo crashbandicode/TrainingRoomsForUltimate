@@ -2505,7 +2505,15 @@ approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 196734
+ceiling = 196636
 date = "2026-11-23"
-reason = "F10: a directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 196734 on install 2 d50a0577 with F10, 269 above the last entry's 196465, which predates the GJ4 rework merge."
+reason = "Install 2, integration total after merging F8, F12, F15, F9, the GJ4 rework and F11 on 152629cd: 196465 (F9 entry, measured on its merged tree) + 0 (GJ4 rework) + 171 (F11, which dropped its own entry because it fitted under F12 196638 on its base) = 196636 measured on 3aace984, with no spare. The integrator added no code."
+approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrator tr-practice-state-sol re-totals size-budget.toml after each merge) and F11 reviewed READY (rv-edge-juggle-sol PASS 19:31:37Z and 20:04:20Z), under the operator measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the final gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196961
+date = "2026-11-23"
+reason = "F10: a directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. F10 adds 325 lines: 196790 measured on 6252fe51 (install 2 d50a0577 with F10) against 196465 there. 196636 (install 2 1a0b3a64) + 325 = 196961 on this head, with no spare."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."

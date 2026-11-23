@@ -1,0 +1,4 @@
+{
+  "guard": {"points": [[-130, -30], [-200, -30], [-230, 60], [-150, -100]], "expect": ["in_view", "in_view", "magnifier", "magnifier", "magnifier"], "start": [-200, -30], "through": ["magnifier", "magnifier", "magnifier"]},
+  "juggle": {"points": [[0, 100], [-100, 130]], "expect": ["in_view", "in_view", "in_view"]}
+}
