@@ -831,7 +831,7 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
-        Effect::OpenCrop { source, combo } => {
+        Effect::OpenCrop { source, combo, .. } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo);
         }
         effect => rr_host::post_effect_at(effect, Some(version)),

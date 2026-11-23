@@ -134,7 +134,7 @@ pub enum Effect {
     RecordDrill,
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
-    OpenCrop { source: String, combo: bool },
+    OpenCrop { source: String, combo: bool, player: bool },
     DuplicateSave { source: String },
     DeleteSave { source: String },
     /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
@@ -1408,7 +1408,7 @@ impl RecordingScreens {
     }
 
     fn open_crop(&mut self, kind: ItemKind, source: String) {
-        self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo };
+        self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo, player: false };
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {
@@ -2955,10 +2955,16 @@ mod tests {
         let crop = screens.file_rows().iter().position(|row| row.title == "Crop").unwrap();
         screens.set_file_cursor(crop);
         screens.handle_page(Button::A, true, SAVES_MACROS);
-        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "nair".into(), combo: false });
+        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "nair".into(), combo: false, player: true });
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        screens.handle_page(Button::ZR, true, SAVES_MACROS);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.set_file_cursor(crop);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "nair".into(), combo: false, player: false });
         // The same action dispatches the combo, without an intermediate editor or write.
         screens.open_crop(ItemKind::Combo, "combo".into());
-        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "combo".into(), combo: true });
+        assert_eq!(screens.take_effect(), Effect::OpenCrop { source: "combo".into(), combo: true, player: false });
         assert!(screens.catalog().macros.iter().any(|file| file.id == "nair" && file.name == "Nair loop"));
     }
 

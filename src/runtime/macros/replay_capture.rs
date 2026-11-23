@@ -279,7 +279,7 @@ fn service_file_name() {
     if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {
         let file = FILE_NAME.lock().unwrap().take();
         if let Some(file) = file {
-            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name) {
+            match crate::engine::rr_runtime::save_clip_file(std::path::Path::new(crate::model::storage::ROOT), file, &name, None) {
                 Ok(id) => {
                     crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}"));
                 }
@@ -928,7 +928,7 @@ fn apply_action(action: ClipAction) {
     };
     match effect {
         Some(ClipEffect::Preview(recording)) => crate::runtime::macros::replay_preview::request_play(*recording, revision),
-        Some(ClipEffect::StopPreview) => crate::runtime::macros::replay_preview::request_stop(),
+        Some(ClipEffect::StopPreview | ClipEffect::PreviewFile { .. }) => crate::runtime::macros::replay_preview::request_stop(),
         Some(ClipEffect::Close) => close_editor(),
         Some(ClipEffect::Export(recording)) => {
             crate::runtime::macros::replay_preview::request_stop();

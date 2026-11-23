@@ -46,6 +46,8 @@ pub struct Facts {
     pub owns_input: bool,
     /// P1 polls since the layout tick last ran.
     pub polls_since_tick: u32,
+    /// The clip editor is up: it reads Player 1 itself, so the menu does not open over it.
+    pub clip: bool,
 }
 
 /// Whether an opening chord may be accepted now.

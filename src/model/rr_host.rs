@@ -335,6 +335,18 @@ pub fn migrated() -> bool {
     MIGRATED.load(Ordering::Acquire)
 }
 
+/// The clip editor's preview of a saved macro: frames `start..end` of `source` play once on `role` through the role's
+/// Play queue, warped to the macro's start save. Running from this call until the run ends or `stop_preview`.
+pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
+    let _ = (source, role, start, end);
+}
+
+/// Stop a running preview (nothing otherwise): the rest of its frames is dropped.
+pub fn stop_preview() {}
+
+/// A preview was asked for and has not ended. Atomic read (a hook may call it).
+pub fn preview_running() -> bool { false }
+
 /// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
 /// (`recorder::recording_or_playback`) read this, because the old recorder machine never sees rr_host's takes. Playback is
 /// left out on purpose: a fighter-mismatch Switch is admitted while its play has started, and must not refuse itself.
@@ -2211,6 +2223,81 @@ mod tests {
         [None, None, None, None, None]
     }
 
+    /// A preview feeds only the selected range to its role after the start save lands.
+    fn a_crop_preview_plays_its_window_on_the_role_through_the_play_queue() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let root = scratch("preview-role");
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR))
+                .save_new(&NamedSave::new("Start", state(8), state(7)).unwrap()).unwrap();
+            let frames = (1..=6).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+            let kind = if role == Role::Player { 8 } else { 7 };
+            let mut recording = super::super::macros::MacroRecording::new("Take", "13.0.5", StartState::neutral(kind, 0, 1.0), frames).unwrap();
+            recording.set_start_save(Some(&save_id)).unwrap();
+            recording.set_start_save_on(true);
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+            let index = RecordingIndex::load(&root).unwrap();
+            assert!(index.active(Role::Player).is_none() && index.active(Role::Cpu).is_none());
+            request_preview(&id, role, 1, 4);
+            assert!(preview_running() && pending());
+            let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
+            assert_eq!(tick.warp_place.map(|p| p.0), Some(role));
+            assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
+            warp_landed();
+            let mut taken = Vec::new();
+            for _ in 0..6 {
+                service_at(&root, &none(), "2026-11-23", state(8), state(7));
+                let (frame, other) = if role == Role::Player {
+                    (take_player_frame(), take_cpu_frame())
+                } else {
+                    (take_cpu_frame(), take_player_frame())
+                };
+                assert!(other.is_none());
+                match frame {
+                    Some(frame) => taken.push(frame.buttons),
+                    None => break,
+                }
+            }
+            assert_eq!(taken, [2, 3, 4]);
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert!(!preview_running());
+            let index = RecordingIndex::load(&root).unwrap();
+            assert!(index.active(Role::Player).is_none() && index.active(Role::Cpu).is_none());
+        }
+    }
+
+    /// Stopping a preview discards its unplayed inputs.
+    fn stopping_a_crop_preview_drops_the_rest() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("preview-stop");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let frames = (1..=6).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let recording = super::super::macros::MacroRecording::new("Take", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        request_preview(&id, Role::Cpu, 0, 6);
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(1));
+        stop_preview();
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(take_cpu_frame().is_none());
+        assert!(!preview_running());
+    }
+
+    /// A missing preview source finishes without a warp.
+    fn a_crop_preview_of_a_missing_macro_ends_at_once() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("preview-missing");
+        request_preview("nope", Role::Player, 0, 3);
+        let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!preview_running());
+        assert!(tick.warp.is_none());
+    }
+
     fn posted_chords_reach_the_role_machines() {
         let _hold = hold();
         reset_host();
@@ -2430,7 +2517,7 @@ mod tests {
         )
         .unwrap();
         let macro_id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
-        post_effect(Effect::OpenCrop { source: macro_id.clone(), combo: false });
+        post_effect(Effect::OpenCrop { source: macro_id.clone(), combo: false, player: false });
         let tick = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(tick.diags.iter().all(|line| !line.starts_with("screen=crop source=")), "opening the editor never writes a file");
         assert_eq!(Library::new(root.join(MACROS_DIR)).list().unwrap().entries.len(), 1);
@@ -4795,6 +4882,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_crop_preview_plays_its_window_on_the_role_through_the_play_queue", a_crop_preview_plays_its_window_on_the_role_through_the_play_queue as fn()),
+            ("stopping_a_crop_preview_drops_the_rest", stopping_a_crop_preview_drops_the_rest as fn()),
+            ("a_crop_preview_of_a_missing_macro_ends_at_once", a_crop_preview_of_a_missing_macro_ends_at_once as fn()),
             ("queued_rename_checks_the_originating_index_revision", queued_rename_checks_the_originating_index_revision as fn()),
             ("posted_chords_reach_the_role_machines", posted_chords_reach_the_role_machines as fn()),
             ("a_taken_pair_stays_pending_until_its_write_is_done", a_taken_pair_stays_pending_until_its_write_is_done as fn()),

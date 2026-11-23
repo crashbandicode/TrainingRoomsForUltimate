@@ -598,6 +598,28 @@ mod tests {
     use super::*;
     use crate::model::state::record::StartState;
 
+    /// The saved-macro editor routes previews through Recording and hides the clip page.
+    fn the_crop_preview_is_wired_to_recordings_playback() {
+        let capture = include_str!("../runtime/macros/replay_capture.rs");
+        assert!(!capture.contains("macro_file(recording, false)"));
+        assert!(capture.contains("rr_host::request_preview("));
+        assert!(capture.contains("rr_host::stop_preview()"));
+        let named = include_str!("../runtime/macros/named_macros.rs");
+        let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(hold.contains("clip_previewing"));
+        let worker = include_str!("../runtime/ui/worker.rs");
+        let clip = worker.split("if s.phase == Phase::Clip {").nth(1).unwrap().split("\n    }").next().unwrap();
+        let store = clip.split("EXT_SHOWN.store(").nth(1).unwrap().split(';').next().unwrap();
+        assert!(store.contains("hides_page()"));
+    }
+
+    #[test]
+    fn case_table() {
+        crate::test_table::run(&[
+            ("the_crop_preview_is_wired_to_recordings_playback", the_crop_preview_is_wired_to_recordings_playback as fn()),
+        ]);
+    }
+
     #[test]
     fn a_missed_tech_start_takes_the_asked_face_whatever_the_pose_gives() {
         struct Fake { pose_up: bool, flag: bool, motion: u64, restarts: u8 }
