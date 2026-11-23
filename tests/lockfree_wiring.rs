@@ -47,6 +47,13 @@ fn ordered(src: &str, steps: &[&str]) {
     }
 }
 
+#[test]
+fn slot_capture_and_library_pad_priority_is_preserved() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    ordered(body(recorder, "on_ai_frame"),
+        &["slot_control(shulk)", "cpu_role_control()", "host_cpu(controller)"]);
+}
+
 /// Step 2a: a settings publish (the menu worker's commit, the diag reload) only notes the roster's re-plan and the preload
 /// planner's reset; the game frame (`lobby::update`, the input poll and the fighter frame on MainThread) runs both, in the order the
 /// publish made them, before the scene clock. No plugin thread reaches either, so the roster's, the planner's and the sources' locks
