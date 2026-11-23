@@ -121,9 +121,9 @@ Area: **1.9-2.3k** without a ruling; **+1.5k** parking, **+2.5k** compaction (§
 | Finding | Change | Saves | Risk | Rows |
 | --- | --- | ---: | --- | --- |
 | `model/macros/ui_anchor.rs` (122) and `model/macro_ui/replay_panel.rs` (137): no user (M) | delete (pkg4 manifest edit) | 259 | L | none |
-| `named_macros.rs:337-345,870-888` (`Legacy`), `:734-775`, `:492-503` superseded by the recorder state | delete | ~60 | L | s4-03/04 |
-| Two copies of the fork's practice/lobby/save-state facade: `runtime/macros/port.rs:155-286` vs `runtime/lobby/training/{practice.rs:17-41,lobby.rs:21-57,mod.rs:64-127}` | `port` uses the lobby facade (inside the pkg4 wiring) | ~100 | M-H | s4-03/04, lobby rows |
-| `InputFrame` (`macros/recording.rs:29`) = `MappedInputs` (`input_delay.rs:17`); `StartSnapshot`/`Origin` vs `StartState` | one type, JSON shape identical | 60-70 | L-M | s4-01/02, s4-03/04 |
+| Named playback and slot transfer | removed in F7b; the panel, prompts and replay capture remain | measured in F7b | L | F7b-1–9 |
+| Two copies of the fork's practice/lobby/save-state facade vs `runtime/lobby/training/{practice.rs,lobby.rs,mod.rs}` | `port` uses the lobby facade (inside the pkg4 wiring) | ~100 | M-H | s4-03/04, lobby rows |
+| `InputFrame` (`macros/recording.rs:29`) = `MappedInputs` (`input_delay.rs:17`) | one type, JSON shape identical; F7b removed `StartSnapshot`/`Origin` | 60-70 | L-M | s4-01/02, s4-03/04 |
 | Constants and `is_neutral` 2× (`model/recording.rs:30-55` vs `macro_panel.rs:16-76,1661`); `MacroSource` 2× (`port.rs:141`, `compat/menu.rs:35`); sync helper 2× (`port.rs:6-23`, `compat/sync.rs`) | one each | ~40 | L | s4-01 |
 | Diag hook counters written 3× (`features/cpu.rs:117-178`, `states.rs:167-241`, `recorder.rs:91-145`) | one counter type beside `hook_stats::ENTRIES` | 120-150 | L | s2-02..04 hook budget, s4-01 |
 | smash-match-data `capture.rs` (360), `clip.rs` (417), `validate.rs:1031-1141`, `Capture::load/save`: used only as a test oracle (`shared_capture.rs:482,734,769`) | vendor only what is used (lead ruling: the crate is carried unchanged) | 850-950 | M | s4-03/04 |

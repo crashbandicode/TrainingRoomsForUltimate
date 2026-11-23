@@ -25,7 +25,6 @@ pub fn is_layer_panel(editor: Editor) -> bool {
 pub fn open_panel(editor: Editor, slot: Option<usize>) -> bool {
     match editor {
         Editor::NamedLibrary => named_macros::open_library(slot),
-        Editor::SaveSlotToLibrary => named_macros::export_record_slot(slot),
         Editor::EditPlacement => named_macros::open_editor(),
         Editor::ReplayWindow => replay_capture::open_editor(),
         _ => {}

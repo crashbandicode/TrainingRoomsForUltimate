@@ -518,6 +518,7 @@ fn pad(stick: Point, press: u32) -> Correction {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::edge_juggle::perfect::{Segment, JUMP, SPECIAL};
 
@@ -769,5 +770,6 @@ mod tests {
                 "frame {frame}, status {status:#x}"
             );
         }
+    }
     }
 }

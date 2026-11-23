@@ -201,8 +201,7 @@ pub struct Out {
     /// The fighter's record waits on a feature (`ApplyBuff`, `WaitForPokemonSwitch`,
     /// `WaitForCopyAbility`): the runtime runs that feature's step this frame.
     pub wait: Option<Marker>,
-    /// Both records of the load are done: `Some(saved_on_ledge)`, once per restore (the recorder's
-    /// `on_state_restored`).
+    /// Both records of the load are done: `Some(saved_on_ledge)`, once per restore.
     pub restored: Option<bool>,
     /// The Ice Climbers hand-off happened: Nana is placed next.
     pub nana_next: bool,

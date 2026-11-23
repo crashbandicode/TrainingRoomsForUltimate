@@ -212,6 +212,7 @@ impl AuraFlight {
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
     use crate::model::edge_juggle::perfect::Segment;
 
@@ -426,5 +427,6 @@ mod tests {
                 }
             }
         }
+    }
     }
 }

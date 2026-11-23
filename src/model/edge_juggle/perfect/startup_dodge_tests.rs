@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::super::{AirPhysics, ThreatClock, GUARD};
 use super::{AttackForecast, MotionSample, ThreatProjection};
 
@@ -247,4 +248,5 @@ fn neutral_dodge_window_uses_each_native_body_and_reserves_a_frame_at_each_end()
     for &(kind, name) in CHOICES {
         assert!(neutral_dodge_window(kind as i32).is_some(), "{name}");
     }
+}
 }

@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 use crate::model::edge_juggle::perfect::Segment;
 
@@ -265,4 +266,5 @@ fn sonic_checks_the_live_dash_before_restarting_its_jump_plan() {
         };
         assert!(flight.step(SonicBeat { frame, position, ..sample }).is_none());
     }
+}
 }

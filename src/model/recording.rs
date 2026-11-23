@@ -1,36 +1,12 @@
-//! Input recording and playback (SPEC-input-01): five slots of 600 frames of P1's mapped input that
-//! the CPU performs live while they are recorded and replays on demand. Pure: the runtime reads the
-//! game, calls one of the three stage methods (`poll`, `control`, `post_frame`) and applies the answer.
-//!
-//! The recorder's three stages in one game frame (SPEC-input-01 §5.2):
-//! 1. `poll`: P1's final mapped input (after input delay). Stores the frame when recording and makes
-//!    P1's output neutral while the recorder owns P1 (lockout, standby, recording).
-//! 2. `control`: the CPU's control frame, after the AI wrote its controls. Counts the lockout down,
-//!    injects the current frame into the CPU, advances.
-//! 3. `post_frame`: the end-of-run check, the loop, the crop, the mash queue pop.
-//!
-//! Decisions applied (docs/DECISIONS.md, the specs' *Decided* lines): B4 Record refused while an AI
-//! drives P1; B5/N4 the setting `settings_override_playback`; B8 batch (full-range frame bounds, an
-//! unrecorded or empty slot is refused, playback refused while recording, stop on reset, chords ignored
-//! while a save state loads); per-slot facing and starting status (§6.1); the Recording Slot and the
-//! duration are latched at the start of the lockout (SPEC-input-01 question 4).
-//!
-//! Frame bounds (question 1, B8): a recording of duration `L` stores frames `0..L` and playback plays
-//! every stored frame, one per CPU control frame, so a slot of length `n` takes `n` control frames.
+//! CPU-role recording and Playback Slot control decisions.
 
-use super::cpu::ids::{Table, C, UNRESOLVED};
-use super::cpu::playback::PlaybackState;
-use super::cpu::settings::Weights;
+use super::cpu::ids::{Table, C};
 use super::input_delay::MappedInputs;
 use super::settings::Snapshot;
 
 pub const SLOTS: usize = 5;
 /// Frames per slot: the largest Recording Duration.
 pub const SLOT_FRAMES: usize = 600;
-/// Frames of a named recording (`training_mod_macros::MAX_FRAMES`: ten minutes at 60 fps); the named capture lasts until the stop chord.
-pub const NAMED_FRAMES: u16 = 36_000;
-/// A slot's length before anything was recorded into it.
-pub const INITIAL_LENGTH: u16 = 60;
 /// Control frames of the lockout that follows the record chord (SPEC-input-01 §5.3).
 pub const LOCKOUT_FRAMES: u16 = 30;
 /// `ledge playback` buffer, and the one used while the CPU is still in `CLIFF_CATCH`.
@@ -71,7 +47,6 @@ pub struct RecorderSettings {
     pub crop: bool,
     pub place: bool,
     pub hitstun: HitstunTiming,
-    pub save_state_slots: Weights<5>,
     pub mash_interrupt: bool,
 }
 
@@ -81,7 +56,6 @@ impl RecorderSettings {
             crop: true,
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
-            save_state_slots: Weights([0; 5]),
             mash_interrupt: true,
         }
     }
@@ -98,7 +72,6 @@ impl RecorderSettings {
                 Some(2) => HitstunTiming::HitstopBegins,
                 _ => HitstunTiming::HitstunEnds,
             },
-            save_state_slots: Weights::from_row(row("save_state_playback")),
             mash_interrupt: on("playback_mash"),
         }
     }
@@ -117,7 +90,6 @@ pub enum Mode {
     /// The lockout after the record chord.
     Pause,
     Record,
-    Playback,
 }
 
 /// Who holds the CPU's controller.
@@ -181,34 +153,6 @@ impl Phase {
 
 /// The header every recorder notice carries; the recorder clears it before it posts the next phase.
 pub const NOTICE_HEADER: &str = "Input Recording";
-
-/// What the CPU was when a slot's recording began (the fork's export contract, SPEC-input-01 §9).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StartSnapshot {
-    pub fighter_kind: i32,
-    pub costume: u32,
-    pub situation: i32,
-    pub speed_x: f32,
-    pub speed_y: f32,
-}
-
-impl StartSnapshot {
-    pub const NONE: StartSnapshot = StartSnapshot { fighter_kind: 0, costume: 0, situation: 0, speed_x: 0.0, speed_y: 0.0 };
-}
-
-/// One slot's origin: facing at the lockout and the status the first frame led to (§6.1).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Origin {
-    /// +1 or -1 (the CPU's `lr`).
-    pub facing: i8,
-    /// The CPU's status on the poll after frame 0, or `UNRESOLVED` until captured.
-    pub status: i32,
-    pub start: StartSnapshot,
-}
-
-impl Origin {
-    pub const NONE: Origin = Origin { facing: 1, status: UNRESOLVED, start: StartSnapshot::NONE };
-}
 
 /// Why a recording was not started.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -316,29 +260,18 @@ pub unsafe fn p1_driven_by_ai(operation_cpu: bool, fallback: bool, export: Optio
 /// Why a playback was not started (decision B8: an unrecorded slot, or playback while recording).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayRefusal {
-    /// The lockout is running.
-    Lockout,
-    /// A recording is running (question 17, B8).
-    Recording,
     /// A slot index of 5 or more.
     SlotOutOfRange,
     /// Nothing recorded in that slot, or its length is 0 (question 11, B8).
     SlotEmpty,
-    /// A named playback of no frames (or too many).
-    NothingLoaded,
-    FightersMissing,
 }
 
 impl PlayRefusal {
     pub const fn text(self) -> &'static str {
         match self {
-            PlayRefusal::Lockout => "Wait for the lockout to end",
-            PlayRefusal::Recording => "Finish the recording first",
             PlayRefusal::SlotOutOfRange => "No such slot",
             // restriction: playback-slot-empty
             PlayRefusal::SlotEmpty => "This Playback Slot is empty: pick its macro on the Recording page",
-            PlayRefusal::NothingLoaded => "Nothing to play",
-            PlayRefusal::FightersMissing => "Both fighters must be present",
         }
     }
 }
@@ -382,16 +315,8 @@ pub struct ControlOut {
     pub hold_cliff_timer: bool,
 }
 
-/// The CPU facts the control stage needs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ControlCtx {
-    /// The CPU is Shulk and his Monado dial is open: no mirroring then.
-    pub shulk_dial: bool,
-}
-
 /// Menu CPU-role record. The numbered slot table holds 600 frames; a menu file holds up to
-/// `macros::MAX_FRAMES`, so this keeps the same lockout, standby, and CPU possession as
-/// [`Recorder::poll`] and [`Recorder::control`] and streams the stored frames out one at a time.
+/// `macros::MAX_FRAMES`, so this streams the stored frames out one at a time.
 ///
 /// A press while the phase is still lockout is neutralised and dropped. The idle baseline
 /// (`FLICK_JUMP`) during standby is injected and not stored. The first non-neutral poll ends
@@ -410,7 +335,6 @@ const fn phase_of(mode: Mode, possession: Possession) -> Phase {
         (Mode::Pause, _) => Phase::Lockout,
         (Mode::Record, Possession::Standby) => Phase::Standby,
         (Mode::Record, _) => Phase::Recording,
-        (Mode::Playback, _) => Phase::Playback,
         (Mode::None, _) => Phase::Idle,
     }
 }
@@ -498,34 +422,10 @@ impl CpuRoleDrive {
                     out.write = Some(inject_values(self.live, 1));
                 }
             }
-            Mode::None | Mode::Playback => {}
+            Mode::None => {}
         }
         out
     }
-}
-
-/// What the post-frame stage found.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct PostOut {
-    /// A recording or playback reached its last frame.
-    pub ended: Option<Ended>,
-    /// The mash queue head is a Playback Slot: pop it (mash `reset`), the playback it asked for is over.
-    pub pop_mash: bool,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Ended {
-    Played { slot: u8 },
-    /// A named playback (or a clip preview) played to its end.
-    NamedPlayed,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PostCtx {
-    /// The CPU's `lr` now (a loop restart re-reads it).
-    pub facing: i8,
-    /// The mash queue's head is a Playback Slot action.
-    pub queue_head_is_playback: bool,
 }
 
 /// What the mash queue and the CPU's state say when the recorder is idle (§5.4).
@@ -536,7 +436,7 @@ pub struct MashCtx {
     pub in_hitstun: bool,
     pub in_hitstop: bool,
     /// The mapped term is enabled, or, for any other start, the fighter can act (the runtime asks
-    /// only when `Recorder::mash_needs_term` says so).
+    /// only when `mash_needs_term` says so).
     pub term_enabled: bool,
 }
 
@@ -547,422 +447,92 @@ pub struct PlayStart {
     pub frames: u16,
 }
 
-/// The recorder.
-#[derive(Clone, Debug)]
-pub struct Recorder {
-    slots: [[MappedInputs; SLOT_FRAMES]; SLOTS],
-    len: [u16; SLOTS],
-    recorded: [bool; SLOTS],
-    origin: [Origin; SLOTS],
-    mode: Mode,
-    possession: Possession,
-    /// The next frame to inject (and, recording, the frame the next poll stores).
-    frame: u16,
-    lockout: u16,
-    buffer: u8,
-    /// The current run's length in frames.
-    length: u16,
-    record_slot: u8,
-    play_slot: u8,
-    recorded_facing: i8,
-    current_facing: i8,
-    starting_status: i32,
-    /// Latched at the lockout: crop is read at the end, the duration was latched with `length`.
-    mash_started: bool,
-    /// The frame source is the named layer's buffer (SPEC-input-01 section 9), not a numbered slot.
-    named: bool,
-}
-
-impl Default for Recorder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Recorder {
-    pub const fn new() -> Self {
-        Self {
-            slots: [[MappedInputs::NEUTRAL; SLOT_FRAMES]; SLOTS],
-            len: [INITIAL_LENGTH; SLOTS],
-            recorded: [false; SLOTS],
-            origin: [Origin::NONE; SLOTS],
-            mode: Mode::None,
-            possession: Possession::Player,
-            frame: 0,
-            lockout: 0,
-            buffer: 0,
-            length: INITIAL_LENGTH,
-            record_slot: 0,
-            play_slot: 0,
-            recorded_facing: 1,
-            current_facing: 1,
-            starting_status: UNRESOLVED,
-            mash_started: false,
-            named: false,
-        }
-    }
-
-    // ---- queries (SPEC-input-01 §5.6 and the CPU specs' interface) -----------------------------
-
-    /// The frame source of the run is the named layer's buffer.
-    pub const fn is_named(&self) -> bool {
-        self.named
-    }
-
-    pub const fn mode(&self) -> Mode {
-        self.mode
-    }
-
-    #[cfg(test)]
-    pub const fn possession(&self) -> Possession {
-        self.possession
-    }
-
-    pub const fn frame(&self) -> u16 {
-        self.frame
-    }
-
-    pub const fn length(&self) -> u16 {
-        self.length
-    }
-
-    #[cfg(test)]
-    pub fn slot_len(&self, slot: u8) -> u16 {
-        self.len.get(usize::from(slot)).copied().unwrap_or(0)
-    }
-
-    #[cfg(test)]
-    pub fn is_recorded(&self, slot: u8) -> bool {
-        self.recorded.get(usize::from(slot)).copied().unwrap_or(false)
-    }
-
-    /// The stored frames of `slot` (its length), for export and the clip layer.
-    #[cfg(test)]
-    pub fn frames(&self, slot: u8) -> Option<&[MappedInputs]> {
-        let i = usize::from(slot);
-        self.slots.get(i).map(|s| &s[..usize::from(self.len[i]).min(SLOT_FRAMES)])
-    }
-
-    /// `is_playback()` of the CPU specs: the recorder holds the CPU in Record or Playback.
-    pub const fn is_playback(&self) -> bool {
-        matches!(self.mode, Mode::Record | Mode::Playback)
-    }
-
-    pub const fn is_recording(&self) -> bool {
-        matches!(self.mode, Mode::Record)
-    }
-
-    /// Lockout or standby.
-    pub const fn is_standby(&self) -> bool {
-        matches!(self.possession, Possession::Lockout | Possession::Standby)
-    }
-
-    /// The summary the CPU behaviours read (`Cpu::playback`); `queued` is the mash queue's.
-    pub fn playback_state(&self, queued: bool) -> PlaybackState {
-        PlaybackState {
-            running: self.is_playback(),
-            recording: self.is_recording(),
-            standby: self.is_standby(),
-            queued,
-        }
-    }
-
-    /// The phase for the tint and the notice.
-    pub const fn phase(&self) -> Phase {
-        phase_of(self.mode, self.possession)
-    }
-
-    // ---- starting and stopping -----------------------------------------------------------------
-
-    /// The named layer's playback (`playback_named`): `frames` frames from the layer's buffer, mirrored by the
-    /// recorded `facing` against the CPU's current_facing now. Refused during the lockout and a recording like any playback.
-    pub fn start_named_playback(&mut self, frames: u16, recorded_facing: i8, status: i32, current_facing: i8) -> Result<PlayStart, PlayRefusal> {
-        match self.mode {
-            Mode::Pause => return Err(PlayRefusal::Lockout),
-            Mode::Record => return Err(PlayRefusal::Recording),
-            _ => {}
-        }
-        if frames == 0 || frames > NAMED_FRAMES {
-            return Err(PlayRefusal::NothingLoaded);
-        }
-        self.length = frames;
-        self.mode = Mode::Playback;
-        self.possession = Possession::Player;
-        self.frame = 0;
-        self.buffer = 0;
-        self.current_facing = current_facing;
-        self.recorded_facing = recorded_facing;
-        self.starting_status = status;
-        self.named = true;
-        Ok(PlayStart { slot: 0, frames })
-    }
-
-    /// Begin playing `slot`; `facing` is the CPU's `lr` now.
-    pub fn start_playback(&mut self, slot: u8, facing: i8) -> Result<PlayStart, PlayRefusal> {
-        match self.mode {
-            Mode::Pause => return Err(PlayRefusal::Lockout),
-            Mode::Record => return Err(PlayRefusal::Recording),
-            _ => {}
-        }
-        let i = usize::from(slot);
-        if i >= SLOTS {
-            return Err(PlayRefusal::SlotOutOfRange);
-        }
-        if !self.recorded[i] || self.len[i] == 0 || usize::from(self.len[i]) > SLOT_FRAMES {
-            return Err(PlayRefusal::SlotEmpty);
-        }
-        self.length = self.len[i];
-        self.play_slot = slot;
-        self.mode = Mode::Playback;
-        self.possession = Possession::Player;
-        self.frame = 0;
-        self.buffer = 0;
-        self.current_facing = facing;
-        self.recorded_facing = self.origin[i].facing;
-        self.starting_status = self.origin[i].status;
-        self.named = false;
-        Ok(PlayStart { slot, frames: self.length })
-    }
-
-    /// The ledge feature's playback: the buffer is 5 frames, 4 when the CPU is still in `CLIFF_CATCH`.
-    pub fn playback_ledge(&mut self, slot: u8, facing: i8, cliff_catch: bool) -> Result<PlayStart, PlayRefusal> {
-        let start = self.start_playback(slot, facing)?;
-        self.buffer = if cliff_catch { CLIFF_CATCH_BUFFER } else { LEDGE_BUFFER };
-        Ok(start)
-    }
-
-    /// `stop_playback`: the state returns to None and the owner counters reset (decision B8: also
-    /// buffer and lockout, §5.3). Called on a save-state load request, a mash interrupt, the session
-    /// end, a hot swap, a Training reset and the named layer.
-    pub fn stop(&mut self) {
-        self.mode = Mode::None;
-        self.possession = Possession::Player;
-        self.frame = 0;
-        self.buffer = 0;
-        self.lockout = 0;
-        self.mash_started = false;
-        self.named = false;
-    }
-
-    // ---- the control stage ---------------------------------------------------------------------
-
-    /// One CPU control frame, after the AI wrote its controls.
-    pub fn control(&mut self, c: &ControlCtx) -> ControlOut {
-        self.control_from(c, &|_| None)
-    }
-
-    /// control of a named run: the frame at an index comes from the layer's buffer (None: not captured yet, the CPU gets neutral
-    /// controls and the clock waits, SPEC-input-01 section 9 has_captured_frame).
-    pub fn control_named(&mut self, c: &ControlCtx, frame: &dyn Fn(u16) -> Option<MappedInputs>) -> ControlOut {
-        self.control_from(c, frame)
-    }
-
-    fn control_from(&mut self, c: &ControlCtx, named: &dyn Fn(u16) -> Option<MappedInputs>) -> ControlOut {
-        let mut out = ControlOut { write: None, hold_cliff_timer: false };
-        match self.mode {
-            Mode::Pause => {
-                out.hold_cliff_timer = true;
-                self.lockout = self.lockout.saturating_sub(1);
-                if self.lockout == 0 {
-                    self.mode = Mode::Record;
-                    self.possession = Possession::Standby;
-                }
-            }
-            Mode::Record => {
-                let i = usize::from(self.record_slot);
-                if self.possession == Possession::Standby {
-                    out.hold_cliff_timer = true;
-                    out.write = Some(self.injected(self.slots[i][0], c));
-                } else {
-                    out.write = Some(self.injected(self.slots[i][usize::from(self.frame.min(self.length - 1))], c));
-                    self.advance();
-                }
-            }
-            Mode::Playback => {
-                let i = usize::from(self.play_slot);
-                let at = self.frame.min(self.length.saturating_sub(1));
-                let frame = if self.named { named(at).unwrap_or(MappedInputs::NEUTRAL) } else { self.slots[i][usize::from(at)] };
-                out.write = Some(self.injected(frame, c));
-                if self.buffer > 0 {
-                    self.buffer -= 1;
-                } else {
-                    self.advance();
-                }
-            }
-            Mode::None => {}
-        }
-        out
-    }
-
-    fn advance(&mut self) {
-        if self.frame < self.length {
-            self.frame += 1;
-        }
-    }
-
-    fn injected(&self, frame: MappedInputs, c: &ControlCtx) -> Inject {
-        // The playback mirror is fixed at start or restore, so a turn does not flip the rest.
-        let mirror = if c.shulk_dial { 1 } else { self.recorded_facing * self.current_facing };
-        let frame = if self.buffer > 0 && self.buffer <= BUFFER_NEUTRAL_MAX { MappedInputs::NEUTRAL } else { frame };
-        inject_values(frame, mirror)
-    }
-
-    // ---- the post-frame stage ------------------------------------------------------------------
-
-    /// The end-of-run check, the crop, the loop (SPEC-input-01 §5.3 "End detection").
-    pub fn post_frame(&mut self, c: &PostCtx) -> PostOut {
-        let mut out = PostOut::default();
-        if !matches!(self.mode, Mode::Record | Mode::Playback) || self.frame < self.length || self.buffer > 0 {
-            return out;
-        }
-        self.possession = Possession::Player;
-        out.pop_mash = c.queue_head_is_playback;
-        if self.named {
-            // The layer owns the frames; a capture that reached its maximum ends here like a stop chord.
-            out.ended = Some(Ended::NamedPlayed);
-            self.frame = 0;
-            self.mode = Mode::None;
-            self.named = false;
-            return out;
-        }
-        out.ended = Some(Ended::Played { slot: self.play_slot });
-        self.frame = 0;
-        self.mode = Mode::None;
-        out
-    }
-
-    // ---- triggers ------------------------------------------------------------------------------
-
-    /// Both chords passed in one poll: playback wins and the record request is dropped (§2.2).
-    #[cfg(test)]
-    pub fn resolve_chords(record: bool, playback: bool) -> ChordAction {
-        if playback {
-            ChordAction::Playback
-        } else if record {
-            ChordAction::Record
-        } else {
-            ChordAction::None
-        }
-    }
-
-    // ---- the mash trigger (§5.4) ---------------------------------------------------------------
-
-    /// The mapped transition term for a slot's starting status; ranges are inclusive at both ends.
-    /// Anything else has no single term: wait until the fighter can act (`cpu::actionable`, SPEC-cpu-07 §3).
-    /// Upstream's side-special placeholder is not enabled for every fighter that can act: Greninja answers
-    /// no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23).
-    pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
-        if t.is(C::StatusAttackAir, status) {
-            Some(C::TermContAttackAir)
-        } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {
-            Some(C::TermContEscapeAir)
-        } else if t.is(C::StatusSpecialHi, status) {
-            Some(C::TermContSpecialHi)
-        } else if t.is(C::StatusJumpSquat, status) {
-            Some(C::TermContJumpSquat)
-        } else if t.is(C::StatusJumpAerial, status) {
-            Some(C::TermContJumpAerial)
-        } else if t.is(C::StatusEscape, status) {
-            Some(C::TermContEscape)
-        } else if t.within(C::StatusEscapeF, C::StatusEscapeB, status) {
-            Some(C::TermContEscapeF)
-        } else if t.is(C::StatusCatch, status) {
-            Some(C::TermContCatch)
-        } else {
-            None
-        }
-    }
-
-    /// The starting status of `slot`, for its mapped term or, for any other start, whether the fighter can act.
-    pub fn starting_status_of(&self, slot: u8) -> i32 {
-        self.origin.get(usize::from(slot)).map_or(UNRESOLVED, |o| o.status)
-    }
-
-    /// Whether the mash trigger evaluation needs the mapped term or, for any other start, whether the
-    /// fighter can act: the recorder is idle, the head is a playback, and the timing depends on the
-    /// check (every case but hitstun with a hitstop timing).
-    pub fn mash_needs_term(&self, s: &RecorderSettings, head: Option<u8>, in_hitstun: bool) -> bool {
-        self.mode == Mode::None && head.is_some() && !(in_hitstun && s.hitstun != HitstunTiming::HitstunEnds)
-    }
-    /// Whether a playback the mash queue asked for starts now (§5.4 table).
-    pub fn mash_should_start(&self, s: &RecorderSettings, c: &MashCtx) -> Option<u8> {
-        let slot = c.head_slot?;
-        if self.mode != Mode::None {
-            return None;
-        }
-        let now = if c.in_hitstun {
-            match s.hitstun {
-                HitstunTiming::HitstopBegins => true,
-                HitstunTiming::HitstopEnds => !c.in_hitstop,
-                HitstunTiming::HitstunEnds => c.term_enabled,
-            }
-        } else {
-            c.term_enabled
-        };
-        now.then_some(slot)
-    }
-
-    /// Mark that the last start came from the mash queue (so the runtime pops the head at the end).
-    pub fn note_mash_started(&mut self) {
-        self.mash_started = true;
-    }
-
-    /// Mash Interrupt: stop a playback when a mash trigger fires (`playback_mash`); never while a
-    /// recording or the lockout owns the CPU.
-    pub fn interrupt_on_mash(&mut self, s: &RecorderSettings) -> bool {
-        if s.mash_interrupt && self.mode == Mode::Playback {
-            self.stop();
-            true
-        } else {
-            false
-        }
-    }
-
-    // ---- the named layer's contract (§9) -------------------------------------------------------
-
-    /// `import_named_slot`: replace one slot with `frames` (1..=600) and its origin, or change nothing.
-    pub fn import_slot(&mut self, slot: u8, frames: &[MappedInputs], origin: Origin) -> Result<(), ImportRefusal> {
-        let i = usize::from(slot);
-        if i >= SLOTS {
-            return Err(ImportRefusal::SlotOutOfRange);
-        }
-        if frames.len() > SLOT_FRAMES {
-            return Err(ImportRefusal::TooLong(frames.len()));
-        }
-        // rc.12 TR1: no frames empties the slot (its macro left it).
-        self.slots[i] = [MappedInputs::NEUTRAL; SLOT_FRAMES];
-        self.slots[i][..frames.len()].copy_from_slice(frames);
-        self.len[i] = frames.len() as u16;
-        self.recorded[i] = !frames.is_empty();
-        self.origin[i] = origin;
-        Ok(())
-    }
-
-    /// `export_named`: the frames and the origin of a recorded slot.
-    pub fn export_slot(&self, slot: u8) -> Result<(&[MappedInputs], Origin), ExportRefusal> {
-        let i = usize::from(slot);
-        if i >= SLOTS {
-            return Err(ExportRefusal::SlotOutOfRange);
-        }
-        if !self.recorded[i] || self.len[i] == 0 || usize::from(self.len[i]) > SLOT_FRAMES {
-            return Err(ExportRefusal::NotRecorded);
-        }
-        Ok((&self.slots[i][..usize::from(self.len[i])], self.origin[i]))
-    }
-
-    /// Change the current facing (the clip layer sets it at a restored pose).
-    pub fn set_current_facing(&mut self, facing: i8) {
-        self.current_facing = facing;
-    }
-
-}
-
-#[cfg(test)]
+/// One Playback Slot run on the CPU: the AI hook starts it, takes one frame per control frame, and ends it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ChordAction {
-    None,
-    Record,
-    Playback,
+pub struct SlotRun { slot: u8, frame: u16, length: u16, buffer: u8, mirror: i8, generation: u32 }
+
+impl SlotRun {
+    pub const fn idle() -> Self {
+        Self { slot: 0, frame: 0, length: 0, buffer: 0, mirror: 1, generation: 0 }
+    }
+
+    pub const fn active(&self) -> bool { self.length != 0 }
+    pub const fn slot(&self) -> u8 { self.slot }
+    pub const fn length(&self) -> u16 { self.length }
+    pub const fn generation(&self) -> u32 { self.generation }
+    #[cfg(test)]
+    pub const fn frame(&self) -> u16 { self.frame }
+
+    /// Facing is latched at the start; ledge playback buffers the first input.
+    pub fn start(slot: u8, length: u16, recorded_facing: i8, facing: i8, ledge: Option<bool>, generation: u32) -> Self {
+        Self { slot, frame: 0, length, buffer: match ledge {
+            Some(true) => CLIFF_CATCH_BUFFER, Some(false) => LEDGE_BUFFER, None => 0,
+        }, mirror: recorded_facing * facing, generation }
+    }
+
+    pub fn control(&mut self, shulk_dial: bool, frame_at: impl FnOnce(u16) -> Option<MappedInputs>) -> Option<Inject> {
+        if !self.active() { return None; }
+        let Some(frame) = frame_at(self.frame.min(self.length - 1)) else {
+            self.stop();
+            return None;
+        };
+        let frame = if self.buffer > 0 && self.buffer <= BUFFER_NEUTRAL_MAX { MappedInputs::NEUTRAL } else { frame };
+        let out = inject_values(frame, if shulk_dial { 1 } else { self.mirror });
+        if self.buffer > 0 { self.buffer -= 1; } else { self.frame = self.frame.saturating_add(1); }
+        Some(out)
+    }
+
+    pub fn post(&mut self) -> Option<u8> {
+        if !self.active() || self.frame < self.length || self.buffer > 0 { return None; }
+        let slot = self.slot;
+        self.stop();
+        Some(slot)
+    }
+
+    pub fn stop(&mut self) { *self = Self::idle(); }
+}
+
+/// The mapped transition term for a slot's starting status; ranges are inclusive at both ends.
+/// Anything else has no single term: wait until the fighter can act (`cpu::actionable`, SPEC-cpu-07 §3).
+/// Upstream's side-special placeholder is not enabled for every fighter that can act: Greninja answers
+/// no while idle and after hitstun, Mario answers yes while idle (F8 trace 2026-11-23).
+pub fn term_for_status(t: &Table, status: i32) -> Option<C> {
+    if t.is(C::StatusAttackAir, status) {
+        Some(C::TermContAttackAir)
+    } else if t.within(C::StatusEscapeAir, C::StatusEscapeAirSlide, status) {
+        Some(C::TermContEscapeAir)
+    } else if t.is(C::StatusSpecialHi, status) {
+        Some(C::TermContSpecialHi)
+    } else if t.is(C::StatusJumpSquat, status) {
+        Some(C::TermContJumpSquat)
+    } else if t.is(C::StatusJumpAerial, status) {
+        Some(C::TermContJumpAerial)
+    } else if t.is(C::StatusEscape, status) {
+        Some(C::TermContEscape)
+    } else if t.within(C::StatusEscapeF, C::StatusEscapeB, status) {
+        Some(C::TermContEscapeF)
+    } else if t.is(C::StatusCatch, status) {
+        Some(C::TermContCatch)
+    } else {
+        None
+    }
+}
+
+pub fn mash_needs_term(idle: bool, s: &RecorderSettings, head: Option<u8>, in_hitstun: bool) -> bool {
+    idle && head.is_some() && !(in_hitstun && s.hitstun != HitstunTiming::HitstunEnds)
+}
+
+pub fn mash_should_start(idle: bool, s: &RecorderSettings, c: &MashCtx) -> Option<u8> {
+    let slot = c.head_slot?;
+    if !idle { return None; }
+    let now = if c.in_hitstun {
+        match s.hitstun {
+            HitstunTiming::HitstopBegins => true,
+            HitstunTiming::HitstopEnds => !c.in_hitstop,
+            HitstunTiming::HitstunEnds => c.term_enabled,
+        }
+    } else { c.term_enabled };
+    now.then_some(slot)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -976,21 +546,6 @@ impl ImportRefusal {
         match self {
             ImportRefusal::SlotOutOfRange => "No such Playback Slot. Nothing was changed.".to_owned(),
             ImportRefusal::TooLong(n) => format!("This macro is {n} frames; a Playback Slot holds {SLOT_FRAMES}. Crop it first."),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ExportRefusal {
-    SlotOutOfRange,
-    NotRecorded,
-}
-
-impl ExportRefusal {
-    pub const fn message(self) -> &'static str {
-        match self {
-            ExportRefusal::SlotOutOfRange => "Record Slot is out of range",
-            ExportRefusal::NotRecorded => "Record into this slot first",
         }
     }
 }

@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 
 const VIEW: View = View([14.0; 2], [0.0, -250.0], [-100.0, 100.0], Some([-60.0, 90.0]));
@@ -755,4 +756,5 @@ fn an_off_stage_spawn_takes_the_draws_it_took_on_main() {
         "the first drawn spot is clear of Player 1 and ends the draws after three: {spot:?}, rng {:#x}",
         run.rng
     );
+}
 }

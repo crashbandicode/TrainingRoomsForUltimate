@@ -2569,7 +2569,7 @@ approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrato
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197655
+ceiling = 196855
 date = "2026-11-23"
-reason = "F11 swap-back: Guard the Edge or Juggler with its own CPU fighter, left from the picker with B, asked for the original fighter before the picker had put the held body back, so the original came back at the picked start and could be KO’d. The practice CPU service now waits until the picker has let go and its menu request was taken. Measured 197655 on install 2 64a7c06b plus the fix, 18 above 197637."
-approved_by = "tr-primary-2 ruling 2026-11-23 21:46:22Z (build fix/f11-swap-back, target install 2), under the operator’s measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS are reported with the gate."
+reason = "F13: a directional special's parts are drill and combo steps: an Aim event per entry into the travel status with the way the fighter went, the second part a step of its own; the last drill step waits for its special to end and a hit link keeps its travel until the heading or the exit; Aim files are versions 3 and 4. Measured 196855 on install 2 82716623 + F13, 782 below the merged tree's 197637 ceiling."
+approved_by = "Operator's order 2026-11-23 ~16:39Z through tr-primary-2 (both parts into this build), item F13, under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."

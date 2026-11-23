@@ -1,3 +1,4 @@
+lib_unit_tests! {
 use super::*;
 
 const COMMON: [crate::model::edge_juggle::perfect::Segment; 5] = [
@@ -421,4 +422,5 @@ fn snake_right_region_rejects_unflown_stages_facing_and_release_points() {
     assert!(CypherFlight::start(&facts, CypherSample { facing: -1.0, ..first }).is_none());
     facts.position = [right + 30.0, -30.0];
     assert!(CypherFlight::start(&facts, CypherSample { position: facts.position, ..first }).is_none());
+}
 }

@@ -41,6 +41,7 @@ pub(super) fn has_common_underside([near, far]: [Point; 2], bottom: f32, outline
 
 #[cfg(test)]
 mod tests {
+    lib_unit_tests! {
     use super::*;
 
     #[test]
@@ -84,5 +85,6 @@ mod tests {
         ] {
             assert!(!contains(&rows, x, y), "invalid cell ({x}, {y})");
         }
+    }
     }
 }

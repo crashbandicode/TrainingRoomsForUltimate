@@ -118,8 +118,6 @@ mod input05;
 mod input_delay;
 #[path = "../input_mapping_callers.rs"]
 mod input_mapping_callers;
-#[path = "../input_named.rs"]
-mod input_named;
 #[path = "../input_pause.rs"]
 mod input_pause;
 #[path = "../input_pending.rs"]
