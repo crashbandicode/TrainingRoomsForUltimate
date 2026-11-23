@@ -3,6 +3,7 @@
 pub mod controller;
 pub mod picker;
 pub mod discovery;
+pub mod practice_state;
 pub mod session;
 pub mod solver;
 pub mod surface;

@@ -30,6 +30,7 @@ const FIXTURE: &str = r#"
 #![allow(dead_code, unused_unsafe, unused_variables, unused_assignments, non_snake_case)]
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 static GENERATION: AtomicU64 = AtomicU64::new(10);
+static RESULT_OWNER: AtomicU64 = AtomicU64::new(0);
 static TEMP_KIND: AtomicU32 = AtomicU32::new(u32::MAX);
 static READY: AtomicBool = AtomicBool::new(true);
 static REQUESTED: AtomicU32 = AtomicU32::new(u32::MAX);
@@ -42,6 +43,7 @@ mod skyline { pub mod nn { pub mod os {
 } } }
 mod worker { pub enum Event { Cancel(u64), Setup(u64, &'static str) } }
 fn post(_: worker::Event, _: u64) {}
+fn own_result(generation: u64) { RESULT_OWNER.store(generation, Ordering::Relaxed); }
 fn revoke() {}
 mod natives {
     pub fn fighter_entry(entry: usize) -> usize { entry }
@@ -108,6 +110,7 @@ fn fresh() {
     REQUESTED.store(u32::MAX, Ordering::Relaxed);
     TEMP_KIND.store(u32::MAX, Ordering::Relaxed);
     READY.store(true, Ordering::Relaxed);
+    RESULT_OWNER.store(0, Ordering::Relaxed);
 }
 
 /// Mash On with a Random attacker; Choose rolls fighter A and asks for it. A's body initialises: the reset hub runs
@@ -120,10 +123,12 @@ fn the_restart_from_its_own_attacker_load_keeps_the_random_roll() {
     let mut game = Game::new(config);
     body_kind(1);
     unsafe { actual_choose(&mut game, Some(config), 11, 22, 99) };
+    assert_eq!(RESULT_OWNER.load(Ordering::Relaxed), game.generation);
     let first = game.requested.unwrap().attacker_kind;
     assert_eq!((game.step, REQUEST_COUNT.load(Ordering::Relaxed), REQUESTED.load(Ordering::Relaxed)), (Step::Reload, 1, first));
     body_kind(first);
     unsafe { actual_restart(&mut game, Some(config), false) };
+    assert_eq!(RESULT_OWNER.load(Ordering::Relaxed), game.generation);
     assert_eq!(game.step, Step::Choose);
     unsafe { actual_choose(&mut game, Some(config), 11, 22, 99) };
     assert_eq!(game.requested.unwrap().attacker_kind, first, "the restart rolled another attacker");

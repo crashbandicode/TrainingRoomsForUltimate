@@ -35,6 +35,7 @@ use crate::model::practice_games::best_time;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::wizard::Kind;
+use crate::runtime::bridge_state::PracticeCapture;
 use crate::runtime::{
     game::{self, natives},
     published, scene, state_natives as state,
@@ -1723,7 +1724,26 @@ unsafe fn hold_cpu(cpu: usize, [x, y]: [f32; 2]) {
     state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
 }
 
-fn post_notice(run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
+fn report_drill_state(capture: PracticeCapture, run: &Run, best: Option<u32>, best_streak: Option<u32>) {
+    capture.submit(|| {
+        let best = match run.drill {
+            Drill::GuardEdge => best_streak,
+            Drill::Juggler => best,
+        };
+        let mut fields = run.rounds.practice_fields(run.wizard, best);
+        if run.wizard.is_none() && run.rounds.phase == Phase::Place {
+            fields.step = match run.placement {
+                Placement::ResetResources => "reset_resources",
+                Placement::Grounded => "grounded",
+                Placement::Airborne => "airborne",
+            };
+        }
+        fields
+    });
+}
+
+fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_streak: Option<u32>) {
+    report_drill_state(capture, run, best, best_streak);
     let Session {
         phase,
         attempts,
@@ -1836,6 +1856,7 @@ pub unsafe fn frame(fighter: usize) {
         return;
     }
     let drill = wanted();
+    let capture = drill.map(|drill| PracticeCapture::of(drill.game()));
     if drill.is_none() && !ENGINE_ACTIVE.load(Ordering::Acquire) {
         return;
     }
@@ -1895,8 +1916,18 @@ pub unsafe fn frame(fighter: usize) {
             published::WIZARDS.set_up(Kind::DrillStart, false);
             notices::clear(NOTICE);
         }
+        if let Some(capture) = capture {
+            capture.submit(|| {
+                crate::model::practice_state::Fields {
+                    phase: "starting",
+                    step: "waiting_for_cpu",
+                    ..Default::default()
+                }
+            });
+        }
         return;
     };
+    let capture = capture.unwrap_or_default();
     let cpu = body.accessor;
     if !owns_setup() {
         engine.wake_cpu(Some(body));
@@ -1904,6 +1935,10 @@ pub unsafe fn frame(fighter: usize) {
             run.rounds.discard_attempt();
             run.placement = Placement::ResetResources;
             run.notice = FixedPath::new();
+            // A pending Start belongs to the next run.
+            if START.load(Ordering::Acquire) == 0 {
+                report_drill_state(capture, run, None, None);
+            }
         }
         return;
     }
@@ -2083,7 +2118,7 @@ pub unsafe fn frame(fighter: usize) {
                 }
             }
         }
-        post_notice(run, best_time(bests, key), best_time(streaks, key));
+        post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
         return;
     }
     if !game::granted(crate::model::sites_pkg2::STATUS_KIND_OFFSET)
@@ -2231,7 +2266,7 @@ pub unsafe fn frame(fighter: usize) {
             crate::model::practice_games::record_max(streaks, key, u32::from(run.rounds.streak));
         }
     }
-    post_notice(run, best_time(bests, key), best_time(streaks, key));
+    post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
 }
 pub fn look(active: bool) -> ([Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS], bool) {
     use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};

@@ -2,17 +2,24 @@
 //! sets the one value here, and the games read it on their own threads (an atomic only, never a lock). A game that is not
 //! the running one reads its mode as Off and stops through its own Off path, so one game runs at a time.
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::model::practice_games::Game;
 use crate::runtime::diag_log::diagnostic;
 
-/// The running game's code (`Game::code`), 0 for none.
-static ACTIVE: AtomicU8 = AtomicU8::new(0);
+/// The running game's code in the low byte, plus an activation number. Stop preserves the number.
+static ACTIVE: AtomicU64 = AtomicU64::new(0);
+pub const STARTING: u64 = 0x100;
+const GAME_MASK: u64 = 0xff;
+
+pub fn activation() -> (u64, Option<Game>) {
+    let word = ACTIVE.load(Ordering::Acquire);
+    (word, Game::from_code(word as u8))
+}
 
 /// The game Start started last and Stop has not ended.
 pub fn active() -> Option<Game> {
-    Game::from_code(ACTIVE.load(Ordering::Acquire))
+    activation().1
 }
 
 pub fn is(game: Game) -> bool {
@@ -40,7 +47,8 @@ pub fn start(game: Game, how: How) {
     if game != Game::Parry {
         super::parry::stopped();
     }
-    ACTIVE.store(game.code(), Ordering::Release);
+    let next = (ACTIVE.load(Ordering::Relaxed) & !(GAME_MASK | STARTING)).wrapping_add(0x200);
+    ACTIVE.store(next | STARTING | u64::from(game.code()), Ordering::Release);
     match game {
         Game::Eggs => super::hitbox::eggs_start(),
         Game::Btt => super::btt::start(how.place_targets),
@@ -54,12 +62,13 @@ pub fn start(game: Game, how: How) {
             }
         }
     }
+    ACTIVE.fetch_and(!STARTING, Ordering::Release);
     diagnostic(format_args!("[Practice] start game={game:?} how={how:?}"));
 }
 
 /// Stop the running game (the menu worker, Stop with the menu open).
 pub fn stop() {
-    let was = Game::from_code(ACTIVE.swap(0, Ordering::AcqRel));
+    let was = Game::from_code(ACTIVE.fetch_and(!GAME_MASK, Ordering::AcqRel) as u8);
     super::edge_juggle::stopped();
     super::parry::stopped();
     diagnostic(format_args!("[Practice] stop game={was:?}"));
@@ -67,7 +76,10 @@ pub fn stop() {
 
 /// End the named game from its frame or input path, if the menu still owns that game.
 pub fn finish(game: Game) {
-    let _ = ACTIVE.compare_exchange(game.code(), 0, Ordering::AcqRel, Ordering::Acquire);
+    let word = ACTIVE.load(Ordering::Acquire);
+    if word as u8 == game.code() {
+        let _ = ACTIVE.compare_exchange(word, word & !GAME_MASK, Ordering::AcqRel, Ordering::Acquire);
+    }
 }
 
 /// The game the menu can stop, including an Eggs-ercise result that can still be restarted.

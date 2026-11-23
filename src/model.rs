@@ -304,3 +304,6 @@ lib_unit_tests! {
 
 #[path = "model/egg_zone.rs"]
 pub mod egg_zone;
+
+#[path = "model/practice_state.rs"]
+pub mod practice_state;

@@ -213,6 +213,30 @@ fn lookup_is_due_at_most_once_a_second_for_thirty_seconds_then_off_for_the_boot(
     assert!(!bad.enabled() && !bad.due(2_000));
 }
 
+
+#[test]
+fn a_busy_registration_retries_neither_too_early_nor_after_success() {
+    let mut search = Discovery::default();
+    assert!(search.due(0));
+    assert_eq!(search.registration(-6), None);
+    assert!(!search.due(999));
+    assert!(search.due(1_000), "the bridge registry was briefly busy");
+    assert_eq!(search.registration(0), Some(0));
+    assert!(!search.due(2_000));
+    assert_eq!(search.state, Search::Found);
+
+    let mut rejected = Discovery::default();
+    assert!(rejected.due(0));
+    assert_eq!(rejected.registration(-5), None);
+    assert!(!rejected.enabled());
+
+    let mut exhausted = Discovery::default();
+    assert!(exhausted.due(0));
+    assert_eq!(exhausted.registration(-6), None);
+    assert!(!exhausted.due(30_001));
+    assert!(!exhausted.enabled());
+}
+
 #[test]
 fn a_changed_snapshot_is_wanted_and_a_dropped_publish_stays_dirty_until_it_lands() {
     let mut p = Publisher::default();

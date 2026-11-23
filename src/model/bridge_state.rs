@@ -234,6 +234,8 @@ pub fn header_usable(magic: u32, abi: u32, struct_size: u32, readers: u32, max_p
 
 /// The contract's provider slot count.
 pub const PROVIDER_SLOTS: u32 = 8;
+/// Another plugin has the Bridge registry's registration slot (State API v1).
+const REGISTER_BUSY: i32 = -6;
 
 /// `ack.result` for the handler's own outcome.
 pub fn ack_result(handled: bool) -> &'static str {
@@ -316,6 +318,19 @@ impl Discovery {
         }
         self.next_ms = now_ms + Self::EVERY_MS;
         true
+    }
+
+    /// Classify the bridge's registration result within this lookup schedule.
+    pub fn registration(&mut self, result: i32) -> Option<i32> {
+        if result == REGISTER_BUSY {
+            return None;
+        }
+        if result < 0 {
+            self.disable();
+            return None;
+        }
+        self.found();
+        Some(result)
     }
 
     pub fn found(&mut self) {

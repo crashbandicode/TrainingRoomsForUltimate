@@ -22,6 +22,14 @@ mod engine {
 }
 
 mod runtime {
+    pub mod bridge_state {
+        pub struct PracticeCapture;
+        impl PracticeCapture {
+            pub fn of(_game: crate::model::practice_games::Game) -> Self { Self }
+            pub fn submit(self, _sample: impl FnOnce() -> crate::model::practice_state::Fields) {}
+        }
+    }
+
     pub mod diag_log {
         pub fn diagnostic(_message: core::fmt::Arguments<'_>) {}
     }

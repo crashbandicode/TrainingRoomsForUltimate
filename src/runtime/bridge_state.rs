@@ -2,13 +2,15 @@
 //! TrainingRooms has no link-time dependency on the bridge: the UI worker looks its table up by name at most once a second
 //! for the first 30 s (`nn::ro::LookupSymbol`), validates it before any call, registers once and keeps that handle for the
 //! boot. Without the bridge the lookups stop at 30 s and every entry point is one relaxed load. Publishing happens on the
-//! worker only; the game thread's calls (`note_notice`, `note_zone`) never wait.
+//! worker only. Game-side notice, zone and practice producers use bounded, nonblocking handoffs.
 
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::model::bridge_state as m;
 use crate::model::menu::table::{Control, Row};
+use crate::model::practice_games::Game;
+use crate::model::practice_state::{self as practice, Fields};
 
 /// The table's fixed header, read and checked before the whole table is.
 #[repr(C)]
@@ -32,6 +34,171 @@ struct Api {
 }
 
 const SYMBOL: &[u8] = b"ssbu_hw_bridge_state_api_v1\0";
+const ADMISSION_SYMBOL: &[u8] = b"ssbu_hw_bridge_state_admission_gen_v1\0";
+
+/// Optional, boot-lifetime bridge export. Zero when no compatible practice provider was registered.
+static ADMISSION: AtomicUsize = AtomicUsize::new(0);
+static THINKS: [AtomicU64; practice::CPU_ENTRIES] = [const { AtomicU64::new(0) }; practice::CPU_ENTRIES];
+
+#[derive(Clone, Copy)]
+struct PracticeSample {
+    admission: u64,
+    activation: u64,
+    fields: Fields,
+    result: bool,
+}
+
+static PRACTICE: hos_lock::Mailbox<PracticeSample, 8> = hos_lock::Mailbox::new();
+
+fn practice_admission() -> u64 {
+    let address = ADMISSION.load(Ordering::Acquire);
+    if address == 0 {
+        return 0;
+    }
+    // SAFETY: lookup accepts the boot-lifetime C-ABI export with this signature only.
+    let admitted: extern "C" fn() -> u64 = unsafe { core::mem::transmute(address) };
+    admitted()
+}
+
+/// A sample's owner before the engine moves. Disabled captures never evaluate their projection.
+#[derive(Clone, Copy, Default)]
+pub struct PracticeCapture {
+    admission: u64,
+    activation: u64,
+}
+
+impl PracticeCapture {
+    pub fn of(game: Game) -> Self {
+        let admission = practice_admission();
+        if admission != 0 {
+            use crate::runtime::features::practice::{activation, STARTING};
+            let (activation, active) = activation();
+            if active == Some(game) && activation & STARTING == 0 {
+                return Self { admission, activation };
+            }
+        }
+        Self { admission: 0, activation: 0 }
+    }
+
+    pub fn only(self, activation: u64) -> Self {
+        if self.activation == activation { self } else { Self::default() }
+    }
+
+    pub fn submit(self, sample: impl FnOnce() -> Fields) {
+        self.post(false, || Some(sample()));
+    }
+
+    /// Mash out's grading worker owns the asynchronous result, while the game thread owns phase and elapsed.
+    pub fn result(self, sample: impl FnOnce() -> Option<Fields>) {
+        self.post(true, sample);
+    }
+
+    fn post(self, result: bool, sample: impl FnOnce() -> Option<Fields>) {
+        let Self { admission, activation } = self;
+        if admission == 0 || crate::runtime::features::practice::activation().0 != activation {
+            return;
+        }
+        if let Some(fields) = sample() {
+            PRACTICE.post(PracticeSample { admission, activation, fields, result });
+        }
+    }
+}
+
+/// Existing AI epilogue. Use the primary match first and inspect other live entries only while admitted.
+pub fn note_ai_think(primary_match: Option<i32>, matches: impl FnMut(i32) -> bool) {
+    if let Some(entry) = practice::think_entry(practice_admission(), primary_match, matches) {
+        THINKS[entry].fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+struct PracticeProvider {
+    admission_export: usize,
+    registration: m::Discovery,
+    handle: Option<i32>,
+    admission: u64,
+    activation: u64,
+    fields: Fields,
+    result: Fields,
+    publisher: m::Publisher,
+    snapshot: String,
+}
+
+impl PracticeProvider {
+    fn discover() -> Option<Self> {
+        let mut address = 0usize;
+        // SAFETY: the loader is given a NUL-terminated symbol and one output address.
+        let result = unsafe { skyline::nn::ro::LookupSymbol(&mut address, ADMISSION_SYMBOL.as_ptr()) };
+        if result != 0 || address == 0 {
+            return None;
+        }
+        Some(Self {
+            admission_export: address,
+            registration: m::Discovery::default(),
+            handle: None,
+            admission: 0,
+            activation: 0,
+            fields: Fields::default(),
+            result: Fields::default(),
+            publisher: m::Publisher::default(),
+            snapshot: String::new(),
+        })
+    }
+
+    fn practice_handle(&mut self, now_ms: u64, register: extern "C" fn(*const u8, u32, u32, u32) -> i32) -> Option<i32> {
+        if self.registration.due(now_ms) {
+            let result = register(practice::NAME.as_ptr(), practice::NAME.len() as u32, practice::SCHEMA_ID, practice::SCHEMA_VERSION);
+            self.handle = self.registration.registration(result);
+            if self.handle.is_some() {
+                ADMISSION.store(self.admission_export, Ordering::Release);
+            }
+        }
+        self.handle
+    }
+
+    fn poll_practice(
+        &mut self,
+        now_ms: u64,
+        register: extern "C" fn(*const u8, u32, u32, u32) -> i32,
+        publish: extern "C" fn(i32, *const u8, u32) -> i32,
+    ) {
+        let Some(handle) = self.practice_handle(now_ms, register) else { return };
+        let admission = practice_admission();
+        if admission == 0 {
+            return;
+        }
+        let (activation, game) = practice::published_activation(scene(now_ms), crate::runtime::features::practice::activation);
+        if admission != self.admission || activation != self.activation {
+            self.admission = admission;
+            self.activation = activation;
+            self.fields = Fields::default();
+            self.result = Fields::default();
+            self.publisher = m::Publisher::default();
+        }
+        PRACTICE.drain(|sample| {
+            if sample.admission == admission && sample.activation == activation {
+                if sample.result {
+                    self.result = sample.fields;
+                } else {
+                    practice::adopt_sample(&mut self.fields, sample.fields);
+                }
+            }
+        });
+        let counts = core::array::from_fn(|entry| THINKS[entry].load(Ordering::Relaxed));
+        let mut fields = self.fields;
+        if game == Some(Game::Mashout) && !self.result.last_outcome.is_empty() {
+            fields.last_outcome = self.result.last_outcome;
+            fields.last_frames = self.result.last_frames;
+            fields.baseline_frames = self.result.baseline_frames;
+            fields.fastest_frames = self.result.fastest_frames;
+            fields.best = self.result.best;
+        }
+        practice::snapshot(game, fields, counts, &mut self.snapshot);
+        if self.publisher.wants(self.snapshot.as_bytes()) && practice_admission() == admission {
+            let result = publish(handle, self.snapshot.as_ptr(), self.snapshot.len() as u32);
+            self.publisher.published(self.snapshot.as_bytes(), result);
+        }
+    }
+}
 
 /// Off once the lookup window ended without a bridge (or its table was unusable): every entry point returns at once.
 static ENABLED: AtomicBool = AtomicBool::new(true);
@@ -163,6 +330,7 @@ pub fn action(row: Option<&Row>) -> String {
 #[derive(Default)]
 pub struct Provider {
     discovery: m::Discovery,
+    practice: Option<PracticeProvider>,
     api: Option<&'static Api>,
     handle: i32,
     publisher: m::Publisher,
@@ -185,6 +353,10 @@ impl Provider {
             }
             return;
         };
+        let Some(publish) = api.publish else { return };
+        if let (Some(practice), Some(register)) = (&mut self.practice, api.register_provider) {
+            practice.poll_practice(now_ms, register, publish);
+        }
         read_notice(&mut self.notice.0, &mut self.notice.1);
         let shown = m::shown_notice(NOTICE_VISIBLE.load(Ordering::Relaxed), (self.notice.0.as_str(), self.notice.1.as_str()));
         let notice = shown.map_or((String::new(), String::new()), |(h, b)| (h.to_string(), b.to_string()));
@@ -193,7 +365,6 @@ impl Provider {
         if !self.publisher.wants(self.snapshot.as_bytes()) {
             return;
         }
-        let Some(publish) = api.publish else { return };
         let result = publish(self.handle, self.snapshot.as_ptr(), self.snapshot.len() as u32);
         self.publisher.published(self.snapshot.as_bytes(), result);
     }
@@ -219,13 +390,11 @@ impl Provider {
         let api = unsafe { &*table };
         let usable = api.register_provider.is_some() && api.publish.is_some() && api.event.is_some();
         let Some(register) = api.register_provider.filter(|_| usable) else { return self.discovery.disable() };
-        let handle = register(m::NAME.as_ptr(), m::NAME.len() as u32, m::SCHEMA_ID, m::SCHEMA_VERSION);
-        if handle < 0 {
-            return self.discovery.disable();
-        }
+        let result = register(m::NAME.as_ptr(), m::NAME.len() as u32, m::SCHEMA_ID, m::SCHEMA_VERSION);
+        let Some(handle) = self.discovery.registration(result) else { return };
         self.api = Some(api);
+        self.practice = PracticeProvider::discover();
         self.handle = handle;
-        self.discovery.found();
         FOUND.store(true, Ordering::Relaxed);
         crate::runtime::diag_log::diagnostic(format_args!("[TrainingRooms] bridge_state registered handle={handle}"));
     }

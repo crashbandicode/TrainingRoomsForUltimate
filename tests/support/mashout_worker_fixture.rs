@@ -7,6 +7,8 @@ mod model {
     }
     pub mod practice_games { // PRACTICE
     }
+    pub mod practice_state { // PRACTICE_STATE
+    }
     pub mod mashout {
         pub mod grade { // GRADE
         }
@@ -27,6 +29,28 @@ mod model {
     }
 }
 mod runtime {
+    pub mod bridge_state {
+        use crate::model::{practice_games::Game, practice_state::Fields};
+        use std::sync::atomic::Ordering;
+
+        #[derive(Clone, Copy, Default)]
+        pub struct PracticeCapture { activation: u64 }
+        #[allow(dead_code)]
+        impl PracticeCapture {
+            pub fn of(_: Game) -> Self { Self { activation: crate::ACTIVATION.load(Ordering::Acquire) } }
+            pub fn only(self, activation: u64) -> Self {
+                if self.activation == activation { self } else { Self::default() }
+            }
+            pub fn result(self, sample: impl FnOnce() -> Option<Fields>) {
+                if self.activation == 0 || self.activation != crate::ACTIVATION.load(Ordering::Acquire) {
+                    return;
+                }
+                if let Some(fields) = sample() {
+                    crate::RESULTS.lock().unwrap().push((self.activation, fields));
+                }
+            }
+        }
+    }
     pub mod diag_log {
         pub fn diagnostic(_: core::fmt::Arguments<'_>) {}
     }
@@ -46,6 +70,21 @@ fn wanted() -> bool {
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 static FAULT: AtomicU64 = AtomicU64::new(0);
 static SWITCH_AFTER_DRAIN: AtomicU64 = AtomicU64::new(0);
+static ACTIVATION: AtomicU64 = AtomicU64::new(0);
+static OWNER_GENERATION: AtomicU64 = AtomicU64::new(0);
+static OWNER_ACTIVATION: AtomicU64 = AtomicU64::new(0);
+static RESULTS: std::sync::Mutex<Vec<(u64, model::practice_state::Fields)>> = std::sync::Mutex::new(Vec::new());
+#[allow(dead_code)]
+fn result_owner() -> Option<(u64, u64)> {
+    let generation = OWNER_GENERATION.load(Ordering::Acquire);
+    let activation = OWNER_ACTIVATION.load(Ordering::Acquire);
+    (generation != 0 && generation == OWNER_GENERATION.load(Ordering::Acquire)).then_some((generation, activation))
+}
+fn own_result(generation: u64, activation: u64) {
+    OWNER_GENERATION.store(0, Ordering::Release);
+    OWNER_ACTIVATION.store(activation, Ordering::Release);
+    OWNER_GENERATION.store(generation, Ordering::Release);
+}
 struct Config;
 static CONFIG: Config = Config;
 impl Config {
@@ -104,6 +143,7 @@ mod notices {
     }
 }
 mod worker {
+    use crate::model::practice_games::Game as PracticeGame;
     // WORKER
     #[cfg(test)]
     mod epoch_tests {
@@ -121,6 +161,9 @@ mod worker {
             EPOCH.store(1, Ordering::Relaxed);
             FAULT.store(0, Ordering::Relaxed);
             SWITCH_AFTER_DRAIN.store(0, Ordering::Relaxed);
+            ACTIVATION.store(0, Ordering::Relaxed);
+            own_result(0, 0);
+            RESULTS.lock().unwrap().clear();
             EVENTS.0.lock().unwrap().clear();
             REPLIES.0.lock().unwrap().clear();
             notices::clear(NOTICE_ID);
@@ -172,6 +215,58 @@ mod worker {
             queue(Event::Observe(5, epoch, bounds.fastest, true));
             service();
             assert_eq!(WORKER.lock().session.phase(), Phase::Done);
+        }
+        #[test]
+        fn a_new_activation_does_not_inherit_the_previous_done_grade() {
+            reset();
+            ACTIVATION.store(1, Ordering::Release);
+            let stale = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
+            ACTIVATION.store(2, Ordering::Release);
+            stale.result(|| panic!("a stale capture must not project"));
+            crate::runtime::bridge_state::PracticeCapture::default().result(|| panic!("a disabled capture must not project"));
+            ACTIVATION.store(1, Ordering::Release);
+            own_result(5, 1);
+            begin(1, SeedOrigin::Export);
+            finish(1);
+            let posted = std::mem::take(&mut *RESULTS.lock().unwrap());
+            assert_eq!(posted.len(), 1);
+            assert_eq!(posted[0].0, 1);
+            assert!(!posted[0].1.last_outcome.is_empty());
+
+            ACTIVATION.store(2, Ordering::Release);
+            service();
+            assert!(RESULTS.lock().unwrap().is_empty(), "old Done must not publish under the new activation");
+
+            own_result(6, 2);
+            queue(Event::Cancel(5));
+            queue(Event::Setup(6, "Mash out · Loading attacker"));
+            service();
+            assert!(RESULTS.lock().unwrap().is_empty());
+            EPOCH.store(2, Ordering::Release);
+            queue(Event::Begin(6, 2, key(SeedOrigin::Export), seed(), SeedOrigin::Export));
+            service();
+            let bounds = solved();
+            queue(Event::Observe(6, 2, bounds.fastest, true));
+            service();
+            let posted = std::mem::take(&mut *RESULTS.lock().unwrap());
+            assert_eq!(posted.len(), 1);
+            assert_eq!(posted[0].0, 2);
+            assert!(!posted[0].1.last_outcome.is_empty());
+
+            own_result(7, 2);
+            service();
+            assert!(RESULTS.lock().unwrap().is_empty(), "a different generation must not publish");
+            own_result(6, 2);
+            ACTIVATION.store(3, Ordering::Release);
+            queue(Event::TechGrade(6, crate::model::tech::session::Grade::Perfect(Some(2)), None, 3));
+            service();
+            assert!(RESULTS.lock().unwrap().is_empty(), "old TechGrade must not publish under the new activation");
+            own_result(6, 3);
+            queue(Event::TechGrade(6, crate::model::tech::session::Grade::Perfect(Some(2)), None, 3));
+            service();
+            let posted = std::mem::take(&mut *RESULTS.lock().unwrap());
+            assert_eq!(posted.len(), 1);
+            assert_eq!((posted[0].0, posted[0].1.last_outcome, posted[0].1.best), (3, "perfect", Some(3)));
         }
         #[test]
         fn newer_native_epoch_cancels_before_best_publication() {

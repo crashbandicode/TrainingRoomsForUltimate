@@ -196,6 +196,8 @@ static SLOTS_READY: AtomicBool = AtomicBool::new(false);
 static CONFIG: Published<Option<Config>> = Published::new(None);
 static START: AtomicBool = AtomicBool::new(false);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
+static RESULT_GENERATION: AtomicU64 = AtomicU64::new(0);
+static RESULT_ACTIVATION: AtomicU64 = AtomicU64::new(0);
 static ARMED: AtomicU64 = AtomicU64::new(0);
 static P1: AtomicUsize = AtomicUsize::new(0);
 static THRESHOLD: AtomicU32 = AtomicU32::new(0);
@@ -290,6 +292,21 @@ pub fn set_admission(on: bool) {
 }
 fn admission() -> Admission {
     Admission::new(READY.load(Ordering::Acquire) && SLOTS_READY.load(Ordering::Acquire))
+}
+
+/// The practice activation that owns this generation's grade (the worker posts a result for no other).
+fn own_result(generation: u64) {
+    use crate::runtime::features::practice::{activation, STARTING};
+    RESULT_GENERATION.store(0, Ordering::Release);
+    RESULT_ACTIVATION.store(activation().0 & !STARTING, Ordering::Release);
+    RESULT_GENERATION.store(generation, Ordering::Release);
+}
+
+/// (generation, activation), or None while the pair is being replaced.
+pub(super) fn result_owner() -> Option<(u64, u64)> {
+    let generation = RESULT_GENERATION.load(Ordering::Acquire);
+    let activation = RESULT_ACTIVATION.load(Ordering::Acquire);
+    (generation != 0 && generation == RESULT_GENERATION.load(Ordering::Acquire)).then_some((generation, activation))
 }
 
 /// rc.15 practice menu: Mash out runs while it is the running game (Start to Stop), no longer while its row is On.
@@ -588,6 +605,28 @@ impl Game {
             tech_attempt: None,
             tech_wait: None,
             prep_damage: None,
+        }
+    }
+    fn practice_fields(&self) -> crate::model::practice_state::Fields {
+        use crate::model::practice_state::Fields;
+        let phase = match self.step {
+            Step::Off => "off",
+            Step::Choose => "choose",
+            Step::Reload => "reload",
+            Step::Place => "place",
+            Step::Settle => "settle",
+            Step::Entering => "entering",
+            Step::Held => "held",
+            Step::Result => "result",
+            Step::Failed => "failed",
+            Step::Release => "release",
+            Step::Retry => "retry",
+            Step::Restore => "restore",
+        };
+        Fields {
+            phase,
+            attempt_frames: self.clock.as_ref().map(Clock::elapsed),
+            ..Fields::default()
         }
     }
     fn step(&mut self, next: Step, text: &'static str) {
@@ -1093,6 +1132,14 @@ pub unsafe fn frame(fighter: usize) {
         OWN_CPU.store(0, Ordering::Release);
         return;
     };
+    let capture = crate::runtime::bridge_state::PracticeCapture::of(PracticeGame::Mashout);
+    frame_game(fighter, &mut game);
+    if !START.load(Ordering::Acquire) {
+        capture.submit(|| game.practice_fields());
+    }
+}
+
+unsafe fn frame_game(fighter: usize, game: &mut Game) {
     // Disabling restores the native slots immediately, but must still restore the
     // temporary CPU through the existing frame path.
     // rc.15 practice menu: Mash out runs while it is the running game (Start and Stop), no longer while its row is On.
@@ -1159,6 +1206,7 @@ pub unsafe fn frame(fighter: usize) {
         revoke();
         post(worker::Event::Cancel(game.generation), game.generation);
         game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+        own_result(game.generation);
         if game.config != config {
             game.roll = None;
         }
@@ -1477,6 +1525,7 @@ pub unsafe fn frame(fighter: usize) {
         Step::Retry if released => {
             post(worker::Event::Cancel(game.generation), game.generation);
             game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            own_result(game.generation);
             game.saw_catch = false;
             game.followed = false;
             game.trolley = None;
@@ -1518,6 +1567,7 @@ pub unsafe fn frame(fighter: usize) {
             let kind = ((body + 0xc) as *const u32).read();
             game.original.get_or_insert(kind);
             game.generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+            own_result(game.generation);
             game.p1 = p1;
             game.cpu = cpu;
             game.saw_catch = false;
