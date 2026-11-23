@@ -1208,6 +1208,21 @@ mod tests {
     }
 
     #[test]
+    fn placement_waits_for_a_knocked_out_player() {
+        let cases = [
+            (Placement::ResetResources, PlacementFrame::default(), PlacementAction::ResetResources),
+            (Placement::Grounded, PlacementFrame { grounded: true, wait: true, ..PlacementFrame::default() },
+             PlacementAction::PlaceStart),
+            (Placement::Airborne, PlacementFrame { airborne: true, fall: true, ..PlacementFrame::default() },
+             PlacementAction::HoldStart),
+        ];
+        for (placement, frame, normal) in cases {
+            assert_eq!(placement.action(PlacementFrame { player_ko: true, ..frame }), PlacementAction::RestartPlacement);
+            assert_eq!(placement.action(PlacementFrame { player_ko: false, ..frame }), normal);
+        }
+    }
+
+    #[test]
     fn a_new_session_and_ready_start_a_new_player_allowance() {
         let idle = PlacedPlayer { hit_freeze: false, wait: true };
         let drill = Drill::GuardEdge;
@@ -1745,16 +1760,48 @@ mod tests {
             [[-68.0, -4.25], [68.0, -4.25]],
         ).unwrap();
         for side in [-1.0, 1.0] {
-            let lip = [side * 68.0, -4.25];
+            let lip = [side * 67.0, -4.25];
             let outside = [side * 130.0, -4.25];
             let cursor = stage.player_cursor(Drill::GuardEdge, outside).unwrap();
             assert_eq!(
                 stage.player_cursor(Drill::GuardEdge, [cursor[0] - side * 2.0, cursor[1]]),
-                Some([side * 66.0, -4.25]),
+                Some([side * 65.0, -4.25]),
             );
             assert_eq!(cursor, lip);
             assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
         }
+    }
+
+    #[test]
+    fn guard_player_point_stops_one_unit_inside_the_floor_ends() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-79.9856, 0.0], [79.9856, 0.0]],
+        ).unwrap();
+        for side in [-1.0_f32, 1.0] {
+            let outside = [side * 150.0, 4.0];
+            let inside = [side * (79.9856_f32 - 1.5), 4.0];
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, outside), Some([side * (79.9856_f32 - 1.0), 4.0]));
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, inside), Some(inside));
+            assert_eq!(stage.player_cursor(Drill::Juggler, outside), Some(outside));
+        }
+    }
+
+    #[test]
+    fn a_main_floor_narrower_than_two_units_keeps_the_player_on_its_middle() {
+        let stage = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-0.5, 0.0], [1.0, 0.0]],
+        ).unwrap();
+        for x in [-8.0, 0.0, 8.0] {
+            assert_eq!(stage.player_cursor(Drill::GuardEdge, [x, 0.0]), Some([0.25, 0.0]));
+            assert_eq!(stage.player_cursor(Drill::Juggler, [x, 0.0]), Some([x, 0.0]));
+        }
+        let exactly_two = Stage::new(
+            [-10.0, 10.0, 10.0, -10.0], [-9.0, 9.0, 9.0, -9.0],
+            [[-1.0, 0.0], [1.0, 0.0]],
+        ).unwrap();
+        assert_eq!(exactly_two.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([0.0, 0.0]));
     }
 
     #[test]
