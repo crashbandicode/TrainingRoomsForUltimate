@@ -92,7 +92,39 @@ impl Parts {
         Self { inside: false, count: 0, pending: 0, age: 0, facing: 0 }
     }
 
-    pub fn step(&mut self, _now: Now) -> Seen {
-        Seen::NONE
+    pub fn step(&mut self, now: Now) -> Seen {
+        if !now.aimer || !(now.special || now.travel) {
+            let seen = if self.pending != 0 {
+                Seen { inside: false, part: self.pending, dir: None, facing: self.facing, age: self.age }
+            } else {
+                Seen::NONE
+            };
+            *self = Self::new();
+            return seen;
+        }
+        if !self.inside {
+            if !(now.start || now.travel) {
+                return Seen::NONE;
+            }
+            self.inside = true;
+            self.facing = now.facing;
+        }
+        if now.entered && self.count < 2 && self.pending == 0 {
+            self.count += 1;
+            self.pending = self.count;
+            self.age = 0;
+        }
+        let mut seen = Seen { inside: true, facing: self.facing, ..Seen::NONE };
+        if self.pending != 0 {
+            if now.aimed.is_some() || !now.travel {
+                seen.part = self.pending;
+                seen.dir = now.aimed;
+                seen.age = self.age;
+                self.pending = 0;
+            } else {
+                self.age = self.age.saturating_add(1);
+            }
+        }
+        seen
     }
 }

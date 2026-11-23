@@ -371,6 +371,7 @@ impl Grade {
         !self.wrong_move
             && self.missing().is_none()
             && self.wrong_dir().is_none()
+            && self.extra_aim.is_none()
             && self.worst(tolerance).is_none()
     }
 }
@@ -382,7 +383,7 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
     grade_mode(reference, attempt, false, reference.events().any(|event| matches!(event.kind, Kind::Aim(_))))
 }
 
-fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, _aims: bool) -> Grade {
+fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
     let mut from = 0;
@@ -404,7 +405,7 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, _aims: b
                 from = i + 1;
                 let got = attempt.events[i].unwrap();
                 if reference.presses_only || got.dir == want.dir {
-                    Mark::At(got.offset - want.offset)
+                    Mark::At(if aims && matches!(want.kind, Kind::Aim(_)) { 0 } else { got.offset - want.offset })
                 } else {
                     Mark::WrongDir
                 }
@@ -422,7 +423,12 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, _aims: b
         wrong_move: !input_only && attempt.to != reference.to,
         marks,
         extra,
-        extra_aim: None,
+        extra_aim: aims.then(|| attempt.events.iter().enumerate().find_map(|(i, event)| {
+            match event {
+                Some(Event { kind: Kind::Aim(part), .. }) if !used[i] => Some(*part),
+                _ => None,
+            }
+        })).flatten(),
         wrong_spot: (!input_only)
             .then_some(reference.spot)
             .flatten()
@@ -725,7 +731,7 @@ impl Helper {
         }
         if let Some(link) = tracker
             .latest_link()
-            .filter(|l| Some(l.hit) != self.capture.last_link)
+            .filter(|l| Some(l.hit) != self.capture.last_link && !tracker.aim_pending())
         {
             self.capture.last_link = Some(link.hit);
             let after = self.capture.after;
@@ -735,7 +741,12 @@ impl Helper {
             self.capture.current.push(rec);
             self.seen = self.seen.wrapping_add(1);
             if !input_only {
-                self.on_link(rec, first, exchange, &mut out);
+                let actual = if self.target.as_ref().is_some_and(Combo::has_aim) {
+                    rec
+                } else {
+                    LinkRec::of(&link, tracker, after, false)
+                };
+                self.on_link(actual, first, exchange, &mut out);
             }
         }
         if input_only {
@@ -931,8 +942,15 @@ fn summarize(
         || grades().find_map(|(i, g)| Some((i as u8, missing_reason(event(g, g.missing()?)?))));
     let wrong_dir = || {
         grades()
-            .find_map(|(i, g)| Some((i as u8, Reason::WrongDir(event(g, g.wrong_dir()?)?.kind))))
+            .find_map(|(i, g)| {
+                let kind = event(g, g.wrong_dir()?)?.kind;
+                Some((i as u8, match kind {
+                    Kind::Aim(part) => Reason::WrongAim(part),
+                    _ => Reason::WrongDir(kind),
+                }))
+            })
     };
+    let extra_aim = || grades().find_map(|(i, g)| g.extra_aim.map(|part| (i as u8, Reason::ExtraAim(part))));
     let off = || {
         grades().find_map(|(i, g)| {
             let (step, delta) = g.worst(tolerance)?;
@@ -966,6 +984,7 @@ fn summarize(
             .or_else(wrong_spot)
             .or_else(missing)
             .or_else(wrong_dir)
+            .or_else(extra_aim)
             .or_else(off),
     }
 }
@@ -987,12 +1006,14 @@ fn events_between(
     let mut drift_order = [0u8; 8];
     let mut drift_seen = 0usize;
     for snap in tracker.snaps() {
-        if snap.frame > until {
+        if snap.frame > until && !aims {
             break;
         }
         let in_range = snap.frame > after && snap.frame <= until;
         if in_range {
-            if push_edges(&mut timed, &mut count, prev, snap, aims) && event_frame_count < STEPS {
+            let mut physical = snap;
+            physical.aim.part = 0;
+            if push_edges(&mut timed, &mut count, prev, physical, aims) && event_frame_count < STEPS {
                 event_frames[event_frame_count] = snap.frame;
                 event_frame_count += 1;
             }
@@ -1004,6 +1025,16 @@ fn events_between(
                 )) {
                     note_drift(&mut drift_counts, &mut drift_order, &mut drift_seen, index);
                 }
+            }
+        }
+        if aims && snap.aim.part != 0 {
+            let entry = snap.frame.saturating_sub(u32::from(snap.aim.age));
+            if entry > after && entry <= until {
+                insert_timed(&mut timed, &mut count, Timed {
+                    kind: Kind::Aim(snap.aim.part),
+                    dir: facing_dir(snap.aim.dir, snap.aim.facing),
+                    frame: entry,
+                });
             }
         }
         prev = Some(snap);
@@ -1031,7 +1062,7 @@ fn push_edges(
     count: &mut usize,
     prev: Option<Snap>,
     now: Snap,
-    _aims: bool,
+    aims: bool,
 ) -> bool {
     let mut saw = false;
     let prev_buttons = prev.map(|snap| snap.buttons).unwrap_or(0);
@@ -1046,14 +1077,16 @@ fn push_edges(
             push_timed(out, count, Kind::Release(button), left, now.frame);
         }
     }
-    if prev_x.abs() < DASH_STICK_X
+    if !(aims && now.aim.inside)
+        && prev_x.abs() < DASH_STICK_X
         && now_x.abs() >= DASH_STICK_X
         && super::frame_strip::flick_fresh(0, DASH_FLICK_X)
     {
         saw = true;
         push_timed(out, count, Kind::Flick(Flick::Dash), left, now.frame);
     }
-    if !held(prev_buttons, FLICK_JUMP)
+    if !(aims && now.aim.inside)
+        && !held(prev_buttons, FLICK_JUMP)
         && held(now.buttons, FLICK_JUMP)
         && now_y >= JUMP_STICK_Y
         && super::frame_strip::flick_fresh(0, JUMP_FLICK_Y)
@@ -1061,7 +1094,8 @@ fn push_edges(
         saw = true;
         push_timed(out, count, Kind::Flick(Flick::TapJump), left, now.frame);
     }
-    if prev_y > DIVE_CONT
+    if !(aims && now.aim.inside)
+        && prev_y > DIVE_CONT
         && now_y <= DIVE_CONT
         && now.airborne
         && super::frame_strip::flick_fresh(0, DIVE_FLICK)
@@ -1080,6 +1114,9 @@ fn push_edges(
             push_timed(out, count, Kind::Press(button), left, now.frame);
         }
     }
+    if aims && now.aim.part != 0 {
+        push_timed(out, count, Kind::Aim(now.aim.part), facing_dir(now.aim.dir, now.aim.facing), now.frame);
+    }
     saw
 }
 
@@ -1097,6 +1134,18 @@ fn push_timed(
     if *count < STEPS {
         out[*count] = Some(Timed { kind, dir, frame });
         *count += 1;
+    }
+}
+
+fn insert_timed(out: &mut [Option<Timed>; STEPS], count: &mut usize, event: Timed) {
+    let at = (0..*count).find(|&i| out[i].is_some_and(|other| other.frame > event.frame)).unwrap_or(*count);
+    if at < STEPS {
+        let end = (*count).min(STEPS - 1);
+        for i in (at..end).rev() {
+            out[i + 1] = out[i];
+        }
+        out[at] = Some(event);
+        *count = (*count + 1).min(STEPS);
     }
 }
 
@@ -1197,7 +1246,10 @@ impl InputCapture {
                 .links()
                 .last()
                 .is_none_or(|l| l.events().count() == STEPS);
+            let next_part = matches!(event.kind, Kind::Aim(2..))
+                && self.combo.links().last().is_some_and(|link| link.events().next().is_some());
             if (full
+                || next_part
                 || (group_idle
                     && self
                         .last

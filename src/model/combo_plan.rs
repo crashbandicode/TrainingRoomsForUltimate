@@ -71,7 +71,11 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
             BAD
         }
         Mark::WrongDir => {
-            let _ = write!(t, "{name} wrong direction");
+            let _ = if name.ends_with("direction") {
+                write!(t, "{name} wrong")
+            } else {
+                write!(t, "{name} wrong direction")
+            };
             BAD
         }
     };

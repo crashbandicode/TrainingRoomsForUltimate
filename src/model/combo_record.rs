@@ -201,10 +201,11 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
-        let version = if self.combo.input_only {
-            2
-        } else {
-            SCHEMA_VERSION
+        let version = match (self.combo.input_only, self.combo.has_aim()) {
+            (false, false) => SCHEMA_VERSION,
+            (true, false) => 2,
+            (false, true) => 3,
+            (true, true) => 4,
         };
         if let Some(source) = &self.source {
             let mut object = source.clone();
@@ -266,7 +267,7 @@ impl ComboRecord {
         let object = value.as_object().ok_or("not an object")?;
         match object.get("schema_version") {
             None => {}
-            Some(version) if matches!(version.as_u64(), Some(1 | 2)) => {}
+            Some(version) if matches!(version.as_u64(), Some(1..=4)) => {}
             Some(_) => return Err("schema_version"),
         }
         let name = match object.get("name") {
@@ -277,19 +278,21 @@ impl ComboRecord {
         let shown = |key| object.get(key).and_then(Value::as_str).and_then(shown_name);
         let recorded_on = shown("recorded_on");
         let made_from = shown("made_from");
-        let input = object.get("schema_version").and_then(Value::as_u64) == Some(2);
+        let version = object.get("schema_version").and_then(Value::as_u64).unwrap_or(1);
+        let input = matches!(version, 2 | 4);
+        let aims = matches!(version, 3 | 4);
         if input && object.get("kind").and_then(Value::as_str) != Some("input_drill") { return Err("kind"); }
         let key = if input { "input_steps" } else { "links" };
         let links = object.get(key).and_then(Value::as_array).ok_or(key)?;
         if links.is_empty() || links.len() > LINKS { return Err(key); }
         let mut previous = 0;
         let mut combo = Combo::from_links(links.iter().map(|value| {
-            if !input { return link_of(value, false); }
+            if !input { return link_of(value, aims); }
             let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
             if events.is_empty() || events.len() > STEPS { return Err("events"); }
             let mut link = LinkRec::INPUT;
             for (slot, event) in link.events.iter_mut().zip(events) {
-                let event = parse_event(event.as_object().ok_or("event")?, false)?;
+                let event = parse_event(event.as_object().ok_or("event")?, aims)?;
                 if event.offset < previous { return Err("offset"); }
                 previous = event.offset;
                 *slot = Some(event);
@@ -407,7 +410,7 @@ fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static 
     ))
 }
 
-fn parse_event(event: &Map<String, Value>, _aims: bool) -> Result<Event, &'static str> {
+fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static str> {
     let name = |k: &'static str| event.get(k).and_then(Value::as_str).ok_or(k);
     let dir = dir_of(name("dir")?).ok_or("dir")?;
     let offset = int(event, "offset")?;
@@ -416,6 +419,10 @@ fn parse_event(event: &Map<String, Value>, _aims: bool) -> Result<Event, &'stati
         "release" => Kind::Release(button_of(name("button")?).ok_or("button")?),
         "cstick" => Kind::CStick,
         "flick" => Kind::Flick(value_of(&FLICKS, name("flick")?).ok_or("flick")?),
+        "aim" if aims => match event.get("part").and_then(Value::as_u64) {
+            Some(part @ 1..=2) => Kind::Aim(part as u8),
+            _ => return Err("event"),
+        },
         _ => return Err("event"),
     };
     Ok(Event { kind, dir, offset })
@@ -537,7 +544,7 @@ impl<'de> Deserialize<'de> for ComboRecord {
 impl Record for ComboRecord {
     type Error = ComboError;
     type Summary = ComboEntry;
-    const SCHEMA_VERSIONS: &'static [u32] = &[1, 2];
+    const SCHEMA_VERSIONS: &'static [u32] = &[1, 2, 3, 4];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), ComboError> {
