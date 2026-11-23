@@ -8,14 +8,14 @@ fn clip() -> Clip {
     Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true }
 }
 
-fn fed(p1: u32, cpu: u32, preview: bool, hides: bool) -> Fed { Fed { p1, cpu, preview, hides } }
+fn fed(p1: u32, cpu: u32, preview: bool, hides: bool) -> Fed { Fed { p1, cpu, run: [0, 0], preview, hides } }
 
 #[test]
 fn a_fed_line_names_both_counts_and_both_flags_and_fits_its_buffer() {
     let mut got = Vec::new();
     FedSeen::default().sample(fed(0, 37, true, false), |s| { got.push(s.to_owned()); 0 });
-    FedSeen::default().sample(fed(u32::MAX, u32::MAX, true, true), |s| { got.push(s.to_owned()); 0 });
-    assert_eq!(got, vec!["fed p1=0 cpu=37 preview=1 hides=0", "fed p1=4294967295 cpu=4294967295 preview=1 hides=1"]);
+    FedSeen::default().sample(Fed { p1: u32::MAX, cpu: u32::MAX, run: [u32::MAX, u32::MAX], preview: true, hides: true }, |s| { got.push(s.to_owned()); 0 });
+    assert_eq!(got, vec!["fed p1=0 cpu=37 run.p1=0 run.cpu=0 preview=1 hides=0", "fed p1=4294967295 cpu=4294967295 run.p1=4294967295 run.cpu=4294967295 preview=1 hides=1"]);
 }
 
 #[test]
@@ -31,9 +31,9 @@ fn each_rise_and_the_return_go_out_on_the_frame_that_first_sees_them() {
         seen.sample(now, |s| { got.push((frame, s.to_owned())); 0 });
     }
     assert_eq!(got, vec![
-        (100, "fed p1=0 cpu=0 preview=1 hides=1".to_string()), (102, "fed p1=1 cpu=0 preview=1 hides=1".to_string()),
-        (103, "fed p1=2 cpu=0 preview=1 hides=1".to_string()), (104, "fed p1=3 cpu=0 preview=1 hides=1".to_string()),
-        (105, "fed p1=3 cpu=0 preview=0 hides=0".to_string()), (107, "fed p1=4 cpu=0 preview=0 hides=0".to_string()),
+        (100, "fed p1=0 cpu=0 run.p1=0 run.cpu=0 preview=1 hides=1".to_string()), (102, "fed p1=1 cpu=0 run.p1=0 run.cpu=0 preview=1 hides=1".to_string()),
+        (103, "fed p1=2 cpu=0 run.p1=0 run.cpu=0 preview=1 hides=1".to_string()), (104, "fed p1=3 cpu=0 run.p1=0 run.cpu=0 preview=1 hides=1".to_string()),
+        (105, "fed p1=3 cpu=0 run.p1=0 run.cpu=0 preview=0 hides=0".to_string()), (107, "fed p1=4 cpu=0 run.p1=0 run.cpu=0 preview=0 hides=0".to_string()),
     ]);
 }
 
@@ -45,7 +45,7 @@ fn a_line_that_goes_out_late_is_announced_as_lost() {
     seen.sample(fed(0, 1, false, false), |s| { got.push(s.to_owned()); 1 });
     seen.sample(fed(0, 2, false, false), |s| { got.push(s.to_owned()); 0 });
     seen.sample(fed(0, 2, false, false), |_| panic!("already sent"));
-    assert_eq!(got, vec!["fed p1=0 cpu=1 preview=0 hides=0", "fed lost=1", "fed lost=2", "fed p1=0 cpu=2 preview=0 hides=0"]);
+    assert_eq!(got, vec!["fed p1=0 cpu=1 run.p1=0 run.cpu=0 preview=0 hides=0", "fed lost=1", "fed lost=2", "fed p1=0 cpu=2 run.p1=0 run.cpu=0 preview=0 hides=0"]);
 
     let mut seen = FedSeen::default();
     seen.sample(fed(1, 0, false, false), |_| 1);
@@ -53,19 +53,37 @@ fn a_line_that_goes_out_late_is_announced_as_lost() {
     seen.sample(fed(1, 0, false, false), |_| { calls += 1; if calls == 1 { 0 } else { 1 } });
     let mut got = Vec::new();
     seen.sample(fed(1, 0, false, false), |s| { got.push(s.to_owned()); 0 });
-    assert_eq!(got, vec!["fed lost=1", "fed p1=1 cpu=0 preview=0 hides=0"]);
+    assert_eq!(got, vec!["fed lost=1", "fed p1=1 cpu=0 run.p1=0 run.cpu=0 preview=0 hides=0"]);
 }
 
 #[test]
-fn the_fed_state_survives_its_two_words() {
+fn the_fed_state_survives_its_words() {
     let mut seen = FedSeen::default();
     assert_eq!(FedSeen::from_words(seen.words()), seen);
-    seen.sample(fed(u32::MAX, 7, true, false), |_| 1);
-    seen.sample(fed(u32::MAX, 7, true, true), |_| 1);
+    seen.sample(Fed { run: [5, u32::MAX], ..fed(u32::MAX, 7, true, false) }, |_| 1);
+    seen.sample(Fed { run: [5, u32::MAX], ..fed(u32::MAX, 7, true, true) }, |_| 1);
     assert_eq!(FedSeen::from_words(seen.words()), seen);
     assert_ne!(seen, FedSeen::default());
-    seen.sample(fed(3, u32::MAX, false, true), |_| 0);
+    seen.sample(Fed { run: [7, 9], ..fed(3, u32::MAX, false, true) }, |_| 0);
     assert_eq!(FedSeen::from_words(seen.words()), seen);
+}
+
+#[test]
+fn a_load_is_a_line_of_its_own_and_a_skipped_poll_is_announced_only_when_something_changed() {
+    let at = |p1: u32| Fed { p1, run: [1, 0], ..Fed::default() };
+    let mut seen = FedSeen::default();
+    let mut got = Vec::new();
+    seen.sample(at(0), |s| { got.push(s.to_owned()); 0 });
+    seen.sample(at(1), |s| { got.push(s.to_owned()); 0 });
+    seen.skip();
+    seen.sample(at(1), |_| panic!("nothing changed"));
+    seen.sample(at(2), |s| { got.push(s.to_owned()); 0 });
+    seen.skip();
+    seen.sample(at(4), |s| { got.push(s.to_owned()); 0 });
+    assert_eq!(got, vec![
+        "fed p1=0 cpu=0 run.p1=1 run.cpu=0 preview=0 hides=0", "fed p1=1 cpu=0 run.p1=1 run.cpu=0 preview=0 hides=0",
+        "fed p1=2 cpu=0 run.p1=1 run.cpu=0 preview=0 hides=0", "fed lost=1", "fed p1=4 cpu=0 run.p1=1 run.cpu=0 preview=0 hides=0",
+    ]);
 }
 
 #[test]

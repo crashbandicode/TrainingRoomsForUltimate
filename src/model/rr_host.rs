@@ -207,6 +207,7 @@ static CAP_LEN: AtomicUsize = AtomicUsize::new(0);
 static PLAYED: AtomicU32 = AtomicU32::new(0);
 static FED: [AtomicU64; 2] = [const { AtomicU64::new(0) }; 2];
 static RUN_GEN: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
+static RUNS: [AtomicU32; 2] = [const { AtomicU32::new(0) }; 2];
 static CAP_FRAMES: [AtomicU64; MAX_FRAMES] = [const { AtomicU64::new(0) }; MAX_FRAMES];
 // Final converted event records only. CAP_FRAMES stays exclusively owned by ordinary Record mechanics.
 static INPUT_MODE: AtomicU8 = AtomicU8::new(0); // bit1 Make, bit2 direct Record; either may overlap another take
@@ -879,6 +880,8 @@ pub fn fed_frames(role: Role) -> u32 {
     let fed = FED[index].load(Ordering::Acquire);
     if (fed >> 32) as u32 == generation { fed as u32 } else { 0 }
 }
+
+pub fn fed_run(role: Role) -> Option<(u32, u32)> { Some((0, fed_frames(role))) }
 
 pub fn start_gated() -> bool {
     START_GATE.load(Ordering::Acquire)
@@ -2539,6 +2542,7 @@ fn reset_host() {
     PLAYED.store(0, Ordering::Release);
     for count in &FED { count.store(0, Ordering::Release); }
     for generation in &RUN_GEN { generation.store(0, Ordering::Release); }
+    for runs in &RUNS { runs.store(0, Ordering::Release); }
     RECORD_EDGE.store(0, Ordering::Release);
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
@@ -2596,6 +2600,7 @@ mod tests {
     lib_unit_tests! {
     use super::super::macros::StartState;
     use super::*;
+    use crate::model::bridge_events::{Fed, FedSeen};
     use std::sync::Mutex as TestMutex;
 
     static TEST_LOCK: TestMutex<()> = TestMutex::new(());
@@ -4723,16 +4728,16 @@ mod tests {
         assert!(take_player_frame().is_none() && !preview_running());
     }
 
+    fn fed_poll(seen: &mut FedSeen, lines: &mut Vec<(u32, String)>, frame: &mut u32, hides: bool) -> Option<u32> {
+        let ((run_p1, p1), (run_cpu, cpu)) = (fed_run(Role::Player).unwrap(), fed_run(Role::Cpu).unwrap());
+        let at = *frame;
+        seen.sample(Fed { p1, cpu, run: [run_p1, run_cpu], preview: preview_running(), hides }, |text| { lines.push((at, text.to_owned())); 0 });
+        *frame += 1;
+        take_player_frame().map(|taken| taken.buttons)
+    }
+
     fn a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out() {
-        use crate::model::bridge_events::{Fed, FedSeen};
         const N: u32 = 6;
-        fn poll(seen: &mut FedSeen, lines: &mut Vec<(u32, String)>, frame: &mut u32, hides: bool) -> Option<u32> {
-            let now = Fed { p1: fed_frames(Role::Player), cpu: fed_frames(Role::Cpu), preview: preview_running(), hides };
-            let at = *frame;
-            seen.sample(now, |text| { lines.push((at, text.to_owned())); 0 });
-            *frame += 1;
-            take_player_frame().map(|taken| taken.buttons)
-        }
         let _hold = hold();
         reset_host();
         let root = scratch("drill-fed");
@@ -4743,37 +4748,90 @@ mod tests {
 
         assert!(request_drill_preview(&take, N));
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let run1 = fed_run(Role::Player).unwrap().0;
+        assert_eq!(fed_run(Role::Player), Some((run1, 0)));
         assert_eq!(fed_frames(Role::Player), 0);
         for expected in 1..=N {
-            assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
+            assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
             assert_eq!(fed_frames(Role::Player), expected);
         }
-        assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), None);
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, true), None);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(!preview_running());
-        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
         assert_eq!(fed_frames(Role::Player), N);
 
         assert!(request_drill_preview(&take, N));
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let run2 = fed_run(Role::Player).unwrap().0;
+        assert_eq!(run2, run1 + 1);
         assert_eq!(fed_frames(Role::Player), 0);
         for expected in 1..=3 {
-            assert_eq!(poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
+            assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, true), Some(expected));
         }
         stop_preview();
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(!preview_running());
-        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
-        assert_eq!(poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
         assert_eq!(fed_frames(Role::Player), 3);
         assert_eq!(fed_frames(Role::Cpu), 0);
 
-        let line = |p1: u32, on: bool| format!("fed p1={p1} cpu=0 preview={0} hides={0}", u8::from(on));
-        let mut expected: Vec<(u32, String)> = (0..=N).map(|k| (100 + k, line(k, true))).collect();
-        expected.push((101 + N, line(N, false)));
-        expected.extend((0..3).map(|k| (102 + N + k, line(k, true))));
-        expected.push((105 + N, line(3, false)));
+        let line = |p1: u32, run: u32, on: bool| format!("fed p1={p1} cpu=0 run.p1={run} run.cpu=0 preview={0} hides={0}", u8::from(on));
+        let mut expected: Vec<(u32, String)> = (0..=N).map(|k| (100 + k, line(k, run1, true))).collect();
+        expected.push((101 + N, line(N, run1, false)));
+        expected.extend((0..3).map(|k| (102 + N + k, line(k, run2, true))));
+        expected.push((105 + N, line(3, run2, false)));
         assert_eq!(lines, expected);
+    }
+
+    fn an_ordinary_plays_load_and_every_frame_show_on_the_fed_line() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("play-fed");
+        tick(&root);
+        let frames = (1..=5).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let recording = MacroRecording::new("Fed", "13.0.5", StartState::neutral(8, 0, 1.0), frames).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Player, Some(&id), 1)?; Ok(true) }).unwrap();
+        let (mut seen, mut lines, mut frame) = (FedSeen::default(), Vec::new(), 200);
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
+        assert!(lines.is_empty());
+        assert_eq!(fed_run(Role::Player), Some((0, 0)));
+
+        on_chords(false, true, false);
+        tick(&root);
+        assert_eq!(fed_run(Role::Player), Some((1, 0)));
+        for expected in 1..=5 {
+            assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), Some(expected));
+        }
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
+
+        tick(&root);
+        on_chords(false, true, false);
+        tick(&root);
+        assert_eq!(fed_run(Role::Player), Some((2, 0)));
+        assert_eq!(take_player_frame().map(|taken| taken.buttons), Some(1));
+        for expected in 2..=5 {
+            assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), Some(expected));
+        }
+        assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
+
+        let line = |p1: u32, run: u32| format!("fed p1={p1} cpu=0 run.p1={run} run.cpu=0 preview=0 hides=0");
+        let mut expected: Vec<(u32, String)> = (201..=206).map(|at| (at, line(at - 201, 1))).collect();
+        expected.extend((207..=211).map(|at| (at, line(at - 206, 2))));
+        assert_eq!(lines, expected);
+    }
+
+    fn a_count_is_not_paired_with_a_run_number_while_a_load_stores() {
+        let _hold = hold();
+        reset_host();
+        assert_eq!(fed_run(Role::Cpu), Some((0, 0)));
+        RUNS[role_index(Role::Cpu)].fetch_add(1, Ordering::AcqRel);
+        assert_eq!(fed_run(Role::Cpu), None);
+        assert_eq!(fed_run(Role::Player), Some((0, 0)));
+        RUNS[role_index(Role::Cpu)].fetch_add(1, Ordering::AcqRel);
+        assert_eq!(fed_run(Role::Cpu), Some((1, 0)));
     }
 
     fn a_stop_while_the_index_is_unreadable_retires_the_preview_run() {
@@ -6117,6 +6175,7 @@ mod tests {
             ("one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer", one_ledge_request_through_a_publication_starts_exactly_one_run_with_its_buffer as fn()),
             ("a_deferred_ledge_request_denies_an_immediate_climb_query", a_deferred_ledge_request_denies_an_immediate_climb_query as fn()),
             ("a_roles_fed_count_is_the_frames_its_hook_took", a_roles_fed_count_is_the_frames_its_hook_took as fn()),
+            ("a_count_is_not_paired_with_a_run_number_while_a_load_stores", a_count_is_not_paired_with_a_run_number_while_a_load_stores as fn()),
             ("a_late_credit_of_the_old_run_is_not_counted_for_the_new_one", a_late_credit_of_the_old_run_is_not_counted_for_the_new_one as fn()),
             ("a_crop_preview_owes_the_start_speed_as_play_does", a_crop_preview_owes_the_start_speed_as_play_does as fn()),
             ("a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back", a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back as fn()),
@@ -6173,6 +6232,7 @@ mod tests {
             ("deleting_a_drill_deletes_its_take",deleting_a_drill_deletes_its_take as fn()),
             ("a_recorded_drills_take_previews_on_player_one_through_the_play_queue",a_recorded_drills_take_previews_on_player_one_through_the_play_queue as fn()),
             ("a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out", a_drill_previews_fed_count_and_its_fed_line_follow_each_frame_handed_out as fn()),
+            ("an_ordinary_plays_load_and_every_frame_show_on_the_fed_line", an_ordinary_plays_load_and_every_frame_show_on_the_fed_line as fn()),
             ("a_stop_while_the_index_is_unreadable_retires_the_preview_run", a_stop_while_the_index_is_unreadable_retires_the_preview_run as fn()),
             ("x_during_a_play_on_player_one_starts_no_drill_preview",x_during_a_play_on_player_one_starts_no_drill_preview as fn()),
             ("make_preserves_an_open_record_prefix_and_physical_cstick",make_preserves_an_open_record_prefix_and_physical_cstick as fn()),
