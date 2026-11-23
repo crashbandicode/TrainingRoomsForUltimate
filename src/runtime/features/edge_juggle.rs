@@ -2102,14 +2102,9 @@ pub unsafe fn frame(fighter: usize) {
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             let confirm = std::mem::take(&mut run.confirm_player);
-            let placed = wizard.player_floor(run.stage, wizard.cursor(), confirm, |point| {
-                snap_player(p1, drill, run.stage, point)
-            });
-            if let Some(p1) = placed {
-                wizard.setup.p1 = p1;
-                if confirm {
-                    wizard.advance();
-                }
+            let placed = wizard.settle_player(|point| snap_player(p1, drill, run.stage, point));
+            if placed && confirm {
+                wizard.advance();
             } else if confirm {
                 notices::refuse("Pick a point above a floor"); // restriction: edge-juggle-player-no-floor
             }
