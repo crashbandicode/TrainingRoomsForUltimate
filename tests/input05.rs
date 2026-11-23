@@ -313,6 +313,40 @@ fn a_refusal_during_a_running_drill_shows_over_the_drill_status() {
     assert!(q.is_queued(0x34));
 }
 
+fn a_refused_save_or_load_shows_over_a_standing_notice_and_gives_it_back() {
+    use model::state::refused::{Action, Refused};
+    let mut q = Queue::new();
+    let status = "0/0 · Streak 0 · Best 0";
+    q.upsert(0x34, "Guard the Edge", Body::copied(status), 600, DEFAULT_COLOR);
+    let draw = q.tick(true, false).draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Guard the Edge", status));
+    for _ in 1..10 { assert!(q.tick(true, false).visible); }
+
+    let text = Refused::Empty.notice(Action::Load).unwrap();
+    q.post_refusal("Save State", Body::copied(text), 150, DEFAULT_COLOR);
+    for tick in 0..150 {
+        let out = q.tick(true, false);
+        assert!(out.visible);
+        if tick == 0 {
+            let draw = out.draw.unwrap();
+            assert_eq!((draw.header, draw.body.as_str()), ("Save State", text));
+        } else {
+            assert!(out.draw.is_none());
+        }
+    }
+    let out = q.tick(true, false);
+    assert!(out.visible);
+    let draw = out.draw.unwrap();
+    assert_eq!((draw.header, draw.body.as_str()), ("Guard the Edge", status));
+    for _ in 1..590 {
+        let out = q.tick(true, false);
+        assert!(out.visible && out.draw.is_none());
+    }
+    assert!(q.is_empty());
+    assert_eq!(q.take_delivered(), Some(0x34));
+    assert!(!q.tick(true, false).visible);
+}
+
 fn a_refusal_keeps_plain_order_and_passes_every_standing_notice() {
     let before = ALLOCS.with(Cell::get);
     let mut q = Queue::new();
@@ -372,6 +406,7 @@ fn case_table() {
         ("a_refusal_shows_at_once_over_the_guard_wizard_page_and_gives_it_back", a_refusal_shows_at_once_over_the_guard_wizard_page_and_gives_it_back as fn()),
         ("a_refused_juggler_player_point_shows_over_its_page_once_per_press", a_refused_juggler_player_point_shows_over_its_page_once_per_press as fn()),
         ("a_refusal_during_a_running_drill_shows_over_the_drill_status", a_refusal_during_a_running_drill_shows_over_the_drill_status as fn()),
+        ("a_refused_save_or_load_shows_over_a_standing_notice_and_gives_it_back", a_refused_save_or_load_shows_over_a_standing_notice_and_gives_it_back as fn()),
         ("a_refusal_keeps_plain_order_and_passes_every_standing_notice", a_refusal_keeps_plain_order_and_passes_every_standing_notice as fn()),
     ]);
 }

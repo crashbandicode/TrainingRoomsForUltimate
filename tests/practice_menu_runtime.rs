@@ -177,10 +177,13 @@ fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage()
 fn every_refusal_goes_through_the_queue_s_refusal_post() {
     let notices = src("src/runtime/features/notices.rs");
     let refuse = item(&notices, "pub fn refuse(");
-    assert!(refuse.contains("send(Mail::Refuse(text));"));
+    assert!(refuse.contains("send(Mail::Refuse(\"Input Recording\", text, 120));"));
     assert!(!refuse.contains("post("));
     let take = item(&notices, "fn take_mail(");
-    assert!(take.contains("Mail::Refuse(text) => queue.post_refusal(\"Input Recording\", Body::copied(text), 120, DEFAULT_COLOR)"));
+    assert!(take.contains("Mail::Refuse(header, text, length) => queue.post_refusal(header, Body::copied(text), length, DEFAULT_COLOR)"));
+    let save = item(&notices, "pub fn save_state_refused(");
+    assert!(save.contains("send(Mail::Refuse(\"Save State\", text, 150));"));
+    assert!(!save.contains("post("));
     let chords = src("src/runtime/features/chords.rs");
     let refused = chords.find("if recorder_refused {").unwrap();
     assert!(chords[refused..].contains("notices::refuse(\"Stop the drill to start recording or play inputs\")"));
