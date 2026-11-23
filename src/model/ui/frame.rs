@@ -1278,7 +1278,11 @@ mod tests {
                 let group = group_of(entry);
                 group != usize::from(SAVES_MACROS) && group != usize::from(COMBOS_SEQ)
             }) { break; }
-            menu.press(Button::Down);
+            menu.press(if matches!(menu.focus(), Some(Entry::Group(g)) if g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ)) {
+                Button::JumpDown
+            } else {
+                Button::Down
+            });
         }
         let group = group_of(menu.focus().unwrap());
         assert!(group != usize::from(SAVES_MACROS) && group != usize::from(COMBOS_SEQ));
@@ -1361,6 +1365,7 @@ mod tests {
         m.press(Button::R);
         m.press(Button::R);
         page_frame(&m, &mut f);
+        assert_eq!(m.recording().hint(Face::Page), "A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close");
         assert_eq!(f.hint.string_lossy(), format!("{}      {BUILD_TAG}", m.recording().hint(Face::Page)));
         m.recording_mut().toggle_popup();
         page_frame(&m, &mut f);

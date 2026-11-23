@@ -6,7 +6,7 @@ use engine::library::{LoopCount, RecordingIndex, Role};
 use engine::macros::{InputFrame, MacroRecording, StartState};
 use engine::playback::{Book, Playback};
 use model::menu::input::Button;
-use model::menu::table::ROWS;
+use model::menu::table::{COMBOS_SEQ, ROWS, SAVES_MACROS};
 use model::menu::{Entry, Env, Menu, Screen, LOOP_ROW};
 use model::recording_menu::{LoopMark, ViewRole};
 use model::settings::Settings;
@@ -26,7 +26,11 @@ static LOOP_TEST: std::sync::Mutex<()> = std::sync::Mutex::new(());
 fn focus(menu: &mut Menu, target: Entry) {
     for _ in 0..=menu.entry_count(menu.page()) {
         if menu.focus() == Some(target) { return; }
-        menu.press(Button::Down);
+        menu.press(if matches!(menu.focus(), Some(Entry::Group(g)) if g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ)) {
+            Button::JumpDown
+        } else {
+            Button::Down
+        });
     }
     panic!("cannot focus {target:?}");
 }

@@ -934,7 +934,7 @@ impl RecordingScreens {
                 _ => "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
             }
         } else {
-            "A open   X loop in MACROS   ZR role   L/R page   B close"
+            "A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close"
         }
     }
 

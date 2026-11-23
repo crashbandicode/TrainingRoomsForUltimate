@@ -10,7 +10,7 @@ use model::menu::chord::Chord;
 use model::menu::delay::{DelayRange, DelaySpec};
 use model::menu::grid::{ConsoleMode, GridKind, GridLayout, Move, RosterUse};
 use model::menu::input::Button;
-use model::menu::table::{row_count, Control, Editor, Page, GROUPS, ROWS};
+use model::menu::table::{row_count, Control, Editor, Page, COMBOS_SEQ, GROUPS, ROWS, SAVES_MACROS};
 use model::menu::{
     reroll, DelayView, Entry, Env, Grey, Menu, RowValue, Screen, SliderState,
 };
@@ -46,7 +46,11 @@ fn goto_entry(m: &mut Menu, entry: Entry) {
         if m.focus() == Some(entry) {
             return;
         }
-        m.press(Button::Down);
+        m.press(if matches!(m.focus(), Some(Entry::Group(g)) if g == usize::from(SAVES_MACROS) || g == usize::from(COMBOS_SEQ)) {
+            Button::JumpDown
+        } else {
+            Button::Down
+        });
     }
     panic!("could not focus {entry:?}");
 }

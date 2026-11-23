@@ -17,7 +17,7 @@ listed in [the docs index](../README.md).
 This page uses some keys its own way. Its footer reads:
 
 ```text
-A open   X loop in MACROS   ZR role   L/R page   B close
+A open   X loop in MACROS   ZL+Up/Down section   ZR role   L/R page   B close
 ```
 
 | Key | What it does here |
