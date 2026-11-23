@@ -208,6 +208,8 @@
         {
           "run": "f11.py:picker",
           "args": {
+            "cpu_kind": 32,
+            "cpu_gravity": 0.12,
             "ident": "6",
             "name": "guard",
             "points": [
@@ -250,6 +252,8 @@
         {
           "run": "f11.py:through",
           "args": {
+            "cpu_kind": 32,
+            "cpu_gravity": 0.12,
             "ident": "6",
             "name": "guard-through",
             "cpu": [
@@ -280,6 +284,8 @@
         {
           "run": "f11.py:picker",
           "args": {
+            "cpu_kind": 32,
+            "cpu_gravity": 0.12,
             "ident": "7",
             "name": "juggle",
             "points": [

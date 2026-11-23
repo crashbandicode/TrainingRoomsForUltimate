@@ -5,10 +5,20 @@ flight-755d9936 (edge_steps.py). Every observation reads three things and keeps 
   tr.practice   wizard.step, wizard.x/y and wizard.cpu (in_view | magnifier; the second is the game's FLAG_IS_LOUPE)
   fighters      where the CPU's body is (bridge `fighters`)
   tr.menu       the picker's notice ("CPU (x, y) ...")
-Each row saves f11-<name>.json in its folder and raises when an expectation given in its args is not met.
+
+The body comparison has no tolerance and no rounding. A held body is rewritten once a frame and the game's physics
+then takes one step of the fighter's gravity before the bridge samples it
+(artifacts/phase23/edge-juggle/ROOT-CAUSE-g9-ready-y-drop.md), so the expected sample is, as f32 words:
+  x == the picked x;  y == f32(picked y) - f32(the CPU fighter's gravity).
+The picked point is the one tr.practice publishes (Rust's shortest round-trip decimal, exact as f32). The gravity is
+a row argument tied to the CPU's kind, which the row checks first (f11-probe-1: Zero Suit Samus, kind 32, 0.12; 12
+of 12 samples met this rule bit for bit). A missing read is a failure. After B the body's x, y and situation must
+equal the read taken before the picker opened. A start is checked as rows G9/G10 check it (edge_ready_exact).
+Each row saves f11-<name>.json in its folder and raises when an expectation is not met.
 """
 import json
 import re
+import struct
 import subprocess
 import sys
 import time
@@ -18,9 +28,43 @@ import routes
 import switch_hw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import edge_ready_exact  # noqa: E402
 import edge_steps as edge  # noqa: E402
 
 PRACTICE = "tr.practice"
+
+
+def _f32(value):
+    return struct.unpack("<f", struct.pack("<f", float(value)))[0]
+
+
+def _word(value):
+    return "0x%08x" % struct.unpack("<I", struct.pack("<f", float(value)))[0]
+
+
+def held_problem(body, point, gravity):
+    """Why a held body's bridge sample is not the picked point (None: it is). Pure; no tolerance."""
+    try:
+        x, y = point
+        want = [_word(x), _word(_f32(_f32(y) - _f32(gravity)))]
+        have = [_word(body["x"]), _word(body["y"])]
+    except (KeyError, TypeError, ValueError):
+        return f"a read is missing: body {body!r}, picked point {point!r}"
+    if have != want:
+        return f"body {have} ({body['x']}, {body['y']}) is not the held point {want} (picked {point}, gravity {gravity})"
+    return None
+
+
+def back_problem(body, origin):
+    """Why the body is not back where it stood (None: it is): x, y and situation equal the read before the picker."""
+    try:
+        have = [_word(body["x"]), _word(body["y"]), body["situation"]]
+        want = [_word(origin["x"]), _word(origin["y"]), origin["situation"]]
+    except (KeyError, TypeError, ValueError):
+        return f"a read is missing: body {body!r}, origin {origin!r}"
+    if have != want or None in have:
+        return f"after B the CPU reads {have} {body!r}; before the picker it read {want} {origin!r}"
+    return None
 
 
 def _save(ctx, name, body):
@@ -32,7 +76,15 @@ def _cpu_body(ctx, scene):
     run = routes.instance_path(ctx, "bridge_log").parent
     bodies = switch_hw.bridge_state(run, ("fighters",), cap=4)["fighters"]
     body = bodies.get(4 if scene == "lobby" else 1, {})
-    return {key: body.get(key) for key in ("x", "y", "situation", "status", "dmg")}
+    return {key: body.get(key) for key in ("kind", "x", "y", "situation", "status", "dmg")}
+
+
+def _fixture(ctx, scene, cpu_kind):
+    """The CPU before the picker; its kind must be the one the row's gravity belongs to."""
+    origin = _cpu_body(ctx, scene)
+    if origin.get("kind") != cpu_kind:
+        raise RuntimeError(f"FIXTURE: the CPU's kind is {origin.get('kind')!r}; this row's gravity is for kind {cpu_kind}")
+    return origin
 
 
 def _practice(ctx, step, cap=6, cpu=None):
@@ -117,13 +169,10 @@ def recover(ctx, scene="training"):
     return {"backed_out_of": looks, "cpu_body": _cpu_body(ctx, scene)}
 
 
-def _at_point(seen, tolerance=0.6):
-    """The CPU's body stands on the picker's point (the bridge's fighters against the practice state)."""
-    try:
-        return (abs(float(seen["cpu_body"]["x"]) - float(seen["wizard"]["wizard.x"])) <= tolerance
-                and abs(float(seen["cpu_body"]["y"]) - float(seen["wizard"]["wizard.y"])) <= tolerance)
-    except (KeyError, TypeError, ValueError):
-        return None
+def _published(seen):
+    """The picker's point as tr.practice published it, or None when either word is missing."""
+    point = (seen["wizard"].get("wizard.x"), seen["wizard"].get("wizard.y"))
+    return None if None in point else point
 
 
 def _finish(ctx, name, body, problems):
@@ -136,82 +185,82 @@ def _finish(ctx, name, body, problems):
                  for s in body.get("seen", [])]}
 
 
-def picker(ctx, ident="6", scene="training", points=(), expect=None, leave=True, name="picker"):
+def picker(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", points=(), expect=None, name="picker"):
     """Open a drill's picker (its CPU step), walk the crosshair through `points`, then leave it with B.
 
-    `expect`: one wizard.cpu word per observation (the default point first, then each of `points`); None records only.
-    With `leave`, B backs out to the menu and the CPU must be back where it stood before the picker.
+    `expect`: one wizard.cpu word per observation (the default point first, then each of `points`); None records
+    only. At every observation the CPU's body must be the held point; after B it must be back where it stood.
     """
-    origin = _cpu_body(ctx, scene)
+    origin = _fixture(ctx, scene, cpu_kind)
     state = edge._setup(ctx, scene, ident)
     wanted = list(expect) if expect else [None] * (len(points) + 1)
     seen = [_observe(ctx, scene, state, f"{name}-00-default", expect=wanted[0])]
     for index, point in enumerate(points, 1):
         state = edge._move(ctx, scene, state, tuple(point))
         seen.append(_observe(ctx, scene, state, f"{name}-{index:02d}-{point[0]}_{point[1]}", expect=wanted[index]))
-    body = {"ident": ident, "scene": scene, "origin": origin, "seen": seen}
+    body = {"ident": ident, "scene": scene, "cpu_kind": cpu_kind, "cpu_gravity": cpu_gravity, "origin": origin,
+            "seen": seen}
     problems = [f"{s['name']}: {s['problem']}" for s in seen if s.get("problem")]
-    problems += [f"{s['name']}: the CPU's body is not on the point: {s['cpu_body']} vs {s['wizard']}"
-                 for s in seen if _at_point(s) is False]
-    if leave:
-        edge._press(ctx, scene, "B", open="1")
-        time.sleep(1.0)
-        body["back"] = _cpu_body(ctx, scene)
-        body["back_still"] = str(ctx.shot(f"{name}-left"))
-        edge._close(ctx, scene)
-        try:
-            moved = (abs(float(body["back"]["x"]) - float(origin["x"])) > 0.6
-                     or abs(float(body["back"]["y"]) - float(origin["y"])) > 0.6)
-        except (TypeError, ValueError):
-            moved = True
-        if moved:
-            problems.append(f"after B the CPU is at {body['back']}, it stood at {origin}")
+    for s in seen:
+        held = held_problem(s["cpu_body"], _published(s), cpu_gravity)
+        if held:
+            problems.append(f"{s['name']}: {held}")
+    edge._press(ctx, scene, "B", open="1")
+    time.sleep(1.0)
+    body["back"] = _cpu_body(ctx, scene)
+    body["back_still"] = str(ctx.shot(f"{name}-left"))
+    edge._close(ctx, scene)
+    back = back_problem(body["back"], origin)
+    if back:
+        problems.append(back)
     return _finish(ctx, name, body, problems)
 
 
-def through(ctx, ident="6", scene="training", cpu=(-100, -20), player=(-40, 0), expect=None, start=True,
+def through(ctx, cpu_kind, cpu_gravity, ident="6", scene="training", cpu=(-100, -20), player=(-40, 0), expect=None,
             name="through"):
-    """The whole picker: CPU point, (Juggler: percent,) player point, preview; then start the drill and stop it.
+    """Guard the Edge's whole picker: CPU point, player point, preview; then start the drill and stop it.
 
-    `expect`: wizard.cpu words for the CPU step, the player step and the preview. Starting must reach Ready with the
-    CPU on its start, as before the fix.
+    `expect`: wizard.cpu words for the CPU step, the player step and the preview. In every step the CPU's body must
+    be the held CPU point (the one published at the CPU step). The start is checked as rows G9/G10 check it: the
+    plugin's own read at its Ready-to-Live boundary equals the picked point word for word (edge_ready_exact).
     """
-    pages = {"6": (1, 2, 3), "7": (1, 3, 4)}[ident]
+    if ident != "6":
+        raise ValueError("through covers Guard the Edge; the Juggler's start is row J6's")
+    _fixture(ctx, scene, cpu_kind)
     wanted = list(expect) if expect else [None] * 3
     state = edge._move(ctx, scene, edge._setup(ctx, scene, ident), tuple(cpu))
     seen = [_observe(ctx, scene, state, f"{name}-cpu", expect=wanted[0])]
-    if ident == "7":
-        edge._select(ctx, scene, ident, 2)
-    state = edge._select(ctx, scene, ident, pages[1])
-    state = edge._move(ctx, scene, state, tuple(player))
+    cpu_point = _published(seen[0])
+    state = edge._move(ctx, scene, edge._select(ctx, scene, ident, 2), tuple(player))
     seen.append(_observe(ctx, scene, state, f"{name}-player", step="player", expect=wanted[1]))
-    state = edge._select(ctx, scene, ident, pages[2])
+    state = edge._select(ctx, scene, ident, 3)
     seen.append(_observe(ctx, scene, state, f"{name}-preview", step="preview", expect=wanted[2]))
-    body = {"ident": ident, "scene": scene, "seen": seen}
+    body = {"ident": ident, "scene": scene, "cpu_kind": cpu_kind, "cpu_gravity": cpu_gravity, "cpu_point": cpu_point,
+            "seen": seen}
     problems = [f"{s['name']}: {s['problem']}" for s in seen if s.get("problem")]
-    # The CPU waits on its own start in every step, also while the crosshair is the player's.
-    for s in seen:
-        try:
-            on_start = (abs(float(s["cpu_body"]["x"]) - cpu[0]) <= 0.6 and abs(float(s["cpu_body"]["y"]) - cpu[1]) <= 0.6)
-        except (TypeError, ValueError):
-            on_start = False
-        if not on_start:
-            problems.append(f"{s['name']}: the CPU's body is at {s['cpu_body']}, its start is {cpu}")
-    if start:
-        before = edge._read(ctx, scene)
-        ctx.play(edge.TAP["A"])
-        edge._ready(ctx, scene, before, ident, None, None, None)
-        time.sleep(0.5)
-        body["ready"] = {"cpu_body": _cpu_body(ctx, scene), "practice": {
-            key: value for key, value in _practice(ctx, None).items() if key in ("phase", "step", "wizard.cpu")},
-            "still": str(ctx.shot(f"{name}-ready"))}
-        if body["ready"]["practice"].get("wizard.cpu"):
-            problems.append(f"a running drill still reports wizard.cpu: {body['ready']['practice']}")
-        # The observations are kept before the tail that puts the game back. Stop and the close run once: a failure
-        # of either in a one-Eden boot is a finding (tr-primary-2, 2026-11-23 19:26:28Z), not something to retry.
-        _save(ctx, name, body)
-        edge._stop(ctx, scene, ident)
-        edge._close(ctx, scene)
+    for s in seen:  # the CPU waits on its own start in every step, also while the crosshair is the player's
+        held = held_problem(s["cpu_body"], cpu_point, cpu_gravity)
+        if held:
+            problems.append(f"{s['name']}: {held}")
+    if _published(seen[2]) != cpu_point:
+        problems.append(f"the preview publishes {_published(seen[2])}, the CPU step published {cpu_point}")
+    _save(ctx, name, {**body, "problems": problems})
+    point = edge_ready_exact.save_picked(ctx, keep=False)
+    before = edge._read(ctx, scene)
+    watch = edge_ready_exact.open_trace(ctx)
+    ctx.play(edge.TAP["A"])
+    edge._ready(ctx, scene, before, ident, None, None, None)
+    body["ready"] = edge_ready_exact.check_ready(ctx, scene, point, watch, player[0], cpu[0], 100)["edge_ready_exact"]
+    body["ready"]["practice"] = {key: value for key, value in _practice(ctx, None).items()
+                                 if key in ("phase", "step", "wizard.cpu")}
+    body["ready"]["still"] = str(ctx.shot(f"{name}-ready"))
+    if body["ready"]["practice"].get("wizard.cpu"):
+        problems.append(f"a running drill still reports wizard.cpu: {body['ready']['practice']}")
+    # The observations are kept before the tail that puts the game back. Stop and the close run once: a failure
+    # of either in a one-Eden boot is a finding (tr-primary-2, 2026-11-23 19:26:28Z), not something to retry.
+    _save(ctx, name, {**body, "problems": problems})
+    edge._stop(ctx, scene, ident)
+    edge._close(ctx, scene)
     return _finish(ctx, name, body, problems)
 
 
