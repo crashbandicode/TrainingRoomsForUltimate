@@ -16,7 +16,8 @@ use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
-use crate::model::frame_strip::{Sample, Settings, Tracker};
+use crate::model::frame_strip::{angle_of, Angle, Move, Sample, Settings, Tracker};
+use crate::model::aim;
 use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, LinkLine, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
@@ -29,6 +30,10 @@ use crate::runtime::{published, state_natives};
 static ENABLED: AtomicBool = AtomicBool::new(false);
 /// The hitstun-left read may run (`reaction_left`).
 static REACTION_ON: AtomicBool = AtomicBool::new(false);
+/// The side-attack motion read may run (`angle`).
+static ANGLE_ON: AtomicBool = AtomicBool::new(false);
+/// The directional-special position reads may run (`travel`).
+static AIM_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
 static GRADER_LIVE: AtomicBool = AtomicBool::new(false);
@@ -163,6 +168,33 @@ pub fn set_reaction(on: bool) {
     REACTION_ON.store(on, Ordering::Release);
 }
 
+/// The side-attack motion's angle, when the CPU mash unit's closure passed.
+unsafe fn angle(accessor: usize) -> Option<Angle> {
+    if !ANGLE_ON.load(Ordering::Acquire) {
+        return None;
+    }
+    angle_of(natives::motion_kind(accessor))
+}
+
+/// Boot: the angle read's row passed its guard.
+pub fn set_angle_read(on: bool) {
+    ANGLE_ON.store(on, Ordering::Release);
+}
+
+/// The position while in a directional-special travel status; the position reads are the Recording unit's rows.
+unsafe fn travel(accessor: usize, status: i32) -> Option<(f32, f32)> {
+    if !AIM_ON.load(Ordering::Acquire) {
+        return None;
+    }
+    let kind = p1_fighter(accessor)?;
+    (aim::travel_status(kind) == Some(status)).then(|| (natives::pos_x(accessor), natives::pos_y(accessor)))
+}
+
+/// Boot: the directional-special position reads' rows passed their guards.
+pub fn set_aim_read(on: bool) {
+    AIM_ON.store(on, Ordering::Release);
+}
+
 /// P1's fighter, for a saved combo's "recorded on" (SPEC-input-07 §4, metadata only): `utility::get_kind` is the CPU
 /// core unit's row, so the read runs only while that unit's closure passed (boot); otherwise `None`, and a save
 /// records no fighter.
@@ -289,6 +321,7 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     // The record names the hit only on the frame its knockback was written (the game clears it on the next).
     let launched = if spots { natives::damage_reaction(accessor) } else { 0.0 };
     let struck = if spots && launched > 0.0 { struck(accessor) } else { None };
+    let attack = if p1 { ids.attack(status) } else { None };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -303,7 +336,9 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         struck: struck.map(|(id, slot, _)| (id, slot)),
         dealt: struck.map_or(0.0, |(_, _, dealt)| dealt),
         object_id: if spots { ((accessor + natives::ACCESSOR_OBJECT_ID_FIELD) as *const u32).read() } else { 0 },
-        attack: if p1 { ids.attack(status) } else { None },
+        attack,
+        angle: if p1 && matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle(accessor) } else { None },
+        travel: if p1 { travel(accessor, status) } else { None },
         reaction,
         shielding: ids.shielding(status),
         status,
@@ -633,8 +668,9 @@ pub fn hud_tick(
     draw_settings: Settings,
     parry: Option<&crate::model::parry::View>,
     cells: bool,
+    labels: [bool; 2],
     mut apply: impl FnMut(usize, &Look, Changed),
-) -> (Option<LinkLine>, bool) {
+) -> (Option<LinkLine>, bool, [Option<u8>; 2]) {
     let tracker = *TRACKER.lock();
     let (_, line, history) = RENDERER.lock().draw_with_spec(
         &tracker, StripDraw { shown, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
@@ -648,5 +684,6 @@ pub fn hud_tick(
             apply(local, look, changed)
         },
     );
-    (line, history)
+    let aims = if shown { crate::model::frame_strip_plan::aims_drawn(&tracker, labels) } else { [None; 2] };
+    (line, history, aims)
 }

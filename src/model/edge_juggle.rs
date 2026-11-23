@@ -907,6 +907,7 @@ pub struct Wizard {
     left_start: Option<[f32; 2]>,
     moved: bool,
     cross: Crosshair,
+    floor_at: [f32; 2],
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -1006,6 +1007,7 @@ impl Wizard {
             left_start,
             moved: false,
             cross: Crosshair::new(cpu),
+            floor_at: cpu,
             step: WizardStep::Cpu,
             setup: Setup {
                 cpu,
@@ -1017,6 +1019,7 @@ impl Wizard {
             wizard.setup.cpu = wizard.default_cpu(stage, 0)?;
             wizard.cross.jump(wizard.setup.cpu);
         }
+        wizard.floor_at = wizard.cross.at;
         Some(wizard)
     }
 
@@ -1112,27 +1115,20 @@ impl Wizard {
         self.drill == Drill::Juggler || stage.off_stage(self.setup.cpu).is_some()
     }
 
-    pub fn player_floor(
-        &self,
-        stage: Stage,
-        cursor: [f32; 2],
-        confirm: bool,
-        mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>,
-    ) -> Option<[f32; 2]> {
-        sample(cursor).or_else(|| {
-            let previous = self.setup.p1;
-            // A ray at a shared lip can hit the wall. Confirm the displayed
-            // floor point only after its own fresh sample succeeds.
-            if confirm
-                && self.drill == Drill::GuardEdge
-                && cursor[0] != previous[0]
-                && stage.ledges.iter().any(|ledge| cursor[0] == ledge[0])
-            {
-                sample(previous)
-            } else {
-                None
+    /// The Player page keeps its cursor over a floor: a move with none under it is undone.
+    pub fn settle_player(&mut self, mut sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>) -> bool {
+        let (at, was) = (self.cross.at, self.floor_at);
+        for cursor in [Some(at), (at != was).then_some(was)].into_iter().flatten() {
+            if let Some(p1) = sample(cursor) {
+                if cursor != at {
+                    self.cross.jump(cursor);
+                }
+                (self.floor_at, self.setup.p1) = (cursor, p1);
+                return true;
             }
-        })
+        }
+        self.cross.jump(was);
+        false
     }
 
     pub fn change_percent(&mut self, delta: i16) {
@@ -1163,10 +1159,12 @@ impl Wizard {
     }
 
     fn jump_page(&mut self) {
-        self.cross.jump(match self.step {
+        let at = match self.step {
             WizardStep::Cpu | WizardStep::Percent => self.setup.cpu,
             WizardStep::Player | WizardStep::Preview => self.setup.p1,
-        });
+        };
+        self.cross.jump(at);
+        self.floor_at = at;
     }
 }
 
@@ -2062,34 +2060,138 @@ mod tests {
         assert_eq!(wide_enough.player_cursor(Drill::GuardEdge, [8.0, 0.0]), Some([2.0 - PLAYER_INSET, 0.0]));
     }
 
+    fn player_stage() -> Stage {
+        Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-79.9856, 0.0], [79.9893, 0.0]],
+        ).unwrap()
+    }
+
+    fn player_wizard(drill: Drill, stage: Stage) -> Wizard {
+        let mut w = Wizard::new(drill, stage, [0.0, 0.0], 60, (0, 0), None).unwrap();
+        assert_eq!(w.floor_at, w.cursor());
+        w.advance();
+        if drill == Drill::Juggler {
+            w.advance();
+        }
+        assert_eq!(w.step, WizardStep::Player);
+        assert_eq!(w.floor_at, w.cursor());
+        w
+    }
+
+    fn player_floor_sample([x, _]: [f32; 2]) -> Option<[f32; 2]> {
+        (-79.9856..=79.9893).contains(&x).then_some([x, 0.0])
+    }
+
+    fn player_frame(
+        w: &mut Wizard, stage: Stage, stick: [f32; 2], held: u16,
+        sample: impl FnMut([f32; 2]) -> Option<[f32; 2]>,
+    ) -> bool {
+        w.steer(stage, &btt::Pad { stick, held, ..btt::Pad::default() });
+        w.settle_player(sample)
+    }
+
     #[test]
-    fn edge_player_confirms_the_last_solid_floor_when_the_endpoint_is_a_wall() {
-        let stage = Stage::new(
-            [-180.0, 180.0, 120.0, -90.0],
-            [-160.0, 160.0, 118.0, -80.0],
-            [[-68.0, -4.25], [68.0, -4.25]],
-        ).unwrap();
-        let previous = [-66.140_594, -3.862];
-        let edge = Wizard::new(Drill::GuardEdge, stage, previous, 100, (0, 0), Some(0)).unwrap();
-        let lip = [-68.0, -3.862];
-        let mut queries = Vec::new();
-        assert_eq!(edge.player_floor(stage, lip, true, |point| {
-            queries.push(point);
-            (point == previous).then_some(previous)
-        }), Some(previous));
-        assert_eq!(queries, [lip, previous]);
-        assert!(edge.player_floor(stage, lip, false, |point| {
-            assert_eq!(point, lip, "only fresh confirmation revalidates the prior point");
-            None
-        }).is_none());
-        assert!(edge.player_floor(stage, lip, true, |_| None).is_none());
-        assert!(edge.player_floor(stage, [-60.0, 0.0], true, |point| {
-            (point == previous).then_some(previous)
-        }).is_none(), "a failed interior sample needs a new cursor location");
-        let juggler = Wizard::new(Drill::Juggler, stage, previous, 60, (0, 0), Some(0)).unwrap();
-        assert!(juggler.player_floor(stage, lip, true, |point| {
-            (point == previous).then_some(previous)
-        }).is_none(), "Juggler selects the current platform height");
+    fn a_juggler_player_cursor_stays_where_its_floor_was_read() {
+        let stage = player_stage();
+        let mut w = player_wizard(Drill::Juggler, stage);
+        let mut all_placed = true;
+        for _ in 0..64 {
+            all_placed &= player_frame(&mut w, stage, [-1.0, 0.0], 0, player_floor_sample);
+        }
+        assert_eq!(w.cursor(), [-78.0, 0.0]);
+        assert_eq!(w.setup.p1, [-78.0, 0.0]);
+        assert!(all_placed);
+        let mut right = w;
+        let right_key = 1 << crate::model::chords::logical::DPAD_RIGHT;
+        assert!(player_frame(&mut right, stage, [0.0; 2], right_key, player_floor_sample));
+        assert_eq!(right.cursor(), [-77.0, 0.0]);
+        assert_eq!(right.setup.p1, [-77.0, 0.0]);
+        assert!(player_frame(&mut w, stage, [1.0, 0.0], 0, player_floor_sample));
+        assert_eq!(w.cursor(), [-76.0, 0.0]);
+        assert_eq!(w.setup.p1, [-76.0, 0.0]);
+    }
+
+    #[test]
+    fn a_dpad_step_reaches_the_last_whole_unit_of_a_floor() {
+        use crate::model::chords::logical::DPAD_LEFT;
+
+        let stage = player_stage();
+        let mut w = player_wizard(Drill::Juggler, stage);
+        for _ in 0..64 {
+            player_frame(&mut w, stage, [-1.0, 0.0], 0, player_floor_sample);
+        }
+        let left = 1 << DPAD_LEFT;
+        assert!(player_frame(&mut w, stage, [0.0; 2], left, player_floor_sample));
+        assert_eq!(w.cursor(), [-79.0, 0.0]);
+        assert_eq!(w.setup.p1, [-79.0, 0.0]);
+        assert!(player_frame(&mut w, stage, [0.0; 2], 0, player_floor_sample));
+        assert!(player_frame(&mut w, stage, [0.0; 2], left, player_floor_sample));
+        assert_eq!(w.cursor(), [-79.0, 0.0]);
+        assert_eq!(w.setup.p1, [-79.0, 0.0]);
+
+        let mut repeat = player_wizard(Drill::Juggler, stage);
+        for _ in 0..20 {
+            assert!(player_frame(&mut repeat, stage, [0.0; 2], left, player_floor_sample));
+        }
+        assert_eq!(repeat.cursor(), [-4.0, 0.0]);
+        assert_eq!(repeat.setup.p1, [-4.0, 0.0]);
+    }
+
+    // A floor read can miss where a floor meets a wall (the removed lip case); this pins cursor behavior, not a fix.
+    #[test]
+    fn a_floor_read_that_misses_at_one_x_undoes_a_step_that_lands_on_it() {
+        use crate::model::chords::logical::DPAD_LEFT;
+
+        let stage = player_stage();
+        let mut w = player_wizard(Drill::Juggler, stage);
+        let floor = |point: [f32; 2]| {
+            if point[0] == -40.0 { None } else { player_floor_sample(point) }
+        };
+        for _ in 0..19 {
+            assert!(player_frame(&mut w, stage, [-1.0, 0.0], 0, floor));
+        }
+        let left = 1 << DPAD_LEFT;
+        assert!(player_frame(&mut w, stage, [0.0; 2], left, floor));
+        assert_eq!(w.cursor(), [-39.0, 0.0]);
+        for _ in 0..2 {
+            assert!(player_frame(&mut w, stage, [0.0; 2], 0, floor));
+            assert!(player_frame(&mut w, stage, [0.0; 2], left, floor));
+            assert_eq!(w.cursor(), [-39.0, 0.0]);
+            assert_eq!(w.setup.p1, [-39.0, 0.0]);
+        }
+        assert!(player_frame(&mut w, stage, [-1.0, 0.0], 0, floor));
+        assert_eq!(w.cursor(), [-41.0, 0.0]);
+        assert_eq!(w.setup.p1, [-41.0, 0.0]);
+    }
+
+    #[test]
+    fn a_player_point_whose_floor_is_gone_is_refused() {
+        let stage = player_stage();
+        let mut w = player_wizard(Drill::Juggler, stage);
+        assert!(w.settle_player(player_floor_sample));
+        let (cursor, p1) = (w.cursor(), w.setup.p1);
+        assert!(!w.settle_player(|_| None));
+        assert_eq!((w.cursor(), w.setup.p1), (cursor, p1));
+        assert!(!player_frame(&mut w, stage, [1.0, 0.0], 0, |_| None));
+        assert_eq!((w.cursor(), w.setup.p1), (cursor, p1));
+    }
+
+    #[test]
+    fn a_guard_player_cursor_on_a_point_with_no_floor_goes_back_to_its_last_floor() {
+        let stage = player_stage();
+        let mut w = player_wizard(Drill::GuardEdge, stage);
+        let stop = stage.ledges[0][0] + PLAYER_INSET;
+        let floor = |point: [f32; 2]| {
+            if point[0] == stop { None } else { player_floor_sample(point) }
+        };
+        let mut all_placed = true;
+        for _ in 0..64 {
+            all_placed &= player_frame(&mut w, stage, [-1.0, 0.0], 0, floor);
+        }
+        assert_eq!(w.cursor(), [-78.0, 0.0]);
+        assert_eq!(w.setup.p1, [-78.0, 0.0]);
+        assert!(all_placed);
     }
 
     #[test]

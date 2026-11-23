@@ -66,6 +66,7 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.page.role=\"\"",
         "recording.capture.role=\"\"",
         "recording.indicator=\"\"",
+        "strip.aims=\"\"",
         "list=\"rows/22\"",
         "list.count=2",
         "list.index=0",
@@ -124,6 +125,21 @@ fn the_indicator_is_the_take_the_hud_drew_on_a_fresh_pass() {
     assert_eq!(recording_indicator(drew(None), 1000, 500), "", "the pass drew no chip: the stock layout, the menu, no take");
     assert_eq!(recording_indicator(drew(Some(Take::Player)), 1501, 500), "", "no pass since: a waiting room without the host");
     assert_eq!(recording_indicator(0, 10, 500), "", "never drawn");
+}
+
+#[test]
+fn strip_aims_reports_the_marks_drawn_on_the_last_pass() {
+    let stamp = aims_stamp(1000, [Some(4), Some(0)]);
+    assert_eq!(strip_aims(stamp, 1200, 500), [Some(4), Some(0)]);
+    assert_eq!(strip_aims(aims_stamp(1000, [Some(2), None]), 1500, 500), [Some(2), None]);
+    assert_eq!(strip_aims(aims_stamp(1000, [None; 2]), 1000, 500), [None; 2]);
+    assert_eq!(strip_aims(stamp, 1501, 500), [None; 2]);
+    assert_eq!(strip_aims(0, 10, 500), [None; 2]);
+    for (aims, expected) in [([Some(4), Some(0)], "L R"), ([Some(2), None], "U"), ([None; 2], "")] {
+        let mut out = String::new();
+        assert!(snapshot(&View { strip_aims: aims, ..View::default() }, &mut out));
+        assert!(out.contains(&format!("\nrecording.indicator=\"\"\nstrip.aims=\"{expected}\"\n")));
+    }
 }
 
 #[test]
