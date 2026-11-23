@@ -3,8 +3,14 @@
 //! by file and lint by lint with its exact count, and `Cargo.toml` may set no lint to `allow`. A new suppression
 //! fails this test; so does a `KNOWN` row whose suppressions are gone, so the table only shrinks.
 //!
-//! The two hos-lock suppressions have operator approval (2026-11-02 14:2xZ, L2). Other rows carry their
-//! approval and reason; a row gains `approved` only with the operator's approval and its date.
+//! Exactly two hos-lock suppressions have operator approval (2026-11-02 14:2xZ, L2). The other rows are
+//! the remaining carried ones (decision D9 accepted those narrowly for byte-identical carried code); the lead
+//! takes each to the operator or has it removed at the root (with a recorded carry edit for carried code). A row
+//! gains `approved` only with the operator's approval and its date.
+//!
+//! The `tech_launch_native.rs` row is permitted by the primary's rc15 item-7b order (2026-11-22 ~23:48Z: a narrow
+//! allow with a one-line reason where the code is cfg-needed). It is not marked `approved`: no separate operator
+//! approval of the allow itself is recorded.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -13,7 +19,7 @@ use std::path::Path;
 /// (file, lint, count, status).
 const KNOWN: &[(&str, &str, usize, &str)] = &[
     ("crates/hos-lock/src/lib.rs", "clippy::declare_interior_mutable_const", 2, "approved: operator 2026-11-02 14:2xZ, L2; lock_api RawMutex/RawRwLock require const INIT"),
-    ("src/runtime/features/tech_launch_native.rs", "dead_code", 1, "approved: operator 2026-11-22 14:02Z, rc15 item 7b; shared diag launcher payloads"),
+    ("src/runtime/features/tech_launch_native.rs", "dead_code", 1, "permitted: tr-primary-2 rc15 item-7b order 2026-11-22 ~23:48Z (narrow allow, cfg-needed code); shared diag launcher payloads"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
