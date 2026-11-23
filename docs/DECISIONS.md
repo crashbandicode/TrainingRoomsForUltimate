@@ -1816,27 +1816,25 @@ fighter written onto it. The cursor already stops on the readable end of the flo
    in play. GJ1 uses the same read. Player 1's percent is left alone, as today.
 3. **The floor's last point,** after the measurement:
    - **A** (recommended): keep it as a start and make it repeat, so every release begins in the edge-teeter wait.
-   - **B:** stop the crosshair 1 unit inside the end, so each start is a point inside the floor.
+   - **B:** stop the crosshair 1 unit inside the end, so every start is a plain standing wait.
    - Either way the Preview prints where Player 1 will rest, not `(−80, 0)`.
 
 **Built 2026-11-23 (fix build).**
 - Placement waits while Player 1 is KO'd and wakes a held CPU if placement restarts.
 - Option B was chosen: both falls came after Ready began, so a pre-Ready correction catches neither, and a correction during Ready cannot distinguish the game's fall from a player's own drop to the ledge. The game's cause is unknown. See [the design](design/gj4-player-start.md).
 - The measurement boot was not flown; the `83eecc32` trace was read again instead.
+- Host tests are named in the design; the Eden proof is the fix build's boot. Whether a fighter written one unit inside stands in a plain Wait or starts the teeter there is not measured.
 
 ![GJ4: Player 1's start, the two measured defects](decisions/gte-next-GJ4-player-start.png)
 
-### Planned tests and proof
-
-GJ1–GJ3 are recorded here as planned at this base. GJ4's host tests are in its [built design](design/gj4-player-start.md);
-its Eden proof remains pending.
+### Planned tests and proof (not written, not run)
 
 | Operator clause | Design | Planned test |
 | --- | --- | --- |
 | Player 1 returns to the stage successfully after a successful edgeguard for it to count | GJ1 rule A: the return window, the 10 s limit, a Player 1 KO or the limit is a miss | model tests of the session for each of the five card texts; a source test of the two native reads |
 | Use the same crosshair as Break the Targets instead of picking a quadrant | GJ2: one crosshair page with the shared controls; side, ledge and upper or lower read from the point | model tests of the allowed region, the two side defaults, the remembered start and the bests' bucket |
 | For Juggler, reuse the same crosshair when selecting the CPU's area | GJ3: the shared controls and picture on Juggler's CPU page | a model test of the D-pad step on that page |
-| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the inset start | model and source tests named in the built design |
+| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the lip start after the measurement | model tests of the wait; the fix for the floor's last point gets its tests after the measurement |
 
 The Eden proof of each uses the bridge lineup (tr-primary-2 ledger, 2026-11-22 17:09:54Z) and playbook `b49b4e1` or
 later.

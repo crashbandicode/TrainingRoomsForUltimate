@@ -29,6 +29,8 @@ use the same rule.
 
 ## Requirement trace
 
+Clauses are the decided GJ4 of `docs/DECISIONS.md` (2026-11-22); the item was ordered into the fix build on 2026-11-23.
+
 | Operator clause | Design | Test |
 | --- | --- | --- |
 | The next attempt waits for a KO'd Player 1 | KO status restarts placement, waking a held CPU | `placement_waits_for_a_knocked_out_player`, `edge_juggle_waits_for_a_knocked_out_player` |
@@ -38,6 +40,6 @@ use the same rule.
 ## Limits and proof
 
 - Not flown in Eden at this head. Whether a fighter written one unit inside stands in Wait or starts teeter there
-  has not been measured; neither is the observed fall past the end.
+  has not been measured. Either way it stands on the floor: the fall was only seen from the floor's last point.
 - The edge-teeter start is no longer selectable. Juggler's point is not clamped.
 - A KO during Ready, after the write, is not handled. Player 1's damage between attempts is left alone.
