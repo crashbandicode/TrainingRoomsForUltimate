@@ -2847,10 +2847,10 @@ mod tests {
         let mut settings = Snapshot::factory();
         let mut ledge = vec![0; 10];
         ledge[option::PLAYBACK_FIRST as usize] = 1;
-        settings.set("ledge_state", ledge).unwrap();
+        settings.set("ledge_state", &ledge).unwrap();
         let mut delay = vec![0; 31];
         delay[0] = 1;
-        settings.set("ledge_delay", delay).unwrap();
+        settings.set("ledge_delay", &delay).unwrap();
         let mut cpu = Cpu::new(CpuSettings::from_snapshot(&settings), 77);
         cpu.ids = Table::with(&[(C::StatusCliffWait, 41), (C::StatusCliffCatch, 40), (C::TermContCliffClimb, 7)]);
         let key = FighterKey::new(1, false).unwrap();
