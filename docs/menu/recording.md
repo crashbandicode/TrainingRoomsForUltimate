@@ -296,6 +296,16 @@ its own screen ([above](#a-file-s-own-screen)).
 - **Default:** On
 - **How:** A, Left or Right flips it.
 
+### Place fighters before Record
+
+On: Record first opens four pages to place Player 1 and the CPU, choose their starting states and set their
+damage. The recorded start is saved with the macro. Off: Record starts at once. The Recording pop-up's Y button
+also flips this setting. Placement works in Training and the waiting room.
+
+- **Values:** On, Off
+- **Default:** Off
+- **How:** A, Left or Right flips it.
+
 ### Hitstun timing
 
 When a Playback Slot action starts after the CPU is hit: As Hitstun Ends (when the CPU can act again), As Hitstop

@@ -1864,3 +1864,9 @@ The room has no pause panel, so while a drill runs the plugin sets that partner'
 the game's own setter and gives the room's Training Partner Behavior back at Stop, and its level is the drill's.
 The room's L + R + A also restarts the drill's set. Eden rows for both scenes are in the combined run.
 Turning Lobby Practice Off while a drill runs stops it first; the partner gets its behavior and fighter back, then practice ends. If the partner cannot be given back, practice stays on in that room until the room ends.
+
+## Record placement · RP4 missed-tech face
+
+DOWN's entry picks the missed-tech face from the fighter's pose. On the same frame, immediately after entry,
+the plugin sets the chosen face flag and restarts that face's bound motion when either differs from the choice.
+X selects face up or face down.

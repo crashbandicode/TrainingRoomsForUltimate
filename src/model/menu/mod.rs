@@ -445,6 +445,7 @@ pub struct Menu {
     page_reset: Option<(Page, Vec<&'static str>)>,
     /// The recording pop-up and the Recording page's library. Not a settings row.
     recording: super::recording_menu::RecordingScreens,
+    place_first: Option<bool>,
     /// Mash out's popup over a chip of its grid, while open.
     mashout_pop: Option<MashoutPop>,
     practice_cpu_pop: Option<usize>,
@@ -515,6 +516,7 @@ impl Menu {
             edits: Vec::new(),
             page_reset: None,
             recording: super::recording_menu::RecordingScreens::new(),
+            place_first: None,
             mashout_pop: None,
             practice_cpu_pop: None,
             ignored: false,
@@ -535,6 +537,7 @@ impl Menu {
         self.chord_capture = ChordCapture::Preview;
         self.chord_refusal = None;
         self.edits.clear();
+        self.place_first = None;
         self.mashout_pop = None;
         self.practice_cpu_pop = None;
         self.sync();
@@ -1077,6 +1080,10 @@ impl Menu {
         core::mem::take(&mut self.outbox)
     }
 
+    pub fn take_place_first(&mut self) -> Option<bool> {
+        self.place_first.take()
+    }
+
     #[cfg(test)]
     pub fn outbox(&self) -> &Outbox {
         &self.outbox
@@ -1234,7 +1241,13 @@ impl Menu {
             other => other,
         };
         if self.recording.popup_open() {
-            self.ignored = !self.recording.press_popup_outcome(button);
+            if button == Button::Y && self.recording.popup_accepts_place_first() {
+                let on = self.toggle_by_id("recording_place");
+                self.put("recording_place", if on { &[0, 1] } else { &[1, 0] });
+                self.place_first = Some(self.toggle_by_id("recording_place"));
+            } else {
+                self.ignored = !self.recording.press_popup_outcome(button);
+            }
             return;
         }
         // L / R step the page from a submenu as from the page itself (`press_page`), leaving the sub-screens.

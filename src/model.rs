@@ -103,6 +103,8 @@ pub mod migration_run;
 pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
+#[path = "model/record_place.rs"]
+pub mod record_place;
 #[path = "model/numbered_picker.rs"]
 pub mod numbered_picker;
 /// The recording pop-up, the Recording page's library, and the file screens.

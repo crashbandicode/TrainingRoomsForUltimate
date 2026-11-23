@@ -11,6 +11,65 @@ use serde_json::{Map, Value};
 use super::held_item::HeldItem;
 use super::json::Writer;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum StartState {
+    #[default]
+    Standard,
+    Tumble,
+    Helpless,
+    Footstool,
+    MissedTechUp,
+    MissedTechDown,
+    Trip,
+}
+
+impl StartState {
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::Tumble => "tumble",
+            Self::Helpless => "helpless",
+            Self::Footstool => "footstool",
+            Self::MissedTechUp => "missed_tech_up",
+            Self::MissedTechDown => "missed_tech_down",
+            Self::Trip => "trip",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "tumble" => Self::Tumble,
+            "helpless" => Self::Helpless,
+            "footstool" => Self::Footstool,
+            "missed_tech_up" => Self::MissedTechUp,
+            "missed_tech_down" => Self::MissedTechDown,
+            "trip" => Self::Trip,
+            _ => Self::Standard,
+        }
+    }
+
+    pub const fn title(self) -> &'static str {
+        match self {
+            Self::Standard => "Standard",
+            Self::Tumble => "Tumble",
+            Self::Helpless => "Helpless",
+            Self::Footstool => "Footstool",
+            Self::MissedTechUp => "Missed tech · face up",
+            Self::MissedTechDown => "Missed tech · face down",
+            Self::Trip => "Trip",
+        }
+    }
+
+    pub const fn grounded(self) -> Option<bool> {
+        match self {
+            Self::Standard => None,
+            Self::Tumble | Self::Helpless | Self::Footstool => Some(false),
+            Self::MissedTechUp | Self::MissedTechDown | Self::Trip => Some(true),
+        }
+    }
+
+}
+
 /// The step marker of the load machine (SPEC-state-01 §5). Runtime only: it is written to the file as
 /// part of the record and forced back to `NoAction` when the file is read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,6 +83,7 @@ pub enum Marker {
     NanaPosMove,
     WaitForPokemonSwitch,
     WaitForCopyAbility,
+    WaitStart,
 }
 
 impl Marker {
@@ -38,6 +98,7 @@ impl Marker {
             Marker::NanaPosMove => "NanaPosMove",
             Marker::WaitForPokemonSwitch => "WaitForPokemonSwitch",
             Marker::WaitForCopyAbility => "WaitForCopyAbility",
+            Marker::WaitStart => "WaitStart",
         }
     }
 }
@@ -174,6 +235,7 @@ pub struct SavedState {
     pub lr: f32,
     /// The game's situation constant (ground / air / cliff / other).
     pub situation_kind: i32,
+    pub start_state: StartState,
     pub marker: Marker,
     /// The saved fighter kind, `-1` when never saved.
     pub fighter_kind: i32,
@@ -208,6 +270,7 @@ impl SavedState {
             percent: 0.0,
             lr: 1.0,
             situation_kind: 0,
+            start_state: StartState::Standard,
             marker: Marker::NoAction,
             fighter_kind: -1,
             charge: Charge::default(),
@@ -240,6 +303,7 @@ impl SavedState {
         record.percent = float("percent", 0.0);
         record.lr = float("lr", 1.0);
         record.situation_kind = int("situation_kind", 0);
+        record.start_state = object.get("start_state").and_then(Value::as_str).map(StartState::from_key).unwrap_or_default();
         record.fighter_kind = int("fighter_kind", -1);
         record.charge = object.get("charge").map(charge_from_json).unwrap_or_default();
         record.steve = object.get("steve_state").and_then(steve_from_json);
@@ -258,6 +322,9 @@ impl SavedState {
         out.field_f32("percent", self.percent);
         out.field_f32("lr", self.lr);
         out.field_int("situation_kind", i64::from(self.situation_kind));
+        if self.start_state != StartState::Standard {
+            out.field_str("start_state", self.start_state.key());
+        }
         out.field_str("state", self.marker.name());
         out.field_int("fighter_kind", i64::from(self.fighter_kind));
         out.key("charge");

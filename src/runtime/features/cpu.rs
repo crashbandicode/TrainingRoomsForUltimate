@@ -547,6 +547,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             let _state = HookScope::enter_hook(HookId::StateFrame);
             crate::runtime::features::states::frame(a0);
         }
+        unsafe { super::record_place::frame(a0) };
         if primary_p1 {
             unsafe { super::lockon::update_practice_items(a0) };
         }

@@ -225,10 +225,10 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Spacing grader adds one Display & Controls row (12 → 13).
     // Off-stage zone, Moving paths and Target expiry add three Eggs-ercise rows.
     // rc.15 compact strip: Display & Controls gained Link history (the operator's order via the primary, 2026-11-21 18:48Z; 13 → 14).
-    assert_eq!(counts(false), [34, 11, 13, 91, 14, 3]);
-    assert_eq!(counts(true), [33, 11, 13, 91, 14, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 163);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 162);
+    assert_eq!(counts(false), [34, 11, 14, 91, 14, 3]);
+    assert_eq!(counts(true), [33, 11, 14, 91, 14, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 164);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 163);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -247,7 +247,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
     // Spacing grader adds one Display & Controls row (145 → 146).
-    assert_eq!(ROWS.len(), 167);
+    assert_eq!(ROWS.len(), 168);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }

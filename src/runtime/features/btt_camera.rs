@@ -59,7 +59,7 @@ pub(crate) fn interrupt_placement() {
 /// Both CPU dispatch paths use the same session as the camera. This is an
 /// atomic read, independent of whether the native camera rows were admitted.
 pub(super) fn placing() -> bool {
-    OWNERS.placement(covered())
+    OWNERS.placement(covered()) || super::record_place::holding()
 }
 
 fn covered() -> bool {
@@ -74,6 +74,7 @@ pub(super) fn placement_pad(buttons: u32) -> Option<crate::model::edge_juggle::p
 pub(super) fn update_placement() -> bool {
     OWNERS.request(model::EGG_ZONE_OWNER, super::egg_zone::wizard_active());
     OWNERS.request(model::EDGE_JUGGLE_OWNER, super::edge_juggle::placement_active());
+    OWNERS.request(model::RECORD_PLACE_OWNER, super::record_place::placement_active());
     OWNERS.camera_wanted(covered())
 }
 

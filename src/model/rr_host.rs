@@ -28,7 +28,7 @@ use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
 use crate::model::recording::{inject_values, ControlCtx, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
-use crate::model::state::record::SavedState;
+use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
 
 const ROLE_PLAYER: u8 = 1;
@@ -40,6 +40,7 @@ static ASK_FIGHTER: AtomicBool = AtomicBool::new(true);
 static LAST_ROLE: AtomicU8 = AtomicU8::new(ROLE_PLAYER);
 static CAP_ROLE: AtomicU8 = AtomicU8::new(0);
 static CAP_LEN: AtomicUsize = AtomicUsize::new(0);
+static PLAYED: AtomicU32 = AtomicU32::new(0);
 static CAP_FRAMES: [AtomicU64; MAX_FRAMES] = [const { AtomicU64::new(0) }; MAX_FRAMES];
 // Final converted event records only. CAP_FRAMES stays exclusively owned by ordinary Record mechanics.
 static INPUT_MODE: AtomicU8 = AtomicU8::new(0); // bit1 Make, bit2 direct Record; either may overlap another take
@@ -88,7 +89,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let take = converted_input(mode).expect("observed take").capture; INPUT_MODE.fetch_and(!mode, Ordering::AcqRel);
     if take.combo.overflow { tick.notices.push(DRILL_CAPACITY); return; }
     if take.combo.is_empty() { tick.notices.push(super::rr_runtime::EMPTY_RECORDING); return; }
-    let recorded_on = if activate { RECORD_START.lock().take().map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty()) } else { None };
+    let recorded_on = if activate { take_record_start().map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty()) } else { None };
     if let Ok(id) = save_made_combo(root, &take.combo, source, recorded_on, unix_now()) {
         if activate {
             let _ = RecordingIndex::update(root, |index| {
@@ -228,9 +229,18 @@ static CPU_ROLE_ON: AtomicBool = AtomicBool::new(false);
 /// does: a frame fed before the restore is undone by it. A CPU-role file begins on its first
 /// press, so its opening action was always lost (Eden `rc5-opus-cpu2`, 2026-11-08).
 static WARP_HOLD: AtomicBool = AtomicBool::new(false);
-/// Both fighters at the last record chord that started a recording (`note_record_start`). Values only: the game thread
-/// writes it, the worker takes it when the recording stops.
-static RECORD_START: hos_lock::Mutex<Option<RecordStart>> = hos_lock::Mutex::new(None);
+static START_GATE: AtomicBool = AtomicBool::new(false);
+#[derive(Clone, Copy)]
+struct PostedStart {
+    seq: u64,
+    start: RecordStart,
+}
+
+/// One game-thread writer (chord or placement poll), one recording-worker reader.
+static RECORD_STARTS: hos_lock::TripleBuffer<PostedStart> =
+    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY });
+static START_SEQ: AtomicU64 = AtomicU64::new(0);
+static START_USED: AtomicU64 = AtomicU64::new(0);
 /// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
 static START_SPEED: hos_lock::Mutex<[Option<StartSpeed>; 2]> = hos_lock::Mutex::new([None; 2]);
 /// The roles with a `START_SPEED` entry, so the per-frame check takes no lock while nothing is owed.
@@ -403,6 +413,10 @@ pub fn set_record_role(role: Role) {
     RECORD_ROLE.store(bits, Ordering::Release);
 }
 
+pub fn record_role() -> Role {
+    if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player }
+}
+
 /// The pop-up's role, posted by the menu worker before the record chord.
 pub fn publish_fighter_prompt(on: bool) {
     ASK_FIGHTER.store(on, Ordering::Release);
@@ -429,6 +443,14 @@ pub fn cpu_role_after_chord(facing: i8) {
         CPU_ROLE_ON.store(false, Ordering::Release);
     } else if role == ROLE_CPU && !drive.active() {
         drive.begin(facing);
+        CPU_ROLE_ON.store(true, Ordering::Release);
+    }
+}
+
+pub fn cpu_role_begin_placed(facing: i8) {
+    let mut drive = CPU_DRIVE.lock();
+    if CAP_ROLE.load(Ordering::Acquire) == ROLE_CPU && !drive.active() {
+        drive.begin_placed(facing);
         CPU_ROLE_ON.store(true, Ordering::Release);
     }
 }
@@ -583,6 +605,38 @@ pub fn warp_landed() {
     WARP_HOLD.store(false, Ordering::Release);
 }
 
+pub fn start_gate(up: bool) {
+    if up {
+        PLAYED.store(0, Ordering::Release);
+    }
+    START_GATE.store(up, Ordering::Release);
+}
+
+pub fn captured_frames() -> u32 {
+    CAP_LEN.load(Ordering::Acquire) as u32
+}
+
+pub fn played_frames() -> u32 {
+    PLAYED.load(Ordering::Acquire)
+}
+
+pub fn start_gated() -> bool {
+    START_GATE.load(Ordering::Acquire)
+}
+
+pub fn start_ready() -> bool {
+    !(RUN_PLAYER.load(Ordering::Acquire) && PLAYER_FRAMES.is_empty())
+        && !(RUN_CPU.load(Ordering::Acquire) && CPU_FRAMES.is_empty())
+}
+
+pub fn abort_warp() {
+    LOAD.store(true, Ordering::Release);
+    cut(Role::Player);
+    cut(Role::Cpu);
+    WARP_HOLD.store(false, Ordering::Release);
+    start_gate(false);
+}
+
 /// One fighter at a record chord: the live values the start save keeps (`StartPose::saved`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct StartPose {
@@ -592,10 +646,11 @@ pub struct StartPose {
     pub y: f32,
     pub percent: f32,
     pub lr: f32,
+    pub start_state: PlacementStartState,
 }
 
 /// A role never seen: kind −1.
-const UNSEEN: StartPose = StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0 };
+const UNSEEN: StartPose = StartPose { fighter_kind: -1, situation_kind: 0, x: 0.0, y: 0.0, percent: 0.0, lr: 1.0, start_state: PlacementStartState::Standard };
 
 impl StartPose {
     /// The saved record of this pose; a fighter never seen (kind −1) is a never-saved record.
@@ -610,6 +665,7 @@ impl StartPose {
         state.y = self.y;
         state.percent = self.percent;
         state.lr = self.lr;
+        state.start_state = self.start_state;
         state
     }
 }
@@ -623,6 +679,8 @@ pub struct RecordStart {
 }
 
 impl RecordStart {
+    const EMPTY: Self = Self { poses: [UNSEEN; 2], speeds: [(0.0, 0.0); 2] };
+
     /// Both role bodies as the game held them at the Record chord (slot 0 Player 1, 1 the CPU): each one's pose and
     /// summed speed, read from the body then. Never the frame-published pose (`live_pose`): that is the role's last
     /// published frame, which may be another fighter's. A role without a body is a never-seen pose (kind −1) at rest.
@@ -665,7 +723,7 @@ pub fn live_pose(slot: usize) -> StartPose {
         return UNSEEN;
     }
     let [x, y, percent, lr] = [0, 1, 2, 3].map(|i: usize| f32::from_bits(cells[i].load(Ordering::Acquire)));
-    StartPose { fighter_kind: kind, situation_kind: sit.load(Ordering::Acquire), x, y, percent, lr }
+    StartPose { fighter_kind: kind, situation_kind: sit.load(Ordering::Acquire), x, y, percent, lr, start_state: PlacementStartState::Standard }
 }
 
 /// The speed a Play gives the playing role on its first input after the warp: the macro's recorded start speed with
@@ -680,7 +738,13 @@ pub struct StartSpeed {
 /// The game thread, at a record chord that starts a recording (`capture_role() == 0`), before `on_chords`: both fighters'
 /// live pose and speeds. Values only; no allocation.
 pub fn note_record_start(start: RecordStart) {
-    *RECORD_START.lock() = Some(start);
+    let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
+    RECORD_STARTS.write(PostedStart { seq, start });
+}
+
+fn take_record_start() -> Option<RecordStart> {
+    let posted = RECORD_STARTS.read().0;
+    (START_USED.swap(posted.seq, Ordering::AcqRel) != posted.seq).then_some(posted.start)
 }
 
 /// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b)): what the role's run owes its first input, taken once by the
@@ -688,7 +752,8 @@ pub fn note_record_start(start: RecordStart) {
 pub fn take_start_speed(role: Role) -> Option<StartSpeed> {
     let bit = 1u8 << role_index(role);
     // While the warp's restore is pending no input is fed, and the restore would undo a speed set now.
-    if START_OWED.load(Ordering::Acquire) & bit == 0 || WARP_HOLD.load(Ordering::Acquire) {
+    if START_OWED.load(Ordering::Acquire) & bit == 0 || WARP_HOLD.load(Ordering::Acquire)
+        || cut_flag(role).load(Ordering::Acquire) {
         return None;
     }
     START_OWED.fetch_and(!bit, Ordering::AcqRel);
@@ -833,7 +898,7 @@ pub fn service_at(
         show_chord_notice(root, &mut tick);
     }
     if edge == 2 && INPUT_MODE.load(Ordering::Acquire) & 2 != 0 {
-        save_input(root, "", true, &mut tick); let _ = taken_frames(); let _ = RECORD_START.lock().take();
+        save_input(root, "", true, &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
         let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
             "cpu"
@@ -851,7 +916,7 @@ pub fn service_at(
         // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
         // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
         // stands in, at rest, as before.
-        let (player, cpu, speeds) = match RECORD_START.lock().take() {
+        let (player, cpu, speeds) = match take_record_start() {
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
@@ -1118,6 +1183,9 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
         (record.x, record.y) = placement.apply((record.x, record.y));
         if placement.delta_y != 0.0 && record.situation_kind == 0 {
             record.situation_kind = SITUATION_AIR;
+            if matches!(record.start_state, PlacementStartState::MissedTechUp | PlacementStartState::MissedTechDown | PlacementStartState::Trip) {
+                record.start_state = PlacementStartState::Standard;
+            }
         }
     }
     pair
@@ -2000,12 +2068,15 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
 fn take_frame(role: Role) -> Option<InputFrame> {
-    if WARP_HOLD.load(Ordering::Acquire) || cut_flag(role).load(Ordering::Acquire)
+    if WARP_HOLD.load(Ordering::Acquire) || start_gated() || cut_flag(role).load(Ordering::Acquire)
         || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
     {
         return None;
     }
-    role_frames(role).pop().map(unpack)
+    role_frames(role).pop().map(|frame| {
+        PLAYED.fetch_add(1, Ordering::AcqRel);
+        unpack(frame)
+    })
 }
 
 fn role_frames(role: Role) -> &'static FrameQueue {
@@ -2058,6 +2129,7 @@ fn reset_host() {
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);
     CAP_ROLE.store(0, Ordering::Release);
     CAP_LEN.store(0, Ordering::Release);
+    PLAYED.store(0, Ordering::Release);
     RECORD_EDGE.store(0, Ordering::Release);
     PLAY_PLAYER.store(false, Ordering::Release);
     PLAY_CPU.store(false, Ordering::Release);
@@ -2091,7 +2163,8 @@ fn reset_host() {
     DEFER_MIGRATE.store(false, Ordering::Release);
     CPU_ROLE_ON.store(false, Ordering::Release);
     WARP_HOLD.store(false, Ordering::Release);
-    *RECORD_START.lock() = None;
+    START_GATE.store(false, Ordering::Release);
+    START_USED.store(RECORD_STARTS.read().0.seq, Ordering::Release);
     *START_SPEED.lock() = [None; 2];
     START_OWED.store(0, Ordering::Release);
     *CPU_DRIVE.lock() = CpuRoleDrive::idle();
@@ -4253,7 +4326,228 @@ mod tests {
     }
 
     fn pose(kind: i32, x: f32, lr: f32) -> StartPose {
-        StartPose { fighter_kind: kind, situation_kind: 0, x, y: 0.0, percent: 0.0, lr }
+        StartPose { fighter_kind: kind, situation_kind: 0, x, y: 0.0, percent: 0.0, lr, start_state: PlacementStartState::Standard }
+    }
+
+    #[test]
+    fn a_record_start_is_posted_without_a_lock() {
+        let source = include_str!("rr_host.rs");
+        let body = source.split("pub fn note_record_start(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(!body.contains("lock("));
+        assert!(!source.contains(concat!("static RECORD_", "START:")));
+    }
+
+    #[test]
+    fn the_worker_uses_the_last_posted_start_once() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("posted-start-once");
+        for x in [1.0, 2.0] {
+            note_record_start(RecordStart { poses: [pose(13, x, 1.0), pose(7, 0.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+        }
+        for x in [40.0, 50.0] {
+            on_chords(true, false, false);
+            push_capture(ROLE_PLAYER, InputFrame { buttons: 4, ..InputFrame::default() });
+            on_chords(true, false, false);
+            let mut live = state(13);
+            live.x = x;
+            service_at(&root, &none(), "2026-11-22", live, state(7));
+        }
+        let macros = Library::new(root.join(MACROS_DIR));
+        let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+        let mut positions: Vec<_> = macros.list().unwrap().entries.iter().map(|entry| {
+            let recording = macros.load(&entry.id).unwrap();
+            saves.load(recording.start_save.as_deref().unwrap()).unwrap().player.x
+        }).collect();
+        positions.sort_by(f32::total_cmp);
+        assert_eq!(positions, [2.0, 50.0]);
+    }
+
+    #[test]
+    fn five_starts_without_a_worker_tick_keep_the_newest() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("five-posted-starts");
+        for i in 1..=5 {
+            note_record_start(RecordStart { poses: [pose(13, i as f32, 1.0), pose(7, 0.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+            on_chords(true, false, false);
+            push_capture(ROLE_PLAYER, InputFrame { buttons: i, ..InputFrame::default() });
+            on_chords(true, false, false);
+        }
+        service_at(&root, &none(), "2026-11-22", state(13), state(7));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let entries = macros.list().unwrap().entries;
+        assert_eq!(entries.len(), 1);
+        let recording = macros.load(&entries[0].id).unwrap();
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(recording.start_save.as_deref().unwrap()).unwrap();
+        assert_eq!(save.player.x, 5.0);
+    }
+
+    fn placed_save(tag: &str) -> NamedSave {
+        use crate::model::state::record::StartState as PlacedState;
+        reset_host();
+        let root = scratch(tag);
+        let mut p1 = pose(13, -30.0, -1.0);
+        p1.y = 4.0;
+        p1.percent = 80.0;
+        p1.situation_kind = 0;
+        p1.start_state = PlacedState::MissedTechUp;
+        let mut cpu = pose(7, 40.0, 1.0);
+        cpu.y = -8.0;
+        cpu.percent = 45.0;
+        cpu.situation_kind = SITUATION_AIR;
+        cpu.start_state = PlacedState::Tumble;
+        note_record_start(RecordStart { poses: [p1, cpu], speeds: [(0.0, 0.0); 2] });
+        on_chords(true, false, false);
+        push_capture(ROLE_PLAYER, InputFrame { buttons: 4, ..InputFrame::default() });
+        on_chords(true, false, false);
+        service_at(&root, &none(), "2026-11-22", state(13), state(7));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let recording = macros.load(&macros.list().unwrap().entries[0].id).unwrap();
+        Store::<NamedSave>::new(root.join(SAVES_DIR)).load(recording.start_save.as_deref().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn placed_start_becomes_the_start_save() {
+        use crate::model::state::record::StartState as PlacedState;
+        let _hold = hold();
+        let saved = placed_save("placed-save");
+        assert_eq!((saved.player.x, saved.player.y, saved.player.percent, saved.player.situation_kind, saved.player.start_state),
+                   (-30.0, 4.0, 80.0, 0, PlacedState::MissedTechUp));
+        assert_eq!((saved.cpu.x, saved.cpu.y, saved.cpu.percent, saved.cpu.situation_kind, saved.cpu.start_state),
+                   (40.0, -8.0, 45.0, SITUATION_AIR, PlacedState::Tumble));
+    }
+
+    #[test]
+    fn placed_start_keeps_each_fighters_facing() {
+        let _hold = hold();
+        let saved = placed_save("placed-facing");
+        assert_eq!((saved.player.lr, saved.cpu.lr), (-1.0, 1.0));
+    }
+
+    #[test]
+    fn the_start_gate_keeps_every_playback_frame_back() {
+        let _hold = hold();
+        reset_host();
+        let p1 = InputFrame { buttons: 1, ..InputFrame::default() };
+        let cpu = InputFrame { buttons: 2, ..InputFrame::default() };
+        assert!(PLAYER_FRAMES.push(pack(p1)));
+        assert!(CPU_FRAMES.push(pack(cpu)));
+        start_gate(true);
+        assert!(start_gated());
+        assert_eq!(take_player_frame(), None);
+        assert_eq!(take_cpu_frame(), None);
+        start_gate(false);
+        assert!(!start_gated());
+        assert_eq!(take_player_frame(), Some(p1));
+        assert_eq!(take_cpu_frame(), Some(cpu));
+    }
+
+    #[test]
+    fn played_frames_count_from_the_start_gate() {
+        let _hold = hold();
+        reset_host();
+        let frame = InputFrame { buttons: 1, ..InputFrame::default() };
+        assert!(PLAYER_FRAMES.push(pack(frame)));
+        assert!(CPU_FRAMES.push(pack(frame)));
+        start_gate(true);
+        assert_eq!(played_frames(), 0);
+        assert_eq!(take_player_frame(), None);
+        assert_eq!(take_cpu_frame(), None);
+        assert_eq!(played_frames(), 0);
+        start_gate(false);
+        WARP_HOLD.store(true, Ordering::Release);
+        assert_eq!(take_player_frame(), None);
+        assert_eq!(played_frames(), 0);
+        WARP_HOLD.store(false, Ordering::Release);
+        assert_eq!(take_player_frame(), Some(frame));
+        assert_eq!(played_frames(), 1);
+        assert_eq!(take_cpu_frame(), Some(frame));
+        assert_eq!(played_frames(), 2);
+        assert_eq!(take_cpu_frame(), None);
+        assert_eq!(played_frames(), 2);
+        start_gate(true);
+        assert_eq!(played_frames(), 0);
+    }
+
+    #[test]
+    fn captured_frames_follows_push_capture() {
+        let _hold = hold();
+        reset_host();
+        assert_eq!(captured_frames(), 0);
+        CAP_ROLE.store(ROLE_PLAYER, Ordering::Release);
+        push_capture(ROLE_CPU, InputFrame::default());
+        assert_eq!(captured_frames(), 0);
+        push_capture(ROLE_PLAYER, InputFrame::default());
+        assert_eq!(captured_frames(), 1);
+        push_capture(ROLE_PLAYER, InputFrame::default());
+        assert_eq!(captured_frames(), 2);
+    }
+
+    #[test]
+    fn start_ready_waits_for_a_running_roles_first_frame() {
+        let _hold = hold();
+        reset_host();
+        assert!(start_ready());
+        RUN_PLAYER.store(true, Ordering::Release);
+        assert!(!start_ready());
+        assert!(PLAYER_FRAMES.push(pack(InputFrame::default())));
+        assert!(start_ready());
+        RUN_CPU.store(true, Ordering::Release);
+        assert!(!start_ready());
+        assert!(CPU_FRAMES.push(pack(InputFrame::default())));
+        assert!(start_ready());
+    }
+
+    #[test]
+    fn abort_warp_retires_the_waiting_play_before_the_gate_opens() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("abort-warp");
+        service_at(&root, &none(), "2026-11-22", state(8), state(7));
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR))
+            .save_new(&NamedSave::new("Run", state(8), state(7)).unwrap()).unwrap();
+        let mut start = StartState::neutral(8, 0, 1.0);
+        start.speed_x = 1.5;
+        let mut recording = MacroRecording::new("Run", "13.0.5", start,
+            vec![InputFrame { buttons: 4, ..InputFrame::default() }]).unwrap();
+        recording.set_start_save(Some(&save)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Player, Some(&id), 1)?; Ok(true) }).unwrap();
+        on_chords(false, true, false);
+        assert_eq!(service_at(&root, &none(), "2026-11-22", state(8), state(7)).warp.as_deref(), Some(save.as_str()));
+        start_gate(true);
+        warp_landed();
+        service_at(&root, &none(), "2026-11-22", state(8), state(7));
+        assert!(!PLAYER_FRAMES.is_empty());
+        assert!(CPU_FRAMES.push(pack(InputFrame { buttons: 9, ..InputFrame::default() })));
+        assert!(START_OWED.load(Ordering::Acquire) != 0);
+        assert!(take_player_frame().is_none());
+        abort_warp();
+        assert!(!start_gated());
+        assert!(take_player_frame().is_none());
+        assert!(take_cpu_frame().is_none());
+        assert!(take_start_speed(Role::Player).is_none());
+        service_at(&root, &none(), "2026-11-22", state(8), state(7));
+        assert!(take_player_frame().is_none());
+        assert!(take_cpu_frame().is_none());
+        assert!(take_start_speed(Role::Player).is_none());
+    }
+
+    #[test]
+    fn a_raised_ground_start_plays_as_standard() {
+        use crate::model::state::record::StartState as PlacedState;
+        for start_state in [PlacedState::MissedTechUp, PlacedState::MissedTechDown, PlacedState::Trip] {
+            let mut player = state(8);
+            player.start_state = start_state;
+            let pair = warp_pair(NamedSave::new("Run", player.clone(), state(7)).unwrap(),
+                Some((Role::Player, Placement { delta_y: 3.0, ..Placement::default() })));
+            assert_eq!(pair[0].situation_kind, SITUATION_AIR);
+            assert_eq!(pair[0].start_state, PlacedState::Standard);
+            let flat = warp_pair(NamedSave::new("Run", player, state(7)).unwrap(),
+                Some((Role::Player, Placement { delta_x: 3.0, ..Placement::default() })));
+            assert_eq!(flat[0].start_state, start_state);
+        }
     }
 
     /// RECORDING-REDESIGN "Start save: the save state this macro starts at", and PLAY-MOMENTUM (primary 2026-11-08

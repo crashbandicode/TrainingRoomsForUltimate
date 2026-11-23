@@ -101,6 +101,21 @@ fn no_focused_list_has_empty_keys_and_an_index_of_minus_one() {
 }
 
 #[test]
+fn extra_lines_come_after_the_list_and_before_the_rows() {
+    let view = View { extra: "place.first=1\nplace.role=\"cpu\"\n", ..eggs_start() };
+    let mut out = String::new();
+    assert!(snapshot(&view, &mut out));
+    assert!(out.contains("list.value=\"\"\nplace.first=1\nplace.role=\"cpu\"\nrows.count=2\n"));
+
+    let extra = format!("place.long=\"{}\"\n", "x".repeat(1500));
+    let long = "row".repeat(200);
+    let rows = [long.as_str(), long.as_str()];
+    let view = View { extra: &extra, rows: &rows, ..eggs_start() };
+    assert!(!snapshot(&view, &mut out));
+    assert!(out.len() <= MAX && out.contains("rows.complete=0"));
+}
+
+#[test]
 fn the_page_level_has_no_group_and_strings_are_escaped() {
     let view = View { open: true, page: "cpu", row: Some("Say \"hi\"\\now\nnext"), action: "row", ..View::default() };
     let mut out = String::new();

@@ -5,6 +5,9 @@ the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
+| `record-place-practice` | `Stop the practice game to place fighters` | A running practice game owns the fighters, so placement does not open over it. | Operator record-placement design, R1 handoff |
+| `record-place-start` | `Not recorded · {fighter} could not start in {state}` | A placed recording is discarded if either fighter cannot start in its requested state at the first input. | Operator record-placement design, R1 handoff |
+| `record-place-load` | `Not placed · {fighter} could not start in {state}` | Playback is stopped if the requested start cannot be synchronized; its save is retained. | Operator record-placement design, R1 handoff |
 | MASH-R2-NO-END | Escaped · {elapsed}f · fastest {fastest}f (no grade: this hold never ends on its own) | Native no-input escape is infinite and no verified deadline exists, so S has no finite denominator; no best/streak entry. | primary R2, 2026-11-15 |
 | MASH-R2-NO-SAVING | Escaped · {elapsed}f · Mashing can't shorten this hold | F equals the no-input duration, including Robin at damage >=120; no best/streak entry. | primary R2, 2026-11-15 |
 | M3-T2-NATIVE-EPOCH | Capture restarted · no grade | During Held, only a native seed published by the guarded main+0x639d44 observer for a Bury down throw replaces the clock. Every other Held restart and every Result restart remains unscored. A late-seed result is explicitly labelled from the throw's clatter start; all bounds, elapsed ticks and carried latches originate in that observed seed. | primary approved t2 design/guard exception and conditional grading, 2026-11-16 |

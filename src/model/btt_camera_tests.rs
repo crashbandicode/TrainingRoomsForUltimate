@@ -8,6 +8,23 @@ use super::*;
 const NORMAL: i32 = 1;
 const ZOOM: i32 = 8;
 
+#[test]
+fn record_placing_asks_for_the_placement_camera() {
+    let owners = CameraRequests::idle();
+    assert!(!owners.placement(false));
+    owners.request(RECORD_PLACE_OWNER, true);
+    assert!(owners.placement(false));
+    assert!(owners.camera_wanted(false));
+    assert!(!owners.placement(true));
+    owners.request(RECORD_PLACE_OWNER, false);
+    assert!(!owners.placement(false));
+    assert!(!owners.camera_wanted(false));
+    owners.request(RECORD_PLACE_OWNER, true);
+    owners.interrupt();
+    assert!(!owners.placement(false));
+    assert!(!owners.camera_wanted(false));
+}
+
 /// Where the mode takes the game's camera and reads the stage's camera range (the normal placing box): native Training and an
 /// active waiting-room practice (rc.14, 11-15: the LDN pass showed both local to the console); not in a match, not while a
 /// fighter swap owns the scene, not on a lobby flag left over from an earlier room.
@@ -100,7 +117,7 @@ fn btt_camera_owners_preserve_mode_through_handover() {
         if let Some(to) = act { *mode = to; }
         act
     }
-    let bits = [BTT_PLACEMENT_OWNER, TECH_CAMERA_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER, TECH_PLACEMENT_OWNER];
+    let bits = [BTT_PLACEMENT_OWNER, TECH_CAMERA_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER, TECH_PLACEMENT_OWNER, RECORD_PLACE_OWNER];
     for before in [NORMAL, ZOOM, FIXED] {
         for owner in bits {
             let owners = CameraRequests::idle();
@@ -139,7 +156,7 @@ fn btt_camera_owners_preserve_mode_through_handover() {
 }
 
 fn each_placement_owner_holds_the_cpu_and_releases_the_previous_view() {
-    let editors = [BTT_PLACEMENT_OWNER, TECH_PLACEMENT_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER];
+    let editors = [BTT_PLACEMENT_OWNER, TECH_PLACEMENT_OWNER, EGG_ZONE_OWNER, EDGE_JUGGLE_OWNER, RECORD_PLACE_OWNER];
     for owner in editors {
         for (closed, covered, invalidated, mode) in [
             (true, false, false, Some(FIXED)), // Apply, Back

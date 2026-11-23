@@ -103,6 +103,16 @@ fn toggle_input_display(presses: u32) {
     diagnostic(format_args!("[TrainingRooms] input_display bind on={on} presses={presses}"));
 }
 
+fn commit_place_first(on: bool) {
+    let Some(mut settings) = SETTINGS.lock().clone() else { return };
+    if settings.menu.set("recording_place", if on { &[1, 0] } else { &[0, 1] }).is_err() {
+        return;
+    }
+    published::publish(&settings.menu, 0, [None; 2]);
+    replace_menu_settings(settings);
+    writer::request_settings();
+}
+
 /// Wake the menu worker (any thread; never waits, no allocation).
 pub fn wake() {
     WAKE.set();
@@ -475,6 +485,15 @@ fn publish_bridge_state(s: &mut Session) {
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
         let list = crate::model::bridge_state::published_list(m, flow::model_takes_presses(open, POPUP.load(Ordering::Acquire), *phase, pending_close.is_some()));
+        let first = crate::runtime::published::live().is_some_and(|live| live.recorder.place);
+        let popup = m.is_some_and(|m| m.recording().popup_open());
+        let role = if crate::engine::rr_host::record_role() == crate::engine::library::Role::Cpu {
+            crate::model::record_place::Who::Cpu
+        } else {
+            crate::model::record_place::Who::P1
+        };
+        let mut extra = String::new();
+        crate::model::record_place::write_shown(&crate::runtime::features::record_place::shown(), first, popup, role, &mut extra);
         let view = crate::model::bridge_state::View {
             open: open && m.is_some(),
             page: m.map_or("", |m| m.page().id()),
@@ -505,6 +524,7 @@ fn publish_bridge_state(s: &mut Session) {
             list_count: list.count,
             list_index: list.index,
             list_value: &list.value,
+            extra: &extra,
             rows_omitted: true,
             ..Default::default()
         };
@@ -678,11 +698,16 @@ fn press(button: Button, s: &mut Session) {
     refresh_recording(s);
     let version = s.recording_version();
     if popup && !open {
+        let mut place_first = None;
         if let Some(menu) = s.menu.as_mut() {
             menu.set_console(console_mode());
             let handled = menu.press_outcome(button);
+            place_first = menu.take_place_first();
             crate::runtime::bridge_state::note_ack(handled);
             post_recording_effect(menu, version);
+        }
+        if let Some(on) = place_first {
+            commit_place_first(on);
         }
         return;
     }
@@ -722,6 +747,7 @@ fn press(button: Button, s: &mut Session) {
             }
         } else {
             handled = m.press_outcome(button);
+            let _ = m.take_place_first();
             // Eden reads where each press left the cursor (the section jump, the remembered place).
             if crate::runtime::export::wanted() {
                 diagnostic(format_args!("[Ui] press {button:?} page={} cursor={} depth={} screen={:?} row={:?} recording={}",

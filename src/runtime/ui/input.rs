@@ -99,7 +99,8 @@ pub fn on_p1_poll(holder: usize) {
     }
     let wizard = crate::runtime::features::tech::wizard_active()
         || crate::runtime::features::edge_juggle::wizard_active()
-        || crate::runtime::features::egg_zone::wizard_active();
+        || crate::runtime::features::egg_zone::wizard_active()
+        || crate::runtime::features::record_place::wizard_active();
     if !prompt && ((!wizard && step.open) || (chord_open && allowed && !open)) {
         adapter.resync(buttons, style);
         INPUT_OWNERS.fetch_or(Owners::MENU.bits(), Ordering::AcqRel);

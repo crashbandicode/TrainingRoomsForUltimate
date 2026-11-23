@@ -343,6 +343,9 @@ fn run_inner() {
     let edge_juggle_on = crate::runtime::features::edge_juggle::install(
         cpu_core_on && recording_on && roster_on && capabilities::unit_usable(Feature::EdgeJuggle, &usable)
     );
+    let record_place_on = crate::runtime::features::record_place::install(
+        cpu_core_on && recording_on && state_on && hitbox_on && capabilities::unit_usable(Feature::RecordPlace, &usable)
+    );
 
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
@@ -470,6 +473,12 @@ fn run_inner() {
         report(Feature::CpuTech, cpu_tech_on, None),
         report(Feature::TechPractice, tech_practice_on, (!cpu_core_on).then_some("cpu_core_not_installed")),
         report(Feature::EdgeJuggle, edge_juggle_on, (!recording_on).then_some("recording_not_installed")),
+        report(Feature::RecordPlace, record_place_on,
+            if !cpu_core_on { Some("cpu_core_not_installed") }
+            else if !recording_on { Some("recording_not_installed") }
+            else if !state_on { Some("state_core_not_installed") }
+            else if !hitbox_on { Some("hitbox_not_installed") }
+            else { None }),
         report(Feature::CpuShield, cpu_shield_on, None),
         report(Feature::CpuMash, cpu_mash_on, None),
         report(Feature::CpuShieldDamage, cpu_shield_damage_on, None),

@@ -52,6 +52,7 @@ pub struct View<'a> {
     pub list_count: usize,
     pub list_index: Option<usize>,
     pub list_value: &'a str,
+    pub extra: &'a str,
     /// The visible rows of the screen showing (optional, sent last).
     pub rows: &'a [&'a str],
     /// The publisher does not list the rows (the v1 limit): `rows.complete=0` whatever `rows` holds.
@@ -206,6 +207,7 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
     push_str(out, "list.value", view.list_value);
+    out.push_str(view.extra);
     // The optional rows come last: as many as fit under the bound, and a mark when some did not.
     let mut rows = String::new();
     let mut shown = 0;
@@ -296,7 +298,7 @@ pub fn scene_name(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
     }
 }
 
-fn push_str(out: &mut String, key: &str, value: &str) {
+pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {
     out.push_str(key);
     out.push('=');
     quote(out, value);

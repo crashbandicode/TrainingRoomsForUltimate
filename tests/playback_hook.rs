@@ -8,6 +8,25 @@ use crate::engine;
 use model::hook_stats::{hook_allocations, HookId, HookScope};
 
 #[test]
+fn placed_cpu_recording_has_no_lockout_or_standby() {
+    use model::input_delay::MappedInputs;
+    use model::recording::{ControlCtx, CpuRoleDrive, Phase};
+    let mut drive = CpuRoleDrive::idle();
+    drive.begin_placed(-1);
+    assert_eq!(drive.phase(), Phase::Recording);
+    let first = MappedInputs { buttons: 42, lstick_x: 60, ..MappedInputs::NEUTRAL };
+    let mut player = first;
+    assert_eq!(drive.poll(&mut player), Some(first));
+    assert_eq!(player, MappedInputs::NEUTRAL);
+    let cpu = drive.control(&ControlCtx { facing: -1, shulk_dial: false });
+    assert_eq!(cpu.write.unwrap().buttons, 42);
+    assert!(!cpu.hold_cliff_timer);
+    drive.begin_placed(1);
+    let mut neutral = MappedInputs::NEUTRAL;
+    assert_eq!(drive.poll(&mut neutral), Some(MappedInputs::NEUTRAL));
+}
+
+#[test]
 fn playback_makes_no_hook_allocations() {
     use engine::library::{LoopCount, RecordingIndex, Role};
     use engine::macros::{InputFrame, MacroRecording, StartState};

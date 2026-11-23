@@ -244,6 +244,12 @@ pub mod natives {
         at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
+    pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32) {
+        if let Some(f) = at::<extern "C" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) {
+            f(accessor, motion, frame, rate, false, 0.0, false, false);
+        }
+    }
+
     pub unsafe fn is_enable_cancel(accessor: usize) -> bool {
         at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }

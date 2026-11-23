@@ -149,6 +149,7 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 | | Trigger | dropdown | Button, Save State load / Button | Input Recording |
 | | Duration | dropdown | 60–600 frames / 150 | Input Recording |
 | | Crop trailing neutral | toggle | On | Input Recording → Recording Crop |
+| | Place fighters before Record | toggle | Off | Record placement wizard |
 | Playback | Button slots | checklist | 1–5 / 1 | Input Recording → Playback Button Slots |
 | | Hitstun timing | dropdown | (upstream values) / Hitstun | Input Recording → Playback Hitstun Timing |
 | | Save-state slots | checklist | 1–5 / none | Input Recording → Save State Playback |

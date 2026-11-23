@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 175;
+pub const COUNT: usize = 176;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -110,6 +110,7 @@ pub static DEFS: [Def; COUNT] = [
     // 60, 90, 120, 150 ...: 150 is index 3.
     row!("recording_duration", Single, 19, [3]),
     row!("recording_crop", Single, 2, [0]),
+    row!("recording_place", Single, 2, [1]),
     row!("playback_button_slots", Weighted, 5, [0]),
     row!("hitstun_playback", Single, 3, [0]),
     row!("save_state_playback", Weighted, 5, []),

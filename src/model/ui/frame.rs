@@ -856,6 +856,10 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
         // The r8 pop-up has no help panel: the page row's help under it described a row the pop-up does not show.
         frame.help[0].clear();
         frame.help[1].clear();
+        if rec.popup_accepts_place_first() {
+            let on = menu.settings().menu.get("recording_place").and_then(|row| row.first()).copied().unwrap_or(0) != 0;
+            let _ = write!(frame.help[1], "Y place first · {}", if on { "On" } else { "Off" });
+        }
         // Its own column, right of the list: the header, then the row under the cursor and the files joined to it in
         // kind boxes, the headings over them, and plain lines.
         let items = rec.connection_items(face, group);
@@ -1174,6 +1178,58 @@ mod tests {
             hot_sequences: vec!["q1".into()],
         });
         menu
+    }
+
+    #[test]
+    fn the_popup_y_flips_place_first() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().toggle_popup();
+        let mut frame = Frame::new();
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.help[1].string_lossy(), "Y place first · Off");
+        let ([_, center_y, _, height], help_y, hint_y) = frame.dialog_box().unwrap();
+        assert!(help_y[1] > hint_y && hint_y > center_y - height / 2.0);
+        assert!(menu.press_outcome(Button::Y));
+        assert_eq!(menu.settings().menu.get("recording_place"), Some(&[1, 0][..]));
+        assert!(menu.outbox().changed);
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.help[1].string_lossy(), "Y place first · On");
+        assert!(menu.press_outcome(Button::Y));
+        assert_eq!(menu.settings().menu.get("recording_place"), Some(&[0, 1][..]));
+        page_frame(&menu, &mut frame);
+        assert_eq!(frame.help[1].string_lossy(), "Y place first · Off");
+
+        let last = menu.recording().section(Face::Popup, SAVES_MACROS, 1).rows.len() - 1;
+        menu.recording_mut().set_cursor(Face::Popup, SAVES_MACROS, 1, last);
+        assert!(menu.press_outcome(Button::A));
+        assert!(menu.recording().picker_open());
+        assert!(!menu.press_outcome(Button::Y));
+        assert_eq!(menu.settings().menu.get("recording_place"), Some(&[0, 1][..]));
+        page_frame(&menu, &mut frame);
+        assert!(frame.help[1].is_empty());
+    }
+
+    #[test]
+    fn the_popup_y_reports_the_new_place_first_value_once() {
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().toggle_popup();
+        assert!(menu.press_outcome(Button::Y));
+        assert_eq!(menu.take_place_first(), Some(true));
+        assert_eq!(menu.take_place_first(), None);
+        assert!(menu.press_outcome(Button::Y));
+        assert_eq!(menu.take_place_first(), Some(false));
+        assert_eq!(menu.take_place_first(), None);
+
+        let last = menu.recording().section(Face::Popup, SAVES_MACROS, 1).rows.len() - 1;
+        menu.recording_mut().set_cursor(Face::Popup, SAVES_MACROS, 1, last);
+        assert!(menu.press_outcome(Button::A));
+        assert!(menu.recording().picker_open());
+        assert!(!menu.press_outcome(Button::Y));
+        assert_eq!(menu.take_place_first(), None);
     }
 
     /// Primary 2026-11-08 15:55Z, the r8 pop-up as drawn (`RECORDING-REDESIGN-r8-popup-combo.png`): the title

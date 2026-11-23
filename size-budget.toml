@@ -2445,3 +2445,11 @@ ceiling = 194138
 date = "2026-11-23"
 reason = "Recording reads the current bodies at the Record chord, and the worker refreshes its live pose with Save States Off. Measured 194138, 42 above 194096."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording fix-round item, rv-preview-vis PASS 2026-11-23 05:24:59Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196349
+date = "2026-11-23"
+reason = "Recording placement lets players set both fighters' positions, damage and requested start states in Training and waiting rooms. It starts Record or Play after both requested onsets, verifies the chosen missed-tech bound motion and publishes the live samples. Measured 196349, 2211 above 194138."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording placement design and requested onset ruling 2026-11-23 03:50:00Z. Source and exact build passed rv-hit-streak 05:14:23Z."

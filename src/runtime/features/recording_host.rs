@@ -59,6 +59,7 @@ unsafe fn live_body(body: Option<super::recorder::Body>) -> Option<(rr_host::Sta
         y: natives::pos_y(at),
         percent: natives::damage(at, 0),
         lr: natives::lr(at),
+        start_state: crate::model::state::record::StartState::Standard,
     };
     let (x, y) = fighter_speed(at).unwrap_or_default();
     let finite = |v: f32| if v.is_finite() { v } else { 0.0 };

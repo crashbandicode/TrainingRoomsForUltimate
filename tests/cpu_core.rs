@@ -62,6 +62,24 @@ fn unsafe_c(i: usize) -> C {
 // ---- the game's constant table --------------------------------------------------------------------
 
 #[test]
+fn place_state_status_names_resolve() {
+    let names = [
+        (C::StatusFallSpecial, "FIGHTER_STATUS_KIND_FALL_SPECIAL"),
+        (C::StatusTreadDamageAir, "FIGHTER_STATUS_KIND_TREAD_DAMAGE_AIR"),
+        (C::StatusSlip, "FIGHTER_STATUS_KIND_SLIP"),
+        (C::FlagDownUp, "FIGHTER_STATUS_DOWN_FLAG_UP"),
+    ];
+    let mut table = Table::unresolved();
+    let missing = table.resolve(|hash| names.iter().position(|(_, name)| lua_bind_hash(name) == hash).map(|n| n as i32 + 10));
+    assert_eq!(missing, ids::COUNT - names.len());
+    for (index, (constant, name)) in names.iter().enumerate() {
+        assert_eq!(ids::NAMES[*constant as usize], *name);
+        assert_eq!(table.get(*constant), index as i32 + 10);
+        assert!(table.resolved(*constant));
+    }
+}
+
+#[test]
 fn cpu_ids_hash_matches_the_published_vectors() {
     // Vectors of the third-party MIT crate `lua_bind_hash` 1.0.1 (its own unit test).
     assert_eq!(xxh64(b"password", SEED), 0xe58325ff3537c13a);

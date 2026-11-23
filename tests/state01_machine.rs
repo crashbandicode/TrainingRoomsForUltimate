@@ -89,6 +89,192 @@ fn run_ground_load(machine: &mut Machine, settings: &StateSettings, rng: &mut Rn
 }
 
 #[test]
+fn load_holds_a_placed_pair_in_wait_start() {
+    use model::state::machine::StartWait;
+    use model::state::record::StartState;
+    let mut player = saved(10.0, 2.0, -1.0, GROUND, 7);
+    player.start_state = StartState::Trip;
+    let cpu = saved(-4.0, 10.0, 1.0, CLIFF, 1);
+    let mut machine = machine_with(player, cpu, 0);
+    let settings = StateSettings { mirroring: Mirroring::Alternate, ..settings() };
+    let mut rng = rng();
+    request(&mut machine, &settings, &mut rng);
+    for entry in [0, 1] {
+        machine.frame(&input(entry), &settings, &mut rng);
+        machine.frame(&FrameIn { kind: if entry == 1 { 1 } else { 7 }, ..input(entry) }, &settings, &mut rng);
+    }
+    let p1 = machine.frame(&FrameIn { status: StatusNow::Wait, ..input(0) }, &settings, &mut rng);
+    let cpu = machine.frame(&FrameIn { kind: 1, status: StatusNow::CliffCatch, ..input(1) }, &settings, &mut rng);
+    assert_eq!(p1.placing.unwrap(), Placing { x: -10.0, y: 2.0, lr: 1.0, grounded: true, request: None });
+    assert_eq!(cpu.placing.unwrap(), Placing { x: 4.0, y: 16.0, lr: -1.0, grounded: false, request: None });
+    assert_eq!((machine.marker(Role::Player, 0), machine.marker(Role::Cpu, 0)), (Marker::WaitStart, Marker::WaitStart));
+    assert!(machine.is_loading());
+    assert!(p1.restored.is_none() && cpu.restored.is_none());
+    let mut file = model::state::file::SaveFile::default();
+    file.player[0].marker = Marker::WaitStart;
+    let json = file.to_pretty();
+    assert!(json.contains("\"state\": \"WaitStart\""));
+    assert_eq!(model::state::file::SaveFile::parse(json.as_bytes()).unwrap().player[0].marker, Marker::NoAction);
+    let expected = [
+        StartWait { x: -10.0, y: 2.0, lr: 1.0, grounded: true, state: StartState::Trip },
+        StartWait { x: 4.0, y: 16.0, lr: -1.0, grounded: false, state: StartState::Standard },
+    ];
+    for _ in 0..3 {
+        for entry in [0, 1] {
+            let out = machine.frame(&FrameIn { stage_id: 0x5f, kind: 7, ..input(entry) }, &settings, &mut rng);
+            assert_eq!(out.start, Some(expected[entry as usize]));
+            assert!(out.restored.is_none());
+        }
+    }
+    machine.cancel_all();
+    assert!(!machine.is_loading());
+    assert_eq!((machine.marker(Role::Player, 0), machine.marker(Role::Cpu, 0)), (Marker::NoAction, Marker::NoAction));
+
+    let mut player = saved(10.0, 2.0, -1.0, GROUND, 7);
+    player.start_state = StartState::Trip;
+    let mut temporary = Machine::default();
+    temporary.mirror_sign = -1.0;
+    assert!(temporary.begin_temporary([player, saved(3.0, 0.0, 1.0, GROUND, 7)]));
+    for entry in [0, 1] {
+        temporary.frame(&input(entry), &settings, &mut rng);
+        temporary.frame(&input(entry), &settings, &mut rng);
+        temporary.frame(&FrameIn { status: StatusNow::Wait, ..input(entry) }, &settings, &mut rng);
+    }
+    let out = temporary.frame(&FrameIn { status: StatusNow::Wait, ..input(0) }, &settings, &mut rng);
+    assert_eq!(out.start.unwrap().x, 10.0);
+    assert_eq!(temporary.restoring_record(Role::Cpu, &settings).marker, Marker::WaitStart);
+
+    let mut popo = saved(5.0, 0.0, 1.0, GROUND, 0x4b);
+    popo.start_state = StartState::Trip;
+    let mut pair = machine_with(popo, saved(1.0, 0.0, 1.0, GROUND, 7), 0);
+    let normal = StateSettings::default();
+    request(&mut pair, &normal, &mut rng);
+    pair.frame(&FrameIn { kind: 0x4b, popo: true, ..input(0) }, &normal, &mut rng);
+    pair.frame(&FrameIn { kind: 0x4b, popo: true, prev_rebirth: true, ..input(0) }, &normal, &mut rng);
+    let popo_frame = FrameIn { kind: 0x4b, popo: true, prev_rebirth: true, status: StatusNow::Wait, ..input(0) };
+    assert!(pair.frame(&popo_frame, &normal, &mut rng).nana_next);
+    assert_eq!(pair.marker(Role::Player, 0), Marker::NanaPosMove);
+    let nana = FrameIn { nana: true, kind: 0x4c, status: StatusNow::Wait, ..input(0) };
+    assert!(pair.frame(&nana, &normal, &mut rng).start.is_none());
+    assert_eq!(pair.marker(Role::Player, 0), Marker::WaitStart);
+    assert!(pair.frame(&nana, &normal, &mut rng).start.is_none());
+    assert_eq!(pair.frame(&popo_frame, &normal, &mut rng).start.unwrap().x, 5.0);
+}
+
+#[test]
+fn a_load_with_start_states_off_never_waits_for_a_start() {
+    use model::state::record::StartState;
+    for enabled in [false, true] {
+        let mut cpu = saved(2.0, 0.0, -1.0, GROUND, 7);
+        cpu.start_state = StartState::Trip;
+        let mut machine = machine_with(saved(1.0, 0.0, 1.0, GROUND, 7), cpu, 0);
+        machine.set_start_states(enabled);
+        let settings = settings();
+        let mut rng = rng();
+        assert!(request(&mut machine, &settings, &mut rng).start.is_none());
+        for entry in [0, 1] {
+            assert!(machine.frame(&input(entry), &settings, &mut rng).start.is_none());
+        }
+        for entry in [0, 1] {
+            assert!(machine.frame(&input(entry), &settings, &mut rng).start.is_none());
+        }
+        for entry in [0, 1] {
+            let out = machine.frame(&FrameIn { status: StatusNow::Wait, ..input(entry) }, &settings, &mut rng);
+            assert_eq!(out.start.map(|start| start.state),
+                enabled.then_some(if entry == 0 { StartState::Standard } else { StartState::Trip }));
+            assert_eq!(out.done.unwrap().next, if enabled { Marker::WaitStart } else { Marker::NoAction });
+        }
+        for entry in [0, 1] {
+            let role = if entry == 0 { Role::Player } else { Role::Cpu };
+            assert_eq!(machine.marker(role, 0), if enabled { Marker::WaitStart } else { Marker::NoAction });
+            let out = machine.frame(&input(entry), &settings, &mut rng);
+            if enabled {
+                assert_eq!(out.start.unwrap().state, if entry == 0 { StartState::Standard } else { StartState::Trip });
+            } else {
+                assert!(out.start.is_none());
+            }
+        }
+        assert_eq!(machine.is_loading(), enabled);
+    }
+}
+
+#[test]
+fn reloading_state_records_keeps_the_installed_start_state_capability() {
+    let states = include_str!("../src/runtime/features/states.rs");
+    let adopt = states.split("fn adopt_reload()").nth(1).unwrap().split("\nconst HANDOFF_SLOTS").next().unwrap();
+    assert!(adopt.find("reload.machine.set_start_states(super::record_place::installed())").unwrap()
+        < adopt.find("core::mem::swap(&mut s.machine, &mut reload.machine)").unwrap());
+}
+
+#[test]
+fn load_waits_for_a_feature_before_wait_start() {
+    use model::state::record::StartState;
+    let mut player = saved(1.0, 2.0, 1.0, GROUND, 6);
+    player.start_state = StartState::Trip;
+    let mut machine = machine_with(player, saved(2.0, 0.0, -1.0, GROUND, 7), 0);
+    let s = settings();
+    let mut rng = rng();
+    request(&mut machine, &s, &mut rng);
+    let kirby = FrameIn { kind: 6, kirby: true, ..input(0) };
+    machine.frame(&kirby, &s, &mut rng);
+    machine.frame(&kirby, &s, &mut rng);
+    let done = machine.frame(&FrameIn { status: StatusNow::Wait, ..kirby }, &s, &mut rng);
+    assert_eq!(done.done.unwrap().next, Marker::WaitForCopyAbility);
+    assert!(done.start.is_none());
+    assert_eq!(machine.marker(Role::Player, 0), Marker::WaitForCopyAbility);
+    assert_eq!(machine.frame(&kirby, &s, &mut rng).wait, Some(Marker::WaitForCopyAbility));
+    machine.finish_wait(Role::Player);
+    assert_eq!(machine.marker(Role::Player, 0), Marker::WaitStart);
+    assert_eq!(machine.frame(&kirby, &s, &mut rng).start.unwrap().state, StartState::Trip);
+    assert!(machine.is_loading());
+}
+
+#[test]
+fn finish_start_ends_the_load_through_restored() {
+    use model::state::record::StartState;
+    let mut player = saved(10.0, 0.0, 1.0, GROUND, 7);
+    player.start_state = StartState::Trip;
+    let mut machine = machine_with(player, saved(-10.0, 0.0, -1.0, GROUND, 7), 0);
+    let s = settings();
+    let mut rng = rng();
+    let (p1, cpu) = run_ground_load(&mut machine, &s, &mut rng);
+    assert!(p1.restored.is_none() && cpu.restored.is_none());
+    assert!(machine.is_loading());
+    machine.finish_start();
+    assert_eq!((machine.marker(Role::Player, 0), machine.marker(Role::Cpu, 0)), (Marker::NoAction, Marker::NoAction));
+    assert!(!machine.is_loading());
+    assert_eq!(machine.frame(&input(0), &s, &mut rng).restored, Some(false));
+    assert_eq!(machine.frame(&input(1), &s, &mut rng).restored, None);
+}
+
+#[test]
+fn a_load_without_a_start_state_is_unchanged() {
+    let mut machine = loaded();
+    let s = settings();
+    let mut rng = rng();
+    let request = request(&mut machine, &s, &mut rng);
+    assert!(request.stop_playback && request.start.is_none());
+    for entry in [0, 1] {
+        let role = if entry == 0 { Role::Player } else { Role::Cpu };
+        assert_eq!(machine.marker(role, 0), Marker::KillPlayer);
+        let kill = machine.frame(&input(entry), &s, &mut rng);
+        assert!(kill.force_dead && kill.start.is_none());
+        assert_eq!(machine.marker(role, 0), Marker::WaitForAlive);
+        let alive = machine.frame(&input(entry), &s, &mut rng);
+        assert!(alive.cleanup && alive.start.is_none());
+        assert_eq!(alive.placing.unwrap().request, Some(Request::Wait));
+        assert_eq!(machine.marker(role, 0), Marker::PosMove);
+        let done = machine.frame(&FrameIn { status: StatusNow::Wait, ..input(entry) }, &s, &mut rng);
+        assert!(done.start.is_none());
+        assert_eq!(done.done.unwrap().next, Marker::NoAction);
+        assert_eq!(machine.marker(role, 0), Marker::NoAction);
+        assert_eq!(done.restored, (entry == 1).then_some(false));
+    }
+    assert!(!machine.is_loading());
+    assert!(machine.frame(&input(0), &s, &mut rng).restored.is_none());
+}
+
+#[test]
 fn temporary_pair_uses_death_restore_without_mutating_any_numbered_record() {
     let mut machine = Machine::default();
     for (i, record) in machine

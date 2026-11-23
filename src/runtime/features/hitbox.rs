@@ -888,17 +888,20 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
     own[..3].copy_from_slice(&eggs_orbs);
     let zone_wizard = super::egg_zone::wizard_active();
     let edge_wizard = super::edge_juggle::wizard_active();
+    let record_wizard = super::record_place::wizard_active();
     let tech = super::tech::running();
     let grader = super::input_display::grader_live();
     // The break volume supplies the geometry for both the hurt disc and the grade zones.
     let hurt_on = SETTING.load(Ordering::Acquire) && legend::shows(SHOWN.load(Ordering::Acquire), hitbox::KIND_HURT);
     let mut targets = [Orb::NONE; 1 + crate::model::btt::MAX];
     let mut n_targets = 0;
-    if (hurt_on || grader) && !tech && !edge_wizard && !zone_wizard {
+    if (hurt_on || grader) && !tech && !edge_wizard && !zone_wizard && !record_wizard {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
-    let mut marks = if edge_wizard {
+    let mut marks = if record_wizard {
+        super::record_place::look(active)
+    } else if edge_wizard {
         super::edge_juggle::look(active)
     } else if tech {
         Marks { looks: super::tech::look(active), pointer: None }

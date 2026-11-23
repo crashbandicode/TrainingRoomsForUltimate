@@ -58,6 +58,8 @@ features! {
     TechPractice => "tech_practice",
     /// Native Training practice games, using the frame and recorder hooks.
     EdgeJuggle => "edge_juggle",
+    /// Recording placement and start states, on the frame, poll and save-state hooks.
+    RecordPlace => "record_place",
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
     /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
     CpuShield => "cpu_shield",

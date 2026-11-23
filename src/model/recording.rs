@@ -69,6 +69,7 @@ pub enum HitstunTiming {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecorderSettings {
     pub crop: bool,
+    pub place: bool,
     pub hitstun: HitstunTiming,
     pub save_state_slots: Weights<5>,
     pub mash_interrupt: bool,
@@ -78,6 +79,7 @@ impl RecorderSettings {
     pub const fn factory() -> Self {
         Self {
             crop: true,
+            place: false,
             hitstun: HitstunTiming::HitstunEnds,
             save_state_slots: Weights([0; 5]),
             mash_interrupt: true,
@@ -90,6 +92,7 @@ impl RecorderSettings {
         let on = |id: &str| row(id).first().is_some_and(|v| *v != 0);
         Self {
             crop: on("recording_crop"),
+            place: on("recording_place"),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,
                 Some(2) => HitstunTiming::HitstopBegins,
@@ -429,6 +432,14 @@ impl CpuRoleDrive {
         self.mode = Mode::Pause;
         self.possession = Possession::Lockout;
         self.lockout = LOCKOUT_FRAMES;
+        self.recorded_facing = if facing < 0 { -1 } else { 1 };
+        self.live = MappedInputs::NEUTRAL;
+    }
+
+    pub fn begin_placed(&mut self, facing: i8) {
+        self.mode = Mode::Record;
+        self.possession = Possession::Cpu;
+        self.lockout = 0;
         self.recorded_facing = if facing < 0 { -1 } else { 1 };
         self.live = MappedInputs::NEUTRAL;
     }

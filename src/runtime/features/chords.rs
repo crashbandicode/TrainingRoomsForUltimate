@@ -74,7 +74,7 @@ pub unsafe fn on_poll(controller: usize) {
     let sample = Sample::of(style, current, just_down)
         .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
-    let wizard = super::tech::wizard_active() || super::edge_juggle::wizard_active() || super::egg_zone::wizard_active();
+    let wizard = super::tech::wizard_active() || super::edge_juggle::wizard_active() || super::egg_zone::wizard_active() || super::record_place::wizard_active();
     let drill_running = super::edge_juggle::running();
     let accepted = {
         let mut state = STATE.lock();
@@ -122,7 +122,8 @@ pub unsafe fn on_poll(controller: usize) {
     let step_take = lobby_speed::step_take(style, hold_open, chord_bits);
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
-    let hide = !block && unsafe { super::egg_zone::poll(controller, sample) || super::tech::poll(controller, sample) || super::edge_juggle::poll(controller, sample) || btt::poll(controller, sample, keys) };
+    let placing = unsafe { super::record_place::poll(controller, sample, block) };
+    let hide = placing || !block && unsafe { super::egg_zone::poll(controller, sample) || super::tech::poll(controller, sample) || super::edge_juggle::poll(controller, sample) || btt::poll(controller, sample, keys) };
     let chord_bits = chord_bits | if hide && wizard { u32::MAX } else if hide { !chords::bit::PLUS_MASK } else { 0 };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {

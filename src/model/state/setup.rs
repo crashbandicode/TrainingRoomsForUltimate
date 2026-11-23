@@ -104,6 +104,7 @@ impl FighterSetup {
             percent: self.percent,
             lr: self.lr,
             situation_kind: self.situation_kind,
+            start_state: super::record::StartState::Standard,
             marker: Marker::NoAction,
             fighter_kind: self.fighter_kind,
             charge: self.charge,

@@ -1122,6 +1122,10 @@ impl RecordingScreens {
         self.keyboard.is_some() || self.picker.is_some() || self.file.is_some()
     }
 
+    pub(crate) fn popup_accepts_place_first(&self) -> bool {
+        self.popup_open && !(self.overlay_face == Face::Popup && self.overlay_open())
+    }
+
     fn set_popup_role(&mut self, role: ViewRole) {
         self.popup_role = role;
         if role == ViewRole::Cpu {

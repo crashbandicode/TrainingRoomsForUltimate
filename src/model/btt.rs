@@ -830,7 +830,8 @@ pub const EGG_ZONE_OWNER: u8 = 4;
 pub const EDGE_JUGGLE_OWNER: u8 = 8;
 pub const TECH_PLACEMENT_OWNER: u8 = 16;
 const INTERRUPTED: u8 = 32;
-const PLACEMENT_OWNERS: u8 = BTT_PLACEMENT_OWNER | EGG_ZONE_OWNER | EDGE_JUGGLE_OWNER | TECH_PLACEMENT_OWNER;
+pub const RECORD_PLACE_OWNER: u8 = 64;
+const PLACEMENT_OWNERS: u8 = BTT_PLACEMENT_OWNER | EGG_ZONE_OWNER | EDGE_JUGGLE_OWNER | TECH_PLACEMENT_OWNER | RECORD_PLACE_OWNER;
 
 /// Lock-free owner requests; the game thread alone steps the camera state.
 pub struct CameraRequests(std::sync::atomic::AtomicU8);

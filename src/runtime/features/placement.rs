@@ -14,12 +14,16 @@ pub(super) unsafe fn floor_under(body: usize, [x, y]: [f32; 2], platforms: bool)
     Some([x, floor.height(x)?])
 }
 
-/// Stand on a floor point; the caller has checked the constants and grants.
-pub(super) unsafe fn stand(body: usize, [x, y]: [f32; 2], facing: f32) {
+pub(super) unsafe fn ground(body: usize, [x, y]: [f32; 2], facing: f32) {
     state::clear_speed_all(body);
     state::init_pos(body, &state::Vector3f { x, y, z: 0.0 });
     state::set_lr(body, facing);
     state::set_situation_kind(body, konst(C::SituationGround));
+}
+
+/// Stand on a floor point; the caller has checked the constants and grants.
+pub(super) unsafe fn stand(body: usize, at: [f32; 2], facing: f32) {
+    ground(body, at, facing);
     state::status_request(body, konst(C::StatusWait));
 }
 

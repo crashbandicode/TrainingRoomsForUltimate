@@ -97,6 +97,7 @@ const FOREIGN_RECEIVERS: &[(&str, &[&str], &str)] = &[
     ("assign_value", &["target"], "the compat Assignable impls: TYPED_STATIC_CALLS follows MENU's (assign -> store)"),
     ("open", &["?", "keeper", "list"], PANELS),
     ("tick", &["?", "queue", "ui"], PANELS),
+    ("tick", &["sync"], "record_place::Sync is the model's start synchroniser, a plain value with no lock"),
     (
         "tick",
         &["attempt"],
@@ -1079,6 +1080,9 @@ const MODEL_CALLBACKS: &[(&str, &str)] = &[
     ("lockon::update_practice_items", "lockon::place_target_item"),
     ("lockon::update_practice_items", "lockon::retire_target_item"),
     ("lockon::update_practice_items", "lockon::owns_live_item"),
+    ("record_place::act", "record_place::force_down"),
+    ("record_place::act", "record_place::face"),
+    ("record_place::act", "record_place::set_face"),
 ];
 
 const KEYBOARD_CALLBACK: &str = "the inline keyboard's SDK callback: the SDK runs it synchronously on the thread that calls into \

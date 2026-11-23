@@ -40,6 +40,27 @@ fn take(head: &[MappedInputs]) -> Vec<MappedInputs> {
 }
 
 #[test]
+fn place_row_is_in_recording_options_off_by_default() {
+    use model::menu::table::{Control, Page, ROWS};
+    let crop = ROWS.iter().position(|row| row.id == "recording_crop").unwrap();
+    let row = &ROWS[crop + 1];
+    assert_eq!(row.id, "recording_place");
+    assert_eq!(row.title, "Place fighters before Record");
+    assert_eq!(row.page(), Page::Recording);
+    assert_eq!(row.group, ROWS[crop].group);
+    assert!(matches!(row.control, Control::Toggle));
+    assert_eq!(row.help, "On: Record first opens a wizard to place both fighters\nand pick their state. Off: Record starts at once.");
+    let mut snapshot = Snapshot::factory();
+    assert_eq!(snapshot.get("recording_place"), Some(&[0, 1][..]));
+    assert!(!RecorderSettings::factory().place);
+    assert!(!RecorderSettings::from_snapshot(&snapshot).place);
+    snapshot.set("recording_place", &[1, 0]).unwrap();
+    assert!(RecorderSettings::from_snapshot(&snapshot).place);
+    snapshot.set("recording_place", &[0, 1]).unwrap();
+    assert!(!RecorderSettings::from_snapshot(&snapshot).place);
+}
+
+#[test]
 fn menu_defaults_match_spec() {
     let s = RecorderSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(s, RecorderSettings::factory());

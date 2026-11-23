@@ -14,7 +14,7 @@ use crate::model::cpu::rng::Rng;
 use super::file::{SaveFile, SLOTS};
 use super::held_item::HeldItem;
 use super::place;
-use super::record::{Charge, Marker, SavedState, Steve};
+use super::record::{Charge, Marker, SavedState, StartState, Steve};
 use super::refused::{Action, Refused};
 use super::settings::StateSettings;
 
@@ -143,6 +143,15 @@ pub struct Placing {
     pub request: Option<Request>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StartWait {
+    pub x: f32,
+    pub y: f32,
+    pub lr: f32,
+    pub grounded: bool,
+    pub state: StartState,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request {
     Wait,
@@ -162,7 +171,7 @@ pub struct Done {
     pub steve: Option<Steve>,
     /// Play `se_system_position_reset` (the CPU only).
     pub reset_sound: bool,
-    /// The marker the fighter is left in (`NoAction`, or the wait of a feature).
+    /// The marker the fighter is left in (`NoAction`, `WaitStart`, or the wait of a feature).
     pub next: Marker,
     /// Pokémon Trainer: raise the trainer's `ENABLE_CHANGE_POKEMON` flag.
     pub pokemon_switch: bool,
@@ -180,6 +189,7 @@ pub struct Out {
     /// The respawn cleanup (SPEC-state-01 §5.2).
     pub cleanup: bool,
     pub placing: Option<Placing>,
+    pub start: Option<StartWait>,
     /// The training reset hub runs this frame (every PosMove frame).
     pub run_hub: bool,
     pub done: Option<Done>,
@@ -214,6 +224,8 @@ pub struct Machine {
     restore_pending: bool,
     /// Ephemeral restore records. Never part of `file` or the persistence handoff.
     temporary: Option<[SavedState; 2]>,
+    start_targets: [Option<StartWait>; 2],
+    start_states: bool,
 }
 
 impl Default for Machine {
@@ -231,7 +243,13 @@ impl Machine {
             active: None,
             restore_pending: false,
             temporary: None,
+            start_targets: [None; 2],
+            start_states: true,
         }
+    }
+
+    pub fn set_start_states(&mut self, on: bool) {
+        self.start_states = on;
     }
 
     fn records(&self, role: Role) -> &[SavedState; SLOTS] {
@@ -283,6 +301,14 @@ impl Machine {
         }
     }
 
+    fn load_done_marker(&self, slot: usize) -> Marker {
+        if self.start_states && [Role::Player, Role::Cpu].iter().any(|role| self.load_record(*role, slot).start_state != StartState::Standard) {
+            Marker::WaitStart
+        } else {
+            Marker::NoAction
+        }
+    }
+
     /// A Save is marked for a body that hasn't captured yet (any role, any slot).
     pub fn save_marked(&self) -> bool {
         [Role::Player, Role::Cpu].iter().any(|role| (0..SLOTS).any(|slot| self.marker(*role, slot) == Marker::Save))
@@ -310,6 +336,7 @@ impl Machine {
             record.marker = Marker::KillPlayer;
         }
         self.temporary = Some(pair);
+        self.start_targets = [None; 2];
         // This index is only bookkeeping for the existing per-role machine;
         // every load access above selects the temporary pair while it exists.
         self.active = Some(0);
@@ -345,11 +372,20 @@ impl Machine {
         })
     }
 
-    /// A feature's wait is over: the load's record for `role` goes back to `NoAction`.
+    /// A feature's wait is over: the load's record moves to `NoAction` or `WaitStart`.
     pub fn finish_wait(&mut self, role: Role) {
         if let Some(slot) = self.active {
-            self.set_load_marker(role, slot, Marker::NoAction);
+            self.set_load_marker(role, slot, self.load_done_marker(slot));
         }
+    }
+
+    pub fn finish_start(&mut self) {
+        if let Some(slot) = self.active {
+            for role in [Role::Player, Role::Cpu] {
+                self.set_load_marker(role, slot, Marker::NoAction);
+            }
+        }
+        self.start_targets = [None; 2];
     }
 
     /// Cancel every load in progress: all markers back to `NoAction` (Enable turned Off, scene
@@ -363,6 +399,7 @@ impl Machine {
         self.active = None;
         self.restore_pending = false;
         self.temporary = None;
+        self.start_targets = [None; 2];
     }
 
     /// Accept a load request if none is in progress (OQ 5): pick the slot (a weighted random one when
@@ -393,6 +430,7 @@ impl Machine {
 
     fn start_load(&mut self, slot: usize, settings: &StateSettings, rng: &mut Rng) {
         self.active = Some(slot);
+        self.start_targets = [None; 2];
         for role in [Role::Player, Role::Cpu] {
             self.set_marker(role, slot, Marker::KillPlayer);
         }
@@ -429,6 +467,7 @@ impl Machine {
     pub fn capture(&mut self, role: Role, slot: usize, mut state: SavedState) -> bool {
         let slot = slot.min(SLOTS - 1);
         state.marker = Marker::NoAction;
+        state.start_state = super::record::StartState::Standard;
         self.records_mut(role)[slot] = state;
         [Role::Player, Role::Cpu]
             .iter()
@@ -491,6 +530,9 @@ impl Machine {
                 out.wait = Some(marker)
             }
             _ => {}
+        }
+        if !input.nana && self.load_marker(role, slot) == Marker::WaitStart {
+            out.start = self.start_targets[role.index()];
         }
 
         // 5.5 Save, at the end of every callback.
@@ -606,7 +648,13 @@ impl Machine {
         if self.temporary_active() {
             mode = super::settings::DamageMode::SaveState;
         }
-        let mut next = Marker::NoAction;
+        let mut next = self.load_done_marker(slot);
+        if !input.nana && next == Marker::WaitStart {
+            self.start_targets[role.index()] = Some(StartWait {
+                x, y, lr, grounded: situation == Situation::Ground,
+                state: self.load_record(role, slot).start_state,
+            });
+        }
         let charge = (saved_kind == input.kind).then_some(saved_charge);
         if input.kirby {
             next = Marker::WaitForCopyAbility;

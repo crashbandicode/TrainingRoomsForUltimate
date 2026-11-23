@@ -58,6 +58,12 @@ const BOUNDARIES: &[Boundary] = &[
     Boundary { function: "edge_juggle::controls_cpu", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::ai_correction", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
     Boundary { function: "edge_juggle::player_height_request", owner: Some(Feature::EdgeJuggle), gate: Gate::Flag("INSTALLED") },
+    // Record placement's frame, input clock and load targets use its own guarded native closure.
+    Boundary { function: "record_place::frame", owner: Some(Feature::RecordPlace), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "record_place::poll", owner: Some(Feature::RecordPlace), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "record_place::load_target", owner: Some(Feature::RecordPlace), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "record_place::stage", owner: Some(Feature::RecordPlace), gate: Gate::Flag("INSTALLED") },
+    Boundary { function: "record_place::granted", owner: Some(Feature::RecordPlace), gate: Gate::Flag("INSTALLED") },
     // Zoom alone requires Hero's menu rows and the damage/capture readers.
     Boundary { function: "zoom::zoom_pad", owner: None, gate: Gate::Flag("installed") },
     Boundary { function: "zoom::observe_zoom", owner: None, gate: Gate::Flag("installed") },
@@ -214,6 +220,10 @@ impl Analysis {
         }
         for to in ["lockon::create_target_item", "lockon::place_target_item", "lockon::retire_target_item", "lockon::owns_live_item"] {
             graph.dynamic.push(("lockon::update_practice_items".to_owned(), to.to_owned()));
+        }
+        // The model's generic DownBody invokes these runtime methods during the request.
+        for to in ["record_place::force_down", "record_place::face", "record_place::set_face"] {
+            graph.dynamic.push(("record_place::act".to_owned(), to.to_owned()));
         }
         for (from, to) in &graph.dynamic {
             assert_eq!(graph.find(from).len(), 1, "dynamic edge source {from}");
@@ -522,6 +532,8 @@ fn the_reviews_counterexamples_are_disabled() {
     assert_eq!(capabilities::blocked_by(Feature::CpuMash, &u), Some("transition_term_hook"));
     assert_eq!(capabilities::blocked_by(Feature::Recording, &u), Some("transition_term_hook"));
     assert_eq!(capabilities::blocked_by(Feature::CpuCommon, &u), Some("transition_term_hook"));
+    let u = usable_without("state_set_pos");
+    assert!(capabilities::blocked_by(Feature::RecordPlace, &u).is_some());
 }
 
 /// Every game call goes through the layer's grant: the functions that form a native address (`at`) check it,

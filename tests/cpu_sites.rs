@@ -222,6 +222,17 @@ fn cpu_sites_features_need_the_core() {
 }
 
 #[test]
+fn record_place_calls_the_guarded_motion_change_hook() {
+    use model::capabilities::{self, Granted};
+    let site = capabilities::find("motion_change_hook").unwrap();
+    assert_eq!(site.offset, sites_pkg2::MOTION_CHANGE_HOOK_OFFSET);
+    assert_eq!(capabilities::call_rows(site.offset).map(|row| row.name).collect::<Vec<_>>(), ["motion_change_hook"]);
+    let usable = |row: &Site| row.name != "motion_change_hook";
+    assert!(!Granted::from_usable(&usable).allows(site.offset));
+    assert!(!sites::feature_usable(Feature::RecordPlace, usable));
+}
+
+#[test]
 fn cpu_sites_overlapping_windows_are_all_our_own() {
     // Boot compares every window before it writes any (sites::BOOT_PHASES); windows of CPU rows may
     // overlap each other (the thunks are 16 bytes apart) but only with each other or with Called rows.

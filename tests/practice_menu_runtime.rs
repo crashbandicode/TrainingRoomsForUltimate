@@ -74,6 +74,21 @@ fn the_saved_popup_role_is_adopted_at_boot() {
 }
 
 #[test]
+fn the_popup_y_commits_place_first_to_the_live_settings() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let press = item(&worker, "fn press(");
+    let popup = press.split_once("if popup && !open {").unwrap().1.split_once("        return;").unwrap().0;
+    assert!(popup.contains("take_place_first()"));
+    assert!(popup.contains("commit_place_first("));
+    assert!(press.contains("let _ = m.take_place_first();"));
+    let commit = item(&worker, "fn commit_place_first(");
+    let publish = commit.find("published::publish(").unwrap();
+    let replace = commit.find("replace_menu_settings(").unwrap();
+    let request = commit.find("writer::request_settings()").unwrap();
+    assert!(publish < replace && replace < request);
+}
+
+#[test]
 fn a_menu_visit_suspends_tech_practice_and_b_resumes_it() {
     let tech = src("src/runtime/features/tech.rs");
     let frame = item(&tech, "pub unsafe fn frame(");
@@ -459,11 +474,14 @@ fn placement_helpers_keep_the_drills_native_write_order() {
     }
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let helpers = src("src/runtime/features/placement.rs");
+    let ground = item(&helpers, "pub(super) unsafe fn ground(");
+    ordered(ground, &["state::clear_speed_all(", "state::init_pos(", "state::set_lr(",
+        "state::set_situation_kind("]);
+    assert_eq!(ground.matches("state::").count(), 5);
+    assert!(ground.contains("konst(C::SituationGround)"));
     let stand = item(&helpers, "pub(super) unsafe fn stand(");
-    ordered(stand, &["state::clear_speed_all(", "state::init_pos(", "state::set_lr(",
-        "state::set_situation_kind(", "state::status_request("]);
-    assert_eq!(stand.matches("state::").count(), 6);
-    assert!(stand.contains("konst(C::SituationGround)"));
+    ordered(stand, &["ground(body, at, facing)", "state::status_request("]);
+    assert_eq!(stand.matches("state::").count(), 1);
     assert!(stand.contains("konst(C::StatusWait)"));
     let lift = item(&helpers, "pub(super) unsafe fn lift(");
     ordered(lift, &["state::clear_speed_all(", "state::set_pos(", "state::set_lr(",
@@ -521,7 +539,8 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     assert!(!frame.contains("Placement::Airborne if"));
     let placement = src("src/runtime/features/placement.rs");
     assert!(!item(&placement, "pub(super) unsafe fn hold(").contains("p1"));
-    assert!(item(&placement, "pub(super) unsafe fn stand(").contains("state::init_pos(body"));
+    assert!(item(&placement, "pub(super) unsafe fn stand(").contains("ground(body, at, facing)"));
+    assert!(item(&placement, "pub(super) unsafe fn ground(").contains("state::init_pos(body"));
     assert!(frame.contains("placement::hold(cpu, run.setup.cpu)"));
 }
 
@@ -663,6 +682,7 @@ fn every_wizard_reports_through_the_one_shared_path() {
         ("TechWizard", "src/runtime/features/tech.rs"),
         ("TechPlacing", "src/runtime/features/tech.rs"),
         ("BttPlacing", "src/runtime/features/btt.rs"),
+        ("RecordPlacing", "src/runtime/features/record_place.rs"),
     ];
     assert_eq!(listed.len(), cases.len());
     for kind in &listed { assert_eq!(cases.iter().filter(|(name, _)| name == kind).count(), 1, "{kind}"); }
@@ -681,10 +701,10 @@ fn every_wizard_reports_through_the_one_shared_path() {
     assert!(!edge.contains("static WIZARD:"));
     for path in ["src/runtime/features/chords.rs", "src/runtime/ui/input.rs"] {
         let text = src(path);
-        for reader in ["tech::wizard_active()", "edge_juggle::wizard_active()", "egg_zone::wizard_active()"] {
+        for reader in ["tech::wizard_active()", "edge_juggle::wizard_active()", "egg_zone::wizard_active()", "record_place::wizard_active()"] {
             assert_eq!(text.matches(reader).count(), 1, "{path}: {reader}");
         }
-        assert_eq!(text.matches("::wizard_active()").count(), 3, "{path}: exactly the three prompt readers");
+        assert_eq!(text.matches("::wizard_active()").count(), 4, "{path}: exactly the four prompt readers");
         assert!(!text.contains("WIZARDS"), "{path}: prompt ownership uses the wizard readers");
     }
 }

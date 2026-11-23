@@ -242,7 +242,7 @@ pub(crate) unsafe fn body_of(entry_id: i32) -> Option<Body> {
     (accessor != 0).then_some(Body { entry_ptr, fighter, accessor, entry_id })
 }
 
-fn facing_of(lr: f32) -> i8 {
+pub(super) fn facing_of(lr: f32) -> i8 {
     if lr >= 0.0 {
         1
     } else {
@@ -521,8 +521,12 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
 /// Record, Play on Player 1, and Play on CPU. The hook only posts the flags.
 unsafe fn chord_step(body: Body, facing: i8) {
     let play_player = chords::consume(Request::PlayPlayer);
-    let playback = chords::consume(Request::InputPlayback) && !hide_cpu::refuses_play();
+    let playback = chords::consume(Request::InputPlayback);
     let record = chords::consume(Request::InputRecord);
+    if super::record_place::wizard_active() {
+        return;
+    }
+    let playback = playback && !hide_cpu::refuses_play();
     if states::is_loading() {
         if record || playback || play_player {
             event("chord_ignored_loading", "record", i64::from(record), "playback", i64::from(playback));
@@ -551,6 +555,13 @@ unsafe fn chord_step(body: Body, facing: i8) {
             notices::refuse(refusal.text());
             let reason = refusal as i64;
             event("record_refused", "reason", reason, "", 0);
+            false
+        }
+    };
+    let record = match crate::model::record_place::chord(record, recording_host::capturing(), settings().place && super::record_place::installed()) {
+        crate::model::record_place::Chord::Pass(record) => record,
+        crate::model::record_place::Chord::Wizard => {
+            super::record_place::open();
             false
         }
     };
@@ -783,6 +794,7 @@ pub fn on_reset(cause: crate::model::input_delay::Clear) {
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
+    super::record_place::session_clear();
     rec().stop();
     named_macros::clear_session();
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);

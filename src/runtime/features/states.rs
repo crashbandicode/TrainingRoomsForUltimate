@@ -238,6 +238,18 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> Option<R> {
     Some(f(state))
 }
 
+pub(super) fn standby_status() -> i32 {
+    with(|state| state.ids.get(C::StatusStandby)).unwrap_or(UNRESOLVED)
+}
+
+pub(super) fn finish_start() {
+    with(|state| state.machine.finish_start());
+}
+
+pub(super) fn set_start_states(on: bool) {
+    with(|state| state.machine.set_start_states(on));
+}
+
 /// Create the state at boot (before any hook is installed): the slot table, the settings and the
 /// generator seed.
 pub fn init(settings: StateSettings, file: SaveFile, seed: u64) {
@@ -409,7 +421,11 @@ pub fn cancel_pending() {
     KILLING.store(false, Ordering::Release);
     TEMPORARY.store(false, Ordering::Release);
     // A cancelled load never lands; a Play held for it must not wait forever.
-    crate::engine::rr_host::warp_landed();
+    if super::record_place::load_cancelled() {
+        crate::engine::rr_host::abort_warp();
+    } else {
+        crate::engine::rr_host::warp_landed();
+    }
     MAC_PRESENT.store(false, Ordering::Release);
     for slot in &BUFF_ACC {
         slot.store(0, Ordering::Release);
@@ -584,6 +600,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             y: natives::pos_y(accessor),
             percent: natives::damage(accessor, 0),
             lr: natives::lr(accessor),
+            start_state: crate::model::state::record::StartState::Standard,
         }))
     };
     if !crate::engine::rr_host::fighter_frame(live, ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) {
@@ -836,6 +853,9 @@ unsafe fn apply(raw: &Raw, nana: bool, out: Out) {
     }
     if let Some(marker) = out.wait {
         run_wait(raw, marker);
+    }
+    if let Some(start) = out.start {
+        super::record_place::load_target(raw.role.index(), start);
     }
     if let Some(slot) = out.capture {
         capture(raw, nana, slot);
@@ -1167,6 +1187,7 @@ unsafe fn read_record(raw: &Raw) -> SavedState {
         percent: natives::damage(accessor, 0),
         lr: natives::lr(accessor),
         situation_kind: raw.situation,
+        start_state: crate::model::state::record::StartState::Standard,
         marker: Marker::NoAction,
         fighter_kind: raw.kind,
         charge,
@@ -1657,6 +1678,7 @@ fn adopt_reload() {
     let Some(mut pending) = RELOAD.try_lock() else { return };
     let Some(reload) = pending.as_mut() else { return };
     let swapped = with(|s| {
+        reload.machine.set_start_states(super::record_place::installed());
         core::mem::swap(&mut s.machine, &mut reload.machine);
         core::mem::swap(&mut s.saved_miis, &mut reload.saved_miis);
     });

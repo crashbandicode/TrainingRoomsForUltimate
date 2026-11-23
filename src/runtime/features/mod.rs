@@ -24,6 +24,7 @@ pub mod edge_juggle;
 mod placement;
 pub(super) mod egg_zone;
 pub mod recorder;
+pub mod record_place;
 pub mod recording_host;
 pub mod reset_hub;
 pub mod state_effects;

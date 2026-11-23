@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 167] = [
+pub static ROWS: [Row; 168] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -393,6 +393,8 @@ pub static ROWS: [Row; 167] = [
     // Recording > Options. The loop row shows the six counts; the factory value stays length 2.
     r(OPTIONS, "Crop trailing neutral", "recording_crop", TOGGLE,
       "On: Record drops the idle frames at the end of a take.\nOff: it keeps every frame up to the stop."),
+    r(OPTIONS, "Place fighters before Record", "recording_place", TOGGLE,
+      "On: Record first opens a wizard to place both fighters\nand pick their state. Off: Record starts at once."),
     r(OPTIONS, "Hitstun timing", "hitstun_playback", Control::Dropdown(&o::HITSTUN_PLAYBACK),
       "When playback starts after the CPU is hit."),
     r(OPTIONS, "Mash interrupts playback", "playback_mash", TOGGLE,

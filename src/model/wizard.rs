@@ -3,10 +3,10 @@ use super::input_delay::Owners;
 
 /// One variant per wizard; a new wizard adds its variant here and to `ALL`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind { DrillStart, EggZone, TechWizard, TechPlacing, BttPlacing }
+pub enum Kind { DrillStart, EggZone, TechWizard, TechPlacing, BttPlacing, RecordPlacing }
 
 impl Kind {
-    pub const ALL: [Self; 5] = [Self::DrillStart, Self::EggZone, Self::TechWizard, Self::TechPlacing, Self::BttPlacing];
+    pub const ALL: [Self; 6] = [Self::DrillStart, Self::EggZone, Self::TechWizard, Self::TechPlacing, Self::BttPlacing, Self::RecordPlacing];
 }
 
 /// Which wizards are up, read lock-free by the HUD draw. The strip, its card and
@@ -44,6 +44,19 @@ impl Active {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn record_placing_is_a_shared_wizard_kind() {
+        assert_eq!(Kind::ALL.len(), 6);
+        assert!(Kind::ALL.contains(&Kind::RecordPlacing));
+        let active = Active::new();
+        assert!(!active.hides_strip(Owners::NONE));
+        assert!(!active.set_up(Kind::RecordPlacing, true));
+        assert!(active.is_up(Kind::RecordPlacing));
+        assert!(active.hides_strip(Owners::NONE));
+        assert!(active.set_up(Kind::RecordPlacing, false));
+        assert!(!active.hides_strip(Owners::NONE));
+    }
 
     fn set_up_reports_whether_the_wizard_was_up() {
         for kind in Kind::ALL {

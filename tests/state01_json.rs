@@ -17,6 +17,95 @@ use model::state::record::{Charge, Marker, Robin, SavedState, Steve};
 use serde_json::Value;
 
 #[test]
+fn saved_state_writes_a_start_state_only_when_set() {
+    use model::state::record::StartState;
+    let mut file = SaveFile::default();
+    let ordinary = file.to_pretty();
+    assert!(!ordinary.contains("\"start_state\""));
+    file.player[0].start_state = StartState::Tumble;
+    file.cpu[2].start_state = StartState::MissedTechDown;
+    let text = file.to_pretty();
+    assert_eq!(text.matches("\"start_state\"").count(), 2);
+    assert!(text.contains("\"start_state\": \"tumble\""));
+    assert!(text.contains("\"start_state\": \"missed_tech_down\""));
+    assert_eq!(SaveFile::parse(text.as_bytes()).unwrap(), file);
+    file.player[0].start_state = StartState::Standard;
+    file.cpu[2].start_state = StartState::Standard;
+    assert_eq!(file.to_pretty(), ordinary);
+}
+
+#[test]
+fn saved_state_without_a_start_state_reads_as_standard() {
+    use model::state::record::StartState;
+    assert_eq!(SavedState::never_saved().start_state, StartState::Standard);
+    for value in [serde_json::json!({}), serde_json::json!({"start_state": "unknown"}),
+        serde_json::json!({"start_state": 7}), serde_json::json!({"start_state": null})]
+    {
+        assert_eq!(SavedState::from_json(&value).start_state, StartState::Standard);
+    }
+    let mut machine = model::state::machine::Machine::default();
+    let record = SavedState { start_state: StartState::Trip, ..SavedState::never_saved() };
+    machine.capture(model::state::machine::Role::Player, 0, record);
+    assert_eq!(machine.record(model::state::machine::Role::Player, 0).start_state, StartState::Standard);
+}
+
+#[test]
+fn start_state_keys_round_trip() {
+    use model::state::record::StartState;
+    for (state, key, title, grounded) in [
+        (StartState::Tumble, "tumble", "Tumble", Some(false)),
+        (StartState::Helpless, "helpless", "Helpless", Some(false)),
+        (StartState::Footstool, "footstool", "Footstool", Some(false)),
+        (StartState::MissedTechUp, "missed_tech_up", "Missed tech · face up", Some(true)),
+        (StartState::MissedTechDown, "missed_tech_down", "Missed tech · face down", Some(true)),
+        (StartState::Trip, "trip", "Trip", Some(true)),
+    ] {
+        assert_eq!(state.key(), key);
+        assert_eq!(StartState::from_key(key), state);
+        assert_eq!(state.title(), title);
+        assert_eq!(state.grounded(), grounded);
+    }
+    assert_eq!(StartState::from_key(StartState::Standard.key()), StartState::Standard);
+    assert_eq!(StartState::Standard.title(), "Standard");
+    assert_eq!(StartState::Standard.grounded(), None);
+}
+
+#[test]
+fn start_state_survives_fresh_process_continuation() {
+    use model::state::record::StartState;
+    const PHASE: &str = "TR_PLACE_STATE_PROCESS_PHASE";
+    const ROOT: &str = "TR_PLACE_STATE_PROCESS_ROOT";
+    if let Ok(phase) = std::env::var(PHASE) {
+        let path = PathBuf::from(std::env::var_os(ROOT).unwrap()).join("save_states.json");
+        if phase == "save" {
+            let mut file = SaveFile::default();
+            file.player[0].fighter_kind = 8;
+            file.player[0].start_state = StartState::MissedTechUp;
+            persist::save(&path, &file).unwrap();
+        } else {
+            assert_eq!(phase, "continue");
+            let (mut file, outcome) = persist::load(&path);
+            assert_eq!(outcome, Outcome::Read);
+            assert_eq!(file.player[0].start_state, StartState::MissedTechUp);
+            file.player[0].start_state = StartState::Trip;
+            persist::save(&path, &file).unwrap();
+        }
+        return;
+    }
+    let root = TempDir::new();
+    let exe = std::env::current_exe().unwrap();
+    for phase in ["save", "continue"] {
+        let output = std::process::Command::new(&exe)
+            .args(["--exact", "state01_json::start_state_survives_fresh_process_continuation"])
+            .env(PHASE, phase).env(ROOT, &root.0).output().unwrap();
+        assert!(output.status.success(), "{phase}: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    let (file, outcome) = persist::load(&root.0.join("save_states.json"));
+    assert_eq!(outcome, Outcome::Read);
+    assert_eq!(file.player[0].start_state, StartState::Trip);
+}
+
+#[test]
 fn writer_identity_encoding_is_fault_atomic() {
     struct Refused;
     impl serde::Serialize for Refused {
@@ -135,6 +224,7 @@ fn captured(saved_stage: Option<i32>) -> SavedState {
         percent: 42.5,
         lr: -1.0,
         situation_kind: 2,
+        start_state: model::state::record::StartState::Standard,
         marker: Marker::NoAction,
         fighter_kind: 8,
         charge: robin(),
