@@ -2501,3 +2501,11 @@ ceiling = 196465
 date = "2026-11-23"
 reason = "F9: B always backs out of the chain picker, X is done, and no hidden name draft or keyboard job outlives the page's wait. Measured 196465 on install 2 dd6aa1de with F9; F9 adds 105 lines."
 approved_by = "tr-primary-2's F9 order of 2026-11-23 ~15:52Z and ruling of 16:05Z under the operator's measured LOC rule."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 196734
+date = "2026-11-23"
+reason = "F10: a directly recorded input drill keeps its take in a hidden macro file it owns, and X on its row previews it on Player 1 through Recording's playback with the menu hidden. Measured 196734 on install 2 d50a0577 with F10, 269 above the last entry's 196465, which predates the GJ4 rework merge."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Fix round 2026-11-23 item F10 (tr-primary-2 ~16:00Z, ruling 5 of 18:05:17Z); fusion-g2-3 lead. NRO and BSS delta reported with the gate."
