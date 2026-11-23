@@ -2397,3 +2397,11 @@ ceiling = 191842
 date = "2026-11-22"
 reason = "Save the Recording pop-up role and page view in settings.json using the settings writer. Adopt the saved pop-up role at boot so the first Record chord uses it. Old files default to Player. Measured normalized implementation 191842, 54 above the item 3 ceiling 191788. The release gate measures NRO and BSS."
 approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. Recording role memory and cold-start fix reviewed PASS by rv-preview-vis at 22:24:05Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 191869
+date = "2026-11-22"
+reason = "Publish Recording pop-up, page and active capture state through tr.menu for the combined run. The bounded fields and tests measure 27 normalized lines over the reviewed Recording role stack."
+approved_by = "Operator measured LOC rule, TEST-FLOW-2026-11-22.md point 2. TEST-FLOW step 2 requires bridge reads for menu roles and capture state."

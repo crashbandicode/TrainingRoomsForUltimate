@@ -434,6 +434,9 @@ fn publish_bridge_state(s: &mut Session) {
     bridge.tick(now, |notice, ack, out| {
         let open = OPEN.load(Ordering::Acquire);
         let m = menu.as_ref();
+        let recording = m.map(Menu::recording);
+        let [recording_popup_role, recording_page_role] =
+            recording.map_or(["", ""], |screens| screens.roles().map(|role| role.diag()));
         let row = m.and_then(|m| m.help_row());
         let group = m.and_then(|m| match m.screen() { Some(Screen::Rows { group, .. }) => Some(*group), _ => None });
         let practice_picker = m.and_then(|m| {
@@ -479,6 +482,10 @@ fn publish_bridge_state(s: &mut Session) {
             ack,
             ack_result: crate::runtime::bridge_state::ack_result(),
             scene: crate::runtime::bridge_state::scene(now),
+            recording_popup_open: recording.is_some_and(|screens| screens.popup_open()),
+            recording_popup_role,
+            recording_page_role,
+            recording_capture_role: crate::engine::rr_host::capture_role_key(),
             rows_omitted: true,
             ..Default::default()
         };
