@@ -175,11 +175,7 @@ impl PracticeProvider {
                 if sample.result {
                     self.result = sample.fields;
                 } else {
-                    let last_outcome = self.fields.last_outcome;
-                    self.fields = sample.fields;
-                    if self.fields.last_outcome.is_empty() {
-                        self.fields.last_outcome = last_outcome;
-                    }
+                    practice::adopt_sample(&mut self.fields, sample.fields);
                 }
             }
         });

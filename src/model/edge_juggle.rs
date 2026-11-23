@@ -1257,6 +1257,46 @@ mod tests {
     }
 
     #[test]
+    fn drill_outcome_stays_between_attempts_and_clears_on_restart() {
+        let mut session = release(Drill::GuardEdge, None);
+        session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+        assert_eq!(session.phase, Phase::Result(Outcome::Secured, RESULT_FRAMES));
+        assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
+        for _ in 0..RESULT_FRAMES {
+            session.advance_attempt(Observation::default());
+        }
+        assert_eq!(session.phase, Phase::Place);
+        assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
+        session.placed();
+        assert!(matches!(session.phase, Phase::Ready(_)));
+        assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
+        for _ in 0..Drill::GuardEdge.ready_frames() {
+            session.advance_attempt(Observation::default());
+        }
+        assert_eq!(session.phase, Phase::Live);
+        assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
+        session.discard_attempt();
+        assert_eq!(session.phase, Phase::Place);
+        assert_eq!(session.practice_fields(None, None).last_outcome, "secured");
+        session.restart_drill();
+        assert_eq!(session.practice_fields(None, None).last_outcome, "");
+        assert_eq!(session.practice_fields(None, None).attempts, Some(0));
+        assert_eq!(Session::new(Drill::GuardEdge, None).practice_fields(None, None).last_outcome, "");
+
+        let mut unresolved = release(Drill::GuardEdge, None);
+        for _ in 0..EDGE_TIMEOUT {
+            unresolved.advance_attempt(Observation::default());
+        }
+        assert_eq!(unresolved.phase, Phase::Result(Outcome::Unresolved, RESULT_FRAMES));
+        assert_eq!(unresolved.practice_fields(None, None).last_outcome, "unresolved");
+        for _ in 0..RESULT_FRAMES {
+            unresolved.advance_attempt(Observation::default());
+        }
+        assert_eq!(unresolved.practice_fields(None, None).last_outcome, "unresolved");
+        assert_eq!(unresolved.practice_fields(None, None).attempts, Some(0));
+    }
+
+    #[test]
     fn juggler_publishes_percent_preview_and_airtime_result() {
         let stage = Stage::new(
             [-160.0, 150.0, 110.0, -85.0],

@@ -1263,6 +1263,21 @@ mod standing_notice_tests {
     }
 
     #[test]
+    fn eggs_reset_after_a_finished_run_publishes_no_outcome() {
+        let mut run = Run::IDLE;
+        run.start([TIMED, ANY, FAST, DISC, IN_VIEW], 7);
+        run.look(true, || Some(VIEW));
+        run.frames = 1;
+        assert_eq!(run.step(true, 0.0, &[], false, 0), Some(END_FRAMES));
+        assert_eq!((run.practice_fields().phase, run.practice_fields().last_outcome), ("result", "time"));
+        run.reset(11);
+        let fields = run.practice_fields();
+        assert_eq!(fields.last_outcome, "");
+        assert_eq!(fields.score, Some(0));
+        assert!(matches!(fields.phase, "setup" | "live"));
+    }
+
+    #[test]
     fn in_view_uses_the_current_moving_projection_after_floor_read() {
         let mut run = Run::IDLE;
         run.start([TIMED, ANY, FAST, DISC, IN_VIEW], 7);

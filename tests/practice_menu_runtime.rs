@@ -330,6 +330,54 @@ fn cpu_think_counts_follow_the_hooks_training_or_lobby_gate() {
 }
 
 #[test]
+fn a_pending_drill_start_does_not_publish_the_previous_run() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let branch = &frame[frame.find("if !owns_setup() {").unwrap()..];
+    let branch = &branch[..branch.find("return;").unwrap()];
+    let guard = branch.find("if START.load(Ordering::Acquire) == 0 {").expect("a pending Start belongs to the next run");
+    assert!(guard < branch.find("report_drill_state(capture, run, None, None);").unwrap());
+}
+
+#[test]
+fn btt_poll_publishes_input_owned_changes() {
+    let runtime = src("src/runtime/features/btt.rs");
+    let poll = item(&runtime, "pub unsafe fn poll(");
+    assert!(poll.contains("PracticeCapture::of("));
+    assert!(poll.contains("if !START.load(Ordering::Acquire) {"));
+    assert!(poll.contains("capture.submit(|| mode.practice_fields());"));
+    let pass = item(&runtime, "unsafe fn pass(");
+    assert!(pass.find("BTT.lock()").unwrap() < pass.find("START.swap(false, Ordering::AcqRel)").unwrap());
+}
+
+#[test]
+fn a_pending_start_never_publishes_the_previous_run() {
+    let mashout = src("src/runtime/features/mashout.rs");
+    let frame = item(&mashout, "pub unsafe fn frame(");
+    let guard = frame.find("if !START.load(Ordering::Acquire) {").expect("Mash out waits for Start");
+    assert!(guard < frame.find("capture.submit(|| game.practice_fields());").unwrap());
+
+    let tech = src("src/runtime/features/tech.rs");
+    let sample = item(&tech, "fn with_practice_frame(");
+    assert!(sample.contains("if !START.load(Ordering::Acquire)"));
+    assert!(sample.contains("if run.restart_pending { &Session::IDLE }"));
+    let update = item(&tech, "pub unsafe fn frame(");
+    let restart = &update[update.find("if run.restart_pending ||").unwrap()..];
+    let fighter = restart.find("let Some(fighter_kind) = natives::fighter_kind(at) else {").unwrap();
+    let clear = restart.find("run.restart_pending = false;").unwrap();
+    let start = restart.find("run.controller.start(").unwrap();
+    assert!(fighter < clear && clear < start);
+
+    let eggs = src("src/runtime/features/hitbox.rs");
+    let pass = item(&eggs, "unsafe fn eggs_pass(");
+    assert!(pass.find("RUN.lock()").unwrap() < pass.find("EGG_START.swap(false, Ordering::AcqRel)").unwrap());
+
+    let bridge = src("src/runtime/bridge_state.rs");
+    assert!(bridge.contains("practice::adopt_sample(&mut self.fields, sample.fields);"));
+    assert!(!bridge.contains("self.fields.last_outcome = last_outcome"));
+}
+
+#[test]
 fn location_editors_use_one_camera_and_cpu_session() {
     let camera = src("src/runtime/features/btt_camera.rs");
     let frame = item(&camera, "pub(super) fn update_placement(");

@@ -931,5 +931,21 @@ mod practice_fields_tests {
         assert_eq!((state.phase, state.score, state.target_count, state.attempt_frames, state.best),
             ("done", Some(2), Some(2), Some(81), Some(75)));
     }
+
+    #[test]
+    fn btt_input_alone_moves_the_published_phase() {
+        use crate::model::chords::logical::{A, X};
+
+        let mut mode = Btt::IDLE;
+        mode.close_menu(true, true);
+        assert_eq!(mode.practice_fields().phase, "placing");
+        let place = 1u16 << A;
+        assert!(mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+        let confirm = 1u16 << X;
+        assert!(mode.feed(Pad { held: confirm, pressed: confirm, ..Pad::default() }));
+        assert_eq!(mode.practice_fields().phase, "ready");
+        assert!(!mode.feed(Pad { held: place, pressed: place, ..Pad::default() }));
+        assert_eq!(mode.practice_fields().phase, "live");
+    }
     }
 }

@@ -43,6 +43,17 @@ fn idle_and_starting_have_no_stale_game_fields() {
 }
 
 #[test]
+fn a_fresh_run_does_not_inherit_the_previous_outcome() {
+    let mut current = Fields { phase: "result", last_outcome: "complete", score: Some(10), ..Fields::default() };
+    adopt_sample(&mut current, Fields { phase: "live", score: Some(0), ..Fields::default() });
+    assert_eq!(current.last_outcome, "");
+    assert_eq!(current.score, Some(0));
+    let mut wire = String::new();
+    snapshot(Some(Game::Eggs), current, [0; CPU_ENTRIES], &mut wire);
+    assert!(!wire.lines().any(|line| line.starts_with("last.outcome=")), "{wire}");
+}
+
+#[test]
 fn practice_publishes_in_training_and_the_waiting_room() {
     for scene in ["training", "lobby"] {
         assert_eq!(published_activation(scene, || (7, Some(Game::Parry))), (7, Some(Game::Parry)));

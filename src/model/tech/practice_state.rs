@@ -138,6 +138,22 @@ mod tests {
     }
 
     #[test]
+    fn a_deferred_tech_restart_publishes_a_fresh_session() {
+        let mut old = Session::IDLE;
+        old.start(Length::Frames(200));
+        old.placed(2);
+        old.tick(false, None);
+        old.tick(false, None);
+        old.contact_grade(Some(Grade::Perfect(Some(2))));
+        old.stop();
+        let stale = project_tech_state(&old, View::Discovering);
+        assert_eq!((stale.phase, stale.attempts, stale.last_outcome), ("discovering", Some(1), "perfect"));
+        let fresh = project_tech_state(&Session::IDLE, View::Discovering);
+        assert_eq!((fresh.phase, fresh.attempts, fresh.score, fresh.last_outcome),
+            ("discovering", Some(0), Some(0), ""));
+    }
+
+    #[test]
     fn tech_practice_reports_actual_wizard_steps_and_selections() {
         use crate::model::{settings::Settings, tech_settings};
 

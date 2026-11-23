@@ -35,6 +35,14 @@ pub struct Fields {
     pub last_outcome: &'static str,
 }
 
+pub fn adopt_sample(current: &mut Fields, sample: Fields) {
+    let last_outcome = current.last_outcome;
+    *current = sample;
+    if current.last_outcome.is_empty() {
+        current.last_outcome = last_outcome;
+    }
+}
+
 pub fn snapshot(game: Option<Game>, fields: Fields, thinks: [u64; CPU_ENTRIES], out: &mut String) {
     use core::fmt::Write as _;
 

@@ -289,6 +289,15 @@ fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
 
 #[test]
 fn actual_runtime_worker_native_epoch_admission_and_bests() {
+    run_worker_fixture("worker", false);
+}
+
+#[test]
+fn a_new_activation_does_not_inherit_the_previous_done_grade() {
+    run_worker_fixture("worker-practice", true);
+}
+
+fn run_worker_fixture(label: &str, practice_only: bool) {
     let runtime = include_str!("../src/runtime/features/mashout.rs");
     let run = include_str!("../src/model/mashout/run.rs");
     let practice = include_str!("../src/model/practice_games.rs");
@@ -374,7 +383,9 @@ fn actual_runtime_worker_native_epoch_admission_and_bests() {
     ] {
         fixture = fixture.replace(&format!("{marker}\n"), &format!("{source}\n"));
     }
-    run_fixture(fixture, "worker");
+    let practice = "worker::epoch_tests::a_new_activation_does_not_inherit_the_previous_done_grade";
+    let args = if practice_only { ["--exact", practice] } else { ["--skip", practice] };
+    run_fixture_with_args(fixture, label, &args);
 }
 
 #[test]
@@ -412,6 +423,10 @@ fn actual_interposer_install_restore_and_foreign_slot_refusal() {
 }
 
 fn run_fixture(fixture: String, label: &str) {
+    run_fixture_with_args(fixture, label, &[]);
+}
+
+fn run_fixture_with_args(fixture: String, label: &str, args: &[&str]) {
     // Inner module docs need their original position before imports.
     let fixture = fixture.replace("//!", "//");
     let dir = std::env::temp_dir().join(format!("tr-mashout-{label}-{}", std::process::id()));
@@ -443,6 +458,7 @@ fn run_fixture(fixture: String, label: &str) {
     );
     let run = Command::new(&binary)
         .args(["--test-threads=1", "--nocapture"])
+        .args(args)
         .output()
         .unwrap();
     print!("{}", String::from_utf8_lossy(&run.stdout));
