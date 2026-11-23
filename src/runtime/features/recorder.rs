@@ -504,13 +504,15 @@ unsafe fn mash_start(settings: &RecorderSettings, key: FighterKey, body: Body, f
     let in_hitstun = status::in_hitstun(&table, status);
     let in_hitstop = natives::is_stop(body.accessor);
     let needs = rec().mash_needs_term(settings, Some(head), in_hitstun);
-    let term_enabled = if needs {
-        let from = rec().starting_status_of(head);
-        let term = table.get(Recorder::term_for_status(&table, from));
-        term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
-    } else {
-        false
-    };
+    let from = rec().starting_status_of(head);
+    let term_enabled = needs
+        && match Recorder::term_for_status(&table, from) {
+            Some(c) => {
+                let term = table.get(c);
+                term != UNRESOLVED && game::natives::is_enable_transition_term(body.accessor, term)
+            }
+            None => cpu::actionable(body.accessor),
+        };
     let start = rec().mash_should_start(
         settings,
         &MashCtx { head_slot: Some(head), in_hitstun, in_hitstop, term_enabled },
