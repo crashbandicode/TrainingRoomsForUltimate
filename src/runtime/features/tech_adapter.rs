@@ -34,10 +34,6 @@ static DECISION_OBSERVER: OnceLock<DecisionObserver> = OnceLock::new();
 pub fn bind_decision_observer(observer: DecisionObserver) -> Result<(), DecisionObserver> {
     DECISION_OBSERVER.set(observer)
 }
-/// Separate from launch readiness: both common observation prerequisites must be installed.
-pub fn decision_observer_ready() -> bool {
-    tech_ready() && super::cpu_common::contact_ready() && DECISION_OBSERVER.get().is_some()
-}
 #[derive(Clone, Copy)]
 struct Saved {
     position: Vec2,

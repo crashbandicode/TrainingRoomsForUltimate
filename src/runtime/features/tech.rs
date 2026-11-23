@@ -171,19 +171,6 @@ pub fn placing() -> bool {
 fn observe_decision(snapshot: DecisionSnapshot) -> bool {
     DECISIONS.post(snapshot)
 }
-pub fn observe(outcome: Outcome) -> bool {
-    OUTCOMES.post(outcome)
-}
-/// Additional proven native guard edge. The live native reader supplies availability;
-/// neither raw shoulder input nor a trigger-count decrease proves a new press.
-pub fn guard_press() {
-    if !OPEN.load(Ordering::Acquire)
-        && !scene::facts().busy
-        && !published::input_owners().covers_strip()
-    {
-        GUARD_PRESS.store(true, Ordering::Release);
-    }
-}
 fn kind(config: Config) -> Option<SurfaceKind> {
     match config.surface {
         1 => Some(SurfaceKind::Floor),

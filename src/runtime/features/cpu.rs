@@ -205,6 +205,7 @@ mod ev {
     pub const OOS_CALL: usize = 19;
     pub const TAUNT: usize = 20;
     pub const HIDE: usize = 21;
+    #[cfg(feature = "diag")]
     pub const TAG: usize = 22;
     pub const COUNT: usize = 23;
 }

@@ -14,6 +14,8 @@ pub(super) struct Plan {
     pub reserve_lr: Option<f32>,
     pub ground_to_air: bool,
 }
+// The diag launcher (tech_spike) reads these payloads; the product launcher reads only Stop.
+#[cfg_attr(not(feature = "diag"), allow(dead_code))]
 pub(super) enum Moment {
     Placed,
     Reaction,

@@ -29,10 +29,6 @@ static WAITING_READY: AtomicBool = AtomicBool::new(false);
 
 /// UI-layout/game-frame boundary only. These scene facts survive a modal applet
 /// pausing fighter frames; explicit session retirement invalidates them.
-pub fn publish_scene_facts() {
-    let _ = try_publish_scene_facts();
-}
-
 /// Defer unavailable eligibility without publishing a false scene departure.
 pub fn try_publish_scene_facts() -> Result<(), crate::runtime::compat::menu::MenuBusy> {
     let context = crate::runtime::lobby::training::practice::try_context()?;

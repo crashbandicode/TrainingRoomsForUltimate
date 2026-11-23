@@ -2126,7 +2126,7 @@ fn macro_frame_menu_reads_are_nonblocking_and_blocking_edit_seeds_fail() {
     }
     graph.funcs[facts].body = original;
     for (key, safe, blocking) in [
-        ("named_macros::hold_panel_fighter", "panel_entry_in", "panel_entry"),
+        ("named_macros::hold_panel_fighter", "panel_entry_in", "role"),
         ("replay_preview::after_frame", "try_enabled", "enabled"),
         ("replay_capture::browser_needs_native_update", "role_in", "role"),
         ("mii_backend::ready_with", "current_with", "current"),
