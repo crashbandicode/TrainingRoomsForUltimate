@@ -39,6 +39,8 @@ named as in the table. Some need a setting first:
 - Cycle Player needs Fighters & Stages › [Player Swapping](../menu/fighters-and-stages.md#player-swapping) On. It is Off
   by default. Cycle CPU always works.
 
+A refused Save or Load shows in front of a standing notice, which returns afterward.
+
 ## Changing a chord
 
 1. Open Display & Controls › Button chords and press A.

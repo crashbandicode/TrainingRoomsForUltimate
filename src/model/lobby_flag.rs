@@ -63,6 +63,18 @@ pub const fn is_waiting_room(scene: Scene) -> bool {
         && (scene.mode == 0x0201_0000 || scene.mode & 0x7fff_0000 == 0x0701_0000)
 }
 
+/// Lobby Practice was turned Off in a live room while a drill still holds the first partner (its behaviour, its
+/// fighter, or its sleep): practice stays requested until the drill has given them back. There is no deadline: the
+/// obligation ends with the give-back, with a departure (`step`'s own rule, whatever this says) or with the partner's
+/// replacement (the lease drops then, so `holds` is false). Returns the `lobby_practice_on` that `step` takes,
+/// whether a release is under way, and whether the drill is to be stopped now (once, when the release begins).
+pub const fn release(setting_on: bool, was_active: bool, holds: bool, releasing: bool) -> (bool, bool, bool) {
+    if setting_on || !was_active || !holds {
+        return (setting_on, false, false);
+    }
+    (true, true, !releasing)
+}
+
 /// Advance the clock. `scene == None` is "the mode words are not readable": the key stays, practice
 /// is not requested, and a room that was active turns off. The same scene twice does not tear down
 /// again. The mapped slot is not an argument.

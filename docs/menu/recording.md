@@ -60,8 +60,9 @@ the number of files, such as "Save states & Macros (7)".
 
 - Up/Down move through a list. Down past the last save goes on into MACROS. Past the top or the bottom of the two lists
   the cursor moves on to the previous or next line of the page. Left/Right jump between the two lists. ZL + Up/Down move
-  12 rows.
-- A opens the file's own screen. A on *+ New chain* opens the numbered picker.
+  12 rows, stop at the end, then go to the other list and on to the page's next or previous section.
+- A opens the file's own screen. A on *+ New chain* opens the numbered picker, where ZL + Up/Down jump 12 rows
+  and wrap at the ends.
 - X, with the cursor in MACROS, steps the loop count of the view you're in: ∞, 1, 2, 3, 5, 10. It is the same count
   as the [Loop](#loop) row.
 
@@ -149,7 +150,8 @@ It is shown in the Player view only. The left column shows the number of files, 
 
 **How:**
 
-- Up/Down, Left/Right and ZL + Up/Down move as in Save states & Macros.
+- Up/Down, Left/Right and ZL + Up/Down move as in Save states & Macros: a jump at a list's end goes to the other
+  list, then to the page's next or previous section.
 - A on *+ Save last combo…* keeps the last combo the frame strip saw as a new combo and makes it the drill. The Switch
   keyboard asks for a name; an empty name gives it the next Combo N. With no combo on the strip yet, it says so and
   saves nothing.
@@ -450,7 +452,8 @@ Under the title are the pop-up's own tabs:
 ### The lists and the hot five
 
 Each tab shows the same two lists as the page's section, four rows of each, with the same
-[hot five](#save-states-macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows. A
+[hot five](#save-states-macros). Up/Down move inside a list, Left/Right switch lists, ZL + Up/Down move 12 rows and
+wrap within the list. A
 column on the right, headed CONNECTIONS, shows the row under the cursor and the files joined to it, each in a box
 labelled SAVE STATE, MACRO, COMBO or SEQUENCE ([how to read it](../guide/recording.md#reading-the-lists)).
 

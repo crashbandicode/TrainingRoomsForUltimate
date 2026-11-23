@@ -30,6 +30,8 @@ use crate::engine::rr_runtime::{apply_catalog, apply_index, CatalogCache, MenuIn
 use crate::engine::stages::stage_forms::Selection;
 
 static INPUT: Ring<64> = Ring::new();
+/// Whether the menu worker has input waiting.
+pub fn input_pending() -> bool { !INPUT.is_empty() }
 /// What wakes the menu worker (`wake`, any thread, game hooks included). A `hos_lock::Event`, not `std::thread::park`/`unpark`:
 /// std's parker on this target is pthread's, whose `unpark` takes a mutex the parked worker holds around its wait, so a game hook
 /// waking the worker could wait for it (the lock-free runtime). Setting the event never waits.
@@ -436,7 +438,7 @@ fn publish_bridge_state(s: &mut Session) {
         return;
     }
     let now = crate::runtime::clock::uptime_ms();
-    let Session { bridge, menu, panel, .. } = s;
+    let Session { bridge, menu, panel, phase, pending_close, .. } = s;
     bridge.tick(now, |notice, ack, out| {
         let open = OPEN.load(Ordering::Acquire);
         let m = menu.as_ref();
@@ -472,6 +474,7 @@ fn publish_bridge_state(s: &mut Session) {
         let keyboard = crate::runtime::macros::named_macros::naming_pending();
         let action = crate::runtime::bridge_state::action(row);
         let active = crate::runtime::features::practice::active();
+        let list = crate::model::bridge_state::published_list(m, flow::model_takes_presses(open, POPUP.load(Ordering::Acquire), *phase, pending_close.is_some()));
         let view = crate::model::bridge_state::View {
             open: open && m.is_some(),
             page: m.map_or("", |m| m.page().id()),
@@ -498,6 +501,10 @@ fn publish_bridge_state(s: &mut Session) {
             recording_popup_role,
             recording_page_role,
             recording_capture_role: crate::engine::rr_host::capture_role_key(),
+            list: &list.id,
+            list_count: list.count,
+            list_index: list.index,
+            list_value: &list.value,
             rows_omitted: true,
             ..Default::default()
         };

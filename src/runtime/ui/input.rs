@@ -87,6 +87,7 @@ pub fn on_p1_poll(holder: usize) {
     let shortcuts = chords::shortcuts();
     // ZL + Up / Down are jumps only where the screen showing takes them (the worker publishes it, review MN-1).
     adapter.set_jumps(state::JUMPS.load(Ordering::Acquire));
+    adapter.set_backlog(worker::input_pending());
     let step = adapter.poll(buttons, style, open || popup, allowed, shortcuts);
     if state::CLOSING.load(Ordering::Acquire) {
         // The close window waits for the buttons held at its first poll (the press that closed it) to be released.

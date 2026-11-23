@@ -68,6 +68,9 @@ impl<const N: usize> Ring<N> {
 
     pub fn generation(&self) -> u32 { self.generation.load(Ordering::Acquire) }
 
+    /// The producer's view: nothing waits for the worker.
+    pub fn is_empty(&self) -> bool { self.tail.load(Ordering::Acquire) == self.head.load(Ordering::Acquire) }
+
     /// Any cancellation caller. The worker drops stale queued events even at capacity.
     pub fn reset(&self) { self.generation.fetch_add(1, Ordering::AcqRel); }
 

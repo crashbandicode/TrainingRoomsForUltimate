@@ -161,7 +161,7 @@ unsafe fn force_selected(base: usize, cpu: usize, index: i32, work: [i32; COMMAN
     if selected >= COMMAND_COUNT {
         return false;
     }
-    let fighter = natives::entry_active_body(natives::fighter_entry(1));
+    let fighter = natives::entry_active_body(natives::fighter_entry(super::cpu_entry()));
     if fighter == 0 || natives::fighter_accessor(fighter) != cpu {
         return false;
     }

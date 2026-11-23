@@ -11,6 +11,7 @@
 
 pub mod chord;
 pub mod delay;
+pub mod focus_list;
 pub mod grid;
 pub mod input;
 pub mod options;
@@ -29,6 +30,7 @@ use super::practice_games::retired;
 use super::settings::{self, Settings};
 use super::mashout::moves;
 use super::edge_juggle::{Drill, picker::{self as cpu_picker, Picker}};
+pub use focus_list::FocusList;
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
 /// reads (`RecordingScreens::loops`), not the old two-value setting stored under this id.
@@ -405,16 +407,20 @@ pub(crate) fn group_of(entry: Entry) -> usize {
     }
 }
 
+/// A list cursor one window further, stopping at an end; None when already there or the list is empty.
+pub(crate) fn jumped_within(cursor: usize, len: usize, forward: bool) -> Option<usize> {
+    let last = len.checked_sub(1)?;
+    let cursor = cursor.min(last);
+    match forward {
+        true => (cursor < last).then(|| (cursor + LIST_JUMP).min(last)),
+        false => (cursor > 0).then(|| cursor.saturating_sub(LIST_JUMP)),
+    }
+}
+
 /// A list cursor after ZL + Up / Down: one window further, stopping at the first or last entry; from there the next
 /// jump wraps to the other end, as Up / Down do.
-fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
-    let last = len.saturating_sub(1);
-    match forward {
-        true if cursor >= last => 0,
-        true => (cursor + LIST_JUMP).min(last),
-        false if cursor == 0 => last,
-        false => cursor.saturating_sub(LIST_JUMP),
-    }
+pub(crate) fn jumped(cursor: usize, len: usize, forward: bool) -> usize {
+    jumped_within(cursor, len, forward).unwrap_or(if forward { 0 } else { len.saturating_sub(1) })
 }
 
 /// The menu.
@@ -660,9 +666,7 @@ impl Menu {
     }
 
     fn row_visible(&self, row: &Row) -> bool {
-        let native_only = matches!(row.control, Control::Game(Game::GuardEdge | Game::Juggler))
-            || matches!(row.group, table::EDGE | table::JUGGLE);
-        row.visible(self.env.pilot_present) && !(native_only && self.env.waiting_room)
+        row.visible(self.env.pilot_present)
     }
 
     fn group_visible(&self, group: usize) -> bool {

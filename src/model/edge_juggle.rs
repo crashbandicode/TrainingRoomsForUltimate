@@ -1,4 +1,7 @@
 //! Shared attempt clock and scoring for Guard the Edge and Juggler (DESIGN v2).
+use super::btt;
+use super::crosshair::{Crosshair, Marks};
+use super::panes::EGG_WHOLE;
 use crate::model::practice_state::Fields;
 use super::practice_games::{record_max, record_time, result_tick, Game};
 
@@ -8,6 +11,9 @@ pub mod perfect;
 pub mod picker;
 #[path = "edge_juggle/zoom.rs"]
 pub mod zoom;
+#[cfg(test)]
+#[path = "edge_juggle/crosshair_tests.rs"]
+mod crosshair_tests;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
@@ -129,6 +135,15 @@ impl CpuBehavior {
             control == entry && control == ai && operation_cpu == (control != 0x24)
         })
     }
+
+    /// The control type the drill sets itself with the pause menu closed: the wanted selection and the live fighter
+    /// are both AI kinds (not Control) and the operator flag already says CPU, so the game's own apply would change
+    /// only the type. `None`: the stock pause apply has to make the change.
+    pub fn direct(self, entry: u8, ai: u8, operation_cpu: bool, menu: BehaviorMenu, pause: BehaviorPause) -> Option<u8> {
+        let control = self.control_type()?;
+        (operation_cpu && menu == BehaviorMenu::Closed && pause == BehaviorPause::Idle
+            && ![control, entry, ai].contains(&0x24)).then_some(control)
+    }
 }
 
 /// Save the selection once. Retain it through Stop until the game applies the restored selection.
@@ -167,6 +182,41 @@ impl BehaviorLease {
             self.0 = None;
         }
         None
+    }
+}
+
+/// The waiting room has no pause panel: the first training partner's control type is the room's Training Partner
+/// Behavior. Save the room's type once, ask for the stock CPU (type 0), give the saved type back at Stop.
+#[derive(Default)]
+pub struct PartnerLease(Option<(usize, u8)>);
+
+impl PartnerLease {
+    pub const fn new() -> Self { Self(None) }
+    pub fn held(&self) -> bool { self.0.is_some() }
+
+    /// `owner`: the partner's controller; `entry` and `ai`: its two live control types. The type to write now, if any.
+    /// A Control type (0x24) or a fighter no CPU operates is never written.
+    pub fn step(&mut self, level: Option<u8>, owner: usize, entry: u8, ai: u8, operation_cpu: bool) -> Option<u8> {
+        if self.0.is_some_and(|(old, _)| old != owner) {
+            self.0 = None;
+        }
+        if !operation_cpu || entry == 0x24 || ai == 0x24 {
+            return None;
+        }
+        if level.is_some() {
+            match &mut self.0 {
+                None => self.0 = Some((owner, entry)),
+                Some((_, saved)) if entry != 0 => *saved = entry,
+                Some(_) => {}
+            }
+            return (entry != 0 || ai != 0).then_some(0);
+        }
+        let (_, saved) = self.0?;
+        if entry == saved && ai == saved {
+            self.0 = None;
+            return None;
+        }
+        Some(saved)
     }
 }
 
@@ -397,9 +447,9 @@ pub const fn drill_owns_pad(owns_primary: bool, recorder_active: bool) -> bool {
     owns_primary && !recorder_active
 }
 
-/// CPU settings affect both registered bodies of the opposed entry.
-pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::FighterKey) -> bool {
-    active && key.entry == 1
+/// CPU settings affect both registered bodies of the scene's primary opposed entry.
+pub const fn suspends_cpu_settings(active: bool, key: crate::model::cpu::role::FighterKey, primary: u8) -> bool {
+    active && key.entry == primary
 }
 
 /// Runtime admits placement, then ticks only on eligible simulation frames.
@@ -585,20 +635,12 @@ impl Session {
     /// Projects the same attempt state that drives the drill HUD onto the bridge.
     pub fn practice_fields(&self, wizard: Option<Wizard>, best: Option<u32>) -> Fields {
         if let Some(wizard) = wizard {
-            let (step, selection, point, player, value) = match wizard.step {
-                WizardStep::Area => (
-                    "area",
-                    wizard.setup.area.bridge_name(),
-                    Some(wizard.setup.cpu),
-                    None,
-                    None,
-                ),
-                WizardStep::Cpu => ("cpu", "", Some(wizard.setup.cpu), None, None),
-                WizardStep::Percent => ("percent", "", None, None, Some(u32::from(wizard.setup.percent))),
-                WizardStep::Player => ("player", "", Some(wizard.setup.p1), None, None),
+            let (step, point, player, value) = match wizard.step {
+                WizardStep::Cpu => ("cpu", Some(wizard.setup.cpu), None, None),
+                WizardStep::Percent => ("percent", None, None, Some(u32::from(wizard.setup.percent))),
+                WizardStep::Player => ("player", Some(wizard.setup.p1), None, None),
                 WizardStep::Preview => (
                     "preview",
-                    "",
                     Some(wizard.setup.cpu),
                     Some(wizard.setup.p1),
                     Some(u32::from(wizard.setup.percent)),
@@ -607,7 +649,6 @@ impl Session {
             return Fields {
                 phase: "wizard",
                 wizard_step: step,
-                wizard_selection: selection,
                 wizard_point: point,
                 wizard_player_point: player,
                 wizard_value: value,
@@ -655,47 +696,6 @@ impl Session {
     }
 }
 
-/// The stage is split at its centre and at each side's ledge height.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Area {
-    #[default]
-    LowerLeft,
-    LowerRight,
-    UpperLeft,
-    UpperRight,
-}
-
-impl Area {
-    const ALL: [Self; 4] = [
-        Self::LowerLeft,
-        Self::LowerRight,
-        Self::UpperLeft,
-        Self::UpperRight,
-    ];
-
-    pub fn step(self, delta: i32) -> Self {
-        Self::ALL[(self as i32 + delta).rem_euclid(4) as usize]
-    }
-
-    const fn bridge_name(self) -> &'static str {
-        match self {
-            Self::LowerLeft => "lower_left",
-            Self::LowerRight => "lower_right",
-            Self::UpperLeft => "upper_left",
-            Self::UpperRight => "upper_right",
-        }
-    }
-
-    pub const fn title(self) -> &'static str {
-        match self {
-            Self::LowerLeft => "Lower left",
-            Self::LowerRight => "Lower right",
-            Self::UpperLeft => "Upper left",
-            Self::UpperRight => "Upper right",
-        }
-    }
-}
-
 /// Coordinates come from the live main floor, blast bounds, and camera limits.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stage {
@@ -728,30 +728,35 @@ impl Stage {
         })
     }
 
-    fn area_bounds(self, area: Area) -> [f32; 4] {
+    pub fn side(self, x: f32) -> usize {
+        usize::from(x > self.ledges[0][0].midpoint(self.ledges[1][0]))
+    }
+
+    pub fn edge_cursor(self, point: [f32; 2]) -> Option<[f32; 2]> {
         let [left, right, top, bottom] = self.blast;
-        let is_left = matches!(area, Area::LowerLeft | Area::UpperLeft);
-        let [x, y] = self.ledges[usize::from(!is_left)];
-        // Leave one world unit between the start and the ledge or blast boundary.
-        let [lo, hi] = if is_left {
+        clamp_point(point, [left + 1.0, right - 1.0, top - 1.0, bottom + 1.0])
+    }
+
+    pub fn off_stage(self, point: [f32; 2]) -> Option<[f32; 2]> {
+        (self.edge_cursor(point) == Some(point)
+            && (point[0] <= self.ledges[0][0] - 1.0 || point[0] >= self.ledges[1][0] + 1.0))
+            .then_some(point)
+    }
+
+    fn lower_middle(self, side: usize) -> Option<[f32; 2]> {
+        let [left, right, _, bottom] = self.blast;
+        let [x, y] = self.ledges[side];
+        let [lo, hi] = if side == 0 {
             [left + 1.0, x - 1.0]
         } else {
             [x + 1.0, right - 1.0]
         };
-        if matches!(area, Area::LowerLeft | Area::LowerRight) {
-            [lo, hi, y, bottom + 1.0]
-        } else {
-            [lo, hi, top - 1.0, y]
-        }
+        self.off_stage([lo.midpoint(hi), (bottom + 1.0).midpoint(y)])
     }
 
-    pub fn edge_start(self, area: Area, point: [f32; 2]) -> Option<[f32; 2]> {
-        clamp_point(point, self.area_bounds(area))
-    }
-
-    pub fn area_default(self, area: Area) -> Option<[f32; 2]> {
-        let [lo, hi, top, bottom] = self.area_bounds(area);
-        self.edge_start(area, [lo.midpoint(hi), bottom.midpoint(top)])
+    pub fn bucket(self, point: [f32; 2]) -> u8 {
+        let side = self.side(point[0]);
+        side as u8 + 2 * u8::from(point[1] >= self.ledges[side][1])
     }
 
     pub fn camera_point(self, point: [f32; 2]) -> Option<[f32; 2]> {
@@ -779,7 +784,6 @@ fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Setup {
-    pub area: Area,
     pub cpu: [f32; 2],
     pub p1: [f32; 2],
     pub percent: u16,
@@ -808,7 +812,6 @@ pub fn recovery_away_facing(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WizardStep {
-    Area,
     Cpu,
     Percent,
     Player,
@@ -819,8 +822,9 @@ pub enum WizardStep {
 pub struct Wizard {
     drill: Drill,
     area_offset: Option<[f32; 2]>,
-    left_start: Option<(Area, [f32; 2])>,
+    left_start: Option<[f32; 2]>,
     moved: bool,
+    cross: Crosshair,
     pub step: WizardStep,
     pub setup: Setup,
 }
@@ -830,7 +834,6 @@ impl Wizard {
         drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
         stage_key: (i32, u32), fighter: Option<i32>,
     ) -> Option<Self> {
-        let area = Area::default();
         let link_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
             && perfect::link::in_region(stage_key, stage.ledges, [stage.ledges[0][0] - 30.0, stage.ledges[0][1] + 18.0], percent.into());
@@ -840,32 +843,32 @@ impl Wizard {
             None
         };
         let left_start = if let Some(offset) = lucario_left_start {
-            Some((Area::LowerLeft, offset))
+            Some(offset)
         } else if link_start {
-            Some((Area::UpperLeft, [30.0, 18.0]))
+            Some([30.0, 18.0])
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::greninja::KIND) {
-            perfect::greninja::wizard_offset(stage_key).map(|offset| (Area::UpperLeft, offset))
+            perfect::greninja::wizard_offset(stage_key)
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::mario::KIND)
             && perfect::mario::reference_stage(stage_key)
         {
-            Some((Area::LowerLeft, [34.0, -46.0]))
+            Some([34.0, -46.0])
         } else if drill == Drill::GuardEdge && fighter == Some(perfect::snake::KIND)
             && perfect::is_crossing_stage(stage_key)
         {
-            Some((Area::LowerLeft, [20.0, -4.0]))
+            Some([20.0, -4.0])
         } else if drill == Drill::GuardEdge && perfect::is_crossing_stage(stage_key) {
             match fighter {
-                Some(perfect::ness::KIND) => perfect::ness::wizard_offset(stage_key).map(|offset| (Area::LowerLeft, offset)),
+                Some(perfect::ness::KIND) => perfect::ness::wizard_offset(stage_key),
                 Some(perfect::lucas::KIND) if perfect::lucas::reference_stage(stage_key) => {
-                    Some((Area::UpperLeft, perfect::lucas::WIZARD_OFFSET))
+                    Some(perfect::lucas::WIZARD_OFFSET)
                 }
-                Some(perfect::sonic::KIND) => Some((Area::UpperLeft, perfect::sonic::WIZARD_OFFSET)),
+                Some(perfect::sonic::KIND) => Some(perfect::sonic::WIZARD_OFFSET),
                 Some(perfect::hero::KIND) if perfect::hero::reference_stage(stage_key) => {
-                    Some((Area::UpperLeft, perfect::hero::WIZARD_OFFSET))
+                    Some(perfect::hero::WIZARD_OFFSET)
                 }
-                Some(perfect::steve::KIND) => Some((Area::UpperLeft, [18.0, 30.0])),
-                Some(perfect::pyra::PYRA) => Some((Area::LowerLeft, [104.0, -50.0])),
-                Some(perfect::incineroar::KIND) => Some((Area::UpperLeft, [110.0, 10.0])),
+                Some(perfect::steve::KIND) => Some([18.0, 30.0]),
+                Some(perfect::pyra::PYRA) => Some([104.0, -50.0]),
+                Some(perfect::incineroar::KIND) => Some([110.0, 10.0]),
                 _ => None,
             }
         } else {
@@ -914,91 +917,117 @@ impl Wizard {
             }
             _ => None,
         };
-        let (step, cpu) = match drill {
-            Drill::GuardEdge => (WizardStep::Area, Self::area_release(stage, area, Self::release_offset(area, left_start, area_offset))?),
-            Drill::Juggler => (WizardStep::Cpu, stage.default_juggle(p1)),
-        };
-        Some(Self {
+        let cpu = stage.default_juggle(p1);
+        let mut wizard = Self {
             drill,
             area_offset,
             left_start,
             moved: false,
-            step,
+            cross: Crosshair::new(cpu),
+            step: WizardStep::Cpu,
             setup: Setup {
-                area,
                 cpu,
                 p1: stage.player_cursor(drill, p1)?,
                 percent: percent.min(300),
             },
-        })
+        };
+        if drill == Drill::GuardEdge {
+            wizard.setup.cpu = wizard.default_cpu(stage, 0)?;
+            wizard.cross.jump(wizard.setup.cpu);
+        }
+        Some(wizard)
     }
 
-    fn area_release(stage: Stage, area: Area, area_offset: Option<[f32; 2]>) -> Option<[f32; 2]> {
-        if let Some([outside, height]) = area_offset {
-            let lower = matches!(area, Area::LowerLeft | Area::LowerRight);
-            if lower == (height < 0.0) {
-                let left = matches!(area, Area::LowerLeft | Area::UpperLeft);
-                let ledge = stage.ledges[usize::from(!left)];
-                let x = if left { ledge[0] - outside } else { ledge[0] + outside };
-                let point = [x, ledge[1] + height];
-                // Preserve the ordinary default on stages that would clip this release.
-                if stage.edge_start(area, point) == Some(point) {
-                    return Some(point);
-                }
+    pub fn default_cpu(&self, stage: Stage, side: usize) -> Option<[f32; 2]> {
+        let offset = if side == 0 { self.left_start.or(self.area_offset) } else { self.area_offset };
+        if let Some([outside, height]) = offset {
+            let ledge = stage.ledges[side];
+            let x = if side == 0 { ledge[0] - outside } else { ledge[0] + outside };
+            let point = [x, ledge[1] + height];
+            if stage.off_stage(point) == Some(point) {
+                return Some(point);
             }
         }
-        stage.area_default(area)
-    }
-
-    fn release_offset(area: Area, left: Option<(Area, [f32; 2])>, shared: Option<[f32; 2]>) -> Option<[f32; 2]> {
-        left.filter(|(side, _)| *side == area).map(|(_, offset)| offset).or(shared)
-    }
-
-    fn default_cpu(&self, stage: Stage, area: Area) -> Option<[f32; 2]> {
-        Self::area_release(stage, area, Self::release_offset(area, self.left_start, self.area_offset))
+        stage.lower_middle(side)
     }
 
     pub fn unmoved(&self) -> bool {
         self.drill == Drill::GuardEdge && !self.moved
     }
 
-    pub fn shows_cpu(&self) -> bool {
-        matches!(self.step, WizardStep::Area | WizardStep::Cpu | WizardStep::Preview)
+    pub fn cursor(&self) -> [f32; 2] {
+        self.cross.at
+    }
+
+    pub fn marks(&self) -> Marks {
+        let mut looks = [None; btt::LOOKS];
+        let pointer = match self.step {
+            WizardStep::Cpu => {
+                looks[btt::LOOKS - 1] = Some(self.cross.look());
+                Some(self.setup.cpu)
+            }
+            WizardStep::Percent => {
+                looks[0] = Some((self.setup.cpu, EGG_WHOLE));
+                None
+            }
+            WizardStep::Player | WizardStep::Preview => {
+                looks[0] = Some((self.setup.cpu, EGG_WHOLE));
+                looks[btt::LOOKS - 1] = Some(Crosshair::new(self.setup.p1).look());
+                (self.step == WizardStep::Preview).then_some(self.setup.cpu)
+            }
+        };
+        Marks { looks, pointer }
     }
 
     pub fn back_to_defaults(&mut self, defaults: Setup) {
         self.setup = defaults;
         self.moved = false;
         self.step = WizardStep::Preview;
+        self.jump_page();
     }
 
     pub fn remembered(&self, stage: Stage, mut setup: Setup, unmoved: bool) -> Setup {
         if unmoved {
-            if let Some(cpu) = self.default_cpu(stage, setup.area) {
+            if let Some(cpu) = self.default_cpu(stage, stage.side(setup.cpu[0])) {
                 setup.cpu = cpu;
             }
         }
         setup
     }
 
-    pub fn change_area(&mut self, stage: Stage, delta: i32) {
-        let area = self.setup.area.step(delta);
-        let offset = Self::release_offset(area, self.left_start, self.area_offset);
-        if let Some(cpu) = Self::area_release(stage, area, offset) {
-            self.setup.area = area;
+    pub fn set_side_default(&mut self, stage: Stage, other: bool) {
+        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu {
+            return;
+        }
+        let side = stage.side(self.setup.cpu[0]) ^ usize::from(other);
+        if let Some(cpu) = self.default_cpu(stage, side) {
             self.setup.cpu = cpu;
             self.moved = false;
+            self.cross.jump(cpu);
         }
     }
 
-    pub fn move_cpu(&mut self, stage: Stage, point: [f32; 2]) {
-        if let Some(point) = match self.drill {
-            Drill::GuardEdge => stage.edge_start(self.setup.area, point),
-            Drill::Juggler => stage.camera_point(point),
-        } {
-            self.moved |= point != self.setup.cpu;
-            self.setup.cpu = point;
+    pub fn steer(&mut self, stage: Stage, pad: &btt::Pad) {
+        match self.step {
+            WizardStep::Cpu => {
+                let changed = self.cross.step(pad, |p| match self.drill {
+                    Drill::GuardEdge => stage.edge_cursor(p),
+                    Drill::Juggler => stage.camera_point(p),
+                });
+                if changed {
+                    self.setup.cpu = self.cross.at;
+                    self.moved = true;
+                }
+            }
+            WizardStep::Player => {
+                self.cross.step(pad, |p| stage.player_cursor(self.drill, p));
+            }
+            _ => {}
         }
+    }
+
+    pub fn accepts_cpu(&self, stage: Stage) -> bool {
+        self.drill == Drill::Juggler || stage.off_stage(self.setup.cpu).is_some()
     }
 
     pub fn player_floor(
@@ -1031,25 +1060,31 @@ impl Wizard {
 
     pub fn advance(&mut self) {
         self.step = match self.step {
-            WizardStep::Area => WizardStep::Cpu,
             WizardStep::Cpu if self.drill == Drill::Juggler => WizardStep::Percent,
             WizardStep::Cpu | WizardStep::Percent => WizardStep::Player,
             WizardStep::Player | WizardStep::Preview => WizardStep::Preview,
         };
+        self.jump_page();
     }
 
     /// False means B on the first step cancels the wizard.
     pub fn back(&mut self) -> bool {
         self.step = match self.step {
-            WizardStep::Area => return false,
-            WizardStep::Cpu if self.drill == Drill::Juggler => return false,
-            WizardStep::Cpu => WizardStep::Area,
+            WizardStep::Cpu => return false,
             WizardStep::Percent => WizardStep::Cpu,
             WizardStep::Player if self.drill == Drill::Juggler => WizardStep::Percent,
             WizardStep::Player => WizardStep::Cpu,
             WizardStep::Preview => WizardStep::Player,
         };
+        self.jump_page();
         true
+    }
+
+    fn jump_page(&mut self) {
+        self.cross.jump(match self.step {
+            WizardStep::Cpu | WizardStep::Percent => self.setup.cpu,
+            WizardStep::Player | WizardStep::Preview => self.setup.p1,
+        });
     }
 }
 
@@ -1057,6 +1092,25 @@ impl Wizard {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn edge_wizard_opens_on_the_left_default() {
+        let stage = Stage::new(
+            [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
+            [[-80.0, 0.0], [80.0, 0.0]],
+        ).unwrap();
+        let fresh = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (3, 0), None).unwrap();
+        assert_eq!(fresh.step, WizardStep::Cpu);
+        assert_eq!(fresh.setup.cpu, [-155.0, -69.5]);
+        let diddy = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (3, 0), Some(perfect::diddy::KIND)).unwrap();
+        assert_eq!(diddy.setup.cpu, [-94.0, -30.0]);
+        let link = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (3, 0), Some(perfect::link::KIND)).unwrap();
+        assert_eq!(link.setup.cpu, [-110.0, 18.0]);
+        let lucas = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (3, 0), Some(perfect::lucas::KIND)).unwrap();
+        assert_eq!(lucas.setup.cpu, [-98.0, 2.0]);
+        let sonic = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (3, 0), Some(perfect::sonic::KIND)).unwrap();
+        assert_eq!(sonic.setup.cpu, [-106.0, 34.0]);
+    }
 
     #[test]
     fn hit_player_start_is_rewritten_until_it_holds() {
@@ -1225,15 +1279,14 @@ mod tests {
             [-160.0, 150.0, 110.0, -85.0],
             [[-60.0, 5.0], [80.0, 8.0]],
         ).unwrap();
-        let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 7.0], 100, (0, 0), None).unwrap();
+        let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 7.0], 100, (0, 0), None).unwrap();
         let mut session = Session::new(Drill::GuardEdge, Some(1));
-        wizard.change_area(stage, 1);
         let fields = session.practice_fields(Some(wizard), None);
-        assert_eq!((fields.phase, fields.wizard_step, fields.wizard_selection), ("wizard", "area", "lower_right"));
+        assert_eq!((fields.phase, fields.wizard_step), ("wizard", "cpu"));
         assert_eq!(fields.wizard_point, Some(wizard.setup.cpu));
         let mut wire = String::new();
         crate::model::practice_state::snapshot(Some(Drill::GuardEdge.game()), fields, [0; 8], &mut wire);
-        assert!(wire.contains("phase=wizard\nwizard.step=area\nwizard.selection=lower_right\n"));
+        assert!(wire.contains("phase=wizard\nwizard.step=cpu\n"));
 
         assert_eq!(session.practice_fields(None, None).phase, "place");
         session.placed();
@@ -1343,6 +1396,242 @@ mod tests {
     }
 
     #[test]
+        fn drill_behavior_between_ai_kinds_is_set_directly() {
+        use BehaviorMenu::Closed;
+        let nine = CpuBehavior::stock(9);
+        for menu in 0..8u32 {
+            let from = CpuBehavior { menu, level: 0 };
+            let kind = from.control_type().unwrap();
+            assert_eq!(nine.direct(kind, kind, true, Closed, BehaviorPause::Idle), Some(0), "start from menu {menu}");
+            assert_eq!(from.direct(0, 0, true, Closed, BehaviorPause::Idle), Some(kind), "restore to menu {menu}");
+        }
+        // A half-applied type (the entry's copy and the AI disagree) is still between AI kinds.
+        assert_eq!(nine.direct(1, 5, true, Closed, BehaviorPause::Idle), Some(0));
+    }
+
+    #[test]
+    fn control_or_an_open_menu_takes_the_stock_pause_apply() {
+        use BehaviorMenu::{Closed, Open, Transition};
+        let (nine, control, idle) = (CpuBehavior::stock(9), CpuBehavior { menu: 8, level: 2 }, BehaviorPause::Idle);
+        assert_eq!(control.direct(0, 0, true, Closed, idle), None, "to Control");
+        assert_eq!(nine.direct(0x24, 0x24, false, Closed, idle), None, "from Control");
+        assert_eq!(nine.direct(0x24, 1, true, Closed, idle), None);
+        assert_eq!(nine.direct(1, 0x24, true, Closed, idle), None);
+        assert_eq!(nine.direct(1, 1, false, Closed, idle), None, "the operator flag is not CPU");
+        assert_eq!(nine.direct(1, 1, true, Open, idle), None, "the player's own pause applies it on resume");
+        assert_eq!(nine.direct(1, 1, true, Transition, idle), None);
+        assert_eq!(nine.direct(1, 1, true, Closed, BehaviorPause::Opening), None, "a pause transaction is in flight");
+        assert_eq!(nine.direct(1, 1, true, Closed, BehaviorPause::Closing), None);
+        assert_eq!(CpuBehavior { menu: 9, level: 0 }.direct(1, 1, true, Closed, idle), None, "not a menu value");
+    }
+
+    #[test]
+    fn the_waiting_room_partner_is_a_stock_cpu_for_the_drill_and_gets_its_type_back() {
+        struct Game { owner: usize, entry: u8, ai: u8, cpu: bool }
+        fn poll(game: &mut Game, lease: &mut PartnerLease, level: Option<u8>) -> Option<u8> {
+            let write = lease.step(level, game.owner, game.entry, game.ai, game.cpu);
+            if let Some(control) = write {
+                game.entry = control;
+                game.ai = control;
+            }
+            write
+        }
+
+        let mut game = Game { owner: 1, entry: 7, ai: 7, cpu: true };
+        let mut lease = PartnerLease::new();
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+        assert!(lease.held());
+        assert_eq!(poll(&mut game, &mut lease, None), Some(7));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        game.entry = 1;
+        game.ai = 1;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, None), Some(1));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        game.entry = 0;
+        game.ai = 0;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+        assert!(lease.held());
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+        assert!(!lease.held());
+
+        game.entry = 7;
+        game.ai = 7;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        game.ai = 7;
+        assert_eq!(poll(&mut game, &mut lease, Some(9)), Some(0));
+        assert_eq!(poll(&mut game, &mut lease, None), Some(7));
+        assert_eq!(poll(&mut game, &mut lease, None), None);
+
+        for (entry, ai, cpu) in [(7, 7, false), (0x24, 7, true), (7, 0x24, true)] {
+            let mut game = Game { owner: 1, entry, ai, cpu };
+            let mut lease = PartnerLease::new();
+            assert_eq!(poll(&mut game, &mut lease, Some(9)), None);
+            assert!(!lease.held());
+            assert_eq!(poll(&mut game, &mut lease, None), None);
+
+            let mut held = PartnerLease::new();
+            assert_eq!(held.step(Some(9), 1, 7, 7, true), Some(0));
+            assert_eq!(held.step(None, 1, entry, ai, cpu), None);
+            assert!(held.held());
+        }
+        let mut lease = PartnerLease::new();
+        assert_eq!(lease.step(Some(9), 1, 7, 7, true), Some(0));
+        assert_eq!(lease.step(None, 2, 1, 1, true), None);
+        assert!(!lease.held());
+    }
+
+    #[test]
+    fn lobby_practice_off_gives_the_partner_back_first_and_a_departure_writes_nothing() {
+        use crate::model::lobby_flag::{self, FlagClock, Scene};
+        use crate::model::edge_juggle::picker::{self, Settled, Tick};
+        let room = Scene { initialized: true, melee: 0x0d, mode: 0x0701_0100 };
+        let battle = Scene { initialized: true, melee: 0x0e, mode: 0x0701_0101 };
+        let ready = || FlagClock { last_key: lobby_flag::scene_key(room), ui_ready: true, was_active: true };
+        let held = || {
+            let mut lease = PartnerLease::new();
+            assert_eq!(lease.step(Some(9), 1, 7, 7, true), Some(0));
+            lease
+        };
+        let mut clock = ready();
+        let mut lease = held();
+        let mut entry = 0;
+        let mut ai = 0;
+        let mut original = Some(10);
+        let mut observed = Some(20);
+        let mut selected = Some(20);
+        let mut settled = Settled::new(selected);
+        let mut releasing = false;
+        let mut stops = 0;
+        let mut behavior_writes = Vec::new();
+        let mut fighter_requests = Vec::new();
+        let mut ended = false;
+        for tick in 0..10 {
+            let holds = selected.is_some() || lease.held() || original.is_some();
+            let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, holds, releasing);
+            releasing = next_releasing;
+            let (next, decision) = lobby_flag::step(clock, Some(room), on);
+            clock = next;
+            if !decision.active {
+                assert!(!holds && !stop);
+                ended = true;
+                break;
+            }
+            if stop {
+                stops += 1;
+                assert_eq!(tick, 0);
+                selected = None;
+            }
+            if let Some(value) = lease.step(selected.map(|_| 9), 1, entry, ai, true) {
+                behavior_writes.push(value);
+                entry = value;
+                ai = value;
+            }
+            let (next, tick) = picker::tick(settled, selected, original, true, || false, || observed);
+            settled = next;
+            if let Tick::Serve { target, observed: seen, step } = tick {
+                if step.request {
+                    fighter_requests.push(target);
+                    observed = Some(target);
+                } else if seen.is_some() && selected.is_none() {
+                    original = None;
+                }
+            }
+        }
+        assert!(ended);
+        assert_eq!(stops, 1);
+        assert_eq!(behavior_writes, [7]);
+        assert!(!lease.held());
+        assert_eq!(fighter_requests, [10]);
+        assert_eq!(original, None);
+
+        for (setting, releasing) in [(true, false), (false, true)] {
+            let clock = ready();
+            let mut lease = held();
+            assert!(lease.held());
+            let (on, _, _) = lobby_flag::release(setting, clock.was_active, true, releasing);
+            let (_, decision) = lobby_flag::step(clock, Some(battle), on);
+            assert!(!decision.active);
+            lease = PartnerLease::new();
+            assert!(!lease.held());
+            let (_, tick) = picker::tick(Settled::new(Some(20)), None, Some(10), false, || false, || Some(20));
+            assert_eq!(tick, Tick::Left);
+        }
+        for replaced in [false, true] {
+            let mut blocked = held();
+            let mut clock = ready();
+            let mut releasing = false;
+            for tick in 0..20_001 {
+                let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                releasing = next_releasing;
+                let (next, decision) = lobby_flag::step(clock, Some(room), on);
+                clock = next;
+                assert!(decision.active);
+                assert_eq!(stop, tick == 0);
+                assert_eq!(blocked.step(None, 1, 0, 0, false), None);
+                assert!(blocked.held());
+            }
+            assert!(blocked.held());
+            if replaced {
+                assert_eq!(blocked.step(None, 2, 0, 0, true), None);
+                assert!(!blocked.held());
+                let (on, releasing, stop) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                assert_eq!((on, releasing, stop), (false, false, false));
+                let (_, decision) = lobby_flag::step(clock, Some(room), on);
+                assert!(!decision.active);
+            } else {
+                let (on, _, _) = lobby_flag::release(false, clock.was_active, blocked.held(), releasing);
+                let (_, decision) = lobby_flag::step(clock, Some(battle), on);
+                assert!(!decision.active);
+                blocked = PartnerLease::new();
+                assert!(!blocked.held());
+            }
+        }
+    }
+
+    #[test]
+    fn a_drill_between_ai_kinds_never_asks_for_the_pause() {
+        // The game as the drill's poll sees it, and one poll written the way `step_drill_panel` composes the model.
+        struct Game { panel: CpuBehavior, entry: u8, ai: u8, cpu: bool }
+        fn poll(game: &mut Game, lease: &mut BehaviorLease, pause: &mut BehaviorPause, level: Option<u8>) -> bool {
+            let applied = game.panel.applied(game.entry, game.ai, game.cpu);
+            let desired = lease.step(level, 7, game.panel, applied);
+            let needs_stock = desired.is_some_and(|d| !applied || d.menu != game.panel.menu);
+            if let Some((d, control)) = desired.filter(|_| needs_stock)
+                .and_then(|d| Some((d, d.direct(game.entry, game.ai, game.cpu, BehaviorMenu::Closed, *pause)?)))
+            {
+                (game.ai, game.entry, game.panel) = (control, control, d);
+                return false;
+            }
+            if let Some(d) = desired.filter(|_| !needs_stock) { game.panel = d; }
+            pause.pulse(needs_stock, BehaviorMenu::Closed, true)
+        }
+        for menu in 0..8u32 {
+            let original = CpuBehavior { menu, level: 2 };
+            let kind = original.control_type().unwrap();
+            let mut game = Game { panel: original, entry: kind, ai: kind, cpu: true };
+            let (mut lease, mut pause) = (BehaviorLease::new(), BehaviorPause::Idle);
+            for _ in 0..4 { assert!(!poll(&mut game, &mut lease, &mut pause, Some(9)), "start, menu {menu}"); }
+            assert_eq!((game.panel, game.entry, game.ai), (CpuBehavior::stock(9), 0, 0), "menu {menu}");
+            assert!(lease.held());
+            for _ in 0..4 { assert!(!poll(&mut game, &mut lease, &mut pause, None), "stop, menu {menu}"); }
+            assert_eq!((game.panel, game.entry, game.ai), (original, kind, kind), "menu {menu}");
+            assert!(!lease.held());
+        }
+        // Control still asks for the stock pause.
+        let mut game = Game { panel: CpuBehavior { menu: 8, level: 2 }, entry: 0x24, ai: 0x24, cpu: false };
+        let (mut lease, mut pause) = (BehaviorLease::new(), BehaviorPause::Idle);
+        assert!(poll(&mut game, &mut lease, &mut pause, Some(9)));
+        assert_eq!((game.entry, game.ai), (0x24, 0x24), "nothing written outside the pause");
+    }
+
+    #[test]
     fn cpu_behavior_returns_to_its_saved_value_after_a_load() {
         let original = CpuBehavior { menu: 0, level: 3 };
         let changed_in_pause = CpuBehavior { menu: 4, level: 3 };
@@ -1432,17 +1721,17 @@ mod tests {
     }
 
     #[test]
-    fn edge_wizard_four_areas() {
+    fn edge_wizard_cursor_uses_the_blast_box() {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
-        for (area, start, expected) in [
-            (Area::LowerLeft, [300.0, 70.0], [-61.0, 5.0]),
-            (Area::LowerRight, [0.0, -100.0], [81.0, -84.0]),
-            (Area::UpperLeft, [0.0, -20.0], [-61.0, 5.0]),
-            (Area::UpperRight, [200.0, 180.0], [149.0, 109.0]),
+        for (start, expected) in [
+            ([300.0, 70.0], [149.0, 70.0]),
+            ([0.0, -100.0], [0.0, -84.0]),
+            ([0.0, -20.0], [0.0, -20.0]),
+            ([200.0, 180.0], [149.0, 109.0]),
         ] {
-            assert_eq!(stage.edge_start(area, start), Some(expected));
+            assert_eq!(stage.edge_cursor(start), Some(expected));
         }
-        assert_eq!(stage.edge_start(Area::LowerLeft, [f32::NAN, 0.0]), None);
+        assert_eq!(stage.edge_cursor([f32::NAN, 0.0]), None);
     }
 
     #[test]
@@ -1502,11 +1791,16 @@ mod tests {
         let primary = FighterKey::new(1, false).unwrap();
         let partner = FighterKey::new(1, true).unwrap();
         for key in [primary, partner] {
-            assert!(suspends_cpu_settings(true, key));
-            assert!(!suspends_cpu_settings(false, key));
+            assert!(suspends_cpu_settings(true, key, 1));
+            assert!(!suspends_cpu_settings(false, key, 1));
         }
         for entry in [0, 2, 4] {
-            assert!(!suspends_cpu_settings(true, FighterKey::new(entry, false).unwrap()));
+            assert!(!suspends_cpu_settings(true, FighterKey::new(entry, false).unwrap(), 1));
+        }
+        for partner in [false, true] {
+            assert!(suspends_cpu_settings(true, FighterKey::new(4, partner).unwrap(), 4));
+            assert!(!suspends_cpu_settings(false, FighterKey::new(4, partner).unwrap(), 4));
+            assert!(!suspends_cpu_settings(true, FighterKey::new(1, partner).unwrap(), 4));
         }
         assert!(drill_owns_pad(true, false));
         assert!(!drill_owns_pad(false, false));
@@ -1603,13 +1897,13 @@ mod tests {
         let steps = |drill| {
             let mut wizard = Wizard::new(drill, stage, [0.0; 2], 100, (0, 0), None).unwrap();
             [(); 4].map(|()| {
-                let seen = (wizard.step, wizard.shows_cpu());
+                let seen = (wizard.step, wizard.marks().pointer.is_some());
                 wizard.advance();
                 seen
             })
         };
         assert_eq!(steps(Drill::GuardEdge), [
-            (WizardStep::Area, true), (WizardStep::Cpu, true), (WizardStep::Player, false), (WizardStep::Preview, true),
+            (WizardStep::Cpu, true), (WizardStep::Player, false), (WizardStep::Preview, true), (WizardStep::Preview, true),
         ]);
         assert_eq!(steps(Drill::Juggler), [
             (WizardStep::Cpu, true), (WizardStep::Percent, false), (WizardStep::Player, false), (WizardStep::Preview, true),
@@ -1629,20 +1923,20 @@ mod tests {
         assert_ne!(default, diddy.setup.cpu);
 
         let mut a = fresh;
-        a.move_cpu(stage, default);
-        a.move_cpu(stage, [f32::NAN, 0.0]);
+        a.steer(stage, &btt::Pad::default());
+        a.steer(stage, &btt::Pad { stick: [f32::NAN, 0.0], ..btt::Pad::default() });
         assert_eq!(a, fresh);
         assert!(a.unmoved());
 
-        a.move_cpu(stage, [default[0] + 2.0, default[1]]);
+        a.steer(stage, &btt::Pad { stick: [1.0, 0.0], ..btt::Pad::default() });
         assert_ne!(a.setup.cpu, default);
-        a.move_cpu(stage, default);
+        a.steer(stage, &btt::Pad { stick: [-1.0, 0.0], ..btt::Pad::default() });
         assert_eq!(a.setup.cpu, default);
         assert!(!a.unmoved());
         assert_eq!(diddy.remembered(stage, a.setup, a.unmoved()).cpu, default);
 
         let mut b = a;
-        b.change_area(stage, 1);
+        b.set_side_default(stage, true);
         assert!(b.unmoved());
 
         let mut c = a;
@@ -1667,14 +1961,14 @@ mod tests {
         assert_eq!(diddy.remembered(stage, a.setup, true).cpu, diddy.setup.cpu);
         assert!(a.unmoved());
         assert_eq!(diddy.remembered(stage, a.setup, false).cpu, a.setup.cpu);
-        a.move_cpu(stage, [-100.0, -20.0]);
+        a.steer(stage, &btt::Pad { stick: [1.0, 0.0], ..btt::Pad::default() });
         assert!(!a.unmoved());
-        a.change_area(stage, 2);
-        assert_eq!(a.setup.area, Area::UpperLeft);
+        a.set_side_default(stage, true);
+        assert_eq!(stage.side(a.setup.cpu[0]), 1);
         assert!(a.unmoved());
-        let mut upper_diddy = diddy;
-        upper_diddy.change_area(stage, 2);
-        assert_eq!(diddy.remembered(stage, a.setup, true).cpu, upper_diddy.setup.cpu);
+        let mut right_diddy = diddy;
+        right_diddy.set_side_default(stage, true);
+        assert_eq!(diddy.remembered(stage, a.setup, true).cpu, right_diddy.setup.cpu);
         let juggler = Wizard::new(Drill::Juggler, stage, [0.0; 2], 100, key, None).unwrap();
         assert!(!juggler.unmoved());
 
@@ -1694,14 +1988,14 @@ mod tests {
         for key in [(0, 0), (3, 0), (311, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
             assert_eq!(wizard.setup.cpu, [-94.0, -30.0], "{key:?}");
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [94.0, -30.0], "{key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, [-94.0, -30.0], "{key:?}");
         }
         for key in [(0, 1), (89, 0)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x27)).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -1711,8 +2005,8 @@ mod tests {
             [-230.0, 230.0, 185.0, -140.0], [-160.0, 160.0, 100.0, -110.0],
             [[-80.0, 0.0], [80.0, 0.0]],
         ).unwrap();
-        let left = Setup { area: Area::LowerLeft, cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
-        let right = Setup { area: Area::UpperRight, cpu: [118.0, 38.0], percent: 105, ..left };
+        let left = Setup { cpu: [-102.0, -2.0], p1: [0.0, 0.0], percent: 100 };
+        let right = Setup { cpu: [118.0, 38.0], percent: 105, ..left };
         let facing = |drill, stage_key, start| {
             recovery_away_facing(drill, stage_key, stage, start, Some(perfect::link::KIND))
         };
@@ -1736,14 +2030,14 @@ mod tests {
                 Drill::GuardEdge, stage, [-75.0, 0.0], 60, key, Some(perfect::pyra::PYRA),
             ).unwrap();
             assert_eq!(wizard.setup.cpu, [-184.0, -50.0], "{key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
         }
         for (stage_key, fighter) in [((44, 0), perfect::pyra::PYRA), ((3, 0), perfect::pyra::MYTHRA)] {
             let wizard = Wizard::new(
                 Drill::GuardEdge, stage, [0.0; 2], 60, stage_key, Some(fighter),
             ).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -1755,10 +2049,9 @@ mod tests {
         ).unwrap();
         for key in [(0, 0), (3, 0), (311, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x58)).unwrap();
-            wizard.change_area(stage, 2);
             assert_eq!(wizard.setup.cpu, [-98.0, 30.0], "native stage {key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
         }
     }
 
@@ -1770,10 +2063,9 @@ mod tests {
         ).unwrap();
         for key in [(0, 0), (3, 0), (311, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 60, key, Some(0x47)).unwrap();
-            wizard.change_area(stage, 2);
             assert_eq!(wizard.setup.cpu, [-190.0, 10.0], "native stage {key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
         }
     }
 
@@ -1791,7 +2083,7 @@ mod tests {
         }
         for (key, damage) in [((89, 0), 100), ((3, 1), 100), ((3, 0), 65)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], damage, key, Some(0x2c)).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -1804,11 +2096,11 @@ mod tests {
         for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0)).unwrap();
             let left = if perfect::mario::reference_stage(key) { [-114.0, -46.0] }
-                else { stage.area_default(Area::LowerLeft).unwrap() };
+                else { stage.lower_middle(0).unwrap() };
             assert_eq!(wizard.setup.cpu, left);
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerRight).unwrap());
-            wizard.change_area(stage, -1);
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, left);
         }
     }
@@ -1822,18 +2114,18 @@ mod tests {
         for key in [(0, 0), (3, 0), (311, 0), (4, 0), (3, 1)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x22)).unwrap();
             let left = if perfect::is_crossing_stage(key) { [-100.0, -4.0] }
-                else { stage.area_default(Area::LowerLeft).unwrap() };
+                else { stage.lower_middle(0).unwrap() };
             assert_eq!(wizard.setup.cpu, left);
             assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)),
                 perfect::is_crossing_stage(key).then_some(-1.0));
             assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x22)), None);
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             let right = if key == (3, 0) { [100.0, -4.0] }
-                else { stage.area_default(Area::LowerRight).unwrap() };
+                else { stage.lower_middle(1).unwrap() };
             assert_eq!(wizard.setup.cpu, right);
             assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x22)),
                 (key == (3, 0)).then_some(1.0));
-            wizard.change_area(stage, -1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, left);
         }
     }
@@ -1846,21 +2138,20 @@ mod tests {
         ).unwrap();
         for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [-76.0, 0.0], 100, key, Some(0x2)).unwrap();
-            wizard.change_area(stage, 2);
             if perfect::is_crossing_stage(key) {
                 assert_eq!(wizard.setup.cpu, [-109.99, 18.0]);
                 assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), Some(-1.0));
                 assert_eq!(recovery_away_facing(Drill::Juggler, key, stage, wizard.setup, Some(0x2)), None);
                 assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, Setup { percent: 120, ..wizard.setup }, Some(0x2)), None);
             } else {
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+                assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
             }
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             if perfect::is_crossing_stage(key) {
                 assert_eq!(wizard.setup.cpu, [117.99, 38.0]);
                 assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), Some(1.0));
             } else {
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+                assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
                 assert_eq!(recovery_away_facing(Drill::GuardEdge, key, stage, wizard.setup, Some(0x2)), None);
             }
         }
@@ -1877,18 +2168,16 @@ mod tests {
             let mut wizard = Wizard::new(
                 Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x2d),
             ).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-            for (area, expected) in [(Area::UpperLeft, [-120.0, 20.0]),
-                                     (Area::UpperRight, [120.0, 20.0])] {
-                while wizard.setup.area != area {
-                    wizard.change_area(stage, 1);
+            for (side, expected) in [(0, [-120.0, 20.0]), (1, [120.0, 20.0])] {
+                if side == 1 {
+                    wizard.set_side_default(stage, true);
                 }
                 let actual = if perfect::is_crossing_stage(key) {
                     expected
                 } else {
-                    stage.area_default(area).unwrap()
+                    stage.lower_middle(side).unwrap()
                 };
-                assert_eq!(wizard.setup.cpu, actual, "stage {key:?}, area {area:?}");
+                assert_eq!(wizard.setup.cpu, actual, "stage {key:?}, side {side:?}");
             }
         }
     }
@@ -1901,10 +2190,8 @@ mod tests {
         ).unwrap();
         for fighter in [0x1d, 0x1e, 0x1f] {
             for key in [(0, 0), (3, 0), (311, 0), (0, 1)] {
-                let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-                wizard.change_area(stage, 2);
-                let expected = if key.1 == 0 { [-110.0, 6.0] } else { stage.area_default(Area::UpperLeft).unwrap() };
+                let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
+                let expected = if key.1 == 0 { [-110.0, 6.0] } else { stage.lower_middle(0).unwrap() };
                 assert_eq!(wizard.setup.cpu, expected);
             }
         }
@@ -1919,18 +2206,16 @@ mod tests {
         for fighter in [0xd, 0xe] {
             for key in [(0, 0), (3, 0), (311, 0), (0, 1), (89, 0)] {
                 let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(fighter)).unwrap();
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-                wizard.change_area(stage, 2);
                 assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
                     [-120.0, 20.0]
                 } else {
-                    stage.area_default(Area::UpperLeft).unwrap()
+                    stage.lower_middle(0).unwrap()
                 });
-                wizard.change_area(stage, 1);
+                wizard.set_side_default(stage, true);
                 assert_eq!(wizard.setup.cpu, if perfect::is_crossing_stage(key) {
                     [120.0, 20.0]
                 } else {
-                    stage.area_default(Area::UpperRight).unwrap()
+                    stage.lower_middle(1).unwrap()
                 });
             }
         }
@@ -1945,14 +2230,8 @@ mod tests {
         ).unwrap();
         for key in [(0, 0), (3, 0), (311, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(0x37)).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-            while wizard.setup.area != Area::UpperLeft {
-                wizard.change_area(stage, 1);
-            }
             assert_eq!(wizard.setup.cpu, [-106.0, 14.0]);
-            while wizard.setup.area != Area::UpperRight {
-                wizard.change_area(stage, 1);
-            }
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [106.0, 14.0]);
         }
     }
@@ -1968,14 +2247,14 @@ mod tests {
         for key in [(3, 0), (0, 0), (311, 0)] {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
             assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "{key:?}");
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [100.0, -28.0], "{key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "{key:?}");
         }
         for key in [(89, 0), (3, 1)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 0, key, pichu).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -1991,21 +2270,19 @@ mod tests {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff)
                 .unwrap();
             assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "stage {key:?}");
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [100.0, -28.0], "stage {key:?}");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, [-100.0, -28.0], "stage {key:?}");
         }
         let mut waiting_room =
             Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, (311, 0), puff).unwrap();
-        assert_eq!(waiting_room.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-        waiting_room.change_area(stage, 2);
         assert_eq!(waiting_room.setup.cpu, [-120.0, 20.0]);
-        waiting_room.change_area(stage, 1);
+        waiting_room.set_side_default(stage, true);
         assert_eq!(waiting_room.setup.cpu, [120.0, 20.0]);
         for key in [(3, 1), (0, 1), (311, 1)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, puff).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -2028,7 +2305,7 @@ mod tests {
             )
             .unwrap();
             assert_eq!(wizard.setup.cpu, [-100.0, -28.0]);
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [100.0, -28.0]);
         }
     }
@@ -2044,14 +2321,14 @@ mod tests {
         for id in [0, 3, 311] {
             let mut wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, (id, 0), sheik).unwrap();
             assert_eq!(wiz.setup.cpu, [-98.0, -30.0]);
-            wiz.change_area(stage, 1);
+            wiz.set_side_default(stage, true);
             assert_eq!(wiz.setup.cpu, [98.0, -30.0]);
-            wiz.change_area(stage, 1);
-            assert_eq!(wiz.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            wiz.set_side_default(stage, true);
+            assert_eq!(wiz.setup.cpu, [-98.0, -30.0]);
         }
         for key in [(89, 0), (0, 1)] {
             let wiz = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, key, sheik).unwrap();
-            assert_eq!(wiz.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wiz.setup.cpu, stage.lower_middle(0).unwrap());
         }
     }
 
@@ -2067,18 +2344,20 @@ mod tests {
             let mut wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, stage_key, pikachu)
                 .unwrap();
             assert_eq!(wizard.setup.cpu, [-100.0, -55.0]);
-            wizard.change_area(stage, 1);
+            wizard.set_side_default(stage, true);
             assert_eq!(wizard.setup.cpu, [100.0, -55.0]);
-            wizard.advance();
-            wizard.move_cpu(stage, [125.0, -40.0]);
+            for _ in 0..12 {
+                wizard.steer(stage, &btt::Pad { stick: [1.0, 0.625], ..btt::Pad::default() });
+            }
+            wizard.steer(stage, &btt::Pad { stick: [0.5, 0.0], ..btt::Pad::default() });
             assert_eq!(wizard.setup.cpu, [125.0, -40.0], "the wizard still edits the point");
-            wizard.change_area(stage, 1);
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperLeft).unwrap());
+            wizard.set_side_default(stage, true);
+            assert_eq!(wizard.setup.cpu, [-100.0, -55.0]);
         }
 
         for (id, kind) in [((3, 1), pikachu), ((89, 0), pikachu), ((3, 0), Some(0x18)), ((3, 0), None)] {
             let wizard = Wizard::new(Drill::GuardEdge, stage, [0.0, 0.0], 100, id, kind).unwrap();
-            assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
+            assert_eq!(wizard.setup.cpu, stage.lower_middle(0).unwrap());
         }
         let juggle = Wizard::new(Drill::Juggler, stage, [0.0, 0.0], 100, (3, 0), pikachu).unwrap();
         assert_eq!(juggle.setup.cpu, stage.default_juggle([0.0, 0.0]));
@@ -2089,7 +2368,13 @@ mod tests {
         let stage = Stage::new([-160.0, 150.0, 110.0, -85.0], [-160.0, 150.0, 110.0, -85.0], [[-60.0, 5.0], [80.0, 8.0]]).unwrap();
         let mut wizard = Wizard::new(Drill::Juggler, stage, [0.0, 7.0], 60, (3, 0), None).unwrap();
         assert_eq!(wizard.step, WizardStep::Cpu);
-        wizard.move_cpu(stage, [-150.0, 90.0]);
+        for _ in 0..75 {
+            wizard.steer(stage, &btt::Pad { stick: [-1.0, 0.0], ..btt::Pad::default() });
+        }
+        for _ in 0..15 {
+            wizard.steer(stage, &btt::Pad { stick: [0.0, 1.0], ..btt::Pad::default() });
+        }
+        wizard.steer(stage, &btt::Pad { stick: [0.0, 0.75], ..btt::Pad::default() });
         wizard.advance();
         assert_eq!(wizard.step, WizardStep::Percent);
         assert_eq!(wizard.setup.cpu, [-150.0, 90.0]);

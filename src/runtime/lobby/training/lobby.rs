@@ -14,6 +14,7 @@ macro_rules! trace {
 static NATIVE_UI_BUSY: AtomicBool = AtomicBool::new(false);
 static UI_READY: AtomicBool = AtomicBool::new(false);
 static WAS_ACTIVE: AtomicBool = AtomicBool::new(false);
+static RELEASING: AtomicBool = AtomicBool::new(false);
 // Setting-plus-tuple edge for the hazard receipt; UI readiness is not part of it.
 static SEEN_ENTRIES: AtomicU32 = AtomicU32::new(0);
 static LAST_MODE: AtomicU64 = AtomicU64::new(u64::MAX);
@@ -55,13 +56,17 @@ pub fn is_waiting_scene() -> bool {
     })
 }
 
+fn practice_setting(on: bool) -> bool {
+    on || RELEASING.load(Ordering::Acquire)
+}
+
 pub fn requested() -> bool {
-    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()
+    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()
 }
 
 /// Busy is unknown eligibility: callers must defer, not treat it as departure.
 pub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
-    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON && is_waiting_scene())
+    Ok(practice_setting(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())
 }
 
 /// The same request and readiness facts as `active`, without waiting on menu edits.
@@ -99,7 +104,17 @@ pub fn update() {
         ui_ready: UI_READY.load(Ordering::Acquire),
         was_active: WAS_ACTIVE.load(Ordering::Acquire),
     };
-    let practice_on = read(&MENU).lobby_practice == OnOff::ON;
+    let setting_on = read(&MENU).lobby_practice == OnOff::ON;
+    let (practice_on, releasing, stop) = if !setting_on && clock.was_active {
+        let holds = crate::runtime::features::edge_juggle::holds_partner();
+        crate::model::lobby_flag::release(setting_on, clock.was_active, holds, RELEASING.load(Ordering::Acquire))
+    } else {
+        (setting_on, false, false)
+    };
+    RELEASING.store(releasing, Ordering::Release);
+    if stop {
+        crate::runtime::features::edge_juggle::stop_for_release();
+    }
     let (next, decision) = crate::model::lobby_flag::step(clock, observed, practice_on);
     if decision.scene_changed {
         // The new key is stored before the side effects, so a re-entrant tick does not tear the room down twice.

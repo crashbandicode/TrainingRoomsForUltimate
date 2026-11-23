@@ -40,6 +40,11 @@ pub const fn scene(facts: Facts) -> Option<Scene> {
     }
 }
 
+/// Where practice is live, including while a fighter swap is busy.
+pub const fn practice(facts: Facts) -> Option<Scene> {
+    scene(Facts { busy: false, ..facts })
+}
+
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
@@ -94,6 +99,14 @@ mod tests {
         assert_eq!(scene(native), Some(Scene::Training));
     }
 
+    fn practice_keeps_its_scene_during_a_swap() {
+        assert_eq!(practice(f(true, false, true)), Some(Scene::Training));
+        assert_eq!(practice(f(false, true, true)), Some(Scene::Lobby));
+        assert_eq!(practice(f(true, true, true)), Some(Scene::Training));
+        assert_eq!(practice(Facts { native_training: false, lobby_active: true, waiting_room: false, busy: true }), None);
+        assert_eq!(practice(f(false, false, true)), None);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -103,6 +116,7 @@ mod tests {
             ("the_scene_follows_the_facts_and_native_wins", the_scene_follows_the_facts_and_native_wins as fn()),
             ("the_scene_and_the_predicate_agree", the_scene_and_the_predicate_agree as fn()),
             ("a_stale_lobby_flag_outside_the_waiting_room_is_not_training", a_stale_lobby_flag_outside_the_waiting_room_is_not_training as fn()),
+            ("practice_keeps_its_scene_during_a_swap", practice_keeps_its_scene_during_a_swap as fn()),
         ]);
     }
     }

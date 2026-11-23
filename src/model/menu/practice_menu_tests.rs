@@ -53,6 +53,106 @@ fn titles(group: u8) -> Vec<&'static str> {
     ROWS.iter().filter(|r| r.group == group).map(|r| r.title).collect()
 }
 
+fn focus_row(m: &mut Menu, id: &str) -> usize {
+    for _ in 0..=m.entry_count(m.page()) {
+        if let Some(row) = m.focused_row().filter(|&row| ROWS[row].id == id) {
+            return row;
+        }
+        m.press(Button::Down);
+    }
+    panic!("row {id} is not focusable on {:?}", m.page());
+}
+
+#[test]
+fn bridge_page_list_counts_only_cursor_stops_and_writes_drawn_values() {
+    use crate::model::bridge_state::list_view;
+    let mut m = menu();
+    let first = m.cursor();
+    let view = list_view(&m);
+    assert_eq!((view.id.as_str(), view.index), ("page", Some(0)));
+    assert_ne!(m.cursor(), view.index.unwrap(), "the first group header is skipped");
+    let mut stops = vec![first];
+    loop {
+        m.press(Button::Down);
+        if m.cursor() == first { break; }
+        assert!(!stops.contains(&m.cursor()));
+        stops.push(m.cursor());
+        assert_eq!(list_view(&m).index, Some(stops.len() - 1));
+    }
+    assert_eq!(view.count, stops.len());
+    m.press(Button::Down);
+    assert_eq!(list_view(&m).index, Some(1));
+    m.press(Button::Up);
+    m.press(Button::Up);
+    assert_eq!(list_view(&m).index, Some(view.count - 1));
+    assert!(matches!(m.focus(), Some(Entry::ResetPage(_))));
+    assert_eq!(list_view(&m).value, "");
+
+    let row = focus_row(&mut m, "stale_dodges");
+    assert!(matches!(ROWS[row].control, Control::Toggle));
+    let before = list_view(&m).value;
+    m.press(Button::Right);
+    let after = list_view(&m).value;
+    assert!(matches!((before.as_str(), after.as_str()), ("[OFF]", "[ON]") | ("[ON]", "[OFF]")));
+
+    let mut m = menu();
+    m.press(Button::R);
+    m.press(Button::R);
+    assert_eq!(m.page(), Page::Recording);
+    assert!(matches!(m.focus(), Some(Entry::Group(_))));
+    assert_eq!(list_view(&m).value, "");
+}
+
+#[test]
+fn bridge_game_lists_match_in_training_and_waiting_rooms() {
+    use crate::model::bridge_state::list_view;
+    for (game, group, count, want) in [
+        (Game::GuardEdge, table::EDGE, 7, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "CPU percent", "Attempts", "Zoom landing window"][..]),
+        (Game::Juggler, table::JUGGLE, 6, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "Attempts", "Zoom landing window"][..]),
+    ] {
+        for waiting_room in [false, true] {
+            let mut m = Menu::new(Settings::factory(), Env { waiting_room, ..Env::default() });
+            on_list(&mut m, game);
+            m.press(Button::A);
+            let view = list_view(&m);
+            assert_eq!(view.id, format!("rows/{group}"));
+            assert_eq!((view.count, view.index, view.value.as_str()), (count, Some(0), ">"));
+            assert_eq!(m.sub_rows(group).map(|r| ROWS[r].title).collect::<Vec<_>>(), want);
+            for index in 1..want.len() {
+                m.press(Button::Down);
+                assert_eq!(list_view(&m).index, Some(index));
+            }
+            m.press(Button::Down);
+            assert_eq!(list_view(&m).index, Some(0));
+        }
+    }
+}
+
+#[test]
+fn bridge_dropdown_and_slider_follow_the_active_screen() {
+    use crate::model::bridge_state::{list_view, ListView};
+    let mut m = opened(Game::GuardEdge);
+    for _ in 0..5 { m.press(Button::Down); }
+    let row = m.sub_rows(table::EDGE).nth(5).unwrap();
+    let before = list_view(&m).value;
+    m.press(Button::Right);
+    let after = list_view(&m).value;
+    assert_eq!((before.as_str(), after.as_str()), ("<  10  >", "<  20  >"));
+    let chosen = match m.value(row) { RowValue::Choice(Some(index)) => index, other => panic!("{other:?}") };
+    m.press(Button::A);
+    let popup = list_view(&m);
+    assert_eq!(popup.id, format!("popup/{}", ROWS[row].id));
+    assert_eq!((popup.count, popup.index, popup.value.as_str()), (m.option_count(row), Some(chosen), ""));
+
+    let mut m = opened(Game::Tech);
+    let slider = m.sub_rows(table::game_group(Game::Tech)).position(|r| ROWS[r].title == "Damage range").unwrap();
+    for _ in 0..slider { m.press(Button::Down); }
+    m.press(Button::A);
+    assert!(matches!(m.screen(), Some(Screen::Slider { .. })));
+    assert_eq!(m.focus_list(), None);
+    assert_eq!(list_view(&m), ListView::default());
+}
+
 #[test]
 fn games_list_is_one_row_per_game() {
     let list: Vec<_> = ROWS.iter().filter(|r| r.group == table::GAMES).map(|r| r.control).collect();
@@ -75,6 +175,35 @@ fn games_list_is_one_row_per_game() {
         let g = usize::from(table::game_group(game));
         assert!(GROUPS[g].sub && GROUPS[g].page == Page::FightersStages && GROUPS[g].title == game.title());
     }
+}
+
+#[test]
+fn guard_the_edge_and_juggler_show_in_a_waiting_room() {
+    let mut screens = Vec::new();
+    for env in [Env::default(), Env { waiting_room: true, ..Env::default() }] {
+        let m = Menu::new(Settings::factory(), env);
+        let games: Vec<_> = (0..m.entry_count(Page::FightersStages))
+            .filter_map(|index| match m.entry(Page::FightersStages, index) {
+                Some(Entry::Row(row)) if ROWS[row].group == table::GAMES => Some(ROWS[row].title),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(games, ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler"]);
+        let mut visible = Vec::new();
+        for game in [Game::GuardEdge, Game::Juggler] {
+            let mut m = Menu::new(Settings::factory(), env);
+            on_list(&mut m, game);
+            m.press(Button::A);
+            let group = table::game_group(game);
+            assert_eq!(m.screen(), Some(&Screen::Rows { group, cursor: 0 }));
+            let titles: Vec<_> = m.sub_rows(group).map(|row| ROWS[row].title).collect();
+            assert!(!titles.is_empty());
+            assert!(titles.contains(&"CPU fighter and mode"));
+            visible.push(titles);
+        }
+        screens.push(visible);
+    }
+    assert_eq!(screens[0], screens[1]);
 }
 
 #[test]

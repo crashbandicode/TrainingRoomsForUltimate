@@ -47,7 +47,7 @@ A toggle press increments the value and wraps from `max` to 0. A single-choice s
 
 Grid movement rules: `next_row`/`prev_row` wrap within the table's row count; `next_col`/`prev_col` wrap within the column count; after a move the cursor must land on a filled cell: moving down/up or right onto an empty cell repeats the move in the same direction; moving left onto an empty cell slides left ("carriage return") until a filled cell. A row with no filled cell is a model error (panic upstream) and cannot occur with ≤ 32 items filled row-major.
 
-Hold repeat: a direction held on either analog stick repeats every 21 frames (the hold counter counts frames held, fires when it exceeds 20, and every accepted input resets all hold counters). The d-pad does not repeat. This rule is implemented in the input adapter (SPEC-core-03 §3) but belongs to the model's contract for tests.
+Hold repeat: Up / Down on the d-pad or either stick repeat after 21 frames, then quicken to every 8 frames, every 5 from 60 held frames and every 4 from 120. Left / Right repeat only on a stick, every 21 frames; held ZL + Up / Down jumps repeat every 21 frames. A direction held before the menu takes input does not repeat until released, and a repeat waits while the worker has an input pending. This rule is implemented in the input adapter (SPEC-core-03 §3).
 
 ### 2.4 Slider rules
 
@@ -281,7 +281,7 @@ None in the model. The close payload and its file are SPEC-core-04. The factory 
 | Serialization shape `id → [u8]`, sliders `[lower, upper]`; round trip through bulk update | `core02_serialize_roundtrip` | — | — |
 | Bulk update clears before applying (short arrays leave appended options off) | `core02_update_from_shorter_array` | — | — |
 | Factory table: every row of §2.7 with kind, option count and default | `core02_factory_table_matches_spec` (table-driven) | `core02-E5` every tab screenshot | `docs/EDEN-RESULTS.md` |
-| Hold repeat every 21 frames on sticks, none on d-pad | `core02_hold_repeat_period` (adapter) | `core02-E6` | — |
+| Up / Down repeat and quicken; stick Left / Right and held jumps repeat steadily | `model::adapter::tests::case_table` | `core02-E6` superseded | — |
 | Clear-toggle hint rule | `core02_clear_hint_rule` | `core02-E2` | — |
 | Fork hooks: Ordered ranks, paging, hidden rows, pending intents taken once at CLOSE | carried over with the fork's own tests | — | — |
 | **N1** The Developer page is in the ring only while `developer_page` is on; with it off the ring has five pages and L/R skips it; its rows stay in the serialization | `core02_hidden_page_ring`, `core02_hidden_page_rows_serialized` | `core02-E7` Developer page absent / present on the two profiles of `core01-E12` | `docs/EDEN-RESULTS.md` |

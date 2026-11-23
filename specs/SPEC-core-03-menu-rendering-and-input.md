@@ -32,7 +32,7 @@ The settings menu is drawn by the game's own 2D layout engine: the plugin adds p
 - Slider page: a separate panel with a header (the submenu title), a **Min** button and a **Max** button, each showing its value; the hovered handle is highlighted blue, the selected (being edited) handle orange.
 - Confirmation page: only the middle row is visible with two buttons, **No** (left) and **Yes** (right); the hovered one is highlighted.
 - Controller glyphs follow the connected controller type: GameCube controllers show L/R for tab switching and Z for reset; everything else shows ZL/ZR and R.
-- Hold repeat on the sticks (every 21 frames) as SPEC-core-02 §2.3.
+- Up / Down repeat and quicken on the d-pad or sticks; stick Left / Right and held jumps repeat steadily, as SPEC-core-02 §2.3.
 
 ### 2.3 Closing
 

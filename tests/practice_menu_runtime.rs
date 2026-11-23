@@ -30,6 +30,10 @@ fn item<'a>(text: &'a str, head: &str) -> &'a str {
     &text[at..end]
 }
 
+fn member<'a>(text: &'a str, head: &str) -> &'a str {
+    item(text, head).split_once("\n    }\n").expect(head).0
+}
+
 #[test]
 fn the_role_tabs_draw_the_models_caps() {
     let view = src("src/runtime/ui/view.rs");
@@ -155,14 +159,187 @@ fn edge_juggle_yields_wizard_cpu_control_and_keeps_the_drill_lead_in() {
 }
 
 #[test]
+fn the_drills_run_in_a_waiting_room_against_the_first_training_partner() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    assert!(!runtime.contains("scene::is_native_training()"));
+    let cpu_entry = item(&runtime, "fn cpu_entry(");
+    assert!(cpu_entry.contains("LOBBY_CPU_ENTRY") && cpu_entry.contains("scene::practice_scene()"));
+    assert!(member(&runtime, "unsafe fn current()").contains("natives::module_accessor(cpu_entry())"));
+    assert!(item(&runtime, "pub unsafe fn frame(").contains("natives::is_operation_cpu(cpu_entry())"));
+    assert!(item(&runtime, "fn controls_cpu(").contains("natives::module_accessor(cpu_entry())"));
+
+    let zoom = src("src/runtime/features/edge_juggle/zoom.rs");
+    assert!(zoom.contains("natives::fighter_entry(super::cpu_entry())"));
+    assert!(!zoom.contains("fighter_entry(1)"));
+    let picker = src("src/runtime/features/edge_juggle/practice_cpu.rs");
+    assert!(picker.contains("scene::practice_scene().is_some()"));
+    assert!(!picker.contains("is_native_training"));
+
+    let level = src("src/runtime/features/cpu_level.rs");
+    let poll = item(&level, "fn poll_drill_locked(");
+    assert!(poll.contains("scene::practice_scene()"));
+    let partner = poll.find("step_drill_partner(").unwrap();
+    let panel = poll.find("step_drill_panel(").unwrap();
+    assert!(partner < panel);
+    let step = item(&level, "unsafe fn step_drill_partner(");
+    assert!(step.contains("state.drill_partner.step("));
+    assert!(step.contains("AI_SET_BEHAVIOR") && step.contains("ENTRY_BEHAVIOR"));
+    assert!(!step.contains("PANEL_"));
+    assert!(item(&level, "pub(crate) unsafe fn frame(").contains("rules::drill_target("));
+
+    let reset = src("src/runtime/features/states/quick_reset.rs");
+    let request = item(&reset, "fn request(");
+    assert!(request.find("begin_temporary(").unwrap() < request.find("edge_juggle::restart();").unwrap());
+    let cpu = src("src/runtime/features/cpu.rs");
+    assert!(item(&cpu, "pub fn entry_departed(").contains("owner == LOBBY_CPU_ENTRY as u32"));
+
+    let rows = src("data/tables/rows_edge_juggle.ROWS.tsv");
+    let scope = "\tScopes(Scopes::TRAINING.0 | Scopes::LOBBY_WAITING.0)\t";
+    for row in rows.lines().filter(|line| line.starts_with("\"edge_juggle.attack_forecast_")) {
+        assert!(row.contains(scope), "{row}");
+    }
+    for name in ["ai_set_behavior", "special_available_snapshot", "special_available", "escape_slide_distance",
+        "escape_cancel_frame", "special_height", "special_length"] {
+        let prefix = format!("\"edge_juggle.{name}\"");
+        assert!(rows.lines().find(|line| line.starts_with(&prefix)).unwrap().contains(scope), "{name}");
+    }
+    for row in rows.lines().filter(|line| line.starts_with("\"edge_juggle.training_")
+        || line.starts_with("\"edge_juggle.live_") || line.starts_with("\"edge_juggle.pause_hud_")) {
+        assert!(row.contains("\tScopes::TRAINING\t"), "{row}");
+    }
+    let zoom_rows = src("data/tables/rows_edge_zoom.ROWS.tsv");
+    assert_eq!(zoom_rows.lines().filter(|line| line.starts_with("\"edge_zoom.") && line.contains(scope)).count(), 3);
+}
+
+#[test]
+fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let poll = item(&runtime, "pub unsafe fn poll(");
+    assert!(poll.contains("wizard.set_side_default(run.stage, false)"));
+    let y = poll.find("key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu").unwrap();
+    let other = poll[y..].find("wizard.set_side_default(run.stage, true)").unwrap() + y;
+    let check = poll.find("!wizard.accepts_cpu(run.stage)").unwrap();
+    let refusal = poll[check..].find("notices::refuse(\"Pick a point off the stage\"); // restriction: edge-juggle-start-over-stage").unwrap() + check;
+    let back = poll[refusal..].find("return true;").unwrap() + refusal;
+    let save = poll.find("run.setup = wizard.setup").unwrap();
+    assert!(y < other && other < check && check < refusal && refusal < back && back < save);
+}
+
+#[test]
+fn every_refusal_goes_through_the_queue_s_refusal_post() {
+    let notices = src("src/runtime/features/notices.rs");
+    let refuse = item(&notices, "pub fn refuse(");
+    assert!(refuse.contains("send(Mail::Refuse(\"Input Recording\", text, 120));"));
+    assert!(!refuse.contains("post("));
+    let take = item(&notices, "fn take_mail(");
+    assert!(take.contains("Mail::Refuse(header, text, length) => queue.post_refusal(header, Body::copied(text), length, DEFAULT_COLOR)"));
+    let save = item(&notices, "pub fn save_state_refused(");
+    assert!(save.contains("send(Mail::Refuse(\"Save State\", text, 150));"));
+    assert!(!save.contains("post("));
+    let chords = src("src/runtime/features/chords.rs");
+    let refused = chords.find("if recorder_refused {").unwrap();
+    assert!(chords[refused..].contains("notices::refuse(\"Stop the drill to start recording or play inputs\")"));
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let poll = item(&runtime, "pub unsafe fn poll(");
+    assert!(poll.contains("notices::refuse(\"Pick a point off the stage\"); // restriction: edge-juggle-start-over-stage"));
+    assert!(!poll.contains("notices::show_now("));
+}
+
+#[test]
+fn the_bridge_publishes_the_focused_list_and_still_omits_rows() {
+    let worker = src("src/runtime/ui/worker.rs");
+    let publish = item(&worker, "fn publish_bridge_state(");
+    assert!(publish.contains("published_list("));
+    assert!(publish.contains("flow::model_takes_presses("));
+    assert!(publish.contains("POPUP.load("));
+    assert!(!publish.contains("m.filter(|_| open)"));
+    for field in ["list: &list.id", "list_count: list.count", "list_index: list.index", "list_value: &list.value", "rows_omitted: true"] {
+        assert!(publish.contains(field), "{field}");
+    }
+}
+
+#[test]
+fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
+    let lobby = src("src/runtime/lobby/training/lobby.rs");
+    let update = item(&lobby, "pub fn update(");
+    assert!(!lobby.contains("uptime_ms"));
+    assert!(!lobby.contains("RELEASE_SINCE"));
+    assert!(!src("src/model/lobby_flag.rs").contains("RELEASE_MS"));
+    assert!(update.find("lobby_flag::release(").unwrap() < update.find("lobby_flag::step(").unwrap());
+    assert!(update.contains("edge_juggle::stop_for_release()"));
+    assert!(item(&lobby, "pub fn requested(").contains("practice_setting("));
+    assert!(item(&lobby, "pub fn try_requested(").contains("practice_setting("));
+    let edge = src("src/runtime/features/edge_juggle.rs");
+    let holds = item(&edge, "pub(crate) fn holds_partner(");
+    for term in ["wanted().is_some()", "ENGINE_ACTIVE.load(", "super::cpu_level::partner_held()", "practice_cpu::restoring()"] {
+        assert!(holds.contains(term), "{term}");
+    }
+    let level = src("src/runtime/features/cpu_level.rs");
+    assert_eq!(level.matches("DRILL_PARTNER_HELD.store(").count(), 1);
+    let poll = item(&level, "fn poll_drill_locked(");
+    let branch = &poll[poll.find("if scene.is_none() {").unwrap()..poll.find("let level =").unwrap()];
+    assert!(branch.contains("PartnerLease::new()"));
+    assert!(!branch.contains("set_behavior") && !branch.contains("write_unchecked"));
+}
+
+#[test]
+fn a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let read = frame.find("wizard.player_floor(").unwrap();
+    let found = frame[read..].find("if let Some(p1) = placed {").unwrap() + read;
+    let missing = frame[found..].find("} else if confirm {").unwrap() + found;
+    let refusal = frame[missing..].find("notices::refuse(\"Pick a point above a floor\"); // restriction: edge-juggle-player-no-floor").unwrap() + missing;
+    let notice = frame[refusal..].find("post_notice(capture, run").unwrap() + refusal;
+    assert!(read < found && found < missing && missing < refusal && refusal < notice);
+
+    let placement = src("src/runtime/features/placement.rs");
+    let floor = item(&placement, "pub(super) unsafe fn floor_under(");
+    assert!(floor.contains("let top = if platforms { (y + 1.0).min(top) } else { top };"));
+    assert!(floor.contains("let floor = ray.floor(x, [top, bottom], platforms)?;"));
+    assert_eq!(floor.matches("ray.floor(").count(), 1);
+
+    let restrictions = src("docs/RESTRICTIONS.md");
+    assert!(restrictions.contains("`edge-juggle-player-no-floor`"));
+    assert!(restrictions.contains("\"Pick a point above a floor\""));
+}
+
+#[test]
+fn edge_wizard_notices_name_three_pages() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let notice = item(&runtime, "fn post_notice(");
+    for text in [
+        "Edge · 1/3", "Edge · 2/3", "Edge · 3/3",
+        "CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side",
+        "CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next",
+        "P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next",
+        "{percent}% · D-pad change · A next",
+        "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start",
+    ] {
+        assert!(notice.contains(text), "{text}");
+    }
+}
+
+#[test]
+fn edge_bests_key_uses_the_bucket() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    assert!(frame.contains("run.stage.bucket(run.setup.cpu)"));
+    assert!(!frame.contains("run.setup.area"));
+}
+
+#[test]
 fn edge_wizard_marks_its_cpu_start_readably() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let look = item(&runtime, "pub fn look(");
     assert!(!look.contains("scale: 0.3"));
     let hitbox = src("src/runtime/features/hitbox.rs");
-    assert!(item(&hitbox, "pub unsafe fn draw_orbs(").contains("orbs::edge_pointer("));
+    let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
+    assert!(draw.contains("orbs::edge_pointer("));
+    assert!(draw.contains("looks[4..9].iter_mut().zip(pointer)"));
+    assert!(draw.contains("size: 14.0"));
     let notice = item(&runtime, "fn post_notice(");
-    assert!(notice.contains("{} ({x:.0}, {y:.0}) · D-pad choose · A next"));
+    assert!(notice.contains("CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next"));
 }
 
 #[test]
@@ -170,12 +347,13 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let notice = item(&runtime, "fn post_notice(");
     assert!(notice.contains("\"{percent}% · D-pad change · A next\""));
-    assert!(notice.contains("\"P1 ({px:.0}, {py:.0}) · Stick move · A next\""));
+    assert!(notice.contains("\"P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next\""));
     let page_text = notice.split_once("let _ = match wizard.step {").unwrap().1;
-    for head in ["WizardStep::Area =>", "WizardStep::Percent =>", "WizardStep::Player =>"] {
+    for head in ["WizardStep::Percent =>", "WizardStep::Player =>"] {
         let line = page_text.lines().find(|line| line.contains(head)).unwrap();
         assert!(!line.contains("CPU"), "{line}");
     }
+    assert!(!page_text.contains("WizardStep::Area"));
     assert!(!page_text.contains("WizardStep::Percent if run.drill == Drill::GuardEdge"));
     assert!(!page_text.contains("WizardStep::Player if run.drill == Drill::GuardEdge"));
 }
@@ -183,16 +361,16 @@ fn edge_wizard_notice_keeps_the_pages_the_sealed_rows_read() {
 #[test]
 fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
-    assert!(item(&runtime, "pub fn look(").contains("wizard.shows_cpu()"));
+    assert!(item(&runtime, "pub fn look(").contains("wizard.marks()"));
     let hitbox = src("src/runtime/features/hitbox.rs");
     let draw = item(&hitbox, "pub unsafe fn draw_orbs(");
-    assert!(draw.contains(".filter(|_| pointed && !zone_wizard)"));
+    assert!(draw.contains("marks.pointer"));
+    assert!(draw.contains("marks.pointer = None;"));
     assert!(!draw.contains(".filter(|_| edge_wizard)"));
     let notice = item(&runtime, "fn post_notice(");
     for text in [
-        "\"{} ({x:.0}, {y:.0}) · D-pad choose · A next\"",
-        "\"CPU x {x:.0} · Height {:+.0} · Stick move · A next\"",
-        "\"CPU ({x:.0}, {y:.0}) · Stick move · A next\"",
+        "\"CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next\"",
+        "\"CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side\"",
         "\"CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start\"",
     ] {
         assert!(notice.contains(text), "{text}");
@@ -215,11 +393,104 @@ fn edge_juggle_remembers_whether_the_start_was_moved() {
 }
 
 #[test]
+fn drill_cpu_behavior_between_ai_kinds_skips_the_native_pause() {
+    let runtime = src("src/runtime/features/cpu_level.rs");
+    let step = item(&runtime, "unsafe fn step_drill_panel(");
+    assert!(step.contains(".direct(entry_type, ai_type, cpu, menu, state.drill_pause)"));
+    let direct = step.find(".direct(entry_type, ai_type, cpu, menu, state.drill_pause)").expect("direct AI apply");
+    let setter = step.find("set_behavior(controller, i32::from(control))").expect("native setter");
+    let check = step.find("if field::read_unchecked::<u8>(ai, AI_BEHAVIOR) == control {").expect("setter readback");
+    let mirror = step.find("field::write_unchecked(entry, ENTRY_BEHAVIOR, control)").expect("entry mirror");
+    let branch = &step[check..];
+    let branch = &branch[..branch.find("\n            }\n").expect("readback block")];
+    let level = check + branch.find("field::write_unchecked(panel, PANEL_LEVEL, desired.level)").expect("level");
+    let behavior = check + branch.find("field::write_unchecked(panel, PANEL_BEHAVIOR, desired.menu)").expect("behavior");
+    let done = check + branch.find("return false;").expect("no pause");
+    let pulse = step.find("state.drill_pause.pulse(").expect("stock pause fallback");
+    assert!(direct < setter && setter < check && check < mirror && mirror < level);
+    assert!(level < behavior && behavior < done && done < pulse);
+    assert!(branch.contains("field::write_unchecked(entry, ENTRY_BEHAVIOR, control)"));
+    let table = src("data/tables/rows_edge_juggle.ROWS.tsv");
+    let row = table.lines().find(|line| line.starts_with("\"edge_juggle.ai_set_behavior\"")).unwrap();
+    assert!(row.contains("\tSeamKind::Called\t"));
+    let chords = src("src/runtime/features/chords.rs");
+    let injection = chords.find("if super::cpu_level::poll_drill(").expect("pause poll");
+    let body = &chords[injection..];
+    let body = &body[..body.find("\n    }\n").unwrap()];
+    assert!(body.contains("at.read_volatile() | chords::bit::PLUS"));
+    assert_eq!(chords.matches("at.read_volatile() | chords::bit::PLUS").count(), 1);
+}
+
+#[test]
+fn a_crosshair_below_a_platform_finds_the_floor_under_it() {
+    let helpers = src("src/runtime/features/placement.rs");
+    assert!(helpers.contains("pub(super) unsafe fn floor_under("));
+    let floor = item(&helpers, "pub(super) unsafe fn floor_under(");
+    let mut previous = 0;
+    for call in [
+        "natives::camera_limit_range()",
+        "FloorRay::new(body)",
+        "ray.floor(x, [top, bottom], platforms)",
+        "floor.height(x)",
+    ] {
+        let at = floor.find(call).expect(call);
+        assert!(at >= previous, "{call}");
+        previous = at + call.len();
+    }
+    assert!(floor.contains("if platforms { (y + 1.0).min(top) } else { top }"));
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let snap = item(&runtime, "unsafe fn snap_player(");
+    assert!(snap.contains("placement::floor_under(p1, [x, y], platforms)"));
+    assert!(!snap.contains("FloorRay::new("));
+    assert!(!snap.contains("ray.floor("));
+    assert!(snap.contains("x.clamp(stage.ledges[0][0], stage.ledges[1][0])"));
+}
+
+#[test]
+fn placement_helpers_keep_the_drills_native_write_order() {
+    fn ordered(body: &str, calls: &[&str]) {
+        let mut previous = 0;
+        for call in calls {
+            assert_eq!(body.matches(call).count(), 1, "{call}");
+            let at = body.find(call).unwrap();
+            assert!(at >= previous, "{call}");
+            previous = at + call.len();
+        }
+    }
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let helpers = src("src/runtime/features/placement.rs");
+    let stand = item(&helpers, "pub(super) unsafe fn stand(");
+    ordered(stand, &["state::clear_speed_all(", "state::init_pos(", "state::set_lr(",
+        "state::set_situation_kind(", "state::status_request("]);
+    assert_eq!(stand.matches("state::").count(), 6);
+    assert!(stand.contains("konst(C::SituationGround)"));
+    assert!(stand.contains("konst(C::StatusWait)"));
+    let lift = item(&helpers, "pub(super) unsafe fn lift(");
+    ordered(lift, &["state::clear_speed_all(", "state::set_pos(", "state::set_lr(",
+        "state::set_situation_kind("]);
+    assert_eq!(lift.matches("state::").count(), 5);
+    assert!(lift.contains("konst(C::SituationAir)"));
+    let fall = item(&helpers, "pub(super) unsafe fn fall(");
+    ordered(fall, &["state::status_request("]);
+    assert_eq!(fall.matches("state::").count(), 1);
+    assert!(fall.contains("konst(C::StatusFall)"));
+    let hold = item(&helpers, "pub(super) unsafe fn hold(");
+    ordered(hold, &["state::set_sleep(", "state::clear_speed_all(", "state::set_pos("]);
+    assert_eq!(hold.matches("state::").count(), 4);
+    assert!(!hold.contains("status_request"));
+    let place = item(&runtime, "unsafe fn try_place(");
+    ordered(place, &["placement::stand(bodies.p1", "placement::lift(bodies.cpu",
+        "natives::set_int(", "state::heal(", "state::add_damage(", "placement::fall(bodies.cpu)"]);
+    assert!(!runtime.contains("fn write_player("));
+    assert!(!runtime.contains("fn hold_cpu("));
+}
+
+#[test]
 fn edge_juggle_settles_a_hit_player_before_ready() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     assert!(!runtime.contains("fn settle_player"));
     let place = item(&runtime, "unsafe fn try_place(");
-    assert!(place.contains("write_player(bodies.p1"));
+    assert!(place.contains("placement::stand(bodies.p1"));
     assert!(place.contains("Some([x, y])"));
     assert!(!place.contains("state::init_pos(bodies.p1"));
     let on_start = item(&runtime, "unsafe fn on_start(");
@@ -246,9 +517,12 @@ fn edge_juggle_settles_a_hit_player_before_ready() {
     let settle = frame.find("PlacedPlayer::before_ready(").expect("judge before Ready");
     let ready = frame.find("run.rounds.placed()").expect("Ready transition");
     assert!(settle < ready);
-    assert!(frame.contains("write_player(p1, at,"));
+    assert!(frame.contains("placement::stand(p1, at,"));
     assert!(!frame.contains("Placement::Airborne if"));
-    assert!(!item(&runtime, "unsafe fn hold_cpu(").contains("p1"));
+    let placement = src("src/runtime/features/placement.rs");
+    assert!(!item(&placement, "pub(super) unsafe fn hold(").contains("p1"));
+    assert!(item(&placement, "pub(super) unsafe fn stand(").contains("state::init_pos(body"));
+    assert!(frame.contains("placement::hold(cpu, run.setup.cpu)"));
 }
 
 #[test]
@@ -443,7 +717,7 @@ fn guard_the_edge_runtime_enters_and_leaves_through_the_shared_path() {
     let apply = poll.split_once("run.wizard = None;").unwrap().1;
     assert!(apply.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "Apply lowers the bit");
     let frame = item(&edge, "pub unsafe fn frame(");
-    let scene_exit = frame.split_once("if !scene::is_native_training()").unwrap().1.split_once("if published::HOT_SWAP_IN_PROGRESS").unwrap().0;
+    let scene_exit = frame.split_once("if scene::practice_scene().is_none()").unwrap().1.split_once("if published::HOT_SWAP_IN_PROGRESS").unwrap().0;
     assert!(scene_exit.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "scene exit");
     let no_body = frame.split_once("let Some((drill, body))").unwrap().1.split_once("let cpu = body.accessor").unwrap().0;
     assert!(no_body.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "ended drill or missing body");
@@ -551,6 +825,28 @@ fn every_wizard_is_lowered_by_the_menu_and_by_its_own_frame() {
             assert!(paired(body) || phase_off(body), "{head}: every phase writer shares its value");
         }
     }
+}
+
+#[test]
+fn recording_lists_use_the_menus_list_jump() {
+    let recording = src("src/model/recording_menu.rs");
+    let implementation = recording.split_once("#[cfg(test)]\nmod tests").unwrap().0;
+    assert!(!implementation.contains("fn page_by(") && !implementation.contains("const PAGE:"));
+    for head in ["fn page_section(", "fn press_file(", "fn press_picker("] {
+        let body = member(implementation, head);
+        assert!(body.contains("jumped(") || body.contains("jumped_within("), "{head}");
+    }
+    assert!(src("src/model/menu/mod.rs").contains("fn jumped_within("));
+}
+
+#[test]
+fn the_menu_hook_holds_repeats_while_the_worker_is_behind() {
+    let input = src("src/runtime/ui/input.rs");
+    let poll = item(&input, "pub fn on_p1_poll(");
+    let backlog = poll.find("adapter.set_backlog(worker::input_pending())").expect("backlog");
+    assert!(backlog < poll.find("adapter.poll(").unwrap());
+    let worker = src("src/runtime/ui/worker.rs");
+    assert!(item(&worker, "pub fn input_pending()").contains("INPUT.is_empty()"));
 }
 
 #[test]

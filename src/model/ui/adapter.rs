@@ -8,7 +8,7 @@
 //! digital L, 29 real digital R.
 
 use super::menu::chord::Chord;
-use super::menu::input::{Button, HoldRepeat};
+use super::menu::input::{Button, HoldRepeat, Pace};
 
 pub mod bit {
     pub const DPAD_UP: u32 = 0;
@@ -147,13 +147,16 @@ impl Step {
 }
 
 /// The adapter's memory between polls: the held buttons, the stick hold counters, whether anything was pressed
-/// while ZL was held (then its release is not a tap), and whether the screen showing takes jumps.
+/// while ZL was held (then its release is not a tap), whether the screen takes jumps, directions held before
+/// input ownership, and whether the worker has a poll waiting.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Adapter {
     logical: u16,
     dpad: [bool; 4],
     stick: [bool; 4],
     repeat: [HoldRepeat; 4],
+    stale: [bool; 4],
+    backlog: bool,
     zl_used: bool,
     /// The screen showing takes no jumps (`Menu::takes_jumps` false, set by the runtime before each poll).
     no_jumps: bool,
@@ -161,7 +164,8 @@ pub struct Adapter {
 
 impl Adapter {
     pub const fn new() -> Adapter {
-        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4], zl_used: false, no_jumps: false }
+        Adapter { logical: 0, dpad: [false; 4], stick: [false; 4], repeat: [HoldRepeat::new(); 4],
+            stale: [false; 4], backlog: false, zl_used: false, no_jumps: false }
     }
 
     /// Whether the screen showing takes ZL + Up / Down as jumps (`Menu::takes_jumps`). Where it does not, ZL is its
@@ -169,6 +173,9 @@ impl Adapter {
     pub fn set_jumps(&mut self, jumps: bool) {
         self.no_jumps = !jumps;
     }
+
+    /// A repeat due while the worker has a poll waiting waits; an edge never does.
+    pub fn set_backlog(&mut self, behind: bool) { self.backlog = behind; }
 
     /// The edge rule of a chord: every button held and at least one pressed this poll.
     fn chord_passes(chord: Chord, held: u16, pressed: u16) -> bool {
@@ -196,8 +203,14 @@ impl Adapter {
                 }
             }
             for i in 0..4 {
-                let repeat = self.repeat[i].frame(stick[i]);
-                // A d-pad direction presses on its edge only; a stick direction on its edge and every 21 frames.
+                let vertical = i % 2 == 0;
+                let held = dpad[i] || stick[i];
+                self.stale[i] &= held;
+                // Up and Down repeat from the d-pad or a stick and quicken, steadily while a jump is held. Left and Right
+                // change values: a stick repeats them steadily, the d-pad presses on its edge only. A direction held since
+                // before the menu took input does not repeat until it is released.
+                let pace = if vertical && !(zl_held && jumps) { Pace::Quickening } else { Pace::Steady };
+                let repeat = self.repeat[i].frame(!self.stale[i] && if vertical { held } else { stick[i] }, pace, !self.backlog);
                 if (dpad[i] && !self.dpad[i]) || (stick[i] && !self.stick[i]) || repeat {
                     let button = DIRECTION_BUTTONS[i];
                     step.push(match button {
@@ -224,6 +237,7 @@ impl Adapter {
                 self.zl_used = false;
             }
         } else {
+            self.stale = [0, 1, 2, 3].map(|i| dpad[i] || stick[i]);
             for repeat in &mut self.repeat {
                 repeat.reset();
             }
@@ -243,6 +257,7 @@ impl Adapter {
     pub fn resync(&mut self, buttons: u32, style: Style) {
         self.logical = logical(buttons, style);
         let (dpad, stick) = directions(buttons);
+        self.stale = [0, 1, 2, 3].map(|i| dpad[i] || stick[i]);
         self.dpad = dpad;
         self.stick = stick;
         for repeat in &mut self.repeat {
@@ -322,6 +337,111 @@ mod tests {
         assert_eq!(a.poll(0, Style::Pro, true, true, shortcut).presses().collect::<Vec<_>>(), [Button::ZL]);
     }
 
+    fn a_held_down_repeats_and_quickens() {
+        let expected = [21, 29, 37, 45, 53, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120,
+            124, 128, 132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180];
+        for (bit, button) in [(bit::DPAD_DOWN, Button::Down), (bit::DPAD_UP, Button::Up),
+            (bit::LSTICK_DOWN, Button::Down), (bit::RSTICK_DOWN, Button::Down)] {
+            let mut a = Adapter::new();
+            let p = |a: &mut Adapter| a.poll(1 << bit, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+            assert_eq!(p(&mut a), [button]);
+            for k in 1..=180 {
+                let want = if expected.contains(&k) { vec![button] } else { vec![] };
+                assert_eq!(p(&mut a), want, "bit={bit} k={k}");
+            }
+        }
+    }
+
+    fn left_right_and_a_held_jump_keep_the_steady_rule() {
+        for (bit, expected) in [(bit::LSTICK_RIGHT, &[21, 42, 63, 84, 105, 126, 147, 168][..]), (bit::DPAD_RIGHT, &[][..])] {
+            let mut a = Adapter::new();
+            let p = |a: &mut Adapter| a.poll(1 << bit, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+            assert_eq!(p(&mut a), [Button::Right]);
+            for k in 1..=180 {
+                let want = if expected.contains(&k) { vec![Button::Right] } else { vec![] };
+                assert_eq!(p(&mut a), want, "bit={bit} k={k}");
+            }
+        }
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, bits: &[u32]| a.poll(mask(bits), Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, &[bit::ZL]), []);
+        assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), [Button::JumpDown]);
+        for k in 1..=63 {
+            let want = if [21, 42, 63].contains(&k) { vec![Button::JumpDown] } else { vec![] };
+            assert_eq!(p(&mut a, &[bit::ZL, bit::DPAD_DOWN]), want, "k={k}");
+        }
+        assert_eq!(p(&mut a, &[]), []);
+    }
+
+    fn a_direction_held_since_the_menu_opened_does_not_repeat() {
+        for bit in [bit::DPAD_UP, bit::LSTICK_UP] {
+            let mut a = Adapter::new();
+            a.poll(mask(&[bit::B]), Style::Pro, false, true, NO_SHORTCUTS);
+            let held = mask(&[bit::B, bit::DPAD_UP, bit]);
+            assert!(a.poll(held, Style::Pro, false, true, NO_SHORTCUTS).open);
+            a.resync(held, Style::Pro);
+            for k in 1..=200 {
+                assert_eq!(a.poll(1 << bit, Style::Pro, true, true, NO_SHORTCUTS).presses().count(), 0, "bit={bit} k={k}");
+            }
+            assert_eq!(a.poll(0, Style::Pro, true, true, NO_SHORTCUTS).presses().count(), 0);
+            assert_eq!(a.poll(1 << bit, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>(), [Button::Up]);
+            for k in 1..=21 {
+                let want = if k == 21 { vec![Button::Up] } else { vec![] };
+                assert_eq!(a.poll(1 << bit, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>(), want, "bit={bit} k={k}");
+            }
+        }
+    }
+
+    fn a_release_restarts_the_hold() {
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, held| a.poll(if held { 1 << bit::DPAD_DOWN } else { 0 },
+            Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, true), [Button::Down]);
+        for k in 1..=40 {
+            let want = if [21, 29, 37].contains(&k) { vec![Button::Down] } else { vec![] };
+            assert_eq!(p(&mut a, true), want, "first hold k={k}");
+        }
+        assert_eq!(p(&mut a, false), []);
+        assert_eq!(p(&mut a, true), [Button::Down]);
+        for k in 1..=21 {
+            let want = if k == 21 { vec![Button::Down] } else { vec![] };
+            assert_eq!(p(&mut a, true), want, "second hold k={k}");
+        }
+    }
+
+    fn repeats_wait_for_the_worker() {
+        let mut a = Adapter::new();
+        let p = |a: &mut Adapter, bits| a.poll(bits, Style::Pro, true, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+        assert_eq!(p(&mut a, 1 << bit::DPAD_DOWN), [Button::Down]);
+        a.set_backlog(true);
+        for k in 1..=40 { assert_eq!(p(&mut a, 1 << bit::DPAD_DOWN), [], "k={k}"); }
+        a.set_backlog(false);
+        assert_eq!(p(&mut a, 1 << bit::DPAD_DOWN), [Button::Down], "k=41");
+        for k in 42..=49 {
+            let want = if k == 49 { vec![Button::Down] } else { vec![] };
+            assert_eq!(p(&mut a, 1 << bit::DPAD_DOWN), want, "k={k}");
+        }
+        a.set_backlog(true);
+        assert_eq!(p(&mut a, 0), []);
+        assert_eq!(p(&mut a, 1 << bit::DPAD_UP), [Button::Up], "a fresh edge is never delayed");
+    }
+
+    fn a_direction_held_while_the_menu_was_closed_does_not_repeat() {
+        // The Recording pop-up opens without a resync.
+        for bit in [bit::DPAD_DOWN, bit::LSTICK_DOWN] {
+            let mut a = Adapter::new();
+            let p = |a: &mut Adapter, bits: u32, open| a.poll(bits, Style::Pro, open, true, NO_SHORTCUTS).presses().collect::<Vec<_>>();
+            assert_eq!(p(&mut a, 1 << bit, false), []);
+            for k in 1..=60 { assert_eq!(p(&mut a, 1 << bit, true), [], "bit={bit} k={k}"); }
+            assert_eq!(p(&mut a, 0, true), []);
+            assert_eq!(p(&mut a, 1 << bit, true), [Button::Down]);
+            for k in 1..=21 {
+                let want = if k == 21 { vec![Button::Down] } else { vec![] };
+                assert_eq!(p(&mut a, 1 << bit, true), want, "bit={bit} k={k}");
+            }
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -329,6 +449,12 @@ mod tests {
             ("the_chord_is_refused_while_the_pause_menu_owns_input", the_chord_is_refused_while_the_pause_menu_owns_input as fn()),
             ("on_a_screen_without_jumps_zl_is_its_own_button_and_up_down_move", on_a_screen_without_jumps_zl_is_its_own_button_and_up_down_move as fn()),
             ("a_zl_held_since_the_opening_chord_is_not_a_tap", a_zl_held_since_the_opening_chord_is_not_a_tap as fn()),
+            ("a_held_down_repeats_and_quickens", a_held_down_repeats_and_quickens as fn()),
+            ("left_right_and_a_held_jump_keep_the_steady_rule", left_right_and_a_held_jump_keep_the_steady_rule as fn()),
+            ("a_direction_held_since_the_menu_opened_does_not_repeat", a_direction_held_since_the_menu_opened_does_not_repeat as fn()),
+            ("a_release_restarts_the_hold", a_release_restarts_the_hold as fn()),
+            ("repeats_wait_for_the_worker", repeats_wait_for_the_worker as fn()),
+            ("a_direction_held_while_the_menu_was_closed_does_not_repeat", a_direction_held_while_the_menu_was_closed_does_not_repeat as fn()),
         ]);
     }
     }

@@ -48,6 +48,10 @@ pub struct View<'a> {
     pub recording_page_role: &'a str,
     /// The role of the active capture, empty when there is no take.
     pub recording_capture_role: &'a str,
+    pub list: &'a str,
+    pub list_count: usize,
+    pub list_index: Option<usize>,
+    pub list_value: &'a str,
     /// The visible rows of the screen showing (optional, sent last).
     pub rows: &'a [&'a str],
     /// The publisher does not list the rows (the v1 limit): `rows.complete=0` whatever `rows` holds.
@@ -198,6 +202,10 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     push_str(out, "recording.popup.role", view.recording_popup_role);
     push_str(out, "recording.page.role", view.recording_page_role);
     push_str(out, "recording.capture.role", view.recording_capture_role);
+    push_str(out, "list", view.list);
+    let _ = writeln!(out, "list.count={}", view.list_count);
+    let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
+    push_str(out, "list.value", view.list_value);
     // The optional rows come last: as many as fit under the bound, and a mark when some did not.
     let mut rows = String::new();
     let mut shown = 0;
@@ -219,6 +227,33 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     let _ = writeln!(out, "rows.complete={}", u8::from(complete));
     let _ = write!(out, "rows={rows}");
     complete
+}
+
+/// The snapshot's `list` keys for `menu`: its focused list, with a table row's value written as the page draws it
+/// (`frame::write_value`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ListView {
+    pub id: String,
+    pub count: usize,
+    pub index: Option<usize>,
+    pub value: String,
+}
+
+pub fn list_view(menu: &super::menu::Menu) -> ListView {
+    let Some(list) = menu.focus_list() else { return ListView::default() };
+    let value = if let Some(row) = list.row {
+        let mut text = super::frame::Text::<72>::new();
+        super::frame::write_value(menu, row, &mut text);
+        text.string_lossy()
+    } else {
+        list.value
+    };
+    ListView { id: list.id, count: list.count, index: Some(list.index), value }
+}
+
+/// The `list` keys the worker publishes: the model's focused list while the menu's own screens take the presses, else none.
+pub fn published_list(menu: Option<&super::menu::Menu>, model_takes_presses: bool) -> ListView {
+    menu.filter(|_| model_takes_presses).map(list_view).unwrap_or_default()
 }
 
 /// The table header the provider accepts (ssbu-hw-bridge PLUGIN-STATE.md §2): this magic and ABI, exactly the declared

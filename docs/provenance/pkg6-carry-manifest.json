@@ -28862,7 +28862,7 @@
       "dest": "src/runtime/lobby/training/lobby.rs",
       "crate": "root",
       "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-      "dest_sha256": "1401e428821e6ea06ff4fbe99ba62873b79b9b796cf20763896c3ca10d3d974e",
+      "dest_sha256": "2af67fdd1d27dbaead6401ad5c86c1191875ba6510d80aabeebab856653148da",
       "edits": [
         {
           "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -28923,6 +28923,21 @@
           "old": " })\n}\n\npub fn requested() -> bool {\n    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n\npub fn set_ui_",
           "new": " })\n}\n\npub fn requested() -> bool {\n    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n\npub fn set_ui_",
           "reason": "RC15 shared menu hook fix: add fallible eligibility using EDITED.try_lock; preserve successful scene semantics and distinguish Busy from false/departure. Existing blocking API retained for unmigrated owners."
+        },
+        {
+          "old": "static WAS_ACTIVE: AtomicBool = AtomicBool::new(false);\n",
+          "new": "static WAS_ACTIVE: AtomicBool = AtomicBool::new(false);\nstatic RELEASING: AtomicBool = AtomicBool::new(false);\n",
+          "reason": "Track the partner release while Lobby Practice is turned off during a drill."
+        },
+        {
+          "old": "pub fn requested() -> bool {\n    read(&MENU).lobby_practice == OnOff::ON && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON && is_waiting_scene())\n}\n",
+          "new": "fn practice_setting(on: bool) -> bool {\n    on || RELEASING.load(Ordering::Acquire)\n}\n\npub fn requested() -> bool {\n    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(practice_setting(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())\n}\n",
+          "reason": "Keep practice requested while the drill restores the partner after Lobby Practice is turned off."
+        },
+        {
+          "old": "    let practice_on = read(&MENU).lobby_practice == OnOff::ON;\n",
+          "new": "    let setting_on = read(&MENU).lobby_practice == OnOff::ON;\n    let (practice_on, releasing, stop) = if !setting_on && clock.was_active {\n        let holds = crate::runtime::features::edge_juggle::holds_partner();\n        crate::model::lobby_flag::release(setting_on, clock.was_active, holds, RELEASING.load(Ordering::Acquire))\n    } else {\n        (setting_on, false, false)\n    };\n    RELEASING.store(releasing, Ordering::Release);\n    if stop {\n        crate::runtime::features::edge_juggle::stop_for_release();\n    }\n",
+          "reason": "Stop the drill and wait for the partner to be given back before practice ends when Lobby Practice is turned off."
         }
       ]
     },

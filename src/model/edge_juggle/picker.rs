@@ -67,7 +67,7 @@ pub fn service(selected: Option<u32>, target: u32, observed: Option<u32>, settle
 pub enum Tick {
     /// Nothing selected and nothing to restore.
     Idle,
-    /// Outside native Training: the service forgets everything.
+    /// Outside practice (Training or a waiting room): the service forgets everything.
     Left,
     /// Another practice game owns the opponent until it stops.
     OtherGame,

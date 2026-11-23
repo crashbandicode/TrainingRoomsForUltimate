@@ -39,11 +39,13 @@ described in [TECHNICAL.md](../TECHNICAL.md).
 
 ## Moving around
 
-- **Up / Down** move one row. They wrap from the bottom of the page to the top. The left or right stick works too, and
-  holding it keeps moving.
+- **Up / Down** move one row and wrap from the bottom of the page to the top. Hold either on the D-pad or a stick
+  to keep moving: it repeats after a third of a second and speeds up (about 7 rows a second, 12 after one second,
+  15 after two). Left / Right repeat from a stick only, at a steady rate.
 - **ZL + Up / Down** jump to the next or previous section (the first row of each group). From the last section
   ZL + Down goes to the first, and from the first ZL + Up goes to the last. In a list they jump a screenful, stop
-  on the first or last entry, then wrap.
+  on the first or last entry, then wrap. Held, they repeat at the steady rate. On the Recording page's lists, the
+  next jump goes to the other list, then to the page's next or previous section.
 - **L / R** go to the previous or next page from the page and from a game's screen, a fighter grid or an editor
   screen. Popup lists, number editors, the chord editor and the grids that use L / R themselves keep their keys.
 - A section tagged *advanced* (Loading, on Fighters & Stages) is collapsed. A on its header opens or closes it.

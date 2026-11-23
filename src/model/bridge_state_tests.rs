@@ -13,6 +13,10 @@ fn eggs_start() -> View<'static> {
         ack: 7,
         ack_result: "handled",
         scene: "training",
+        list: "rows/22",
+        list_count: 2,
+        list_index: Some(0),
+        list_value: ">",
         notice: Some(("Eggs-ercise", "Eggs 0   1:00")),
         rows: &["Start", "Eggs mode"],
         ..View::default()
@@ -61,6 +65,10 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.popup.role=\"\"",
         "recording.page.role=\"\"",
         "recording.capture.role=\"\"",
+        "list=\"rows/22\"",
+        "list.count=2",
+        "list.index=0",
+        "list.value=\">\"",
         "rows.count=2",
         "rows.complete=1",
         "rows=\"Start\",\"Eggs mode\"",
@@ -83,6 +91,13 @@ fn the_recording_popup_page_and_capture_report_independent_roles() {
     assert!(out.contains("\nrecording.popup.role=\"cpu\"\n"));
     assert!(out.contains("\nrecording.page.role=\"player\"\n"));
     assert!(out.contains("\nrecording.capture.role=\"player\"\n"));
+}
+
+#[test]
+fn no_focused_list_has_empty_keys_and_an_index_of_minus_one() {
+    let mut out = String::new();
+    snapshot(&View::default(), &mut out);
+    assert!(out.contains("\nlist=\"\"\nlist.count=0\nlist.index=-1\nlist.value=\"\"\n"), "{out}");
 }
 
 #[test]

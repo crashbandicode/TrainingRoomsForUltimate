@@ -92,6 +92,38 @@ mod tests {
         clock
     }
 
+    fn release_holds_the_room_until_restored() {
+        use crate::model::lobby_flag::release;
+        for was_active in [false, true] {
+            for holds in [false, true] {
+                for releasing in [false, true] {
+                    assert_eq!(release(true, was_active, holds, releasing), (true, false, false));
+                }
+            }
+        }
+        for holds in [false, true] {
+            for releasing in [false, true] {
+                assert_eq!(release(false, false, holds, releasing), (false, false, false));
+            }
+        }
+        for releasing in [false, true] {
+            assert_eq!(release(false, true, false, releasing), (false, false, false));
+        }
+        assert_eq!(release(false, true, true, false), (true, true, true));
+        assert_eq!(release(false, true, true, true), (true, true, false));
+    }
+
+    fn release_remains_requested_while_the_partner_is_held() {
+        let mut releasing = false;
+        for step in 0..100_000 {
+            let (on, next, stop) = crate::model::lobby_flag::release(false, true, true, releasing);
+            assert!(on, "held partner must keep practice requested at step {step}");
+            assert!(next);
+            assert_eq!(stop, step == 0);
+            releasing = next;
+        }
+    }
+
     fn battle_from(station: &str, clock: FlagClock) -> Step {
         let (_, decision) = step(clock, Some(BATTLE), true);
         assert_eq!(
@@ -528,6 +560,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("release_holds_the_room_until_restored", release_holds_the_room_until_restored as fn()),
+            ("release_remains_requested_while_the_partner_is_held", release_remains_requested_while_the_partner_is_held as fn()),
             ("a_quickplay_match_suspends_naming_as_a_local_match_does", a_quickplay_match_suspends_naming_as_a_local_match_does as fn()),
             ("no_name_keyboard_reads_the_online_mode", no_name_keyboard_reads_the_online_mode as fn()),
             ("training_behaviour_follows_the_live_scene_at_every_station", training_behaviour_follows_the_live_scene_at_every_station as fn()),

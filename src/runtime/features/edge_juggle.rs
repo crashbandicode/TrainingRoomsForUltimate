@@ -1,15 +1,18 @@
-//! Native Training adapter for the edge and juggle games. No additional game hooks.
+//! Training and waiting-room practice adapter for the edge and juggle games: the opponent is entry 1 or the first
+//! training partner. No additional game hooks.
 use std::fmt::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::{Mutex, Published};
 
-use super::{cpu::konst, mashout::FloorRay, notices, practice, recorder, states};
+use super::{cpu::konst, mashout::FloorRay, notices, placement, practice, recorder, states};
+use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
+use crate::model::crosshair::Marks;
 use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
-    role::FighterKey,
+    role::{FighterKey, Scene, LOBBY_CPU_ENTRY},
 };
 use crate::model::edge_juggle::perfect::game_watch::{self, OilInputs, OilStall};
 use crate::model::edge_juggle::perfect::recovery::{
@@ -119,7 +122,6 @@ struct Run {
     stage_floor_y: f32,
     wizard: Option<Wizard>,
     defaults: Setup,
-    cursor: [f32; 2],
     confirm_player: bool,
     setup: Setup,
     rounds: Session,
@@ -165,7 +167,7 @@ struct CpuBody {
 
 impl CpuBody {
     unsafe fn current() -> Option<Self> {
-        let accessor = natives::module_accessor(1)?;
+        let accessor = natives::module_accessor(cpu_entry())?;
         natives::is_fighter(accessor).then(|| Self {
             accessor,
             object_id: natives::battle_object_id(accessor),
@@ -288,8 +290,12 @@ pub(super) fn placement_active() -> bool {
     !OPEN.load(Ordering::Acquire) && wizard_active()
 }
 
+pub(super) fn cpu_entry() -> i32 {
+    if scene::practice_scene() == Some(Scene::Lobby) { LOBBY_CPU_ENTRY } else { 1 }
+}
+
 pub fn allowed(drill: Drill) -> bool {
-    if !INSTALLED.load(Ordering::Acquire) || !scene::is_native_training() {
+    if !INSTALLED.load(Ordering::Acquire) || scene::practice_scene().is_none() {
         return false;
     }
     if super::recording_host::cpu_playback_blocks_drill() {
@@ -303,7 +309,15 @@ pub fn allowed(drill: Drill) -> bool {
 fn wanted() -> Option<Drill> {
     practice::active()
         .and_then(Drill::from_game)
-        .filter(|_| scene::is_native_training())
+        .filter(|_| scene::practice_scene().is_some())
+}
+
+pub(crate) fn holds_partner() -> bool {
+    wanted().is_some() || ENGINE_ACTIVE.load(Ordering::Acquire) || super::cpu_level::partner_held() || practice_cpu::restoring()
+}
+
+pub(crate) fn stop_for_release() {
+    if let Some(drill) = wanted() { practice::finish(drill.game()); }
 }
 
 pub(super) fn running() -> bool {
@@ -332,14 +346,14 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
     }
     running()
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
-        && natives::module_accessor(1) == Some(accessor)
+        && natives::module_accessor(cpu_entry()) == Some(accessor)
 }
 
 pub(super) fn suspends_cpu_settings(key: FighterKey) -> bool {
     let active = INSTALLED.load(Ordering::Acquire)
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         && running();
-    crate::model::edge_juggle::suspends_cpu_settings(active, key)
+    crate::model::edge_juggle::suspends_cpu_settings(active, key, cpu_entry() as u8)
 }
 
 /// The final mapped pad read by P1, after the existing delay and playback stages.
@@ -1458,17 +1472,6 @@ fn axis(pressed: u16, negative: u8, positive: u8) -> i16 {
     i16::from(pressed & (1 << positive) != 0) - i16::from(pressed & (1 << negative) != 0)
 }
 
-fn moved(point: [f32; 2], stick: [f32; 2]) -> [f32; 2] {
-    [0, 1].map(|i| {
-        point[i]
-            + if stick[i].abs() > 0.3 {
-                2.0 * stick[i]
-            } else {
-                0.0
-            }
-    })
-}
-
 /// P1's raw poll. The next fighter frame resolves the floor under the new cursor.
 pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     if !wizard_active() {
@@ -1493,6 +1496,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     let horizontal = axis(pressed, key::DPAD_LEFT, key::DPAD_RIGHT);
     let vertical = axis(pressed, key::DPAD_DOWN, key::DPAD_UP);
     let stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
+    let pad = Pad { stick, held: sample.held, pressed, save: false, load: false };
 
     if key_down(key::B) {
         run.confirm_player = false;
@@ -1504,30 +1508,33 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        wizard.back_to_defaults(run.defaults);
-        run.cursor = wizard.setup.p1;
+        if run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+            wizard.set_side_default(run.stage, false);
+        } else {
+            wizard.back_to_defaults(run.defaults);
+        }
         run.confirm_player = false;
         return true;
     }
+    if key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+        wizard.set_side_default(run.stage, true);
+        return true;
+    }
     match wizard.step {
-        WizardStep::Area => {
-            let delta = horizontal + vertical * 2;
-            if delta != 0 {
-                wizard.change_area(run.stage, i32::from(delta));
-            }
-        }
-        WizardStep::Cpu => wizard.move_cpu(run.stage, moved(wizard.setup.cpu, stick)),
+        WizardStep::Cpu => wizard.steer(run.stage, &pad),
         WizardStep::Percent => wizard.change_percent(horizontal + vertical * 10),
         WizardStep::Player => {
-            if let Some(cursor) = run.stage.player_cursor(run.drill, moved(run.cursor, stick)) {
-                run.cursor = cursor;
-            }
+            wizard.steer(run.stage, &pad);
             run.confirm_player |= key_down(key::A);
             return true;
         }
         WizardStep::Preview => {}
     }
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
+        if wizard.step == WizardStep::Cpu && !wizard.accepts_cpu(run.stage) {
+            notices::refuse("Pick a point off the stage"); // restriction: edge-juggle-start-over-stage
+            return true;
+        }
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
             kept[run.drill as usize] = Some((run.stage_key, run.setup, wizard.unmoved()));
@@ -1585,17 +1592,9 @@ unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {
-    let [_, _, top, bottom] = natives::camera_limit_range()?;
-    let ray = FloorRay::new(p1)?;
     let platforms = drill == Drill::Juggler;
-    let x = if platforms {
-        x
-    } else {
-        x.clamp(stage.ledges[0][0], stage.ledges[1][0])
-    };
-    let top = if platforms { (y + 1.0).min(top) } else { top };
-    let floor = ray.floor(x, [top, bottom], platforms)?;
-    Some([x, floor.height(x)?])
+    let x = if platforms { x } else { x.clamp(stage.ledges[0][0], stage.ledges[1][0]) };
+    placement::floor_under(p1, [x, y], platforms)
 }
 
 /// Give the native fighter scripts one grounded transition before a new fall.
@@ -1632,14 +1631,6 @@ unsafe fn placed_player(p1: usize) -> PlacedPlayer {
         hit_freeze: natives::tech_in_damage_stop(p1) == Some(true),
         wait: wait != UNRESOLVED && natives::status_kind(p1) == wait,
     }
-}
-
-unsafe fn write_player(p1: usize, [x, y]: [f32; 2], facing: f32) {
-    state::clear_speed_all(p1);
-    state::init_pos(p1, &state::Vector3f { x, y, z: 0.0 });
-    state::set_lr(p1, facing);
-    state::set_situation_kind(p1, konst(C::SituationGround));
-    state::status_request(p1, konst(C::StatusWait));
 }
 
 /// Player 1 stands on its written start: the written x, on the floor the write found (the first floor under its feet
@@ -1689,39 +1680,22 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     if jump_count == UNRESOLVED || !game::granted(crate::model::sites_pkg4::WORK_SET_INT_OFFSET) {
         return None;
     }
-    let [cx, cy] = setup.cpu;
+    let [cx, _] = setup.cpu;
     let damage = natives::damage(bodies.cpu, 0);
     if !damage.is_finite() {
         return None;
     }
     let facing = if cx < x { -1.0 } else { 1.0 };
-    write_player(bodies.p1, [x, y], facing);
-    state::clear_speed_all(bodies.cpu);
-    state::set_pos(
-        bodies.cpu,
-        &state::Vector3f {
-            x: cx,
-            y: cy,
-            z: 0.0,
-        },
-    );
+    placement::stand(bodies.p1, [x, y], facing);
     let cpu_facing = crate::model::edge_juggle::recovery_away_facing(
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
     ).unwrap_or(-facing);
-    state::set_lr(bodies.cpu, cpu_facing);
-    state::set_situation_kind(bodies.cpu, air);
+    placement::lift(bodies.cpu, setup.cpu, cpu_facing);
     natives::set_int(bodies.cpu, drill.placed_jump_count(), jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
-    state::status_request(bodies.cpu, fall);
+    placement::fall(bodies.cpu);
     Some([x, y])
-}
-
-/// Like Tech practice, reapply the hold because MotionModule sleep leaves physics running.
-unsafe fn hold_cpu(cpu: usize, [x, y]: [f32; 2]) {
-    state::set_sleep(cpu, true);
-    state::clear_speed_all(cpu);
-    state::set_pos(cpu, &state::Vector3f { x, y, z: 0.0 });
 }
 
 fn report_drill_state(capture: PracticeCapture, run: &Run, best: Option<u32>, best_streak: Option<u32>) {
@@ -1774,37 +1748,34 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
     let mut header = run.drill.game().title();
     if let Some(wizard) = run.wizard {
         let Setup {
-            area,
             cpu: [x, y],
             p1: [px, py],
             percent,
         } = wizard.setup;
         let number = match wizard.step {
-            WizardStep::Area => 0,
-            WizardStep::Cpu => usize::from(run.drill == Drill::GuardEdge),
+            WizardStep::Cpu => 0,
             WizardStep::Percent => 1,
-            WizardStep::Player => 2,
-            WizardStep::Preview => 3,
+            WizardStep::Player => if run.drill == Drill::GuardEdge { 1 } else { 2 },
+            WizardStep::Preview => if run.drill == Drill::GuardEdge { 2 } else { 3 },
         };
-        header = [
-            ["Edge · 1/4", "Edge · 2/4", "Edge · 3/4", "Edge · 4/4"],
-            [
+        header = match run.drill {
+            Drill::GuardEdge => ["Edge · 1/3", "Edge · 2/3", "Edge · 3/3"][number],
+            Drill::Juggler => [
                 "Juggle · 1/4",
                 "Juggle · 2/4",
                 "Juggle · 3/4",
                 "Juggle · 4/4",
-            ],
-        ][run.drill as usize][number];
+            ][number],
+        };
         let _ = match wizard.step {
-            WizardStep::Area => write!(text, "{} ({x:.0}, {y:.0}) · D-pad choose · A next", area.title()),
             WizardStep::Cpu if run.drill == Drill::Juggler => write!(
                 text,
-                "CPU x {x:.0} · Height {:+.0} · Stick move · A next",
+                "CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next",
                 y - run.stage_floor_y,
             ),
-            WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick move · A next"),
+            WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side"),
             WizardStep::Percent => write!(text, "{percent}% · D-pad change · A next"),
-            WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick move · A next"),
+            WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next"),
             WizardStep::Preview => write!(
                 text,
                 "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start"
@@ -1863,7 +1834,7 @@ pub unsafe fn frame(fighter: usize) {
     let Some(mut engine) = ENGINE.try_lock() else {
         return;
     };
-    if !scene::is_native_training() {
+    if scene::practice_scene().is_none() {
         if let Some(old) = engine.run.take() {
             practice::finish(old.drill.game());
         }
@@ -1886,7 +1857,7 @@ pub unsafe fn frame(fighter: usize) {
     let body = CpuBody::current();
     let owns_setup = || {
         super::cpu_level::drill_applied()
-            && natives::is_operation_cpu(1)
+            && natives::is_operation_cpu(cpu_entry())
             && !OPEN.load(Ordering::Acquire)
             && !states::is_loading()
             && !recorder::busy_for_drill()
@@ -2012,7 +1983,6 @@ pub unsafe fn frame(fighter: usize) {
             wizard: editing.then_some(wizard),
             setup,
             defaults: wizard.setup,
-            cursor: wizard.setup.p1,
             confirm_player: false,
             rounds: Session::new(drill, limit),
             body,
@@ -2104,11 +2074,12 @@ pub unsafe fn frame(fighter: usize) {
         run.damage_stop = false;
         run.player_ledge = None;
     }
-    let key = (drill, kind, run.setup.area as u8, run.opponent.mode);
+    let bucket = if drill == Drill::GuardEdge { run.stage.bucket(run.setup.cpu) } else { 0 };
+    let key = (drill, kind, bucket, run.opponent.mode);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             let confirm = std::mem::take(&mut run.confirm_player);
-            let placed = wizard.player_floor(run.stage, run.cursor, confirm, |point| {
+            let placed = wizard.player_floor(run.stage, wizard.cursor(), confirm, |point| {
                 snap_player(p1, drill, run.stage, point)
             });
             if let Some(p1) = placed {
@@ -2116,6 +2087,8 @@ pub unsafe fn frame(fighter: usize) {
                 if confirm {
                     wizard.advance();
                 }
+            } else if confirm {
+                notices::refuse("Pick a point above a floor"); // restriction: edge-juggle-player-no-floor
             }
         }
         post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
@@ -2136,8 +2109,7 @@ pub unsafe fn frame(fighter: usize) {
     let dead_or_rebirthing = status == konst(C::StatusDead) || status == konst(C::StatusRebirth);
     let damage = Some(natives::damage(cpu, 0)).filter(|d| d.is_finite());
     let damage_stop = natives::tech_in_damage_stop(cpu) == Some(true);
-    let [left, right] = run.stage.ledges;
-    let side = |x| usize::from(x > left[0].midpoint(right[0]));
+    let side = |x| run.stage.side(x);
     let player_ledge =
         (natives::situation_kind(p1) == konst(C::SituationCliff)).then(|| side(natives::pos_x(p1)));
     let cpu_ledge = side(natives::pos_x(cpu));
@@ -2202,11 +2174,11 @@ pub unsafe fn frame(fighter: usize) {
                 let watched = run.settle.map(|at| (placed_player(p1), on_start(p1, at), run.rounds.player_rewrites()));
                 let (rewrite, ready) = PlacedPlayer::before_ready(watched, falling, drill);
                 if let (true, Some(at)) = (rewrite, run.settle) {
-                    write_player(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
+                    placement::stand(p1, at, if run.setup.cpu[0] < at[0] { -1.0 } else { 1.0 });
                     run.rounds.player_rewritten();
                 }
                 if falling {
-                    hold_cpu(cpu, run.setup.cpu);
+                    placement::hold(cpu, run.setup.cpu);
                     *held_cpu = Some(body);
                 } else {
                     state::status_request(cpu, fall);
@@ -2221,7 +2193,7 @@ pub unsafe fn frame(fighter: usize) {
     } else {
         let before = run.rounds.phase;
         if matches!(before, Phase::Ready(_)) && *held_cpu == Some(body) {
-            hold_cpu(cpu, run.setup.cpu);
+            placement::hold(cpu, run.setup.cpu);
         }
         let zoom = matches!(run.opponent.mode, Mode::Drill(DrillId::Zoom));
         if before == Phase::Live && zoom {
@@ -2268,27 +2240,16 @@ pub unsafe fn frame(fighter: usize) {
     }
     post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
 }
-pub fn look(active: bool) -> ([Option<([f32; 2], crate::model::panes::EggLook)>; super::btt::LOOKS], bool) {
-    use crate::model::panes::{EggLook, EggPicture, EGG_WHOLE};
-    let mut marks = [None; super::btt::LOOKS];
+pub fn look(active: bool) -> Marks {
+    let empty = Marks { looks: [None; super::btt::LOOKS], pointer: None };
     if !active || !wizard_active() {
-        return (marks, false);
+        return empty;
     }
     let Some(engine) = ENGINE.try_lock() else {
-        return (marks, false);
+        return empty;
     };
     let Some(wizard) = engine.run.as_ref().and_then(|run| run.wizard) else {
-        return (marks, false);
+        return empty;
     };
-    marks[0] = Some((wizard.setup.cpu, EGG_WHOLE));
-    if matches!(wizard.step, WizardStep::Player | WizardStep::Preview) {
-        marks[super::btt::LOOKS - 1] = Some((
-            wizard.setup.p1,
-            EggLook {
-                picture: EggPicture::Cursor,
-                ..EGG_WHOLE
-            },
-        ));
-    }
-    (marks, wizard.shows_cpu())
+    wizard.marks()
 }

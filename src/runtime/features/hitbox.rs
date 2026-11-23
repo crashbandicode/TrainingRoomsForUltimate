@@ -30,6 +30,7 @@ use hos_lock::Mutex;
 
 use crate::model::cpu::hash::{hash40, lua_bind_hash};
 use crate::model::cpu::role::LOBBY_CPU_ENTRY;
+use crate::model::crosshair::Marks;
 use crate::model::eggs::{self, Recovery, Run, TargetEvent, HEADER, NOTICE_ID};
 use crate::model::egg_zone::{Side, Zone};
 use crate::runtime::features::btt;
@@ -897,16 +898,17 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
         n_targets = orbs::target_hurt_orbs(&own[..3], &mut targets);
         n_targets += orbs::target_hurt_orbs(&marks, &mut targets[n_targets..]);
     }
-    let (marks, pointed) = if edge_wizard {
+    let mut marks = if edge_wizard {
         super::edge_juggle::look(active)
     } else if tech {
-        (super::tech::look(active), false)
+        Marks { looks: super::tech::look(active), pointer: None }
     } else {
-        (marks, false)
+        Marks { looks: marks, pointer: None }
     };
-    own[3..].copy_from_slice(&marks);
+    own[3..].copy_from_slice(&marks.looks);
     if zone_wizard {
         own.fill(None);
+        marks.pointer = None;
     }
     let mut cache = ORB_PANES.lock();
     let registrations = tick::REGISTRATIONS.load(Ordering::Acquire);
@@ -986,9 +988,8 @@ pub unsafe fn draw_orbs(layout: *mut skyline::nn::ui2d::Layout, name: &[u8]) {
             [dot.centre, dot.tail] = [[x, y, 0.0]; 2];
             Some((plan(&dot, [255; 4])?, look))
         });
-        if let Some(pointer) = own[3]
-            .filter(|_| pointed && !zone_wizard)
-            .and_then(|([x, y], _)| project_to_canvas([x, y, 0.0], half))
+        if let Some(pointer) = marks.pointer
+            .and_then(|[x, y]| project_to_canvas([x, y, 0.0], half))
             .and_then(|canvas| orbs::edge_pointer(canvas))
         {
             for (look, point) in looks[4..9].iter_mut().zip(pointer) {

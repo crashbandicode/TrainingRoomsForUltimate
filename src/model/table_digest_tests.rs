@@ -105,7 +105,7 @@ fn every_data_row_has_a_64_byte_guard() {
 const SEAM_ROWS: usize = 704;
 const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7627858d6adc";
 const EDGE_JUGGLE_ROWS: usize = 24;
-const EDGE_JUGGLE_DIGEST: &str = "f915f3d91b813ad276a78aa65678cd901c6eed6d2041df78c838811e2791ec0b";
+const EDGE_JUGGLE_DIGEST: &str = "e2f841548afadaa39460582c2df3cc5ec6d78090b78c388174d947a5f6478fde";
 // The shared overlay sampler adds the guarded stock process_end entry.
 const SITE_ROWS: usize = 282;
 const SITE_DIGEST: &str = "b4c427137e55b222d61e618f0d7e873cc070c89e0e119f5f41968b8f502cd55d";

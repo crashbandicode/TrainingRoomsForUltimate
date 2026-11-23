@@ -278,7 +278,7 @@ lib_unit_tests! {
 
         #[test]
         fn hero_upper_left_wizard_uses_the_measured_release_on_each_reviewed_stage() {
-            use crate::model::edge_juggle::{Area, Drill, Stage, Wizard};
+            use crate::model::edge_juggle::{Drill, Stage, Wizard};
 
             let stage = Stage::new(
                 [-240.0, 240.0, 192.0, -140.0],
@@ -289,17 +289,14 @@ lib_unit_tests! {
                 ((3, 0), [LEFT[0] - 40.0, LEFT[1] + 20.0]),
                 ((0, 0), [LEFT[0] - 40.0, LEFT[1] + 20.0]),
                 ((311, 0), [LEFT[0] - 40.0, LEFT[1] + 20.0]),
-                ((3, 1), stage.area_default(Area::UpperLeft).unwrap()),
-                ((89, 0), stage.area_default(Area::UpperLeft).unwrap()),
+                ((3, 1), stage.lower_middle(0).unwrap()),
+                ((89, 0), stage.lower_middle(0).unwrap()),
             ] {
                 let mut wizard =
                     Wizard::new(Drill::GuardEdge, stage, [0.0; 2], 100, key, Some(KIND)).unwrap();
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::LowerLeft).unwrap());
-                wizard.change_area(stage, 2);
-                assert_eq!(wizard.setup.area, Area::UpperLeft);
                 assert_eq!(wizard.setup.cpu, expected);
-                wizard.change_area(stage, 1);
-                assert_eq!(wizard.setup.cpu, stage.area_default(Area::UpperRight).unwrap());
+                wizard.set_side_default(stage, true);
+                assert_eq!(wizard.setup.cpu, stage.lower_middle(1).unwrap());
             }
         }
 

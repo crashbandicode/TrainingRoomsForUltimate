@@ -146,6 +146,7 @@ pub fn saved(slot: usize) {
 enum Mail {
     Post(&'static str, &'static str, u16, [u8; 4]),
     PostRequired(&'static str, &'static str, u16, [u8; 4]),
+    Refuse(&'static str, &'static str, u16),
     PostBody(&'static str, Body, u16, [u8; 4]),
     Upsert(u8, &'static str, Body, u16, [u8; 4]),
     ShowNow(u8, &'static str, Body, u16, [u8; 4]),
@@ -165,6 +166,7 @@ fn take_mail(queue: &mut Queue) {
     MAILBOX.drain(|mail| match mail {
         Mail::Post(header, body, length, color) => queue.post_static(header, body, length, color),
         Mail::PostRequired(header, body, length, color) => queue.post_required(header, Body::copied(body), length, color),
+        Mail::Refuse(header, text, length) => queue.post_refusal(header, Body::copied(text), length, DEFAULT_COLOR),
         Mail::PostBody(header, body, length, color) => queue.post(header, body, length, color),
         Mail::Upsert(id, header, body, length, color) => queue.upsert(id, header, body, length, color),
         Mail::ShowNow(id, header, body, length, color) => queue.show_now(id, header, body, length, color),
@@ -192,13 +194,14 @@ pub fn save_state_refused(action: crate::model::state::refused::Action, why: cra
         published::input_owners().bits()
     ));
     if let Some(text) = why.notice(action) {
-        post("Save State", text, 150, DEFAULT_COLOR);
+        send(Mail::Refuse("Save State", text, 150));
     }
 }
 
-/// A refusal text, shown for two seconds in the default colour.
+/// A refusal shown for two seconds in the default colour, in front of a standing notice on screen
+/// (`Queue::post_refusal`), which returns afterward.
 pub fn refuse(text: &'static str) {
-    post("Input Recording", text, 120, DEFAULT_COLOR);
+    send(Mail::Refuse("Input Recording", text, 120));
 }
 
 /// The recorder changed phase: replace its message (once per phase change, SPEC-input-05 §6.2).

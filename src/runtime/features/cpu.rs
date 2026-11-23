@@ -277,7 +277,7 @@ pub fn entry_departed(owner: u32) {
         hide_cpu::publish(cpu);
     });
     if owner == 0 { forget_player_position(); unsafe { taunt_frame(0, 0, false) }; }
-    if owner == 1 { super::edge_juggle::practice_cpu::cpu_entry_departed(); }
+    if owner == 1 || owner == LOBBY_CPU_ENTRY as u32 { super::edge_juggle::practice_cpu::cpu_entry_departed(); }
 }
 
 /// Unconditional scene retirement, including when no save/record lease exists.
