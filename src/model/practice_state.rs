@@ -23,6 +23,9 @@ pub struct Fields {
     pub wizard_step: &'static str,
     pub wizard_selection: &'static str,
     pub wizard_point: Option<[f32; 2]>,
+    /// How a picker's CPU point is shown (`crosshair::cpu_view`): `in_view` or `magnifier`; empty when the CPU's
+    /// body is not held there.
+    pub wizard_cpu: &'static str,
     pub wizard_player_point: Option<[f32; 2]>,
     pub wizard_value: Option<u32>,
     pub score: Option<u32>,
@@ -62,6 +65,7 @@ pub fn snapshot(game: Option<Game>, fields: Fields, thinks: [u64; CPU_ENTRIES], 
             ("step", fields.step),
             ("wizard.step", fields.wizard_step),
             ("wizard.selection", fields.wizard_selection),
+            ("wizard.cpu", fields.wizard_cpu),
             ("last.outcome", fields.last_outcome),
         ] {
             if !value.is_empty() {

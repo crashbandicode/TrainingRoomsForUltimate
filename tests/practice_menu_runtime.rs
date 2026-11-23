@@ -351,12 +351,13 @@ fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
 fn a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let frame = item(&runtime, "pub unsafe fn frame(");
-    let read = frame.find("wizard.player_floor(").unwrap();
-    let found = frame[read..].find("if let Some(p1) = placed {").unwrap() + read;
+    let read = frame.find("wizard.settle_player(").unwrap();
+    let found = frame[read..].find("if placed && confirm {").unwrap() + read;
     let missing = frame[found..].find("} else if confirm {").unwrap() + found;
     let refusal = frame[missing..].find("notices::refuse(\"Pick a point above a floor\"); // restriction: edge-juggle-player-no-floor").unwrap() + missing;
     let notice = frame[refusal..].find("post_notice(capture, run").unwrap() + refusal;
     assert!(read < found && found < missing && missing < refusal && refusal < notice);
+    assert!(!frame.contains("wizard.setup.p1 ="));
 
     let placement = src("src/runtime/features/placement.rs");
     let floor = item(&placement, "pub(super) unsafe fn floor_under(");
@@ -1099,4 +1100,49 @@ fn lucas_missing_special_reach_preserves_the_independent_detour_rule() {
         .split_once("    if !recovery::generic_timing_allowed(kind, special, matches!(recovery, Some((_, false)))) {")
         .expect("guard timing corrections after the independent detour");
     assert!(detour.contains("PerfectRule::Detour"));
+}
+
+#[test]
+fn the_drill_picker_holds_the_cpu_at_the_picked_point() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let picker = frame.split_once("if let Some(wizard) = &mut run.wizard {").expect("the picker branch").1;
+    let (picker, started) = picker
+        .split_once("post_notice(capture, run, best_time(bests, key), best_time(streaks, key));\n        return;\n    }\n")
+        .expect("the picker reports and returns");
+    assert!(picker.contains("run.cpu_view = hold_preview(preview, held_cpu, body, wizard.setup.cpu);"));
+    // A started drill wakes the CPU for the placement that follows.
+    assert!(started.trim_start().starts_with("if preview.take().is_some() && held_cpu.take() == Some(body) {"));
+    let hold = item(&runtime, "unsafe fn hold_preview(");
+    assert!(hold.contains("placement::preview(preview, body.accessor, body.object_id, at) == Some(true)"));
+    assert!(hold.contains("*held_cpu = Some(body);"));
+    assert!(hold.contains("crosshair::cpu_view(preview.as_ref())"));
+    let placement = src("src/runtime/features/placement.rs");
+    let preview = item(&placement, "pub(super) unsafe fn preview(");
+    assert!(preview.contains("crosshair::preview_step("));
+    assert!(preview.find("PreviewAct::Lift").unwrap() < preview.find("lift(body, at").unwrap());
+    assert!(preview.find("PreviewAct::Hold").unwrap() < preview.find("hold(body, at)").unwrap());
+    assert!(preview.contains("konst(C::WorkFlagIsLoupe)") && preview.contains("natives::is_flag(body,"));
+    // The chevron goes while the body is there and the game HUD can show its magnifier; the state says which.
+    assert!(item(&runtime, "pub fn look(").contains("wizard.marks().shown(engine.preview.is_some() && published::hud())"));
+    assert!(item(&runtime, "fn report_drill_state(").contains("fields.wizard_cpu = run.cpu_view;"));
+}
+
+#[test]
+fn leaving_the_picker_puts_the_cpu_back_where_it_stood() {
+    let runtime = src("src/runtime/features/edge_juggle.rs");
+    let wake = item(&runtime, "unsafe fn wake_cpu(");
+    assert!(wake.contains("self.preview.take()"), "a wake ends the preview");
+    let ended = wake.split_once("self.preview.take()").unwrap().1;
+    // A loading save state places the fighters itself.
+    assert!(ended.contains("!states::is_loading()"));
+    assert!(ended.contains("placement::restore(current.accessor, preview.origin());"));
+    let placement = src("src/runtime/features/placement.rs");
+    let restore = item(&placement, "pub(super) unsafe fn restore(");
+    assert!(restore.find("origin.grounded").unwrap() < restore.find("stand(body, origin.at, origin.facing)").unwrap());
+    assert!(restore.contains("lift(body, origin.at, origin.facing)") && restore.contains("fall(body)"));
+    // The end of the scene drops the preview with the bodies.
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let scene_end = frame.split_once("if scene::practice_scene().is_none() {").unwrap().1.split_once("return;").unwrap().0;
+    assert!(scene_end.contains("engine.preview = None;"));
 }

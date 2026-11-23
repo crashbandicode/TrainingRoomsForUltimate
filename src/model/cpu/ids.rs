@@ -407,6 +407,8 @@ game_constants! {
     // rc.14 Hide CPU: a fighter's player tag, the pair the game's own cursor helper writes (`main+0x67db00`).
     WorkFlagCursor = "FIGHTER_INSTANCE_WORK_ID_FLAG_CURSOR",
     WorkFlagNameCursor = "FIGHTER_INSTANCE_WORK_ID_FLAG_NAME_CURSOR",
+    // Fix round 2026-11-23 (F11): the game shows its off-screen magnifier for this fighter (set by `main+0x62a560`).
+    WorkFlagIsLoupe = "FIGHTER_INSTANCE_WORK_ID_FLAG_IS_LOUPE",
 }
 
 /// The statuses of the clatter list, in the spec's order.
