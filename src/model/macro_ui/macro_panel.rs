@@ -1752,6 +1752,23 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
+    fn f9_the_page_name_draft_never_outlives_its_keyboard() {
+        use crate::model::flow::{name_step, NameStep};
+        let mut ui = MacroUi::new();
+        let token = 1u64 << 62;
+        ui.offer_name(NameContext { token, title: "Name chain" }, "", "");
+        assert!(ui.is_open());
+        assert_eq!(ui.external_name_token(), Some(token));
+        assert_eq!(name_step(true, true, true), NameStep::Nothing);
+        ui.on_pad(Pad::Back);
+        assert!(!ui.is_open());
+        assert_eq!(name_step(true, true, false), NameStep::Cancel);
+        ui.offer_name(NameContext { token, title: "Name chain" }, "", "");
+        assert_eq!(name_step(false, true, true), NameStep::Discard);
+        ui.on_pad(Pad::Back);
+        assert!(!ui.is_open());
+    }
+
     fn start() -> StartState {
         StartState {
             fighter_kind: 0x08,
@@ -2375,6 +2392,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("f9_the_page_name_draft_never_outlives_its_keyboard", f9_the_page_name_draft_never_outlives_its_keyboard as fn()),
             ("clip_keyboard_accepts_empty_default_name", clip_keyboard_accepts_empty_default_name as fn()),
             ("native_keyboard_validation_preserves_draft_and_inputs", native_keyboard_validation_preserves_draft_and_inputs as fn()),
             ("empty_name_stays_on_the_dialog_and_typed_name_pages", empty_name_stays_on_the_dialog_and_typed_name_pages as fn()),

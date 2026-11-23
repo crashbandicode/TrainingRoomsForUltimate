@@ -52,6 +52,21 @@ pub enum Step {
     HidePrompt,
 }
 
+/// What the worker does about the Recording page's name draft on one pass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NameStep { Nothing, Cancel, Discard }
+
+/// `page`: the page's keyboard is up. `asked`: its offer reached the layer and no answer is waiting to be taken.
+/// `draft`: the layer's draft for it is open. An open draft holds both fighters and is never drawn for this page,
+/// so it may be open only while the page waits for it.
+pub const fn name_step(page: bool, asked: bool, draft: bool) -> NameStep {
+    match (page, asked, draft) {
+        (true, true, false) => NameStep::Cancel,
+        (false, _, true) => NameStep::Discard,
+        _ => NameStep::Nothing,
+    }
+}
+
 /// Whether the menu side still owns Player 1's input (the `Owners::MENU` bit): the open menu, its closing frames, the
 /// pop-up, or the closed-menu fighter question. Releasing on any one of them alone handed the question's presses to the
 /// match and let the frame strip draw over it (rc.5 XPS proof).
@@ -132,6 +147,15 @@ pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    fn f9_name_step_truth_table() {
+        for (page, asked, draft, expected) in [
+            (false, false, false, NameStep::Nothing), (false, false, true, NameStep::Discard),
+            (false, true, false, NameStep::Nothing), (false, true, true, NameStep::Discard),
+            (true, false, false, NameStep::Nothing), (true, false, true, NameStep::Nothing),
+            (true, true, false, NameStep::Cancel), (true, true, true, NameStep::Nothing),
+        ] { assert_eq!(name_step(page, asked, draft), expected); }
+    }
 
     fn seen(menu_open: bool, panel_visible: bool, clip_visible: bool) -> Seen {
         Seen { menu_open, panel_visible, clip_visible, clip_foreground: clip_visible, prompt_visible: false }
@@ -237,6 +261,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("f9_name_step_truth_table", f9_name_step_truth_table as fn()),
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
             ("clip_sync_outlives_menu_on_both_entry_routes", clip_sync_outlives_menu_on_both_entry_routes as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),

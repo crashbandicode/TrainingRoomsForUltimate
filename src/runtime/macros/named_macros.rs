@@ -101,6 +101,14 @@ pub fn external_name_open(token: u64) -> bool {
     lock_read(&UI).external_name_token() == Some(token)
 }
 
+pub fn confirmed_name_waiting(token: u64) -> bool {
+    lock_read(&CONFIRMED_NAME).as_ref().is_some_and(|found| found.context.token == token)
+}
+
+pub fn discard_external_name(token: u64) {
+    if external_name_open(token) { on_pad(Pad::Back); }
+}
+
 pub fn suspended() -> bool { SUSPENDED.load(Ordering::Acquire) }
 #[derive(Clone, Copy)]
 enum Lifecycle { Suspend, SceneChanged { discard: bool }, Clear { keep: bool } }
@@ -606,6 +614,7 @@ pub fn service_keyboard() {
     { return; }
     // The closing applet's confirm/cancel must not become a gameplay input.
     crate::runtime::features::recorder::swallow_p1(15);
+    let hidden = lock_read(&UI).external_name_token() == Some(crate::runtime::features::recording_host::NAME_TOKEN);
     match result {
         crate::runtime::mii::native_keyboard::KeyboardResult::Confirmed(name) => {
             let effect = lock_write(&UI).confirm_native_name(name);
@@ -614,10 +623,15 @@ pub fn service_keyboard() {
             defer_effect(effect);
         }
         crate::runtime::mii::native_keyboard::KeyboardResult::Cancelled => {
-            if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }
+            if job.waiting || job.replay || hidden { lock_write(&UI).on_pad(Pad::Back); }
         }
         crate::runtime::mii::native_keyboard::KeyboardResult::Failed(code) => {
-            notify(&format!("System keyboard failed ({code:#X}); draft kept"));
+            if hidden {
+                notify(&format!("System keyboard failed ({code:#X})"));
+                lock_write(&UI).on_pad(Pad::Back);
+            } else {
+                notify(&format!("System keyboard failed ({code:#X}); draft kept"));
+            }
         }
         crate::runtime::mii::native_keyboard::KeyboardResult::Interrupted => {}
     }

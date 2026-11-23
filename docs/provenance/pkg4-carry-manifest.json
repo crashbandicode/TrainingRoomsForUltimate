@@ -1374,7 +1374,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "1757e1cccc457318bca5cf1dd1338c75d7966871d5aba268b628c3a2e96e082b",
+   "dest_sha256": "73c255681fe93fef31ecd9993aab4abcb23ace4c685d7e785c271e63ab7c8237",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -1982,6 +1982,16 @@
      "old": "        let draft = NameDraft {\n            name: source.name.clone(),\n            native_cursor: source.name.encode_utf16().count(),\n            page: 0,\n            cursor: 31,\n            body: NameBody::Macro(Box::new(MacroNameBody {\n                frames: source.frames.clone(),\n                start: source.start,\n                placement,\n                version: source.game_version.clone(),\n                mii: source.mii,\n            })),\n            keyboard_title: MACRO_KEYBOARD_TITLE,\n        }",
      "new": "        let draft = NameDraft::from_recording(source, placement)",
      "reason": "rc.15 Phase 3 approved LOW-risk reuse (2026-11-15): share the recording-to-name-draft projection; caller effects and all fields preserved."
+    },
+    {
+     "old": "    use super::*;\n\n",
+     "new": "    use super::*;\n\n    fn f9_the_page_name_draft_never_outlives_its_keyboard() {\n        use crate::model::flow::{name_step, NameStep};\n        let mut ui = MacroUi::new();\n        let token = 1u64 << 62;\n        ui.offer_name(NameContext { token, title: \"Name chain\" }, \"\", \"\");\n        assert!(ui.is_open());\n        assert_eq!(ui.external_name_token(), Some(token));\n        assert_eq!(name_step(true, true, true), NameStep::Nothing);\n        ui.on_pad(Pad::Back);\n        assert!(!ui.is_open());\n        assert_eq!(name_step(true, true, false), NameStep::Cancel);\n        ui.offer_name(NameContext { token, title: \"Name chain\" }, \"\", \"\");\n        assert_eq!(name_step(false, true, true), NameStep::Discard);\n        ui.on_pad(Pad::Back);\n        assert!(!ui.is_open());\n    }\n\n",
+     "reason": "F9: Test the page-owned external name draft lifecycle."
+    },
+    {
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"f9_the_page_name_draft_never_outlives_its_keyboard\", f9_the_page_name_draft_never_outlives_its_keyboard as fn()),\n",
+     "reason": "F9: Test the page-owned external name draft lifecycle."
     }
    ]
   },
@@ -2277,7 +2287,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "b21bc6aa96c5bda42ff199eedb70b368802ea498b161f1912a2e56888b5bd087",
+   "dest_sha256": "e52a7ad00f9b1777af8a76cd5a755e6c1b44f7bb6f6b1e463d55630fe5667ce2",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -3048,6 +3058,26 @@
      "old": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(module_accessor) {\n        practice::panel_entry(module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
      "new": "    let hold_panel = hook_queries().panel_visible || (hook_queries().replay_loading\n        && WorkModule::get_int(module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_ENTRY_ID)\n            == FighterId::Player as i32);\n    let entry = if hold_panel && !crate::runtime::macros::replay_preview::needs_native_update(module_accessor)\n        && !crate::runtime::macros::replay_capture::browser_needs_native_update(context, module_accessor) {\n        practice::panel_entry_in(context, module_accessor)\n    } else { None };\n    if let Some(entry) = entry {\n        if found.is_none() && !StopModule::is_special_stop(module_accessor) {\n            StopModule::set_special_stop(module_accessor, true);\n",
      "reason": "RC15 macro frame shared menu fix 5fe28b1c: fresh fallible context before panel/session/mailbox mutation; pass resolved eligibility through original shared practice/roster/Mii implementations. Busy defers without consuming requests or publishing false scene. Original source hash retained."
+    },
+    {
+     "old": "    lock_read(&UI).external_name_token() == Some(token)\n",
+     "new": "    lock_read(&UI).external_name_token() == Some(token)\n}\n\npub fn confirmed_name_waiting(token: u64) -> bool {\n    lock_read(&CONFIRMED_NAME).as_ref().is_some_and(|found| found.context.token == token)\n}\n\npub fn discard_external_name(token: u64) {\n    if external_name_open(token) { on_pad(Pad::Back); }\n",
+     "reason": "F9: Token-scoped Recording name cancellation and discard."
+    },
+    {
+     "old": "    crate::runtime::features::recorder::swallow_p1(15);\n",
+     "new": "    crate::runtime::features::recorder::swallow_p1(15);\n    let hidden = lock_read(&UI).external_name_token() == Some(crate::runtime::features::recording_host::NAME_TOKEN);\n",
+     "reason": "F9: Token-scoped Recording name cancellation and discard."
+    },
+    {
+     "old": "            if job.waiting || job.replay { lock_write(&UI).on_pad(Pad::Back); }\n",
+     "new": "            if job.waiting || job.replay || hidden { lock_write(&UI).on_pad(Pad::Back); }\n",
+     "reason": "F9: Token-scoped Recording name cancellation and discard."
+    },
+    {
+     "old": "            notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n",
+     "new": "            if hidden {\n                notify(&format!(\"System keyboard failed ({code:#X})\"));\n                lock_write(&UI).on_pad(Pad::Back);\n            } else {\n                notify(&format!(\"System keyboard failed ({code:#X}); draft kept\"));\n            }\n",
+     "reason": "F9: Token-scoped Recording name cancellation and discard."
     }
    ]
   },
