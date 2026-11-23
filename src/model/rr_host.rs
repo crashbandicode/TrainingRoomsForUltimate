@@ -288,6 +288,8 @@ enum PreviewAsk {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
+    /// A Vault preview returns both fighters to its first saved pair through the same named load as `warp`.
+    pub warp_home: Option<Box<[SavedState; 2]>>,
     /// The playing role and the placement of the file that warps (`warp_pair`).
     pub warp_place: Option<(Role, Placement)>,
     pub notices: Vec<&'static str>,
@@ -334,6 +336,12 @@ pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
     *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: source.to_owned(), role, frames: start as usize..end as usize });
     PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
+
+pub fn request_clip_preview(recording: MacroRecording) {
+    let _ = recording;
+}
+
+pub fn preview_away() -> bool { false }
 
 /// Stop a running preview (nothing otherwise): the rest of its frames is dropped.
 pub fn stop_preview() {
@@ -699,6 +707,14 @@ static LIVE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 static LIVE_SIT: [AtomicI32; 2] = [const { AtomicI32::new(0) }; 2];
 /// x, y, percent and facing, as `f32` bits.
 static LIVE_F32: [[AtomicU32; 4]; 2] = [const { [const { AtomicU32::new(0) }; 4] }; 2];
+
+/// Whether the save-state step of a fighter's frame runs: Save States is On, a temporary load is under way, or this
+/// body just took a posted named load (a Play's, a Make combo's or a crop preview's warp to a start save). The named
+/// load is taken whatever Save States says: behind the Off return it was never taken and the run it held never started.
+pub fn save_state_step(enabled: bool, temporary: bool, take_named: impl FnOnce() -> bool) -> bool {
+    let _ = take_named;
+    enabled || temporary
+}
 
 /// One fighter's frame in Training, in the order the frame runs it (`states::on_fighter_frame`): the role's live pose
 /// is published for the worker first, whatever Save States says, and only then does Save States Off end the frame. `live`
@@ -2248,8 +2264,63 @@ mod tests {
         [None, None, None, None, None]
     }
 
+    fn a_named_load_is_taken_with_save_states_off() {
+        let calls = core::cell::Cell::new(0);
+        let take = |result| {
+            calls.set(calls.get() + 1);
+            result
+        };
+        assert!(save_state_step(false, false, || take(true)));
+        assert!(!save_state_step(false, false, || take(false)));
+        assert!(save_state_step(true, false, || take(false)));
+        assert!(save_state_step(false, true, || take(false)));
+        assert_eq!(calls.get(), 4);
+    }
+
     /// A preview feeds only the selected range to its role after the start save lands.
     fn a_crop_preview_plays_its_window_on_the_role_through_the_play_queue() {
+        linked_crop_preview(true);
+    }
+
+    fn a_linked_crop_preview_starts_with_save_states_off() {
+        linked_crop_preview(false);
+    }
+
+    fn land_pair(pair: [SavedState; 2], enabled: bool) -> bool {
+        use crate::model::cpu::rng::Rng;
+        use crate::model::state::machine::{FrameIn, Machine, SituationIds, StatusNow};
+        use crate::model::state::settings::StateSettings;
+
+        let mut posted = Some(pair);
+        let mut restore = Machine::default();
+        let settings = StateSettings { enable: enabled, ..StateSettings::default() };
+        let mut rng = Rng::new(7);
+        let mut restored = false;
+        for status in [StatusNow::Other, StatusNow::Wait] {
+            for entry in [0, 1] {
+                let temporary = restore.temporary_active();
+                if fighter_frame(None, save_state_step(enabled, temporary, || {
+                    posted.take().is_some_and(|pair| restore.begin_temporary(pair))
+                })) {
+                    let input = FrameIn {
+                        entry, nana: false, popo: false, kind: if entry == 0 { 8 } else { 7 },
+                        dead: false, status, prev_rebirth: false, standby: false, stage_id: 0x40,
+                        situation: SituationIds { ground: 0, air: 2, cliff: 1 },
+                        save_chord: false, load_chord: false, suspend_autoload: false,
+                        kirby: false, pokemon: false, buffable: false,
+                    };
+                    if restore.frame(&input, &settings, &mut rng).restored.is_some() {
+                        assert!(!restored);
+                        restored = true;
+                        warp_landed();
+                    }
+                }
+            }
+        }
+        restored && posted.is_none() && !restore.temporary_active()
+    }
+
+    fn linked_crop_preview(enabled: bool) {
         let _hold = hold();
         for role in [Role::Player, Role::Cpu] {
             reset_host();
@@ -2271,7 +2342,8 @@ mod tests {
             assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
             assert_eq!(tick.warp_place.map(|p| p.0), Some(role));
             assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
-            warp_landed();
+            let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save_id).unwrap();
+            let restored = land_pair([save.player, save.cpu], enabled);
             let mut taken = Vec::new();
             for _ in 0..6 {
                 service_at(&root, &none(), "2026-11-23", state(8), state(7));
@@ -2287,10 +2359,124 @@ mod tests {
                 }
             }
             assert_eq!(taken, [2, 3, 4]);
+            assert!(restored);
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert!(!preview_running());
             let index = RecordingIndex::load(&root).unwrap();
             assert!(index.active(Role::Player).is_none() && index.active(Role::Cpu).is_none());
+        }
+    }
+
+    fn a_crop_preview_ends_when_the_library_cannot_be_read() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("preview-bad-index");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
+        request_preview("macro-1", Role::Cpu, 0, 3);
+        assert!(preview_running());
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!preview_running() && lock(&PREVIEW_ASK).is_none());
+    }
+
+    fn a_crop_preview_owes_the_start_speed_as_play_does() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let root = scratch("preview-speed");
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            let save = NamedSave::new("Start", state(8), state(7)).unwrap();
+            let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+            let kind = if role == Role::Player { 8 } else { 7 };
+            let start = StartState { speed_x: 2.0, speed_y: -1.0, ..StartState::neutral(kind, 0, -1.0) };
+            let mut recording = MacroRecording::new("Run", "13.0.5", start, vec![InputFrame::default(); 3]).unwrap();
+            recording.set_start_save(Some(&save_id)).unwrap();
+            recording.set_start_save_on(true);
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(role, Some(&id), 1).unwrap();
+            index.save(&root).unwrap();
+            on_chords(false, role == Role::Player, role == Role::Cpu);
+            let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
+            assert!(land_pair([save.player.clone(), save.cpu.clone()], true));
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            let ordinary = take_start_speed(role);
+            assert_eq!(ordinary, Some(StartSpeed { speed: (2.0, -1.0), facing: -1.0 }));
+            reset_host();
+            request_preview(&id, role, 0, 3);
+            let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(tick.warp.as_deref(), Some(save_id.as_str()));
+            assert!(land_pair([save.player, save.cpu], true));
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(take_start_speed(role), ordinary);
+        }
+    }
+
+    fn a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("vault-preview");
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let start = StartState { speed_x: 1.5, speed_y: 0.0, ..StartState::neutral(7, 0, -1.0) };
+        let frames: Vec<_> = (1..=5).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let clip = MacroRecording::new("Clip", "13.0.5", start, frames.clone()).unwrap();
+        let mut player = state(8); player.x = 10.0;
+        let mut cpu = state(7); cpu.x = 30.0;
+        let home = [player.clone(), cpu.clone()];
+        request_clip_preview(clip.clone());
+        let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert!(tick.warp.is_none());
+        assert_eq!(tick.warp_home.as_deref(), Some(&home));
+        assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
+        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        let mut received = Vec::new();
+        for _ in 0..6 {
+            service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+            assert!(take_player_frame().is_none());
+            if let Some(frame) = take_cpu_frame() { received.push(frame); }
+        }
+        assert_eq!(received, frames);
+        assert_eq!(take_start_speed(Role::Cpu), Some(StartSpeed { speed: (1.5, 0.0), facing: -1.0 }));
+        service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert!(!preview_running() && preview_away());
+        player.x = 90.0; cpu.x = 99.0;
+        request_clip_preview(clip.clone());
+        let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert_eq!(tick.warp_home.as_deref(), Some(&home));
+        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        stop_preview();
+        let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert_eq!(tick.warp_home.as_deref(), Some(&home));
+        assert!(preview_away());
+        assert!(land_pair(*tick.warp_home.unwrap(), false));
+        service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
+        assert!(!preview_away() && !pending());
+
+        let mut air_clip = clip;
+        air_clip.start.situation = SITUATION_AIR;
+        request_clip_preview(air_clip);
+        let tick = service_at(&root, &none(), "2026-11-23", player, cpu);
+        assert_eq!(tick.warp_home.unwrap()[1].situation_kind, SITUATION_AIR);
+    }
+
+    fn a_cpu_crop_preview_holds_right_whatever_the_facing() {
+        let _hold = hold();
+        for start in [0, 6] {
+            reset_host();
+            let root = scratch("preview-right");
+            service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            let frame = InputFrame { lstick_x: 80, ..InputFrame::default() };
+            let recording = MacroRecording::new("Right", "13.0.5", StartState::neutral(7, 0, -1.0), vec![frame; 63]).unwrap();
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+            request_preview(&id, Role::Cpu, start, 63);
+            let expected = playback_controller(frame).stick_x;
+            assert!(expected > 0.0);
+            for _ in start..63 {
+                service_at(&root, &none(), "2026-11-23", state(8), state(7));
+                assert_eq!(cpu_controller(take_cpu_frame).unwrap().stick_x, expected);
+                assert!(take_player_frame().is_none());
+            }
         }
     }
 
@@ -4852,6 +5038,12 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_crop_preview_owes_the_start_speed_as_play_does", a_crop_preview_owes_the_start_speed_as_play_does as fn()),
+            ("a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back", a_vault_clip_preview_plays_on_the_cpu_and_puts_both_fighters_back as fn()),
+            ("a_cpu_crop_preview_holds_right_whatever_the_facing", a_cpu_crop_preview_holds_right_whatever_the_facing as fn()),
+            ("a_named_load_is_taken_with_save_states_off", a_named_load_is_taken_with_save_states_off as fn()),
+            ("a_linked_crop_preview_starts_with_save_states_off", a_linked_crop_preview_starts_with_save_states_off as fn()),
+            ("a_crop_preview_ends_when_the_library_cannot_be_read", a_crop_preview_ends_when_the_library_cannot_be_read as fn()),
             ("a_crop_preview_plays_its_window_on_the_role_through_the_play_queue", a_crop_preview_plays_its_window_on_the_role_through_the_play_queue as fn()),
             ("stopping_a_crop_preview_drops_the_rest", stopping_a_crop_preview_drops_the_rest as fn()),
             ("a_crop_preview_of_a_missing_macro_ends_at_once", a_crop_preview_of_a_missing_macro_ends_at_once as fn()),

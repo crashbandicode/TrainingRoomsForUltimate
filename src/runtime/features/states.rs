@@ -490,6 +490,21 @@ fn begin_temporary(pair: [SavedState; 2]) -> bool {
     .unwrap_or(false)
 }
 
+fn take_named_load() -> bool {
+    let named = {
+        let _take = NAMED_TAKE.lock();
+        NAMED_LOAD.take(take_pair)
+    };
+    let Some(pair) = named else { return false };
+    let accepted = begin_temporary(pair);
+    if accepted {
+        recorder::on_load_request();
+        hud_load(Role::Player.index(), true);
+        hud_load(Role::Cpu.index(), true);
+    }
+    accepted
+}
+
 /// Ask the game's table for every constant, once. Called from the frame step outside its `HookScope`.
 fn ensure_consts() -> bool {
     if CONSTS_READY.load(Ordering::Acquire) {
@@ -588,8 +603,7 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     crate::runtime::export::fighter_frame(entry, kind, raw.status, raw.situation, flags, accessor, fighter);
     quick_reset::observe(&raw, nana);
     if role == Role::Player && !nana { setups::service(); }
-    // The role's live pose is published before the Save States gate: the recording worker reads it whatever Save
-    // States says (combined run rc15-ib-1f7e0174: with Off it kept the previous CPU).
+    // Publish the role's live pose before the Save States Off return, including when a named load starts.
     let live = if nana {
         None
     } else {
@@ -603,7 +617,10 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             start_state: crate::model::state::record::StartState::Standard,
         }))
     };
-    if !crate::engine::rr_host::fighter_frame(live, ENABLE.load(Ordering::Acquire) || TEMPORARY.load(Ordering::Acquire)) {
+    if !crate::engine::rr_host::fighter_frame(live, crate::engine::rr_host::save_state_step(
+        ENABLE.load(Ordering::Acquire), TEMPORARY.load(Ordering::Acquire),
+        || !nana && !reset_hub::cpu_operated(fighter) && take_named_load(),
+    )) {
         // rc.12: with Save States Off a Save or Load press is refused once, not kept for when it goes On.
         refuse_pending(!nana && !reset_hub::cpu_operated(fighter), Refused::Off);
         return;
@@ -719,18 +736,6 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
     let load_chord = !nana && !reset_hub::cpu_operated(fighter) && LOAD_REQUEST.swap(false, Ordering::AcqRel);
     if !nana && !reset_hub::cpu_operated(fighter) {
         apply_bound_post();
-        let named = {
-            let _take = NAMED_TAKE.lock();
-            NAMED_LOAD.take(take_pair)
-        };
-        if let Some(pair) = named {
-            let accepted = begin_temporary(pair);
-            if accepted {
-                recorder::on_load_request();
-                hud_load(Role::Player.index(), true);
-                hud_load(Role::Cpu.index(), true);
-            }
-        }
     }
     let stage_id = natives::stage_id();
     let suspend_autoload = super::edge_juggle::running();

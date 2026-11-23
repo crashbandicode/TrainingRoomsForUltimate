@@ -604,13 +604,23 @@ mod tests {
         assert!(!capture.contains("macro_file(recording, false)"));
         assert!(capture.contains("rr_host::request_preview("));
         assert!(capture.contains("rr_host::stop_preview()"));
+        assert!(capture.contains("request_clip_preview("));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        let apply = host.split("fn apply(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(apply.contains("tick.warp_home") && apply.contains("request_named_load("));
         let named = include_str!("../runtime/macros/named_macros.rs");
+        assert!(named.contains("rr_host::preview_away()"));
         let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(hold.contains("clip_previewing"));
         let worker = include_str!("../runtime/ui/worker.rs");
         let clip = worker.split("if s.phase == Phase::Clip {").nth(1).unwrap().split("\n    }").next().unwrap();
         let store = clip.split("EXT_SHOWN.store(").nth(1).unwrap().split(';').next().unwrap();
         assert!(store.contains("hides_page()"));
+        let states = include_str!("../runtime/features/states.rs");
+        let frame = states.split("pub unsafe fn on_fighter_frame(").nth(1).unwrap().split("\n}").next().unwrap();
+        let off = frame.find("refuse_pending(!nana").unwrap();
+        assert!(frame.find("take_named_load()").unwrap() < off);
+        assert!(!frame[off..].contains("NAMED_LOAD.take("));
     }
 
     #[test]
