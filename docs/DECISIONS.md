@@ -1879,5 +1879,7 @@ file screens, pickers, saved layouts, Mii lists and the Keep / Switch question s
 
 Every list's Up / Down wraps through one shared step. On the Recording page each list wraps on its own; an empty list
 passes to the other list. ZL + Up / Down keep D3's section jump, Left / Right switch lists, and L / R turn the page.
-Grids are unchanged. The Recording-page rule is the default by the edge-juggle-sol lane, posted 12:53:06Z, pending
-tr-primary-2's ruling A or B.
+Grids are unchanged. The Recording page's footer names ZL + Up / Down as the way out of a list.
+
+The Recording-page rule was the edge-juggle-sol lane's default (posted 12:53:06Z); tr-primary-2 approved it the same
+day (ruling of about 12:55Z). The operator may still overrule it.
