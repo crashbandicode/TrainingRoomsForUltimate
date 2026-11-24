@@ -805,17 +805,17 @@ fn the_angle_and_deflection_toggle_grades_the_stick() {
         crate::model::frame_strip_plan::Text::new("L1 1st deflection 50% low"));
 }
 
-/// The travel table's static cost. An entry is packed into 24 bytes, and the combos of the hit capture, which never
-/// carry a travel (a link is taken at its hit, before the part ends), have no table.
+/// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
+/// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
+/// more code than the data it saved (`833913b3`), so every combo carries the table.
 #[test]
-fn the_travel_table_is_packed_and_the_hit_capture_carries_none() {
-    use core::mem::{size_of, size_of_val};
-    let helper = Helper::new();
-    let (entry, combo, hits) = (size_of::<Detail>(), size_of::<Combo>(), size_of_val(&helper.capture.current));
-    println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} hit_combo={hits} Helper={} InputCapture={}",
+fn the_travel_table_is_packed_into_96_bytes_a_combo() {
+    use core::mem::size_of;
+    let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
+    println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
         size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
-    assert_eq!(entry, 24, "a travel detail");
-    assert_eq!(hits, combo - DETAILS * entry, "a hit-capture combo has no travel table");
+    assert_eq!((entry, DETAILS * entry), (24, 96), "a travel detail and a combo's table");
+    assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
 }
 
 #[test]

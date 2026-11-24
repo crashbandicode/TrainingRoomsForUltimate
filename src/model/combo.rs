@@ -372,50 +372,35 @@ impl Detail {
     }
 }
 
-/// The links of one exchange, in order, with room for `D` travel details. A drill, its attempt and a saved combo
-/// are a [`Combo`]; the hit capture's exchanges are a [`HitCombo`], which has no table: a link is taken at its hit,
-/// before a travel part ends.
+/// The links of one exchange, in order, and the travel details of a drill's first `DETAILS` aims.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ComboOf<const D: usize> {
+pub struct Combo {
     pub input_only: bool,
     pub overflow: bool,
     links: [Option<LinkRec>; LINKS],
     len: usize,
     /// Sorted by event, the free entries last.
-    details: [Detail; D],
+    details: [Detail; DETAILS],
 }
 
-pub type Combo = ComboOf<DETAILS>;
-pub type HitCombo = ComboOf<0>;
-
-impl<const D: usize> Default for ComboOf<D> {
+impl Default for Combo {
     fn default() -> Self {
         Self::EMPTY
     }
 }
 
-impl<const D: usize> ComboOf<D> {
-    pub const EMPTY: Self = Self {
+impl Combo {
+    pub const EMPTY: Combo = Combo {
         input_only: false,
         overflow: false,
         links: [None; LINKS],
         len: 0,
-        details: [Detail::EMPTY; D],
+        details: [Detail::EMPTY; DETAILS],
     };
 
-    /// The same links with room for `E` travel details; a detail past `E` is dropped.
-    pub fn resized<const E: usize>(&self) -> ComboOf<E> {
-        let mut out = ComboOf::<E> { input_only: self.input_only, overflow: self.overflow, links: self.links,
-            len: self.len, details: [Detail::EMPTY; E] };
-        for (slot, detail) in out.details.iter_mut().zip(self.details) {
-            *slot = detail;
-        }
-        out
-    }
-
     /// A combo of 1 to `LINKS` links.
-    pub fn from_links(links: impl IntoIterator<Item = LinkRec>) -> Option<Self> {
-        let mut combo = Self::EMPTY;
+    pub fn from_links(links: impl IntoIterator<Item = LinkRec>) -> Option<Combo> {
+        let mut combo = Combo::EMPTY;
         for link in links {
             if !combo.push(link) {
                 return None;
@@ -900,8 +885,8 @@ struct Capture {
     /// The tracker's exchange count, and the frame after which the next link's presses count.
     exchange: u32,
     after: u32,
-    current: HitCombo,
-    previous: HitCombo,
+    current: Combo,
+    previous: Combo,
     last_link: Option<u32>,
     held: Option<Link>,
     graded: Option<u32>,
@@ -930,8 +915,8 @@ impl Helper {
             capture: Capture {
                 exchange: 0,
                 after: 0,
-                current: HitCombo::EMPTY,
-                previous: HitCombo::EMPTY,
+                current: Combo::EMPTY,
+                previous: Combo::EMPTY,
                 last_link: None,
                 held: None,
                 graded: None,
@@ -982,11 +967,10 @@ impl Helper {
 
     /// *Save last combo*: the open exchange when it has a link, else the one before.
     pub fn last_combo(&self) -> Option<Combo> {
-        self.last_hits().map(|hits| hits.resized())
+        self.last_combo_ref().copied()
     }
 
-    /// The same exchange as the capture holds it, without a travel table.
-    pub fn last_hits(&self) -> Option<&HitCombo> {
+    pub fn last_combo_ref(&self) -> Option<&Combo> {
         [&self.capture.current, &self.capture.previous].into_iter().find(|c| !c.is_empty())
     }
 
@@ -1044,7 +1028,7 @@ impl Helper {
             if !self.capture.current.is_empty() {
                 self.capture.previous = self.capture.current;
             }
-            self.capture.current = HitCombo::EMPTY;
+            self.capture.current = Combo::EMPTY;
             self.capture.exchange = exchange;
             self.capture.after = first_hit;
             self.capture.graded = None;
