@@ -41,9 +41,17 @@ fn reasons() -> Vec<Reason> {
     all.extend(DELTAS.iter().map(|&d| Reason::CStickOff(d)));
     all.extend(kinds.map(Reason::WrongDir));
     for part in [1, 2] {
-        all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part)]);
+        all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part), Reason::AimPath(part)]);
+        // The stick's angle is off by 11 to 180 degrees and its deflection by 16 to 100 points.
+        all.extend([11, -11, 180, -180].map(|d| Reason::AimAngle(part, d)));
+        all.extend([16, -16, 100, -100].map(|d| Reason::AimDeflection(part, d)));
     }
     all
+}
+
+/// A travel part as its faults name it.
+fn ordinal(part: u8) -> &'static str {
+    if part == 1 { "1st" } else { "2nd" }
 }
 
 /// The sentence the card owes for a fault, written out here a second time.
@@ -66,6 +74,11 @@ fn sentence(unit: &str, link: u8, reason: Reason) -> String {
         Reason::MissingAim(part) => format!("{} missing", event_label(Kind::Aim(part))),
         Reason::WrongAim(part) => format!("{} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => format!("extra {}", event_label(Kind::Aim(part))),
+        Reason::AimPath(part) => format!("{} path off", ordinal(part)),
+        Reason::AimAngle(part, d) => format!("{} angle {} off", ordinal(part), d.unsigned_abs()),
+        Reason::AimDeflection(part, d) => {
+            format!("{} deflection {}% {}", ordinal(part), d.unsigned_abs(), if d < 0 { "low" } else { "high" })
+        }
     };
     format!("{unit}{} {fault}", u32::from(link) + 1)
 }
@@ -185,6 +198,15 @@ fn every_mark_under_a_step_is_shown_in_full() {
         marks.extend(DELTAS.iter().map(|&d| {
             (Mark::At(d), format!("{name} {}f {}", d.abs(), if d > 0 { "late" } else { "early" }))
         }));
+        // A travel part's own marks: its path, and with the stick toggle its angle and deflection.
+        if let Kind::Aim(part) = kind {
+            let part = ordinal(part);
+            marks.push((Mark::Path, format!("{part} path off")));
+            marks.extend([11, -180].map(|d: i16| (Mark::Angle(d), format!("{part} angle {} off", d.unsigned_abs()))));
+            marks.extend([16, -100].map(|d: i8| {
+                (Mark::Deflection(d), format!("{part} deflection {}% {}", d.unsigned_abs(), if d < 0 { "low" } else { "high" }))
+            }));
+        }
         for (mark, want) in marks {
             let (text, _) = crate::model::combo_plan::mark_text(mark, name, 0);
             assert_eq!(String::from_utf16(text.units()).unwrap(), want);
