@@ -78,6 +78,37 @@ fn a_buffered_grab_is_its_own_action() {
 }
 
 #[test]
+fn a_numbered_jab_becoming_rapid_names_the_hit_without_opening_another_action() {
+    use crate::model::hash40::hash40;
+    use crate::model::move_names::Namer;
+
+    for (motions, expected) in [
+        (&["attack_100_start"][..], "Rapid jab"),
+        (&["attack_100"][..], "Rapid jab"),
+        (&["attack_100", "attack_100_end"][..], "Rapid jab finisher"),
+    ] {
+        let mut tracker = Tracker::new();
+        tracker.step(attack(Move::DashAttack, ATTACK_DASH, 0.0), hit(), NONE);
+        tracker.step(idle(), stun(), NONE);
+        tracker.step(Sample { motion: hash40("attack_12"), ..attack(Move::Jab, ATTACK, 8.0) }, stun(), NONE);
+        let id = tracker.action.id;
+        for (frame, motion) in motions.iter().enumerate() {
+            let cpu = if frame + 1 == motions.len() { hit() } else { stun() };
+            tracker.step(Sample { motion: hash40(motion), ..attack(Move::Jab, 0x28, frame as f32) }, cpu, NONE);
+            assert_eq!(tracker.action.id, id, "a change of name is not a new action");
+        }
+        let link = tracker.latest_link().expect("dash attack into the rapid hit");
+        let desc = ActionDesc::of(link.to, link.shown[1], link.variants[1]);
+        let mut name = String::new();
+        desc.write(&mut name, false, Namer::OFF).unwrap();
+        assert_eq!(name, "Jab");
+        name.clear();
+        desc.write(&mut name, false, Namer::new(true, None, None)).unwrap();
+        assert_eq!(name, expected, "hit on {motions:?}");
+    }
+}
+
+#[test]
 fn a_throw_takes_its_variant_when_it_begins() {
     let mut tracker = Tracker::new();
     tracker.step(attack(Move::Jab, ATTACK, 0.0), hit(), NONE);
