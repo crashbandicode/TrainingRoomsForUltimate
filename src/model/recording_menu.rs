@@ -917,7 +917,7 @@ impl RecordingScreens {
     #[cfg(test)]
     pub fn set_combo(&mut self, id: &str, combo: Combo) {
         if let Some(file) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
-            file.combo = Box::new(combo);
+            *file.combo = combo;
         }
     }
 

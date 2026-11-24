@@ -368,7 +368,7 @@ pub struct MakeComboPass {
 }
 
 /// The strip's combo, named Combo N, marked made from `source`. The drill is not written.
-pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<super::move_names::FighterId>, at: u64) -> Result<String, Error> {
+pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, at: u64) -> Result<String, Error> {
     save_combo(root, combo, source, recorded_on, fighter, None, at)
 }
 
@@ -376,11 +376,11 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
 /// take named in the drill's `take`. No source: `made_from` stays empty.
 /// If the drill file cannot be written the take is deleted, so no take is left under MACROS. Once the drill file
 /// exists both files stay, also when the index update then fails.
-pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, fighter: Option<super::move_names::FighterId>, take: String, at: u64) -> Result<String, Error> {
+pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: String, at: u64) -> Result<String, Error> {
     save_combo(root, combo, "", recorded_on, fighter, Some(take), at)
 }
 
-fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<super::move_names::FighterId>, take: Option<String>, at: u64) -> Result<String, Error> {
+fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: Option<String>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let cleanup = || {
         if let Some(take) = take.as_deref() {
@@ -430,7 +430,7 @@ pub fn delete_combo(root: &Path, id: &str) -> bool {
 
 /// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
 /// Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md: "makes it the drill").
-pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, fighter: Option<super::move_names::FighterId>, at: u64) -> Result<String, Error> {
+pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let name = match clean_name(name) {
         Some(name) => name,

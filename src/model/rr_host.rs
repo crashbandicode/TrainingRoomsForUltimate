@@ -258,7 +258,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     if take.combo.is_empty() { tick.notices.push(super::rr_runtime::EMPTY_RECORDING); return; }
     let start = if activate { take_record_start() } else { None };
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
-    let fighter = start.and_then(|s| super::move_names::recorded_identity(super::move_names::PUBLISHED.player(), s.poses[0].fighter_kind));
+    let fighter = start.and_then(|s| crate::model::move_names::recorded_identity(crate::model::move_names::PUBLISHED.player(), s.poses[0].fighter_kind));
     // F10: a directly recorded drill owns the macro file holding its take.
     let kept = if activate { keep_drill_take(root, start) } else { None };
     let saved = match kept {
@@ -2157,7 +2157,7 @@ fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
     let label = lock(&PLAYER_LABEL).clone();
     let recorded_on = (!label.is_empty()).then_some(label);
-    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, super::move_names::PUBLISHED.player().map(|(_, id)| id), unix_now()) {
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, crate::model::move_names::PUBLISHED.player().map(|(_, id)| id), unix_now()) {
         tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
     }
 }
