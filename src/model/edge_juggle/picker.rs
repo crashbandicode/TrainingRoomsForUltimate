@@ -393,6 +393,26 @@ mod tests {
     }
 
     #[test]
+    fn the_original_is_asked_for_only_while_practice_is_live() {
+        const MARIO: u32 = 0;
+        const SIMON: u32 = 67;
+        let requests = |training: bool, gate: bool| {
+            let ready = || Some(MARIO);
+            let observed = || if gate { observable(None, || false, ready) } else { ready() };
+            match tick(Settled::default(), None, Some(SIMON), training, || false, observed).1 {
+                Tick::Serve { step, .. } => u32::from(step.request),
+                Tick::Left => 0,
+                other => panic!("{other:?}"),
+            }
+        };
+        for gate in [true, false] {
+            assert_eq!(requests(true, gate), 1);
+            assert_eq!(requests(false, gate), 0);
+        }
+        assert_eq!(tick(Settled::default(), None, Some(SIMON), false, || false, || Some(MARIO)).1, Tick::Left);
+    }
+
+    #[test]
     fn a_selection_is_compared_whatever_the_picker_holds() {
         const DONKEY: u32 = 0x01;
         // The drill's own choice is in the slot and its picker holds it: the slot is read, the hold is not asked about.

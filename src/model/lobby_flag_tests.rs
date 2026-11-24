@@ -92,6 +92,66 @@ mod tests {
         clock
     }
 
+    /// `lobby::update`'s three calls, in its order (`tests/practice_menu_runtime.rs` pins them in the source).
+    fn pass(clock: FlagClock, scene: Scene, setting_on: bool, holds: bool, releasing: bool) -> (FlagClock, Step, bool, bool) {
+        use crate::model::lobby_flag::{release, released_clock};
+        let (practice_on, releasing, stop) = if !setting_on && clock.was_active {
+            release(setting_on, clock.was_active, holds, releasing)
+        } else {
+            (setting_on, false, false)
+        };
+        let (next, decision) = step(released_clock(clock, releasing), Some(scene), practice_on);
+        (next, decision, releasing, stop)
+    }
+
+    /// F15-4: the draw pass can read the Off before the game thread and drop the room's readiness first. `holds` is
+    /// whatever still owes the partner: a running drill, or only its borrowed fighter after Stop or after B in a picker.
+    fn off_keeps_practice_until_the_partner_is_back_whichever_thread_saw_the_off_first() {
+        for draw_first in [true, false] {
+            let mut clock = ready(WAITING);
+            clock.ui_ready = !draw_first;
+            let (next, decision, mut releasing, stop) = pass(clock, WAITING, false, true, false);
+            assert!(decision.active && !decision.active_changed, "draw_first={draw_first}");
+            assert!(releasing && stop);
+            clock = next;
+            for n in 0..600 {
+                clock.ui_ready = n % 2 == 0;
+                let (next, decision, still, stop) = pass(clock, WAITING, false, true, releasing);
+                assert!(decision.active && still && !stop, "pass {n}");
+                (clock, releasing) = (next, still);
+            }
+            let (next, decision, still, stop) = pass(clock, WAITING, false, false, releasing);
+            assert!(!decision.active && decision.active_changed && !still && !stop);
+            let (_, decision, still, _) = pass(next, WAITING, false, true, still);
+            assert!(!decision.active && !still, "an ended practice starts no release");
+        }
+    }
+
+    fn off_with_nothing_owed_ends_practice_at_once() {
+        for ui_ready in [true, false] {
+            let mut clock = ready(WAITING);
+            clock.ui_ready = ui_ready;
+            let (_, decision, releasing, stop) = pass(clock, WAITING, false, false, false);
+            assert!(!decision.active && decision.active_changed && !releasing && !stop);
+        }
+    }
+
+    fn leaving_the_room_ends_a_release() {
+        let mut clock = ready(WAITING);
+        clock.ui_ready = false;
+        let (clock, _, releasing, _) = pass(clock, WAITING, false, true, false);
+        let (_, decision, _, _) = pass(clock, BATTLE, false, true, releasing);
+        assert!(!decision.active && decision.scene_changed && decision.suspend_waiting);
+    }
+
+    fn a_room_whose_layout_is_not_ready_is_not_practice_without_a_release() {
+        let mut clock = ready(WAITING);
+        clock.ui_ready = false;
+        let (_, decision, releasing, _) = pass(clock, WAITING, true, true, false);
+        assert!(!decision.active && !releasing);
+        assert_eq!(crate::model::lobby_flag::released_clock(clock, false), clock);
+    }
+
     fn release_holds_the_room_until_restored() {
         use crate::model::lobby_flag::release;
         for was_active in [false, true] {
@@ -560,6 +620,10 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("off_keeps_practice_until_the_partner_is_back_whichever_thread_saw_the_off_first", off_keeps_practice_until_the_partner_is_back_whichever_thread_saw_the_off_first as fn()),
+            ("off_with_nothing_owed_ends_practice_at_once", off_with_nothing_owed_ends_practice_at_once as fn()),
+            ("leaving_the_room_ends_a_release", leaving_the_room_ends_a_release as fn()),
+            ("a_room_whose_layout_is_not_ready_is_not_practice_without_a_release", a_room_whose_layout_is_not_ready_is_not_practice_without_a_release as fn()),
             ("release_holds_the_room_until_restored", release_holds_the_room_until_restored as fn()),
             ("release_remains_requested_while_the_partner_is_held", release_remains_requested_while_the_partner_is_held as fn()),
             ("a_quickplay_match_suspends_naming_as_a_local_match_does", a_quickplay_match_suspends_naming_as_a_local_match_does as fn()),

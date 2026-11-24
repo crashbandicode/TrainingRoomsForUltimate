@@ -332,6 +332,10 @@ fn lobby_practice_off_stops_the_drill_and_waits_for_the_partner() {
     assert!(!src("src/model/lobby_flag.rs").contains("RELEASE_MS"));
     assert!(update.find("lobby_flag::release(").unwrap() < update.find("lobby_flag::step(").unwrap());
     assert!(update.contains("edge_juggle::stop_for_release()"));
+    let step_at = update.find("lobby_flag::step(").unwrap();
+    assert!(update[step_at..].starts_with("lobby_flag::step(crate::model::lobby_flag::released_clock(clock, releasing), observed, practice_on)"));
+    assert_eq!(update.matches("lobby_flag::step(").count(), 1);
+    assert!(item(&src("src/model/lobby_flag.rs"), "pub const fn released_clock(").contains("clock.ui_ready || releasing"));
     assert!(item(&lobby, "pub fn requested(").contains("practice_setting("));
     assert!(item(&lobby, "pub fn try_requested(").contains("practice_setting("));
     let edge = src("src/runtime/features/edge_juggle.rs");

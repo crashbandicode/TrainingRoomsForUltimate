@@ -75,6 +75,10 @@ pub const fn release(setting_on: bool, was_active: bool, holds: bool, releasing:
     (true, true, !releasing)
 }
 
+pub const fn released_clock(clock: FlagClock, _releasing: bool) -> FlagClock {
+    clock
+}
+
 /// Advance the clock. `scene == None` is "the mode words are not readable": the key stays, practice
 /// is not requested, and a room that was active turns off. The same scene twice does not tear down
 /// again. The mapped slot is not an argument.

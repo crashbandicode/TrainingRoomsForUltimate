@@ -115,7 +115,7 @@ pub fn update() {
     if stop {
         crate::runtime::features::edge_juggle::stop_for_release();
     }
-    let (next, decision) = crate::model::lobby_flag::step(clock, observed, practice_on);
+    let (next, decision) = crate::model::lobby_flag::step(crate::model::lobby_flag::released_clock(clock, releasing), observed, practice_on);
     if decision.scene_changed {
         // The new key is stored before the side effects, so a re-entrant tick does not tear the room down twice.
         LAST_MODE.store(next.last_key, Ordering::Relaxed);
