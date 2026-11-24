@@ -855,6 +855,24 @@ fn the_angle_and_deflection_toggle_grades_the_stick() {
         crate::model::frame_strip_plan::Text::new("L1 1st deflection 50% low"));
 }
 
+#[test]
+fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
+    use crate::model::combo_plan::{mark_text, reason_text};
+    let reference = travel((-40, 0), (1800, 83));
+    for angle in [1700, 1900] {
+        assert!(steering_attempt(reference, travel((-40, 0), (angle, 83)), true).clean);
+    }
+    for (angle, degrees) in [(1698, "10.2"), (1902, "10.2"), (1600, "20")] {
+        let actual = travel((-40, 0), (angle, 83));
+        let result = steering_attempt(reference, actual, true);
+        let why = reason_text(&result);
+        assert_eq!(String::from_utf16(why.units()).unwrap(), format!("L1 1st angle {degrees} off"));
+        let mark = action::stick_off(&reference, &actual).unwrap();
+        let label = mark_text(mark, "1st direction", 1).0;
+        assert_eq!(String::from_utf16(label.units()).unwrap(), format!("1st angle {degrees} off"));
+    }
+}
+
 /// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
 /// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
 /// more code than the data it saved (`833913b3`), so every combo carries the table.
