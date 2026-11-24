@@ -11,8 +11,11 @@ use std::convert::TryFrom;
 
 use smash::app::{self, lua_bind::*, BattleObjectModuleAccessor, Fighter};
 use smash::lib::lua_const::*;
+use crate::engine::library::Role;
+use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
+use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
 
@@ -782,13 +785,30 @@ pub fn clip_view() -> Option<ClipView> {
 pub fn worker_preview_notices() {
     service_file_name();
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
-        if editor.view().playing
-            && TAIL.lock().unwrap().over(crate::engine::rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {
-            if crate::engine::rr_host::preview_away() {
-                crate::engine::rr_host::stop_preview();
-            } else {
-                editor.preview_progress(u32::MAX);
+        let before = editor.view();
+        if before.playing {
+            let role = match before.context {
+                ClipContext::Macro { player: true } => Role::Player,
+                _ => Role::Cpu,
+            };
+            editor.preview_cursor(rr_host::fed_frames(role));
+            let mut spans = [Span::default(); WATCH_SPANS];
+            let (run, count) = rr_host::watch_copy(&mut spans);
+            if rr_host::fed_run(role).is_some_and(|(current, _)| current == run) {
+                editor.watch(&spans[..count]);
+            }
+            let after = editor.view();
+            if before.cursor != after.cursor || before.marks != after.marks
+                || before.mark_count != after.mark_count || before.move_text != after.move_text {
                 crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            }
+            if TAIL.lock().unwrap().over(rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {
+                if rr_host::preview_away() {
+                    rr_host::stop_preview();
+                } else {
+                    editor.preview_progress(u32::MAX);
+                    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+                }
             }
         }
     }
@@ -919,8 +939,8 @@ fn apply_action(action: ClipAction) {
                 crate::engine::rr_host::request_clip_preview(*recording);
             }
         },
-        Some(ClipEffect::PreviewFile { start, end, player: _ }) => {
-            if let Some((id, player)) = source {
+        Some(ClipEffect::PreviewFile { start, end, player }) => {
+            if let Some((id, _)) = source {
                 TAIL.lock().unwrap().restart();
                 let role = if player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };
                 crate::engine::rr_host::request_preview(&id, role, start, end);
@@ -969,8 +989,13 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         if controller.just_down.b() { cancel_reload(); }
         return;
     }
-    if clip_view().is_some_and(|v| v.playing) {
-        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
+    if let Some(view) = clip_view().filter(|v| v.playing) {
+        if controller.just_down.x() || controller.just_down.b() {
+            on_action(ClipAction::TogglePlay);
+        } else if matches!(view.context, crate::engine::macro_ui::clip_panel::ClipContext::Macro { .. })
+            && (controller.just_down.dpad_up() || controller.just_down.dpad_down()) {
+            on_action(ClipAction::SwapTarget);
+        }
         return;
     }
     let p = controller.just_down;
@@ -993,7 +1018,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     let action = if p.b() { Some(ClipAction::Cancel) }
         else if confirm { Some(ClipAction::Confirm) }
         else if p.x() { Some(if modifier { ClipAction::ToggleCapture } else { ClipAction::TogglePlay }) }
-        else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Restart }) }
+        else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Snap }) }
         else if p.l() || (gcc && p.real_digital_l()) { Some(ClipAction::SelectIn) }
         else if p.r() || (gcc && p.real_digital_r()) { Some(ClipAction::SelectOut) }
         else {

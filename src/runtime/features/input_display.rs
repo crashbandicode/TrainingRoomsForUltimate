@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
+use crate::engine::{library::Role, rr_host};
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker};
 use crate::model::spacing::{Grade, Grader, Lanes};
@@ -379,11 +380,14 @@ pub unsafe fn sample_frame(player: usize) {
         GRADER_LIVE.store(grader, Ordering::Relaxed);
     }
     let input_drill = crate::engine::rr_host::input_observation_wanted() || super::combo::input_observation_wanted();
+    let take = rr_host::capture_role();
+    let preview = rr_host::preview_role();
+    let watching = take != 0 || preview.is_some();
     if player == 0 {
         skip_frame(true);
         return;
     }
-    if !sampling && !input_drill {
+    if !sampling && !input_drill && !watching {
         skip_frame(true);
         return;
     }
@@ -424,6 +428,24 @@ pub unsafe fn sample_frame(player: usize) {
     let spots = spots_wanted();
     let p1 = sample(player, &ids, true, spots);
     let cpu = sample(cpu, &ids, false, spots);
+    let watched = if take != 0 {
+        let fed = rr_host::captured_frames();
+        (fed > 0).then(|| (rr_host::CAPTURE_RUN, fed - 1, if take == 1 { &p1 } else { &cpu }))
+    } else if let Some(role) = preview {
+        rr_host::fed_run(role).and_then(|(run, fed)| {
+            (fed > 0).then(|| (run, fed - 1, if role == Role::Player { &p1 } else { &cpu }))
+        })
+    } else {
+        None
+    };
+    if let Some((run, index, s)) = watched {
+        rr_host::watch_feed(run, index, !s.actionable && !s.hitstun && !s.shieldstun,
+            ids.attack(s.status).or(ids.named_move(s.status)));
+    }
+    if !sampling && !input_drill {
+        skip_frame(true);
+        return;
+    }
     let taken = GRADER.take();
     #[cfg(feature = "diag")]
     {

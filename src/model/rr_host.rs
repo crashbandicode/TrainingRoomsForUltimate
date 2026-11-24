@@ -11,6 +11,7 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
+use super::macro_ui::clip_marks::{Span, Watch, WATCH_SPANS};
 use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
@@ -21,7 +22,7 @@ use super::rr_runtime::{
 };
 use crate::model::action::Late;
 use crate::model::combo::{Combo, InputCapture};
-use crate::model::frame_strip::Snap;
+use crate::model::frame_strip::{Move, Snap};
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
@@ -35,6 +36,7 @@ use crate::model::store::{self, Record, Store};
 
 const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
+pub const CAPTURE_RUN: u32 = u32::MAX;
 
 static SLOT_SEQ: [AtomicU32; SLOTS] = [const { AtomicU32::new(0) }; SLOTS];
 static SLOT_TAPES: [crate::model::macro_handoff::PlayBuffers<InputFrame>; SLOTS] =
@@ -400,6 +402,7 @@ static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 static PREVIEW: AtomicU8 = AtomicU8::new(0);
+static ACTION_WATCH: hos_lock::Mutex<Watch> = hos_lock::Mutex::new(Watch::new());
 static PREVIEW_ASK: Mutex<Option<PreviewAsk>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
@@ -582,6 +585,31 @@ pub fn stop_preview() {
 
 /// A preview was asked for and has not ended. Atomic read (a hook may call it).
 pub fn preview_running() -> bool { PREVIEW.load(Ordering::Acquire) != 0 }
+
+pub fn preview_role() -> Option<Role> {
+    match PREVIEW.load(Ordering::Acquire) {
+        ROLE_PLAYER => Some(Role::Player),
+        ROLE_CPU => Some(Role::Cpu),
+        _ => None,
+    }
+}
+
+pub fn watch_feed(run: u32, index: u32, busy: bool, mv: Option<Move>) {
+    if let Some(mut watch) = ACTION_WATCH.try_lock() {
+        watch.feed(run, index, busy, mv);
+    }
+}
+
+pub fn watch_copy(out: &mut [Span; WATCH_SPANS]) -> (u32, usize) {
+    let watch = ACTION_WATCH.lock();
+    let spans = watch.spans();
+    out[..spans.len()].copy_from_slice(spans);
+    (watch.run(), spans.len())
+}
+
+pub fn watch_clear() {
+    *ACTION_WATCH.lock() = Watch::new();
+}
 
 /// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
 /// (`recorder::recording_or_playback`) read this, because the old recorder machine never sees rr_host's takes. Playback is
