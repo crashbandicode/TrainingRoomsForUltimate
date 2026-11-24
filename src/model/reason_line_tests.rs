@@ -250,6 +250,35 @@ fn the_widest_fractional_angle_reaches_both_card_panes() {
     assert_eq!(String::from_utf16(mark.text.units()).unwrap(), "2nd angle 179.9 off");
 }
 
+/// The input-drill card for a special's own travel, kept on its press: the steer fault and the widest of its texts
+/// are drawn whole on the reason pane and on the mark pane, with the step's prefix.
+#[test]
+fn a_steered_specials_faults_reach_both_card_panes() {
+    let reference = LinkRec {
+        events: retain([Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 0 }]),
+        ..LinkRec::INPUT
+    };
+    for (mark, reason, text) in [
+        (Mark::Steer, Reason::Steer, "Special steer wrong"),
+        (Mark::Path, Reason::AimPath(0), "Special path off"),
+        (Mark::Angle(-1799), Reason::AimAngle(0, -1799), "Special angle 179.9 off"),
+        (Mark::Deflection(100), Reason::AimDeflection(0, 100), "Special deflection 100% high"),
+    ] {
+        let mut h = Helper::new();
+        h.set_target(Some(Combo { input_only: true, ..Combo::from_links([reference; LINKS]).unwrap() }));
+        let mut g = grade(&reference, &reference);
+        g.marks[0] = Some(mark);
+        h.attempt = Some(Attempt { grades: [Some(g); LINKS], len: LINKS,
+            summary: Some(faulted(15, reason)), ..Attempt::new(0, false) });
+        let (card, _) = drawn(&h, None);
+        let why = card[at::REASON];
+        check(&String::from_utf16(why.text.units()).unwrap(), why, &format!("S16 {text}"));
+        let under = card[at::RULER - 1];
+        assert!(under.visible);
+        assert_eq!(String::from_utf16(under.text.units()).unwrap(), text);
+    }
+}
+
 /// A link cell's title (pane `TITLE`): its number and both moves.
 #[test]
 fn a_links_title_names_both_moves_in_full() {
