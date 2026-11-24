@@ -265,6 +265,14 @@ impl LinkRec {
         self.description_bits(0) & 31 != 0 && self.description_bits(1) & 31 != 0
     }
 
+    pub fn step_desc(&self) -> Option<ActionDesc> { None }
+
+    pub fn set_step(&mut self, _desc: ActionDesc) {}
+
+    pub fn write_title(&self, out: &mut impl core::fmt::Write, _tight: bool) -> core::fmt::Result {
+        out.write_str("Step")
+    }
+
     /// A move's saved description, with the follow-up's aim events.
     pub fn desc(&self, side: usize) -> ActionDesc {
         let bits = self.description_bits(side);
@@ -1644,3 +1652,7 @@ mod action_model_tests;
 #[cfg(test)]
 #[path = "reason_line_tests.rs"]
 mod reason_line_tests;
+
+#[cfg(test)]
+#[path = "drill_step_moves_tests.rs"]
+mod drill_step_moves_tests;

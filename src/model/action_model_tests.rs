@@ -652,7 +652,7 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
     let mut capture = InputCapture::new();
     capture.step_late(Snap { buttons: ATTACK | CSTICK_ON, lstick_x: 60, lstick_y: 20,
         rstick_x: 60, rstick_y: 20, facing: 1, ..Snap::empty(1) },
-        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
+        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE });
     let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
     assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
 }
@@ -727,7 +727,7 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     helper.set_target(Some(target));
     for frame in 1..=4 {
         let late = if frame == 2 {
-            action::Late { open: Some((Some(1), Some(None))) }
+            action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }
         } else { action::Late::NONE };
         helper.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
             facing: 1, ..Snap::empty(frame) }, Some(late), &mut Out::default());
@@ -735,10 +735,10 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     assert_eq!(helper.attempt().unwrap().len(), 1);
     let mut out = Out::default();
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(5) },
-        Some(action::Late { open: Some((Some(1), Some(None))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }), &mut out);
     assert!(out.link.is_none() && out.resolved.is_none());
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(6) },
-        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE }), &mut out);
     assert_eq!(out.link.unwrap().0, 0);
     assert_eq!(out.resolved.unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
 
