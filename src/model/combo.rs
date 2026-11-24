@@ -249,13 +249,17 @@ impl LinkRec {
         (bits >> (side * 12)) & 0xfff
     }
 
+    fn pack_description(desc: ActionDesc) -> u32 {
+        let of = desc.of.and_then(|mv| DESC_MOVES.iter().position(|&candidate| candidate == mv))
+            .map_or(1, |index| index as u32 + 2);
+        let angle = match desc.angle { None => 0, Some(Angle::Up) => 1, Some(Angle::Down) => 2 };
+        of | (angle << 5) | (u32::from(desc.normal.min(31)) << 7)
+    }
+
     pub(crate) fn set_descriptions(&mut self, desc: [ActionDesc; 2]) {
         let mut bits = 0u32;
         for (side, desc) in desc.into_iter().enumerate() {
-            let of = desc.of.and_then(|mv| DESC_MOVES.iter().position(|&candidate| candidate == mv))
-                .map_or(1, |index| index as u32 + 2);
-            let angle = match desc.angle { None => 0, Some(Angle::Up) => 1, Some(Angle::Down) => 2 };
-            bits |= (of | (angle << 5) | (u32::from(desc.normal.min(31)) << 7)) << (side * 12);
+            bits |= Self::pack_description(desc) << (side * 12);
         }
         self.shown = [bits as u8, (bits >> 8) as u8, (bits >> 16) as u8];
     }
@@ -265,12 +269,91 @@ impl LinkRec {
         self.description_bits(0) & 31 != 0 && self.description_bits(1) & 31 != 0
     }
 
-    pub fn step_desc(&self) -> Option<ActionDesc> { None }
+    pub fn step_desc(&self) -> Option<ActionDesc> {
+        self.step_side(1)
+    }
 
-    pub fn set_step(&mut self, _desc: ActionDesc) {}
+    pub fn set_step(&mut self, desc: ActionDesc) {
+        self.set_step_side(1, Some(desc));
+    }
 
-    pub fn write_title(&self, out: &mut impl core::fmt::Write, _tight: bool) -> core::fmt::Result {
-        out.write_str("Step")
+    fn is_special(desc: ActionDesc) -> bool {
+        desc.of.is_some() || matches!(desc.mv,
+            Move::NeutralSpecial | Move::SideSpecial | Move::UpSpecial | Move::DownSpecial)
+    }
+
+    pub fn step_side(&self, side: usize) -> Option<ActionDesc> {
+        if self.description_bits(side) & 31 == 0 { return None; }
+        let mut desc = self.desc(side);
+        desc.parts = [None; 2];
+        let owner = [1, 0].into_iter().find(|&i| {
+            self.description_bits(i) & 31 != 0 && Self::is_special(self.desc(i))
+        });
+        if owner == Some(side) {
+            for event in self.events() {
+                if let Kind::Aim(part @ 1..=2) = event.kind {
+                    desc.parts[usize::from(part - 1)] = Some(event.dir);
+                }
+            }
+        }
+        Some(desc)
+    }
+
+    pub fn set_step_side(&mut self, side: usize, desc: Option<ActionDesc>) {
+        let shift = side * 12;
+        let mut bits = u32::from(self.shown[0]) | (u32::from(self.shown[1]) << 8) | (u32::from(self.shown[2]) << 16);
+        bits = (bits & !(0xfff << shift)) | (desc.map_or(0, Self::pack_description) << shift);
+        self.shown = [bits as u8, (bits >> 8) as u8, (bits >> 16) as u8];
+        let mv = desc.map_or(Move::Other, |desc| desc.mv);
+        if side == 0 { self.from = mv; } else { self.to = mv; }
+    }
+
+    fn origin_ends(&self) -> (Option<Event>, Option<Event>) {
+        let mut origins = self.events().filter(|event| action::originates(event.kind));
+        (origins.next(), origins.last())
+    }
+
+    fn origin_side(&self, offset: i32) -> Option<usize> {
+        let (first, last) = self.origin_ends();
+        match (first, last) {
+            (Some(first), Some(_)) if first.offset == offset => Some(0),
+            (_, Some(last)) if last.offset == offset => Some(1),
+            (Some(first), None) if first.offset == offset => Some(1),
+            _ => None,
+        }
+    }
+
+    pub fn write_title(&self, out: &mut impl core::fmt::Write, tight: bool) -> core::fmt::Result {
+        match self.origin_ends() {
+            (Some(first), Some(last)) => {
+                Self::write_step_input(out, self.step_side(0), first, tight)?;
+                out.write_str(if tight { ">" } else { " > " })?;
+                Self::write_step_input(out, self.step_side(1), last, tight)
+            }
+            (Some(first), None) => Self::write_step_input(out, self.step_side(1), first, tight),
+            (None, _) => {
+                if let Some(desc) = self.step_side(1) { return desc.write(out, tight); }
+                if let Some(event) = self.events().next() { return Self::write_step_input(out, None, event, tight); }
+                Ok(())
+            }
+        }
+    }
+
+    fn write_step_input(out: &mut impl core::fmt::Write, desc: Option<ActionDesc>, event: Event, tight: bool) -> core::fmt::Result {
+        if let Some(desc) = desc { return desc.write(out, tight); }
+        let label = match event.kind {
+            Kind::Flick(Flick::Dash) => "Dash",
+            Kind::Flick(Flick::FastFall) => "Fast-fall",
+            Kind::Flick(Flick::TapJump) => "Tap-jump",
+            kind => super::combo_plan::event_label(kind),
+        };
+        out.write_str(label)?;
+        let arrow = action::arrow(event.dir);
+        if !arrow.is_empty() {
+            if !tight { out.write_str(" ")?; }
+            out.write_str(arrow)?;
+        }
+        Ok(())
     }
 
     /// A move's saved description, with the follow-up's aim events.
@@ -467,10 +550,23 @@ impl Combo {
             if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::Aim(1)))
                 && count + current.events().count() <= STEPS
             {
+                let (p_first, p_last) = previous.origin_ends();
+                let (c_first, c_last) = current.origin_ends();
+                let (from, to) = match (p_first, p_last, c_first, c_last) {
+                    (Some(_), last, Some(_), _) =>
+                        (if last.is_some() { previous.step_side(0) } else { previous.step_side(1) }, current.step_side(1)),
+                    (Some(_), last, None, _) =>
+                        (last.and_then(|_| previous.step_side(0)), previous.step_side(1)),
+                    (None, _, Some(_), last) =>
+                        (last.and_then(|_| current.step_side(0)), current.step_side(1)),
+                    (None, _, None, _) => (None, previous.step_side(1).or_else(|| current.step_side(1))),
+                };
                 let previous = self.links[k - 1].as_mut().unwrap();
                 for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
                     *slot = Some(event);
                 }
+                previous.set_step_side(0, from);
+                previous.set_step_side(1, to);
                 self.links.copy_within(k + 1..self.len, k);
                 self.len -= 1;
                 self.links[self.len] = None;
@@ -1578,24 +1674,54 @@ impl InputCapture {
                 .is_none_or(|l| l.events().count() == STEPS);
             let next_part = matches!(event.kind, Kind::Aim(2..))
                 && self.combo.links().last().is_some_and(|link| link.events().next().is_some());
-            if (full
+            if full
                 || next_part
                 || (group_idle
                     && action::originates(event.kind)
                     && self
                         .last
-                        .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
-                && !self.combo.push(LinkRec::INPUT)
+                        .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX))
             {
-                return None;
+                let previous = if next_part {
+                    self.combo.links().last().and_then(|link| {
+                        [1, 0].into_iter().filter_map(|side| link.step_side(side)).find(|desc| LinkRec::is_special(*desc))
+                    })
+                } else { None };
+                if !self.combo.push(LinkRec::INPUT) { return None; }
+                if let Some(desc) = previous {
+                    self.combo.links[self.combo.len - 1].as_mut().unwrap().set_step(desc);
+                }
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
+            if action::originates(event.kind) {
+                let (first, last) = link.origin_ends();
+                if first.is_some() && last.is_none() {
+                    link.set_step_side(0, link.step_side(1));
+                } else if first.is_none() {
+                    link.set_step_side(0, None);
+                }
+                link.set_step_side(1, None);
+            }
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
                 kind: event.kind,
                 dir: event.dir,
                 offset: (event.frame - start) as i32,
             });
             self.last = Some(event.frame);
+        }
+        if let Some((Some(press), mv, of, normal)) = late.named {
+            if let Some(first) = self.first.filter(|&first| press >= first) {
+                let offset = (press - first) as i32;
+                let found = self.combo.links().enumerate().find_map(|(step, link)| {
+                    link.origin_side(offset).map(|side| (step, side))
+                });
+                if let Some((step, side)) = found {
+                    let link = self.combo.links[step].as_mut().unwrap();
+                    let angle = link.step_side(side).filter(|desc| desc.mv == mv).and_then(|desc| desc.angle);
+                    link.set_step_side(side, Some(ActionDesc { mv, of: if mv == Move::Other { of } else { None },
+                        angle, normal, parts: [None; 2] }));
+                }
+            }
         }
         if let Some((Some(press), side)) = late.open {
             self.decided = Some(press);
@@ -1609,7 +1735,14 @@ impl InputCapture {
                     })
                 });
                 if let Some((step, index)) = chosen {
-                    let event = self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap();
+                    let link = self.combo.links[step].as_mut().unwrap();
+                    if let Some(side) = link.origin_side(offset) {
+                        if let Some(mut desc) = link.step_side(side) {
+                            desc.angle = angle;
+                            link.set_step_side(side, Some(desc));
+                        }
+                    }
+                    let event = link.events[index].as_mut().unwrap();
                     let direction = action::angled(event.dir, angle);
                     if direction != event.dir {
                         event.dir = direction;

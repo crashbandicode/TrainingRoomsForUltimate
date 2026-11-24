@@ -524,7 +524,12 @@ impl Plan<'_> {
             1 => {
                 let mut text = Text::EMPTY;
                 if input {
-                    let _ = write!(text, "Step {}", k + 1);
+                    let mut count = super::frame_strip_plan::Tally(0);
+                    let _ = write!(count, "{} ", k + 1);
+                    let _ = reference.write_title(&mut count, false);
+                    let tight = count.0 > usize::from(super::panes::cb::units(TITLE + c));
+                    let _ = write!(text, "{} ", k + 1);
+                    let _ = reference.write_title(&mut text, tight);
                 } else {
                     let _ = write!(text, "{} ", k + 1);
                     let _ = reference.desc(0).write(&mut text, false);

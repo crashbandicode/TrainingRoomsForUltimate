@@ -57,6 +57,7 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+    /// The originating press and its known move, base and variant.
     pub named: Option<(Option<u32>, Move, Option<Move>, u8)>,
 }
 
@@ -91,13 +92,14 @@ pub struct Action {
     pub origin: Option<u32>,
     pub(crate) variant_known: bool,
     pub(crate) told: Option<Option<Angle>>,
+    pub(crate) told_named: Option<(Move, Option<Move>, u8)>,
 }
 
 impl Action {
     pub const fn new() -> Self {
         Self { id: 0, start: 0, mv: Move::Other, base: None, angle: None,
             shown: Shown { of: None, dirs: [None; 2] }, shown_id: 0, variant: 0, origin: None, variant_known: false,
-            told: None }
+            told: None, told_named: None }
     }
 }
 

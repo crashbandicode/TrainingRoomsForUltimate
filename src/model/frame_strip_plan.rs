@@ -155,7 +155,7 @@ pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
 }
 
 /// How many units a description writes, without keeping them.
-struct Tally(usize);
+pub(crate) struct Tally(pub usize);
 
 impl core::fmt::Write for Tally {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {

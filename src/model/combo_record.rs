@@ -245,7 +245,17 @@ impl ComboRecord {
             .enumerate()
             .map(|(k, l)| {
                 let holds = if self.combo.input_only { self.combo.holds(k) } else { l.holds() };
-                if self.combo.input_only { return json!({"events": events_value(l, &holds)}); }
+                if self.combo.input_only {
+                    let mut step = json!({"events": events_value(l, &holds)});
+                    for (side, key) in [(0, "from_shown"), (1, "to_shown")] {
+                        if let Some(desc) = l.step_side(side) {
+                            let mut shown = description_value(desc);
+                            shown["move"] = json!(key_of(&MOVES, desc.mv));
+                            step[key] = shown;
+                        }
+                    }
+                    return step;
+                }
                 let mut link = json!({
                     "from": move_key(l.from),
                     "to": move_key(l.to),
@@ -332,6 +342,11 @@ impl ComboRecord {
                 if event.offset < previous { return Err("offset"); }
                 previous = event.offset;
                 *slot = Some(event);
+            }
+            for (side, key) in [(0, "from_shown"), (1, "to_shown")] {
+                if let Some(shown) = value.get(key) {
+                    link.set_step_side(side, Some(parse_description(shown, Move::Other, key, true)?));
+                }
             }
             Ok(link)
         }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
@@ -424,8 +439,8 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
         Some(Value::String(text)) => Some(dir_of(text).ok_or("drift")?),
         Some(_) => return Err("drift"),
     };
-    let from_shown = o.get("from_shown").map(|value| parse_description(value, from, "from_shown")).transpose()?;
-    let to_shown = o.get("to_shown").map(|value| parse_description(value, to, "to_shown")).transpose()?;
+    let from_shown = o.get("from_shown").map(|value| parse_description(value, from, "from_shown", false)).transpose()?;
+    let to_shown = o.get("to_shown").map(|value| parse_description(value, to, "to_shown", false)).transpose()?;
     let mut rec = LinkRec {
         from,
         to,
@@ -448,13 +463,14 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
     Ok(rec)
 }
 
-fn parse_description(value: &Value, mv: Move, key: &'static str) -> Result<ActionDesc, &'static str> {
+fn parse_description(value: &Value, mv: Move, key: &'static str, step: bool) -> Result<ActionDesc, &'static str> {
     let object = value.as_object().ok_or(key)?;
     let exact = match object.get("move") {
+        None if step => return Err(key),
         None => mv,
         Some(value) => {
             let found = value.as_str().and_then(move_of).ok_or(key)?;
-            if mv != Move::Other || !matches!(found, Move::Grab | Move::Throw | Move::FinalSmash) { return Err(key); }
+            if !step && (mv != Move::Other || !matches!(found, Move::Grab | Move::Throw | Move::FinalSmash)) { return Err(key); }
             found
         }
     };

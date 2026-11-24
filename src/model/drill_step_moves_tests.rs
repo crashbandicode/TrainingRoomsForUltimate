@@ -224,6 +224,21 @@ fn a_specials_aim_arrow_stays_with_it_when_a_later_input_is_aerial() {
 }
 
 #[test]
+fn aim_arrows_follow_the_last_described_special_not_an_undescribed_input() {
+    let mut rec = LinkRec { events: retain([
+        event(Kind::Press(Button::Special), Dir::Up, 0),
+        event(Kind::Aim(1), Dir::Back, 4),
+        event(Kind::Press(Button::Attack), Dir::Neutral, 5),
+    ]), ..LinkRec::INPUT };
+    rec.set_step_side(0, Some(desc(Move::UpSpecial, None, None, 0)));
+    assert_eq!(title(&rec, false), "Up B ← > Attack");
+    rec.set_step_side(1, Some(desc(Move::NeutralSpecial, None, None, 0)));
+    assert_eq!(title(&rec, false), "Up B > Neutral B ←");
+    rec.set_step_side(1, Some(desc(Move::Aerial, None, None, 0)));
+    assert_eq!(title(&rec, false), "Up B ← > Aerial");
+}
+
+#[test]
 fn an_own_status_updates_the_same_press_without_losing_its_base() {
     let mut tracker = Tracker::new();
     let mut capture = InputCapture::new();

@@ -782,6 +782,7 @@ impl Tracker {
             let origin = self.presses().find(|p| p.frame <= frame && frame - p.frame <= INPUT_LOOKBACK).map(|p| p.frame);
             self.action.origin = origin;
             self.action.told = None;
+            self.action.told_named = None;
             self.action.variant = 0;
             self.action.variant_known = false;
             self.active_seen = false;
@@ -813,6 +814,11 @@ impl Tracker {
         if opened || (side.is_some() && side != self.action.told) {
             self.late.open = Some((self.action.origin, side));
             self.action.told = side;
+        }
+        let named = (self.action.mv, self.action.shown.of, self.action.variant);
+        if (named.0 != Move::Other || named.1.is_some()) && self.action.told_named != Some(named) {
+            self.late.named = Some((self.action.origin, named.0, named.1, named.2));
+            self.action.told_named = Some(named);
         }
         let start = match p1.attack {
             Some(Move::NeutralSpecial) => Some(super::aim::Family::Neutral),

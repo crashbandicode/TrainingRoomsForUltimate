@@ -116,7 +116,7 @@ fn input_bar_names_steps_and_has_no_hit_verdict_or_window() {
     use crate::model::panes::strip_layout::C;
     let mut h=Helper::new(); h.set_target(Some(capture(&[(0,1),(2,0)]))); run(&mut h,4,&[(0,1),(2,0)]);
     let mut texts=Vec::new(); Renderer::new().draw(&h,&Text::EMPTY,None,true,(&C,false),|_,look,_| { if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); } });
-    assert!(texts.iter().any(|t| t=="Step 1")); assert!(texts.iter().any(|t| t=="Drill"));
+    assert!(texts.iter().any(|t| t=="1 Attack")); assert!(texts.iter().any(|t| t=="Drill"));
     assert!(texts.iter().all(|t| !t.contains("TRUE") && !t.contains("DROP") && !t.contains("other>other")));
 }
 
