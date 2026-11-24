@@ -510,6 +510,14 @@ impl Grade {
         self.marks.iter().position(|m| *m == Some(Mark::Missing))
     }
 
+    fn missing_only_aims(&self, tolerance: u8) -> bool {
+        self.missing().is_some()
+            && self.extra_aim.is_none() && self.wrong_dir().is_none() && self.worst(tolerance).is_none()
+            && self.marks.iter().zip(&self.reference.events).all(|(mark, event)| {
+                *mark != Some(Mark::Missing) || event.is_some_and(|e| matches!(e.kind, Kind::Aim(_)))
+            })
+    }
+
     pub fn wrong_dir(&self) -> Option<usize> {
         self.marks.iter().position(|m| *m == Some(Mark::WrongDir))
     }
@@ -958,7 +966,7 @@ impl Helper {
             if !input_only && !aims && self.capture.graded != Some(link.hit) {
                 let rec = LinkRec::of(&link, tracker, self.capture.after, false);
                 self.capture.graded = Some(link.hit);
-                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out, None);
+                self.on_link(rec, self.capture.current.is_empty(), exchange, &mut out);
             }
             if tracker.aim_pending().is_some_and(|entry| entry <= link.hit) {
                 self.capture.held = Some(link);
@@ -995,7 +1003,7 @@ impl Helper {
         self.capture.current.push(rec);
         self.seen = self.seen.wrapping_add(1);
         if self.target.as_ref().is_some_and(|target| !target.input_only && target.has_aim()) {
-            self.on_link(rec, first, exchange, out, None);
+            self.on_link(rec, first, exchange, out);
         }
     }
 
@@ -1065,7 +1073,13 @@ impl Helper {
             } else {
                 None
             };
-            self.on_link(actual, false, start, out, later);
+            let k = attempt.len;
+            let Some(grade) = input_grade(target, &self.input.combo, k, &actual, later) else { break };
+            // A non-final step can still receive its aim until the special ends or the next step opens.
+            if snap.aim.inside && self.input.combo.len() == k + 1 && grade.missing_only_aims(self.settings.tolerance) {
+                break;
+            }
+            self.record_grade(grade, out);
             if self
                 .attempt
                 .is_some_and(|a| a.open() && a.len == self.input.combo.len())
@@ -1111,7 +1125,7 @@ impl Helper {
         };
     }
 
-    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out, extra: Option<u8>) {
+    fn on_link(&mut self, rec: LinkRec, first: bool, exchange: u32, out: &mut Out) {
         let Some(target) = self.target.as_ref().filter(|_| self.settings.on) else {
             return;
         };
@@ -1151,19 +1165,17 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let g = if target.input_only {
-            let Some(g) = input_grade(target, &self.input.combo, attempt.len, &rec, extra) else { return };
-            g
-        } else {
-            let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() };
-            let mut g = grade_with(reference, &rec, false, target.has_aim(), context);
-            g.extra_aim = g.extra_aim.or(extra);
-            g
-        };
+        let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() };
+        let g = grade_with(reference, &rec, false, target.has_aim(), context);
+        self.record_grade(g, out);
+    }
+
+    fn record_grade(&mut self, g: Grade, out: &mut Out) {
+        let attempt = self.attempt.as_mut().unwrap();
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
-        if attempt.len == target.len() || (target.input_only && !g.clean(self.settings.tolerance)) {
+        if attempt.len == self.target.as_ref().unwrap().len() || (g.input_only && !g.clean(self.settings.tolerance)) {
             self.resolve_open(Outcome::Completed, out);
         }
     }

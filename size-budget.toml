@@ -2669,3 +2669,11 @@ ceiling = 198136
 date = "2026-11-24"
 reason = "Merge 3 of install 4: the ACTION model through section 7 with a held buttons deadline counted from the attempts own press (a defect rv-hit-streak found before READY) and f14-dirs grab, throw and Final Smash actions (feat/action-moves 6a7735d3). Measured 198136 on fcab1e75, 53 above the entry before it (198083): +8 from the moves and +45 from the hold-deadline fix."
 approved_by = "tr-primary-2 ruling 2026-11-24 20:35:08Z (the merge-3 line budget approved at the measured 198,136: +8 f14-dir, +45 the hold-limit fix), after its ruling of 20:05:25Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198144
+date = "2026-11-24"
+reason = "Delay a missing aim verdict while the active special can still supply it; leave press and release deadlines unchanged. Measured +8 implementation lines against c4c43b23."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:09:55Z: fix-only ceiling 198,144, subject to the full size receipt."

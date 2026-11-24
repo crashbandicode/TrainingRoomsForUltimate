@@ -534,7 +534,7 @@ fn a_hit_combo_tells_an_angled_tilt_from_a_level_one() {
     assert!(!grade(&up, &up).wrong_move);
     let mut helper = Helper::new();
     helper.set_target(Some(Combo::from_links([up]).unwrap()));
-    helper.on_link(level, true, 1, &mut Out::default(), None);
+    helper.on_link(level, true, 1, &mut Out::default());
     assert_eq!(helper.results().next().unwrap().fault, Some((0, Reason::WrongMove(Move::SideTilt))));
     let special = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"up_special"}))).combo.get(0).unwrap();
     let other = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"side_special"}))).combo.get(0).unwrap();
