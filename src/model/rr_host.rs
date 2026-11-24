@@ -4968,7 +4968,10 @@ mod tests {
         reset_host();
         let root = scratch("save-last");
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        set_fighter_label("Mario");
+        use crate::model::move_names::{FighterId, PUBLISHED};
+        let recorded = FighterId { chara: crate::model::hash40::hash40("ui_chara_pikachu"), specials: [0; 4] };
+        let later = FighterId { chara: crate::model::hash40::hash40("ui_chara_fox"), specials: [0; 4] };
+        set_fighter_label("Pikachu");
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
         set_strip_sample((0, None));
         post_effect(Effect::SaveLastCombo { name: String::new() });
@@ -4976,7 +4979,10 @@ mod tests {
         assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", empty.diags);
         assert!(empty.notices.contains(&EMPTY_COMBO));
         assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
+        PUBLISHED.set_player(Some((8, recorded)));
         set_strip_sample((3, Some(sample_combo())));
+        PUBLISHED.set_player(Some((7, later)));
+        set_fighter_label("Fox");
         post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });
         let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(saved.diags.iter().any(|line| line.starts_with("screen=save-last-combo saved=")), "{:?}", saved.diags);
@@ -4984,7 +4990,9 @@ mod tests {
         assert_eq!(listed.entries.len(), 1);
         let id = listed.entries[0].id.clone();
         let file = combos.load(&id).unwrap();
-        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Mario")));
+        assert_eq!(file.fighter, Some(recorded), "a later P1 cannot rename the retained exchange");
+        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Pikachu")));
+        PUBLISHED.set_player(None);
         let index = RecordingIndex::load(&root).unwrap();
         assert_eq!(index.drill().map(|drill| (drill.kind, drill.id.as_str())), Some((DrillKind::Combo, id.as_str())));
         assert_eq!(index.hot(Kind::Combo).first(), Some(&id));
