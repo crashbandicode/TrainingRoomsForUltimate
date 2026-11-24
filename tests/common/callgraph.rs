@@ -895,7 +895,8 @@ impl Graph {
     }
 
     pub fn find(&self, key: &str) -> Vec<usize> {
-        self.funcs.iter().enumerate().filter(|(_, f)| f.key() == key).map(|(i, _)| i).collect()
+        let Some((_, name)) = key.rsplit_once("::") else { return Vec::new() };
+        self.by_name.get(name).into_iter().flatten().copied().filter(|&i| self.funcs[i].key() == key).collect()
     }
 
     /// The functions a path or a method call in `from` can mean.
