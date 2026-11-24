@@ -154,6 +154,32 @@ fn raw_string_end(bytes: &[u8], start: usize) -> Option<usize> {
 }
 
 #[test]
+fn a_late_new_mii_retires_the_same_setup_session_as_an_ordinary_new_pick() {
+    use crate::engine::swap::character_memory::WaitingSession;
+
+    let mut memory = WaitingSession::empty();
+    let first = (0x49, [0, 1, 2, 0]);
+    let second = (0x49, [2, 0, 1, 2]);
+    memory.scene_changed(true, 0x0d, 0x07010101);
+    assert!(!memory.observe(0, first));
+    memory.scene_changed(true, 0x0e, 0x07010101);
+    memory.scene_changed(true, 0x0d, 0x07010101);
+    assert!(!memory.arrived(0, |origin| origin.0 == second.0));
+    assert!(memory.observe(0, second), "only the exact observation proves a fresh lobby");
+    assert!(!memory.observe(0, second), "do not retire the new session twice");
+
+    let roster = include_str!("../src/runtime/roster/character_roster.rs");
+    for (caller, branch) in [("fn observe_mii_origin(", "if fresh {"), ("unsafe fn service_body(", "if fresh_lobby {")] {
+        let body = block(roster, caller);
+        let fresh = block(body, branch);
+        assert!(fresh.contains("retire_waiting_lobby();"), "{caller} must retire Setup as well as hats when fresh");
+    }
+    let retire = block(roster, "fn retire_waiting_lobby()");
+    assert!(retire.contains("kirby_hats::fresh_lobby();"));
+    assert!(retire.contains("named_macros::waiting_scene_changed(false);"));
+}
+
+#[test]
 fn actual_cpu_request_handoff_and_reload_readiness() {
     let roster = include_str!("../src/runtime/roster/character_roster.rs");
     let cpu = include_str!("../src/runtime/mii/mii_ordinary_cpu.rs");
