@@ -1,26 +1,19 @@
-//! The travel statuses from F13 trace boot `f13-trace-0a17-1` (REPORT.md §1). Kinds come from the game's
-//! `FIGHTER_KIND_*` constants; each entry into a status is one part. F13's drill steps build on this table.
+//! Directional-special parts are inferred from movement and the stick.
+//! Entry, velocity, heading and the special's own direction determine an onset.
+//! See `docs/design/action-model.md`.
 
 /// Minimum movement in game units before a travel's heading is known.
 pub const MOVED: f32 = 1.0;
-
-const TRAVEL: [(i32, i32); 10] = [
-    (0x08, 0x1e1), // Pikachu
-    (0x13, 0x1e1), // Pichu
-    (0x35, 0x1e7), // Greninja
-    (0x36, 0x1e1), // Palutena
-    (0x11, 0x1e3), // Zelda
-    (0x10, 0x1e7), // Sheik
-    (0x19, 0x1e6), // Mewtwo
-    (0x07, 0x1e1), // Fox
-    (0x14, 0x1e2), // Falco
-    (0x2f, 0x1e1), // Wolf
-];
-
-/// The fighter's travel status, if it is in the trace table.
-pub fn travel_status(kind: i32) -> Option<i32> {
-    TRAVEL.iter().find(|(fighter, _)| *fighter == kind).map(|(_, status)| *status)
-}
+/// Frames after an entry, not counting hitstop, in which the movement must show.
+pub const W: u8 = 3;
+/// The least change of velocity, in units a frame, that makes a movement a new one.
+pub const DV: f32 = 1.0;
+/// How far a heading may lie from the stick, from the onset before it and from the special's own direction, in degrees.
+pub const FOLLOW: f32 = 33.75;
+/// The stick is off centre from this radius (raw stick units; 24 is 20% deflection).
+pub const DEAD: i16 = 24;
+/// A velocity slower than this, in units a frame, is not one that can be carried on.
+const CARRIED: f32 = 0.3;
 
 /// The nearest eight-way screen direction of a movement, once it has moved far enough.
 pub fn heading(dx: f32, dy: f32) -> Option<u8> {
@@ -45,7 +38,7 @@ pub fn heading(dx: f32, dy: f32) -> Option<u8> {
 /// What the strip knows about Player 1's directional special on one frame (F13).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Seen {
-    /// Player 1 is in a tabled special: from its start status to the end of its own statuses.
+    /// Player 1 is in a special: from its start status to the end of its own statuses.
     pub inside: bool,
     /// 1 or 2 on the one frame that part's direction became known, else 0.
     pub part: u8,
@@ -61,70 +54,182 @@ impl Seen {
     pub const NONE: Seen = Seen { inside: false, part: 0, dir: None, facing: 0, age: 0 };
 }
 
-/// One frame of Player 1 for [`Parts::step`].
+fn angle(x: f32, y: f32) -> f32 {
+    y.atan2(x).to_degrees().rem_euclid(360.0)
+}
+
+fn diff(a: f32, b: f32) -> f32 {
+    ((a - b + 180.0).rem_euclid(360.0) - 180.0).abs()
+}
+
+/// Which special Player 1 is inside; it gives the direction the special goes by itself.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Family { Neutral, Side, Up, Down }
+
+impl Family {
+    /// Whether the heading is the special's own direction.
+    pub fn nominal(self, heading: f32) -> bool {
+        match self {
+            Self::Neutral => false,
+            Self::Side => diff(heading, 0.0).min(diff(heading, 180.0)) <= FOLLOW,
+            Self::Up => diff(heading, 90.0) <= FOLLOW,
+            Self::Down => diff(heading, 270.0) <= FOLLOW,
+        }
+    }
+}
+
+/// Whether the stick points along the heading, allowing downward ground travel along the same side.
+pub fn follows(stick: (i8, i8), heading: f32, ground: bool) -> bool {
+    let (x, y) = (f32::from(stick.0), f32::from(stick.1));
+    if x * x + y * y < f32::from(DEAD) * f32::from(DEAD) { return false; }
+    if diff(angle(x, y), heading) <= FOLLOW { return true; }
+    let level = diff(heading, 0.0).min(diff(heading, 180.0)) <= FOLLOW;
+    ground && level && y < 0.0 && x != 0.0 && (x > 0.0) == (heading.to_radians().cos() > 0.0)
+}
+
+/// One frame of Player 1 for [`Rule::step`].
 #[derive(Clone, Copy, Debug)]
 pub struct Now {
-    /// The fighter is in the table.
-    pub aimer: bool,
-    /// The status is the up special's start.
-    pub start: bool,
-    /// The status is the start or one of the fighter's own.
-    pub special: bool,
-    /// The status is the travel status, and it was entered on this frame.
-    pub travel: bool,
-    pub entered: bool,
-    /// The direction the strip marked on this frame, if it did.
-    pub aimed: Option<u8>,
+    pub frame: u32,
+    pub status: i32,
+    pub start: Option<Family>,
+    pub own: bool,
+    pub pos: Option<(f32, f32)>,
+    pub stop: bool,
     pub facing: i8,
+    pub grounded: bool,
+    pub press: u32,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Parts {
-    inside: bool,
-    count: u8,
-    pending: u8,
-    age: u8,
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Candidate {
+    status: i32,
+    base: (f32, f32),
+    old: (f32, f32),
+    entry: u32,
+    k: u8,
+    ground: bool,
+}
+
+/// The state of the outcome rule for the current special.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rule {
+    family: Option<Family>,
     facing: i8,
+    onsets: u8,
+    statuses: [Option<i32>; 2],
+    last_heading: Option<f32>,
+    window: u32,
+    last_status: Option<i32>,
+    previous: Option<(f32, f32)>,
+    previous2: Option<(f32, f32)>,
+    previous_ground: bool,
+    candidate: Option<Candidate>,
+    #[cfg(test)]
+    pub(crate) keep_nominal: bool,
 }
 
-impl Parts {
+impl Rule {
     pub const fn new() -> Self {
-        Self { inside: false, count: 0, pending: 0, age: 0, facing: 0 }
+        Self { family: None, facing: 0, onsets: 0, statuses: [None; 2], last_heading: None,
+            window: 0, last_status: None, previous: None, previous2: None, previous_ground: true,
+            candidate: None, #[cfg(test)] keep_nominal: false }
     }
 
-    pub fn step(&mut self, now: Now) -> Seen {
-        if !now.aimer || !(now.special || now.travel) {
-            let seen = if self.pending != 0 {
-                Seen { inside: false, part: self.pending, dir: None, facing: self.facing, age: self.age }
-            } else {
-                Seen::NONE
-            };
-            *self = Self::new();
-            return seen;
-        }
-        if !self.inside {
-            if !(now.start || now.travel) {
-                return Seen::NONE;
-            }
-            self.inside = true;
+    /// Player 1 is inside a special as of the last step.
+    pub fn inside(&self) -> bool { self.family.is_some() }
+
+    /// The entry of a status whose movement may still show.
+    pub fn pending(&self) -> Option<u32> { self.candidate.map(|candidate| candidate.entry) }
+
+    /// Advance the rule, looking back for the newest matching stick sample.
+    pub fn step(&mut self, now: Now, mut stick: impl FnMut(u32, f32, bool) -> Option<(i8, i8)>) -> Seen {
+        if let Some(family) = now.start.filter(|_| self.last_status != Some(now.status)) {
+            self.family = Some(family);
             self.facing = now.facing;
+            self.onsets = 0;
+            self.statuses = [None; 2];
+            self.last_heading = None;
+            self.window = now.press;
+            self.candidate = None;
+        } else if self.family.is_some() && now.start.is_none() && !now.own {
+            self.family = None;
+            self.candidate = None;
         }
-        if now.entered && self.count < 2 && self.pending == 0 {
-            self.count += 1;
-            self.pending = self.count;
-            self.age = 0;
+        if self.family.is_some() && now.own && self.last_status != Some(now.status) {
+            let old = match (self.previous, self.previous2) {
+                (Some(a), Some(b)) => (a.0 - b.0, a.1 - b.1),
+                _ => (0.0, 0.0),
+            };
+            self.candidate = self.previous.or(now.pos).map(|base| Candidate {
+                status: now.status, base, old, entry: now.frame, k: 0, ground: self.previous_ground,
+            });
         }
-        let mut seen = Seen { inside: true, facing: self.facing, ..Seen::NONE };
-        if self.pending != 0 {
-            if now.aimed.is_some() || !now.travel {
-                seen.part = self.pending;
-                seen.dir = now.aimed;
-                seen.age = self.age;
-                self.pending = 0;
-            } else {
-                self.age = self.age.saturating_add(1);
+
+        let mut seen = if self.family.is_some() {
+            Seen { inside: true, facing: self.facing, ..Seen::NONE }
+        } else { Seen::NONE };
+        if let Some(mut candidate) = self.candidate {
+            if now.status != candidate.status {
+                self.candidate = None;
+            } else if let Some(pos) = now.pos.filter(|_| !now.stop) {
+                let dx = pos.0 - candidate.base.0;
+                let dy = pos.1 - candidate.base.1;
+                if dx * dx + dy * dy < MOVED * MOVED {
+                    candidate.k += 1;
+                    self.candidate = (candidate.k < W).then_some(candidate);
+                } else {
+                    let n = f32::from(candidate.k + 1);
+                    let new = (dx / n, dy / n);
+                    let old = candidate.old;
+                    let old_speed = old.0.hypot(old.1);
+                    let new_speed = new.0.hypot(new.1);
+                    let heading = angle(dx, dy);
+                    let carried = old_speed >= CARRIED && diff(angle(old.0, old.1), heading) <= FOLLOW
+                        && new_speed <= old_speed + DV;
+                    let turned = self.last_heading.is_none_or(|last| diff(last, heading) > FOLLOW);
+                    let impulse = self.statuses.contains(&Some(now.status))
+                        || ((new.0 - old.0).hypot(new.1 - old.1) >= DV && !carried && turned);
+                    if impulse {
+                        self.onsets = self.onsets.saturating_add(1);
+                        let followed = stick(self.window, heading, candidate.ground).is_some();
+                        #[cfg(test)]
+                        let nominal = self.family.is_some_and(|family| family.nominal(heading)) && !self.keep_nominal;
+                        #[cfg(not(test))]
+                        let nominal = self.family.is_some_and(|family| family.nominal(heading));
+                        if followed && !nominal && self.onsets <= 2 {
+                            seen.part = self.onsets;
+                            seen.dir = self::heading(dx, dy);
+                            seen.age = now.frame.saturating_sub(candidate.entry).min(u32::from(u8::MAX)) as u8;
+                        }
+                        self.window = now.frame.saturating_add(1);
+                        self.last_heading = Some(heading);
+                        if !self.statuses.contains(&Some(now.status)) {
+                            if self.statuses[0].is_none() { self.statuses[0] = Some(now.status); }
+                            else if self.statuses[1].is_none() { self.statuses[1] = Some(now.status); }
+                        }
+                    }
+                    self.candidate = None;
+                }
             }
+        }
+        self.last_status = Some(now.status);
+        if !now.stop {
+            self.previous2 = self.previous;
+            self.previous = now.pos;
+            self.previous_ground = now.grounded;
         }
         seen
     }
 }
+
+impl Default for Rule {
+    fn default() -> Self { Self::new() }
+}
+
+#[cfg(test)]
+#[path = "aim_tests.rs"]
+mod tests;
+#[cfg(test)]
+#[path = "aim_f13_fixture.rs"]
+mod f13;

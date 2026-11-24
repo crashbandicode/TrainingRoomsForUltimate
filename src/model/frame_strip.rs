@@ -163,10 +163,8 @@ pub struct Sample {
     pub motion: u64,
     /// P1 only: the angle of a side attack.
     pub angle: Option<Angle>,
-    /// P1 only: its position during a directional special's travel status.
-    pub travel: Option<(f32, f32)>,
-    /// P1 only: its fighter has a directional special in the aim table.
-    pub aimer: bool,
+    /// P1 only: its position, when the position reads are on.
+    pub pos: Option<(f32, f32)>,
     /// The CPU only, in hitstun: the hitstun frames left (`None` when it could not be read).
     pub reaction: Option<f32>,
     /// Holding or raising a shield (`GUARD_ON ..= GUARD_DAMAGE`).
@@ -493,9 +491,7 @@ pub struct Tracker {
     press_head: usize,
     aims: [Option<Aim>; AIMS],
     aim_head: usize,
-    travel: bool,
-    aim_from: Option<(u32, (f32, f32))>,
-    parts: super::aim::Parts,
+    rule: super::aim::Rule,
     history: [Option<Link>; HISTORY],
     advantage: Option<Advantage>,
     frame: u32,
@@ -551,9 +547,7 @@ impl Tracker {
             press_head: 0,
             aims: [None; AIMS],
             aim_head: 0,
-            travel: false,
-            aim_from: None,
-            parts: super::aim::Parts::new(),
+            rule: super::aim::Rule::new(),
             history: [None; HISTORY],
             advantage: None,
             frame: 0,
@@ -598,7 +592,7 @@ impl Tracker {
 
     /// The entry frame of a travel whose direction is not known yet.
     pub fn aim_pending(&self) -> Option<u32> {
-        self.aim_from.map(|(at, _)| at)
+        self.rule.pending()
     }
 
     pub fn tags(&self) -> impl Iterator<Item = &Tag> + '_ {
@@ -764,7 +758,7 @@ impl Tracker {
             } else if self.action.mv != Move::Other {
                 self.action.base = Some(self.action.mv);
             }
-            if !(self.travel && p1.travel.is_some()) {
+            if !(self.rule.inside() && self.action.mv == Move::Other && p1.attack == Some(Move::Other)) {
                 self.action.shown = Shown::default();
                 self.action.shown_id = self.action.shown_id.wrapping_add(1);
             }
@@ -799,33 +793,36 @@ impl Tracker {
                 self.push_aim(frame, angle.dir());
             }
         }
-        let mut aimed = None;
-        let entered = p1.travel.is_some() && !self.travel;
-        if entered {
-            self.aim_from = p1.travel.map(|pos| (frame, pos));
-            if self.action.mv == Move::Other {
-                self.action.shown.of = self.action.base;
-            }
-        } else if p1.travel.is_none() {
-            self.aim_from = None;
-        }
-        self.travel = p1.travel.is_some();
-        if let (Some((at, from)), Some(pos)) = (self.aim_from, p1.travel) {
-            if let Some(dir) = super::aim::heading(pos.0 - from.0, pos.1 - from.1) {
-                self.aim_from = None;
-                self.push_aim(at, dir);
-                aimed = Some(dir);
-            }
-        }
-        let seen = self.parts.step(super::aim::Now {
-            aimer: p1.aimer,
-            start: p1.attack == Some(Move::UpSpecial),
-            special: matches!(p1.attack, Some(Move::UpSpecial | Move::Other)),
-            travel: p1.travel.is_some(),
-            entered,
-            aimed,
+        let start = match p1.attack {
+            Some(Move::NeutralSpecial) => Some(super::aim::Family::Neutral),
+            Some(Move::SideSpecial) => Some(super::aim::Family::Side),
+            Some(Move::UpSpecial) => Some(super::aim::Family::Up),
+            Some(Move::DownSpecial) => Some(super::aim::Family::Down),
+            _ => None,
+        };
+        let (snaps, head, len) = (&self.snaps, self.snap_head, self.snap_len);
+        let seen = self.rule.step(super::aim::Now {
+            frame,
+            status: p1.status,
+            start,
+            own: p1.attack == Some(Move::Other),
+            pos: p1.pos,
+            stop: p1.stop,
             facing: p1.facing,
+            grounded: !p1.airborne,
+            press: self.action.origin.unwrap_or(frame),
+        }, |from, heading, ground| {
+            (0..len)
+                .map(|i| snaps[(head + SNAP_RING - 1 - i) % SNAP_RING])
+                .take_while(|snap| snap.frame >= from)
+                .find_map(|snap| {
+                    let stick = (snap.lstick_x, snap.lstick_y);
+                    super::aim::follows(stick, heading, ground).then_some(stick)
+                })
         });
+        if let Some(dir) = seen.dir.filter(|_| seen.part != 0) {
+            self.push_aim(frame.saturating_sub(u32::from(seen.age)), dir);
+        }
         self.snaps[(self.snap_head + SNAP_RING - 1) % SNAP_RING].aim = seen;
         self.p1_was_actionable = p1.actionable || p1.hitstun || p1.shieldstun;
         self.p1_status = p1.status;
