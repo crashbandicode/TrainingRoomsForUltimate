@@ -2809,3 +2809,11 @@ ceiling = 199824
 date = "2026-11-24"
 reason = "Move names joined with the ACTION model on the install 4 head b5177cdb (merge 5 and 3C): measured 199824 (tools/sloc.py tree). The join was 199284 on merge 5 and 3C adds 539 to merge 5 (198722 less 198183); the fold is 1 line over their sum, where 3C's link line takes the Namer argument."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value), on the approvals cited by the entries above; the 1 line from the resolution is posted with the pin for its ruling."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199998
+date = "2026-11-24"
+reason = "Merge 3D of install 4: a special's own travel is measured, kept on its press and graded (path within the steering tolerance; beyond a 2-unit floor the stick most held, and with the stick toggle its angle and deflection). Measured 199998 on 3c5d0295, 174 above merge 4 (199824, 436c7a68)."
+approved_by = "tr-primary-2 ruling 2026-11-24 23:16:49Z (the 3D line budget approved at the measured 199,998, +174)."
