@@ -166,6 +166,41 @@ fn a_step_with_three_actions_shows_the_first_and_the_last() {
 }
 
 #[test]
+fn a_simultaneous_dash_flick_does_not_steal_the_attack_description() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, lstick_x: 127, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::DashAttack), status: 0x27, facing: 1,
+        ..Sample::default() }, MappedInputs { lstick_x: 127, ..MappedInputs::NEUTRAL });
+    assert_eq!(capture.combo.len(), 1);
+    assert_eq!(bar(capture.combo)[0], "1 Dash → > Dash attack");
+    let step = capture.combo.get(0).unwrap();
+    assert_eq!(side(step, 0), None);
+    assert_eq!(side(step, 1).map(|desc| desc.mv), Some(Move::DashAttack));
+}
+
+#[test]
+fn a_simultaneous_cstick_owns_the_attack_and_a_middle_input_is_not_shown() {
+    for (left, expected, first) in [
+        (0, "1 Side smash > Attack", Some(Move::SideSmash)),
+        (127, "1 Dash → > Attack →", None),
+    ] {
+        let mut tracker = Tracker::new();
+        let mut capture = InputCapture::new();
+        tick(&mut tracker, &mut capture, idle(), MappedInputs {
+            buttons: 1 | CSTICK_ON, lstick_x: left, rstick_x: 127, ..MappedInputs::NEUTRAL
+        });
+        tick(&mut tracker, &mut capture, Sample { attack: Some(Move::SideSmash), status: 0x27, facing: 1,
+            ..Sample::default() }, MappedInputs { lstick_x: left, ..MappedInputs::NEUTRAL });
+        assert_eq!(capture.combo.len(), 1);
+        assert_eq!(bar(capture.combo)[0], expected);
+        let step = capture.combo.get(0).unwrap();
+        assert_eq!(side(step, 0).map(|desc| desc.mv), first);
+        assert_eq!(side(step, 1), None);
+    }
+}
+
+#[test]
 fn two_described_actions_survive_saving_and_reloading() {
     let record = ComboRecord::new("Drill".into(), two_described(), None);
     let value = serde_json::to_value(&record).unwrap();
