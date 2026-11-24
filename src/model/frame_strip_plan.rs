@@ -27,11 +27,38 @@ pub const CPU_TAG: [u8; 4] = [150, 150, 158, 255];
 /// Dark text for a label that sits on a light block (the LAST pills' text, a hit block's spot label).
 pub const INK: [u8; 4] = [10, 14, 20, 255];
 
-/// A text box's content: UTF-16 units of the game's font (ASCII, or one glyph unit). As long as the native boxes
-/// (`panes::iv::TEXT_UNITS`), so the longest line a plan writes is whole here and in its box.
+/// A text box's content: UTF-16 units of the game's font (ASCII, or one glyph unit). As long as a long line
+/// (`panes::iv::TEXT_UNITS`), so the longest line a plan writes is whole here; a pane's own capacity is its bar's
+/// table (`panes::iv::units`, `panes::cb::units`).
 pub const TEXT_UNITS: usize = super::panes::iv::TEXT_UNITS as usize;
-/// A line whose place cannot grow (a name on the card, a pill's label, the LAST row's moves) keeps this many units.
-pub const SHORT_UNITS: usize = 24;
+/// A short line's units: every line but the long ones, and what a line whose place cannot grow keeps (a name on the
+/// card, a pill's label, the LAST row's moves).
+pub const SHORT_UNITS: usize = super::panes::iv::SHORT_UNITS as usize;
+
+/// A name as it is stored between draws (the card's title, a sequence's name and its chips): a short line's units.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Short {
+    units: [u16; SHORT_UNITS],
+    len: u8,
+}
+
+impl Short {
+    pub const EMPTY: Short = Short { units: [0; SHORT_UNITS], len: 0 };
+
+    /// The first [`SHORT_UNITS`] units of `s`.
+    pub fn new(s: &str) -> Short {
+        let mut short = Short::EMPTY;
+        for (slot, unit) in short.units.iter_mut().zip(s.encode_utf16()) {
+            *slot = unit;
+            short.len += 1;
+        }
+        short
+    }
+
+    pub fn text(&self) -> Text {
+        Text::from_units(&self.units[..usize::from(self.len)])
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Text {
@@ -46,11 +73,6 @@ impl Text {
         let mut t = Text::EMPTY;
         let _ = t.write_str(s);
         t
-    }
-
-    /// `s` for a line whose place cannot grow: its first [`SHORT_UNITS`] units.
-    pub fn short(s: &str) -> Text {
-        Text::new(s).cut(SHORT_UNITS)
     }
 
     /// The first `units` units.
@@ -593,52 +615,127 @@ pub fn input_line(link: &Link) -> Text {
     t
 }
 
-/// What was last written to each of a bar's `N` panes (the strip here, the combo bar in `combo_plan`).
-pub struct Panes<const N: usize> {
-    written: [Option<Look>; N],
+/// A pane's look as the cache keeps it: a short line's units and the text's whole length. The units of a long line
+/// past those are in the cache's `tails`.
+#[derive(Clone, Copy)]
+struct Kept {
+    visible: bool,
+    x: f32,
+    y: f32,
+    w: f32,
+    rot: f32,
+    color: [u8; 4],
+    units: [u16; SHORT_UNITS],
+    len: u8,
 }
 
-impl<const N: usize> Default for Panes<N> {
+/// The units of one long line past a short line's.
+#[derive(Clone, Copy)]
+struct Tail {
+    /// The pane it belongs to, plus one; 0 while free.
+    pane: u16,
+    units: [u16; TEXT_UNITS - SHORT_UNITS],
+}
+
+/// What was last written to each of a bar's `N` panes (the strip here, the combo bar in `combo_plan`), `L` of them
+/// long lines by the bar's capacity table. A pane costs a short line; only a long line adds its tail.
+pub struct Panes<const N: usize, const L: usize> {
+    written: [Option<Kept>; N],
+    tails: [Tail; L],
+}
+
+impl<const N: usize, const L: usize> Default for Panes<N, L> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const N: usize> Panes<N> {
+impl<const N: usize, const L: usize> Panes<N, L> {
     pub const fn new() -> Self {
-        Self { written: [None; N] }
+        Self { written: [None; N], tails: [Tail { pane: 0, units: [0; TEXT_UNITS - SHORT_UNITS] }; L] }
     }
 
     /// The cached look for native writes deferred until the model guard is released.
-    pub fn written(&self, index: usize) -> Option<&Look> { self.written[index].as_ref() }
+    pub fn written(&self, index: usize) -> Option<Look> {
+        let kept = self.written[index]?;
+        let tail = self.tails.iter().find(|tail| usize::from(tail.pane) == index + 1);
+        let len = usize::from(kept.len).min(if tail.is_some() { TEXT_UNITS } else { SHORT_UNITS });
+        let mut text = Text::EMPTY;
+        let head = len.min(SHORT_UNITS);
+        text.units[..head].copy_from_slice(&kept.units[..head]);
+        if let Some(tail) = tail.filter(|_| len > SHORT_UNITS) {
+            text.units[SHORT_UNITS..len].copy_from_slice(&tail.units[..len - SHORT_UNITS]);
+        }
+        text.len = len as u8;
+        Some(Look { visible: kept.visible, x: kept.x, y: kept.y, w: kept.w, rot: kept.rot, color: kept.color, text })
+    }
+
+    /// Keep `look` for pane `index`: a short line's units with the pane, the rest of a long line in its tail.
+    fn keep(&mut self, index: usize, look: &Look) {
+        let units = look.text.units();
+        let head = units.len().min(SHORT_UNITS);
+        let mut kept = Kept {
+            visible: look.visible,
+            x: look.x,
+            y: look.y,
+            w: look.w,
+            rot: look.rot,
+            color: look.color,
+            units: [0; SHORT_UNITS],
+            len: units.len() as u8,
+        };
+        kept.units[..head].copy_from_slice(&units[..head]);
+        if units.len() > SHORT_UNITS {
+            let own = self.tails.iter().position(|tail| usize::from(tail.pane) == index + 1);
+            match own.or_else(|| self.tails.iter().position(|tail| tail.pane == 0)) {
+                Some(slot) => {
+                    self.tails[slot].pane = index as u16 + 1;
+                    self.tails[slot].units[..units.len() - SHORT_UNITS].copy_from_slice(&units[SHORT_UNITS..]);
+                }
+                None => kept.len = SHORT_UNITS as u8,
+            }
+        }
+        self.written[index] = Some(kept);
+    }
 
     /// The layout was registered again: nothing the plugin wrote is there any more.
     pub fn invalidate(&mut self) {
         self.written = [None; N];
+        for tail in &mut self.tails {
+            tail.pane = 0;
+        }
     }
 
     /// Hidden: only the container is written as `hidden` (and only when it was shown). Returns the writes.
     pub fn hide(&mut self, container: usize, hidden: Look, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
-        if !Changed::between(self.written[container].as_ref(), &hidden).any() {
+        if !Changed::between(self.written(container).as_ref(), &hidden).any() {
             return 0;
         }
         apply(container, &hidden, Changed { visible: true, ..Changed::default() });
-        self.written[container] = Some(hidden);
+        self.keep(container, &hidden);
         1
     }
 
-    /// Shown: every pane whose look changed, with what changed. Returns the writes.
-    pub fn show(&mut self, look: impl Fn(usize) -> Look, mut apply: impl FnMut(usize, &Look, Changed)) -> usize {
+    /// Shown: every pane whose look changed, with what changed. `units` is the bar's capacity table: a pane's text is
+    /// what its line holds, as its native box holds it. Returns the writes.
+    pub fn show(
+        &mut self,
+        units: fn(usize) -> u16,
+        look: impl Fn(usize) -> Look,
+        mut apply: impl FnMut(usize, &Look, Changed),
+    ) -> usize {
         let mut writes = 0;
         for i in 0..N {
-            let look = look(i);
-            let changed = Changed::between(self.written[i].as_ref(), &look);
+            let mut look = look(i);
+            look.text = look.text.cut(usize::from(units(i)));
+            let old = self.written(i);
+            let changed = Changed::between(old.as_ref(), &look);
             if changed.any() {
                 apply(i, &look, changed);
                 writes += 1;
             }
             // A hidden pane keeps what it showed last, so showing it again writes only what differs.
-            self.written[i] = Some(if look.visible { look } else { Look { visible: false, ..self.written[i].unwrap_or(look) } });
+            self.keep(i, &if look.visible { look } else { Look { visible: false, ..old.unwrap_or(look) } });
         }
         writes
     }
@@ -656,7 +753,7 @@ pub struct StripDraw<'a> {
 }
 
 /// What was last written to each of the strip's panes.
-pub type Renderer = Panes<COUNT>;
+pub type Renderer = Panes<COUNT, { super::panes::iv::LONG_LINES }>;
 
 impl Renderer {
     /// One UI tick. Hidden: only the container is written (and only when it was shown). Shown: every pane whose look
@@ -699,7 +796,7 @@ impl Renderer {
             let look = content.readout(1, true);
             LinkLine::from_units(look.text.units().iter().copied())
         });
-        (self.show(|i| content.look(i), apply), Some(line), history)
+        (self.show(super::panes::iv::units, |i| content.look(i), apply), Some(line), history)
     }
 }
 

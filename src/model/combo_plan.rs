@@ -562,7 +562,7 @@ impl Plan<'_> {
 }
 
 /// What was last written to each of the bar's panes (`frame_strip_plan::Panes`).
-pub type Renderer = super::frame_strip_plan::Panes<COUNT>;
+pub type Renderer = super::frame_strip_plan::Panes<COUNT, { super::panes::cb::LONG_LINES }>;
 
 /// Whether the bar is shown: the strip shown, the helper On and a target (`Renderer::draw`; the notice slot sits under it).
 pub fn shown(helper: &Helper, strip_shown: bool) -> bool {
@@ -594,7 +594,7 @@ impl Renderer {
         captions.reason.text = captions.reason.text.fitted(spec.card.reason_width(), super::panes::iv::FONT_SUB.0, REASON_LINES);
         let metrics = captions.metrics(helper.results().count());
         let plan = Plan { helper, seq, captions };
-        let writes = self.show(|i| match plan.ink(i) {
+        let writes = self.show(super::panes::cb::units, |i| match plan.ink(i) {
             Some(ink) => Look { visible: true, text: ink.text, color: ink.color, ..Look::HIDDEN }
                 .at(spec.card.place(i, seq.is_some(), &spec.strip, history, metrics, ink.detail)),
             None => Look::HIDDEN,

@@ -275,7 +275,7 @@ impl StripSpec {
 /// A hidden text box of the frame strip.
 const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
     hidden(under(
-        text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT),
+        text(name, [x, y, w, 30.0], align, font, iv::SHORT_UNITS, TEXT),
         Name::new("TrIv"),
     ))
 }
@@ -284,7 +284,7 @@ const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)
 /// start empty and are positioned by their slot on the first live update.
 pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name) -> Spec {
     use iv::at::*;
-    use iv::{BACKDROP_COLOR, FONT_SUB, FONT_TAG, FONT_VALUE, TEXT_UNITS};
+    use iv::{BACKDROP_COLOR, FONT_SUB, FONT_TAG, FONT_VALUE, SHORT_UNITS, TEXT_UNITS};
     let parent = Name::new("TrIv");
     match local {
         CONTAINER => container(
@@ -381,7 +381,7 @@ pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name
                 with_height(spec.readout(i - READ_VALUE, 1), 40.0),
                 Align::Left,
                 FONT_VALUE,
-                TEXT_UNITS,
+                SHORT_UNITS,
                 TEXT,
             ),
             parent,

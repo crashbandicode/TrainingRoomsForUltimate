@@ -485,7 +485,7 @@ fn deferred_cached_looks_match_direct_visible_writes() {
             let count = direct.show(|_| look, |i, look, change| expected.push((i, *look, change)));
             let mut changes = [None];
             assert_eq!(deferred.show(|_| look, |i, _, change| changes[i] = Some(change)), count);
-            let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, *deferred.written(i).unwrap(), c))).collect();
+            let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, deferred.written(i).unwrap(), c))).collect();
             assert_eq!(expected.len(), actual.len());
             for ((i, want, changed), (j, got, flags)) in expected.into_iter().zip(actual) {
                 assert_eq!((i, changed, want.visible), (j, flags, got.visible));
@@ -582,6 +582,10 @@ fn only_the_long_line_types_get_long_boxes() {
         (cb::at::TITLE..cb::at::VERDICT).chain(cb::at::OFFSET..cb::at::RULER).chain([cb::at::REASON]).collect();
     expected.sort_unstable();
     assert_eq!(long(&card), expected, "the card's link titles, marks and reason");
+    // The boxes are declared from the same tables the pane caches read.
+    assert!(strip.iter().all(|(local, chars)| iv::units(*local) == *chars), "the strip's boxes follow its table");
+    assert!(card.iter().all(|(local, chars)| cb::units(*local) == *chars), "the card's boxes follow its table");
+    assert_eq!((iv::LONG_LINES, cb::LONG_LINES), (3, 9));
     let other: Vec<u16> = strip.iter().chain(&card).map(|(_, chars)| *chars).filter(|chars| *chars != 40).collect();
     assert!(other.iter().all(|chars| matches!(chars, 2 | 24)), "{other:?}");
     assert_eq!(other.iter().filter(|chars| **chars == 24).count(), 68 - 12, "every other line keeps 24 units");
@@ -604,7 +608,7 @@ fn lines_that_cannot_grow_keep_their_24_units() {
     use crate::model::{combo, combo_plan, frame_strip::Button};
     let long = "A thirty character combo name!";
     assert_eq!((long.len(), SHORT_UNITS), (30, 24));
-    assert_eq!(Text::short(long), Text::new(&long[..SHORT_UNITS]));
+    assert_eq!(Short::new(long).text(), Text::new(&long[..SHORT_UNITS]));
 
     // A sequence's card: the name beside "landed", and a chip.
     let link = combo::LinkRec::presses(Move::Jab, Move::UpTilt, Verdict::True(None), None,
@@ -618,7 +622,7 @@ fn lines_that_cannot_grow_keep_their_24_units() {
     let mut chips = [Text::EMPTY; crate::model::panes::cb::CHIPS];
     chips[0] = Text::new(long);
     let seq = combo_plan::SeqView {
-        name: Text::short(long),
+        name: Short::new(long).text(),
         at: 1,
         steps: 2,
         streak: 0,

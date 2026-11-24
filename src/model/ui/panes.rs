@@ -549,7 +549,20 @@ pub mod cb {
     /// The bar's centre below the strip's, and its size (the mockup's 864 × 132).
     pub const BACKDROP_COLOR: [u8; 4] = super::iv::BACKDROP_COLOR;
     pub const CELL_COLOR: [u8; 4] = [30, 36, 48, 255];
-    pub const TEXT_UNITS: u16 = super::iv::TEXT_UNITS;
+
+    /// A line's capacity in UTF-16 units, by its pane: the card's table, read by its native boxes and by its pane
+    /// cache. The reason, the link titles and the marks under a step carry sentences longer than a short line.
+    pub const fn units(local: usize) -> u16 {
+        use at::*;
+        match local {
+            REASON => super::iv::TEXT_UNITS,
+            i if (i >= TITLE && i < VERDICT) || (i >= OFFSET && i < RULER) => super::iv::TEXT_UNITS,
+            _ => super::iv::SHORT_UNITS,
+        }
+    }
+
+    /// The card's lines that are longer than a short line.
+    pub const LONG_LINES: usize = super::long_lines(false);
 }
 
 #[path = "strip_layout/mod.rs"]
@@ -608,9 +621,25 @@ pub mod iv {
 
     pub use super::strip_layout::strip::*;
     pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
-    /// The text boxes' capacity in UTF-16 units, the strip's and the combo card's alike: the longest line a plan
-    /// writes (the card's reason, 37 units) fits, so no line is cut by its box or by `frame_strip_plan::Text`.
+    /// A long line's capacity in UTF-16 units: the longest line a plan writes (the card's reason, 37 units) fits, so
+    /// it is cut neither by its box nor by `frame_strip_plan::Text`. Which lines are long is `units` here and in `cb`.
     pub const TEXT_UNITS: u16 = 40;
+    /// Every other line's capacity.
+    pub const SHORT_UNITS: u16 = 24;
+
+    /// A line's capacity in UTF-16 units, by its pane: the strip's table, read by its native boxes and by its pane
+    /// cache. The readouts' sub-lines carry the folded link and Parry's grade words; a chip and a stick mark are one glyph.
+    pub const fn units(local: usize) -> u16 {
+        use at::*;
+        match local {
+            i if (i >= CHIP_GLYPH && i < CHIP_SHAFT) || (i >= STICK && i < TAG_BOX) => 2,
+            i if i >= READ_SUB && i < LAST_TEXT => TEXT_UNITS,
+            _ => SHORT_UNITS,
+        }
+    }
+
+    /// The strip's lines that are longer than a short line.
+    pub const LONG_LINES: usize = super::long_lines(true);
     /// Small labels, the readouts' sub-lines, the readouts' values.
     pub const FONT_TAG: (f32, f32) = (14.0, 22.0);
     pub const FONT_SUB: (f32, f32) = (16.0, 26.0);
@@ -712,7 +741,7 @@ const fn cb_name(local: usize) -> Name {
 
 /// A hidden text box of the combo bar; `x` is the box's centre.
 const fn cb_text(name: Name, size: [f32; 4], align: Align, font: (f32, f32)) -> Spec {
-    hidden(under(text(name, size, align, font, cb::TEXT_UNITS, TEXT), Name::new("TrCb")))
+    hidden(under(text(name, size, align, font, iv::SHORT_UNITS, TEXT), Name::new("TrCb")))
 }
 
 /// The combo bar's panes: kind, place and size, all hidden until the helper draws them.
@@ -732,7 +761,7 @@ const fn cb_spec(layout: &strip_layout::LayoutSpec, local: usize, name: Name) ->
         SEQ_LINKS => cb_text(name, size, Align::Left, FONT_TAG),
         SEQ_STREAK | SEQ_BEST => cb_text(name, size, Align::Left, FONT_SUB),
         SEQ_PILL => under(rect(name, size, SEQ_PILL_COLOR, false), parent),
-        SEQ_PILL_TEXT => hidden(under(text(name, size, Align::Center, FONT_TAG, cb::TEXT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
+        SEQ_PILL_TEXT => hidden(under(text(name, size, Align::Center, FONT_TAG, iv::SHORT_UNITS, SEQ_PILL_TEXT_COLOR), parent)),
         i if i < CELL => under(rect(name, size, TEXT, false), parent),
         i if i < TITLE => under(rect(name, size, CELL_COLOR, false), parent),
         i if i < RULER => cb_text(name, size, Align::Center, FONT_TAG),
@@ -935,14 +964,38 @@ pub fn btt_hud_box(body: &str, strip: bool, bar: bool) -> [f32; 4] {
     [-936.0, y, width, 48.0]
 }
 
-/// Archive placement for a strip or card pane, using the same spec as the live HUD.
+/// Archive placement for a strip or card pane, using the same spec as the live HUD. A text box is declared as long
+/// as its line's capacity (`iv::units`, `cb::units`).
 pub const fn strip_pane_spec(layout: &strip_layout::LayoutSpec, index: usize) -> Spec {
     let name = name_of(index);
     if index < IDX_CB {
-        strip_layout::strip::iv_spec(&layout.strip, index - IDX_IV, name)
+        lined(strip_layout::strip::iv_spec(&layout.strip, index - IDX_IV, name), iv::units(index - IDX_IV))
     } else {
-        cb_spec(layout, index - IDX_CB, name)
+        lined(cb_spec(layout, index - IDX_CB, name), cb::units(index - IDX_CB))
     }
+}
+
+/// A text box declared `units` UTF-16 units long; any other pane as it is.
+const fn lined(mut spec: Spec, units: u16) -> Spec {
+    if let Kind::Text { align, font, color, .. } = spec.kind {
+        spec.kind = Kind::Text { align, font, chars: units, color };
+    }
+    spec
+}
+
+/// How many panes of a bar carry a long line by its capacity table: the strip's (`strip`) or the card's.
+const fn long_lines(strip: bool) -> usize {
+    let count = if strip { iv::COUNT } else { cb::COUNT };
+    let mut long = 0;
+    let mut local = 0;
+    while local < count {
+        let units = if strip { iv::units(local) } else { cb::units(local) };
+        if units > iv::SHORT_UNITS {
+            long += 1;
+        }
+        local += 1;
+    }
+    long
 }
 
 /// Pane `index`'s kind and place.
