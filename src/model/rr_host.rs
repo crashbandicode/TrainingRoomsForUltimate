@@ -29,7 +29,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
-use crate::model::recording_menu::{Effect, LoopMark, Selection, ViewRole};
+use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
 
@@ -49,7 +49,8 @@ static SLOT_REFUSAL: AtomicBool = AtomicBool::new(false);
 pub fn set_slot(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
     if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
     if let Some(recording) = recording {
-        if recording.frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(recording.frames.len())); }
+        let len = recording.trim.window(&recording.frames).len();
+        if len > SLOT_FRAMES { return Err(ImportRefusal::TooLong(len)); }
     }
     SLOT_SEQ[slot].fetch_add(1, Ordering::SeqCst);
     let result = set_slot_data(slot, recording);
@@ -60,7 +61,8 @@ pub fn set_slot(slot: usize, recording: Option<&MacroRecording>) -> Result<(), I
 fn set_slot_data(slot: usize, recording: Option<&MacroRecording>) -> Result<(), ImportRefusal> {
     if slot >= SLOTS { return Err(ImportRefusal::SlotOutOfRange); }
     if let Some(recording) = recording {
-        if recording.frames.len() > SLOT_FRAMES { return Err(ImportRefusal::TooLong(recording.frames.len())); }
+        let len = recording.trim.window(&recording.frames).len();
+        if len > SLOT_FRAMES { return Err(ImportRefusal::TooLong(len)); }
     }
     let tape = &SLOT_TAPES[slot];
     // SAFETY: the recording worker is the single slot publisher.
@@ -69,11 +71,11 @@ fn set_slot_data(slot: usize, recording: Option<&MacroRecording>) -> Result<(), 
             tape.prepare(SLOT_FRAMES);
             SLOT_PREPARED[slot].store(true, Ordering::Release);
         }
-        if let Some(recording) = recording.filter(|r| !r.frames.is_empty()) {
+        if let Some(recording) = recording.filter(|r| !r.trim.window(&r.frames).is_empty()) {
             let facing = u64::from(recording.start.facing < 0.0);
             let status = u64::from(recording.start.status as u32);
             SLOT_META[slot].store(status | facing << 32, Ordering::SeqCst);
-            tape.fill(&recording.frames);
+            tape.fill(&recording.frames[recording.trim.window(&recording.frames)]);
         } else {
             tape.retract();
         }
@@ -289,7 +291,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now()).ok().flatten()
+    super::rr_runtime::save_drill_take(root, frames, state, record_trim(), unix_now()).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -857,7 +859,7 @@ pub fn cpu_playback(queued: bool) -> PlaybackState {
 }
 
 pub fn playback_roles() -> [bool; 2] {
-    [false, false]
+    [role_playing(Role::Player), role_playing(Role::Cpu) || SLOT_RUNNING.load(Ordering::Acquire)]
 }
 
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
@@ -1237,7 +1239,7 @@ pub fn service_at(
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire))
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim())
         {
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);
@@ -1324,14 +1326,27 @@ pub fn set_role_fighter(role: Role, kind: i32) {
     }
 }
 
-/// The strip's last combo and its count of links captured (`combo::Helper::seen`), from the recording worker's tick.
-/// rc.12 TR7: Recording › Options › Crop trailing neutral, as the last publish left it (factory On).
-static RECORD_TRIM: AtomicBool = AtomicBool::new(true);
+/// Record-time trim last published by Recording › Options (factory End).
+static RECORD_TRIM: AtomicU8 = AtomicU8::new(crate::model::trim::Trim::End as u8);
+static PLAYBACK_INDICATOR: AtomicBool = AtomicBool::new(true);
 
-pub fn set_record_trim(trim: impl Into<crate::model::trim::Trim>) {
-    RECORD_TRIM.store(trim.into() == crate::model::trim::Trim::End, Ordering::Release);
+pub fn set_record_trim(trim: crate::model::trim::Trim) {
+    RECORD_TRIM.store(trim as u8, Ordering::Release);
 }
 
+fn record_trim() -> crate::model::trim::Trim {
+    crate::model::trim::Trim::from_index(RECORD_TRIM.load(Ordering::Acquire))
+}
+
+pub fn set_playback_indicator(on: bool) {
+    PLAYBACK_INDICATOR.store(on, Ordering::Release);
+}
+
+pub fn playback_indicator_enabled() -> bool {
+    PLAYBACK_INDICATOR.load(Ordering::Acquire)
+}
+
+/// The strip's last combo and its count of links captured (`combo::Helper::seen`), from the recording worker's tick.
 pub fn set_strip_sample(sample: (u32, Option<Combo>, CaptureOwner)) {
     *lock(&STRIP) = sample;
 }
@@ -2156,7 +2171,21 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
         Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
         Effect::SetStartSave { id, chain: true, on } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
         Effect::SetStartSave { id, chain: false, on } => rename::<MacroRecording>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
-        Effect::SetTrim { .. } => {},
+        Effect::SetTrim { id, kind: FileKind::Macro, trim } => {
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| file.trim = trim);
+            note_slots_changed(false);
+        }
+        Effect::SetTrim { id, kind: FileKind::Combo, trim } => {
+            if let Ok(file) = ComboLibrary::new(root.join("combos")).load(&id) {
+                if file.combo.input_only {
+                    if let Some(take) = file.take {
+                        rename::<MacroRecording>(root, MACROS_DIR, &take, |file| file.trim = trim);
+                    }
+                    rename::<ComboRecord>(root, "combos", &id, |file| file.trim = trim);
+                }
+            }
+        }
+        Effect::SetTrim { .. } => {}
     }
 }
 
@@ -2327,6 +2356,7 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
     };
     match ask {
         Some(PreviewAsk::Start { source, role, frames }) => {
+            let frames = book.drill_preview_range(&source, frames);
             let owed = if source == CLIP_ID {
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
@@ -2564,7 +2594,8 @@ fn reset_host() {
     for seq in &SLOT_SEQ { seq.store(0, Ordering::Release); }
     INPUT_MODE.store(0, Ordering::Release); DRILL_ARMED.store(false, Ordering::Release); for p in &INPUT_POLLS { p.store(0, Ordering::Release); } for e in &INPUT_EPOCH { e.store(0, Ordering::Release); } *INPUT_STATE.lock() = [InputTake::EMPTY; 2]; for p in &INPUT_RESULT { p.write(InputTake::EMPTY); } *lock(&SAVED_DRILL) = None;
     SLOTS_DIRTY.store(1, Ordering::Release);
-    RECORD_TRIM.store(true, Ordering::Release);
+    RECORD_TRIM.store(crate::model::trim::Trim::End as u8, Ordering::Release);
+    PLAYBACK_INDICATOR.store(true, Ordering::Release);
     RECORD_ROLE.store(ROLE_PLAYER, Ordering::Release);
     ASK_FIGHTER.store(true, Ordering::Release);
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);
@@ -2672,6 +2703,18 @@ mod tests {
 
     fn start_slot(slot: u8, facing: i8) -> Result<Option<PlayStart>, PlayRefusal> {
         slot_start_mash(slot, slot_take(slot).unwrap(), facing)
+    }
+
+    fn an_owed_slot_does_not_show_the_playback_indicator() {
+        let _hold = hold();
+        reset_host();
+        SLOT_SEQ[0].store(1, Ordering::Release);
+        assert_eq!(slot_start_ledge(0, 1, None), Ok(None));
+        assert!(slot_owed());
+        assert!(!SLOT_RUNNING.load(Ordering::Acquire));
+        assert_eq!(playback_roles(), [false, false]);
+        SLOT_SEQ[0].store(0, Ordering::Release);
+        slot_stop();
     }
 
     fn a_playback_slot_run_plays_its_macro_through_the_cpu_pad() {
@@ -4503,7 +4546,7 @@ mod tests {
         let file = active_plain_macro(&root, Role::Player, 70);
         let take = super::super::rr_runtime::save_drill_take(
             &root, vec![InputFrame { buttons: 90, ..InputFrame::default() }],
-            StartState::neutral(8, 0, 1.0), false, 1,
+            StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1,
         ).unwrap().unwrap();
         on_chords(false, true, false);
         assert!(!request_drill_preview(&take, 1), "a queued Play also blocks the preview");
@@ -4706,10 +4749,10 @@ mod tests {
     }
 
     fn a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change() {
-        let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu); set_record_trim(false);
+        let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu); set_record_trim(crate::model::trim::Trim::Off);
         post_effect(Effect::RecordDrill); note_record_start(RecordStart { poses:[pose(0,0.0,1.0),pose(7,5.0,-1.0)], speeds:[(0.0,0.0);2] }); on_chords(true,false,false); assert_eq!(capture_role(),ROLE_PLAYER);
         for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },Late::NONE,false); }
-        on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7)); set_record_trim(true);
+        on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7)); set_record_trim(crate::model::trim::Trim::End);
         let id=take_saved_drill().unwrap(); assert!(take_saved_drill().is_none());
         assert_eq!(RecordingIndex::load(&root).unwrap().drill().unwrap().id,id);
         let file=ComboLibrary::new(root.join("combos")).load(&id).unwrap(); assert_eq!(file.recorded_on.as_deref(),Some("Mario"));
@@ -4732,7 +4775,7 @@ mod tests {
         reset_host();
         let root = scratch("direct-drill-preview");
         set_record_role(Role::Cpu);
-        set_record_trim(false);
+        set_record_trim(crate::model::trim::Trim::Off);
         post_effect(Effect::RecordDrill);
         let first = crate::model::move_names::FighterId { chara: crate::model::hash40::hash40("ui_chara_miiswordsman"), specials: [0, 1, 2, 0] };
         post_record_start(RecordStart { poses: [pose(0x49, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] }, Some(first));
@@ -4745,7 +4788,7 @@ mod tests {
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        set_record_trim(true);
+        set_record_trim(crate::model::trim::Trim::End);
         let drill = ComboLibrary::new(root.join("combos")).load(&take_saved_drill().unwrap()).unwrap();
         assert_eq!(drill.fighter, Some(first), "even a later Mii of the same kind cannot replace the recorded loadout");
         crate::model::move_names::PUBLISHED.set_player(None);
@@ -4778,7 +4821,7 @@ mod tests {
         let root = scratch("drill-fed");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let frames = (1..=N).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
-        let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1).unwrap().unwrap();
         let (mut seen, mut lines, mut frame) = (FedSeen::default(), Vec::new(), 100);
 
         assert!(request_drill_preview(&take, N));
@@ -4876,7 +4919,7 @@ mod tests {
             let root = scratch(if stop { "drill-stop-bad-index" } else { "drill-bad-index" });
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
-            let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+            let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1).unwrap().unwrap();
             assert!(request_drill_preview(&take, 80));
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert_eq!(take_player_frame().unwrap().buttons, 1);
@@ -4910,7 +4953,7 @@ mod tests {
         let _hold = hold();
         reset_host();
         let root = scratch("delete-direct-drill");
-        set_record_trim(false);
+        set_record_trim(crate::model::trim::Trim::Off);
         post_effect(Effect::RecordDrill);
         note_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
         on_chords(true, false, false);
@@ -4921,7 +4964,7 @@ mod tests {
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        set_record_trim(true);
+        set_record_trim(crate::model::trim::Trim::End);
         let id = take_saved_drill().unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
         let combo = ComboLibrary::new(root.join("combos")).load(&id).unwrap().combo;
@@ -6213,6 +6256,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("an_owed_slot_does_not_show_the_playback_indicator", an_owed_slot_does_not_show_the_playback_indicator as fn()),
             ("a_playback_slot_run_plays_its_macro_through_the_cpu_pad", a_playback_slot_run_plays_its_macro_through_the_cpu_pad as fn()),
             ("a_play_on_cpu_frame_ends_a_slot_run", a_play_on_cpu_frame_ends_a_slot_run as fn()),
             ("a_slot_waits_for_a_running_cpu_macro", a_slot_waits_for_a_running_cpu_macro as fn()),

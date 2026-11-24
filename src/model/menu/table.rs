@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 170] = [
+pub static ROWS: [Row; 171] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -391,8 +391,8 @@ pub static ROWS: [Row; 170] = [
     r(REPLAYS, "Replay capture", "", Control::ReplayCapture,
       "On: capture match inputs when saving a replay.\nThis choice is saved automatically."),
     // Recording > Options. The loop row shows the six counts; the factory value stays length 2.
-    r(OPTIONS, "Crop trailing neutral", "recording_crop", TOGGLE,
-      "On: Record drops the idle frames at the end of a take.\nOff: it keeps every frame up to the stop."),
+    r(OPTIONS, "Trim trailing neutral", "recording_crop", Control::Dropdown(&o::TRIM),
+      "Start, End or Both: remove idle frames from those sides.\nOff: keep every frame up to the stop."),
     r(OPTIONS, "Place fighters before Record", "recording_place", TOGGLE,
       "On: Record first opens a wizard to place both fighters\nand pick their state. Off: Record starts at once."),
     r(OPTIONS, "Hitstun timing", "hitstun_playback", Control::Dropdown(&o::HITSTUN_PLAYBACK),
@@ -655,6 +655,8 @@ pub static ROWS: [Row; 170] = [
       "Finish a set of 10 or 20 attempts, or practise freely.\nThe clock starts at release."),
     r(JUGGLE, "Zoom landing window", "juggle_zoom_window", Control::Number { first: 1, step: 1 },
       "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
+    r(OPTIONS, "Show playback indicator", "playback_indicator", TOGGLE,
+      "On: show which role is playing a recording.\nOff: hide the playback indicator."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

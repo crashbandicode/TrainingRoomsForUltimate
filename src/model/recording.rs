@@ -44,7 +44,6 @@ pub enum HitstunTiming {
 /// The recording rows of the settings, as one `Copy` value the hooks read without allocating.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecorderSettings {
-    pub crop: bool,
     pub trim: super::trim::Trim,
     pub indicator: bool,
     pub place: bool,
@@ -55,9 +54,8 @@ pub struct RecorderSettings {
 impl RecorderSettings {
     pub const fn factory() -> Self {
         Self {
-            crop: true,
             trim: super::trim::Trim::End,
-            indicator: false,
+            indicator: true,
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
             mash_interrupt: true,
@@ -68,10 +66,10 @@ impl RecorderSettings {
         let row = |id: &str| snapshot.get(id).unwrap_or(&[]);
         let first = |id: &str| row(id).iter().position(|v| *v != 0);
         let on = |id: &str| row(id).first().is_some_and(|v| *v != 0);
+        let trim = super::trim::Trim::from_row(row("recording_crop"));
         Self {
-            crop: on("recording_crop"),
-            trim: super::trim::Trim::from(on("recording_crop")),
-            indicator: false,
+            trim,
+            indicator: on("playback_indicator"),
             place: on("recording_place"),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,

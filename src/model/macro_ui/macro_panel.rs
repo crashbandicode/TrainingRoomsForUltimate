@@ -14,8 +14,8 @@ use crate::model::recording_menu::ViewRole;
 
 const PAGE: usize = NX_SUBMENU_ROWS * NX_SUBMENU_COLUMNS;
 /// Matches the legacy recorder's flick-jump bit. Other buttons count as input.
+#[cfg(test)]
 const FLICK_JUMP: u32 = 0x8000;
-const STICK_NEUTRAL: i8 = 24;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pad {
@@ -1694,18 +1694,7 @@ fn clip_version(version: &str) -> String {
 }
 
 pub fn crop_neutral_tail(frames: &mut Vec<InputFrame>) {
-    while frames.last().is_some_and(neutral_frame) {
-        frames.pop();
-    }
-}
-
-fn neutral_frame(frame: &InputFrame) -> bool {
-    let stick = |value: i8| value.unsigned_abs() < STICK_NEUTRAL as u8;
-    (frame.buttons == 0 || frame.buttons == FLICK_JUMP)
-        && stick(frame.lstick_x)
-        && stick(frame.lstick_y)
-        && stick(frame.rstick_x)
-        && stick(frame.rstick_y)
+    crate::model::trim::Trim::End.apply(frames);
 }
 
 #[cfg(test)]

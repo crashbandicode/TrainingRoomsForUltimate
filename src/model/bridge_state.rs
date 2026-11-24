@@ -50,6 +50,7 @@ pub struct View<'a> {
     pub recording_capture_role: &'a str,
     /// The role of the take the HUD's row drew on its last pass, empty when it drew none or that pass is stale.
     pub recording_indicator: &'a str,
+    pub playback_indicator: &'a str,
     /// The strip's last drawn direction marks, oldest first.
     pub strip_aims: [Option<u8>; 2],
     pub list: &'a str,
@@ -210,6 +211,7 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
     push_str(out, "recording.page.role", view.recording_page_role);
     push_str(out, "recording.capture.role", view.recording_capture_role);
     push_str(out, "recording.indicator", view.recording_indicator);
+    push_str(out, "playback.indicator", view.playback_indicator);
     out.push_str("strip.aims=\"");
     let mut separator = "";
     for dir in view.strip_aims.into_iter().flatten() {
@@ -341,12 +343,20 @@ pub fn recording_indicator(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static s
     }
 }
 
-pub fn playback_indicator_stamp(now_ms: u64, _drawn: [bool; 2]) -> u64 {
-    now_ms << 2
+pub fn playback_indicator_stamp(now_ms: u64, drawn: [bool; 2]) -> u64 {
+    (now_ms << 2) | u64::from(drawn[0]) | (u64::from(drawn[1]) << 1)
 }
 
-pub fn playback_indicator(_stamp: u64, _now_ms: u64, _fresh_ms: u64) -> &'static str {
-    ""
+pub fn playback_indicator(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static str {
+    if now_ms.saturating_sub(stamp >> 2) > fresh_ms {
+        return "";
+    }
+    match stamp & 3 {
+        1 => "player",
+        2 => "cpu",
+        3 => "both",
+        _ => "",
+    }
 }
 
 /// A HUD pass and its direction marks, oldest first.

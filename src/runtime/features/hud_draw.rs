@@ -140,7 +140,12 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         None
     };
     let btt = crate::runtime::features::btt::hud();
-    let row = (!menu_open).then(|| hud_row::hud_row(crate::engine::rr_host::capture_take(), [false; 2], btt.as_str())).flatten();
+    let playing = if crate::engine::rr_host::playback_indicator_enabled() {
+        crate::engine::rr_host::playback_roles()
+    } else {
+        [false; 2]
+    };
+    let row = (!menu_open).then(|| hud_row::hud_row(crate::engine::rr_host::capture_take(), playing, btt.as_str())).flatten();
     let chip = row.as_ref().map(|row| hud_row::hud_row_box(row, strip_shown, card.is_some()));
     write_notice(
         notice,
@@ -148,8 +153,10 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         chip,
         drop,
     );
-    let drawn = write_btt(root, row.as_ref(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]));
+    let mut playback_drawn = [false; 2];
+    let drawn = write_btt(root, row.as_ref(), chip.map(|[x, y, w, h]| [x, y - drop, w, h]), &mut playback_drawn);
     crate::runtime::bridge_state::note_recording_indicator(drawn);
+    crate::runtime::bridge_state::note_playback_indicator(playback_drawn);
 
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
@@ -280,7 +287,7 @@ unsafe fn place(target: *mut Pane, [x, y, w, h]: [f32; 4], shown: bool) {
 /// The compact HUD row (`model::hud_row`): Break the Targets' line or the recording indicator. Existing builders and the
 /// target's material, independent of the transient notice queue. Returns the take it drew: none while the row is hidden
 /// or the layout has no such row (the stock layout), so the bridge never names a chip that is not on screen.
-unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option<[f32; 4]>) -> Option<hud_row::Take> {
+unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option<[f32; 4]>, playback_drawn: &mut [bool; 2]) -> Option<hud_row::Take> {
     let container = pane::find_child(root, p::name_of(p::IDX_BTT).as_bytes());
     if container.is_null() { return None; }
     pane::set_visible(container, chip.is_some());
@@ -303,6 +310,9 @@ unsafe fn write_btt(root: *mut Pane, row: Option<&hud_row::HudRow>, chip: Option
         let n = crate::model::boot_notices::notice_units(row.text.as_str(), &mut buffer);
         pane::set_text(text, &buffer[..n]);
         pane::set_text_color(text, p::linear(row.color));
+    }
+    if !picture.is_null() && !text.is_null() {
+        *playback_drawn = row.playing;
     }
     row.take.filter(|_| !picture.is_null() && !text.is_null())
 }

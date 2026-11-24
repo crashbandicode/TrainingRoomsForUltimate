@@ -279,6 +279,7 @@ static NOTICE_VISIBLE: AtomicBool = AtomicBool::new(false);
 /// The HUD row's last pass (the snapshot's `recording.indicator`): `m::indicator_stamp`, one atomic store from the UI
 /// tick (never a lock), read by the worker; older than `SCENE_FRESH_MS` is gone.
 static RECORDING_INDICATOR: AtomicU64 = AtomicU64::new(0);
+static PLAYBACK_INDICATOR: AtomicU64 = AtomicU64::new(0);
 /// The direction marks drawn by the strip's last pass (`m::aims_stamp`).
 static STRIP_AIMS: AtomicU64 = AtomicU64::new(0);
 
@@ -337,6 +338,16 @@ pub fn note_recording_indicator(drawn: Option<crate::model::hud_row::Take>) {
 /// The role of the take the HUD's row drew on its last pass, empty once that pass is stale.
 pub fn recording_indicator(now_ms: u64) -> &'static str {
     m::recording_indicator(RECORDING_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
+}
+
+pub fn note_playback_indicator(drawn: [bool; 2]) {
+    if FOUND.load(Ordering::Relaxed) {
+        PLAYBACK_INDICATOR.store(m::playback_indicator_stamp(crate::runtime::clock::uptime_ms(), drawn), Ordering::Relaxed);
+    }
+}
+
+pub fn playback_indicator(now_ms: u64) -> &'static str {
+    m::playback_indicator(PLAYBACK_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
 }
 
 /// The strip's direction marks on this pass, oldest first.

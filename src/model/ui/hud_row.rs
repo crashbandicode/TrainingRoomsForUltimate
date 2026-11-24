@@ -68,33 +68,56 @@ pub struct HudRow {
 }
 
 /// `take` is the open take; `line` is Break the Targets' HUD line ("" for none). `None` hides the row.
-pub fn hud_row(take: Option<Take>, _playing: [bool; 2], line: &str) -> Option<HudRow> {
-    if take.is_none() && line.is_empty() {
+pub fn hud_row(take: Option<Take>, playing: [bool; 2], line: &str) -> Option<HudRow> {
+    if take.is_none() && !playing[0] && !playing[1] && line.is_empty() {
         return None;
     }
     let mut text = FixedPath::new();
     if let Some(take) = take {
         let _ = text.write_str(take.label());
+        if playing[0] || playing[1] || !line.is_empty() {
+            let _ = text.write_str(" · ");
+        }
+    }
+    let play = match playing {
+        [true, false] => "PLAY P1",
+        [false, true] => "PLAY CPU",
+        [true, true] => "PLAY P1 + CPU",
+        [false, false] => "",
+    };
+    if !play.is_empty() {
+        let _ = text.write_str(play);
         if !line.is_empty() {
             let _ = text.write_str(" · ");
         }
     }
-    let remaining = if take.is_none() { usize::MAX } else { TEXT_UNITS - text.as_str().chars().count() };
+    let remaining = if text.as_str().is_empty() { usize::MAX } else { TEXT_UNITS.saturating_sub(text.as_str().chars().count()) };
     for ch in line.chars().take(remaining) {
         if text.write_char(ch).is_err() {
             break;
         }
     }
-    let color = take.map_or(panes::TEXT, Take::color);
-    Some(HudRow { text, color, chip: take.map_or([255; 4], Take::color), take, playing: [false; 2], line: !line.is_empty() })
+    let role_color = take.map(Take::color).or_else(|| match playing {
+        [true, false] => Some(PLAYER_COLOR),
+        [_, true] => Some(CPU_COLOR),
+        _ => None,
+    });
+    Some(HudRow { text, color: role_color.unwrap_or(panes::TEXT), chip: role_color.unwrap_or([255; 4]), take, playing, line: !line.is_empty() })
 }
 
 /// `[left, centre y, w, h]`: the indicator alone is `REC_W` wide at the row's corner; anything with the line is
 /// `panes::btt_hud_box` of the text.
 pub fn hud_row_box(row: &HudRow, strip: bool, bar: bool) -> [f32; 4] {
-    if row.take.is_some() && !row.line {
+    if !row.line && row.take.is_some() && row.playing == [false; 2] {
         let [x, y, _, h] = panes::btt_hud_box("", false, false);
         [x, y, REC_W, h]
+    } else if !row.line && (row.playing[0] || row.playing[1]) {
+        let [x, y, _, h] = panes::btt_hud_box("", false, false);
+        let panes::Kind::Text { font, .. } = panes::spec(panes::IDX_BTT + 3).kind else {
+            return [x, y, REC_W, h];
+        };
+        let width = crate::model::notice_box::measure(row.text.as_str().encode_utf16(), font.0).0 / 0.9 + 65.0;
+        [x, y, width.max(REC_W), h]
     } else {
         panes::btt_hud_box(row.text.as_str(), strip, bar)
     }

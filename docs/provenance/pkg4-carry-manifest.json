@@ -494,7 +494,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "628c5d6175d1fd063fa255b6e8b49a94fc8c8e18c885b7167a447538d8e25b40",
+   "dest_sha256": "1fd684cb26737e94a448bdae240a020d4978b174d5999cf001b5b45664a03f43",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -546,9 +546,9 @@
      "reason": "F7: play saved crop previews on their selected Recording role."
     },
     {
-     "old": "    pub rstick_y: i8,\n}\n\n/// Fighter context",
-     "new": "    pub rstick_y: i8,\n}\n\nimpl crate::model::trim::Trim {\n    pub fn window(self, frames: &[InputFrame]) -> core::ops::Range<usize> {\n        let mut kept = frames.to_vec();\n        if self == Self::End {\n            crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut kept);\n        }\n        0..kept.len()\n    }\n\n    pub fn apply(self, frames: &mut Vec<InputFrame>) {\n        let range = self.window(frames);\n        *frames = frames[range].to_vec();\n    }\n}\n\n/// Fighter context",
-     "reason": "Red-stage trim API retains the existing End crop and leaves the other modes unimplemented."
+     "old": "/// One frame of mapped controller input (not a native struct dump).\n#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]\npub struct InputFrame {\n    pub buttons: u32,\n    pub lstick_x: i8,\n    pub lstick_y: i8,\n    pub rstick_x: i8,\n    pub rstick_y: i8,\n}\n",
+     "new": "pub use crate::model::trim::InputFrame;\n",
+     "reason": "The pure trim model owns InputFrame so standalone model tests and the macro model share the same type."
     },
     {
      "old": "    pub frames: Vec<InputFrame>,\n    /// Save id",
@@ -1480,7 +1480,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "185f859dab5c28fd6e85ec73dd51be4b430d32facb54cbd75154e04033906144",
+   "dest_sha256": "2306b0b621fff4ce9a64e23c13882d3cad1bf9f1ab43ff206b7904420d9c3c67",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -2168,6 +2168,16 @@
      "old": "    prompt_commit: Option<(String, String)>,\n    /// Name dialog parked while its placement page is open.\n    held_save: Option<NameDraft>,\n    /// CPU position from the latest save-state restore, before the offset.\n    anchor: Option<(f32, f32)>,\n    anchor_generation: Option<u64>,\n    edit_anchor: Option<(f32, f32)>,\n    pending_kind: Option<i32>,\n    claimed: bool,\n    character_ready: bool,\n    playback_on: bool,\n",
      "new": "    prompt_commit: Option<(String, String)>,\n    /// Name dialog parked while its placement page is open.\n    held_save: Option<NameDraft>,\n    /// CPU position from the latest save-state restore, before the offset.\n    anchor: Option<(f32, f32)>,\n    edit_anchor: Option<(f32, f32)>,\n    pending_kind: Option<i32>,\n    claimed: bool,\n    character_ready: bool,\n    playback_on: bool,\n",
      "reason": "F7b: move Playback Slots onto rr_host and retire named playback and slot transfer."
+    },
+    {
+     "old": "const FLICK_JUMP: u32 = 0x8000;\nconst STICK_NEUTRAL: i8 = 24;",
+     "new": "#[cfg(test)]\nconst FLICK_JUMP: u32 = 0x8000;",
+     "reason": "The shared trim model owns the neutral predicate; this constant remains for crop parity tests."
+    },
+    {
+     "old": "pub fn crop_neutral_tail(frames: &mut Vec<InputFrame>) {\n    while frames.last().is_some_and(neutral_frame) {\n        frames.pop();\n    }\n}\n\nfn neutral_frame(frame: &InputFrame) -> bool {\n    let stick = |value: i8| value.unsigned_abs() < STICK_NEUTRAL as u8;\n    (frame.buttons == 0 || frame.buttons == FLICK_JUMP)\n        && stick(frame.lstick_x)\n        && stick(frame.lstick_y)\n        && stick(frame.rstick_x)\n        && stick(frame.rstick_y)\n}",
+     "new": "pub fn crop_neutral_tail(frames: &mut Vec<InputFrame>) {\n    crate::model::trim::Trim::End.apply(frames);\n}",
+     "reason": "The existing end crop delegates to the pure trim model."
     }
    ]
   },

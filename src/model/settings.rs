@@ -610,6 +610,10 @@ fn snapshot_from(label: &'static str, nested: Option<Nested>, issues: &mut Vec<I
         // rc.14: the two-option Hitbox Visualization row became a checklist (`legend::migrate`).
         let old = (id == super::legend::ROW).then(|| value.as_array().map(|a| a.iter().map(|v| v.as_u64().unwrap_or(0).min(1) as u8).collect::<Vec<_>>())).flatten();
         let value = old.and_then(|old| super::legend::migrate(&old)).map_or(value, |row| row.to_vec().into());
+        let old_trim = (id == "recording_crop").then(|| {
+            value.as_array()?.iter().map(|v| v.as_u64().filter(|v| *v <= 1).map(|v| v as u8)).collect::<Option<Vec<_>>>()
+        }).flatten();
+        let value = old_trim.and_then(|old| super::trim::Trim::migrate(&old)).map_or(value, |row| row.to_vec().into());
         match def(&id) {
             Some((index, def)) => match parse_row(def, &value) {
                 Ok(row) => snapshot.rows[index] = row,

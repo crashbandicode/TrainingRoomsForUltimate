@@ -83,6 +83,7 @@ struct Run {
     step: usize,
     frame: usize,
     end: usize,
+    bounds: Option<(usize, usize)>,
     /// Passes still to play, including the one in progress. `None` plays until the chord stops it.
     remaining: Option<u32>,
     emitted: bool,
@@ -90,7 +91,7 @@ struct Run {
 
 impl Run {
     fn new(id: &str, chain: bool, remaining: Option<u32>, frames: core::ops::Range<usize>) -> Self {
-        Self { id: IdBuf::copy_from(id), chain, step: 0, frame: frames.start, end: frames.end, remaining, emitted: false }
+        Self { id: IdBuf::copy_from(id), chain, step: 0, frame: frames.start, end: frames.end, bounds: None, remaining, emitted: false }
     }
 }
 
@@ -172,6 +173,15 @@ impl Book {
     /// The recording's start state (its recorded start speeds and facing); `None` for anything else.
     pub fn start_state(&self, id: &str) -> Option<super::macros::StartState> {
         self.recordings.get(id).map(|recording| recording.start)
+    }
+
+    pub fn drill_preview_range(&self, id: &str, frames: core::ops::Range<usize>) -> core::ops::Range<usize> {
+        match self.recordings.get(id) {
+            Some(recording) if crate::model::combo_record::is_drill_take_name(&recording.name)
+                && frames.start == 0 && frames.end == recording.frames.len() =>
+                    recording.trim.window(&recording.frames),
+            _ => frames,
+        }
     }
 
     pub fn add_save(&mut self, id: impl Into<String>) {
@@ -309,6 +319,7 @@ impl Playback {
                 }
                 run.step = 0;
                 run.frame = 0;
+                run.bounds = None;
                 run.emitted = false;
                 continue;
             }
@@ -317,12 +328,21 @@ impl Playback {
             } else {
                 run.id
             };
-            let at = run.frame;
-            let frame = if at < run.end {
-                book.recordings.get(step_name.as_str()).and_then(|recording| recording.frames.get(at).copied())
-            } else {
-                None
-            };
+            let recording = book.recordings.get(step_name.as_str());
+            let bounds = recording.map(|recording| {
+                if run.end == usize::MAX {
+                    run.bounds.unwrap_or_else(|| {
+                        let range = recording.trim.window(&recording.frames);
+                        (range.start, range.end)
+                    })
+                } else {
+                    (0, run.end)
+                }
+            });
+            let at = bounds.map_or(run.frame, |(start, _)| run.frame.max(start));
+            let frame = recording.and_then(|recording| {
+                bounds.filter(|(_, end)| at < *end).and_then(|_| recording.frames.get(at).copied())
+            });
             if let Some(frame) = frame {
                 let recording_id = book
                     .recordings
@@ -331,6 +351,7 @@ impl Playback {
                     .unwrap_or("");
                 let run = self.roles[slot].as_mut().unwrap();
                 run.frame = at + 1;
+                run.bounds = bounds;
                 run.emitted = true;
                 return Some(Played {
                     recording_id,
@@ -341,6 +362,7 @@ impl Playback {
             let run = self.roles[slot].as_mut().unwrap();
             run.step += 1;
             run.frame = 0;
+            run.bounds = None;
         }
     }
 

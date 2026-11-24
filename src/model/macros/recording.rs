@@ -24,30 +24,7 @@ pub const MAX_NAME_CHARS: usize = 48;
 /// Longest free-form game version tag, in bytes.
 pub const MAX_GAME_VERSION_BYTES: usize = 32;
 
-/// One frame of mapped controller input (not a native struct dump).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InputFrame {
-    pub buttons: u32,
-    pub lstick_x: i8,
-    pub lstick_y: i8,
-    pub rstick_x: i8,
-    pub rstick_y: i8,
-}
-
-impl crate::model::trim::Trim {
-    pub fn window(self, frames: &[InputFrame]) -> core::ops::Range<usize> {
-        let mut kept = frames.to_vec();
-        if self == Self::End {
-            crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut kept);
-        }
-        0..kept.len()
-    }
-
-    pub fn apply(self, frames: &mut Vec<InputFrame>) {
-        let range = self.window(frames);
-        *frames = frames[range].to_vec();
-    }
-}
+pub use crate::model::trim::InputFrame;
 
 /// Fighter context a macro assumes at its first frame.
 ///

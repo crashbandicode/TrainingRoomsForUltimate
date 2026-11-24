@@ -180,6 +180,7 @@ pub struct SaveFile {
 /// A recording or a chain. A chain's start save is macro 1's; `start_save` on a chain is ignored.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MacroFile {
+    pub trim: super::trim::Trim,
     pub id: String,
     pub name: String,
     pub chain: bool,
@@ -194,6 +195,7 @@ pub struct MacroFile {
 /// A combo file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComboFile {
+    pub trim: super::trim::Trim,
     pub input_only: bool,
     pub id: String,
     pub name: String,
@@ -1392,6 +1394,7 @@ impl RecordingScreens {
             Act::SetActive => self.set_active(self.page_role, &id, on),
             Act::StartSave => self.set_start(kind, &id, on),
             Act::PlaybackSlot => self.step_slot(&id, on),
+            Act::Trim => self.step_trim(kind, &id, on),
             _ => {}
         }
     }
@@ -1419,7 +1422,7 @@ impl RecordingScreens {
                 self.set_start(kind, &id, on);
             }
             Act::PlaybackSlot => self.step_slot(&id, true),
-            Act::Trim => {}
+            Act::Trim => self.step_trim(kind, &id, true),
             Act::Duplicate => {
                 self.duplicate_save(&id);
                 if kind == ItemKind::Save {
@@ -1666,6 +1669,7 @@ impl RecordingScreens {
         self.serial += 1;
         let id = format!("chain-{}", self.serial);
         self.catalog.macros.push(MacroFile {
+            trim: super::trim::Trim::Off,
             id: id.clone(),
             name: label,
             chain: true,
@@ -2092,6 +2096,8 @@ impl RecordingScreens {
         let slot = self.slot_of(id).map_or_else(|| "None".to_string(), |i| format!("Slot {}", i + 1));
         rows.push(row("Playback slot", slot, Act::PlaybackSlot));
         rows.push(row_rename());
+        let trim = self.macro_by_id(id).map_or(super::trim::Trim::Off, |file| file.trim);
+        rows.push(row("Trim", trim.label(), Act::Trim));
         rows.push(row("Crop", "", Act::Crop));
         rows.push(row("Make combo", "", Act::MakeCombo));
         rows.push(row_delete());
@@ -2121,6 +2127,9 @@ impl RecordingScreens {
             }
         }
         rows.push(row_rename());
+        if let Some(combo) = self.combo_by_id(id).filter(|combo| combo.input_only) {
+            rows.push(row("Trim", combo.trim.label(), Act::Trim));
+        }
         rows.push(row("Crop", "", Act::Crop));
         rows.push(row_delete());
         rows
@@ -2166,6 +2175,24 @@ impl RecordingScreens {
 
     fn combo_by_id(&self, id: &str) -> Option<&ComboFile> {
         self.catalog.combos.iter().find(|file| file.id == id)
+    }
+
+    fn step_trim(&mut self, kind: ItemKind, id: &str, forward: bool) {
+        let (trim, file_kind) = match kind {
+            ItemKind::Recording => match self.catalog.macros.iter_mut().find(|file| file.id == id && !file.chain) {
+                Some(file) => (&mut file.trim, FileKind::Macro),
+                None => return,
+            },
+            ItemKind::Combo => match self.catalog.combos.iter_mut().find(|file| file.id == id && file.input_only) {
+                Some(file) => (&mut file.trim, FileKind::Combo),
+                None => return,
+            },
+            _ => return,
+        };
+        let next = (u8::from(forward) + (*trim as u8) + if forward { 0 } else { 3 }) % 4;
+        *trim = super::trim::Trim::from_index(next);
+        self.last_effect = Effect::SetTrim { id: id.to_owned(), kind: file_kind, trim: *trim };
+        self.selection_changed = true;
     }
 
     fn sequence_by_id(&self, id: &str) -> Option<&SequenceFile> {
@@ -2445,6 +2472,7 @@ mod tests {
             saves,
             macros: vec![
                 MacroFile {
+                    trim: crate::model::trim::Trim::Off,
                     id: "nair".into(),
                     name: "Nair loop".into(),
                     chain: false,
@@ -2455,6 +2483,7 @@ mod tests {
                     span: 12,
                 },
                 MacroFile {
+                    trim: crate::model::trim::Trim::Off,
                     id: "dash".into(),
                     name: "Dash grab".into(),
                     chain: false,
@@ -2465,6 +2494,7 @@ mod tests {
                     span: 0,
                 },
                 MacroFile {
+                    trim: crate::model::trim::Trim::Off,
                     id: "throw".into(),
                     name: "CPU throw".into(),
                     chain: false,
@@ -2475,6 +2505,7 @@ mod tests {
                     span: 0,
                 },
                 MacroFile {
+                    trim: crate::model::trim::Trim::Off,
                     id: "pressure".into(),
                     name: "Corner pressure".into(),
                     chain: true,
@@ -2485,7 +2516,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile { input_only: false, take: None,
+            combos: vec![ComboFile { trim: crate::model::trim::Trim::Off, input_only: false, take: None,
                 id: "nairc".into(),
                 name: "Nair loop combo".into(),
                 recorded_on: String::new(),
@@ -2623,6 +2654,7 @@ mod tests {
         catalog.saves.truncate(3);
         for i in 0..45 {
             catalog.macros.push(MacroFile {
+                trim: crate::model::trim::Trim::Off,
                 id: format!("long-{i}"), name: format!("Long {i}"), chain: false, steps: Vec::new(),
                 start_save: None, start_save_on: true, recorded_on: String::new(), span: 0,
             });
@@ -3307,7 +3339,7 @@ mod tests {
         let mut screens = screens();
         screens.catalog.combos.insert(
             0,
-            ComboFile { input_only: false, take: None,
+            ComboFile { trim: crate::model::trim::Trim::Off, input_only: false, take: None,
                 id: "ryu".into(),
                 name: "Ryu BnB".into(),
                 recorded_on: String::new(),
@@ -3682,10 +3714,12 @@ mod tests {
 
     fn x_previews_a_drill_that_has_its_take_on_both_faces() {
         let macro_file = |id: &str, chain: bool, span| MacroFile {
+            trim: crate::model::trim::Trim::Off,
             id: id.into(), name: id.into(), chain, steps: Vec::new(), start_save: None,
             start_save_on: true, recorded_on: String::new(), span,
         };
         let combo = |id: &str, input_only: bool, made_from: Option<&str>, take: Option<&str>| ComboFile {
+            trim: crate::model::trim::Trim::Off,
             input_only, id: id.into(), name: id.into(), recorded_on: String::new(),
             made_from: made_from.map(str::to_string), take: take.map(str::to_string), combo: Box::new(Combo::EMPTY), fighter: None, span: 1,
         };
@@ -3796,9 +3830,9 @@ mod tests {
         assert_eq!(crop.made_from.as_deref(), Some("source"), "the crop keeps its provenance");
         let mut screens = RecordingScreens::new();
         screens.set_catalog(Catalog {
-            macros: vec![MacroFile { id: "source".into(), name: "Source".into(), chain: false, steps: Vec::new(),
+            macros: vec![MacroFile { trim: crate::model::trim::Trim::Off, id: "source".into(), name: "Source".into(), chain: false, steps: Vec::new(),
                 start_save: None, start_save_on: true, recorded_on: String::new(), span: 40 }],
-            combos: vec![ComboFile { id: "crop".into(), name: crop.name, input_only: true, recorded_on: String::new(),
+            combos: vec![ComboFile { trim: crate::model::trim::Trim::Off, id: "crop".into(), name: crop.name, input_only: true, recorded_on: String::new(),
                 made_from: crop.made_from, take: crop.take, combo: Box::new(Combo::EMPTY), fighter: None, span: 1 }],
             ..Catalog::default()
         });

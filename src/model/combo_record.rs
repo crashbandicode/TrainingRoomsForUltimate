@@ -261,6 +261,11 @@ impl ComboRecord {
             } else {
                 object.remove("recorded_fighter");
             }
+            if self.combo.input_only && !self.trim.is_off() {
+                object.insert("trim".into(), json!(self.trim));
+            } else {
+                object.remove("trim");
+            }
             return Value::Object(object);
         }
         let links: Vec<Value> = self
@@ -319,6 +324,9 @@ impl ComboRecord {
         }
         if let Some(take) = &self.take {
             value["take"] = json!(take);
+        }
+        if self.combo.input_only && !self.trim.is_off() {
+            value["trim"] = json!(self.trim);
         }
         value
     }

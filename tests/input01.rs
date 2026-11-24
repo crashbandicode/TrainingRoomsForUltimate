@@ -54,7 +54,7 @@ fn place_row_is_in_recording_options_off_by_default() {
 fn menu_defaults_match_spec() {
     let s = RecorderSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(s, RecorderSettings::factory());
-    assert_eq!((s.crop, s.mash_interrupt), (true, true));
+    assert_eq!((s.trim, s.mash_interrupt), (model::trim::Trim::End, true));
     assert_eq!(s.hitstun, HitstunTiming::HitstunEnds);
 }
 

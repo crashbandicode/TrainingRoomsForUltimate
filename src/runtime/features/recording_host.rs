@@ -235,7 +235,8 @@ pub fn service() {
         rr_host::set_role_fighter(crate::engine::library::Role::Cpu, cpu.fighter_kind);
     }
     rr_host::set_strip_sample(super::combo::strip_sample());
-    rr_host::set_record_trim(super::recorder::settings().crop);
+    rr_host::set_record_trim(super::recorder::settings().trim);
+    rr_host::set_playback_indicator(super::recorder::settings().indicator);
     if player.fighter_kind >= 0 {
         rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }

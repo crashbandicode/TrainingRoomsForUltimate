@@ -194,10 +194,20 @@ fn trim_end_is_the_old_crop_on_one_table() {
         vec![InputFrame { lstick_x: -24, ..frame(0) }, frame(0)],
     ] {
         let mut old = input.clone();
-        crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut old);
+        while old.last().is_some_and(|frame| {
+            let stick = |value: i8| value.unsigned_abs() < 24;
+            (frame.buttons == 0 || frame.buttons == 0x8000)
+                && stick(frame.lstick_x) && stick(frame.lstick_y)
+                && stick(frame.rstick_x) && stick(frame.rstick_y)
+        }) {
+            old.pop();
+        }
         let mut new = input.clone();
         Trim::End.apply(&mut new);
         assert_eq!(new, old);
+        let mut crop = input.clone();
+        crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut crop);
+        assert_eq!(crop, old);
     }
 }
 
@@ -242,10 +252,15 @@ fn recording_trim_migrates_on_to_end_and_off_to_off() {
         assert_eq!(loaded.settings.menu.get("recording_crop"), Some(expected.as_slice()));
         assert_eq!(loaded.settings.defaults.get("recording_crop"), Some(expected.as_slice()));
         assert_eq!(Trim::migrate(&old), Some(expected));
+        let saved: serde_json::Value = serde_json::from_str(&loaded.settings.to_json()).unwrap();
+        assert_eq!(saved["menu"]["recording_crop"], serde_json::json!(expected));
+        assert_eq!(saved["defaults_menu"]["recording_crop"], serde_json::json!(expected));
     }
     assert_eq!(Trim::migrate(&[0, 1, 0, 0]), None);
     assert_eq!(Trim::from_row(&[]), Trim::Off);
     assert_eq!(Trim::from_row(&[0, 1, 1, 0]), Trim::End);
+    let invalid = settings::parse(r#"{"menu":{"recording_crop":[2,0]}}"#);
+    assert!(invalid.issues.iter().any(|issue| issue.at == "menu.recording_crop"));
 }
 
 #[test]
@@ -315,14 +330,14 @@ fn file_trim_round_trips_without_removing_frames() {
             let id = combos.save_new(&record).unwrap();
             let text = std::fs::read_to_string(root.0.join("combos").join(format!("{id}.json"))).unwrap();
             let json: serde_json::Value = serde_json::from_str(&text).unwrap();
-            assert_eq!(json.get("trim").and_then(|value| value.as_str()), key);
-            assert_eq!(combos.load(&id).unwrap().trim, trim);
+            assert_eq!(json.get("trim").and_then(|value| value.as_str()), if input { key } else { None });
+            assert_eq!(combos.load(&id).unwrap().trim, if input { trim } else { Trim::Off });
         }
     }
 }
 
 #[test]
-fn macro_combo_and_drill_screens_have_a_trim_row() {
+fn macro_and_drill_screens_have_a_trim_row() {
     let root = Scratch::new();
     let macro_id = Library::new(root.0.join(MACROS_DIR)).save_new(&recording("Macro", &[1], Trim::Off)).unwrap();
     Store::<Chain>::new(root.0.join(MACROS_DIR)).save_new(&Chain::new("Chain", vec![macro_id]).unwrap()).unwrap();
@@ -333,7 +348,6 @@ fn macro_combo_and_drill_screens_have_a_trim_row() {
     Store::<Sequence>::new(root.0.join(SEQUENCES_DIR)).save_new(&Sequence::new("Sequence", vec![combo_id]).unwrap()).unwrap();
     for (group, name, drill) in [
         (SAVES_MACROS, "Macro", false),
-        (COMBOS_SEQ, "Combo", false),
         (COMBOS_SEQ, "Drill", true),
     ] {
         let screens = open_file(&root.0, group, name, drill);
@@ -356,6 +370,31 @@ fn macro_combo_and_drill_screens_have_a_trim_row() {
 }
 
 #[test]
+fn a_hit_combo_has_no_trim_row() {
+    let root = Scratch::new();
+    let combos = ComboLibrary::new(root.0.join("combos"));
+    let mut record = combo(false, "Combo");
+    record.trim = Trim::Both;
+    let original = record.combo;
+    let id = combos.save_new(&record).unwrap();
+    let path = root.0.join("combos").join(format!("{id}.json"));
+    let text = std::fs::read_to_string(&path).unwrap();
+    let mut json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert!(json.get("trim").is_none());
+    json["trim"] = serde_json::json!("both");
+    std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+    let loaded = combos.load(&id).unwrap().combo;
+    assert_eq!(loaded, original);
+    let attempt = original.links().next().unwrap();
+    assert_eq!(
+        crate::model::combo::grade(loaded.links().next().unwrap(), attempt),
+        crate::model::combo::grade(attempt, attempt)
+    );
+    let screens = open_file(&root.0, COMBOS_SEQ, "Combo", false);
+    assert!(!screens.file_rows().iter().any(|row| row.title == "Trim"));
+}
+
+#[test]
 fn file_trim_row_cycles_and_is_saved() {
     let _host = HostGuard::new();
     let root = Scratch::new();
@@ -363,11 +402,9 @@ fn file_trim_row_cycles_and_is_saved() {
     let macro_id = macros.save_new(&recording("Macro", &[0, 1, 0], Trim::Off)).unwrap();
     let take_id = macros.save_new(&recording("Drill take 0000000000000001", &[0, 1, 0], Trim::Off)).unwrap();
     let combos = ComboLibrary::new(root.0.join("combos"));
-    let combo_id = combos.save_new(&combo(false, "Combo")).unwrap();
     let drill_id = combos.save_new(&combo(true, "Drill").with_take(&take_id)).unwrap();
     for (group, name, drill, id, kind) in [
         (SAVES_MACROS, "Macro", false, macro_id.as_str(), FileKind::Macro),
-        (COMBOS_SEQ, "Combo", false, combo_id.as_str(), FileKind::Combo),
         (COMBOS_SEQ, "Drill", true, drill_id.as_str(), FileKind::Combo),
     ] {
         let mut screens = open_file(&root.0, group, name, drill);
@@ -527,15 +564,21 @@ fn playback_indicator_shares_the_row_with_rec() {
     assert_eq!(row.text.as_str(), "REC CPU · PLAY P1 + CPU · 10/10");
     assert_eq!((row.color, row.chip), (hud_row::CPU_COLOR, hud_row::CPU_COLOR));
     assert_eq!(row.playing, [true, true]);
+    let longest = hud_row::hud_row(Some(Take::Cpu), [true, true], "").unwrap();
+    let rect = hud_row::hud_row_box(&longest, false, false);
+    let crate::model::panes::Kind::Text { font, .. } =
+        crate::model::panes::spec(crate::model::panes::IDX_BTT + 3).kind else { panic!("text pane") };
+    assert!(crate::model::notice_box::measure(longest.text.as_str().encode_utf16(), font.0).0 <= 0.9 * (rect[2] - 64.0));
 }
 
 #[test]
 fn playback_indicator_is_on_by_default() {
     assert_eq!(Snapshot::factory().get("playback_indicator"), Some(&[1, 0][..]));
     assert!(crate::model::recording::RecorderSettings::factory().indicator);
-    let row = ROWS.iter().position(|row| row.id == "recording_crop").unwrap();
-    assert_eq!(ROWS[row + 1].id, "playback_indicator");
-    assert!(matches!(ROWS[row + 1].control, Control::Toggle));
+    let crop = ROWS.iter().find(|row| row.id == "recording_crop").unwrap();
+    let row = ROWS.iter().find(|row| row.id == "playback_indicator").unwrap();
+    assert_eq!(row.group, crop.group);
+    assert!(matches!(row.control, Control::Toggle));
 }
 
 #[test]
