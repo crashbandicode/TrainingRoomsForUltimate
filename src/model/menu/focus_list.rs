@@ -23,8 +23,9 @@ impl Menu {
         let screen = self.screen().copied();
         if screen.is_none() && self.page == Page::Recording {
             let (which, on_library) = self.library_focus();
-            if let Some(list) = self.recording.focus_list(Face::Page, which, on_library) {
-                return Some(list);
+            let list = self.recording.focus_list(Face::Page, which, on_library);
+            if list.is_some() || self.recording.page_overlay_open() {
+                return list;
             }
         }
         let (id, count, index, row) = match screen {
