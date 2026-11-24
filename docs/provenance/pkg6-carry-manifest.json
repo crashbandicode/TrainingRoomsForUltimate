@@ -12838,7 +12838,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "b1d80c4ce08d607d866d25d8f4aad7c077f0aabe127a6bb2deede4cf4d899c28",
+      "dest_sha256": "129da9536dd353c5c55a815015f02149dba233806bc4ba61ca1e9e89fa0932c1",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14496,6 +14496,16 @@
           "old": "                        trace!(\"[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices\");\n",
           "new": "                        trace!(\"[CharacterRoster] fresh waiting lobby; cleared both practice choices\");\n",
           "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    if fresh { crate::runtime::roster::kirby_hats::fresh_lobby(); }\n}",
+          "new": "    if fresh { retire_waiting_lobby(); }\n}\n\nfn retire_waiting_lobby() {\n    crate::runtime::roster::kirby_hats::fresh_lobby();\n    training::named_macros::waiting_scene_changed(false);\n}",
+          "reason": "Quickplay new pick (20:42:50Z): once the exact Mii identity proves a fresh lobby, retire the Setup session as well as the hats, through the same step as an ordinary new pick."
+        },
+        {
+          "old": "                        crate::runtime::roster::kirby_hats::fresh_lobby();\n                        training::named_macros::waiting_scene_changed(false);",
+          "new": "                        retire_waiting_lobby();",
+          "reason": "Quickplay new pick (20:42:50Z): once the exact Mii identity proves a fresh lobby, retire the Setup session as well as the hats, through the same step as an ordinary new pick."
         }
       ]
     },

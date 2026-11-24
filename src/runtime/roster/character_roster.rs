@@ -167,7 +167,12 @@ fn observe_mii_origin(role:Role,generation:u64,kind:u32,forms:Forms,
     let fresh = memory.observe(role as usize,WaitingValue {fighter,forms,cursor:None,
         configuration:Some(configuration),owned:true,original:true});
     drop(memory);
-    if fresh { crate::runtime::roster::kirby_hats::fresh_lobby(); }
+    if fresh { retire_waiting_lobby(); }
+}
+
+fn retire_waiting_lobby() {
+    crate::runtime::roster::kirby_hats::fresh_lobby();
+    training::named_macros::waiting_scene_changed(false);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1400,8 +1405,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                     };
                     if fresh_lobby {
                         trace!("[CharacterRoster] fresh waiting lobby; cleared both practice choices");
-                        crate::runtime::roster::kirby_hats::fresh_lobby();
-                        training::named_macros::waiting_scene_changed(false);
+                        retire_waiting_lobby();
                     }
                     role.sync_selection(fighter, live_owner(role, fighter.kind()));
                 }

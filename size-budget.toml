@@ -2661,3 +2661,11 @@ ceiling = 197314
 date = "2026-11-24"
 reason = "Quickplay new pick: the waiting memory keeps the native body each role's lobby started from, so a different fighter picked at the character select after a match starts the waiting practice fresh. Measured 197314 (tools/sloc.py tree), 37 above install 4 merge 2 0db4728c (197277)."
 approved_by = "tr-primary-2 order 2026-11-24 19:36:34Z (the operator's Quickplay report, install 4: f15-lobby fixes it on fix/qp-css-resets-choice), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). The +37 is reported with the READY."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197317
+date = "2026-11-24"
+reason = "Retire Setup and hats through the same step for a new ordinary or exact Mii pick. Measured +3 on e205206e."
+approved_by = "tr-primary-2 2026-11-24 20:49:18Z approved 197317."
