@@ -128,7 +128,7 @@
       ]
     },
     {
-      "id": "f11-w5",
+      "id": "f11-wc5",
       "start": "lobby",
       "end": "lobby",
       "role": "test",
@@ -140,7 +140,7 @@
           "args": {
             "scene": "lobby",
             "ident": "6",
-            "name": "floor-attach",
+            "name": "p1-placement-control",
             "cpu": [
               -100,
               -20
