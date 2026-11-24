@@ -1233,7 +1233,7 @@ fn airborne_cast(target: Option<Combo>, kick: bool, cast: Cast, speed: (f32, f32
         let (mut p, mut inputs) = if f < 0 { (standing(), MappedInputs::NEUTRAL) } else { cast_frame(cast, f as u32) };
         if kick {
             if p.attack.is_some() { p.attack = Some(Move::DownSpecial); p.status = 0x1df; }
-            if (0..3).contains(&f) { inputs.lstick_y = -127; }
+            if (0..3).contains(&f) { inputs.lstick_y = -60; } // Down B, short of a separate fast-fall edge.
         }
         let (x, y) = if kick { let n = (f - 1).clamp(0, 34) as f32; (n, -n) } else { p.pos.unwrap_or_default() };
         p.pos = Some((x + f as f32 * speed.0, 100.0 + y + f as f32 * speed.1));
