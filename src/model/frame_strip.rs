@@ -4,6 +4,7 @@
 //! pane looks (`frame_strip_plan`). Fixed arrays only, so nothing here allocates.
 
 use super::input_delay::MappedInputs;
+use super::move_names::Normal;
 use super::spots::{self, Peak, Powers, Spot};
 use super::spacing::{Grade, Taken};
 
@@ -799,6 +800,11 @@ impl Tracker {
                     self.action.variant = super::action::variant(p1.motion);
                     self.action.variant_known = true;
                 }
+            }
+        } else if self.action.mv == Move::Jab && p1.attack == Some(Move::Jab) {
+            // ATTACK -> ATTACK_100 can change the hit's name without opening a new action.
+            if let rapid @ (Normal::RapidJab | Normal::RapidJabFinisher) = Normal::of(p1.motion) {
+                self.action.variant = rapid as u8;
             }
         }
         if p1.named == Some(Move::Throw) && self.action.mv == Move::Grab {
