@@ -783,6 +783,50 @@ fn the_runtime_reads_the_angle_and_the_travel_behind_their_gates() {
     assert!(input.contains("aims_drawn(&tracker, labels)") && !input.contains("aims_shown("));
 }
 
+fn the_action_takes_its_origin_when_it_opens() {
+    let mut tracker = Tracker::new();
+    let stun = Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
+    let hit = Sample { stop: true, ..stun };
+    tracker.step(attack(Move::Jab, 1, 0.0), hit, NONE);
+    for frame in 2..=6 {
+        tracker.step(idle(), stun, if frame == 5 { A } else { NONE });
+    }
+    tracker.step(attack(Move::SideTilt, 2, 0.0), hit, NONE);
+    assert_eq!(tracker.origin(), Some(5));
+    assert_eq!(tracker.latest_link().unwrap().press, 5);
+
+    let mut old = Tracker::new();
+    old.step(idle(), idle(), A);
+    for _ in 2..=16 {
+        old.step(idle(), idle(), NONE);
+    }
+    old.step(attack(Move::Jab, 1, 0.0), idle(), NONE);
+    assert_eq!(old.origin(), None);
+}
+
+fn a_throw_stays_in_the_action_of_its_grab() {
+    use super::ids::{Table, C};
+    let t = Table::with(&[(C::Catch, 0x30), (C::CatchAttack, 0x36), (C::Throw, 0x37), (C::Final, 0x1e0)]);
+    assert_eq!(t.named(0x30), Some(Move::Grab));
+    assert_eq!(t.named(0x36), Some(Move::Grab));
+    assert_eq!(t.named(0x37), Some(Move::Throw));
+    assert_eq!(t.named(0x1e0), Some(Move::FinalSmash));
+    assert_eq!(t.named(0x1e1), None);
+    let mut tracker = Tracker::new();
+    let stun = Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
+    let hit = Sample { stop: true, ..stun };
+    let grab = Sample { named: Some(Move::Grab), status: 0x30, ..Sample::default() };
+    let throw = Sample { named: Some(Move::Throw), status: 0x37, ..Sample::default() };
+    tracker.step(grab, hit, NONE);
+    tracker.step(grab, stun, NONE);
+    tracker.step(throw, hit, NONE);
+    assert!(tracker.latest_link().is_none());
+    tracker.step(idle(), stun, NONE);
+    tracker.step(attack(Move::Jab, 1, 0.0), hit, NONE);
+    let link = tracker.latest_link().unwrap();
+    assert_eq!((link.from, link.to), (Move::Throw, Move::Jab));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -824,6 +868,8 @@ fn case_table() {
         ("each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved", each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved as fn()),
         ("a_link_keeps_both_moves_directions_and_the_special_a_travel_continues", a_link_keeps_both_moves_directions_and_the_special_a_travel_continues as fn()),
         ("a_second_part_reaches_the_link_its_special_already_made", a_second_part_reaches_the_link_its_special_already_made as fn()),
+        ("the_action_takes_its_origin_when_it_opens", the_action_takes_its_origin_when_it_opens as fn()),
+        ("a_throw_stays_in_the_action_of_its_grab", a_throw_stays_in_the_action_of_its_grab as fn()),
         ("the_runtime_reads_the_angle_and_the_travel_behind_their_gates", the_runtime_reads_the_angle_and_the_travel_behind_their_gates as fn()),
     ]);
 }

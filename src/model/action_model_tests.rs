@@ -453,4 +453,105 @@ fn a_release_records_its_hold_in_the_file() {
     assert_eq!(read, record);
 }
 
+fn hit_record(from: &str, to: &str, from_shown: Option<serde_json::Value>, to_shown: Option<serde_json::Value>) -> crate::model::combo_record::ComboRecord {
+    let mut value = serde_json::json!({
+        "schema_version": 1, "name": "Drill", "links": [{
+            "from": from, "to": to, "verdict": {"kind": "true", "link": null},
+            "window": null, "events": []
+        }]
+    });
+    if let Some(shown) = from_shown { value["links"][0]["from_shown"] = shown; }
+    if let Some(shown) = to_shown { value["links"][0]["to_shown"] = shown; }
+    serde_json::from_value(value).unwrap()
+}
+
+#[test]
+fn the_bar_and_the_menu_name_a_link_as_the_strip_does() {
+    use crate::model::frame_strip::{Angle, Verdict};
+    use crate::model::frame_strip_plan::{link_moves, Text, TEXT_UNITS};
+    use crate::model::combo_plan::Renderer;
+    use crate::model::panes::strip_layout::C;
+    let mut tracker = Tracker::new();
+    let stun = Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
+    let hit = Sample { stop: true, ..stun };
+    tracker.step(Sample { attack: Some(Move::Jab), status: 1, ..Sample::default() }, hit, MappedInputs::NEUTRAL);
+    tracker.step(standing(), stun, MappedInputs::NEUTRAL);
+    tracker.step(Sample { attack: Some(Move::SideTilt), angle: Some(Angle::Up), status: 2, ..Sample::default() }, hit, MappedInputs::NEUTRAL);
+    let link = tracker.latest_link().unwrap();
+    assert!(matches!(link.verdict, Verdict::True(_)));
+    assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
+    let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
+    let combo = Combo::from_links([rec]).unwrap();
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo)[0], "L1 jab → side tilt ↑ TRUE");
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let mut texts = Vec::new();
+    Renderer::new().draw(&helper, &Text::EMPTY, None, true, (&C, false), |_, look, _| {
+        if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); }
+    });
+    assert!(texts.iter().any(|text| text == "1 Jab>Side tilt ↑"), "{texts:?}");
+}
+
+#[test]
+fn a_hit_combo_tells_an_angled_tilt_from_a_level_one() {
+    let empty = || Some(serde_json::json!({}));
+    let up = *hit_record("jab", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
+    let level = *hit_record("jab", "side_tilt", empty(), empty()).combo.get(0).unwrap();
+    assert!(grade(&up, &level).wrong_move);
+    assert!(!grade(&up, &up).wrong_move);
+    let mut helper = Helper::new();
+    helper.set_target(Some(Combo::from_links([up]).unwrap()));
+    helper.on_link(level, true, 1, &mut Out::default(), None);
+    assert_eq!(helper.results().next().unwrap().fault, Some((0, Reason::WrongMove(Move::SideTilt))));
+    let special = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"up_special"}))).combo.get(0).unwrap();
+    let other = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"side_special"}))).combo.get(0).unwrap();
+    assert!(grade(&special, &other).wrong_move);
+}
+
+#[test]
+fn a_link_without_descriptions_grades_as_before() {
+    let old_tilt = *hit_record("jab", "side_tilt", None, None).combo.get(0).unwrap();
+    let angled = *hit_record("jab", "side_tilt", Some(serde_json::json!({})), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
+    assert!(!grade(&old_tilt, &angled).wrong_move);
+    let old_other = *hit_record("jab", "other", None, None).combo.get(0).unwrap();
+    let thrown = *hit_record("jab", "other", Some(serde_json::json!({})), Some(serde_json::json!({"move":"throw"}))).combo.get(0).unwrap();
+    assert_eq!(thrown.to, Move::Throw);
+    assert!(!grade(&old_other, &thrown).wrong_move);
+}
+
+#[test]
+fn link_descriptions_round_trip_in_optional_keys() {
+    use crate::model::combo_record::ComboRecord;
+    let parsed = hit_record("other", "side_tilt", Some(serde_json::json!({"move":"throw"})), Some(serde_json::json!({"angle":"up"})));
+    let record = ComboRecord::new("Drill".into(), parsed.combo, None);
+    let mut value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["links"][0]["from"], "other");
+    assert_eq!(value["links"][0]["from_shown"], serde_json::json!({"move":"throw"}));
+    assert_eq!(value["links"][0]["to_shown"], serde_json::json!({"angle":"up"}));
+    let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(read, record);
+    value["links"][0]["to_shown"] = serde_json::json!(5);
+    let error = serde_json::from_value::<ComboRecord>(value.clone()).unwrap_err();
+    assert!(error.to_string().contains("to_shown"));
+    value["links"][0].as_object_mut().unwrap().remove("to_shown");
+    let partial: ComboRecord = serde_json::from_value(value).unwrap();
+    let link = partial.combo.get(0).unwrap();
+    assert!(!link.described());
+    assert_eq!(link.from, Move::Other);
+}
+
+#[test]
+fn a_link_record_keeps_its_size() {
+    assert_eq!(core::mem::size_of::<LinkRec>(), 124);
+}
+
+#[test]
+fn the_description_holds_no_names() {
+    let source = include_str!("action.rs");
+    assert_eq!(source.matches(".name()").count(), 1);
+    for name in [r#""Jab""#, r#""Up B""#, r#""Side tilt""#] {
+        assert!(!source.contains(name));
+    }
+}
+
 }
