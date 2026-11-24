@@ -9610,7 +9610,7 @@
       "dest": "src/model/swap/character_memory.rs",
       "crate": "root",
       "src_sha256": "513ed484fc3ab77d9d39567ced7626950b7c63ecc54acdd6f99e08db293c3cc8",
-      "dest_sha256": "39ab20189e147079dcad65c95c26268b987887742f2fc5143a334694e7922409",
+      "dest_sha256": "3d4d6027e55671810eb9bce79f8c4bda834c3e5efd9f7951ddd0fb700850b24a",
       "edits": [
         {
           "table_tests": true,
@@ -9644,6 +9644,81 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "old": "\n    pub fn commit(&mut self, role: usize, fighter: T) {\n",
+          "new": "\n    pub fn arrived(&mut self, _: usize, _: impl FnOnce(&T) -> bool) -> bool { false }\n\n    pub fn commit(&mut self, role: usize, fighter: T) {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the cases of the operator's sequence, and the entry point for a returning body not yet known exactly."
+        },
+        {
+          "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "new": "\n    fn qp_waiting(session: &mut WaitingSession<i32>) {\n        session.scene_changed(true, 0x0d, 0x07010101);\n    }\n\n    fn qp_match_and_return(session: &mut WaitingSession<i32>) {\n        session.scene_changed(true, 0x0e, 0x07010101);\n        qp_waiting(session);\n    }\n\n    fn a_new_pick_after_a_match_forgets_both_roles() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        qp_match_and_return(&mut session);\n        assert!(session.observe(0, 30));\n        assert_eq!(session.restore_target(0), None);\n        assert_eq!(session.restore_target(1), None);\n        assert!(!session.observe(1, 30));\n        assert!(!session.restoration_pending([true, true]));\n\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.commit(1, 6);\n        qp_match_and_return(&mut session);\n        assert_eq!(session.restore_target(0), Some(20));\n        assert!(session.observe(0, 30));\n        assert_eq!(session.restore_target(0), None);\n        assert_eq!(session.restore_target(1), None);\n    }\n\n    fn the_cpu_seen_first_with_the_new_pick_forgets_the_player_too() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.commit(1, 6);\n        qp_match_and_return(&mut session);\n        assert!(session.observe(1, 30));\n        assert_eq!(session.restore_target(0), None);\n        assert!(!session.observe(0, 30));\n    }\n\n    fn the_new_pick_is_the_lobbys_fighter_from_then_on() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        qp_match_and_return(&mut session);\n        assert!(session.observe(0, 30));\n        assert!(!session.observe(1, 30));\n        session.commit(0, 40);\n        qp_match_and_return(&mut session);\n        assert!(!session.observe(0, 30));\n        assert_eq!(session.restore_target(0), Some(40));\n        assert!(!session.observe(1, 30));\n        qp_match_and_return(&mut session);\n        assert!(session.observe(0, 10));\n        assert_eq!(session.restore_target(0), None);\n        assert_eq!(session.restore_target(1), None);\n    }\n\n    fn a_rematch_still_brings_back_both_practice_choices() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.commit(1, 6);\n        for _ in 0..2 {\n            qp_match_and_return(&mut session);\n            assert!(!session.observe(0, 10));\n            assert!(!session.observe(1, 10));\n            assert_eq!(session.restore_target(0), Some(20));\n            assert_eq!(session.restore_target(1), Some(6));\n            session.commit(0, 20);\n            session.commit(1, 6);\n        }\n    }\n\n    fn a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry() {\n        let mut session = WaitingSession::empty();\n        session.scene_changed(true, 0x0d, 0x02010000);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.player_departed();\n        assert!(session.observe(0, 10));\n        assert_eq!(session.restore_target(0), None);\n        assert!(!session.observe(1, 10));\n        session.commit(1, 6);\n        session.scene_changed(true, 0x01, 0x02010000);\n        session.scene_changed(true, 0x0d, 0x02010000);\n        assert!(!session.observe(1, 10));\n        assert_eq!(session.restore_target(1), Some(6));\n    }\n\n    fn a_body_not_yet_known_exactly_decides_on_its_fighter() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.arrived(0, |origin| *origin == 30));\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        qp_match_and_return(&mut session);\n        assert!(!session.arrived(0, |origin| *origin == 10));\n        assert_eq!(session.restore_target(0), Some(20));\n        assert!(!session.observe(0, 10));\n        assert_eq!(session.restore_target(0), Some(20));\n\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        qp_match_and_return(&mut session);\n        assert!(session.arrived(0, |origin| *origin == 30));\n        assert_eq!(session.restore_target(0), None);\n        assert_eq!(session.restore_target(1), None);\n        assert!(!session.observe(0, 31));\n\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        qp_match_and_return(&mut session);\n        assert!(!session.arrived(1, |origin| *origin == 30));\n    }\n\n    fn a_change_of_body_inside_one_waiting_room_is_not_a_new_pick() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(0, 20));\n        session.commit(0, 20);\n        qp_match_and_return(&mut session);\n        assert!(!session.observe(0, 10));\n        assert_eq!(session.restore_target(0), Some(20));\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the cases of the operator's sequence, and the entry point for a returning body not yet known exactly."
+        },
+        {
+          "old": "            (\"disabled_player_restore_does_not_block_cpu_hat_continuation\", disabled_player_restore_does_not_block_cpu_hat_continuation as fn()),\n        ]);\n",
+          "new": "            (\"disabled_player_restore_does_not_block_cpu_hat_continuation\", disabled_player_restore_does_not_block_cpu_hat_continuation as fn()),\n            (\"a_new_pick_after_a_match_forgets_both_roles\", a_new_pick_after_a_match_forgets_both_roles as fn()),\n            (\"the_cpu_seen_first_with_the_new_pick_forgets_the_player_too\", the_cpu_seen_first_with_the_new_pick_forgets_the_player_too as fn()),\n            (\"the_new_pick_is_the_lobbys_fighter_from_then_on\", the_new_pick_is_the_lobbys_fighter_from_then_on as fn()),\n            (\"a_rematch_still_brings_back_both_practice_choices\", a_rematch_still_brings_back_both_practice_choices as fn()),\n            (\"a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry\", a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry as fn()),\n            (\"a_body_not_yet_known_exactly_decides_on_its_fighter\", a_body_not_yet_known_exactly_decides_on_its_fighter as fn()),\n            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n        ]);\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the cases of the operator's sequence, and the entry point for a returning body not yet known exactly."
+        },
+        {
+          "old": "/// create new entries with the exact same scene tuple (13.0.5 runtime trace).\npub struct WaitingSession<T> {\n",
+          "new": "/// create new entries with the exact same scene tuple (13.0.5 runtime trace).\n/// The scene tuple cannot show a CSS visit (the melee byte keeps its previous value), but a new room's native body can.\npub struct WaitingSession<T> {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    choices: [WaitingChoice<T>; 2],\n    scene: Option<(bool, u8, u32)>,\n",
+          "new": "    choices: [WaitingChoice<T>; 2],\n    /// The native body each role's lobby started from.\n    origins: [Option<T>; 2],\n    /// The next observation is the role's first in a new waiting room of the same lobby.\n    returning: [bool; 2],\n    scene: Option<(bool, u8, u32)>,\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "impl<T: Copy> WaitingSession<T> {\n",
+          "new": "impl<T: Copy + PartialEq> WaitingSession<T> {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            choices: [WaitingChoice::empty(); 2],\n            scene: None,\n",
+          "new": "            choices: [WaitingChoice::empty(); 2],\n            origins: [None; 2],\n            returning: [false; 2],\n            scene: None,\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;\n        for choice in &mut self.choices {\n            if same_lobby {\n",
+          "new": "            .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;\n        for role in 0..self.choices.len() {\n            if same_lobby {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "                choice.scene_changed();\n",
+          "new": "                self.choices[role].scene_changed();\n                self.returning[role] = self.origins[role].is_some();\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            } else {\n                choice.clear();\n            }\n",
+          "new": "            } else {\n                self.choices[role].clear();\n                self.origins[role] = None;\n                self.returning[role] = false;\n            }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    /// Called for a newly observed, ready waiting body. Returns whether this is a\n    /// fresh entry lifetime without a match excursion, which forgets BOTH roles.\n",
+          "new": "    fn forget(&mut self) {\n        for choice in &mut self.choices {\n            choice.clear();\n        }\n        self.origins = [None; 2];\n        self.returning = [false; 2];\n        self.player_departed = false;\n    }\n\n    /// Returns whether this is a fresh lobby: a departed waiting entry or a returning\n    /// native body different from the lobby's origin, which only a new CSS pick makes.\n    /// Either case forgets BOTH roles.\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "        let fresh = self.player_departed;\n        if fresh {\n            for choice in &mut self.choices {\n                choice.clear();\n            }\n            self.player_departed = false;\n        }\n",
+          "new": "        let returned = core::mem::take(&mut self.returning[role]);\n        let fresh = self.player_departed || (returned && self.origins[role] != Some(fighter));\n        if fresh { self.forget(); }\n        if self.origins[role].is_none() { self.origins[role] = Some(fighter); }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    pub fn arrived(&mut self, _: usize, _: impl FnOnce(&T) -> bool) -> bool { false }\n",
+          "new": "    /// Check a returning body before its exact value is known; a mismatch forgets both roles.\n    /// A match leaves the return pending for the later exact observation and never sets an origin.\n    pub fn arrived(&mut self, role: usize, same: impl FnOnce(&T) -> bool) -> bool {\n        if !self.returning[role] { return false; }\n        let Some(origin) = self.origins[role].as_ref() else { return false; };\n        if same(origin) { return false; }\n        self.forget();\n        true\n    }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "new": "\n    /// Parity: Training is outside every waiting lobby, so its scene ends what the memory holds and starts no restore.\n    fn a_training_scene_keeps_nothing_of_the_waiting_memory() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.commit(1, 6);\n        assert!(!session.scene_changed(true, 0x20, 0x04040000));\n        assert!(!session.restoration_pending([true, true]));\n        assert!(!session.arrived(0, |origin| *origin == 30));\n        assert!(!session.scene_changed(true, 0x0d, 0x07010101));\n        assert!(!session.observe(0, 30));\n        assert!(!session.observe(1, 30));\n        assert!(!session.restoration_pending([true, true]));\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "reason": "Quickplay new pick (install 4): the parity case for Training, which is outside every waiting lobby."
+        },
+        {
+          "old": "            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n        ]);\n",
+          "new": "            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n            (\"a_training_scene_keeps_nothing_of_the_waiting_memory\", a_training_scene_keeps_nothing_of_the_waiting_memory as fn()),\n        ]);\n",
+          "reason": "Quickplay new pick (install 4): the parity case for Training, which is outside every waiting lobby."
         }
       ]
     },
@@ -12763,7 +12838,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "4cb64958be7009b62b0ccfe3d3d284ab28371736aca96bf5b2322dfd42cce130",
+      "dest_sha256": "129da9536dd353c5c55a815015f02149dba233806bc4ba61ca1e9e89fa0932c1",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14411,6 +14486,26 @@
           "old": "    let owner = read::<u32>(entry, 0xe0);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "new": "    let owner = read::<u32>(entry, 0xe0);\n    crate::model::lra_reset::RESET_OWED.entry_destroyed(owner);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "reason": "Reset-owed latch records each native entry's destruction before any roster locking."
+        },
+        {
+          "old": "                    let fresh_lobby = current_scope.waiting()\n                        && !exact_origin_pending\n                        && WAITING_MEMORY\n                            .lock()\n                            .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));\n",
+          "new": "                    let fresh_lobby = current_scope.waiting() && {\n                        let mut memory = WAITING_MEMORY.lock();\n                        if exact_origin_pending {\n                            // A Mii's exact origin is captured later; a different fighter is already a new pick.\n                            memory.arrived(role as usize, |origin| origin.fighter == fighter)\n                        } else {\n                            memory.observe(role as usize, WaitingValue::ordinary(fighter,forms,None))\n                        }\n                    };\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "                        trace!(\"[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices\");\n",
+          "new": "                        trace!(\"[CharacterRoster] fresh waiting lobby; cleared both practice choices\");\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    if fresh { crate::runtime::roster::kirby_hats::fresh_lobby(); }\n}",
+          "new": "    if fresh { retire_waiting_lobby(); }\n}\n\nfn retire_waiting_lobby() {\n    crate::runtime::roster::kirby_hats::fresh_lobby();\n    training::named_macros::waiting_scene_changed(false);\n}",
+          "reason": "Quickplay new pick (20:42:50Z): once the exact Mii identity proves a fresh lobby, retire the Setup session as well as the hats, through the same step as an ordinary new pick."
+        },
+        {
+          "old": "                        crate::runtime::roster::kirby_hats::fresh_lobby();\n                        training::named_macros::waiting_scene_changed(false);",
+          "new": "                        retire_waiting_lobby();",
+          "reason": "Quickplay new pick (20:42:50Z): once the exact Mii identity proves a fresh lobby, retire the Setup session as well as the hats, through the same step as an ordinary new pick."
         }
       ]
     },

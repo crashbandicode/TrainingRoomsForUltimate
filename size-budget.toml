@@ -2677,3 +2677,27 @@ ceiling = 198144
 date = "2026-11-24"
 reason = "Delay a missing aim verdict while the active special can still supply it; leave press and release deadlines unchanged. Measured +8 implementation lines against c4c43b23."
 approved_by = "tr-primary-2 ruling 2026-11-24 21:09:55Z: fix-only ceiling 198,144, subject to the full size receipt."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197314
+date = "2026-11-24"
+reason = "Quickplay new pick: the waiting memory keeps the native body each role's lobby started from, so a different fighter picked at the character select after a match starts the waiting practice fresh. Measured 197314 (tools/sloc.py tree), 37 above install 4 merge 2 0db4728c (197277)."
+approved_by = "tr-primary-2 order 2026-11-24 19:36:34Z (the operator's Quickplay report, install 4: f15-lobby fixes it on fix/qp-css-resets-choice), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). The +37 is reported with the READY."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197317
+date = "2026-11-24"
+reason = "Retire Setup and hats through the same step for a new ordinary or exact Mii pick. Measured +3 on e205206e."
+approved_by = "tr-primary-2 2026-11-24 20:49:18Z approved 197317."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198183
+date = "2026-11-24"
+reason = "Install 4 integration, merge 5: the Quick Play new-pick fix (fix/rv-qp-fresh-notification 6146f8e9) on top of merge 3 (the ACTION model through the angle, feat/action-model b0921969). Measured 198183 on the merged tree: merge 3 measures 198143 and the fix adds 40 (its own entries: +37 and +3 on merge 2)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 20:05:25Z, 20:35:08Z and the pending-aim correction entry (merge 3, 198144) and of 19:36:34Z and 20:49:18Z (Quick Play fix, 197317 on merge 2)."
