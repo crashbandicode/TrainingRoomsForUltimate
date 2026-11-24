@@ -1759,57 +1759,60 @@ mod tests {
             assert_eq!(lease.step(Some(9), 1, 7, 7, true), Some(0));
             lease
         };
-        let mut clock = ready();
-        let mut lease = held();
-        let mut entry = 0;
-        let mut ai = 0;
-        let mut original = Some(10);
-        let mut observed = Some(20);
-        let mut selected = Some(20);
-        let mut settled = Settled::new(selected);
-        let mut releasing = false;
-        let mut stops = 0;
-        let mut behavior_writes = Vec::new();
-        let mut fighter_requests = Vec::new();
-        let mut ended = false;
-        for tick in 0..10 {
-            let holds = selected.is_some() || lease.held() || original.is_some();
-            let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, holds, releasing);
-            releasing = next_releasing;
-            let (next, decision) = lobby_flag::step(clock, Some(room), on);
-            clock = next;
-            if !decision.active {
-                assert!(!holds && !stop);
-                ended = true;
-                break;
-            }
-            if stop {
-                stops += 1;
-                assert_eq!(tick, 0);
-                selected = None;
-            }
-            if let Some(value) = lease.step(selected.map(|_| 9), 1, entry, ai, true) {
-                behavior_writes.push(value);
-                entry = value;
-                ai = value;
-            }
-            let (next, tick) = picker::tick(settled, selected, original, true, || false, || observed);
-            settled = next;
-            if let Tick::Serve { target, observed: seen, step } = tick {
-                if step.request {
-                    fighter_requests.push(target);
-                    observed = Some(target);
-                } else if seen.is_some() && selected.is_none() {
-                    original = None;
+        for draw_first in [false, true] {
+            let mut clock = ready();
+            clock.ui_ready = !draw_first;
+            let mut lease = held();
+            let mut entry = 0;
+            let mut ai = 0;
+            let mut original = Some(10);
+            let mut observed = Some(20);
+            let mut selected = Some(20);
+            let mut settled = Settled::new(selected);
+            let mut releasing = false;
+            let mut stops = 0;
+            let mut behavior_writes = Vec::new();
+            let mut fighter_requests = Vec::new();
+            let mut ended = false;
+            for tick in 0..10 {
+                let holds = selected.is_some() || lease.held() || original.is_some();
+                let (on, next_releasing, stop) = lobby_flag::release(false, clock.was_active, holds, releasing);
+                releasing = next_releasing;
+                let (next, decision) = lobby_flag::step(lobby_flag::released_clock(clock, releasing), Some(room), on);
+                clock = next;
+                if !decision.active {
+                    assert!(!holds && !stop);
+                    ended = true;
+                    break;
+                }
+                if stop {
+                    stops += 1;
+                    assert_eq!(tick, 0);
+                    selected = None;
+                }
+                if let Some(value) = lease.step(selected.map(|_| 9), 1, entry, ai, true) {
+                    behavior_writes.push(value);
+                    entry = value;
+                    ai = value;
+                }
+                let (next, tick) = picker::tick(settled, selected, original, true, || false, || observed);
+                settled = next;
+                if let Tick::Serve { target, observed: seen, step } = tick {
+                    if step.request {
+                        fighter_requests.push(target);
+                        observed = Some(target);
+                    } else if seen.is_some() && selected.is_none() {
+                        original = None;
+                    }
                 }
             }
+            assert!(ended);
+            assert_eq!(stops, 1);
+            assert_eq!(behavior_writes, [7]);
+            assert!(!lease.held());
+            assert_eq!(fighter_requests, [10]);
+            assert_eq!(original, None);
         }
-        assert!(ended);
-        assert_eq!(stops, 1);
-        assert_eq!(behavior_writes, [7]);
-        assert!(!lease.held());
-        assert_eq!(fighter_requests, [10]);
-        assert_eq!(original, None);
 
         for (setting, releasing) in [(true, false), (false, true)] {
             let clock = ready();
