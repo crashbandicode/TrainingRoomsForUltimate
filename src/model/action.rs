@@ -1,7 +1,7 @@
 //! An action starts at an originating input and owns its later events.
 //! Its model is described in `docs/design/action-model.md`.
 
-use super::combo::{self, Dir, Kind};
+use super::combo::{self, Dir, Kind, Mark};
 use super::frame_strip::{Angle, Move, Shown};
 use super::move_names::{Namer, Normal};
 
@@ -60,10 +60,61 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+    /// The part that ended on this frame and its measured travel.
+    pub travel: Option<(u8, Travel)>,
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None };
+    pub const NONE: Late = Late { open: None, travel: None };
+}
+
+/// A travel part: angles are facing-relative degrees in tenths, path offsets are facing-relative game units.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Travel {
+    /// The deciding stick's angle and deflection in percent.
+    pub stick: Option<(u16, u8)>,
+    /// The whole part's heading and straight-line distance in tenths of a unit.
+    pub heading: u16,
+    pub distance: u16,
+    /// Eight points at equal intervals along the path.
+    pub path: [(i8, i8); 8],
+}
+
+pub const PATH_ABS: f32 = 6.0;
+pub const PATH_REL: f32 = 0.30;
+pub const ANGLE_TOL: i16 = 10;
+pub const DEFLECTION_TOL: i16 = 15;
+
+pub fn path_off(reference: &Travel, attempt: &Travel) -> bool {
+    let mut length = 0.0;
+    let mut previous = (0.0, 0.0);
+    for &(x, y) in &reference.path {
+        let point = (f32::from(x), f32::from(y));
+        length += (point.0 - previous.0).hypot(point.1 - previous.1);
+        previous = point;
+    }
+    let tolerance = PATH_ABS.max(PATH_REL * length);
+    reference.path.iter().zip(attempt.path).any(|(&(x, y), (a, b))| {
+        (f32::from(a) - f32::from(x)).hypot(f32::from(b) - f32::from(y)) > tolerance
+    })
+}
+
+pub fn stick_off(reference: &Travel, attempt: &Travel) -> Option<Mark> {
+    let ((angle, deflection), (actual, magnitude)) = (reference.stick?, attempt.stick?);
+    let delta = (i32::from(actual) - i32::from(angle) + 1800).rem_euclid(3600) - 1800;
+    if delta.abs() > i32::from(ANGLE_TOL) * 10 {
+        return Some(Mark::Angle(delta as i16));
+    }
+    let delta = i16::from(magnitude) - i16::from(deflection);
+    (delta.abs() > DEFLECTION_TOL).then_some(Mark::Deflection(delta as i8))
+}
+
+pub fn stick_of(stick: (i8, i8), facing: i8) -> (u16, u8) {
+    let x = f32::from(i16::from(stick.0) * if facing < 0 { -1 } else { 1 });
+    let y = f32::from(stick.1);
+    let angle = ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600;
+    let deflection = (x.hypot(y) / 120.0 * 100.0).round().clamp(0.0, 100.0) as u8;
+    (angle, deflection)
 }
 
 /// A press's direction with the vertical part the animation chose.

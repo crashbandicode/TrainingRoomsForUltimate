@@ -279,6 +279,7 @@ const ON: Settings = Settings {
     tolerance: 1,
     load_after: false,
     match_spot: false,
+    match_stick: false,
     move_names: false,
 };
 
@@ -348,6 +349,7 @@ fn settings_read_the_three_rows() {
             tolerance: 2,
             load_after: true,
             match_spot: false,
+            match_stick: false,
             move_names: false
         }
     );

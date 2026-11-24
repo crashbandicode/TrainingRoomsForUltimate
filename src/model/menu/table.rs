@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 169] = [
+pub static ROWS: [Row; 170] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -407,6 +407,8 @@ pub static ROWS: [Row; 169] = [
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
     r(OPTIONS, "Match sweet/sour spot", "spots_combo", TOGGLE,
       "On: a link counts only if it lands the same spot as the\nsaved link. Off: the spot is not compared."),
+    r(OPTIONS, "Match angle and deflection", "combo_stick", TOGGLE,
+      "On: an aimed special counts only if the stick's angle and\ndeflection match the saved ones. Off: only where it went."),
     r(OPTIONS, "Move names", "move_names", TOGGLE,
       "On: moves show their names. Specials and Final Smashes use\nthe game's own names. Off: the short names."),
     r(OPTIONS, "On-time tolerance", "combo_tolerance", Control::Dropdown(&o::COMBO_TOLERANCE),

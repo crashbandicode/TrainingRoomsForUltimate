@@ -406,6 +406,15 @@ More: [How a combo is graded](../guide/recording.md#how-a-combo-is-graded)
 
 <!-- CAPTURE-REQUEST spots-v03: a combo saved with a Sweet link, drilled with Match sweet/sour spot On: a Sweet attempt is clean, a Sour attempt drops with "L1 Sour, saved Sweet" on the bar. See artifacts/rc14-spots/. -->
 
+### Match angle and deflection
+
+On: an aimed special in an input drill also compares the deciding stick's angle and deflection with the saved ones.
+Off: the path is compared without matching the stick. Older drills without travel details keep their previous grading.
+
+- **Values:** On, Off
+- **Default:** Off
+- **How:** A, Left or Right flips it.
+
 ### Move names
 
 On: moves use their common names; specials and Final Smashes use the names in the game's message file when available.

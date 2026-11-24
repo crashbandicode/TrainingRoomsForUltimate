@@ -2709,6 +2709,30 @@ approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceili
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 198679
+date = "2026-11-24"
+reason = "Merge 3C of install 4: travel parts (deciding stick, heading, distance, eight-point path), steering and the Match angle and deflection toggle, their marks and texts, the packed travel table, and a later link's first move borrowing its travel arrows. Measured 198679 on 1a55481f, 535 above merge 3 (198144, e09fc3cf)."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:31:04Z (the 3C line budget is approved at the folded head's measured value under the 17:59:40Z rule)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198682
+date = "2026-11-24"
+reason = "Keep the measured angle miss in tenths for the shared mark and reason text; +3 implementation lines on 3C a77cb42e."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:46:20Z: measured fix-only increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198722
+date = "2026-11-24"
+reason = "Install 4 integration, merge 3C: travel parts, steering, the Match angle and deflection toggle and a later link first-move arrows (fix/rv-3c-angle-text 59dfb328) on top of merge 5. Measured 198722 on the merged tree: merge 5 measures 198183 and 3C adds 539 (its own entries: 198682 on merge 3, which measures 198143)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the 3C entries above (198679 and, under the 21:46:20Z rule, 198682) and in the merge 5 entry (198183)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 198087
 date = "2026-11-24"
 reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198087 (tools/sloc.py tree), 1035 above the base e7667f26 (197052)."
@@ -2777,3 +2801,11 @@ ceiling = 199284
 date = "2026-11-24"
 reason = "Move names joined with the ACTION model, with the rapid-jab fix, on the install 4 merge-5 head f6833873: measured 199284 (tools/sloc.py tree), which is the join's 199244 on merge 3 plus the 40 lines merge 5 (the Quick Play new pick) adds to merge 3 (198183 less 198143), with no lines from the fold."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 21:46:20Z (the rapid-jab fix, 199244) and 20:49:18Z (the Quick Play fix)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199824
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model on the install 4 head b5177cdb (merge 5 and 3C): measured 199824 (tools/sloc.py tree). The join was 199284 on merge 5 and 3C adds 539 to merge 5 (198722 less 198183); the fold is 1 line over their sum, where 3C's link line takes the Namer argument."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value), on the approvals cited by the entries above; the 1 line from the resolution is posted with the pin for its ruling."

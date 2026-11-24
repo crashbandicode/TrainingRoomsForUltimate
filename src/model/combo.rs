@@ -2,7 +2,7 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
-use super::action::{self, ActionDesc, Late};
+use super::action::{self, ActionDesc, Late, Travel};
 use super::frame_strip::{
     bin_stick, stick_axis, Angle, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
     DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, INPUT_LOOKBACK, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
@@ -54,6 +54,7 @@ pub const STEPS: usize = 12;
 /// Presses an older file stores, and the press subset a new file still writes for that reader.
 pub const LEGACY_STEPS: usize = 4;
 pub const RESULTS: usize = 8;
+pub const DETAILS: usize = 4;
 
 /// A step's aim: the strip's stick bin (0 right, counter-clockwise in eighths) with left and right merged, so the
 /// fighter's facing does not matter.
@@ -332,13 +333,54 @@ impl LinkRec {
     }
 }
 
-/// The links of one exchange, in order.
+/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 24 bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Detail {
+    /// The link in the high four bits and the event in the low four; `FREE` while unused.
+    at: u8,
+    /// The deciding stick's deflection in percent; `NO_STICK` when none was kept.
+    deflection: u8,
+    angle: u16,
+    heading: u16,
+    distance: u16,
+    path: [(i8, i8); 8],
+}
+
+impl Detail {
+    const FREE: u8 = 0xFF;
+    const NO_STICK: u8 = 0xFF;
+    const EMPTY: Detail =
+        Detail { at: Self::FREE, deflection: Self::NO_STICK, angle: 0, heading: 0, distance: 0, path: [(0, 0); 8] };
+
+    /// The key of an event; `link` is below `LINKS` and `event` below `STEPS`.
+    const fn at(link: usize, event: usize) -> u8 {
+        ((link << 4) | event) as u8
+    }
+
+    fn of(at: u8, travel: Travel) -> Detail {
+        let (angle, deflection) = travel.stick.unwrap_or((0, Self::NO_STICK));
+        Detail { at, deflection, angle, heading: travel.heading, distance: travel.distance, path: travel.path }
+    }
+
+    fn travel(&self) -> Travel {
+        Travel {
+            stick: (self.deflection != Self::NO_STICK).then_some((self.angle, self.deflection)),
+            heading: self.heading,
+            distance: self.distance,
+            path: self.path,
+        }
+    }
+}
+
+/// The links of one exchange, in order, and the travel details of a drill's first `DETAILS` aims.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Combo {
     pub input_only: bool,
     pub overflow: bool,
     links: [Option<LinkRec>; LINKS],
     len: usize,
+    /// Sorted by event, the free entries last.
+    details: [Detail; DETAILS],
 }
 
 impl Default for Combo {
@@ -353,6 +395,7 @@ impl Combo {
         overflow: false,
         links: [None; LINKS],
         len: 0,
+        details: [Detail::EMPTY; DETAILS],
     };
 
     /// A combo of 1 to `LINKS` links.
@@ -395,6 +438,50 @@ impl Combo {
 
     pub fn has_aim(&self) -> bool {
         self.links().any(|link| link.events().any(|event| matches!(event.kind, Kind::Aim(_))))
+    }
+
+    /// Link `k`'s two moves as the saved views show them. A link keeps no inputs before its first hit, so its
+    /// first move's travel arrows come from the link before it, whose follow-up is the same action. The combo's
+    /// first link has none.
+    pub fn descs(&self, k: usize) -> Option<[ActionDesc; 2]> {
+        let link = self.get(k)?;
+        let mut first = link.desc(0);
+        if let Some(before) = k.checked_sub(1).and_then(|k| self.get(k)).map(|before| before.desc(1)) {
+            if before.same_move(&first) {
+                first.parts = before.parts;
+            }
+        }
+        Some([first, link.desc(1)])
+    }
+
+    pub fn travel(&self, link: usize, event: usize) -> Option<Travel> {
+        if link >= LINKS || event >= STEPS {
+            return None;
+        }
+        let at = Detail::at(link, event);
+        self.details.iter().find(|detail| detail.at == at).map(Detail::travel)
+    }
+
+    pub fn travels(&self, link: usize) -> [Option<Travel>; STEPS] {
+        core::array::from_fn(|event| self.travel(link, event))
+    }
+
+    pub(crate) fn attach_travel(&mut self, link: usize, event: usize, travel: Travel) -> bool {
+        if link >= self.len || event >= STEPS || self.links[link].is_none_or(|l| l.events[event].is_none()) {
+            return false;
+        }
+        let detail = Detail::of(Detail::at(link, event), travel);
+        if let Some(slot) = self.details.iter().position(|entry| entry.at == detail.at) {
+            self.details[slot] = detail;
+            return true;
+        }
+        let Some(mut slot) = self.details.iter().position(|entry| entry.at == Detail::FREE) else { return false };
+        while slot > 0 && self.details[slot - 1].at > detail.at {
+            self.details[slot] = self.details[slot - 1];
+            slot -= 1;
+        }
+        self.details[slot] = detail;
+        true
     }
 
     /// Whether the newest event for this button is an unreleased press.
@@ -463,6 +550,14 @@ impl Combo {
                 for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
                     *slot = Some(event);
                 }
+                for detail in self.details.iter_mut().filter(|detail| detail.at != Detail::FREE) {
+                    let (link, event) = (usize::from(detail.at >> 4), usize::from(detail.at & 0xF));
+                    if link == k {
+                        detail.at = Detail::at(k - 1, event + count);
+                    } else if link > k {
+                        detail.at -= 0x10;
+                    }
+                }
                 self.links.copy_within(k + 1..self.len, k);
                 self.len -= 1;
                 self.links[self.len] = None;
@@ -480,6 +575,10 @@ pub enum Mark {
     Missing,
     /// The same kind of event, in order, with a different direction.
     WrongDir,
+    Path,
+    /// Signed shortest difference, in tenths of a degree.
+    Angle(i16),
+    Deflection(i8),
 }
 
 /// One attempted link against its reference link.
@@ -522,6 +621,10 @@ impl Grade {
         self.marks.iter().position(|m| *m == Some(Mark::WrongDir))
     }
 
+    pub fn detail(&self) -> Option<usize> {
+        self.marks.iter().position(|m| matches!(m, Some(Mark::Path | Mark::Angle(_) | Mark::Deflection(_))))
+    }
+
     /// The step with the largest offset outside the tolerance, with that offset.
     pub fn worst(&self, tolerance: u8) -> Option<(usize, i32)> {
         let mut worst: Option<(usize, i32)> = None;
@@ -545,6 +648,7 @@ impl Grade {
             && self.missing().is_none()
             && self.wrong_dir().is_none()
             && self.extra_aim.is_none()
+            && self.detail().is_none()
             && self.worst(tolerance).is_none()
     }
 }
@@ -561,6 +665,9 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
         ref_holds: reference.holds(),
         att_holds: attempt.holds(),
         owns_aim: reference.owns_aim(),
+        ref_travels: [None; STEPS],
+        att_travels: [None; STEPS],
+        match_stick: false,
     })
 }
 
@@ -568,6 +675,9 @@ struct GradeContext {
     ref_holds: [Option<u32>; STEPS],
     att_holds: [Option<u32>; STEPS],
     owns_aim: [bool; STEPS],
+    ref_travels: [Option<Travel>; STEPS],
+    att_travels: [Option<Travel>; STEPS],
+    match_stick: bool,
 }
 
 fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool, context: GradeContext) -> Grade {
@@ -608,7 +718,15 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                     } else {
                         got.offset - want.offset
                     };
-                    Mark::At(delta)
+                    if matches!(want.kind, Kind::Aim(_)) && got.dir == want.dir {
+                        if let (Some(reference), Some(attempt)) = (context.ref_travels[index], context.att_travels[i]) {
+                            if action::path_off(&reference, &attempt) {
+                                Mark::Path
+                            } else if context.match_stick {
+                                action::stick_off(&reference, &attempt).unwrap_or(Mark::At(delta))
+                            } else { Mark::At(delta) }
+                        } else { Mark::At(delta) }
+                    } else { Mark::At(delta) }
                 } else {
                     Mark::WrongDir
                 }
@@ -644,12 +762,15 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
     }
 }
 
-fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extra: Option<u8>) -> Option<Grade> {
+fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extra: Option<u8>, match_stick: bool) -> Option<Grade> {
     let reference = target.get(index)?;
     let context = GradeContext {
         ref_holds: target.holds(index),
         att_holds: actual.holds(index),
         owns_aim: target.owns_aim(index),
+        ref_travels: target.travels(index),
+        att_travels: actual.travels(index),
+        match_stick,
     };
     let mut grade = grade_with(reference, rec, true, target.has_aim(), context);
     grade.extra_aim = grade.extra_aim.or(extra);
@@ -696,6 +817,10 @@ pub enum Reason {
     MissingAim(u8),
     WrongAim(u8),
     ExtraAim(u8),
+    AimPath(u8),
+    /// Part number and the signed angle difference in tenths of a degree.
+    AimAngle(u8, i16),
+    AimDeflection(u8, i8),
 }
 
 /// An attempt's result.
@@ -750,6 +875,7 @@ impl Attempt {
 pub const ROW_ON: &str = "combo_helper";
 pub const ROW_TOLERANCE: &str = "combo_tolerance";
 pub const ROW_AFTER: &str = "combo_after";
+pub const ROW_STICK: &str = "combo_stick";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -758,6 +884,7 @@ pub struct Settings {
     pub load_after: bool,
     /// *Match sweet/sour spot* (decision SP4, `spots::ROW_COMBO`): a link counts only when it lands the saved link's spot.
     pub match_spot: bool,
+    pub match_stick: bool,
     pub move_names: bool,
 }
 
@@ -775,6 +902,7 @@ impl Settings {
             tolerance: 1,
             load_after: false,
             match_spot: false,
+            match_stick: false,
             move_names: false,
         }
     }
@@ -791,6 +919,7 @@ impl Settings {
             tolerance: choice(ROW_TOLERANCE).map_or(factory.tolerance, |i| i.min(2) as u8),
             load_after: choice(ROW_AFTER).map_or(factory.load_after, |i| i == 1),
             match_spot: super::spots::row_on(snapshot, super::spots::ROW_COMBO),
+            match_stick: super::spots::row_on(snapshot, ROW_STICK),
             move_names: super::spots::row_on(snapshot, super::move_names::ROW_MOVE_NAMES),
         }
     }
@@ -1044,7 +1173,10 @@ impl Helper {
         if self.attempt.is_none() {
             self.attempt = Some(Attempt::new(start, false));
         }
-        if let Some(j) = amended {
+        if let Some(j) = amended[0] {
+            self.regrade(j, out);
+        }
+        if let Some(j) = amended[1].filter(|j| Some(*j) != amended[0]) {
             self.regrade(j, out);
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
@@ -1085,7 +1217,7 @@ impl Helper {
                 None
             };
             let k = attempt.len;
-            let Some(grade) = input_grade(target, &self.input.combo, k, &actual, later) else { break };
+            let Some(grade) = input_grade(target, &self.input.combo, k, &actual, later, self.settings.match_stick) else { break };
             // A non-final step can still receive its aim until the special ends or the next step opens.
             if snap.aim.inside && self.input.combo.len() == k + 1 && grade.missing_only_aims(self.settings.tolerance) {
                 break;
@@ -1105,7 +1237,7 @@ impl Helper {
             let attempt = self.attempt.as_ref().filter(|attempt| attempt.open() && j < attempt.len)?;
             let previous = attempt.grades[j]?;
             let actual = self.input.combo.get(j).copied()?;
-            let mut grade = input_grade(target, &self.input.combo, j, &actual, previous.extra_aim)?;
+            let mut grade = input_grade(target, &self.input.combo, j, &actual, previous.extra_aim, self.settings.match_stick)?;
             grade.extra_aim = previous.extra_aim;
             Some(grade)
         });
@@ -1176,7 +1308,8 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() };
+        let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim(),
+            ref_travels: [None; STEPS], att_travels: [None; STEPS], match_stick: false };
         let g = grade_with(reference, &rec, false, target.has_aim(), context);
         self.record_grade(g, out);
     }
@@ -1272,6 +1405,17 @@ fn summarize(
             })
     };
     let extra_aim = || grades().find_map(|(i, g)| g.extra_aim.map(|part| (i as u8, Reason::ExtraAim(part))));
+    let detail = || grades().find_map(|(i, g)| {
+        let index = g.detail()?;
+        let Kind::Aim(part) = event(g, index)?.kind else { return None };
+        let reason = match g.marks[index]? {
+            Mark::Path => Reason::AimPath(part),
+            Mark::Angle(delta) => Reason::AimAngle(part, delta),
+            Mark::Deflection(delta) => Reason::AimDeflection(part, delta),
+            _ => return None,
+        };
+        Some((i as u8, reason))
+    });
     let off = || {
         grades().find_map(|(i, g)| {
             let (step, delta) = g.worst(tolerance)?;
@@ -1306,6 +1450,7 @@ fn summarize(
             .or_else(missing)
             .or_else(wrong_dir)
             .or_else(extra_aim)
+            .or_else(detail)
             .or_else(off),
     }
 }
@@ -1560,11 +1705,11 @@ impl InputCapture {
     fn step_mode(&mut self, snap: Snap, group_idle: bool, aims: bool) {
         self.step_with(snap, Late::NONE, group_idle, aims);
     }
-    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> Option<usize> {
+    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> [Option<usize>; 2] {
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
-        if self.combo.overflow { return None; }
+        if self.combo.overflow { return [None; 2]; }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
@@ -1590,7 +1735,7 @@ impl InputCapture {
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
                 && !self.combo.push(LinkRec::INPUT)
             {
-                return None;
+                return [None; 2];
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
@@ -1600,6 +1745,7 @@ impl InputCapture {
             });
             self.last = Some(event.frame);
         }
+        let mut amended = [None; 2];
         if let Some((Some(press), side)) = late.open {
             self.decided = Some(press);
             if let (Some(angle), Some(first)) = (side, self.first.filter(|&first| press >= first)) {
@@ -1616,12 +1762,24 @@ impl InputCapture {
                     let direction = action::angled(event.dir, angle);
                     if direction != event.dir {
                         event.dir = direction;
-                        return Some(step);
+                        amended[0] = Some(step);
                     }
                 }
             }
         }
-        None
+        if let Some((part, travel)) = late.travel {
+            let chosen = self.combo.links[..self.combo.len].iter().enumerate().rev().find_map(|(step, link)| {
+                link.as_ref()?.events.iter().enumerate().rev().find_map(|(index, event)| {
+                    event.is_some_and(|event| event.kind == Kind::Aim(part)).then_some((step, index))
+                })
+            });
+            if let Some((step, index)) = chosen {
+                if self.combo.attach_travel(step, index, travel) {
+                    amended[1] = Some(step);
+                }
+            }
+        }
+        amended
     }
     fn undecided(&self, k: usize, now: u32) -> bool {
         let Some(first) = self.first else { return false };
