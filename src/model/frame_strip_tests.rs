@@ -712,9 +712,9 @@ fn a_link_keeps_both_moves_directions_and_the_special_a_travel_continues() {
 }
 
 fn a_second_part_reaches_the_link_its_special_already_made() {
-    use crate::model::frame_strip_plan::{folded_link, link_moves, TEXT_UNITS};
+    use crate::model::frame_strip_plan::{folded_link, link_moves, SHORT_UNITS};
     let stun = || Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
-    let text = |line: crate::model::frame_strip_plan::LinkLine| String::from_utf16(line.units()).unwrap();
+    let text = |line: crate::model::frame_strip_plan::Text| String::from_utf16(line.units()).unwrap();
     // Frame 35: the travel is entered and hits, so Jab links into it before any direction is known.
     let mut tracker = linked_special(true);
     // 36..=38 travel 1 goes left; 39..=41 the status between the parts; 42..=43 travel 2 goes right.
@@ -731,7 +731,7 @@ fn a_second_part_reaches_the_link_its_special_already_made() {
     assert_eq!(tracker.aims().collect::<Vec<_>>(), vec![Aim { frame: 42, dir: 0 }, Aim { frame: 35, dir: 4 }]);
     let link = tracker.latest_link().expect("the jab linked into the special");
     assert_eq!((link.from, link.to, link.shown), (Move::Jab, Move::Other, [Shown::default(), both]));
-    assert_eq!(text(link_moves(&link, TEXT_UNITS)), "Jab > Up B ← →");
+    assert_eq!(text(link_moves(&link, SHORT_UNITS)), "Jab > Up B ← →");
     assert_eq!(text(folded_link(&link)), "TRUE · Jab > Up B ← →");
     // An unrelated move with a direction of its own alters neither name; when it hits, the special keeps both arrows as the link's first move.
     tracker.step(Sample { pos: Some((-22.0, 0.0)), ..idle() }, stun(), NONE);
@@ -745,7 +745,7 @@ fn a_second_part_reaches_the_link_its_special_already_made() {
     let links: Vec<_> = tracker.history().map(|l| (l.from, l.to, l.shown)).collect();
     assert_eq!(links[0], (Move::Other, Move::SideTilt, [both, Shown { of: None, dirs: [Some(2), None] }]));
     assert_eq!(links[1], (Move::Jab, Move::Other, [Shown::default(), both]));
-    assert_eq!(text(link_moves(&tracker.latest_link().unwrap(), TEXT_UNITS)), "Up B ← → > Side tilt ↑");
+    assert_eq!(text(link_moves(&tracker.latest_link().unwrap(), SHORT_UNITS)), "Up B ← → > Side tilt ↑");
 }
 
 fn the_runtime_reads_the_angle_and_the_travel_behind_their_gates() {

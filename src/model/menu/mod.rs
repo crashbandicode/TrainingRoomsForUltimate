@@ -30,6 +30,7 @@ use super::practice_games::retired;
 use super::settings::{self, Settings};
 use super::mashout::moves;
 use super::edge_juggle::{Drill, picker::{self as cpu_picker, Picker}};
+use super::recording_menu::Face;
 pub use focus_list::FocusList;
 
 /// The id of Recording › Options › Loop. The row shows, cycles, lists and resets the page role's loop count, the count Play
@@ -1144,8 +1145,18 @@ impl Menu {
         self.stack.last()
     }
 
+    /// Screens above the focused page or recording list (the bridge snapshot's depth).
     pub fn depth(&self) -> usize {
-        self.stack.len()
+        if self.recording.popup_open() {
+            return self.recording.depth(Face::Popup, 0, true);
+        }
+        let recording_depth = if self.page == Page::Recording {
+            let (group, on_library) = self.library_focus();
+            self.recording.depth(Face::Page, group, on_library)
+        } else {
+            0
+        };
+        self.stack.len() + recording_depth
     }
 
     /// The console's operation mode changed (docked or undocked). A grid already open keeps the
@@ -1367,11 +1378,15 @@ impl Menu {
         self.clamp_cursor();
     }
 
+    pub(super) fn library_focus(&self) -> (u8, bool) {
+        let group = self.focus().map(group_of);
+        let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
+        (group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8, on_library)
+    }
+
     fn press_page(&mut self, button: Button) {
         if self.page == Page::Recording {
-            let group = self.focus().map(group_of);
-            let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
-            let which = group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8;
+            let (which, on_library) = self.library_focus();
             match self.recording.handle_page(button, on_library, which) {
                 super::recording_menu::PageHit::Close => { self.closed = true; return; }
                 super::recording_menu::PageHit::Consumed => {
