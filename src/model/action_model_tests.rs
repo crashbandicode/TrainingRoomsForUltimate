@@ -581,7 +581,8 @@ fn a_link_record_keeps_its_size() {
 #[test]
 fn the_description_holds_no_names() {
     let source = include_str!("action.rs");
-    assert_eq!(source.matches(".name()").count(), 1);
+    assert_eq!(source.matches(".name()").count(), 0);
+    assert_eq!(source.matches("namer.name(").count(), 1, "the one name call goes through the move names");
     for name in [r#""Jab""#, r#""Up B""#, r#""Side tilt""#] {
         assert!(!source.contains(name));
     }

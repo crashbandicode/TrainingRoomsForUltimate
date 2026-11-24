@@ -1,5 +1,6 @@
 lib_unit_tests! {
 use super::*;
+use crate::model::action::ActionDesc;
 use crate::model::combo::{Combo, Helper, LinkRec, Settings};
 use crate::model::combo_record::ComboRecord;
 use crate::model::frame_strip::{Link, Move, Shown, Tracker, Verdict};
@@ -628,6 +629,78 @@ fn only_selected_message_texts_are_decoded_and_compacted() {
     assert!(Names::build(&bad).is_err());
 }
 
+fn written(desc: ActionDesc, namer: Namer<'_>) -> String {
+    let mut text = String::new();
+    desc.write(&mut text, false, namer).unwrap();
+    text
+}
+
+fn the_action_models_variant_is_the_engine_common_animations() {
+    for motion in [
+        "attack_11", "attack_12", "attack_13", "attack_100", "attack_100_end", "attack_dash", "attack_s3_hi",
+        "attack_hi4", "attack_air_b", "catch", "catch_dash", "catch_turn", "catch_attack", "throw_f", "throw_lw",
+        "cliff_attack_quick", "down_attack_u", "slip_attack", "invented_motion",
+    ] {
+        assert_eq!(crate::model::action::variant(hash40(motion)), Normal::of(hash40(motion)) as u8, "{motion}");
+    }
+}
+
+fn the_strip_names_the_variant_the_game_chose() {
+    isolated("the_strip_names_the_variant_the_game_chose", || {
+    let _guard = published();
+    let mut l = link(Move::Jab, Move::Grab);
+    l.variants = [Normal::Jab2 as u8, Normal::DashGrab as u8];
+    PUBLISHED.set_on(false);
+    assert_eq!(strip_text(&l), "Jab > Grab");
+    PUBLISHED.set_on(true);
+    assert_eq!(strip_text(&l), "Jab 2 > Dash grab");
+    l.variants = [0; 2];
+    assert_eq!(strip_text(&l), "Jab > Grab");
+    });
+}
+
+fn a_saved_link_keeps_its_variant_for_the_bar_and_the_menu() {
+    isolated("a_saved_link_keeps_its_variant_for_the_bar_and_the_menu", || {
+    let _guard = published();
+    let mut rec = LinkRec::presses(Move::Jab, Move::Throw, Verdict::True(None), None, &[]);
+    rec.set_descriptions([
+        ActionDesc::of(Move::Jab, Shown::default(), Normal::Jab3 as u8),
+        ActionDesc::of(Move::Throw, Shown::default(), Normal::ForwardThrow as u8),
+    ]);
+    let combo = Combo::from_links([rec]).unwrap();
+    assert_eq!(combo_link_lines(&combo, Namer::recorded(None)), ["L1 Jab 3 → Forward throw TRUE"]);
+    assert_eq!(bar_text(combo), "1 Jab 3>Forward throw");
+    let record = ComboRecord::new("Test".into(), combo, None);
+    let read: ComboRecord = serde_json::from_str(&serde_json::to_string(&record).unwrap()).unwrap();
+    assert_eq!(combo_link_lines(&read.combo, Namer::recorded(None)), ["L1 Jab 3 → Forward throw TRUE"]);
+    PUBLISHED.set_on(false);
+    assert_eq!(combo_link_lines(&read.combo, Namer::recorded(None)), ["L1 jab → throw TRUE"]);
+    assert_eq!(bar_text(combo), "1 Jab>Throw");
+    });
+}
+
+fn the_final_smash_shows_the_games_name_for_the_fighter() {
+    let names = Names::build(&shared_file()).unwrap();
+    let desc = ActionDesc::of(Move::FinalSmash, Shown::default(), 0);
+    assert_eq!(written(desc, Namer::new(true, Some(&names), Some(fighter("alpha")))), "Test Grand Finish");
+    assert_eq!(written(desc, Namer::new(true, Some(&names), None)), "Final Smash");
+    assert_eq!(written(desc, Namer::new(true, Some(&names), Some(fighter("beta")))), "Final Smash");
+    assert_eq!(written(desc, Namer::OFF), "Final Smash");
+}
+
+fn the_toggle_off_prints_the_action_models_text() {
+    for (mv, normal) in [
+        (Move::Jab, Normal::Jab2), (Move::Grab, Normal::DashGrab), (Move::Throw, Normal::ForwardThrow),
+        (Move::FinalSmash, Normal::Unknown), (Move::UpSpecial, Normal::Unknown), (Move::Aerial, Normal::BackAir),
+    ] {
+        assert_eq!(written(ActionDesc::of(mv, Shown::default(), normal as u8), Namer::OFF), mv.name());
+    }
+    let mut up = Shown::default();
+    up.dirs[0] = Some(2);
+    assert_eq!(written(ActionDesc::of(Move::SideTilt, up, Normal::ForwardTilt as u8), Namer::OFF), "Side tilt ↑");
+    assert_eq!(written(ActionDesc::of(Move::SideTilt, up, Normal::ForwardTilt as u8), Namer::new(true, None, None)), "Forward tilt ↑");
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -662,6 +735,11 @@ fn case_table() {
         ("same_kind_after_a_strip_reset_reads_the_new_loadout", same_kind_after_a_strip_reset_reads_the_new_loadout as fn()),
         ("the_file_is_read_only_after_the_mod_filesystem_is_mounted", the_file_is_read_only_after_the_mod_filesystem_is_mounted as fn()),
         ("only_selected_message_texts_are_decoded_and_compacted", only_selected_message_texts_are_decoded_and_compacted as fn()),
+        ("the_action_models_variant_is_the_engine_common_animations", the_action_models_variant_is_the_engine_common_animations as fn()),
+        ("the_strip_names_the_variant_the_game_chose", the_strip_names_the_variant_the_game_chose as fn()),
+        ("a_saved_link_keeps_its_variant_for_the_bar_and_the_menu", a_saved_link_keeps_its_variant_for_the_bar_and_the_menu as fn()),
+        ("the_final_smash_shows_the_games_name_for_the_fighter", the_final_smash_shows_the_games_name_for_the_fighter as fn()),
+        ("the_toggle_off_prints_the_action_models_text", the_toggle_off_prints_the_action_models_text as fn()),
     ]);
 }
 }
