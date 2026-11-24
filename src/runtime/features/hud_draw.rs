@@ -123,6 +123,17 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         combo::hud_tick(strip_shown, draw_settings.link_history, parry.is_some(), &mut drawn, |local, look, changed| {
             write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
         });
+        // A reason that wrapped is taller than its row, and its card grows by the wrapped line.
+        if let Some(Some((sequence, lines))) = drawn {
+            let reason = bar[cb::at::REASON] as *mut Pane;
+            if !reason.is_null() {
+                pane::set_height(reason, C.card.reason_height(lines));
+            }
+            let plate = bar[if sequence { cb::at::SEQ_BACKDROP } else { cb::at::BACKDROP }] as *mut Pane;
+            if !plate.is_null() {
+                pane::set_height(plate, C.card.grown(sequence, lines)[3]);
+            }
+        }
         // This draw's own card; only a contended tick falls back to the last one drawn.
         drawn.unwrap_or_else(|| combo::card(strip_shown))
     } else {

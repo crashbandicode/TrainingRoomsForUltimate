@@ -48,7 +48,7 @@ struct Sample {
 // Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
 static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
     Mutex::new((Renderer::new(), [None; combo_plan::COUNT]));
-/// Last drawn card: none (0), combo (1), or sequence (2). A contended tick preserves the visible card.
+/// Last drawn card: none (0), combo (1), or sequence (2), plus 2 for each line of its reason. A contended tick preserves the visible card.
 static CARD: AtomicU8 = AtomicU8::new(0);
 static INPUT_TARGET: AtomicBool = AtomicBool::new(false);
 pub fn input_observation_wanted() -> bool {
@@ -302,12 +302,12 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
         };
         Box::new(SequenceStage {
             generation,
-            name: Text::new(&plan.name),
+            name: Text::short(&plan.name),
             steps: plan.steps.iter().map(|step| step.combo).collect(),
             names: plan
                 .steps
                 .iter()
-                .map(|step| Text::new(&step.name))
+                .map(|step| Text::short(&step.name))
                 .collect(),
             streak: plan.streak,
             best: plan.best,
@@ -530,7 +530,7 @@ pub fn saved(combo: &Combo) {
 pub fn set_target(target: Option<(Combo, &str)>) {
     stage_target(target);
     let name = target.map_or("", |(_, name)| name);
-    NAME_POSTED.publish(Text::new(name));
+    NAME_POSTED.publish(Text::short(name));
     LABELS.lock().target = Label::new(name);
 }
 
@@ -549,7 +549,7 @@ pub fn stage_target(target: Option<(Combo, &str)>) {
     let name = target.map_or("", |(_, name)| name);
     let mut labels = LABELS.lock();
     labels.settle();
-    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name))));
+    STAGED.publish(target.map(|(combo, name)| (combo, Text::short(name))));
     labels.pending = Some((STAGED.generation(), Label::new(name)));
 }
 
@@ -579,12 +579,13 @@ pub fn on_layout_registered() {
 /// game's task workers (`anchors::ui_pass_calculate`), while the fighter frame may hold `HELPER`, `NAME` or `PLAN`: it takes
 /// them with `try_lock`, and on contention writes nothing this pass (the bar keeps its panes; the next pass draws). No plugin
 /// thread takes them (the menu worker posts: `NAME_POSTED`, `PLAN_POST`); this tick takes what it posted first.
-/// A tick that drew sets `drawn` to its card; a contended tick leaves it alone.
+/// A tick that drew sets `drawn` to its card (a sequence's or a combo's, and the lines of its reason); a contended tick
+/// leaves it alone.
 pub fn hud_tick(
     strip_shown: bool,
     history_enabled: bool,
     parry: bool,
-    drawn: &mut Option<Option<bool>>,
+    drawn: &mut Option<Option<(bool, usize)>>,
     mut apply: impl FnMut(usize, &Look, Changed),
 ) -> usize {
     // Borrow the static Helper. Copying it exhausts the game task's stack.
@@ -605,7 +606,7 @@ pub fn hud_tick(
     let history = C.history_row(history_enabled, parry, card.is_some());
     let (panes, changes) = &mut *renderer;
     changes.fill(None);
-    let writes = panes.draw(
+    let (writes, reason_lines) = panes.draw(
         &helper,
         &name,
         seq.as_ref(),
@@ -620,17 +621,17 @@ pub fn hud_tick(
             apply(i, panes.written(i).unwrap(), *changed);
         }
     }
-    CARD.store(card.map_or(0, |sequence| 1 + u8::from(sequence)), Ordering::Release);
+    let card = card.map(|sequence| (sequence, reason_lines));
+    CARD.store(card.map_or(0, |(sequence, lines)| 1 + u8::from(sequence) + 2 * lines as u8), Ordering::Release);
     *drawn = Some(card);
     writes
 }
 
-/// The card of the last HUD tick that drew, for a contended tick while the strip is shown: a combo (`Some(false)`) or a
-/// sequence (`Some(true)`).
-pub fn card(strip_shown: bool) -> Option<bool> {
+/// The card of the last HUD tick that drew, for a contended tick while the strip is shown: a combo (`false`) or a
+/// sequence (`true`), and the lines of its reason.
+pub fn card(strip_shown: bool) -> Option<(bool, usize)> {
     match CARD.load(Ordering::Acquire) {
-        1 if strip_shown => Some(false),
-        2 if strip_shown => Some(true),
+        card if card != 0 && strip_shown => Some(((card - 1) % 2 == 1, usize::from((card - 1) / 2))),
         _ => None,
     }
 }

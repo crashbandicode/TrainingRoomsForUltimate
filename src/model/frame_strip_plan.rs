@@ -27,8 +27,11 @@ pub const CPU_TAG: [u8; 4] = [150, 150, 158, 255];
 /// Dark text for a label that sits on a light block (the LAST pills' text, a hit block's spot label).
 pub const INK: [u8; 4] = [10, 14, 20, 255];
 
-/// A text box's content: UTF-16 units of the game's font (ASCII, or one glyph unit).
-pub const TEXT_UNITS: usize = 24;
+/// A text box's content: UTF-16 units of the game's font (ASCII, or one glyph unit). As long as the native boxes
+/// (`panes::iv::TEXT_UNITS`), so the longest line a plan writes is whole here and in its box.
+pub const TEXT_UNITS: usize = super::panes::iv::TEXT_UNITS as usize;
+/// A line whose place cannot grow (a name on the card, a pill's label, the LAST row's moves) keeps this many units.
+pub const SHORT_UNITS: usize = 24;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Text {
@@ -43,6 +46,27 @@ impl Text {
         let mut t = Text::EMPTY;
         let _ = t.write_str(s);
         t
+    }
+
+    /// `s` for a line whose place cannot grow: its first [`SHORT_UNITS`] units.
+    pub fn short(s: &str) -> Text {
+        Text::new(s).cut(SHORT_UNITS)
+    }
+
+    /// The first `units` units.
+    pub fn cut(self, units: usize) -> Text {
+        Text::from_units(&self.units()[..units.min(self.units().len())])
+    }
+
+    /// The lines of the text: 0 for none, else one more than its line breaks.
+    pub fn lines(&self) -> usize {
+        if self.len == 0 { 0 } else { 1 + self.units().iter().filter(|&&unit| unit == u16::from(b'\n')).count() }
+    }
+
+    /// Wrapped so no line is wider than `width` at x size `font`, on at most `lines` lines (`notice_box::wrap`).
+    pub fn fitted(mut self, width: f32, font: f32, lines: usize) -> Text {
+        self.len = super::notice_box::wrap(&mut self.units, usize::from(self.len), width, font, lines) as u8;
+        self
     }
 
     pub fn glyph(unit: u16) -> Text {
@@ -79,16 +103,16 @@ impl core::fmt::Write for Text {
     }
 }
 
-/// The LINK sub-line has a dedicated native text box. Keep its extra capacity out of the pane cache.
+/// The LINK sub-line, written from the tracker's snapshot beside the pane cache. As long as its box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LinkLine {
-    units: [u16; LINK_UNITS as usize],
+    units: [u16; TEXT_UNITS],
     len: usize,
 }
 
 impl LinkLine {
     fn from_units(units: impl IntoIterator<Item = u16>) -> Self {
-        let mut line = Self { units: [0; LINK_UNITS as usize], len: 0 };
+        let mut line = Self { units: [0; TEXT_UNITS], len: 0 };
         for (out, unit) in line.units.iter_mut().zip(units) {
             *out = unit;
             line.len += 1;
@@ -520,10 +544,11 @@ impl<'a> Content<'a> {
         };
         match (part, link) {
             (0, _) => Look::paint(place, color),
-            (1, _) => Look::label(place, label, INK),
+            // The pill and the gap to the next one cannot grow: both lines keep their short length.
+            (1, _) => Look::label(place, label.cut(SHORT_UNITS), INK),
             (_, None) => Look::HIDDEN,
             (_, Some(link)) => {
-                let t = Text::from_units(link_moves(&link, TEXT_UNITS).units());
+                let t = Text::from_units(link_moves(&link, SHORT_UNITS).units());
                 Look::label(place, t, TEXT)
             }
         }

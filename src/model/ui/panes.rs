@@ -549,7 +549,7 @@ pub mod cb {
     /// The bar's centre below the strip's, and its size (the mockup's 864 × 132).
     pub const BACKDROP_COLOR: [u8; 4] = super::iv::BACKDROP_COLOR;
     pub const CELL_COLOR: [u8; 4] = [30, 36, 48, 255];
-    pub const TEXT_UNITS: u16 = 24;
+    pub const TEXT_UNITS: u16 = super::iv::TEXT_UNITS;
 }
 
 #[path = "strip_layout/mod.rs"]
@@ -608,8 +608,9 @@ pub mod iv {
 
     pub use super::strip_layout::strip::*;
     pub const BACKDROP_COLOR: [u8; 4] = [14, 18, 27, 222];
-    /// The text boxes' capacity in UTF-16 units.
-    pub const TEXT_UNITS: u16 = 24;
+    /// The text boxes' capacity in UTF-16 units, the strip's and the combo card's alike: the longest line a plan
+    /// writes (the card's reason, 37 units) fits, so no line is cut by its box or by `frame_strip_plan::Text`.
+    pub const TEXT_UNITS: u16 = 40;
     /// Small labels, the readouts' sub-lines, the readouts' values.
     pub const FONT_TAG: (f32, f32) = (14.0, 22.0);
     pub const FONT_SUB: (f32, f32) = (16.0, 26.0);

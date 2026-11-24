@@ -16,13 +16,19 @@ pub struct Metrics {
     pub links: usize,
     pub tolerance: usize,
     pub title: usize,
+    /// The lines the reason takes at the card's width (0: none). Each line after the first grows the card.
+    pub reason_lines: usize,
 }
+
+/// The most lines a reason is wrapped to.
+pub const REASON_LINES: usize = 2;
 
 impl Metrics {
     const EMPTY: Self = Self {
         pills: 0,
         result: 0,
         reason: 0,
+        reason_lines: 0,
         previous: 0,
         streak: 0,
         best: 0,
@@ -149,13 +155,32 @@ pub const C: CardSpec = CardSpec {
 impl CardSpec {
     /// Card centre and dimensions relative to TrIv.
     pub const fn bounds(&self, sequence: bool) -> [f32; 4] {
-        let h = self.heights[sequence as usize];
+        self.grown(sequence, 1)
+    }
+
+    /// The card with a reason of `reason_lines` lines: it grows down by one line pitch for each line after the first.
+    pub const fn grown(&self, sequence: bool, reason_lines: usize) -> [f32; 4] {
+        let h = self.heights[sequence as usize] + self.wrap_drop(reason_lines);
         [
             self.left + self.width / 2.0,
             self.top - h / 2.0,
             self.width,
             h,
         ]
+    }
+
+    const fn wrap_drop(&self, reason_lines: usize) -> f32 {
+        reason_lines.saturating_sub(1) as f32 * self.text_height
+    }
+
+    /// The widest a line of the reason may be: the card's content width.
+    pub const fn reason_width(&self) -> f32 {
+        self.content_width()
+    }
+
+    /// The reason pane's height for `lines` lines.
+    pub const fn reason_height(&self, lines: usize) -> f32 {
+        self.text_height + self.wrap_drop(lines)
     }
 
     const fn content_left(&self) -> f32 {
@@ -192,8 +217,8 @@ impl CardSpec {
         (Place::new(x, y, w), h)
     }
 
-    const fn plate(&self, sequence: bool) -> (Place, f32) {
-        let [x, y, width, height] = self.bounds(sequence);
+    const fn plate(&self, sequence: bool, reason_lines: usize) -> (Place, f32) {
+        let [x, y, width, height] = self.grown(sequence, reason_lines);
         Self::box_at(x, y, width, height)
     }
 
@@ -209,9 +234,11 @@ impl CardSpec {
         let span = self.content_width();
         let [title, progress, result] = self.single_rows;
         let [seq_header, seq_name, seq_chips, seq_result, seq_stats] = self.sequence_rows;
+        // The statistics sit under the reason: a wrapped reason moves them down.
+        let seq_stats = seq_stats + self.wrap_drop(metrics.reason_lines);
         match i {
             CONTAINER => Self::box_at(0.0, 0.0, self.width, self.heights[1]),
-            BACKDROP => self.plate(false),
+            BACKDROP => self.plate(false, metrics.reason_lines),
             HEADER => self.text(left, title, span),
             STREAK => self.text(left, progress, span),
             RESULT | REASON => self.text(
@@ -230,7 +257,7 @@ impl CardSpec {
                 let height = if i >= TITLE && i < RULER { self.text_height } else { height };
                 (place, height)
             }
-            SEQ_BACKDROP => self.plate(true),
+            SEQ_BACKDROP => self.plate(true, metrics.reason_lines),
             SEQ_PILL | SEQ_PILL_TEXT => Self::box_at(
                 left + self.sequence_pill[0] / 2.0,
                 self.top - seq_header,
@@ -348,7 +375,8 @@ impl CardSpec {
         } else if (i == RESULT || i == REASON) && m.reason != 0 {
             let result_width = self.estimating(m.result, false);
             let reason_width = self.estimating(m.reason, false);
-            if self.fits(result_width, reason_width) {
+            // A wrapped reason has its own row; its box is centred half the extra height lower, so its first line stays there.
+            if m.reason_lines <= 1 && self.fits(result_width, reason_width) {
                 if i == REASON {
                     *place = self
                         .text(
@@ -359,7 +387,8 @@ impl CardSpec {
                         .0;
                 }
             } else {
-                place.y = self.top - if i == RESULT { result_high } else { reason_low };
+                let reason_row = reason_low + self.wrap_drop(m.reason_lines) / 2.0;
+                place.y = self.top - if i == RESULT { result_high } else { reason_row };
             }
         }
     }
@@ -368,10 +397,14 @@ impl CardSpec {
         let left = self.content_left();
         let [_, title, _, footer, stats] = self.sequence_rows;
         let [previous_high, result_low] = self.sequence_extra_rows;
+        let drop = self.wrap_drop(m.reason_lines);
+        let stats = stats + drop;
         if (i == RESULT || i == REASON || i == SEQ_LANDED) && m.previous != 0 {
             let prev_width = self.estimating(m.previous, false);
             let item_width = self.estimating(m.result.max(m.reason), false);
-            if self.fits(prev_width, item_width) && i != SEQ_LANDED {
+            // A wrapped reason has its own row; its box is centred half the extra height lower, so its first line stays there.
+            let shares = m.reason_lines <= 1 && self.fits(prev_width, item_width);
+            if shares && i != SEQ_LANDED {
                 return self
                     .text(
                         left + prev_width + self.caption_gap,
@@ -380,12 +413,14 @@ impl CardSpec {
                     )
                     .0;
             }
-            if !self.fits(prev_width, item_width) {
+            if !shares {
                 return self
                     .text(
                         left,
                         if i == SEQ_LANDED {
                             previous_high
+                        } else if i == REASON {
+                            result_low + drop / 2.0
                         } else {
                             result_low
                         },

@@ -105,11 +105,16 @@ fn dropped(summary: Summary) -> SeqView {
     }
 }
 
+/// Every pane of the card as drawn, and the lines of its reason.
+fn drawn(h: &Helper, seq: Option<&SeqView>) -> (Vec<Look>, usize) {
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    let (_, lines) = Renderer::new().draw(h, &Text::new("Jab loop"), seq, true, (&C, false), |i, look, _| looks[i] = *look);
+    (looks, lines)
+}
+
 /// What the card puts on its reason line, and the pane as placed.
 fn shown(h: &Helper, seq: Option<&SeqView>) -> (String, Look) {
-    let mut looks = vec![Look::HIDDEN; COUNT];
-    Renderer::new().draw(h, &Text::new("Jab loop"), seq, true, (&C, false), |i, look, _| looks[i] = *look);
-    let look = looks[at::REASON];
+    let look = drawn(h, seq).0[at::REASON];
     (String::from_utf16(look.text.units()).unwrap(), look)
 }
 
@@ -185,5 +190,54 @@ fn a_links_title_names_both_moves_in_full() {
     Renderer::new().draw(&h, &Text::new("Jab loop"), None, true, (&C, false), |i, look, _| looks[i] = *look);
     assert!(looks[at::TITLE].visible);
     assert_eq!(String::from_utf16(looks[at::TITLE].text.units()).unwrap(), "1 Dash attack>Dash attack");
+}
+
+/// The one reason a player can reach that is wider than the card: it takes a second line, its first line stays on its
+/// row, and the card, the statistics under it and the fade behind a fighter follow.
+#[test]
+fn a_reason_wider_than_the_card_wraps_and_the_card_grows_one_line() {
+    let wide = Reason::WrongDir(Kind::Release(Button::Special));
+    let text = |looks: &[Look]| String::from_utf16(looks[at::REASON].text.units()).unwrap();
+    let pitch = C.card.text_height;
+    assert_eq!(pitch, 26.0);
+    assert_eq!(C.card.grown(false, 1), C.card.bounds(false));
+    assert_eq!(C.card.bounds(false), [804.0, 66.0, 288.0, 84.0]);
+    assert_eq!(C.card.grown(false, 2), [804.0, 53.0, 288.0, 110.0]);
+    assert_eq!(C.card.grown(true, 2), [804.0, -3.0, 288.0, 222.0]);
+    assert_eq!((C.card.reason_height(0), C.card.reason_height(1), C.card.reason_height(2)), (26.0, 26.0, 52.0));
+
+    // A drill: step 9's sentence fits the card, step 16's does not.
+    let (one, one_lines) = drawn(&graded(true, faulted(8, wide)), None);
+    let (two, two_lines) = drawn(&graded(true, faulted(15, wide)), None);
+    assert_eq!((text(&one).as_str(), one_lines), ("S9 Special release wrong direction", 1));
+    assert_eq!((text(&two).as_str(), two_lines), ("S16 Special release wrong\ndirection", 2));
+    assert_eq!((C.card.top - one[at::REASON].y, one[at::REASON].w), (74.0, 268.0));
+    assert_eq!((one[at::REASON].y - two[at::REASON].y, two[at::REASON].w), (pitch / 2.0, 268.0), "the first line stays on its row");
+    assert_eq!(one[at::RESULT].y, two[at::RESULT].y);
+    assert_eq!(one[at::BACKDROP].y, C.card.bounds(false)[1]);
+    assert_eq!(two[at::BACKDROP].y, C.card.grown(false, 2)[1]);
+
+    // A dropped sequence: the statistics under the reason move down with the plate.
+    let seq = |link| {
+        let mut waiting = graded(false, faulted(link, wide));
+        waiting.attempt = None;
+        drawn(&waiting, Some(&dropped(faulted(link, wide))))
+    };
+    let ((one, one_lines), (two, two_lines)) = (seq(8), seq(15));
+    assert_eq!((one_lines, two_lines), (1, 2));
+    assert_eq!(text(&two), "L16 Special release wrong\ndirection");
+    assert_eq!(one[at::REASON].y - two[at::REASON].y, pitch / 2.0);
+    assert_eq!(one[at::SEQ_LANDED].y, two[at::SEQ_LANDED].y);
+    for i in [at::SEQ_STREAK, at::SEQ_BEST, at::SEQ_LINKS, at::SEQ_TOLERANCE] {
+        assert_eq!(one[i].y - two[i].y, pitch, "pane {i} is one line lower");
+    }
+    assert_eq!(one[at::SEQ_BACKDROP].y - two[at::SEQ_BACKDROP].y, pitch / 2.0);
+    assert_eq!(two[at::SEQ_BACKDROP].y, C.card.grown(true, 2)[1]);
+
+    // A fighter behind the grown part of the plate fades the panel only while the reason has its second line.
+    let [x, y, _, h] = C.card.grown(false, 2);
+    let behind = [[x + C.strip.origin_x, y - h / 2.0 + 5.0 + C.strip.origin_y]];
+    assert_eq!(C.opacity(0.0, false, Some((false, 2)), behind), C.covered_alpha);
+    assert_eq!(C.opacity(0.0, false, Some((false, 1)), behind), u8::MAX);
 }
 }

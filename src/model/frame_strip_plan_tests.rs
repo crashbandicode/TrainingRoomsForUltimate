@@ -152,11 +152,11 @@ fn the_last_row_and_the_link_line_name_the_direction_beside_the_move() {
     );
     assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), "TRUE · Jab > Side tilt ↑");
     let special = Link { to: Move::Other, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] }], ..link };
-    assert_eq!(String::from_utf16(link_moves(&special, TEXT_UNITS).units()).unwrap(), "Jab > Up B ← →");
+    assert_eq!(String::from_utf16(link_moves(&special, SHORT_UNITS).units()).unwrap(), "Jab > Up B ← →");
     let named = Link { to: Move::SideTilt, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(2), None] }], ..link };
-    assert_eq!(String::from_utf16(link_moves(&named, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
+    assert_eq!(String::from_utf16(link_moves(&named, SHORT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
     let plain = Link { shown: [Shown::default(); 2], ..link };
-    assert_eq!(String::from_utf16(link_moves(&plain, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt");
+    assert_eq!(String::from_utf16(link_moves(&plain, SHORT_UNITS).units()).unwrap(), "Jab > Side tilt");
 }
 
 #[test]
@@ -247,23 +247,23 @@ fn compact_bounds_and_fade_follow_the_scene_and_visible_rows() {
     assert_eq!(C.strip.bounds(true, false), [0.0, 23.0, 1296.0, 170.0]);
     assert_eq!(C.strip.bounds(false, false), [0.0, 39.0, 1296.0, 138.0]);
     assert_eq!(C.strip.bounds(false, true), [0.0, 7.0, 1296.0, 202.0]);
-    let seen = C.opacity(0.0, false, Some(true), [[0.0, 535.0]]);
+    let seen = C.opacity(0.0, false, Some((true, 1)), [[0.0, 535.0]]);
     assert_eq!(seen, u8::MAX);
     assert_eq!(
-        C.opacity(0.0, false, Some(true), [[0.0, 500.0]]),
+        C.opacity(0.0, false, Some((true, 1)), [[0.0, 500.0]]),
         C.covered_alpha
     );
     assert_eq!(
-        C.opacity(0.0, false, Some(true), [[804.0, 400.0]]),
+        C.opacity(0.0, false, Some((true, 1)), [[804.0, 400.0]]),
         C.covered_alpha
     );
     assert_eq!(C.opacity(0.0, false, None, [[804.0, 400.0]]), u8::MAX);
     assert_eq!(
-        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 500.0]]),
+        C.opacity(C.scene_drop(true), false, Some((true, 1)), [[804.0, 500.0]]),
         u8::MAX
     );
     assert_eq!(
-        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 400.0]]),
+        C.opacity(C.scene_drop(true), false, Some((true, 1)), [[804.0, 400.0]]),
         C.covered_alpha
     );
 }
@@ -557,6 +557,74 @@ fn parrys_grade_words_are_shown_in_full() {
     let words = "Grading unavailable (not counted)";
     assert_eq!(String::from_utf16(looks[at::READ_SUB + 1].text.units()).unwrap(), words);
     assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), words);
+}
+
+/// One length for a HUD line: every text box of the strip and of the combo card holds what a plan's `Text` holds.
+/// The two-unit boxes are single glyphs.
+#[test]
+fn the_hud_text_boxes_are_as_long_as_the_plans_text() {
+    use crate::model::panes::{cb, iv, spec, Kind, IDX_CB, IDX_IV};
+    assert_eq!((usize::from(iv::TEXT_UNITS), usize::from(cb::TEXT_UNITS)), (TEXT_UNITS, TEXT_UNITS));
+    let lengths: Vec<u16> = (IDX_IV..IDX_IV + iv::COUNT)
+        .chain(IDX_CB..IDX_CB + cb::COUNT)
+        .filter_map(|index| match spec(index).kind {
+            Kind::Text { chars, .. } => Some(chars),
+            _ => None,
+        })
+        .collect();
+    assert!(lengths.iter().all(|&chars| usize::from(chars) == TEXT_UNITS || chars == 2), "{lengths:?}");
+    assert_eq!(lengths.iter().filter(|&&chars| chars != 2).count(), 68, "41 lines of the strip and 27 of the card");
+}
+
+/// Lines whose place cannot grow keep 24 units: a name on the card, Parry's pills and the LAST row's moves.
+#[test]
+fn lines_that_cannot_grow_keep_their_24_units() {
+    use crate::model::drill::{Advance, Stepped};
+    use crate::model::{combo, combo_plan, frame_strip::Button};
+    let long = "A thirty character combo name!";
+    assert_eq!((long.len(), SHORT_UNITS), (30, 24));
+    assert_eq!(Text::short(long), Text::new(&long[..SHORT_UNITS]));
+
+    // A sequence's card: the name beside "landed", and a chip.
+    let link = combo::LinkRec::presses(Move::Jab, Move::UpTilt, Verdict::True(None), None,
+        &[combo::Event::press(Button::Attack, combo::Aim::Neutral, 0)]);
+    let target = combo::Combo::from_links([link]).unwrap();
+    let mut helper = combo::Helper::new();
+    helper.set_target(Some(target));
+    helper.step(&Tracker::new(), combo::Settings { on: true, ..combo::Settings::factory() });
+    helper.continue_with(target);
+    let clean = combo::Summary { outcome: combo::Outcome::Completed, graded: 1, true_links: 1, total: 1, clean: true, fault: None };
+    let mut chips = [Text::EMPTY; crate::model::panes::cb::CHIPS];
+    chips[0] = Text::new(long);
+    let seq = combo_plan::SeqView {
+        name: Text::short(long),
+        at: 1,
+        steps: 2,
+        streak: 0,
+        best: 0,
+        first: 0,
+        chips,
+        last: Some(Stepped { step: 0, summary: clean, advance: Advance::Next(1) }),
+        last_name: Text::new(long),
+    };
+    let mut card = vec![Look::HIDDEN; combo_plan::COUNT];
+    combo_plan::Renderer::new().draw(&helper, &Text::EMPTY, Some(&seq), true, (&C, false), |i, look, _| card[i] = *look);
+    let on_card = |i: usize| String::from_utf16(card[i].text.units()).unwrap();
+    assert_eq!(on_card(combo_plan::at::SEQ_LANDED), long[..SHORT_UNITS]);
+    assert_eq!(on_card(combo_plan::at::SEQ_CHIP_TEXT), format!("1  {}", &long[..SHORT_UNITS - 3]));
+
+    // Parry's pill is 96 units wide: Tech's words keep their first 24 units there.
+    use crate::model::parry::{Attempt, View};
+    let mut view = View::EMPTY;
+    view.last[0] = Some(Attempt { grade: crate::model::tech::session::Grade::Unavailable, hit: 1, window: None });
+    let mut strip = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw_parry(&Tracker::new(), true, false, Some(&view), |i, look, _| strip[i] = *look);
+    assert_eq!(String::from_utf16(strip[at::PILL_TEXT].text.units()).unwrap(), "Grading unavailable (not");
+
+    // The LAST row's moves are fitted to the gap before the next pill.
+    let tracker = directional_combo(Move::DashAttack, Move::DashAttack, None, None);
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Dash attack>Dash attack");
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

@@ -34,6 +34,7 @@ pub const BRACKET_TEXT_Y: f32 = LEG_Y - 18.0;
 pub const READ_X: f32 = 276.0;
 pub const READ_VALUE_Y: [f32; 3] = [TOP - 26.0, TOP - 68.5, TOP - 111.0];
 pub const READ_SUB_X: f32 = READ_X + 75.0;
+/// The units the folded LINK line is fitted to: what its box holds beside the readout.
 pub const LINK_UNITS: u16 = 32;
 pub const DIVIDER_X: f32 = 262.5;
 pub const DIVIDER_Y: f32 = TOP - 69.0;
@@ -385,21 +386,17 @@ pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name
             ),
             parent,
         )),
-        i if i < LAST_TEXT => {
-            let row = i - READ_SUB;
-            let capacity = if row == 1 { LINK_UNITS } else { TEXT_UNITS };
-            hidden(under(
-                text(
-                    name,
-                    with_height(spec.readout(row, 2), 30.0),
-                    Align::Left,
-                    FONT_SUB,
-                    capacity,
-                    TEXT,
-                ),
-                parent,
-            ))
-        }
+        i if i < LAST_TEXT => hidden(under(
+            text(
+                name,
+                with_height(spec.readout(i - READ_SUB, 2), 30.0),
+                Align::Left,
+                FONT_SUB,
+                TEXT_UNITS,
+                TEXT,
+            ),
+            parent,
+        )),
         LAST_TEXT => iv_text(
             name,
             with_width(spec.last_label(), 60.0),
