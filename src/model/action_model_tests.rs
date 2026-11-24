@@ -658,6 +658,23 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
 }
 
 #[test]
+fn a_finished_side_attack_keeps_its_animation_direction_in_the_take() {
+    for (mv, angle, expected) in [
+        (Move::SideTilt, Some(Angle::Up), Dir::ForwardUp),
+        (Move::SideSmash, Some(Angle::Down), Dir::ForwardDown),
+        (Move::SideTilt, None, Dir::Forward),
+    ] {
+        let (mut tracker, mut capture) = tilt((60, 0), angle, mv);
+        let press = |capture: &InputCapture| capture.combo.get(0).unwrap().events()
+            .find(|e| e.kind == Kind::Press(Button::Attack)).unwrap().dir;
+        assert_eq!(press(&capture), expected);
+        tracker.step(standing(), standing(), MappedInputs::NEUTRAL);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        assert_eq!(press(&capture), expected, "{mv:?} after returning to idle");
+    }
+}
+
+#[test]
 fn the_strip_mark_and_the_drill_direction_agree() {
     for (angle, mark, dir) in [(Some(Angle::Up), Some(2), Dir::ForwardUp),
         (Some(Angle::Down), Some(6), Dir::ForwardDown), (None, None, Dir::Forward)] {
