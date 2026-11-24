@@ -17,7 +17,7 @@ Hitbox Visualization has one colour scheme: red and pink attacks, purple grabs, 
   [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On. It doesn't open over the game's pause menu.
 - While it is open, your buttons go to the menu, the frame strip steps aside, and in Training the game's HUD hides.
 - While it is open the CPU stands frozen where it is, and moves again when you close the menu.
-  Your own fighter is not frozen. A preview, save-state load, recording or macro playing on the CPU goes on.
+  Your own fighter is not frozen. A preview, save-state load, recording or macro that is playing goes on.
   A CPU fighter change waits until the menu closes.
 - **B** closes it. Inside a list or an editor, B goes back one step first.
 - Your changes take effect when you close the menu with B. If the menu is closed for you instead (a match starts, or
