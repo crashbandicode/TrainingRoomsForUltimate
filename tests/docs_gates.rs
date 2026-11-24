@@ -8,7 +8,7 @@
 //! break and passes on the clean case; the external-link script's tests use a server on 127.0.0.1 only. The network check
 //! itself (`tools/check_external_links.py`) is a release step and is not run here (docs/BUILD.md, "Release checklist").
 //!
-//! Like the size gate (`tests/size_budget.rs`) these shell out to `/usr/bin/python3` and have no skip switch. Neither this
+//! Like the size gate's host tests (`tests/size_budget.rs`) these shell out to `/usr/bin/python3` and have no skip switch. Neither this
 //! file nor the scripts are counted by the size gate (`tools/sloc.py` leaves `tests/` out and counts Rust only).
 
 use std::process::Command;
