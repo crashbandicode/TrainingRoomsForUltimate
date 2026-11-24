@@ -2657,10 +2657,26 @@ approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceili
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 198083
+date = "2026-11-24"
+reason = "The ACTION model through section 7 on install 4 merge 2: events are owned by the action that made them (steps from originating inputs, clear, the hold band), one description for the strip, the bar, the menu and the grader, the outcome rule in place of the ten-fighter travel table, and a side attacks angle from its animation. Measured 198083 on 70602649, 806 above merge 2s measured 197277."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:05:25Z (the merge-3 line budget approved at the measured 198,083, +806 on merge 2, for the ACTION model core, the outcome rule and section 7)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 198087
 date = "2026-11-24"
 reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198087 (tools/sloc.py tree), 1035 above the base e7667f26 (197052)."
 approved_by = "tr-primary-2 ruling 2026-11-24 17:21:31Z (operator green light about 17:22Z, install 4: the move-name toggle), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198136
+date = "2026-11-24"
+reason = "Merge 3 of install 4: the ACTION model through section 7 with a held buttons deadline counted from the attempts own press (a defect rv-hit-streak found before READY) and f14-dirs grab, throw and Final Smash actions (feat/action-moves 6a7735d3). Measured 198136 on fcab1e75, 53 above the entry before it (198083): +8 from the moves and +45 from the hold-deadline fix."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:35:08Z (the merge-3 line budget approved at the measured 198,136: +8 f14-dir, +45 the hold-limit fix), after its ruling of 20:05:25Z."
 
 [[budget]]
 scope = "total"
@@ -2693,3 +2709,11 @@ ceiling = 198375
 date = "2026-11-24"
 reason = "Move names with both reviewed corrections in one tree (fix/rv-move-name-loader c480dd8c and fix/rv-mii-owner-refresh 711d59fe on 68d14125): measured 198375 (tools/sloc.py tree), which is 198312 plus the loader correction's 9 and the identity corrections' 54, with no lines from the merges."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 19:27:44Z (+9) and 19:31:56Z (+57)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199231
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model (feat/action-model c4c43b23, the merge-3 candidate): measured 199231 on the merged tree (tools/sloc.py tree). Merge 3 is 198136 and the move names add 1098 on merge 2 (198375 less 197277); the merged tree is 3 lines under their sum, because the three print sites now share the ACTION model's one formatter."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above."

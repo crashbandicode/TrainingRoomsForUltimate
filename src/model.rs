@@ -67,6 +67,8 @@ pub mod frame_strip;
 pub mod move_names;
 #[path = "model/aim.rs"]
 pub mod aim;
+#[path = "model/action.rs"]
+pub mod action;
 #[path = "model/frame_strip_plan.rs"]
 pub mod frame_strip_plan;
 #[path = "model/game_speed.rs"]

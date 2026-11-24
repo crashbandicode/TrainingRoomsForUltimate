@@ -2282,11 +2282,15 @@ pub fn combo_link_lines(combo: &Combo, namer: super::move_names::Namer<'_>) -> V
 
 fn link_panel_lines(index: usize, link: &super::combo::LinkRec, namer: super::move_names::Namer<'_>) -> Vec<String> {
     let word = if link.is_true() { "TRUE" } else { "FALSE" };
+    let mut from = String::new();
+    let mut to = String::new();
+    let _ = link.desc(0).write(&mut from, false, namer);
+    let _ = link.desc(1).write(&mut to, false, namer);
     let mut lines = vec![format!(
         "L{} {} → {} {word}",
         index + 1,
-        if namer.is_on() { namer.name(link.from, super::move_names::Normal::Unknown).as_str().to_owned() } else { link.from.name().to_ascii_lowercase() },
-        if namer.is_on() { namer.name(link.to, super::move_names::Normal::Unknown).as_str().to_owned() } else { link.to.name().to_ascii_lowercase() }
+        if namer.is_on() { from } else { from.to_ascii_lowercase() },
+        if namer.is_on() { to } else { to.to_ascii_lowercase() }
     )];
     if let Some(events) = event_line(link) {
         lines.push(events);
@@ -2331,19 +2335,8 @@ fn with_dir(dir: super::combo::Dir, word: &str) -> String {
 }
 
 fn dir_arrow(dir: super::combo::Dir) -> &'static str {
-    use super::combo::Dir;
-    match dir {
-        Dir::Forward => "→",
-        Dir::Back => "←",
-        Dir::Up => "↑",
-        Dir::Down => "↓",
-        // The UI font maps the four cardinal arrows and not the diagonals.
-        Dir::ForwardUp => "↑→",
-        Dir::BackUp => "↑←",
-        Dir::ForwardDown => "↓→",
-        Dir::BackDown => "↓←",
-        Dir::Neutral | Dir::Side => "",
-    }
+    // The UI font maps the four cardinal arrows and not the diagonals.
+    super::action::arrow(dir)
 }
 
 fn drift_line(dir: Option<super::combo::Dir>) -> Option<String> {

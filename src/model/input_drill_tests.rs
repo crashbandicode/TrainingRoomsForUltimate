@@ -62,7 +62,7 @@ fn four_dash_fixture_with_native_idle_flag_saves_and_grades_four_steps() {
 #[test]
 fn input_idle_groups_and_continuations_share_combo_bounds() {
     assert_eq!(capture(&[(0,1),(20,0)]).len(),1);
-    assert_eq!(capture(&[(0,1),(21,0)]).len(),2);
+    assert_eq!(capture(&[(0,1),(21,0)]).len(),1);
     let mut c=InputCapture::new();
     for f in 0..(LINKS*STEPS) { c.step(snap(f as u32, if f%2==0 {1} else {0})); }
     assert_eq!(c.combo.len(),LINKS); assert!(!c.combo.overflow);

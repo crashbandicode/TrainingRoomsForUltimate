@@ -549,6 +549,7 @@ fn snap_link(frames: &[(MappedInputs, Sample)]) -> LinkRec {
         presses_only: false,
         drift,
         spot: None,
+        shown: [0; 3],
     }
 }
 

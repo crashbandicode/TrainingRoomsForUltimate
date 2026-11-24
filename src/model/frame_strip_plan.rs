@@ -5,7 +5,7 @@
 
 use core::fmt::Write as _;
 
-use super::frame_strip::{Aim, Cell, Link, Move, Tracker, Verdict, WINDOW};
+use super::frame_strip::{Aim, Cell, Link, Tracker, Verdict, WINDOW};
 use super::panes::strip_layout::{LayoutSpec, Place, strip::StripSpec};
 #[cfg(test)]
 use super::panes::strip_layout::C;
@@ -127,15 +127,16 @@ impl core::fmt::Write for Text {
 
 /// The game's font has cardinal arrows, but not diagonal arrows.
 pub const fn arrow(dir: u8) -> &'static str {
+    use super::combo::Dir;
     match dir {
-        0 => "→",
-        1 => "↑→",
-        2 => "↑",
-        3 => "↑←",
-        4 => "←",
-        5 => "↓←",
-        6 => "↓",
-        7 => "↓→",
+        0 => super::action::arrow(Dir::Forward),
+        1 => super::action::arrow(Dir::ForwardUp),
+        2 => super::action::arrow(Dir::Up),
+        3 => super::action::arrow(Dir::BackUp),
+        4 => super::action::arrow(Dir::Back),
+        5 => super::action::arrow(Dir::BackDown),
+        6 => super::action::arrow(Dir::Down),
+        7 => super::action::arrow(Dir::ForwardDown),
         _ => "",
     }
 }
@@ -153,21 +154,30 @@ pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
     [older.or(newest), older.and(newest)]
 }
 
+/// How many units a description writes, without keeping them.
+struct Tally(usize);
+
+impl core::fmt::Write for Tally {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.0 += s.encode_utf16().count();
+        Ok(())
+    }
+}
+
 /// The two move names and their direction marks, fitted to the given capacity.
 fn append_moves(text: &mut Text, link: &Link, capacity: usize) {
-    let moves = [link.from, link.to];
-    let names = {
-        let namer = super::move_names::Namer::live();
-        core::array::from_fn::<_, 2, _>(|i| namer.name(link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]), super::move_names::Normal::Unknown))
-    };
-    let names = names.each_ref().map(|name| name.as_str());
-    let arrows = link.shown.map(|shown| shown.dirs.map(|dir| dir.map_or("", arrow)));
-    let space = |s: &str| if s.is_empty() { "" } else { " " };
-    let loose = [names[0], space(arrows[0][0]), arrows[0][0], space(arrows[0][1]), arrows[0][1], " > ",
-                 names[1], space(arrows[1][0]), arrows[1][0], space(arrows[1][1]), arrows[1][1]];
-    let tight = [names[0], "", arrows[0][0], "", arrows[0][1], ">", names[1], "", arrows[1][0], "", arrows[1][1]];
-    let parts = if loose.iter().map(|s| s.encode_utf16().count()).sum::<usize>() <= capacity { loose } else { tight };
-    for part in parts { let _ = text.write_str(part); }
+    let namer = super::move_names::Namer::live();
+    let desc = [
+        super::action::ActionDesc::of(link.from, link.shown[0], link.variants[0]),
+        super::action::ActionDesc::of(link.to, link.shown[1], link.variants[1]),
+    ];
+    let mut loose = Tally(" > ".len());
+    let _ = desc[0].write(&mut loose, false, namer);
+    let _ = desc[1].write(&mut loose, false, namer);
+    let tight = loose.0 > capacity;
+    let _ = desc[0].write(&mut *text, tight, namer);
+    let _ = text.write_str(if tight { ">" } else { " > " });
+    let _ = desc[1].write(&mut *text, tight, namer);
 }
 
 pub fn link_moves(link: &Link, capacity: usize) -> Text {

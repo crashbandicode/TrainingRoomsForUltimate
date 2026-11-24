@@ -1952,3 +1952,18 @@ built on the item owner's default; the operator may overrule it.
 tr-primary-2's inbox ruling at 17:21:31Z and the operator's green light about 17:22Z, install 4: add an Off-by-default
 move-name toggle. Live views name Player 1's moves; saved views use the recorded fighter or common names when that
 identity is unavailable. Special and Final Smash names come from the message file served by ARCropolis.
+
+## The ACTION model (2026-11-24): one fighter-agnostic model for recorded inputs — decided (operator)
+
+Decided by the operator on 2026-11-24 for the next build (relayed by tr-primary-2, inbox 17:21:31Z):
+
+- The ten-fighter list is eliminated. Aims come from the outcome rule, for every fighter.
+- No aim event in a special's own direction: a straight-up up special has no first-direction mark.
+- A side tilt's or side smash's angle comes from the animation the game chose, not from the stick.
+- A button already held when a take starts still counts as a press.
+- Charge: the hold length, from the press to the release of the same button, is recorded and graded within a band.
+- Steering (each travel's path) and an angle-and-deflection toggle are decided too; they are built as a separate
+  change.
+- The Final Smash needs no handling of its own (19:48:35Z).
+
+Design: [design/action-model.md](design/action-model.md).

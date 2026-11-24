@@ -526,10 +526,11 @@ impl Plan<'_> {
                 if input {
                     let _ = write!(text, "Step {}", k + 1);
                 } else {
-                    let _ = {
-                        let namer = super::move_names::Namer::target();
-                        write!(text, "{} {}>{}", k + 1, namer.name(reference.from, super::move_names::Normal::Unknown), namer.name(reference.to, super::move_names::Normal::Unknown))
-                    };
+                    let namer = super::move_names::Namer::target();
+                    let _ = write!(text, "{} ", k + 1);
+                    let _ = reference.desc(0).write(&mut text, false, namer);
+                    let _ = text.write_str(">");
+                    let _ = reference.desc(1).write(&mut text, false, namer);
                 }
                 Ink::text(text, MUTED)
             }
@@ -541,9 +542,10 @@ impl Plan<'_> {
                 None => Ink::text(verdict_text(reference.verdict), RULE),
             },
             3 => {
-                let mark = grade?.marks[0]?;
+                let g = grade?;
+                let mark = g.marks[0]?;
                 let step = first_step?;
-                let (text, color) = mark_text(mark, event_label(step.kind), tolerance);
+                let (text, color) = mark_text(mark, event_label(step.kind), tolerance.saturating_add(g.band[0]));
                 Ink::text(text, color)
             }
             4 => Ink::shape(RULE),
@@ -553,13 +555,16 @@ impl Plan<'_> {
                 Ink::shape(GOOD).detail(Detail::Window(a - origin, b + 1 - origin))
             }
             6 => Ink::shape(MUTED).detail(Detail::Marker(first_step?.offset - origin)),
-            _ => match grade?.marks[0]? {
-                Mark::At(d) => {
-                    let color = if d.unsigned_abs() <= u32::from(tolerance) { GOOD } else { WARN };
-                    Ink::shape(color).detail(Detail::Marker(first_step?.offset + d - origin))
+            _ => {
+                let g = grade?;
+                match g.marks[0]? {
+                    Mark::At(d) => {
+                        let color = if d.unsigned_abs() <= u32::from(tolerance) + u32::from(g.band[0]) { GOOD } else { WARN };
+                        Ink::shape(color).detail(Detail::Marker(first_step?.offset + d - origin))
+                    }
+                    _ => return None,
                 }
-                _ => return None,
-            },
+            }
         };
         Some(ink)
     }
