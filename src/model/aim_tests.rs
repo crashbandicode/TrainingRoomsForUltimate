@@ -264,6 +264,7 @@ fn the_stick_most_held_is_kept_with_the_own_travel() {
     assert_eq!(run(&[((0, 100), 3), ((0, 0), 10)]), Some((0, 0)), "no direction held");
     assert_eq!(run(&[((-60, 60), 5), ((-90, 90), 5), ((10, 10), 9)]), Some((1350, 100)), "the newest sample of that direction");
     assert_eq!(run(&[((0, 100), 5), ((0, 0), 5)]), Some((900, 83)), "a tie goes to the direction");
+    assert_eq!(run(&[((100, 0), 255), ((0, 100), 256)]), Some((900, 83)), "up was held one frame longer");
 }
 
 #[test]
