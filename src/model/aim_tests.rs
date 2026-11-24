@@ -53,6 +53,32 @@ fn simple(start: i32, movement: (f32, f32), stick: (i8, i8), grounded: bool) -> 
     driver.reports()
 }
 
+/// Each pair uses measured approach positions one game frame apart, then a controlled moving special.
+/// Opposite steering and a >2-unit path difference must remain distinguishable at the normal one-frame tolerance.
+#[test]
+fn entry_motion_one_frame_apart_compares_on_all_44_pikachu_fall_samples() {
+    let approach = |rows: &[f13::Row], steer: bool| {
+        let mut driver = Driver::new();
+        for r in rows { driver.push(0x10, (r.x, r.y), (0, 0), false, false); }
+        let r = rows.last().unwrap();
+        for n in 1..=6 {
+            driver.push(UP, (r.x + if steer { n as f32 * 0.5 } else { 0.0 }, r.y + n as f32),
+                if steer { (-90, 90) } else { (0, 0) }, false, false);
+        }
+        driver.push(0x10, (r.x, r.y), (0, 0), false, false);
+        driver.rule.ended().unwrap().1
+    };
+    let (mut checked, mut matching) = (0, 0);
+    for cast in f13::CASTS {
+        for w in cast.rows.windows(4).filter(|w| w[1..].iter().all(|r| r.air && r.status == 0x10)) {
+            let (saved, actual) = (approach(&w[..3], true), approach(&w[1..], false));
+            checked += 1;
+            matching += usize::from(action::steer_off(&saved, &actual, false).is_some());
+        }
+    }
+    assert_eq!((checked, matching), (44, 44));
+}
+
 #[test]
 fn the_outcome_rule_gives_f13s_pikachu_parts() {
     for cast in f13::CASTS {
