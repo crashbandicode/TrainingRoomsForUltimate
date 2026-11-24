@@ -1062,7 +1062,7 @@ fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: 
                 hot_lo.get_or_insert(slot);
                 hot_hi = Some(slot);
             }
-            if view.hairline_after == Some(5) && offset + 1 == 5 {
+            if view.hairline_after == Some(offset + 1) {
                 frame.hairline = Some(slot as u8);
             }
             frame.row_count = (slot + 1) as u8;
