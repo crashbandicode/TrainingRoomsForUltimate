@@ -937,7 +937,7 @@ impl MenuIndex {
 
 // The fighter table is the switch (and test) roster. A host library build has no names.
 #[cfg(any(test, target_os = "switch"))]
-pub(super) fn fighter_name(kind: i32) -> String {
+pub(crate) fn fighter_name(kind: i32) -> String {
     if kind < 0 {
         return String::new();
     }
