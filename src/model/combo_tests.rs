@@ -279,6 +279,8 @@ const ON: Settings = Settings {
     tolerance: 1,
     load_after: false,
     match_spot: false,
+    match_stick: false,
+    move_names: false,
 };
 
 /// The reference: a jab and three up tilts, each pressed one frame after P1 could act.
@@ -385,18 +387,28 @@ fn a_new_final_result_keeps_an_older_deferred_load() {
 
 fn a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh() {
     let mut run = Run::new(with_target());
+    let before = run.helper.seen();
     run.combo(JAB, &[(UP_TILT, 1)], ON);
+    let original = CaptureOwner::new(8, Some(crate::model::move_names::FighterId {
+        chara: crate::model::hash40::hash40("ui_chara_pikachu"), specials: [0; 4],
+    }));
+    run.helper.retain_owner(before, || original);
+    let before = run.helper.seen();
     // The strip clears while the load runs and starts counting again.
     run.tracker.clear();
     run.last_hit = None;
     run.frame = 0;
     run.step(idle(), NONE, ON);
+    run.helper.retain_owner(before, || panic!("a no-link frame cannot replace the retained fighter"));
+    assert_eq!(run.helper.retained_owner, original);
     assert_eq!(
         run.resolved().last().map(|s| s.outcome),
         Some(Outcome::Cleared)
     );
     assert_eq!(run.helper.results().count(), 1);
     run.combo(JAB, &[(UP_TILT, 1), (UP_TILT, 1), (UP_TILT, 1)], ON);
+    run.helper.retain_owner(before, || CaptureOwner::UNKNOWN);
+    assert_eq!(run.helper.retained_owner, CaptureOwner::UNKNOWN, "a new unidentified take cannot borrow the previous owner");
     let last = *run.resolved().last().unwrap();
     assert!(last.clean, "{last:?}");
     assert_eq!(
@@ -424,7 +436,9 @@ fn settings_read_the_three_rows() {
             on: true,
             tolerance: 2,
             load_after: true,
-            match_spot: false
+            match_spot: false,
+            match_stick: false,
+            move_names: false
         }
     );
     snapshot.set(crate::model::spots::ROW_COMBO, &[1, 0]).unwrap();

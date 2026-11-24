@@ -8,7 +8,8 @@ it was held, which angle the game chose and where the special went. One descript
 the menu and the grader. The design and requirement trace are `artifacts/phase23/action-model/DESIGN.md` (base
 `e7667f26`); research is in `artifacts/phase23/research/general-input-recording/REPORT.md` and `REPORT-2.md`.
 
-Travel detail and the angle-and-deflection toggle in DESIGN §8–§9 are a separate change and are not described here.
+Travel detail and the angle-and-deflection toggle of DESIGN §8–§9 are described under "Travel parts and the stick
+toggle".
 
 ## The five defects it removes
 
@@ -69,7 +70,7 @@ ended is not a reaction. An ordinary `Release` stays recorded but contributes no
 `ActionDesc` carries the opening move, an `of` continuation for `Other`, the side-attack angle, a variant and two
 directions. `write` names the move and writes the angle and parts through `action::arrow`; the strip's
 `append_moves`, combo-bar cell and recording menu use it. Diagonals are two cardinal arrows. The description holds
-kinds, never names; `variant` returns zero, leaving move variants for the move-name lane.
+kinds, never names; `variant` identifies engine-common motion variants and returns zero when none is known.
 
 `LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of`
 (0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five
@@ -129,6 +130,35 @@ using `action::angled`; forward or back is retained and the animation supplies u
 direction can wait up to `INPUT_LOOKBACK` frames. `Helper::regrade` updates an already graded step while its attempt
 is open and resolves a newly unclean attempt.
 
+## Travel parts and the stick toggle
+
+`action::Travel` is what one travel part measured: the deciding stick (angle in tenths of a degree, deflection in
+percent), the heading and straight-line distance of the whole part (tenths of a degree, tenths of a unit) and eight
+path points in game units from where the part began. Everything is facing-relative: 0° is forward, 90° is up.
+
+- **Measured by the rule.** When `aim::Rule` reports an onset as a part it opens that part: its base position, the
+  special's facing and the deciding stick, which is the newest stick sample since the onset before it (or the press)
+  that points along the heading (`aim::follows`, `action::stick_of`). It keeps up to 16 positions; when they are full
+  it keeps every second one and samples half as often. The part ends on the first frame whose status is not the
+  part's. `Rule::ended` and `Tracker::late().travel` hold the part number and its `Travel` on that frame only.
+- **Path.** The line from the base through the kept positions to the last one, resampled at eighths of its length,
+  mirrored for a left facing, rounded and saturated to ±127 units.
+- **Kept with the drill.** `InputCapture::step_with` attaches the travel to the newest `Aim` event of that part
+  (`Combo::attach_travel`). A combo has room for `DETAILS` (4) travels, 24 bytes each; a fifth is dropped. The join on
+  load and a crop move the entries with their events.
+- **Graded in input drills.** When the reference's and the attempt's aim both carry a travel and their eight-way
+  directions agree, `action::path_off` fails the step with `Mark::Path` if any of the eight points is farther apart
+  than `max(PATH_ABS, PATH_REL × the reference path's length)` (6 units, 0.30). With *Match angle and deflection* On,
+  `action::stick_off` then fails it with `Mark::Angle` when the stick's angle is more than `ANGLE_TOL` (10°) off, else
+  with `Mark::Deflection` when its deflection is more than `DEFLECTION_TOL` (15 points) off. The reasons are
+  `AimPath`, `AimAngle` and `AimDeflection` ("S1 1st path off", "S1 1st angle 12 off", "S1 1st deflection 30% low"),
+  reported after an extra aim and before a timing fault. The angle mark and reason use the same tenth of a degree
+  that was graded: a 10.2-degree miss shows `10.2 off`, not `10 off`.
+- **Late travel.** A part can end after its step was graded; `Helper::regrade` grades that step again, as for a late
+  angle.
+- **The toggle.** Recording › Options, *Match angle and deflection* (`combo_stick`, Off by default), read into
+  `combo::Settings::match_stick`.
+
 ## The runtime reads
 
 On sampled Player 1 frames, `input_display::p1_motion` reads the animation for a recognised attack or named move
@@ -139,7 +169,8 @@ No hook, native site, lock or static was added for the ACTION model.
 ## Files
 
 On input-drill load, a step beginning with a release or `Aim(1)` joins its predecessor if their events fit in 12;
-the original file is not rewritten by loading. A release may write unsigned `hold`, checked for type on reading.
+the original file is not rewritten by loading. Optional event keys include `hold` and `reacted` for releases and
+`stick`, `heading`, `distance` and `path` for aim travel. A release may write unsigned `hold`, checked for type on reading.
 This build records reactions using the selected On-time tolerance and writes `reacted: true` for an input-drill
 `LetGo` and `reacted: false` for an ordinary release; a non-boolean is rejected. For a legacy release without
 `reacted`, an owned hold under eight frames stays ungraded,
@@ -148,6 +179,12 @@ it the causal rule.
 Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (the three
 new kinds), `of` (a move key), `angle` (`up` or `down`) and `variant` (0–31). Both objects are needed for a described
 link; `{}` is valid. `from` and `to` write `other` for Grab, Throw and Final Smash for older readers.
+
+An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a
+stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs). On reading, an aim event with `path` gets
+a travel: `path` must be eight pairs of integers from −127 to 127, `heading` a number from 0 to under 360,
+`distance` a number of 0 or more, and `stick`, when present, an angle in the same range and a deflection from 0 to
+100. Without `path` the other three keys are ignored. No schema version changes.
 
 Versions 1 and 3 are hit combos, 2 and 4 are input drills; 3 and 4 allow aim events. The writer selects 1 or 2
 when the combo has no aim, 3 or 4 when it has one. A source-backed write retains its original fields but writes the
@@ -170,8 +207,12 @@ selected version and name.
 - The re-entry shortcut of rule B remembers two statuses per special.
 - The stick search of rule C reaches back no further than the tracker keeps frames (`SNAP_RING`, 96).
 - Hit-combo aim events retain eight-way direction grading.
-- A saved link stores no travel arrows. The bar and the menu show the follow-up's from its aim events; for the first
-  move they show the base special and the angle only, where the live strip also shows its travel arrows.
+- A saved link stores no travel arrows. The bar and the menu show the follow-up's from its aim events. A link after
+  the first shows its first move's from the link before it, whose follow-up is the same action (`Combo::descs`). The
+  combo's first link shows only the base special and the angle for its first move, where the live strip also shows
+  its travel arrows.
+- A drill keeps travel detail for its first four aims; hit-combo links keep none.
+- Every stored combo carries the 96-byte travel table, also where no travel can occur.
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
 - An origin identifies a press frame, not a button: simultaneous presses share that frame and cannot be distinguished
@@ -221,3 +262,13 @@ selected version and name.
   `the_design_tolerances_are_the_stated_defaults`, `stick_flicks_inside_any_special_are_not_events`,
   `any_fighters_special_can_aim`, `no_fighter_table_is_left`,
   `the_runtime_reads_the_angle_and_the_travel_behind_their_gates`.
+- Travel and the stick toggle: `a_travel_part_records_its_stick_heading_distance_and_path`,
+  `the_deciding_stick_is_the_last_one_that_pointed_along_the_heading`,
+  `a_path_is_eight_points_by_arc_length_facing_relative`, `the_tracker_hands_over_a_travel_when_its_part_ends`,
+  `a_steered_part_is_graded_on_its_path_within_the_tolerance`, `a_short_warp_fails_a_long_warp_drill`,
+  `the_angle_and_deflection_toggle_grades_the_stick`, `the_toggle_row_reads_its_setting_and_is_off_by_default`,
+  `a_travel_that_ends_after_its_step_was_graded_amends_the_grade`, `aim_details_round_trip_in_optional_keys`,
+  `a_drill_keeps_details_for_its_first_four_aims`, `the_travel_table_is_packed_into_96_bytes_a_combo`,
+  `a_later_links_first_move_borrows_its_travel_arrows`; the new reasons and marks are also drawn by
+  `every_reason_the_grader_can_give_is_shown_in_full_at_the_cards_width` and
+  `every_mark_under_a_step_is_shown_in_full`.

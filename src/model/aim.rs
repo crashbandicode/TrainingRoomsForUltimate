@@ -2,6 +2,8 @@
 //! Entry, velocity, heading and the special's own direction determine an onset.
 //! See `docs/design/action-model.md`.
 
+use super::action::{self, Travel};
+
 /// Minimum movement in game units before a travel's heading is known.
 pub const MOVED: f32 = 1.0;
 /// Frames after an entry, not counting hitstop, in which the movement must show.
@@ -111,6 +113,68 @@ struct Candidate {
     ground: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct OpenPart {
+    number: u8,
+    status: i32,
+    base: (f32, f32),
+    facing: i8,
+    stick: Option<(u16, u8)>,
+    last: (f32, f32),
+    trail: [(f32, f32); 16],
+    len: u8,
+    stride: u32,
+    tick: u32,
+}
+
+impl OpenPart {
+    fn sample_part(&mut self, pos: (f32, f32)) {
+        self.last = (pos.0 - self.base.0, pos.1 - self.base.1);
+        self.tick += 1;
+        if self.tick < self.stride { return; }
+        self.tick = 0;
+        if usize::from(self.len) == self.trail.len() {
+            for i in 0..8 { self.trail[i] = self.trail[i * 2 + 1]; }
+            self.len = 8;
+            self.stride = self.stride.saturating_mul(2);
+        }
+        self.trail[usize::from(self.len)] = self.last;
+        self.len += 1;
+    }
+
+    fn measured(&self) -> Travel {
+        let mirror = if self.facing < 0 { -1.0 } else { 1.0 };
+        let last = (if self.last.0 == 0.0 { 0.0 } else { self.last.0 * mirror }, self.last.1);
+        let heading = ((last.1.atan2(last.0).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600;
+        let distance = (last.0.hypot(last.1) * 10.0).round().clamp(0.0, f32::from(u16::MAX)) as u16;
+        let mut length = 0.0;
+        let mut previous = (0.0_f32, 0.0_f32);
+        for point in self.trail[..usize::from(self.len)].iter().copied().chain(core::iter::once(self.last)) {
+            length += (point.0 - previous.0).hypot(point.1 - previous.1);
+            previous = point;
+        }
+        let path = core::array::from_fn(|i| {
+            let wanted = length * (i + 1) as f32 / 8.0;
+            let mut travelled = 0.0;
+            let mut previous = (0.0_f32, 0.0_f32);
+            let mut point = self.last;
+            for next in self.trail[..usize::from(self.len)].iter().copied().chain(core::iter::once(self.last)) {
+                let segment = (next.0 - previous.0).hypot(next.1 - previous.1);
+                if segment > 0.0 && travelled + segment >= wanted {
+                    let t = (wanted - travelled) / segment;
+                    point = (previous.0 + (next.0 - previous.0) * t, previous.1 + (next.1 - previous.1) * t);
+                    break;
+                }
+                travelled += segment;
+                previous = next;
+            }
+            ((point.0 * mirror).round().clamp(-127.0, 127.0) as i8,
+                point.1.round().clamp(-127.0, 127.0) as i8)
+        });
+        Travel { stick: self.stick, heading, distance, path }
+    }
+}
+
 /// The state of the outcome rule for the current special.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Rule {
@@ -125,6 +189,8 @@ pub struct Rule {
     previous2: Option<(f32, f32)>,
     previous_ground: bool,
     candidate: Option<Candidate>,
+    part: Option<OpenPart>,
+    ended: Option<(u8, Travel)>,
     #[cfg(test)]
     pub(crate) keep_nominal: bool,
 }
@@ -133,7 +199,7 @@ impl Rule {
     pub const fn new() -> Self {
         Self { family: None, facing: 0, onsets: 0, statuses: [None; 2], last_heading: None,
             window: 0, last_status: None, previous: None, previous2: None, previous_ground: true,
-            candidate: None, #[cfg(test)] keep_nominal: false }
+            candidate: None, part: None, ended: None, #[cfg(test)] keep_nominal: false }
     }
 
     /// Player 1 is inside a special as of the last step.
@@ -142,8 +208,19 @@ impl Rule {
     /// The entry of a status whose movement may still show.
     pub fn pending(&self) -> Option<u32> { self.candidate.map(|candidate| candidate.entry) }
 
+    pub fn ended(&self) -> Option<(u8, Travel)> { self.ended }
+
     /// Advance the rule, looking back for the newest matching stick sample.
     pub fn step(&mut self, now: Now, mut stick: impl FnMut(u32, f32, bool) -> Option<(i8, i8)>) -> Seen {
+        self.ended = None;
+        if let Some(part) = self.part.as_mut() {
+            if now.status == part.status && (now.start.is_some() || now.own) {
+                if let Some(pos) = now.pos.filter(|_| !now.stop) { part.sample_part(pos); }
+            } else {
+                self.ended = Some((part.number, part.measured()));
+                self.part = None;
+            }
+        }
         if let Some(family) = now.start.filter(|_| self.last_status != Some(now.status)) {
             self.family = Some(family);
             self.facing = now.facing;
@@ -192,15 +269,20 @@ impl Rule {
                         || ((new.0 - old.0).hypot(new.1 - old.1) >= DV && !carried && turned);
                     if impulse {
                         self.onsets = self.onsets.saturating_add(1);
-                        let followed = stick(self.window, heading, candidate.ground).is_some();
+                        let deciding = stick(self.window, heading, candidate.ground);
                         #[cfg(test)]
                         let nominal = self.family.is_some_and(|family| family.nominal(heading)) && !self.keep_nominal;
                         #[cfg(not(test))]
                         let nominal = self.family.is_some_and(|family| family.nominal(heading));
-                        if followed && !nominal && self.onsets <= 2 {
+                        if deciding.is_some() && !nominal && self.onsets <= 2 {
                             seen.part = self.onsets;
                             seen.dir = self::heading(dx, dy);
                             seen.age = now.frame.saturating_sub(candidate.entry).min(u32::from(u8::MAX)) as u8;
+                            let mut part = OpenPart { number: seen.part, status: now.status, base: candidate.base,
+                                facing: self.facing, stick: deciding.map(|sample| action::stick_of(sample, self.facing)),
+                                last: (0.0, 0.0), trail: [(0.0, 0.0); 16], len: 0, stride: 1, tick: 0 };
+                            part.sample_part(pos);
+                            self.part = Some(part);
                         }
                         self.window = now.frame.saturating_add(1);
                         self.last_heading = Some(heading);

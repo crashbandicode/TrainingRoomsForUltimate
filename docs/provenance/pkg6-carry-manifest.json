@@ -12838,7 +12838,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "129da9536dd353c5c55a815015f02149dba233806bc4ba61ca1e9e89fa0932c1",
+      "dest_sha256": "d792c367785e504830cb6c29bdf9cd923ad4793e2aa38055f23fc8d9de9d8b40",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14506,6 +14506,11 @@
           "old": "                        crate::runtime::roster::kirby_hats::fresh_lobby();\n                        training::named_macros::waiting_scene_changed(false);",
           "new": "                        retire_waiting_lobby();",
           "reason": "Quickplay new pick (20:42:50Z): once the exact Mii identity proves a fresh lobby, retire the Setup session as well as the hats, through the same step as an ordinary new pick."
+        },
+        {
+          "old": "// Both icon paths use this roster module's published, verified text base.\n",
+          "new": "/// # Safety\n/// The guarded roster seam must be called from the game thread.\npub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 { return None; }\n    // SAFETY: `BASE` is published only after the roster seam passes its guard.\n    let hash = unsafe { fighter_kind_hash(base, kind) };\n    let chara = hash & 0xff_ffff_ffff;\n    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)\n}\n\n// Both icon paths use this roster module's published, verified text base.\n",
+          "reason": "Move names (install 4): a fighter kind's ui_chara hash40 through the already guarded roster.kind_hash seam, for matching the game's special-name labels; no new site."
         }
       ]
     },

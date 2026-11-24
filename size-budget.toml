@@ -1697,6 +1697,7 @@ ceiling = 150210
 date = "2026-11-16"
 reason = "rc.15 Stage tech v9 measured total on 0938ec33: 150210, +2016 over 148194. Lead-approved FOR OPERATOR REVIEW; final total set at integration. No code-counting change or feature removal."
 approved_by = "Operator rc.15-update size approval: final total set at integration; primary 18:49Z, 2026-11-16, explicitly authorizes this measured-total budget entry FOR OPERATOR REVIEW."
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -1728,6 +1729,7 @@ ceiling = 154569
 date = "2026-11-17"
 reason = "TechUI stage-surface bootstrap root fix measured 154569: +117 over final combined 154452, within the approved +300. Exact total, no headroom. Platform and airborne discovery share native stage rays; finite work ends in completion or explicit failure. FOR OPERATOR REVIEW; counting and gates unchanged."
 approved_by = "Operator rc.15 size approval; primary 2026-11-17 03:20Z explicitly approves growth up to +300 over 154452 FOR OPERATOR REVIEW."
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -1735,6 +1737,7 @@ ceiling = 154717
 date = "2026-11-17"
 reason = "TechUI collision-lifetime recovery measured 154717: +148 over 154569, within approved +300. Pure world selection rebinds to freshly discovered geometry after reset; strict native lifetime guards and exact matching remain. One combined exact total, no headroom. FOR OPERATOR REVIEW; counting and gates unchanged."
 approved_by = "Operator rc.15 size approval; primary 2026-11-17 04:38Z explicitly authorizes growth up to +300 over154569 FOR OPERATOR REVIEW."
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -1750,6 +1753,7 @@ ceiling = 154972
 date = "2026-11-17"
 reason = "RESHIP-3 final Tech plus LEAD-1 integrated source measured154972, no headroom. Within combined approval envelope148683+(154717-148194)+207=155413, with441 overlap saved. Includes reviewed versioned repick dispatch and typed admission composed with Tech nonblocking context and exact acceptance. Counting and gates unchanged."
 approved_by = "Operator rc.15 size approval; primary2026-11-17 06:23Z combines card and Tech approvals, primary06:29Z adds approved LEAD-1 +207. Exact combined measured total, FOR OPERATOR REVIEW."
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -2101,6 +2105,7 @@ ceiling = 166621
 date = "2026-11-20"
 reason = "Merge of rc.15 target hurtbox size (c11226fc) onto 577ad6b8: hurt and article-hurt orbs drawn at the part size times the measured world scale; an invalid sample omits the orb. The branch measured 165901 on 629870c5 (+16 over 165885). Added to main's 166605: 166621."
 approved_by = "Operator 2026-11-19 asked for the target hurtbox fix ('that should be fixed'); primary c07b3449 merged after REVIEW PASS review-visualizer-astra 02:52Z and added the measured delta."
+
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
@@ -2252,7 +2257,6 @@ ceiling = 187566
 date = "2026-11-21"
 reason = "merge_budget for 1 Frame 985c79c6 on the intermediate card d6074747. Measured normalized implementation 187566, +235 over the intermediate ceiling 187331, with zero spare. Intermediate release NRO 5124096 B and BSS 1720320 B. Standalone 1 Frame release NRO 5128192 B and BSS 1720320 B. The exact integrated release receipt records the combined NRO and BSS against the intermediate baseline."
 approved_by = "Operator via tr-primary-2 at 16:47Z authorized the exact merge budget under the rule that line count may grow when memory remains efficient and nothing is wasteful."
-
 
 [[budget]]
 scope = "total"
@@ -2701,3 +2705,115 @@ ceiling = 198183
 date = "2026-11-24"
 reason = "Install 4 integration, merge 5: the Quick Play new-pick fix (fix/rv-qp-fresh-notification 6146f8e9) on top of merge 3 (the ACTION model through the angle, feat/action-model b0921969). Measured 198183 on the merged tree: merge 3 measures 198143 and the fix adds 40 (its own entries: +37 and +3 on merge 2)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 20:05:25Z, 20:35:08Z and the pending-aim correction entry (merge 3, 198144) and of 19:36:34Z and 20:49:18Z (Quick Play fix, 197317 on merge 2)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198679
+date = "2026-11-24"
+reason = "Merge 3C of install 4: travel parts (deciding stick, heading, distance, eight-point path), steering and the Match angle and deflection toggle, their marks and texts, the packed travel table, and a later link's first move borrowing its travel arrows. Measured 198679 on 1a55481f, 535 above merge 3 (198144, e09fc3cf)."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:31:04Z (the 3C line budget is approved at the folded head's measured value under the 17:59:40Z rule)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198682
+date = "2026-11-24"
+reason = "Keep the measured angle miss in tenths for the shared mark and reason text; +3 implementation lines on 3C a77cb42e."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:46:20Z: measured fix-only increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198722
+date = "2026-11-24"
+reason = "Install 4 integration, merge 3C: travel parts, steering, the Match angle and deflection toggle and a later link first-move arrows (fix/rv-3c-angle-text 59dfb328) on top of merge 5. Measured 198722 on the merged tree: merge 5 measures 198183 and 3C adds 539 (its own entries: 198682 on merge 3, which measures 198143)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the 3C entries above (198679 and, under the 21:46:20Z rule, 198682) and in the merge 5 entry (198183)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198087
+date = "2026-11-24"
+reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198087 (tools/sloc.py tree), 1035 above the base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 17:21:31Z (operator green light about 17:22Z, install 4: the move-name toggle), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198312
+date = "2026-11-24"
+reason = "Move names on install 4 merge 2 (0db4728c): measured 198312 on the merged tree (tools/sloc.py tree), which is merge 2's 197277 plus the move-name toggle's 1035, with no lines from the resolution."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its move-name ruling of 17:21:31Z and the two entries above."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198321
+date = "2026-11-24"
+reason = "Bound total move-name parsing work and retained bytes. UTF-16 decoding writes directly to the retained table; measured +9 on 68d14125."
+approved_by = "tr-primary-2, 2026-11-24 19:27:44Z, measured 198321."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198369
+date = "2026-11-24"
+reason = "Bind the retained exchange and directly recorded drill to their captured fighter and Mii loadout; carry the recorded owner through save and target selection."
+approved_by = "tr-primary-2, 2026-11-24 19:31:56Z (+57 on 68d14125, measured on 43b3a21d)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198375
+date = "2026-11-24"
+reason = "Move names with both reviewed corrections in one tree (fix/rv-move-name-loader c480dd8c and fix/rv-mii-owner-refresh 711d59fe on 68d14125): measured 198375 (tools/sloc.py tree), which is 198312 plus the loader correction's 9 and the identity corrections' 54, with no lines from the merges."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 19:27:44Z (+9) and 19:31:56Z (+57)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199232
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model (feat/action-model c4c43b23, the merge-3 candidate): measured 199232 with the variant joined (tools/sloc.py tree). Merge 3 is 198136 and the move names add 1098 on merge 2 (198375 less 197277); the joined tree is 2 lines under their sum, because the three print sites now share the ACTION model's one formatter."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199239
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model on the install 4 merge-3 head e09fc3cf: measured 199239 (tools/sloc.py tree), which is the join's 199232 on the merge-3 candidate plus 7 of the two reviewer fixes merge 3 took (the pending-aim fix was approved at +8), with no lines from the merge."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above and its 21:09:55Z approval of the merge-3 reviewer fixes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199244
+date = "2026-11-24"
+reason = "Name a rapid jab or finisher on a continued Jab action without changing its ownership. Measured +5 on e143d22d."
+approved_by = "tr-primary-2 2026-11-24 21:46:20Z approved 199244."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199284
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model, with the rapid-jab fix, on the install 4 merge-5 head f6833873: measured 199284 (tools/sloc.py tree), which is the join's 199244 on merge 3 plus the 40 lines merge 5 (the Quick Play new pick) adds to merge 3 (198183 less 198143), with no lines from the fold."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 21:46:20Z (the rapid-jab fix, 199244) and 20:49:18Z (the Quick Play fix)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199824
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model on the install 4 head b5177cdb (merge 5 and 3C): measured 199824 (tools/sloc.py tree). The join was 199284 on merge 5 and 3C adds 539 to merge 5 (198722 less 198183); the fold is 1 line over their sum, where 3C's link line takes the Namer argument."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value), on the approvals cited by the entries above; the 1 line from the resolution is posted with the pin for its ruling."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199828
+date = "2026-11-24"
+reason = "Merge 4b: a combo file's links are read straight into the record, which takes the menu worker's deepest stack path from 57,728 to 53,888 B. Measured 199828 (tools/sloc.py tree), 4 above merge 4's 199824."
+approved_by = "tr-primary-2 2026-11-24 23:01:06Z (merge 4b, owner f15-lobby) and its standing rule of 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)."

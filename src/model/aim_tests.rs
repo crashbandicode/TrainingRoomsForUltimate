@@ -12,11 +12,12 @@ struct Driver {
     rule: Rule,
     sticks: Vec<(u32, (i8, i8))>,
     seen: Vec<Seen>,
+    facing: i8,
 }
 
 impl Driver {
     fn new() -> Self {
-        Self { rule: Rule::new(), sticks: Vec::new(), seen: Vec::new() }
+        Self { rule: Rule::new(), sticks: Vec::new(), seen: Vec::new(), facing: 1 }
     }
 
     fn push(&mut self, status: i32, pos: (f32, f32), stick: (i8, i8), stop: bool, grounded: bool) -> Seen {
@@ -27,7 +28,7 @@ impl Driver {
             DOWN => Some(Family::Down), NEUTRAL => Some(Family::Neutral), _ => None,
         };
         let now = Now { frame, status, start, own: matches!(status, A | B), pos: Some(pos),
-            stop, facing: 1, grounded, press: 0 };
+            stop, facing: self.facing, grounded, press: 0 };
         let sticks = &self.sticks;
         let seen = self.rule.step(now, |from, heading, ground| {
             sticks.iter().rev().find_map(|&(frame, stick)| {
@@ -171,5 +172,71 @@ fn hitstop_frames_do_not_use_up_the_onset_window() {
 fn the_design_tolerances_are_the_stated_defaults() {
     assert_eq!((MOVED, W, DV, FOLLOW, DEAD), (1.0, 3, 1.0, 33.75, 24));
     assert_eq!([7, 8, 64, 400].map(crate::model::action::hold_band), [0, 1, 8, 15]);
+}
+
+#[test]
+fn a_travel_part_records_its_stick_heading_distance_and_path() {
+    for facing in [1, -1] {
+        let mut d = Driver::new();
+        d.facing = facing;
+        for _ in 0..10 { d.push(UP, (0.0, 0.0), (-90, 90), false, false); }
+        for n in 1..=10 {
+            d.push(A, (-4.0 * n as f32, 4.0 * n as f32), (-90, 90), false, false);
+            assert_eq!(d.rule.ended(), None);
+            if n == 5 {
+                d.push(A, (999.0, 999.0), (-90, 90), true, false);
+                assert_eq!(d.rule.ended(), None);
+            }
+        }
+        d.push(B, (-40.0, 40.0), (-90, 90), false, false);
+        let (part, travel) = d.rule.ended().unwrap();
+        assert_eq!(part, 1);
+        assert_eq!(travel.stick, Some((if facing == 1 { 1350 } else { 450 }, 100)));
+        assert_eq!((travel.heading, travel.distance), (if facing == 1 { 1350 } else { 450 }, 566));
+        assert_eq!(travel.path[7], (if facing == 1 { -40 } else { 40 }, 40));
+        assert_eq!(travel.path[0], (if facing == 1 { -5 } else { 5 }, 5));
+        d.push(B, (-40.0, 40.0), (-90, 90), false, false);
+        assert_eq!(d.rule.ended(), None);
+    }
+}
+
+#[test]
+fn the_deciding_stick_is_the_last_one_that_pointed_along_the_heading() {
+    for (last, expected) in [((-50, 50), (1350, 59)), ((90, 90), (1350, 100))] {
+        let mut d = Driver::new();
+        for _ in 0..40 { d.push(UP, (0.0, 0.0), (-90, 90), false, false); }
+        for _ in 0..2 { d.push(UP, (0.0, 0.0), last, false, false); }
+        for n in 1..=10 { d.push(A, (-4.0 * n as f32, 4.0 * n as f32), (90, 90), false, false); }
+        d.push(B, (-40.0, 40.0), (90, 90), false, false);
+        assert_eq!(d.rule.ended().unwrap().1.stick, Some(expected));
+    }
+}
+
+#[test]
+fn a_path_is_eight_points_by_arc_length_facing_relative() {
+    let mut d = Driver::new();
+    for _ in 0..10 { d.push(UP, (0.0, 0.0), (100, 0), false, false); }
+    for n in 1..=8 { d.push(A, (2.0 * n as f32, 0.0), (100, 0), false, false); }
+    for n in 1..=8 { d.push(A, (16.0, 2.0 * n as f32), (100, 0), false, false); }
+    d.push(B, (16.0, 16.0), (100, 0), false, false);
+    assert_eq!(d.rule.ended().unwrap().1.path,
+        [(4, 0), (8, 0), (12, 0), (16, 0), (16, 4), (16, 8), (16, 12), (16, 16)]);
+
+    let mut d = Driver::new();
+    for _ in 0..10 { d.push(UP, (0.0, 0.0), (-100, 0), false, false); }
+    for n in 1..=60 { d.push(A, (-1.5 * n as f32, 0.0), (-100, 0), false, false); }
+    d.push(B, (-90.0, 0.0), (-100, 0), false, false);
+    let path = d.rule.ended().unwrap().1.path;
+    assert_eq!(path[7], (-90, 0));
+    for (i, &(x, y)) in path.iter().enumerate() {
+        assert!((f32::from(x) + 11.25 * (i + 1) as f32).abs() <= 1.0);
+        assert_eq!(y, 0);
+    }
+
+    let mut d = Driver::new();
+    for _ in 0..10 { d.push(UP, (0.0, 0.0), (-100, 0), false, false); }
+    for n in 1..=75 { d.push(A, (-2.0 * n as f32, 0.0), (-100, 0), false, false); }
+    d.push(B, (-150.0, 0.0), (-100, 0), false, false);
+    assert_eq!(d.rule.ended().unwrap().1.path[7], (-127, 0));
 }
 }
