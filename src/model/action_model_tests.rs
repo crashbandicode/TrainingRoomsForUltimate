@@ -554,4 +554,19 @@ fn the_description_holds_no_names() {
     }
 }
 
+#[test]
+fn stick_flicks_inside_any_special_are_not_events() {
+    for inside in [false, true] {
+        let mut capture = InputCapture::new();
+        for (frame, x) in [(0, 0), (1, 127)] {
+            capture.step(Snap {
+                lstick_x: x, facing: 1, aim: Seen { inside, ..Seen::NONE }, ..Snap::empty(frame)
+            });
+        }
+        let flicks: Vec<_> = capture.combo.links().flat_map(LinkRec::events)
+            .filter(|event| matches!(event.kind, Kind::Flick(_))).map(|event| event.kind).collect();
+        assert_eq!(flicks, if inside { vec![] } else { vec![Kind::Flick(Flick::Dash)] });
+    }
+}
+
 }

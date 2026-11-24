@@ -630,29 +630,17 @@ fn heading_bins_a_movement_to_the_nearest_of_eight_directions() {
     }
 }
 
-fn the_travel_statuses_are_the_traces() {
-    use crate::model::aim::travel_status;
-    for (kind, status) in [
-        (0x08, 0x1e1), (0x13, 0x1e1), (0x35, 0x1e7), (0x36, 0x1e1),
-        (0x11, 0x1e3), (0x10, 0x1e7), (0x19, 0x1e6), (0x07, 0x1e1),
-        (0x14, 0x1e2), (0x2f, 0x1e1),
-    ] {
-        assert_eq!(travel_status(kind), Some(status), "{kind:#x}");
-    }
-    assert_eq!(travel_status(0), None);
-}
-
 fn directional_special(still: bool) -> Tracker {
     let mut tracker = Tracker::new();
     for frame in 1..=33u32 {
-        let (mv, status, travel) = match frame {
-            1..=14 => (Move::UpSpecial, 1, None),
-            15..=19 => (Move::Other, 2, Some((if still { 0.0 } else { -11.0 * (frame - 15) as f32 }, 0.0))),
-            20..=28 => (Move::Other, 3, None),
-            _ => (Move::Other, 2, Some((if still { 0.0 } else { -44.0 + 11.0 * (frame - 29) as f32 }, 0.0))),
+        let (mv, status, x) = match frame {
+            1..=14 => (Move::UpSpecial, 1, 0.0),
+            15..=19 => (Move::Other, 2, if still { 0.0 } else { -11.0 * (frame - 15) as f32 }),
+            20..=28 => (Move::Other, 3, if still { 0.0 } else { -44.0 }),
+            _ => (Move::Other, 2, if still { 0.0 } else { -44.0 + 11.0 * (frame - 29) as f32 }),
         };
-        tracker.step(Sample { travel, active: travel.is_some(), ..attack(mv, status, frame as f32) },
-                     idle(), MappedInputs { lstick_y: 100, ..NONE });
+        tracker.step(Sample { pos: Some((x, 0.0)), active: status == 2, ..attack(mv, status, frame as f32) },
+                     idle(), MappedInputs { lstick_x: if frame < 29 { -100 } else { 100 }, ..NONE });
     }
     tracker
 }
@@ -663,16 +651,17 @@ fn each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved() {
                vec![Aim { frame: 29, dir: 0 }, Aim { frame: 15, dir: 4 }]);
     assert!(directional_special(true).aims().next().is_none());
     let mut restarted = Tracker::new();
-    restarted.step(attack(Move::UpSpecial, 1, 0.0), idle(), NONE);
+    let left = MappedInputs { lstick_x: -100, ..NONE };
+    restarted.step(Sample { pos: Some((0.0, 0.0)), ..attack(Move::UpSpecial, 1, 0.0) }, idle(), left);
     for (motion, x) in [(0.0, 0.0), (1.0, -11.0), (2.0, -22.0),
                         (0.0, -33.0), (1.0, -44.0), (2.0, -55.0)] {
-        restarted.step(Sample { travel: Some((x, 0.0)), ..attack(Move::Other, 2, motion) }, idle(), NONE);
+        restarted.step(Sample { pos: Some((x, 0.0)), ..attack(Move::Other, 2, motion) }, idle(), left);
     }
     assert_eq!(restarted.aims().collect::<Vec<_>>(), vec![Aim { frame: 2, dir: 4 }]);
     let mut pending = Tracker::new();
-    pending.step(attack(Move::UpSpecial, 1, 0.0), idle(), NONE);
-    for (motion, x) in [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (1.0, -11.0)] {
-        pending.step(Sample { travel: Some((x, 0.0)), ..attack(Move::Other, 2, motion) }, idle(), NONE);
+    pending.step(Sample { pos: Some((0.0, 0.0)), ..attack(Move::UpSpecial, 1, 0.0) }, idle(), left);
+    for (motion, x, stop) in [(0.0, 0.0, false), (1.0, 0.0, true), (0.0, 0.0, false), (1.0, -11.0, false)] {
+        pending.step(Sample { pos: Some((x, 0.0)), stop, ..attack(Move::Other, 2, motion) }, idle(), left);
     }
     assert_eq!(pending.aims().collect::<Vec<_>>(), vec![Aim { frame: 2, dir: 4 }]);
 }
@@ -684,14 +673,14 @@ fn linked_special(travel: bool) -> Tracker {
             1 | 2 | 20 => idle(),
             3..=19 => Sample { active: frame == 7, ..attack(Move::Jab, 1, (frame - 3) as f32) },
             21..=34 => attack(Move::UpSpecial, 2, (frame - 21) as f32),
-            _ => Sample { active: true, travel: travel.then_some((0.0, 0.0)), ..attack(Move::Other, 3, 0.0) },
+            _ => Sample { active: true, stop: true, ..attack(Move::Other, if travel { 3 } else { 4 }, 0.0) },
         };
         let cpu = match frame {
             7 | 35 => Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() },
             8..=34 => Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() },
             _ => idle(),
         };
-        tracker.step(p1, cpu, MappedInputs { lstick_y: 100, ..NONE });
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..p1 }, cpu, MappedInputs { lstick_x: -100, ..NONE });
     }
     tracker
 }
@@ -700,20 +689,20 @@ fn a_link_keeps_both_moves_directions_and_the_special_a_travel_continues() {
     let mut tracker = linked_special(true);
     assert_eq!(tracker.latest_link().map(|l| (l.from, l.to, l.shown)),
                Some((Move::Jab, Move::Other, [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [None; 2] }])));
-    tracker.step(Sample { active: true, travel: Some((-11.0, 0.0)), ..attack(Move::Other, 3, 1.0) },
-                 Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
+    tracker.step(Sample { active: true, pos: Some((-11.0, 0.0)), ..attack(Move::Other, 3, 1.0) },
+                 Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() }, MappedInputs { lstick_x: -100, ..NONE });
     assert_eq!(tracker.latest_link().map(|l| (l.from, l.to, l.shown)),
                Some((Move::Jab, Move::Other, [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(4), None] }])));
     assert_eq!(tracker.aims().next(), Some(Aim { frame: 35, dir: 4 }));
-    tracker.step(Sample { active: true, travel: Some((-22.0, 0.0)), ..attack(Move::Other, 3, 0.0) },
+    tracker.step(Sample { active: true, pos: Some((-22.0, 0.0)), ..attack(Move::Other, 3, 0.0) },
                  Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
-    tracker.step(Sample { active: true, travel: Some((-33.0, 0.0)), ..attack(Move::Other, 3, 1.0) },
+    tracker.step(Sample { active: true, pos: Some((-33.0, 0.0)), ..attack(Move::Other, 3, 1.0) },
                  Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
     assert_eq!(tracker.aims().collect::<Vec<_>>(), vec![Aim { frame: 35, dir: 4 }]);
     assert_eq!(tracker.latest_link().map(|l| l.shown[1]),
                Some(Shown { of: Some(Move::UpSpecial), dirs: [Some(4), None] }));
-    tracker.step(idle(), Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
-    tracker.step(Sample { active: true, ..attack(Move::DownTilt, 4, 0.0) },
+    tracker.step(Sample { pos: Some((-33.0, 0.0)), ..idle() }, Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
+    tracker.step(Sample { active: true, pos: Some((-33.0, 0.0)), ..attack(Move::DownTilt, 4, 0.0) },
                  Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
     assert_eq!(tracker.latest_link().map(|l| l.shown[0]),
                Some(Shown { of: Some(Move::UpSpecial), dirs: [Some(4), None] }));
@@ -730,13 +719,13 @@ fn a_second_part_reaches_the_link_its_special_already_made() {
     let mut tracker = linked_special(true);
     // 36..=38 travel 1 goes left; 39..=41 the status between the parts; 42..=43 travel 2 goes right.
     for (motion, x) in [(1.0, -11.0), (2.0, -22.0), (3.0, -33.0)] {
-        tracker.step(Sample { active: true, travel: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), NONE);
+        tracker.step(Sample { active: true, pos: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), MappedInputs { lstick_x: -100, ..NONE });
     }
     for motion in 0..3 {
-        tracker.step(attack(Move::Other, 4, motion as f32), stun(), NONE);
+        tracker.step(Sample { pos: Some((-33.0, 0.0)), ..attack(Move::Other, 4, motion as f32) }, stun(), MappedInputs { lstick_x: 100, ..NONE });
     }
     for (motion, x) in [(0.0, -33.0), (1.0, -22.0)] {
-        tracker.step(Sample { active: true, travel: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), NONE);
+        tracker.step(Sample { active: true, pos: Some((x, 0.0)), ..attack(Move::Other, 3, motion) }, stun(), MappedInputs { lstick_x: 100, ..NONE });
     }
     let both = Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] };
     assert_eq!(tracker.aims().collect::<Vec<_>>(), vec![Aim { frame: 42, dir: 0 }, Aim { frame: 35, dir: 4 }]);
@@ -745,13 +734,13 @@ fn a_second_part_reaches_the_link_its_special_already_made() {
     assert_eq!(text(link_moves(&link, TEXT_UNITS)), "Jab > Up B ← →");
     assert_eq!(text(folded_link(&link)), "TRUE · Jab > Up B ← →");
     // An unrelated move with a direction of its own alters neither name; when it hits, the special keeps both arrows as the link's first move.
-    tracker.step(idle(), stun(), NONE);
+    tracker.step(Sample { pos: Some((-22.0, 0.0)), ..idle() }, stun(), NONE);
     for motion in 0..3 {
-        tracker.step(Sample { angle: Some(Angle::Up), ..attack(Move::SideTilt, 5, motion as f32) }, stun(), NONE);
+        tracker.step(Sample { angle: Some(Angle::Up), pos: Some((-22.0, 0.0)), ..attack(Move::SideTilt, 5, motion as f32) }, stun(), NONE);
     }
     assert_eq!(tracker.aims().next(), Some(Aim { frame: 45, dir: 2 }));
     assert_eq!(tracker.latest_link().map(|l| l.shown), Some([Shown::default(), both]));
-    tracker.step(Sample { active: true, angle: Some(Angle::Up), ..attack(Move::SideTilt, 5, 3.0) },
+    tracker.step(Sample { active: true, angle: Some(Angle::Up), pos: Some((-22.0, 0.0)), ..attack(Move::SideTilt, 5, 3.0) },
                  Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
     let links: Vec<_> = tracker.history().map(|l| (l.from, l.to, l.shown)).collect();
     assert_eq!(links[0], (Move::Other, Move::SideTilt, [both, Shown { of: None, dirs: [Some(2), None] }]));
@@ -762,19 +751,19 @@ fn a_second_part_reaches_the_link_its_special_already_made() {
 fn the_runtime_reads_the_angle_and_the_travel_behind_their_gates() {
     let input = include_str!("../runtime/features/input_display.rs");
     assert!(input.contains("static ANGLE_ON: AtomicBool"));
-    let angle = input.split("unsafe fn angle(").nth(1).unwrap_or("");
-    let angle = angle.split("\n}").next().unwrap_or("");
-    assert!(angle.contains("ANGLE_ON.load(") && angle.contains("angle_of(natives::motion_kind("));
+    let motion = input.split("unsafe fn p1_motion(").nth(1).unwrap_or("");
+    let motion = motion.split("\n}").next().unwrap_or("");
+    assert!(motion.contains("ANGLE_ON.load(") && motion.contains("natives::motion_kind(accessor)"));
     assert!(input.contains("static AIM_ON: AtomicBool"));
-    let travel = input.split("unsafe fn travel(").nth(1).unwrap_or("");
-    let travel = travel.split("\n}").next().unwrap_or("");
-    assert!(travel.contains("AIM_ON.load(") && travel.contains("p1_fighter(accessor)")
-            && travel.contains("aim::travel_status(kind)") && travel.contains("natives::pos_x(accessor)")
-            && travel.contains("natives::pos_y(accessor)"));
+    let position = input.split("unsafe fn p1_position(").nth(1).unwrap_or("");
+    let position = position.split("\n}").next().unwrap_or("");
+    assert!(position.contains("AIM_ON.load(") && !position.contains("p1_fighter")
+            && position.contains("natives::pos_x(accessor)") && position.contains("natives::pos_y(accessor)"));
     let sample = input.split("unsafe fn sample(").nth(1).unwrap_or("");
     let sample = sample.split("\n}").next().unwrap_or("");
-    assert!(sample.contains("angle: if p1 && matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle(accessor) }"));
-    assert!(sample.contains("travel: if p1 { travel(accessor, status) } else { None }"));
+    assert!(sample.contains("named,") && sample.contains("motion,"));
+    assert!(sample.contains("angle: if matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle_of(motion) } else { None },"));
+    assert!(sample.contains("pos: if p1 { p1_position(accessor) } else { None },"));
     assert!(!sample.contains("get_int"));
     let boot = include_str!("../runtime/boot.rs");
     assert!(boot.contains("set_angle_read(display_on && capabilities::unit_usable(Feature::CpuMash, &usable))"));
@@ -829,6 +818,31 @@ fn a_throw_stays_in_the_action_of_its_grab() {
     assert_eq!((link.from, link.to), (Move::Throw, Move::Jab));
 }
 
+fn any_fighters_special_can_aim() {
+    let mut tracker = Tracker::new();
+    let stick = MappedInputs { lstick_x: -100, lstick_y: 100, ..NONE };
+    for motion in 0..12 {
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..attack(Move::SideSpecial, 1, motion as f32) }, idle(), stick);
+    }
+    let entry = tracker.frame() + 1;
+    for motion in 0..4 {
+        tracker.step(Sample { pos: Some((-4.0 * (motion + 1) as f32, 4.0 * (motion + 1) as f32)),
+            ..attack(Move::Other, 2, motion as f32) }, idle(), stick);
+    }
+    assert_eq!(tracker.aims().collect::<Vec<_>>(), vec![Aim { frame: entry, dir: 3 }]);
+    assert!(tracker.snaps().any(|snap| snap.frame >= entry && snap.aim.part == 1));
+    assert!(tracker.snaps().all(|snap| snap.aim.inside));
+}
+
+fn no_fighter_table_is_left() {
+    let aim = include_str!("aim.rs");
+    for word in ["TRAVEL", "travel_status", "kind", "0x1e"] { assert!(!aim.contains(word), "{word}"); }
+    let input = include_str!("../runtime/features/input_display.rs");
+    let position = input.split("unsafe fn p1_position(").nth(1).unwrap_or("").split("\n}").next().unwrap_or("");
+    assert!(position.contains("AIM_ON.load(") && position.contains("natives::pos_x(accessor)") && !position.contains("p1_fighter"));
+    assert!(!input.contains("aimer") && !input.contains("travel_status"));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -866,12 +880,13 @@ fn case_table() {
         ("a_level_side_tilt_marks_nothing", a_level_side_tilt_marks_nothing as fn()),
         ("a_buffered_second_swing_of_the_same_angle_marks_again", a_buffered_second_swing_of_the_same_angle_marks_again as fn()),
         ("heading_bins_a_movement_to_the_nearest_of_eight_directions", heading_bins_a_movement_to_the_nearest_of_eight_directions as fn()),
-        ("the_travel_statuses_are_the_traces", the_travel_statuses_are_the_traces as fn()),
         ("each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved", each_entry_into_the_travel_status_marks_its_frame_with_the_way_it_moved as fn()),
         ("a_link_keeps_both_moves_directions_and_the_special_a_travel_continues", a_link_keeps_both_moves_directions_and_the_special_a_travel_continues as fn()),
         ("a_second_part_reaches_the_link_its_special_already_made", a_second_part_reaches_the_link_its_special_already_made as fn()),
         ("the_action_takes_its_origin_when_it_opens", the_action_takes_its_origin_when_it_opens as fn()),
         ("a_throw_stays_in_the_action_of_its_grab", a_throw_stays_in_the_action_of_its_grab as fn()),
+        ("any_fighters_special_can_aim", any_fighters_special_can_aim as fn()),
+        ("no_fighter_table_is_left", no_fighter_table_is_left as fn()),
         ("the_runtime_reads_the_angle_and_the_travel_behind_their_gates", the_runtime_reads_the_angle_and_the_travel_behind_their_gates as fn()),
     ]);
 }
