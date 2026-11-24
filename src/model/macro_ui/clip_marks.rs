@@ -373,6 +373,11 @@ mod tests {
         let strip = CLIP_STRIP[1] - CLIP_STRIP[3] / 2.0..=CLIP_STRIP[1] + CLIP_STRIP[3] / 2.0;
         assert!(lines.iter().all(|y| strip.contains(y)));
         assert!(lines.windows(2).all(|p| p[0] - p[1] >= 44.0));
+        use crate::model::panes::{CLIP_LABEL_BOX, CLIP_VALUE_BOX};
+        let half = f32::from(clip_panel::CLIP_BAR_UNITS) / 2.0;
+        assert_eq!(CLIP_LABEL_BOX.0 - CLIP_LABEL_BOX.1 / 2.0, -half);
+        assert_eq!(CLIP_VALUE_BOX.0 + CLIP_VALUE_BOX.1 / 2.0, half);
+        assert!(CLIP_LABEL_BOX.0 + CLIP_LABEL_BOX.1 / 2.0 <= CLIP_VALUE_BOX.0 - CLIP_VALUE_BOX.1 / 2.0);
         let view = include_str!("../../runtime/ui/view.rs");
         assert!(view.contains("frame.dialog_box()") && view.contains("IDX_BG"));
     }

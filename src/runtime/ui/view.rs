@@ -210,7 +210,11 @@ impl Panes {
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; ROWS] };
         // The r8 pop-up's list column (left of CONNECTIONS); the page keeps its own.
         // Both boxes sit inside the list's outline and cursor with a pad (`panes::ROW_PAD`), the same for every list.
-        let ((label_x, label_w), (value_x, value_w)) = (p::row_label_box(frame.popup), p::row_value_box(frame.popup));
+        let ((label_x, label_w), (value_x, value_w)) = if frame.view == View::Clip {
+            (p::CLIP_LABEL_BOX, p::CLIP_VALUE_BOX)
+        } else {
+            (p::row_label_box(frame.popup), p::row_value_box(frame.popup))
+        };
         for (i, line) in panel.into_iter().enumerate() {
             let sub = list && i < usize::from(frame.row_count) && !frame.rows[i].sub.is_empty();
             if sub {
