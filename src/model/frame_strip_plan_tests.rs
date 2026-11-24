@@ -215,6 +215,8 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
         let last = renderer.written(at::LAST_TEXT).unwrap().visible;
         let pill = renderer.written(at::PILL).unwrap().visible;
         assert_eq!((history, last, pill), (on, on, on));
+        assert_eq!(renderer.written(at::READ_SUB + 1).unwrap().text.units(), line.unwrap().units(),
+            "the cached native write must carry the final folded or unfolded string");
         String::from_utf16(line.unwrap().units()).unwrap()
     };
     assert_eq!(draw(true), "TRUE combo");

@@ -152,6 +152,25 @@ fn every_reason_the_grader_can_give_is_shown_in_full_at_the_cards_width() {
     assert_eq!(seen, reasons().len() * 2 * 3, "every reason, at link 1 and link 16, on the three cards");
 }
 
+#[test]
+fn dropped_reason_fits_beside_the_actual_previous_caption() {
+    let summary = faulted(0, Reason::Drop(1));
+    let mut waiting = graded(false, summary);
+    waiting.attempt = None;
+    let mut seq = dropped(summary);
+    for (name, shares) in [("MMMMMMMMMMM", false), ("iiiiiiiiiii", true)] {
+        seq.last_name = Text::new(name);
+        let (card, _) = drawn(&waiting, Some(&seq));
+        let (prev, why) = (card[at::SEQ_LANDED], card[at::REASON]);
+        check(&String::from_utf16(why.text.units()).unwrap(), why, "L1 DROP +1");
+        assert_eq!(prev.y == why.y, shares, "{name}: fit depends on ink, not unit count");
+        if shares {
+            assert!(prev.x - prev.w / 2.0 + notice_box::measure(prev.text.units().iter().copied(), FONT_SUB.0).0
+                < why.x - why.w / 2.0);
+        }
+    }
+}
+
 /// The mark under a step or link (`mark_text`, pane `OFFSET`): the first recorded event's name and what was wrong.
 #[test]
 fn every_mark_under_a_step_is_shown_in_full() {
