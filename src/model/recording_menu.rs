@@ -368,6 +368,10 @@ impl Place {
     const fn new() -> Place {
         Place { drills: false, parent_at: 0, section: 0, at: [0, 0] }
     }
+
+    fn in_drills(self, group: u8, section: u8) -> bool {
+        self.drills && group == COMBOS_SEQ && section == 1
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -469,6 +473,17 @@ pub struct RecordingScreens {
 }
 
 impl RecordingScreens {
+    /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
+    pub fn depth(&self, face: Face, group: u8, on_library: bool) -> usize {
+        let overlays = if self.overlay_face == face {
+            usize::from(self.file.is_some()) + usize::from(self.picker.is_some()) + usize::from(self.keyboard.is_some())
+        } else {
+            0
+        };
+        let group = if face == Face::Popup { self.popup_group() } else { group };
+        overlays + usize::from((face == Face::Popup || on_library) && self.place(face, group).drills)
+    }
+
     /// The list the cursor rests in on `face` (the bridge snapshot): that face's open numbered picker or file screen,
     /// else, on the library (`on_library`; the pop-up always is), the current section of `group` (the pop-up uses its
     /// own group). `None`: the keyboard is up, the catalog is loading, the list is empty, or the page's cursor is not
@@ -501,7 +516,8 @@ impl RecordingScreens {
         let section = place.section;
         let count = self.items(face, group, section).len();
         let name = if face == Face::Popup { "popup" } else { "page" };
-        list(format!("recording/{name}/{group}/{section}"), count, place.at[usize::from(section)], String::new())
+        let suffix = if place.in_drills(group, section) { "/drills" } else { "" };
+        list(format!("recording/{name}/{group}/{section}{suffix}"), count, place.at[usize::from(section)], String::new())
     }
 
     pub(crate) fn new() -> RecordingScreens {
@@ -1755,7 +1771,7 @@ impl RecordingScreens {
         let cursor = place.at[usize::from(section)].min(items.len().saturating_sub(1));
         let focused = self.focused(face, group);
         let role = self.role(face);
-        let header = if group == COMBOS_SEQ && section == 1 && place.drills { "DRILLS" } else { header_of(group, section) };
+        let header = if place.in_drills(group, section) { "DRILLS" } else { header_of(group, section) };
         let rows = items
             .iter()
             .enumerate()
@@ -3476,6 +3492,174 @@ mod tests {
         }
     }
 
+    fn bridge_drills_menu(face: Face) -> Menu {
+        let mut m = f9_new_menu(COMBOS_SEQ, 1, "DRILLS >");
+        let mut catalog = example();
+        let mut drill = catalog.combos[0].clone();
+        drill.id = "input-drill".into();
+        drill.name = "Movement".into();
+        drill.input_only = true;
+        catalog.combos.push(drill);
+        m.recording_mut().set_catalog(catalog);
+        if face == Face::Popup {
+            m.on_request(Request::RecordingPopup);
+            m.press(Button::ZR);
+            let rows = m.recording().section(face, COMBOS_SEQ, 1).rows;
+            let at = rows.iter().position(|row| row.name == "DRILLS >").unwrap();
+            m.recording_mut().set_cursor(face, COMBOS_SEQ, 1, at);
+        }
+        m
+    }
+
+    fn the_drills_sublist_is_its_own_list_one_level_down_on_both_faces() {
+        use crate::model::bridge_state::list_view;
+        for face in [Face::Page, Face::Popup] {
+            let mut m = bridge_drills_menu(face);
+            let name = if face == Face::Popup { "popup" } else { "page" };
+            let outer = format!("recording/{name}/{COMBOS_SEQ}/1");
+            let before = list_view(&m);
+            assert_eq!((m.depth(), before.id.as_str()), (0, outer.as_str()));
+            m.press(Button::A);
+            let drills = list_view(&m);
+            assert_eq!((m.depth(), drills.id.as_str(), drills.index, drills.count),
+                (1, format!("{outer}/drills").as_str(), Some(0), 2));
+            m.press(Button::Down);
+            assert_eq!(list_view(&m).index, Some(1));
+            m.press(Button::B);
+            let after = list_view(&m);
+            assert_eq!((m.depth(), after.id, after.index), (0, outer, before.index));
+            assert!(!m.is_closed());
+            if face == Face::Popup { assert!(m.recording().popup_open()); }
+        }
+    }
+
+    fn a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it() {
+        use crate::model::bridge_state::{list_view, ListView};
+        for (group, section, label) in [
+            (SAVES_MACROS, 1, "+ New chain"), (COMBOS_SEQ, 0, "+ New sequence"),
+        ] {
+            let mut m = f9_new_menu(group, section, label);
+            let mut catalog = long_catalog();
+            if group == SAVES_MACROS {
+                catalog.macros.clear();
+            } else {
+                catalog.combos.clear();
+            }
+            m.recording_mut().set_catalog(catalog);
+            let rows = m.recording().section(Face::Page, group, section).rows;
+            let index = rows.iter().position(|row| row.name == label).unwrap();
+            m.recording_mut().set_cursor(Face::Page, group, section, index);
+            let id = format!("recording/page/{group}/{section}");
+            assert_eq!((m.depth(), list_view(&m).id), (0, id.clone()));
+            m.press(Button::A);
+            assert!(m.recording().picker_open());
+            assert_eq!(list_view(&m), ListView::default(), "{label}");
+            assert_eq!(m.depth(), 1);
+            m.press(Button::B);
+            assert!(!m.recording().picker_open());
+            assert_eq!((m.depth(), list_view(&m).id), (0, id));
+            assert!(!m.is_closed());
+        }
+
+        let mut keyboard = f9_new_menu(SAVES_MACROS, 1, "+ New chain");
+        keyboard.press(Button::A);
+        assert_eq!((keyboard.depth(), list_view(&keyboard).id), (1, "recording/picker".into()));
+        keyboard.press(Button::A);
+        keyboard.press(Button::X);
+        assert!(keyboard.recording().naming());
+        assert!(!keyboard.recording().picker_open());
+        assert_eq!(list_view(&keyboard), ListView::default());
+        assert_eq!(keyboard.depth(), 1);
+        keyboard.press(Button::B);
+        assert!(!keyboard.recording().naming());
+        assert_eq!((keyboard.depth(), list_view(&keyboard).id), (0, format!("recording/page/{SAVES_MACROS}/1")));
+        assert!(!keyboard.is_closed());
+
+        let mut file = f9_new_menu(SAVES_MACROS, 0, "Corner");
+        file.press(Button::A);
+        assert_eq!((file.depth(), list_view(&file).id), (1, "recording/file".into()));
+        file.recording_mut().set_loading();
+        assert!(file.recording().page_overlay_open());
+        assert_eq!(list_view(&file), ListView::default());
+        assert_eq!(file.depth(), 1);
+        file.press(Button::B);
+        assert!(!file.recording().page_overlay_open());
+        assert_eq!(file.depth(), 0);
+        assert!(!file.is_closed());
+
+        let mut ordinary = recording_list_menu();
+        for _ in 0..500 {
+            if ordinary.help_row().is_some_and(|row| row.id == "recording_crop") { break; }
+            ordinary.press(if list_view(&ordinary).id.starts_with("recording/page/") { Button::JumpDown } else { Button::Down });
+        }
+        assert!(ordinary.help_row().is_some_and(|row| row.id == "recording_crop"));
+        let page = list_view(&ordinary);
+        assert_eq!(page.id, "page");
+        assert!(page.index.is_some());
+        assert_eq!(ordinary.depth(), 0);
+        assert!(!ordinary.recording().page_overlay_open());
+    }
+
+    fn every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists() {
+        use crate::model::bridge_state::list_view;
+        use std::collections::BTreeSet;
+        use std::io::Write;
+        let buttons = [Button::A, Button::B, Button::Up, Button::Down, Button::Left, Button::Right,
+            Button::JumpDown, Button::JumpUp, Button::X, Button::ZR];
+        for face in [Face::Page, Face::Popup] {
+            let mut m = bridge_drills_menu(face);
+            let prefix: &[Button] = if face == Face::Page {
+                &[Button::A, Button::Down, Button::A, Button::B, Button::Left, Button::A,
+                  Button::X, Button::B, Button::B]
+            } else {
+                &[Button::A, Button::Left, Button::Down, Button::A, Button::X, Button::B, Button::B]
+            };
+            let mut seed = 0x7a19_42d3u32;
+            let mut ids = BTreeSet::new();
+            let mut deepest = 0;
+            let mut keyboard = false;
+            let mut history = Vec::new();
+            for step in 0..6000 {
+                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                let button = prefix.get(step).copied().unwrap_or(buttons[((seed >> 16) as usize) % buttons.len()]);
+                history.push(button);
+                m.press(button);
+                m.recording_mut().take_effect();
+                if m.is_closed() || (face == Face::Popup && !m.recording().popup_open()) {
+                    m = bridge_drills_menu(face);
+                    history.clear();
+                    continue;
+                }
+                if m.recording().popup_open() || (m.page() == Page::Recording && m.screen().is_none()) {
+                    let id = list_view(&m).id;
+                    assert!(!(m.recording().page_overlay_open() && id == "page"), "{face:?} {history:?}");
+                    if !id.is_empty() { ids.insert(id); }
+                    keyboard |= m.recording().naming();
+                    deepest = deepest.max(m.depth());
+                    let mut copy = m.clone();
+                    let depth = copy.depth();
+                    for remaining in (0..depth).rev() {
+                        copy.press(Button::B);
+                        assert_eq!(copy.depth(), remaining, "{face:?} {history:?}");
+                        assert!(!copy.is_closed(), "{face:?} {history:?}");
+                        if face == Face::Popup { assert!(copy.recording().popup_open(), "{history:?}"); }
+                    }
+                    copy.press(Button::B);
+                    if face == Face::Popup {
+                        assert!(!copy.recording().popup_open(), "{face:?} {history:?}");
+                    } else {
+                        assert!(copy.is_closed(), "{face:?} {history:?}");
+                    }
+                }
+            }
+            writeln!(std::io::stderr(), "recording walk {face:?}: ids={ids:?} depth={deepest} keyboard={keyboard}").unwrap();
+            assert!(ids.contains("recording/picker"), "{face:?}: {ids:?}");
+            if face == Face::Page { assert!(ids.contains("recording/file"), "{ids:?}"); }
+            assert!(ids.iter().any(|id| id.ends_with("/drills")), "{face:?}: {ids:?}");
+            assert!(keyboard && deepest >= 2, "{face:?}: keyboard={keyboard}, depth={deepest}");
+        }
+    }
+
     /// Review 2 (notice-compact R2): the real empty-library pop-up's compact background holds every element the view
     /// draws in a pop-up: the role key caps, the row band, the CONNECTIONS divider, and the help and hint lines.
     fn popup_background_holds_its_chrome() {
@@ -3642,6 +3826,9 @@ mod tests {
             ("f2_recording_picker_wrap", f2_recording_picker_wrap as fn()),
             ("popup_background_holds_its_chrome", popup_background_holds_its_chrome as fn()),
             ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
+            ("the_drills_sublist_is_its_own_list_one_level_down_on_both_faces", the_drills_sublist_is_its_own_list_one_level_down_on_both_faces as fn()),
+            ("a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it", a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it as fn()),
+            ("every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists", every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists as fn()),
             ("x_previews_a_drill_that_has_its_take_on_both_faces", x_previews_a_drill_that_has_its_take_on_both_faces as fn()),
             ("a_cropped_made_drill_has_no_preview", a_cropped_made_drill_has_no_preview as fn()),
             ("a_reopened_menu_loads_the_catalog_without_a_new_file", a_reopened_menu_loads_the_catalog_without_a_new_file as fn()),
