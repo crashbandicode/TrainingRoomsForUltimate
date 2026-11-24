@@ -98,7 +98,7 @@ fn take_posted_name(name: &mut Short) {
 /// P1's fighter kind at the strip's last sample (-1 none): *Save last combo* writes its name as `recorded_on`.
 static P1_KIND: AtomicI32 = AtomicI32::new(-1);
 
-fn settings() -> Settings {
+pub(super) fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.combo)
 }
 

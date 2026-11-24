@@ -200,7 +200,8 @@ recorded one.
   events; an overfull take saves nothing.
 - **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event
   starts the clock; later steps keep their recorded offsets, including idle gaps. In a new recording, a release is
-  graded on its hold only when the game reacted to it. The hold may differ by the On-time tolerance plus one frame per
+  graded on its hold only when the status of the action started by its press changes on release or within the selected
+  On-time tolerance afterwards. The hold may differ by the On-time tolerance plus one frame per
   eight frames of the saved hold, at most 15 extra frames. A missing graded release, or a button held longer or shorter than that, drops
   the step; a release marked as unreacted is not graded. A special with saved directions is graded on them, not
   its press's stick direction. A side tilt or smash uses

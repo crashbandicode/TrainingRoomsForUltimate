@@ -57,8 +57,8 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
-    /// A status change, with whether it opened a new action.
-    pub turned: Option<bool>,
+    /// A status change and the origin of the action whose status changed.
+    pub turned: Option<Option<u32>>,
 }
 
 impl Late {

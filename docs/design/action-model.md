@@ -56,9 +56,10 @@ the frame the attempt pressed its button (`Combo::owner_press`, `Combo::nth_pres
 plus the saved hold and its band. So a button held longer than the saved hold plus the band and the tolerance drops
 the step: as a missing release, or, when another event of the step kept it open, as a release that is off. A
 reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit combos a
-release with no counterpart at the hit is not graded. `Tracker::late` reports status changes; a captured release
-becomes `LetGo` if a status changes on that frame or within the On-time tolerance afterwards, except an action opening
-attributed to the same press. An ordinary `Release` stays recorded but contributes no mark or deadline in a drill.
+release with no counterpart at the hit is not graded. `Tracker::late` reports the originating press of the action
+whose status changed, before any new action opens. Its release becomes `LetGo` if that change occurs on the release
+frame or within the selected On-time tolerance afterwards. A change with no known origin upgrades nothing. An ordinary
+`Release` stays recorded but contributes no mark or deadline in a drill.
 
 ## One description
 
@@ -136,8 +137,9 @@ No hook, native site, lock or static was added for the ACTION model.
 
 On input-drill load, a step beginning with a release or `Aim(1)` joins its predecessor if their events fit in 12;
 the original file is not rewritten by loading. A release may write unsigned `hold`, checked for type on reading.
-This build writes `reacted: true` for an input-drill `LetGo` and `reacted: false` for an ordinary release; a
-non-boolean is rejected. For a legacy release without `reacted`, an owned hold under eight frames stays ungraded,
+This build records reactions using the selected On-time tolerance and writes `reacted: true` for an input-drill
+`LetGo` and `reacted: false` for an ordinary release; a non-boolean is rejected. For a legacy release without
+`reacted`, an owned hold under eight frames stays ungraded,
 while a hold of eight or more is graded in its band. An unowned release remains ungraded. Re-recording a drill gives
 it the causal rule.
 Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (the three
@@ -169,8 +171,8 @@ selected version and name.
   move they show the base special and the angle only, where the live strip also shows its travel arrows.
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
-- A status change near a release can be unrelated to that release and still mark it reacted. Hit-combo link grading
-  remains unchanged.
+- An origin identifies a press frame, not a button: simultaneous presses share that frame and cannot be distinguished
+  by the reaction rule. Hit-combo link grading remains unchanged.
 - Older drill files lack reaction evidence, so their hold-length compatibility rule cannot establish causality.
 
 ## Host checks
@@ -191,7 +193,9 @@ selected version and name.
   `an_older_files_tap_is_not_graded_and_its_long_hold_is`, `a_new_file_says_whether_the_game_reacted`,
   `a_reacted_release_round_trips`, `a_reset_chord_alone_leaves_no_result`,
   `a_reset_before_the_deadline_leaves_no_result`, `a_real_attempt_then_a_reset_records_as_today`,
-  `a_failed_attempt_is_not_taken_back_by_a_later_reset`.
+  `a_failed_attempt_is_not_taken_back_by_a_later_reset`, `only_the_owning_press_reacts_to_its_actions_change`,
+  `a_press_does_not_react_to_the_opening_of_its_own_action`, `a_held_moves_end_is_a_reaction_for_its_own_press`,
+  `a_recording_uses_the_selected_tolerance`, `the_recording_host_passes_its_selected_reaction_window`.
 - Description and angle: `the_bar_and_the_menu_name_a_link_as_the_strip_does`,
   `a_hit_combo_tells_an_angled_tilt_from_a_level_one`, `a_link_without_descriptions_grades_as_before`,
   `link_descriptions_round_trip_in_optional_keys`, `a_link_record_keeps_its_size`,

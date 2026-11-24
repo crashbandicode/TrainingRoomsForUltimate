@@ -1586,6 +1586,9 @@ impl InputCapture {
     pub fn step(&mut self, snap: Snap) {
         self.step_late(snap, Late::NONE);
     }
+    pub fn set_window(&mut self, window: u8) {
+        self.window = window;
+    }
     pub fn step_late(&mut self, snap: Snap, late: Late) {
         self.step_with(snap, late, true, true);
     }
@@ -1655,7 +1658,7 @@ impl InputCapture {
                 }
             }
         }
-        if let (Some(_), Some(first)) = (late.turned, self.first) {
+        if let (Some(Some(origin)), Some(first)) = (late.turned, self.first) {
             for (_, button) in PRESS_BITS {
                 let latest = self.combo.links[..self.combo.len].iter().enumerate().rev().find_map(|(step, link)| {
                     link.as_ref()?.events.iter().enumerate().rev().find_map(|(index, event)| {
@@ -1670,9 +1673,7 @@ impl InputCapture {
                 if snap.frame.checked_sub(released).is_none_or(|age| age > u32::from(self.window)) { continue; }
                 let Some((_, _, offset)) = self.combo.owner_press(step, index) else { continue };
                 let Ok(press) = u32::try_from(i64::from(first) + i64::from(offset)) else { continue };
-                if late.turned == Some(true) && late.open.is_some_and(|(origin, _)| origin == Some(press)) {
-                    continue;
-                }
+                if origin != press { continue; }
                 self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap().kind = Kind::LetGo(button);
                 amended |= 1u16 << step;
             }
