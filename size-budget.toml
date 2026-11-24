@@ -2677,3 +2677,11 @@ ceiling = 198144
 date = "2026-11-24"
 reason = "Delay a missing aim verdict while the active special can still supply it; leave press and release deadlines unchanged. Measured +8 implementation lines against c4c43b23."
 approved_by = "tr-primary-2 ruling 2026-11-24 21:09:55Z: fix-only ceiling 198,144, subject to the full size receipt."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198679
+date = "2026-11-24"
+reason = "Merge 3C of install 4: travel parts (deciding stick, heading, distance, eight-point path), steering and the Match angle and deflection toggle, their marks and texts, the packed travel table, and a later link's first move borrowing its travel arrows. Measured 198679 on 1a55481f, 535 above merge 3 (198144, e09fc3cf)."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:31:04Z (the 3C line budget is approved at the folded head's measured value under the 17:59:40Z rule)."
