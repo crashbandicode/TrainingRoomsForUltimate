@@ -65,6 +65,8 @@ pub mod input_delay;
 pub mod frame_strip;
 #[path = "model/aim.rs"]
 pub mod aim;
+#[path = "model/action.rs"]
+pub mod action;
 #[path = "model/frame_strip_plan.rs"]
 pub mod frame_strip_plan;
 #[path = "model/game_speed.rs"]

@@ -16,8 +16,7 @@ use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
-use crate::model::frame_strip::{angle_of, Angle, Move, Sample, Settings, Tracker};
-use crate::model::aim;
+use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker};
 use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
@@ -30,9 +29,9 @@ use crate::runtime::{published, state_natives};
 static ENABLED: AtomicBool = AtomicBool::new(false);
 /// The hitstun-left read may run (`reaction_left`).
 static REACTION_ON: AtomicBool = AtomicBool::new(false);
-/// The side-attack motion read may run (`angle`).
+/// The side-attack motion read may run (`p1_motion`).
 static ANGLE_ON: AtomicBool = AtomicBool::new(false);
-/// The directional-special position reads may run (`travel`).
+/// The directional-special position reads may run (`p1_position`).
 static AIM_ON: AtomicBool = AtomicBool::new(false);
 /// P1's fighter read may run (`p1_fighter`).
 static KIND_ON: AtomicBool = AtomicBool::new(false);
@@ -168,12 +167,12 @@ pub fn set_reaction(on: bool) {
     REACTION_ON.store(on, Ordering::Release);
 }
 
-/// The side-attack motion's angle, when the CPU mash unit's closure passed.
-unsafe fn angle(accessor: usize) -> Option<Angle> {
+/// The animation's hash40, when the CPU mash unit's closure passed; 0 otherwise.
+unsafe fn p1_motion(accessor: usize) -> u64 {
     if !ANGLE_ON.load(Ordering::Acquire) {
-        return None;
+        return 0;
     }
-    angle_of(natives::motion_kind(accessor))
+    natives::motion_kind(accessor)
 }
 
 /// Boot: the angle read's row passed its guard.
@@ -181,18 +180,12 @@ pub fn set_angle_read(on: bool) {
     ANGLE_ON.store(on, Ordering::Release);
 }
 
-/// The position while in a directional-special travel status; the position reads are the Recording unit's rows.
-unsafe fn travel(accessor: usize, status: i32) -> Option<(f32, f32)> {
+/// Player 1's position; the position reads are the Recording unit's rows.
+unsafe fn p1_position(accessor: usize) -> Option<(f32, f32)> {
     if !AIM_ON.load(Ordering::Acquire) {
         return None;
     }
-    let kind = p1_fighter(accessor)?;
-    (aim::travel_status(kind) == Some(status)).then(|| (natives::pos_x(accessor), natives::pos_y(accessor)))
-}
-
-unsafe fn aimer(accessor: usize) -> bool {
-    AIM_ON.load(Ordering::Acquire)
-        && p1_fighter(accessor).is_some_and(|kind| aim::travel_status(kind).is_some())
+    Some((natives::pos_x(accessor), natives::pos_y(accessor)))
 }
 
 /// Boot: the directional-special position reads' rows passed their guards.
@@ -327,6 +320,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
     let launched = if spots { natives::damage_reaction(accessor) } else { 0.0 };
     let struck = if spots && launched > 0.0 { struck(accessor) } else { None };
     let attack = if p1 { ids.attack(status) } else { None };
+    let named = if p1 { ids.named_move(status) } else { None };
+    let motion = if p1 && (attack.is_some() || named.is_some()) { p1_motion(accessor) } else { 0 };
     Sample {
         stop: natives::is_stop(accessor),
         hitstun,
@@ -342,9 +337,10 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         dealt: struck.map_or(0.0, |(_, _, dealt)| dealt),
         object_id: if spots { ((accessor + natives::ACCESSOR_OBJECT_ID_FIELD) as *const u32).read() } else { 0 },
         attack,
-        angle: if p1 && matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle(accessor) } else { None },
-        travel: if p1 { travel(accessor, status) } else { None },
-        aimer: p1 && aimer(accessor),
+        named,
+        motion,
+        angle: if matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle_of(motion) } else { None },
+        pos: if p1 { p1_position(accessor) } else { None },
         reaction,
         shielding: ids.shielding(status),
         status,
@@ -473,7 +469,7 @@ pub unsafe fn sample_frame(player: usize) {
     tracker.step_graded(p1, cpu, inputs, taken);
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
-            crate::engine::rr_host::observe_input(snap, tracker.contact_now());
+            crate::engine::rr_host::observe_input(snap, tracker.late(), tracker.contact_now());
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         crate::runtime::features::combo::after_strip(&tracker, p1_kind);

@@ -1,104 +1,43 @@
 //! Trace-derived directional-special steps and legacy compatibility.
 lib_unit_tests! {
 use super::*;
-use crate::model::aim::{Now, Parts, Seen};
+use crate::model::aim::Seen;
 use crate::model::combo_record::ComboRecord;
 use crate::model::frame_strip::Sample;
 use crate::model::input_delay::MappedInputs;
 
-fn now(start: bool, special: bool, travel: bool, entered: bool, aimed: Option<u8>, facing: i8) -> Now {
-    Now { aimer: true, start, special, travel, entered, aimed, facing }
-}
-
-#[test]
-fn parts_count_two_travels_and_report_each_once() {
-    let mut parts = Parts::new();
-    let mut seen = Vec::new();
-    for _ in 0..14 { seen.push(parts.step(now(true, true, false, false, None, 1))); }
-    for f in 0..5 { seen.push(parts.step(now(false, true, true, f == 0, (f == 1).then_some(4), -1))); }
-    for _ in 0..9 { seen.push(parts.step(now(false, true, false, false, None, -1))); }
-    for f in 0..5 { seen.push(parts.step(now(false, true, true, f == 0, (f == 1).then_some(0), -1))); }
-    seen.push(parts.step(now(false, true, false, false, None, -1)));
-    assert!(seen.iter().all(|s| s.inside && s.facing == 1));
-    assert_eq!(seen.iter().filter(|s| s.part != 0).map(|s| (s.part, s.dir, s.age)).collect::<Vec<_>>(),
-        vec![(1, Some(4), 1), (2, Some(0), 1)]);
-}
-
-#[test]
-fn a_travel_that_never_moves_reports_no_direction() {
-    let mut parts = Parts::new();
-    parts.step(now(true, true, false, false, None, 1));
-    for f in 0..5 {
-        assert_eq!(parts.step(now(false, true, true, f == 0, None, -1)).part, 0);
-    }
-    let end = parts.step(now(false, true, false, false, None, -1));
-    assert_eq!((end.inside, end.part, end.dir, end.facing, end.age), (true, 1, None, 1, 5));
-    assert_eq!(parts.step(now(false, true, false, false, None, -1)).part, 0);
-}
-
-#[test]
-fn a_third_travel_and_another_move_are_not_parts() {
-    let mut parts = Parts::new();
-    assert_eq!(parts.step(now(false, true, false, false, None, 1)), Seen::NONE);
-    let mut unsupported = now(true, true, true, true, Some(4), 1);
-    unsupported.aimer = false;
-    assert_eq!(parts.step(unsupported), Seen::NONE);
-    parts.step(now(true, true, false, false, None, 1));
-    for part in 1..=3 {
-        let got = parts.step(now(false, true, true, true, Some(4), -1));
-        assert_eq!(got.part, if part < 3 { part } else { 0 });
-        parts.step(now(false, true, false, false, None, -1));
-    }
-    assert_eq!(parts.step(now(false, false, false, false, None, -1)), Seen::NONE);
-    parts.step(now(true, true, false, false, None, 1));
-    assert_eq!(parts.step(now(false, true, true, true, Some(0), 1)).part, 1);
-}
-
-#[test]
-fn a_pending_travel_reports_once_when_the_special_is_left() {
-    let mut parts = Parts::new();
-    parts.step(now(true, true, false, false, None, 1));
-    parts.step(now(false, true, true, true, None, -1));
-    parts.step(now(false, true, true, false, None, -1));
-    let end = parts.step(now(false, false, false, false, None, -1));
-    assert_eq!((end.inside, end.part, end.dir, end.facing, end.age), (false, 1, None, 1, 2));
-    assert_eq!(parts.step(now(false, false, false, false, None, -1)), Seen::NONE);
-}
-
-#[test]
-fn a_long_pending_travel_saturates_its_age() {
-    let mut parts = Parts::new();
-    parts.step(now(true, true, false, false, None, 1));
-    for f in 0..300 {
-        parts.step(now(false, true, true, f == 0, None, 1));
-    }
-    let end = parts.step(now(false, true, false, false, None, 1));
-    assert_eq!((end.part, end.dir, end.age), (1, None, u8::MAX));
-}
-
-fn strip_sample(attack: Move, travel: Option<(f32, f32)>, facing: i8) -> Sample {
-    Sample { attack: Some(attack), travel, aimer: true, facing, ..Sample::default() }
+fn strip_sample(attack: Move, pos: Option<(f32, f32)>, facing: i8) -> Sample {
+    let status = if attack == Move::UpSpecial { 1 } else if pos.is_some() { 2 } else { 3 };
+    Sample { attack: Some(attack), status, pos: Some(pos.unwrap_or((0.0, 0.0))), facing, ..Sample::default() }
 }
 
 #[test]
 fn the_strip_writes_each_part_on_the_snap_it_was_known() {
     fn run(start: usize, travel: usize, between: usize, first: (f32, f32), second: (f32, f32)) -> Vec<Seen> {
         let mut tracker = Tracker::new();
+        let axis = |value: f32| if value > 0.0 { 100 } else if value < 0.0 { -100 } else { 0 };
+        let stick = |direction: (f32, f32)| MappedInputs {
+            lstick_x: axis(direction.0),
+            lstick_y: axis(direction.1),
+            ..MappedInputs::NEUTRAL
+        };
         for _ in 0..start {
-            tracker.step(strip_sample(Move::UpSpecial, None, 1), Sample::default(), MappedInputs::NEUTRAL);
+            tracker.step(strip_sample(Move::UpSpecial, None, 1), Sample::default(), stick(first));
             assert!(tracker.snaps().last().unwrap().aim.inside);
         }
         let mut entry_frames = Vec::new();
+        let mut pos = (0.0, 0.0);
         for (direction, length) in [(first, travel), (second, travel)] {
             let entry = tracker.frame() + 1;
             entry_frames.push(entry);
             for f in 0..length {
-                tracker.step(strip_sample(Move::Other, Some((direction.0 * f as f32, direction.1 * f as f32)), -1),
-                    Sample::default(), MappedInputs::NEUTRAL);
+                tracker.step(strip_sample(Move::Other, Some((pos.0 + direction.0 * f as f32, pos.1 + direction.1 * f as f32)), -1),
+                    Sample::default(), stick(direction));
                 assert_eq!(tracker.aim_pending(), (f == 0).then_some(entry));
             }
+            pos = (pos.0 + direction.0 * (length - 1) as f32, pos.1 + direction.1 * (length - 1) as f32);
             for _ in 0..between {
-                tracker.step(strip_sample(Move::Other, None, -1), Sample::default(), MappedInputs::NEUTRAL);
+                tracker.step(Sample { pos: Some(pos), ..strip_sample(Move::Other, None, -1) }, Sample::default(), stick(second));
             }
         }
         let reports: Vec<_> = tracker.snaps().filter(|s| s.aim.part != 0).collect();
@@ -165,6 +104,42 @@ fn the_two_zip_drill_passes_only_with_both_directions() {
     assert_eq!(run(target, Some(2), None, true, false).fault, Some((0, Reason::WrongAim(1))));
     assert_eq!(run(target, Some(4), None, true, false).fault, Some((1, Reason::MissingAim(2))));
     assert_eq!(run(target, Some(4), Some(4), true, false).fault, Some((1, Reason::WrongAim(2))));
+}
+
+#[test]
+fn an_active_special_can_still_supply_a_nonfinal_steps_aim() {
+    let target = captured(Some(4), Some(0), true, false, true);
+    for (first, expected) in [(Some(4), None), (Some(2), Some(Reason::WrongAim(1))), (None, Some(Reason::MissingAim(1)))] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=36 {
+            let mut now = script(frame, None, Some(0), true, false);
+            if frame == 19 && first.is_some() {
+                now.aim = Seen { part: 1, dir: first, ..now.aim };
+            }
+            helper.step_inputs(now, &mut Out::default());
+            if frame < 19 {
+                assert!(helper.results().next().is_none(), "the first part could still arrive at frame {frame}");
+            }
+        }
+        let summary = helper.results().next().expect("the special ended");
+        assert_eq!(summary.clean, expected.is_none());
+        assert_eq!(summary.fault, expected.map(|why| (0, why)));
+    }
+}
+
+#[test]
+fn waiting_for_direction_does_not_extend_a_button_deadline() {
+    let target = captured(Some(4), Some(0), true, false, true);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    for frame in 0..=17 {
+        let mut now = script(frame, None, None, true, false);
+        now.buttons = 2;
+        helper.step_inputs(now, &mut Out::default());
+    }
+    let summary = helper.results().next().expect("the saved release is already missing");
+    assert_eq!(summary.fault, Some((0, Reason::MissingRelease(Button::Special))));
 }
 
 #[test]
@@ -371,16 +346,16 @@ fn a_hit_link_waits_for_the_pending_heading() {
     let mut helper = Helper::new();
     let hit_cpu = Sample { stop: true, hitstun: true, reaction: Some(20.0), ..Sample::default() };
     let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
-    let jab = Sample { attack: Some(Move::Jab), status: 0x27, facing: 1, ..Sample::default() };
+    let jab = Sample { attack: Some(Move::Jab), status: 0x27, facing: 1, pos: Some((0.0, 0.0)), ..Sample::default() };
     tracker.step(jab, hit_cpu, MappedInputs::NEUTRAL);
     helper.step(&tracker, Settings::factory());
-    tracker.step(Sample { actionable: true, facing: 1, ..Sample::default() }, stunned_cpu, MappedInputs::NEUTRAL);
+    tracker.step(Sample { actionable: true, facing: 1, pos: Some((0.0, 0.0)), ..Sample::default() }, stunned_cpu, MappedInputs::NEUTRAL);
     helper.step(&tracker, Settings::factory());
     let up_b = MappedInputs { buttons: 2, lstick_y: 127, ..MappedInputs::NEUTRAL };
     tracker.step(strip_sample(Move::UpSpecial, None, 1), stunned_cpu, up_b);
     helper.step(&tracker, Settings::factory());
     let left = MappedInputs { lstick_x: -127, ..MappedInputs::NEUTRAL };
-    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), hit_cpu, left);
+    tracker.step(Sample { stop: true, ..strip_sample(Move::Other, Some((0.0, 0.0)), 1) }, hit_cpu, left);
     helper.step(&tracker, Settings::factory());
     assert!(tracker.latest_link().is_some());
     assert_eq!(tracker.aim_pending(), Some(tracker.frame()));
@@ -395,16 +370,17 @@ fn travel_hit_out(helper: &mut Helper, pending: bool) -> (Tracker, Sample, Mappe
     let mut tracker = Tracker::new();
     let hit_cpu = Sample { stop: true, hitstun: true, reaction: Some(20.0), ..Sample::default() };
     let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
-    let jab = Sample { attack: Some(Move::Jab), status: 0x27, facing: 1, ..Sample::default() };
+    let jab = Sample { attack: Some(Move::Jab), status: 0x27, facing: 1, pos: Some((0.0, 0.0)), ..Sample::default() };
     tracker.step(jab, hit_cpu, MappedInputs::NEUTRAL);
     helper.step(&tracker, Settings::factory());
-    tracker.step(Sample { actionable: true, facing: 1, ..Sample::default() }, stunned_cpu, MappedInputs::NEUTRAL);
+    tracker.step(Sample { actionable: true, facing: 1, pos: Some((0.0, 0.0)), ..Sample::default() }, stunned_cpu, MappedInputs::NEUTRAL);
     helper.step(&tracker, Settings::factory());
     let up_b = MappedInputs { buttons: 2, lstick_y: 127, ..MappedInputs::NEUTRAL };
     tracker.step(strip_sample(Move::UpSpecial, None, 1), stunned_cpu, up_b);
     helper.step(&tracker, Settings::factory());
     let left = MappedInputs { lstick_x: -127, ..MappedInputs::NEUTRAL };
-    tracker.step(strip_sample(Move::Other, pending.then_some((0.0, 0.0)), 1), hit_cpu, left);
+    let pos = if pending { (0.0, 0.0) } else { (-11.0, 0.0) };
+    tracker.step(Sample { stop: pending, ..strip_sample(Move::Other, Some(pos), 1) }, hit_cpu, left);
     let out = helper.step(&tracker, Settings::factory());
     (tracker, hit_cpu, left, out)
 }
@@ -439,12 +415,13 @@ fn a_hit_keeps_a_direction_that_arrives_three_frames_later() {
             }
             let (mut tracker, cpu, left) = travel_hit(&mut helper);
             let hit = tracker.frame();
+            let stick = if x > 0.0 { MappedInputs { lstick_x: 127, ..left } } else { left };
             for elapsed in 1..=2 {
-                tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
+                tracker.step(Sample { stop: true, ..strip_sample(Move::Other, Some((0.0, 0.0)), 1) }, cpu, stick);
                 helper.step(&tracker, Settings::factory());
                 assert!(helper.capture.current.is_empty(), "link taken before heading at +{elapsed}");
             }
-            tracker.step(strip_sample(Move::Other, Some((x, 0.0)), 1), cpu, left);
+            tracker.step(strip_sample(Move::Other, Some((x, 0.0)), 1), cpu, stick);
             helper.step(&tracker, Settings::factory());
             assert_eq!(tracker.frame(), hit + 3);
             let rec = helper.capture.current.get(0).expect("link captured with heading");
@@ -460,15 +437,15 @@ fn a_hit_keeps_a_direction_that_arrives_three_frames_later() {
 fn a_hit_keeps_a_travel_that_exits_without_moving() {
     let mut helper = Helper::new();
     let (mut tracker, cpu, left) = travel_hit(&mut helper);
-    for _ in 0..4 {
+    for _ in 0..2 {
         tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
         helper.step(&tracker, Settings::factory());
         assert!(helper.capture.current.is_empty(), "stationary travel is still pending");
     }
-    tracker.step(strip_sample(Move::Other, None, 1), cpu, left);
+    tracker.step(strip_sample(Move::Other, Some((0.0, 0.0)), 1), cpu, left);
     helper.step(&tracker, Settings::factory());
-    let rec = helper.capture.current.get(0).expect("link captured on travel exit");
-    assert!(rec.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Neutral));
+    let rec = helper.capture.current.get(0).expect("link captured when the onset window ends");
+    assert!(!rec.events().any(|e| matches!(e.kind, Kind::Aim(_))));
 }
 
 #[test]
@@ -499,12 +476,10 @@ fn a_newer_link_does_not_wait_behind_a_held_one() {
     let (mut tracker, hit_cpu, left) = travel_hit(&mut helper);
     let first = tracker.latest_link().unwrap();
     let stunned_cpu = Sample { hitstun: true, reaction: Some(19.0), ..Sample::default() };
-    tracker.step(strip_sample(Move::UpSpecial, Some((0.0, 0.0)), 1), stunned_cpu, left);
+    tracker.step(Sample { stop: true, motion_frame: 1.0, ..strip_sample(Move::Other, Some((0.0, 0.0)), 1) }, stunned_cpu, left);
     helper.step(&tracker, Settings::factory());
     assert!(helper.capture.current.is_empty());
-    let tilt = Sample { attack: Some(Move::UpTilt), status: 0x2b, facing: 1, ..Sample::default() };
-    let attack = MappedInputs { buttons: 1, lstick_y: 127, ..MappedInputs::NEUTRAL };
-    tracker.step(tilt, hit_cpu, attack);
+    tracker.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), hit_cpu, left);
     let second = tracker.latest_link().unwrap();
     assert_ne!(first.hit, second.hit);
     helper.step(&tracker, Settings::factory());
@@ -518,27 +493,26 @@ fn a_newer_link_does_not_wait_behind_a_held_one() {
 #[test]
 fn a_held_link_is_recorded_before_an_exchange_changes() {
     let mut helper = Helper::new();
-    helper.set_target(Some(Combo::from_links([aim_hit_reference(Dir::Neutral)]).unwrap()));
+    helper.set_target(Some(Combo::from_links([aim_hit_reference(Dir::Back)]).unwrap()));
     let (mut tracker, hit_cpu, left) = travel_hit(&mut helper);
     let exchange = tracker.exchange().0;
     let free_cpu = Sample { actionable: true, ..Sample::default() };
-    for _ in 0..=super::super::frame_strip::DROP_MAX + 1 {
-        tracker.step(strip_sample(Move::UpSpecial, Some((0.0, 0.0)), 1), free_cpu, left);
+    for frame in 0..=super::super::frame_strip::DROP_MAX + 1 {
+        tracker.step(Sample { stop: true, motion_frame: frame as f32 + 1.0,
+            ..strip_sample(Move::Other, Some((0.0, 0.0)), 1) }, free_cpu, left);
         let out = helper.step(&tracker, Settings::factory());
         assert!(helper.capture.current.is_empty());
         assert!(helper.results().next().is_none());
         assert!(out.resolved.is_none());
     }
     assert!(!tracker.exchange_open());
-    let tilt = Sample { attack: Some(Move::UpTilt), status: 0x2b, facing: 1, ..Sample::default() };
-    let attack = MappedInputs { buttons: 1, lstick_y: 127, ..MappedInputs::NEUTRAL };
-    tracker.step(tilt, hit_cpu, attack);
+    tracker.step(strip_sample(Move::Other, Some((-11.0, 0.0)), 1), hit_cpu, left);
     assert_ne!(tracker.exchange().0, exchange);
     let out = helper.step(&tracker, Settings::factory());
     assert!(out.resolved.expect("held link graded before exchange reset").clean);
     assert!(helper.capture.current.is_empty());
     let saved = helper.capture.previous.get(0).expect("previous exchange retained");
-    assert!(saved.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Neutral));
+    assert!(saved.events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Back));
 }
 
 #[test]

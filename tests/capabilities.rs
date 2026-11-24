@@ -118,9 +118,9 @@ const BOUNDARIES: &[Boundary] = &[
     // Its hitstun-left read: the CPU tech unit's work_get_float row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::reaction_left", owner: Some(Feature::CpuTech), gate: Gate::Flag("REACTION_ON") },
     // The motion read is the CPU mash unit's motion_kind row.
-    Boundary { function: "input_display::angle", owner: Some(Feature::CpuMash), gate: Gate::Flag("ANGLE_ON") },
+    Boundary { function: "input_display::p1_motion", owner: Some(Feature::CpuMash), gate: Gate::Flag("ANGLE_ON") },
     // The travel position reads are the Recording unit's rows.
-    Boundary { function: "input_display::travel", owner: Some(Feature::Recording), gate: Gate::Flag("AIM_ON") },
+    Boundary { function: "input_display::p1_position", owner: Some(Feature::Recording), gate: Gate::Flag("AIM_ON") },
     // A saved combo's "recorded on": the CPU core unit's utility_get_kind row (boot sets the flag from that unit's closure).
     Boundary { function: "input_display::p1_fighter", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },
     Boundary { function: "input_display::lane_player", owner: Some(Feature::CpuCore), gate: Gate::Flag("KIND_ON") },

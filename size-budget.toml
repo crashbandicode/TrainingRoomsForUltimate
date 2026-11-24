@@ -2653,3 +2653,27 @@ ceiling = 197277
 date = "2026-11-24"
 reason = "Install 4 integration, merge 2: the open-list bridge fix (fix/bridge-open-list ffdff909) and the per-line-type HUD text capacity (fix/reason-line-reviewed a8608671) in one tree. Measured 197277 on the merged tree, 225 above base e7667f26 (197052): +37 from the open-list entries and +188 from the text fix as corrected in review (its own entry allows +235)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 15:47:29Z and 15:56:58Z (open list, +36 and +1) and 17:47:51Z (text capacity, 197287 on the base)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198083
+date = "2026-11-24"
+reason = "The ACTION model through section 7 on install 4 merge 2: events are owned by the action that made them (steps from originating inputs, clear, the hold band), one description for the strip, the bar, the menu and the grader, the outcome rule in place of the ten-fighter travel table, and a side attacks angle from its animation. Measured 198083 on 70602649, 806 above merge 2s measured 197277."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:05:25Z (the merge-3 line budget approved at the measured 198,083, +806 on merge 2, for the ACTION model core, the outcome rule and section 7)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198136
+date = "2026-11-24"
+reason = "Merge 3 of install 4: the ACTION model through section 7 with a held buttons deadline counted from the attempts own press (a defect rv-hit-streak found before READY) and f14-dirs grab, throw and Final Smash actions (feat/action-moves 6a7735d3). Measured 198136 on fcab1e75, 53 above the entry before it (198083): +8 from the moves and +45 from the hold-deadline fix."
+approved_by = "tr-primary-2 ruling 2026-11-24 20:35:08Z (the merge-3 line budget approved at the measured 198,136: +8 f14-dir, +45 the hold-limit fix), after its ruling of 20:05:25Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198144
+date = "2026-11-24"
+reason = "Delay a missing aim verdict while the active special can still supply it; leave press and release deadlines unchanged. Measured +8 implementation lines against c4c43b23."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:09:55Z: fix-only ceiling 198,144, subject to the full size receipt."
