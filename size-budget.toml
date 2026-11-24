@@ -2653,3 +2653,11 @@ ceiling = 197277
 date = "2026-11-24"
 reason = "Install 4 integration, merge 2: the open-list bridge fix (fix/bridge-open-list ffdff909) and the per-line-type HUD text capacity (fix/reason-line-reviewed a8608671) in one tree. Measured 197277 on the merged tree, 225 above base e7667f26 (197052): +37 from the open-list entries and +188 from the text fix as corrected in review (its own entry allows +235)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 15:47:29Z and 15:56:58Z (open list, +36 and +1) and 17:47:51Z (text capacity, 197287 on the base)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197314
+date = "2026-11-24"
+reason = "Quickplay new pick: the waiting memory keeps the native body each role's lobby started from, so a different fighter picked at the character select after a match starts the waiting practice fresh. Measured 197314 (tools/sloc.py tree), 37 above install 4 merge 2 0db4728c (197277)."
+approved_by = "tr-primary-2 order 2026-11-24 19:36:34Z (the operator's Quickplay report, install 4: f15-lobby fixes it on fix/qp-css-resets-choice), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). The +37 is reported with the READY."

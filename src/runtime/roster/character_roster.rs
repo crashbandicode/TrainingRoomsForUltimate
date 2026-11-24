@@ -1389,13 +1389,17 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         && (0x48..=0x4a).contains(&kind)
                         && ((role==Role::Player)
                             || (role==Role::Cpu));
-                    let fresh_lobby = current_scope.waiting()
-                        && !exact_origin_pending
-                        && WAITING_MEMORY
-                            .lock()
-                            .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));
+                    let fresh_lobby = current_scope.waiting() && {
+                        let mut memory = WAITING_MEMORY.lock();
+                        if exact_origin_pending {
+                            // A Mii's exact origin is captured later; a different fighter is already a new pick.
+                            memory.arrived(role as usize, |origin| origin.fighter == fighter)
+                        } else {
+                            memory.observe(role as usize, WaitingValue::ordinary(fighter,forms,None))
+                        }
+                    };
                     if fresh_lobby {
-                        trace!("[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices");
+                        trace!("[CharacterRoster] fresh waiting lobby; cleared both practice choices");
                         crate::runtime::roster::kirby_hats::fresh_lobby();
                         training::named_macros::waiting_scene_changed(false);
                     }

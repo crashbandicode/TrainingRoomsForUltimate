@@ -54,16 +54,23 @@ impl<T: Copy> WaitingChoice<T> {
 /// A waiting player's entry can be destroyed before either a match or a room exit.
 /// Defer that distinction: a match changes the scene; recreating an LDN room can
 /// create new entries with the exact same scene tuple (13.0.5 runtime trace).
+/// The scene tuple cannot show a CSS visit (the melee byte keeps its previous value), but a new room's native body can.
 pub struct WaitingSession<T> {
     choices: [WaitingChoice<T>; 2],
+    /// The native body each role's lobby started from.
+    origins: [Option<T>; 2],
+    /// The next observation is the role's first in a new waiting room of the same lobby.
+    returning: [bool; 2],
     scene: Option<(bool, u8, u32)>,
     player_departed: bool,
 }
 
-impl<T: Copy> WaitingSession<T> {
+impl<T: Copy + PartialEq> WaitingSession<T> {
     pub const fn empty() -> Self {
         Self {
             choices: [WaitingChoice::empty(); 2],
+            origins: [None; 2],
+            returning: [false; 2],
             scene: None,
             player_departed: false,
         }
@@ -78,11 +85,14 @@ impl<T: Copy> WaitingSession<T> {
         let current = lobby(initialized, melee, mode);
         let same_lobby = current.is_some() && self.scene
             .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;
-        for choice in &mut self.choices {
+        for role in 0..self.choices.len() {
             if same_lobby {
-                choice.scene_changed();
+                self.choices[role].scene_changed();
+                self.returning[role] = self.origins[role].is_some();
             } else {
-                choice.clear();
+                self.choices[role].clear();
+                self.origins[role] = None;
+                self.returning[role] = false;
             }
         }
         self.scene = Some((initialized, melee, mode));
@@ -96,21 +106,36 @@ impl<T: Copy> WaitingSession<T> {
         self.player_departed = true;
     }
 
-    /// Called for a newly observed, ready waiting body. Returns whether this is a
-    /// fresh entry lifetime without a match excursion, which forgets BOTH roles.
-    pub fn observe(&mut self, role: usize, fighter: T) -> bool {
-        let fresh = self.player_departed;
-        if fresh {
-            for choice in &mut self.choices {
-                choice.clear();
-            }
-            self.player_departed = false;
+    fn forget(&mut self) {
+        for choice in &mut self.choices {
+            choice.clear();
         }
+        self.origins = [None; 2];
+        self.returning = [false; 2];
+        self.player_departed = false;
+    }
+
+    /// Returns whether this is a fresh lobby: a departed waiting entry or a returning
+    /// native body different from the lobby's origin, which only a new CSS pick makes.
+    /// Either case forgets BOTH roles.
+    pub fn observe(&mut self, role: usize, fighter: T) -> bool {
+        let returned = core::mem::take(&mut self.returning[role]);
+        let fresh = self.player_departed || (returned && self.origins[role] != Some(fighter));
+        if fresh { self.forget(); }
+        if self.origins[role].is_none() { self.origins[role] = Some(fighter); }
         self.choices[role].observe(fighter);
         fresh
     }
 
-    pub fn arrived(&mut self, _: usize, _: impl FnOnce(&T) -> bool) -> bool { false }
+    /// Check a returning body before its exact value is known; a mismatch forgets both roles.
+    /// A match leaves the return pending for the later exact observation and never sets an origin.
+    pub fn arrived(&mut self, role: usize, same: impl FnOnce(&T) -> bool) -> bool {
+        if !self.returning[role] { return false; }
+        let Some(origin) = self.origins[role].as_ref() else { return false; };
+        if same(origin) { return false; }
+        self.forget();
+        true
+    }
 
     pub fn commit(&mut self, role: usize, fighter: T) {
         self.choices[role].commit(fighter);

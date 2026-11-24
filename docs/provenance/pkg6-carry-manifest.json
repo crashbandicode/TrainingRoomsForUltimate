@@ -9610,7 +9610,7 @@
       "dest": "src/model/swap/character_memory.rs",
       "crate": "root",
       "src_sha256": "513ed484fc3ab77d9d39567ced7626950b7c63ecc54acdd6f99e08db293c3cc8",
-      "dest_sha256": "3750e19dba3a157a325834375026445de864171c211b35fb0ce7e079a6319dcc",
+      "dest_sha256": "e8df83dfa91ae508a06c2774a6997163128936c5e63aca58a601a8d8c391b927",
       "edits": [
         {
           "table_tests": true,
@@ -9659,6 +9659,56 @@
           "old": "            (\"disabled_player_restore_does_not_block_cpu_hat_continuation\", disabled_player_restore_does_not_block_cpu_hat_continuation as fn()),\n        ]);\n",
           "new": "            (\"disabled_player_restore_does_not_block_cpu_hat_continuation\", disabled_player_restore_does_not_block_cpu_hat_continuation as fn()),\n            (\"a_new_pick_after_a_match_forgets_both_roles\", a_new_pick_after_a_match_forgets_both_roles as fn()),\n            (\"the_cpu_seen_first_with_the_new_pick_forgets_the_player_too\", the_cpu_seen_first_with_the_new_pick_forgets_the_player_too as fn()),\n            (\"the_new_pick_is_the_lobbys_fighter_from_then_on\", the_new_pick_is_the_lobbys_fighter_from_then_on as fn()),\n            (\"a_rematch_still_brings_back_both_practice_choices\", a_rematch_still_brings_back_both_practice_choices as fn()),\n            (\"a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry\", a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry as fn()),\n            (\"a_body_not_yet_known_exactly_decides_on_its_fighter\", a_body_not_yet_known_exactly_decides_on_its_fighter as fn()),\n            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n        ]);\n",
           "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the cases of the operator's sequence, and the entry point for a returning body not yet known exactly."
+        },
+        {
+          "old": "/// create new entries with the exact same scene tuple (13.0.5 runtime trace).\npub struct WaitingSession<T> {\n",
+          "new": "/// create new entries with the exact same scene tuple (13.0.5 runtime trace).\n/// The scene tuple cannot show a CSS visit (the melee byte keeps its previous value), but a new room's native body can.\npub struct WaitingSession<T> {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    choices: [WaitingChoice<T>; 2],\n    scene: Option<(bool, u8, u32)>,\n",
+          "new": "    choices: [WaitingChoice<T>; 2],\n    /// The native body each role's lobby started from.\n    origins: [Option<T>; 2],\n    /// The next observation is the role's first in a new waiting room of the same lobby.\n    returning: [bool; 2],\n    scene: Option<(bool, u8, u32)>,\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "impl<T: Copy> WaitingSession<T> {\n",
+          "new": "impl<T: Copy + PartialEq> WaitingSession<T> {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            choices: [WaitingChoice::empty(); 2],\n            scene: None,\n",
+          "new": "            choices: [WaitingChoice::empty(); 2],\n            origins: [None; 2],\n            returning: [false; 2],\n            scene: None,\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;\n        for choice in &mut self.choices {\n            if same_lobby {\n",
+          "new": "            .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;\n        for role in 0..self.choices.len() {\n            if same_lobby {\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "                choice.scene_changed();\n",
+          "new": "                self.choices[role].scene_changed();\n                self.returning[role] = self.origins[role].is_some();\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "            } else {\n                choice.clear();\n            }\n",
+          "new": "            } else {\n                self.choices[role].clear();\n                self.origins[role] = None;\n                self.returning[role] = false;\n            }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    /// Called for a newly observed, ready waiting body. Returns whether this is a\n    /// fresh entry lifetime without a match excursion, which forgets BOTH roles.\n",
+          "new": "    fn forget(&mut self) {\n        for choice in &mut self.choices {\n            choice.clear();\n        }\n        self.origins = [None; 2];\n        self.returning = [false; 2];\n        self.player_departed = false;\n    }\n\n    /// Returns whether this is a fresh lobby: a departed waiting entry or a returning\n    /// native body different from the lobby's origin, which only a new CSS pick makes.\n    /// Either case forgets BOTH roles.\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "        let fresh = self.player_departed;\n        if fresh {\n            for choice in &mut self.choices {\n                choice.clear();\n            }\n            self.player_departed = false;\n        }\n",
+          "new": "        let returned = core::mem::take(&mut self.returning[role]);\n        let fresh = self.player_departed || (returned && self.origins[role] != Some(fighter));\n        if fresh { self.forget(); }\n        if self.origins[role].is_none() { self.origins[role] = Some(fighter); }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "    pub fn arrived(&mut self, _: usize, _: impl FnOnce(&T) -> bool) -> bool { false }\n",
+          "new": "    /// Check a returning body before its exact value is known; a mismatch forgets both roles.\n    /// A match leaves the return pending for the later exact observation and never sets an origin.\n    pub fn arrived(&mut self, role: usize, same: impl FnOnce(&T) -> bool) -> bool {\n        if !self.returning[role] { return false; }\n        let Some(origin) = self.origins[role].as_ref() else { return false; };\n        if same(origin) { return false; }\n        self.forget();\n        true\n    }\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
         }
       ]
     },
@@ -12778,7 +12828,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "4cb64958be7009b62b0ccfe3d3d284ab28371736aca96bf5b2322dfd42cce130",
+      "dest_sha256": "b1d80c4ce08d607d866d25d8f4aad7c077f0aabe127a6bb2deede4cf4d899c28",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14426,6 +14476,16 @@
           "old": "    let owner = read::<u32>(entry, 0xe0);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "new": "    let owner = read::<u32>(entry, 0xe0);\n    crate::model::lra_reset::RESET_OWED.entry_destroyed(owner);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "reason": "Reset-owed latch records each native entry's destruction before any roster locking."
+        },
+        {
+          "old": "                    let fresh_lobby = current_scope.waiting()\n                        && !exact_origin_pending\n                        && WAITING_MEMORY\n                            .lock()\n                            .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));\n",
+          "new": "                    let fresh_lobby = current_scope.waiting() && {\n                        let mut memory = WAITING_MEMORY.lock();\n                        if exact_origin_pending {\n                            // A Mii's exact origin is captured later; a different fighter is already a new pick.\n                            memory.arrived(role as usize, |origin| origin.fighter == fighter)\n                        } else {\n                            memory.observe(role as usize, WaitingValue::ordinary(fighter,forms,None))\n                        }\n                    };\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "                        trace!(\"[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices\");\n",
+          "new": "                        trace!(\"[CharacterRoster] fresh waiting lobby; cleared both practice choices\");\n",
+          "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
         }
       ]
     },
