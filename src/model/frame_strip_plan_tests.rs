@@ -559,21 +559,42 @@ fn parrys_grade_words_are_shown_in_full() {
     assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), words);
 }
 
-/// One length for a HUD line: every text box of the strip and of the combo card holds what a plan's `Text` holds.
-/// The two-unit boxes are single glyphs.
+/// Capacity belongs to the line type. Only the lines whose real strings pass 24 units get the long box: the strip's
+/// three readout lines, and the card's reason, link titles and marks. Every other line keeps 24 units; the two-unit
+/// boxes are single glyphs.
 #[test]
-fn the_hud_text_boxes_are_as_long_as_the_plans_text() {
+fn only_the_long_line_types_get_long_boxes() {
     use crate::model::panes::{cb, iv, spec, Kind, IDX_CB, IDX_IV};
-    assert_eq!((usize::from(iv::TEXT_UNITS), usize::from(cb::TEXT_UNITS)), (TEXT_UNITS, TEXT_UNITS));
-    let lengths: Vec<u16> = (IDX_IV..IDX_IV + iv::COUNT)
-        .chain(IDX_CB..IDX_CB + cb::COUNT)
-        .filter_map(|index| match spec(index).kind {
-            Kind::Text { chars, .. } => Some(chars),
-            _ => None,
-        })
-        .collect();
-    assert!(lengths.iter().all(|&chars| usize::from(chars) == TEXT_UNITS || chars == 2), "{lengths:?}");
-    assert_eq!(lengths.iter().filter(|&&chars| chars != 2).count(), 68, "41 lines of the strip and 27 of the card");
+    let boxes = |from: usize, count: usize| -> Vec<(usize, u16)> {
+        (0..count)
+            .filter_map(|local| match spec(from + local).kind {
+                Kind::Text { chars, .. } => Some((local, chars)),
+                _ => None,
+            })
+            .collect()
+    };
+    let long = |boxes: &[(usize, u16)]| -> Vec<usize> {
+        boxes.iter().filter(|(_, chars)| *chars == 40).map(|(local, _)| *local).collect()
+    };
+    let (strip, card) = (boxes(IDX_IV, iv::COUNT), boxes(IDX_CB, cb::COUNT));
+    assert_eq!(long(&strip), (at::READ_SUB..at::LAST_TEXT).collect::<Vec<_>>(), "the strip's three readout lines");
+    let mut expected: Vec<usize> =
+        (cb::at::TITLE..cb::at::VERDICT).chain(cb::at::OFFSET..cb::at::RULER).chain([cb::at::REASON]).collect();
+    expected.sort_unstable();
+    assert_eq!(long(&card), expected, "the card's link titles, marks and reason");
+    let other: Vec<u16> = strip.iter().chain(&card).map(|(_, chars)| *chars).filter(|chars| *chars != 40).collect();
+    assert!(other.iter().all(|chars| matches!(chars, 2 | 24)), "{other:?}");
+    assert_eq!(other.iter().filter(|chars| **chars == 24).count(), 68 - 12, "every other line keeps 24 units");
+}
+
+/// A pane's cached look holds 24 units, as it did before any line was long: only the long lines add to a cache.
+#[test]
+fn the_pane_caches_do_not_pay_for_the_long_lines() {
+    use crate::model::combo_plan;
+    use core::mem::size_of;
+    let (strip, card) = (size_of::<Renderer>(), size_of::<combo_plan::Renderer>());
+    assert!(strip <= COUNT * 72 + 3 * 40, "the strip's cache is {strip} B for {COUNT} panes");
+    assert!(card <= combo_plan::COUNT * 72 + 9 * 40, "the card's cache is {card} B for {} panes", combo_plan::COUNT);
 }
 
 /// Lines whose place cannot grow keep 24 units: a name on the card, Parry's pills and the LAST row's moves.
