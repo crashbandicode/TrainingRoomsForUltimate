@@ -214,7 +214,7 @@ pub struct Rule {
     press: u32,
     origin: u32,
     /// Frames the stick spent in each bin during the special's own travel, and the newest sample of each bin.
-    held: [u8; 9],
+    held: [u16; 9],
     sticks: [(i8, i8); 9],
     #[cfg(test)]
     pub(crate) keep_nominal: bool,
