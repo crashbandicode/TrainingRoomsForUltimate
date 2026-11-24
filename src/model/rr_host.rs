@@ -36,7 +36,7 @@ use crate::model::store::{self, Record, Store};
 
 const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
-pub const CAPTURE_RUN: u32 = u32::MAX;
+pub use super::macro_ui::clip_marks::CAPTURE_RUN;
 
 static SLOT_SEQ: [AtomicU32; SLOTS] = [const { AtomicU32::new(0) }; SLOTS];
 static SLOT_TAPES: [crate::model::macro_handoff::PlayBuffers<InputFrame>; SLOTS] =
@@ -254,7 +254,7 @@ fn converted_input(mode: u8) -> Option<InputTake> {
 pub const DRILL_CAPACITY: &str = "Drill too long: keep it to 16 steps";
 // restriction: combo-capacity
 pub const COMBO_CAPACITY: &str = "Combo too long: keep it to 16 links";
-fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
+fn save_input(root: &Path, source: &str, activate: bool, spans: &[Span], tick: &mut Tick) {
     let mode = if activate { 2 } else { 1 };
     let take = converted_input(mode).expect("observed take").capture; INPUT_MODE.fetch_and(!mode, Ordering::AcqRel);
     if take.combo.overflow { tick.notices.push(DRILL_CAPACITY); return; }
@@ -262,7 +262,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let start = if activate { take_record_start() } else { None };
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
     // F10: a directly recorded drill owns the macro file holding its take.
-    let kept = if activate { keep_drill_take(root, start) } else { None };
+    let kept = if activate { keep_drill_take(root, start, spans) } else { None };
     let saved = match kept {
         Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, kept, unix_now()),
         None => save_made_combo(root, &take.combo, source, recorded_on, unix_now()),
@@ -281,7 +281,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
 
 /// The frames of a direct drill take as a macro (`save_drill_take`), with the start the Record chord posted. `None`
 /// when nothing could be kept: the drill is saved all the same, without a preview.
-fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
+fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span]) -> Option<String> {
     let (_, frames) = taken_frames();
     let state = start.map_or_else(StartState::default, |s| StartState {
         situation: s.poses[0].situation_kind,
@@ -289,7 +289,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now(), &[]).ok().flatten()
+    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now(), spans).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -609,6 +609,14 @@ pub fn watch_copy(out: &mut [Span; WATCH_SPANS]) -> (u32, usize) {
 
 pub fn watch_clear() {
     *ACTION_WATCH.lock() = Watch::new();
+}
+
+/// The spans the watch logged for the take that just closed, taken once. A preview's log is not a take's.
+fn take_capture_spans() -> ([Span; WATCH_SPANS], usize) {
+    let mut spans = [Span::default(); WATCH_SPANS];
+    let (run, count) = watch_copy(&mut spans);
+    watch_clear();
+    (spans, if run == CAPTURE_RUN { count } else { 0 })
 }
 
 /// FS-027 / FS-031: a Recording-page take is open, or its Record edge waits for the next service. The busy guards
@@ -1231,7 +1239,8 @@ pub fn service_at(
         show_chord_notice(root, &mut tick);
     }
     if edge == 2 && INPUT_MODE.load(Ordering::Acquire) & 2 != 0 {
-        save_input(root, "", true, &mut tick); let _ = taken_frames(); let _ = take_record_start();
+        let (spans, count) = take_capture_spans();
+        save_input(root, "", true, &spans[..count], &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
         let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
             "cpu"
@@ -1240,6 +1249,7 @@ pub fn service_at(
         };
         tick.diags
             .push(format!("screen=recording role={role_now} recording=0"));
+        let (spans, count) = take_capture_spans();
         let (role, frames) = taken_frames();
         let mut capture = Capture::idle();
         toggle_record(&mut capture, role);
@@ -1253,7 +1263,7 @@ pub fn service_at(
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire), &[])
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire), &spans[..count])
         {
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);
@@ -2391,7 +2401,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
         (strip.0, strip.1.take())
     };
     let Some(combo) = sample.filter(|combo| seen != job.since && !combo.is_empty()) else {
-        if !converted_input(1).unwrap().contact && !converted_input(1).unwrap().capture.combo.is_empty() { save_input(root, &job.source, false, tick); return; }
+        if !converted_input(1).unwrap().contact && !converted_input(1).unwrap().capture.combo.is_empty() { save_input(root, &job.source, false, &[], tick); return; }
         INPUT_MODE.fetch_and(!1, Ordering::AcqRel);
         tick.notices.push(EMPTY_COMBO);
         tick.diags.push("screen=notice kind=combo-empty".to_string());

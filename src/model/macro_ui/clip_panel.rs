@@ -479,6 +479,11 @@ impl ClipEditor {
             let mut kept = (**recording).clone();
             kept.name = name.to_owned();
             kept.frames = recording.frames[self.window.start() as usize..self.window.end() as usize].to_vec();
+            kept.actions = if self.marks.recorded() {
+                Marks::window(&recording.actions, self.window.start(), self.window.end())
+            } else {
+                Vec::new()
+            };
             return Ok(kept);
         }
         // P-TIMER: the inputs after a break (sudden death) never play from a state before it.

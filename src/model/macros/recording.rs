@@ -142,7 +142,7 @@ pub struct MacroRecording {
     pub mii: Option<crate::engine::mii::lifetime::Configuration>,
     pub placement: Placement,
     pub frames: Vec<InputFrame>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, deserialize_with = "lenient_actions", skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<ActionMark>,
     /// Save id this macro starts from. Absent means the file never had one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -278,6 +278,12 @@ impl MacroRecording {
             self.start_save_on = on;
         }
     }
+}
+
+/// The marks are optional detail: a key of the wrong shape reads as no marks, and the macro still loads.
+fn lenient_actions<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<ActionMark>, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).unwrap_or_default())
 }
 
 fn start_save_switch_on() -> bool {
