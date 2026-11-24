@@ -17,7 +17,7 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 
-use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
+use crate::model::combo::{Combo, Helper, HitCombo, Label, Mark, Out, Outcome, Settings};
 use crate::model::combo_plan::{self, Renderer, SeqView};
 use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Tracker, Verdict};
@@ -42,8 +42,8 @@ struct Sample {
     seen: u32,
     /// The strip's last combo for the recording host: none after a session clear.
     strip_valid: bool,
-    /// *Save last combo*'s: the helper's, which it keeps across a clear.
-    last: Option<Combo>,
+    /// *Save last combo*'s: the helper's, which it keeps across a clear. A hit capture has no travel table.
+    last: Option<HitCombo>,
 }
 // Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
 static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
@@ -132,7 +132,7 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         let stepped = stepped.map(|s| (s, plan.as_deref().map_or(0, |p| p.generation)));
         drop(plan);
         let stepped = stepped.map(|(s, generation)| note_step(s, generation));
-        let last = helper.last_combo();
+        let last = helper.last_hits().copied();
         SAMPLE.write(Sample {
             seen: helper.seen(),
             strip_valid: true,
@@ -196,7 +196,7 @@ pub fn session_clear() {
         SAMPLE.write(Sample {
             seen: helper.seen(),
             strip_valid: false,
-            last: helper.last_combo(),
+            last: helper.last_hits().copied(),
         });
         (out, stepped)
     };
@@ -487,13 +487,15 @@ pub fn p1_kind() -> Option<i32> {
 /// *Save last combo* (worker): the open exchange when it has a link, else the one before, as of the last frame. Read in place
 /// (`with_latest`): a whole `Sample` is two combos, and `tr-menu`'s deepest path cannot carry the copy (`final-surface-cov-4e336da4`).
 pub fn last_combo() -> Option<Combo> {
-    SAMPLE.with_latest(|sample, _| sample.last)
+    SAMPLE.with_latest(|sample, _| sample.last.as_ref().map(|hits| hits.resized()))
 }
 
 /// The last combo published by the strip and the count of links captured (worker; the recording host's tick, on `tr-menu`'s
 /// deepest path), read in place as `last_combo`.
 pub fn strip_sample() -> (u32, Option<Combo>) {
-    SAMPLE.with_latest(|sample, _| (sample.seen, sample.last.filter(|_| sample.strip_valid)))
+    SAMPLE.with_latest(|sample, _| {
+        (sample.seen, sample.last.as_ref().filter(|_| sample.strip_valid).map(|hits| hits.resized()))
+    })
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).

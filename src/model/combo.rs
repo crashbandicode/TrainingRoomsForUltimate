@@ -333,41 +333,89 @@ impl LinkRec {
     }
 }
 
-/// The links of one exchange, in order.
+/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 24 bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Detail {
-    link: u8,
-    event: u8,
-    travel: Travel,
+    /// The link in the high four bits and the event in the low four; `FREE` while unused.
+    at: u8,
+    /// The deciding stick's deflection in percent; `NO_STICK` when none was kept.
+    deflection: u8,
+    angle: u16,
+    heading: u16,
+    distance: u16,
+    path: [(i8, i8); 8],
 }
 
+impl Detail {
+    const FREE: u8 = 0xFF;
+    const NO_STICK: u8 = 0xFF;
+    const EMPTY: Detail =
+        Detail { at: Self::FREE, deflection: Self::NO_STICK, angle: 0, heading: 0, distance: 0, path: [(0, 0); 8] };
+
+    /// The key of an event; `link` is below `LINKS` and `event` below `STEPS`.
+    const fn at(link: usize, event: usize) -> u8 {
+        ((link << 4) | event) as u8
+    }
+
+    fn of(at: u8, travel: Travel) -> Detail {
+        let (angle, deflection) = travel.stick.unwrap_or((0, Self::NO_STICK));
+        Detail { at, deflection, angle, heading: travel.heading, distance: travel.distance, path: travel.path }
+    }
+
+    fn travel(&self) -> Travel {
+        Travel {
+            stick: (self.deflection != Self::NO_STICK).then_some((self.angle, self.deflection)),
+            heading: self.heading,
+            distance: self.distance,
+            path: self.path,
+        }
+    }
+}
+
+/// The links of one exchange, in order, with room for `D` travel details. A drill, its attempt and a saved combo
+/// are a [`Combo`]; the hit capture's exchanges are a [`HitCombo`], which has no table: a link is taken at its hit,
+/// before a travel part ends.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Combo {
+pub struct ComboOf<const D: usize> {
     pub input_only: bool,
     pub overflow: bool,
     links: [Option<LinkRec>; LINKS],
     len: usize,
-    details: [Option<Detail>; DETAILS],
+    /// Sorted by event, the free entries last.
+    details: [Detail; D],
 }
 
-impl Default for Combo {
+pub type Combo = ComboOf<DETAILS>;
+pub type HitCombo = ComboOf<0>;
+
+impl<const D: usize> Default for ComboOf<D> {
     fn default() -> Self {
         Self::EMPTY
     }
 }
 
-impl Combo {
-    pub const EMPTY: Combo = Combo {
+impl<const D: usize> ComboOf<D> {
+    pub const EMPTY: Self = Self {
         input_only: false,
         overflow: false,
         links: [None; LINKS],
         len: 0,
-        details: [None; DETAILS],
+        details: [Detail::EMPTY; D],
     };
 
+    /// The same links with room for `E` travel details; a detail past `E` is dropped.
+    pub fn resized<const E: usize>(&self) -> ComboOf<E> {
+        let mut out = ComboOf::<E> { input_only: self.input_only, overflow: self.overflow, links: self.links,
+            len: self.len, details: [Detail::EMPTY; E] };
+        for (slot, detail) in out.details.iter_mut().zip(self.details) {
+            *slot = detail;
+        }
+        out
+    }
+
     /// A combo of 1 to `LINKS` links.
-    pub fn from_links(links: impl IntoIterator<Item = LinkRec>) -> Option<Combo> {
-        let mut combo = Combo::EMPTY;
+    pub fn from_links(links: impl IntoIterator<Item = LinkRec>) -> Option<Self> {
+        let mut combo = Self::EMPTY;
         for link in links {
             if !combo.push(link) {
                 return None;
@@ -408,9 +456,11 @@ impl Combo {
     }
 
     pub fn travel(&self, link: usize, event: usize) -> Option<Travel> {
-        self.details.iter().flatten()
-            .find(|detail| usize::from(detail.link) == link && usize::from(detail.event) == event)
-            .map(|detail| detail.travel)
+        if link >= LINKS || event >= STEPS {
+            return None;
+        }
+        let at = Detail::at(link, event);
+        self.details.iter().find(|detail| detail.at == at).map(Detail::travel)
     }
 
     pub fn travels(&self, link: usize) -> [Option<Travel>; STEPS] {
@@ -421,22 +471,17 @@ impl Combo {
         if link >= self.len || event >= STEPS || self.links[link].is_none_or(|l| l.events[event].is_none()) {
             return false;
         }
-        let existing = self.details.iter().position(|entry| {
-            entry.is_some_and(|detail| usize::from(detail.link) == link && usize::from(detail.event) == event)
-        });
-        let detail = Detail { link: link as u8, event: event as u8, travel };
-        if let Some(slot) = existing {
-            self.details[slot] = Some(detail);
+        let detail = Detail::of(Detail::at(link, event), travel);
+        if let Some(slot) = self.details.iter().position(|entry| entry.at == detail.at) {
+            self.details[slot] = detail;
             return true;
         }
-        let Some(mut slot) = self.details.iter().position(Option::is_none) else { return false };
-        while slot > 0 && self.details[slot - 1].is_some_and(|previous| {
-            (previous.link, previous.event) > (detail.link, detail.event)
-        }) {
+        let Some(mut slot) = self.details.iter().position(|entry| entry.at == Detail::FREE) else { return false };
+        while slot > 0 && self.details[slot - 1].at > detail.at {
             self.details[slot] = self.details[slot - 1];
             slot -= 1;
         }
-        self.details[slot] = Some(detail);
+        self.details[slot] = detail;
         true
     }
 
@@ -477,12 +522,12 @@ impl Combo {
                 for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
                     *slot = Some(event);
                 }
-                for detail in self.details.iter_mut().flatten() {
-                    if usize::from(detail.link) == k {
-                        detail.link -= 1;
-                        detail.event += count as u8;
-                    } else if usize::from(detail.link) > k {
-                        detail.link -= 1;
+                for detail in self.details.iter_mut().filter(|detail| detail.at != Detail::FREE) {
+                    let (link, event) = (usize::from(detail.at >> 4), usize::from(detail.at & 0xF));
+                    if link == k {
+                        detail.at = Detail::at(k - 1, event + count);
+                    } else if link > k {
+                        detail.at -= 0x10;
                     }
                 }
                 self.links.copy_within(k + 1..self.len, k);
@@ -855,8 +900,8 @@ struct Capture {
     /// The tracker's exchange count, and the frame after which the next link's presses count.
     exchange: u32,
     after: u32,
-    current: Combo,
-    previous: Combo,
+    current: HitCombo,
+    previous: HitCombo,
     last_link: Option<u32>,
     held: Option<Link>,
     graded: Option<u32>,
@@ -885,8 +930,8 @@ impl Helper {
             capture: Capture {
                 exchange: 0,
                 after: 0,
-                current: Combo::EMPTY,
-                previous: Combo::EMPTY,
+                current: HitCombo::EMPTY,
+                previous: HitCombo::EMPTY,
                 last_link: None,
                 held: None,
                 graded: None,
@@ -937,10 +982,11 @@ impl Helper {
 
     /// *Save last combo*: the open exchange when it has a link, else the one before.
     pub fn last_combo(&self) -> Option<Combo> {
-        self.last_combo_ref().copied()
+        self.last_hits().map(|hits| hits.resized())
     }
 
-    pub fn last_combo_ref(&self) -> Option<&Combo> {
+    /// The same exchange as the capture holds it, without a travel table.
+    pub fn last_hits(&self) -> Option<&HitCombo> {
         [&self.capture.current, &self.capture.previous].into_iter().find(|c| !c.is_empty())
     }
 
@@ -998,7 +1044,7 @@ impl Helper {
             if !self.capture.current.is_empty() {
                 self.capture.previous = self.capture.current;
             }
-            self.capture.current = Combo::EMPTY;
+            self.capture.current = HitCombo::EMPTY;
             self.capture.exchange = exchange;
             self.capture.after = first_hit;
             self.capture.graded = None;

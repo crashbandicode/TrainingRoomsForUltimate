@@ -20,7 +20,7 @@ use super::rr_runtime::{
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::action::Late;
-use crate::model::combo::{Combo, InputCapture};
+use crate::model::combo::{Combo, HitCombo, InputCapture};
 use crate::model::frame_strip::Snap;
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
@@ -403,7 +403,7 @@ static PREVIEW: AtomicU8 = AtomicU8::new(0);
 static PREVIEW_ASK: Mutex<Option<PreviewAsk>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
-static STRIP: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
+static STRIP: Mutex<(u32, Option<HitCombo>)> = Mutex::new((0, None));
 static MAKE: Mutex<Option<MakeJob>> = Mutex::new(None);
 static HELD: Mutex<Option<Role>> = Mutex::new(None);
 static ANSWER: Mutex<Option<MismatchChoice>> = Mutex::new(None);
@@ -1321,7 +1321,7 @@ pub fn set_record_trim(on: bool) {
 }
 
 pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
-    *lock(&STRIP) = (seen, combo);
+    *lock(&STRIP) = (seen, combo.map(|combo| combo.resized()));
 }
 
 pub fn set_fighter_label(label: &str) {
@@ -2155,6 +2155,7 @@ fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
         return;
     };
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
+    let combo: Combo = combo.resized();
     let label = lock(&PLAYER_LABEL).clone();
     let recorded_on = (!label.is_empty()).then_some(label);
     if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
@@ -2371,6 +2372,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     };
     INPUT_MODE.fetch_and(!1, Ordering::AcqRel);
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
+    let combo: Combo = combo.resized();
     if save_made_combo(root, &combo, &job.source, None, unix_now()).is_ok() {
         tick.diags.push(format!("screen=make-combo source={} saved=1", job.source));
     }

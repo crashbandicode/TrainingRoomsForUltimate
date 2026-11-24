@@ -87,7 +87,7 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
             BAD
         }
         Mark::Deflection(delta) => {
-            let _ = write!(t, "{} stick {}% {}", name.split_whitespace().next().unwrap_or(name),
+            let _ = write!(t, "{} deflection {}% {}", name.split_whitespace().next().unwrap_or(name),
                 delta.unsigned_abs(), if delta < 0 { "low" } else { "high" });
             BAD
         }
@@ -183,7 +183,7 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
         Reason::AimPath(part) => write!(t, "{unit}{n} {} path off", if part == 1 { "1st" } else { "2nd" }),
         Reason::AimAngle(part, delta) => write!(t, "{unit}{n} {} angle {} off",
             if part == 1 { "1st" } else { "2nd" }, delta.unsigned_abs()),
-        Reason::AimDeflection(part, delta) => write!(t, "{unit}{n} {} stick {}% {}",
+        Reason::AimDeflection(part, delta) => write!(t, "{unit}{n} {} deflection {}% {}",
             if part == 1 { "1st" } else { "2nd" }, delta.unsigned_abs(), if delta < 0 { "low" } else { "high" }),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
         Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
