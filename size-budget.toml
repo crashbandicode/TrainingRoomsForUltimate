@@ -2809,11 +2809,3 @@ ceiling = 199824
 date = "2026-11-24"
 reason = "Move names joined with the ACTION model on the install 4 head b5177cdb (merge 5 and 3C): measured 199824 (tools/sloc.py tree). The join was 199284 on merge 5 and 3C adds 539 to merge 5 (198722 less 198183); the fold is 1 line over their sum, where 3C's link line takes the Namer argument."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value), on the approvals cited by the entries above; the 1 line from the resolution is posted with the pin for its ruling."
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
-ceiling = 199828
-date = "2026-11-24"
-reason = "The menu worker's stack on the move-name join folded with 3C: a record is parsed in its own frame and kept on the heap while the store adopts and validates it. Measured 199828 (tools/sloc.py tree), 4 above the fold's 199824."
-approved_by = "tr-primary-2 2026-11-24 21:46:20Z (standing for install 4: a reviewer's or lead's fix may raise its branch's ceiling to the measured value, up to +60)."

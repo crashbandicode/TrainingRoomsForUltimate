@@ -101,7 +101,12 @@ pub const THREADS: [ThreadStack; 19] = [
     // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
     // rc.7 svc clobbers (2026-11-11): with hos-lock's arbiter calls declaring clobber_abi("C"), values no longer ride in
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_608, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Install 4, the move names folded with the travel parts (2026-11-24): the static path, a combo save listing the
+    // combo folder (`store::decode::<ComboRecord>` under `save_combo`), is 57,728 B (release) and 57,744 B (diag) on
+    // gate 81324d41; it was 55,376 B with the travel parts alone and 56,464 B with the move names alone. Two cuts were
+    // measured and both were deeper (58,688 and 58,736 B, probes 1fa8e40c and 48f7b8ef), so the bound is recorded. The
+    // 88 KiB stack still covers it with the margin and the SDK reserve; 58,982 B is the most it can.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 57_744, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

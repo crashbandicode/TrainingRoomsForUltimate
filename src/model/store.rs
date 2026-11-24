@@ -568,19 +568,12 @@ fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, StoreError> {
     Ok(fs::read(path)?)
 }
 
-/// The parse in its own frame, with the record on the heap: a record is a few KiB, and `decode`'s frame sits under the
-/// whole JSON parse on the menu worker's stack (`tools/stack_depth.py table`, `tr-menu`).
-#[inline(never)]
-fn parse<R: Record>(data: &[u8]) -> Result<Box<R>, serde_json::Error> {
-    serde_json::from_slice::<R>(data).map(Box::new)
-}
-
 fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
-    match parse::<R>(data) {
+    match serde_json::from_slice::<R>(data) {
         Ok(mut rec) => {
             rec.adopt(id);
             rec.validate()?;
-            Ok(*rec)
+            Ok(rec)
         }
         Err(err) => {
             // A newer schema may not fit this layout; call that a version
