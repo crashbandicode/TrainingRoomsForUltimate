@@ -320,6 +320,23 @@ mod tests {
         assert_eq!(session.restore_target(0), Some(20));
     }
 
+    /// Parity: Training is outside every waiting lobby, so its scene ends what the memory holds and starts no restore.
+    fn a_training_scene_keeps_nothing_of_the_waiting_memory() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.commit(1, 6);
+        assert!(!session.scene_changed(true, 0x20, 0x04040000));
+        assert!(!session.restoration_pending([true, true]));
+        assert!(!session.arrived(0, |origin| *origin == 30));
+        assert!(!session.scene_changed(true, 0x0d, 0x07010101));
+        assert!(!session.observe(0, 30));
+        assert!(!session.observe(1, 30));
+        assert!(!session.restoration_pending([true, true]));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -332,6 +349,7 @@ mod tests {
             ("a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry", a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry as fn()),
             ("a_body_not_yet_known_exactly_decides_on_its_fighter", a_body_not_yet_known_exactly_decides_on_its_fighter as fn()),
             ("a_change_of_body_inside_one_waiting_room_is_not_a_new_pick", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),
+            ("a_training_scene_keeps_nothing_of_the_waiting_memory", a_training_scene_keeps_nothing_of_the_waiting_memory as fn()),
         ]);
     }
     }

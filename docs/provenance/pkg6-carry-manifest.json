@@ -9610,7 +9610,7 @@
       "dest": "src/model/swap/character_memory.rs",
       "crate": "root",
       "src_sha256": "513ed484fc3ab77d9d39567ced7626950b7c63ecc54acdd6f99e08db293c3cc8",
-      "dest_sha256": "e8df83dfa91ae508a06c2774a6997163128936c5e63aca58a601a8d8c391b927",
+      "dest_sha256": "3d4d6027e55671810eb9bce79f8c4bda834c3e5efd9f7951ddd0fb700850b24a",
       "edits": [
         {
           "table_tests": true,
@@ -9709,6 +9709,16 @@
           "old": "    pub fn arrived(&mut self, _: usize, _: impl FnOnce(&T) -> bool) -> bool { false }\n",
           "new": "    /// Check a returning body before its exact value is known; a mismatch forgets both roles.\n    /// A match leaves the return pending for the later exact observation and never sets an origin.\n    pub fn arrived(&mut self, role: usize, same: impl FnOnce(&T) -> bool) -> bool {\n        if !self.returning[role] { return false; }\n        let Some(origin) = self.origins[role].as_ref() else { return false; };\n        if same(origin) { return false; }\n        self.forget();\n        true\n    }\n",
           "reason": "Quickplay new pick (install 4, tr-primary-2 2026-11-24 19:36:34Z): the waiting memory keeps the native body each role's lobby started from; a different first body in a returning waiting room is a new pick at the character select and forgets both roles."
+        },
+        {
+          "old": "\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "new": "\n    /// Parity: Training is outside every waiting lobby, so its scene ends what the memory holds and starts no restore.\n    fn a_training_scene_keeps_nothing_of_the_waiting_memory() {\n        let mut session = WaitingSession::empty();\n        qp_waiting(&mut session);\n        assert!(!session.observe(0, 10));\n        assert!(!session.observe(1, 10));\n        session.commit(0, 20);\n        session.commit(1, 6);\n        assert!(!session.scene_changed(true, 0x20, 0x04040000));\n        assert!(!session.restoration_pending([true, true]));\n        assert!(!session.arrived(0, |origin| *origin == 30));\n        assert!(!session.scene_changed(true, 0x0d, 0x07010101));\n        assert!(!session.observe(0, 30));\n        assert!(!session.observe(1, 30));\n        assert!(!session.restoration_pending([true, true]));\n    }\n\n    /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.\n",
+          "reason": "Quickplay new pick (install 4): the parity case for Training, which is outside every waiting lobby."
+        },
+        {
+          "old": "            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n        ]);\n",
+          "new": "            (\"a_change_of_body_inside_one_waiting_room_is_not_a_new_pick\", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),\n            (\"a_training_scene_keeps_nothing_of_the_waiting_memory\", a_training_scene_keeps_nothing_of_the_waiting_memory as fn()),\n        ]);\n",
+          "reason": "Quickplay new pick (install 4): the parity case for Training, which is outside every waiting lobby."
         }
       ]
     },
