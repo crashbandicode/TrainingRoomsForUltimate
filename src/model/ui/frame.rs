@@ -482,6 +482,9 @@ impl Frame {
     pub fn dialog_box(&self) -> Option<([f32; 4], [f32; 2], f32)> {
         use super::notice_box::measure;
         use super::panes as p;
+        if self.view == View::Clip {
+            return Some((p::CLIP_STRIP, p::CLIP_HELP_Y, p::CLIP_HINT_Y));
+        }
         const LEFT: f32 = -880.0;
         const PAD: f32 = 24.0;
         (self.dialog || self.popup || self.view == View::Delay).then_some(())?;

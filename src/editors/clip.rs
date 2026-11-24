@@ -6,7 +6,7 @@
 use core::fmt::Write;
 
 use crate::engine::macro_ui::clip_panel::{clip_help, ClipContext, ClipView, Handle};
-use crate::model::frame::{ClipBar, Frame, Tone, View, TITLE};
+use crate::model::frame::{ClipBar, Frame, Tone, View};
 use crate::model::screens::push;
 
 /// Frames per second of the game: the length of a window in seconds.
@@ -29,8 +29,6 @@ fn handle_code(handle: Handle) -> u8 {
 /// (`replay_capture::scrub_pace`).
 pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) {
     frame.reset();
-    let _ = frame.title.write_str(TITLE);
-    let _ = write!(frame.crumb, "{}  >  {}", if matches!(view.context, ClipContext::Replay { .. }) { "Replay window" } else { "Crop" }, view.source_name);
     frame.view = View::Clip;
     frame.clip = ClipBar {
         total: view.total,
@@ -39,36 +37,34 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
         cursor: view.cursor,
         handle: handle_code(view.handle),
         playing: view.playing,
-        marks: [(0, 0); crate::engine::macro_ui::clip_marks::SHOWN_MARKS],
-        mark_count: 0,
+        marks: view.marks,
+        mark_count: view.mark_count,
     };
     let length = view.end.saturating_sub(view.start);
-    if view.context.preview() { push(frame, "Fighter", fighter, Tone::Normal); }
     let mut window = String::new();
     if let ClipContext::Combo { unit } = view.context {
         let _ = write!(window, "{} - {}  ({length} {} of {})", view.start + 1, view.end, if length == 1 { unit.singular() } else { unit.plural() }, view.total);
     } else {
         let _ = write!(window, "{} - {}  ({length} frames, {:.2}s of {})", view.start, view.end, length as f32 / FPS, view.total);
     }
-    push(frame, "Crop window", &window, Tone::Normal);
-    let mut head = String::new();
-    let _ = write!(head, "{}", view.cursor);
-    push(frame, "Playhead", &head, Tone::Normal);
-    if view.truncated {
-        push(frame, "This capture is partial", "", Tone::Dim);
-    }
-    if view.quantized {
-        push(frame, "Frames were quantized by the capture", "", Tone::Dim);
-    }
-    if view.previous_available {
-        push(frame, "Capture", if view.previous_selected { "previous" } else { "latest" }, Tone::Dim);
-    }
+    let title = format!("{}: {}", if matches!(view.context, ClipContext::Replay { .. }) { "Replay window" } else { "Crop" }, view.source_name);
+    push(frame, &title, &window, Tone::Normal);
+    let target = match view.context {
+        ClipContext::Macro { player: true } => "Plays on Player 1".into(),
+        ClipContext::Macro { player: false } => "Plays on CPU".into(),
+        ClipContext::Replay { .. } => format!("Fighter: {fighter}{}{}{}",
+            if view.previous_selected { " (previous capture)" } else { "" },
+            if view.truncated { " (partial)" } else { "" },
+            if view.quantized { " (quantized)" } else { "" }),
+        ClipContext::Combo { .. } => String::new(),
+    };
+    push(frame, &target, &view.move_text, Tone::Normal);
     let help = clip_help(view, COARSE, CHORD, pace);
-    if !help.notice.is_empty() {
-        push(frame, &help.notice, "", Tone::Dim);
-    }
     let _ = frame.help[0].write_str(&help.primary);
     let _ = frame.help[1].write_str(&help.follow);
+    if pace <= 1 && view.error.is_none() && !help.notice.is_empty() {
+        let _ = write!(frame.help[1], " {}", help.notice);
+    }
     let _ = frame.hint.write_str(&help.controls);
 }
 
