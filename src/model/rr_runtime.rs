@@ -390,7 +390,8 @@ fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<Stri
     let entries = library.list().map_err(|err| { cleanup(); record(err) })?.entries;
     let prefix = if combo.input_only { "Drill" } else { "Combo" };
     let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
-    let mut made = ComboRecord::new(name, *combo, recorded_on).with_fighter(fighter);
+    let mut made = ComboRecord::new(name, *combo, recorded_on);
+    made.fighter = fighter;
     if !source.is_empty() { made = made.with_made_from(source); }
     if let Some(take) = take.as_deref() { made = made.with_take(take); }
     let id = library.save_new(&made).map_err(|err| { cleanup(); record(err) })?;
@@ -436,7 +437,9 @@ pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Opti
         Some(name) => name,
         None => default_name(&library.list().map_err(record)?.entries),
     };
-    let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on).with_fighter(fighter)).map_err(record)?;
+    let mut made = ComboRecord::new(name, *combo, recorded_on);
+    made.fighter = fighter;
+    let id = library.save_new(&made).map_err(record)?;
     RecordingIndex::update(root, |index| {
         index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
         index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
