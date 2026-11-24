@@ -106,7 +106,9 @@ pub const THREADS: [ThreadStack; 19] = [
     // gate 81324d41; it was 55,376 B with the travel parts alone and 56,464 B with the move names alone. Two cuts were
     // measured and both were deeper (58,688 and 58,736 B, probes 1fa8e40c and 48f7b8ef), so the bound is recorded. The
     // 88 KiB stack still covers it with the margin and the SDK reserve; 58,982 B is the most it can.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 57_744, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Vault Recordings diag 7cc632e3: save_input -> save_combo -> Store<ComboRecord>::list reaches 59,040 B;
+    // 92 KiB retains the same margin and SDK reserve. The measured high-water remains the earlier Eden observation.
+    row(ThreadId::Menu, c"tr-menu", 92 * KIB, 59_040, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
