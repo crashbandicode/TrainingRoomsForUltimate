@@ -45,6 +45,8 @@ pub enum HitstunTiming {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecorderSettings {
     pub crop: bool,
+    pub trim: super::trim::Trim,
+    pub indicator: bool,
     pub place: bool,
     pub hitstun: HitstunTiming,
     pub mash_interrupt: bool,
@@ -54,6 +56,8 @@ impl RecorderSettings {
     pub const fn factory() -> Self {
         Self {
             crop: true,
+            trim: super::trim::Trim::End,
+            indicator: false,
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
             mash_interrupt: true,
@@ -66,6 +70,8 @@ impl RecorderSettings {
         let on = |id: &str| row(id).first().is_some_and(|v| *v != 0);
         Self {
             crop: on("recording_crop"),
+            trim: super::trim::Trim::from(on("recording_crop")),
+            indicator: false,
             place: on("recording_place"),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,

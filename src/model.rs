@@ -107,6 +107,8 @@ pub mod migration_run;
 pub mod notify;
 #[path = "model/recording.rs"]
 pub mod recording;
+#[path = "model/trim.rs"]
+pub mod trim;
 #[path = "model/record_place.rs"]
 pub mod record_place;
 #[path = "model/numbered_picker.rs"]

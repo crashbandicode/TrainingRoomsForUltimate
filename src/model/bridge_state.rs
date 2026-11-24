@@ -341,6 +341,14 @@ pub fn recording_indicator(stamp: u64, now_ms: u64, fresh_ms: u64) -> &'static s
     }
 }
 
+pub fn playback_indicator_stamp(now_ms: u64, _drawn: [bool; 2]) -> u64 {
+    now_ms << 2
+}
+
+pub fn playback_indicator(_stamp: u64, _now_ms: u64, _fresh_ms: u64) -> &'static str {
+    ""
+}
+
 /// A HUD pass and its direction marks, oldest first.
 pub fn aims_stamp(now_ms: u64, drawn: [Option<u8>; 2]) -> u64 {
     let nibble = |dir: Option<u8>| u64::from(dir.filter(|dir| *dir < 8).map_or(0, |dir| dir + 1));

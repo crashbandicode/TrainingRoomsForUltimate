@@ -98,6 +98,7 @@ pub struct ComboRecord {
     pub made_from: Option<String>,
     /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
     pub take: Option<String>,
+    pub trim: super::trim::Trim,
     /// The JSON object the record was read from. Writing it back (a rename) changes only `name` (and adds
     /// `schema_version` when the file had none), so fields someone added by hand stay.
     source: Option<Map<String, Value>>,
@@ -206,6 +207,7 @@ impl ComboRecord {
             recorded_on,
             made_from: None,
             take: None,
+            trim: super::trim::Trim::Off,
             source: None,
         }
     }
@@ -323,6 +325,7 @@ impl ComboRecord {
         let recorded_on = shown("recorded_on");
         let made_from = shown("made_from");
         let take = object.get("take").and_then(Value::as_str).filter(|id| shareable_id(id)).map(str::to_owned);
+        let trim = object.get("trim").and_then(|value| serde_json::from_value(value.clone()).ok()).unwrap_or_default();
         let version = object.get("schema_version").and_then(Value::as_u64).unwrap_or(1);
         let input = matches!(version, 2 | 4);
         let aims = matches!(version, 3 | 4);
@@ -366,6 +369,7 @@ impl ComboRecord {
             recorded_on,
             made_from,
             take,
+            trim,
             source: Some(object.clone()),
         })
     }

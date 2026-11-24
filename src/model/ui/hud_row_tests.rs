@@ -10,7 +10,7 @@ fn a_take_shows_rec_in_the_roles_colour() {
         (Take::Player, "REC P1", [255, 83, 92, 255]),
         (Take::Cpu, "REC CPU", [75, 164, 255, 255]),
     ] {
-        let row = hud_row(Some(role), "").unwrap();
+        let row = hud_row(Some(role), [false; 2], "").unwrap();
         assert_eq!(row.text.as_str(), text);
         assert_eq!((row.color, row.chip, row.take, row.line), (color, color, Some(role), false));
     }
@@ -18,7 +18,7 @@ fn a_take_shows_rec_in_the_roles_colour() {
 
 #[test]
 fn no_take_and_no_line_hides_the_row() {
-    assert!(hud_row(None, "").is_none());
+    assert!(hud_row(None, [false; 2], "").is_none());
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn the_targets_line_alone_is_drawn_as_before() {
     for line in ["10/10 0:07.12", "3/10   A place  B undo  X start"] {
         for strip in [false, true] {
             for bar in [false, true] {
-                let row = hud_row(None, line).unwrap();
+                let row = hud_row(None, [false; 2], line).unwrap();
                 assert_eq!(row.text.as_str(), line);
                 assert_eq!((row.color, row.chip, row.take, row.line), ([236, 238, 242, 255], [255; 4], None, true));
                 assert_eq!(hud_row_box(&row, strip, bar), p::btt_hud_box(line, strip, bar));
@@ -37,12 +37,12 @@ fn the_targets_line_alone_is_drawn_as_before() {
 
 #[test]
 fn a_take_during_the_targets_run_shares_the_line() {
-    let row = hud_row(Some(Take::Player), "10/10 0:07.12").unwrap();
+    let row = hud_row(Some(Take::Player), [false; 2], "10/10 0:07.12").unwrap();
     assert_eq!(row.text.as_str(), "REC P1 · 10/10 0:07.12");
     assert_eq!((row.color, row.chip, row.take, row.line), ([255, 83, 92, 255], [255, 83, 92, 255], Some(Take::Player), true));
     assert_eq!(hud_row_box(&row, true, true), p::btt_hud_box("REC P1 · 10/10 0:07.12", true, true));
     for line in ["x".repeat(96), "🟦".repeat(96)] {
-        let row = hud_row(Some(Take::Cpu), &line).unwrap();
+        let row = hud_row(Some(Take::Cpu), [false; 2], &line).unwrap();
         assert!(row.text.as_str().starts_with("REC CPU · "));
         assert_eq!(row.text.as_str().chars().count(), TEXT_UNITS);
         assert!(row.line);
@@ -52,7 +52,7 @@ fn a_take_during_the_targets_run_shares_the_line() {
 #[test]
 fn the_rec_row_is_short_and_holds_its_text() {
     for role in [Take::Player, Take::Cpu] {
-        let row = hud_row(Some(role), "").unwrap();
+        let row = hud_row(Some(role), [false; 2], "").unwrap();
         for strip in [false, true] {
             for bar in [false, true] {
                 let rect = hud_row_box(&row, strip, bar);
@@ -67,7 +67,7 @@ fn the_rec_row_is_short_and_holds_its_text() {
 
 #[test]
 fn a_notice_stacks_under_the_rec_row() {
-    let rec = hud_row_box(&hud_row(Some(Take::Player), "").unwrap(), false, false);
+    let rec = hud_row_box(&hud_row(Some(Take::Player), [false; 2], "").unwrap(), false, false);
     let old = p::btt_hud_box("10/10 0:07.12", false, false);
     let shift = notice_box::stack(59.0, Some(rec));
     assert_eq!(shift, notice_box::stack(59.0, Some(old)));
@@ -90,7 +90,7 @@ fn the_rec_row_keeps_clear_of_the_lobbys_panels() {
         for role in [Take::Player, Take::Cpu] {
             for strip in [false, true] {
                 for bar in [false, true] {
-                    let [x, y, w, h] = hud_row_box(&hud_row(Some(role), "").unwrap(), strip, bar);
+                    let [x, y, w, h] = hud_row_box(&hud_row(Some(role), [false; 2], "").unwrap(), strip, bar);
                     let chip = [x, y - h / 2.0 - drop, x + w, y + h / 2.0 - drop];
                     let c = p::strip_layout::C;
                     let [sx, sy, sw, sh] = c.strip.bounds(true, bar);

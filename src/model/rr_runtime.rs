@@ -186,10 +186,10 @@ pub fn finish_recording(
     cpu: SavedState,
     speed: (f32, f32),
     at: u64,
-    trim: bool,
+    trim: impl Into<crate::model::trim::Trim>,
 ) -> Result<RecordStop, Error> {
     let mut frames = capture.frames.clone();
-    if trim {
+    if trim.into() == crate::model::trim::Trim::End {
         super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
     }
     if frames.is_empty() {
@@ -236,8 +236,8 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
 /// `None` when no frame is left.
-pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64) -> Result<Option<String>, Error> {
-    if trim {
+pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: impl Into<crate::model::trim::Trim>, at: u64) -> Result<Option<String>, Error> {
+    if trim.into() == crate::model::trim::Trim::End {
         super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
     }
     if frames.is_empty() {

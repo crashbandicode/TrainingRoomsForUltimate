@@ -62,12 +62,13 @@ pub struct HudRow {
     pub chip: [u8; 4],
     /// The take shown, if any.
     pub take: Option<Take>,
+    pub playing: [bool; 2],
     /// Break the Targets' line is part of the text.
     pub line: bool,
 }
 
 /// `take` is the open take; `line` is Break the Targets' HUD line ("" for none). `None` hides the row.
-pub fn hud_row(take: Option<Take>, line: &str) -> Option<HudRow> {
+pub fn hud_row(take: Option<Take>, _playing: [bool; 2], line: &str) -> Option<HudRow> {
     if take.is_none() && line.is_empty() {
         return None;
     }
@@ -85,7 +86,7 @@ pub fn hud_row(take: Option<Take>, line: &str) -> Option<HudRow> {
         }
     }
     let color = take.map_or(panes::TEXT, Take::color);
-    Some(HudRow { text, color, chip: take.map_or([255; 4], Take::color), take, line: !line.is_empty() })
+    Some(HudRow { text, color, chip: take.map_or([255; 4], Take::color), take, playing: [false; 2], line: !line.is_empty() })
 }
 
 /// `[left, centre y, w, h]`: the indicator alone is `REC_W` wide at the row's corner; anything with the line is

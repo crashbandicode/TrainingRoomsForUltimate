@@ -157,6 +157,7 @@ pub enum Effect {
     SaveLastCombo { name: String },
     /// Start save flipped on a macro's or a chain's screen. The host writes the switch into the file (Play reads it there).
     SetStartSave { id: String, chain: bool, on: bool },
+    SetTrim { id: String, kind: FileKind, trim: super::trim::Trim },
 }
 
 /// The file kinds Delete removes through [`Effect::DeleteFile`]. A save state has its own effect.
@@ -422,6 +423,7 @@ enum Act {
     StartSave,
     SetActive,
     PlaybackSlot,
+    Trim,
     Bind,
     Duplicate,
     Rename,
@@ -1415,6 +1417,7 @@ impl RecordingScreens {
                 self.set_start(kind, &id, on);
             }
             Act::PlaybackSlot => self.step_slot(&id, true),
+            Act::Trim => {}
             Act::Duplicate => {
                 self.duplicate_save(&id);
                 if kind == ItemKind::Save {

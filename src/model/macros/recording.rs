@@ -34,6 +34,21 @@ pub struct InputFrame {
     pub rstick_y: i8,
 }
 
+impl crate::model::trim::Trim {
+    pub fn window(self, frames: &[InputFrame]) -> core::ops::Range<usize> {
+        let mut kept = frames.to_vec();
+        if self == Self::End {
+            crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut kept);
+        }
+        0..kept.len()
+    }
+
+    pub fn apply(self, frames: &mut Vec<InputFrame>) {
+        let range = self.window(frames);
+        *frames = frames[range].to_vec();
+    }
+}
+
 /// Fighter context a macro assumes at its first frame.
 ///
 /// `situation` and `status` are raw game enum values captured by the runtime;
@@ -133,6 +148,8 @@ pub struct MacroRecording {
     pub mii: Option<crate::engine::mii::lifetime::Configuration>,
     pub placement: Placement,
     pub frames: Vec<InputFrame>,
+    #[serde(default, skip_serializing_if = "crate::model::trim::Trim::is_off")]
+    pub trim: crate::model::trim::Trim,
     /// Save id this macro starts from. Absent means the file never had one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_save: Option<String>,
@@ -158,6 +175,7 @@ impl MacroRecording {
             mii: None,
             placement: Placement::default(),
             frames,
+            trim: crate::model::trim::Trim::Off,
             start_save: None,
             start_save_on: true,
         };

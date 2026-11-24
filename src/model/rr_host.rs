@@ -853,6 +853,10 @@ pub fn cpu_playback(queued: bool) -> PlaybackState {
         owed, recording: false, standby: false, queued }
 }
 
+pub fn playback_roles() -> [bool; 2] {
+    [false, false]
+}
+
 /// The save-state restore a Play's warp asked for has placed both fighters (or the warp was
 /// not requested after all). The held runs step from their first frame on the next tick.
 pub fn warp_landed() {
@@ -1316,8 +1320,8 @@ pub fn set_role_fighter(role: Role, kind: i32) {
 /// rc.12 TR7: Recording › Options › Crop trailing neutral, as the last publish left it (factory On).
 static RECORD_TRIM: AtomicBool = AtomicBool::new(true);
 
-pub fn set_record_trim(on: bool) {
-    RECORD_TRIM.store(on, Ordering::Release);
+pub fn set_record_trim(trim: impl Into<crate::model::trim::Trim>) {
+    RECORD_TRIM.store(trim.into() == crate::model::trim::Trim::End, Ordering::Release);
 }
 
 pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
@@ -2143,6 +2147,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
         Effect::SaveLastCombo { name } => save_last_combo(root, &name, tick),
         Effect::SetStartSave { id, chain: true, on } => rename::<Chain>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
         Effect::SetStartSave { id, chain: false, on } => rename::<MacroRecording>(root, MACROS_DIR, &id, |f| f.start_save_on = on),
+        Effect::SetTrim { .. } => {},
     }
 }
 

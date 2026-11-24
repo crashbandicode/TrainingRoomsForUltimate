@@ -28,6 +28,7 @@ pub static STRENGTH: [&str; 4] = ["None", "Normal", "Medium", "High"];
 pub static MIRRORING: [&str; 3] = ["None", "Alternate", "Random"];
 pub static SAVE_DAMAGE: [&str; 3] = ["Default", "Save State", "Random Value"];
 pub static HITSTUN_PLAYBACK: [&str; 3] = ["As Hitstun Ends", "As Hitstop Ends", "As Hitstop Begins"];
+pub static TRIM: [&str; 4] = ["Start", "End", "Both", "Off"];
 /// The loop counts X cycles, and the Options row shows. The factory row stays length 2.
 pub static LOOP_COUNTS: [&str; 6] = ["∞", "1", "2", "3", "5", "10"];
 pub static BUFFS: [&str; 18] = [

@@ -140,7 +140,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         None
     };
     let btt = crate::runtime::features::btt::hud();
-    let row = (!menu_open).then(|| hud_row::hud_row(crate::engine::rr_host::capture_take(), btt.as_str())).flatten();
+    let row = (!menu_open).then(|| hud_row::hud_row(crate::engine::rr_host::capture_take(), [false; 2], btt.as_str())).flatten();
     let chip = row.as_ref().map(|row| hud_row::hud_row_box(row, strip_shown, card.is_some()));
     write_notice(
         notice,
