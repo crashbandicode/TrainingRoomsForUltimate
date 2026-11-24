@@ -119,7 +119,8 @@ pub const THREADS: [ThreadStack; 19] = [
     // The static bound is the `diag,hang-trace` ELF's: `held_locks` puts 32 `owners::Held` (768 B) in the frame. At "z" it is
     // 4,016 B (plain diag 3,344; at "s" 3,776 and 3,104: B's rc.8 review, then the docs lane's), so 24 KiB.
     row(ThreadId::StallWatch, c"tr-stall-watch", 24 * KIB, 4_016, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
-    row(ThreadId::MoveNames, c"tr-move-names", 204 * KIB, 3_440, 0, "", "move_names::load").with_external(143_376),
+    // provisional until the first gate's ELFs (tools/stack_depth.py)
+    row(ThreadId::MoveNames, c"tr-move-names", 204 * KIB, 8_000, 0, "", "move_names::load").with_external(143_376),
 ];
 
 const fn row(

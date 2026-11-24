@@ -571,7 +571,7 @@ impl Settings {
             tolerance: choice(ROW_TOLERANCE).map_or(factory.tolerance, |i| i.min(2) as u8),
             load_after: choice(ROW_AFTER).map_or(factory.load_after, |i| i == 1),
             match_spot: super::spots::row_on(snapshot, super::spots::ROW_COMBO),
-            move_names: false,
+            move_names: super::spots::row_on(snapshot, super::move_names::ROW_MOVE_NAMES),
         }
     }
 }

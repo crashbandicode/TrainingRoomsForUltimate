@@ -132,7 +132,11 @@ pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
 /// The two move names and their direction marks, fitted to the given capacity.
 pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
     let moves = [link.from, link.to];
-    let names = core::array::from_fn::<_, 2, _>(|i| link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]).name());
+    let names = {
+        let namer = super::move_names::Namer::live();
+        core::array::from_fn::<_, 2, _>(|i| namer.name(link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]), super::move_names::Normal::Unknown))
+    };
+    let names = names.each_ref().map(|name| name.as_str());
     let arrows = link.shown.map(|shown| shown.dirs.map(|dir| dir.map_or("", arrow)));
     let space = |s: &str| if s.is_empty() { "" } else { " " };
     let loose = [names[0], space(arrows[0][0]), arrows[0][0], space(arrows[0][1]), arrows[0][1], " > ",

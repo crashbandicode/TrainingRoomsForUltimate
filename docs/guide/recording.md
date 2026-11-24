@@ -173,6 +173,8 @@ recorded one.
   the stick you hold between the events, is shown and never graded.
 - **Match sweet/sour spot** (Off by default) also compares the spot: with it On a link counts only if it lands the
   spot the saved link landed. A link saved with no spot always matches.
+- **Move names** (Off by default) shows common move names and, when available, the game's own special names.
+  Saved combos use their recorded fighter; older files without that identity use common names.
 - **A follow-up's events end at its hit,** so a button you still hold when the hit lands is not graded for its release.
 - **An older file with only presses** is graded on those presses, with left and right as one direction.
 - **The exchange** ends 20 frames after the CPU can act again, or on a shielded hit. A gap of 20 frames still belongs

@@ -522,7 +522,10 @@ impl Plan<'_> {
                 if input {
                     let _ = write!(text, "Step {}", k + 1);
                 } else {
-                    let _ = write!(text, "{} {}>{}", k + 1, reference.from.name(), reference.to.name());
+                    let _ = {
+                        let namer = super::move_names::Namer::target();
+                        write!(text, "{} {}>{}", k + 1, namer.name(reference.from, super::move_names::Normal::Unknown), namer.name(reference.to, super::move_names::Normal::Unknown))
+                    };
                 }
                 Ink::text(text, MUTED)
             }

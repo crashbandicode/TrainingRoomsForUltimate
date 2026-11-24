@@ -2341,6 +2341,17 @@ pub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {
     (hash & 0xffffffffff != 0).then_some(hash)
 }
 
+/// # Safety
+/// The guarded roster seam must be called from the game thread.
+pub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {
+    let base = BASE.load(Ordering::Acquire);
+    if base == 0 { return None; }
+    // SAFETY: `BASE` is published only after the roster seam passes its guard.
+    let hash = unsafe { fighter_kind_hash(base, kind) };
+    let chara = hash & 0xff_ffff_ffff;
+    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)
+}
+
 // Both icon paths use this roster module's published, verified text base.
 // The conversion borrows no native object and retains no address.
 #[inline]

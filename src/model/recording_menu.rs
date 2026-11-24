@@ -2264,13 +2264,13 @@ pub fn combo_link_lines(combo: &Combo, namer: super::move_names::Namer<'_>) -> V
     }).collect()
 }
 
-fn link_panel_lines(index: usize, link: &super::combo::LinkRec, _: super::move_names::Namer<'_>) -> Vec<String> {
+fn link_panel_lines(index: usize, link: &super::combo::LinkRec, namer: super::move_names::Namer<'_>) -> Vec<String> {
     let word = if link.is_true() { "TRUE" } else { "FALSE" };
     let mut lines = vec![format!(
         "L{} {} → {} {word}",
         index + 1,
-        link.from.name().to_ascii_lowercase(),
-        link.to.name().to_ascii_lowercase()
+        if namer.is_on() { namer.name(link.from, super::move_names::Normal::Unknown).as_str().to_owned() } else { link.from.name().to_ascii_lowercase() },
+        if namer.is_on() { namer.name(link.to, super::move_names::Normal::Unknown).as_str().to_owned() } else { link.to.name().to_ascii_lowercase() }
     )];
     if let Some(events) = event_line(link) {
         lines.push(events);

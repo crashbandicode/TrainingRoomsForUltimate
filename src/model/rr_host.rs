@@ -258,11 +258,12 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     if take.combo.is_empty() { tick.notices.push(super::rr_runtime::EMPTY_RECORDING); return; }
     let start = if activate { take_record_start() } else { None };
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
+    let fighter = start.and_then(|s| super::move_names::recorded_identity(super::move_names::PUBLISHED.player(), s.poses[0].fighter_kind));
     // F10: a directly recorded drill owns the macro file holding its take.
     let kept = if activate { keep_drill_take(root, start) } else { None };
     let saved = match kept {
-        Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, kept, unix_now()),
-        None => save_made_combo(root, &take.combo, source, recorded_on, unix_now()),
+        Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, fighter, kept, unix_now()),
+        None => save_made_combo(root, &take.combo, source, recorded_on, fighter, unix_now()),
     };
     if let Ok(id) = saved {
         if activate {
@@ -2156,7 +2157,7 @@ fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
     let label = lock(&PLAYER_LABEL).clone();
     let recorded_on = (!label.is_empty()).then_some(label);
-    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, super::move_names::PUBLISHED.player().map(|(_, id)| id), unix_now()) {
         tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
     }
 }
@@ -2370,7 +2371,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     };
     INPUT_MODE.fetch_and(!1, Ordering::AcqRel);
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
-    if save_made_combo(root, &combo, &job.source, None, unix_now()).is_ok() {
+    if save_made_combo(root, &combo, &job.source, None, None, unix_now()).is_ok() {
         tick.diags.push(format!("screen=make-combo source={} saved=1", job.source));
     }
 }

@@ -378,6 +378,7 @@ fn run() {
     let mut session = Session::default();
     let mut developer_reload = crate::runtime::developer_reload::Worker::default();
     loop {
+        let names_pending = crate::runtime::features::move_names::service();
         // Retire departing layer state before accepting a new scene's panel input.
         crate::runtime::macros::port::worker_events();
         // An accepted wizard Apply precedes inputs for the next menu opening.
@@ -441,7 +442,7 @@ fn run() {
         publish_bridge_state(&mut session);
         if building || (read_index && session.recording_index.ready(version).is_some()) {
             WAKE.wait(Some(std::time::Duration::ZERO));
-        } else if read_index || session.watching() || developer_pending {
+        } else if read_index || session.watching() || developer_pending || names_pending {
             WAKE.wait(Some(POLL));
         } else if let Some(every) = crate::runtime::bridge_state::poll_interval() {
             // The optional test bridge: its lookup (once a second for 30 s) or its snapshots; nothing once it is off.
@@ -951,7 +952,7 @@ fn apply_grade_target(drill: Option<&str>, kind: Option<crate::engine::library::
                 return;
             };
             combo::stage_sequence(None);
-            combo::stage_target(Some((record.combo, record.name.as_str())));
+            combo::stage_target(Some((record.combo, record.name.as_str(), record.fighter)));
             *applied = Some(Applied {
                 kind: crate::engine::library::DrillKind::Combo,
                 id: id.to_owned(),

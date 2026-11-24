@@ -464,7 +464,8 @@ pub unsafe fn sample_frame(player: usize) {
         GRADER.finish(false);
         return;
     };
-    if CLEAR_DUE.swap(false, Ordering::Relaxed) {
+    let cleared = CLEAR_DUE.swap(false, Ordering::Relaxed);
+    if cleared {
         tracker.clear();
         super::parry::reset();
     }
@@ -477,6 +478,8 @@ pub unsafe fn sample_frame(player: usize) {
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         crate::runtime::features::combo::after_strip(&tracker, p1_kind);
+        // SAFETY: `player` is the live P1 accessor of this frame.
+        unsafe { super::move_names::note_player(player, p1_kind, cleared) };
     }
     if super::parry::on() {
         super::parry::step(parry_frame(player, &ids, &p1, inputs), p1_kind, tracker.newest().unwrap_or(0));

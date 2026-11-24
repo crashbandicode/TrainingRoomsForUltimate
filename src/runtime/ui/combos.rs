@@ -116,7 +116,7 @@ impl Ui {
     }
 
     fn apply_target(&mut self, target: Option<(String, ComboRecord)>) {
-        live::set_target(target.as_ref().map(|(_, r)| (r.combo, r.name.as_str())));
+        live::set_target(target.as_ref().map(|(_, r)| (r.combo, r.name.as_str(), r.fighter)));
         self.target = target.map(|(id, r)| (id, r.name));
     }
 

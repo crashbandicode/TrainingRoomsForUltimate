@@ -106,11 +106,12 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on, &self.made_from, &self.take)
+        (&self.name, &self.combo, &self.recorded_on, &self.fighter, &self.made_from, &self.take)
             == (
                 &other.name,
                 &other.combo,
                 &other.recorded_on,
+                &other.fighter,
                 &other.made_from,
                 &other.take,
             )
@@ -187,6 +188,7 @@ impl ComboRecord {
         })).unwrap();
         combo.input_only = self.combo.input_only;
         let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
+        record.fighter = self.fighter;
         record.made_from = self.made_from.clone();
         Ok(record)
     }
@@ -210,7 +212,10 @@ impl ComboRecord {
         self
     }
 
-    pub fn with_fighter(self, _: Option<super::move_names::FighterId>) -> Self { self }
+    pub fn with_fighter(mut self, fighter: Option<super::move_names::FighterId>) -> Self {
+        self.fighter = fighter;
+        self
+    }
 
     /// Give a directly recorded drill ownership of the macro file holding its take.
     pub fn with_take(mut self, id: impl Into<String>) -> Self {
@@ -240,6 +245,11 @@ impl ComboRecord {
             let mut object = source.clone();
             object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
+            if let Some(fighter) = self.fighter {
+                object.insert("recorded_fighter".into(), json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials}));
+            } else {
+                object.remove("recorded_fighter");
+            }
             return Value::Object(object);
         }
         let links: Vec<Value> = self
@@ -281,6 +291,9 @@ impl ComboRecord {
         if self.combo.input_only { value["kind"] = json!("input_drill"); }
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
+        }
+        if let Some(fighter) = self.fighter {
+            value["recorded_fighter"] = json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials});
         }
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
@@ -338,12 +351,26 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
-            fighter: None,
+            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
             made_from,
             take,
             source: Some(object.clone()),
         })
     }
+}
+
+fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
+    let chara = value.get("ui_chara")?.as_str()?;
+    if chara.is_empty() || chara.len() > 10 || !chara.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+    let chara = u64::from_str_radix(chara, 16).ok()?;
+    if chara == 0 { return None; }
+    let values = value.get("specials")?.as_array()?;
+    if values.len() != 4 { return None; }
+    let mut specials = [0; 4];
+    for (out, value) in specials.iter_mut().zip(values) {
+        *out = u8::try_from(value.as_u64()?).ok().filter(|value| *value <= 2)?;
+    }
+    Some(super::move_names::FighterId { chara, specials })
 }
 
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {

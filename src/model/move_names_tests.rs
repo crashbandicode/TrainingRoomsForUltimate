@@ -518,6 +518,69 @@ fn a_save_takes_the_identity_only_of_the_fighter_the_take_was_recorded_on() {
     assert!(include_str!("rr_host.rs").contains("recorded_identity("));
 }
 
+fn the_variant_numbers_are_fixed_and_fit_five_bits() {
+    let variants = [
+        Normal::Unknown, Normal::Jab1, Normal::Jab2, Normal::Jab3, Normal::RapidJab,
+        Normal::RapidJabFinisher, Normal::DashAttack, Normal::ForwardTilt, Normal::UpTilt,
+        Normal::DownTilt, Normal::ForwardSmash, Normal::UpSmash, Normal::DownSmash,
+        Normal::NeutralAir, Normal::ForwardAir, Normal::BackAir, Normal::UpAir, Normal::DownAir,
+        Normal::Grab, Normal::DashGrab, Normal::PivotGrab, Normal::Pummel, Normal::ForwardThrow,
+        Normal::BackThrow, Normal::UpThrow, Normal::DownThrow, Normal::LedgeAttack,
+        Normal::GetupAttack, Normal::TripAttack,
+    ];
+    let numbers: [u8; 29] = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+    ];
+    for (variant, number) in variants.into_iter().zip(numbers) {
+        assert_eq!(variant as u8, number);
+        assert_eq!(Normal::from_u8(number) as u8, number);
+    }
+    for number in [29, 31, 255] { assert_eq!(Normal::from_u8(number), Normal::Unknown); }
+    assert!((Normal::TripAttack as u8) < 32);
+}
+
+fn the_file_is_read_only_after_the_mod_filesystem_is_mounted() {
+    assert_eq!(load_step(false, false, None, false, 0, 0), LoadStep::Idle);
+    assert_eq!(load_step(true, true, None, false, 0, 0), LoadStep::Idle);
+    assert_eq!(load_step(true, false, None, false, 0, 0), LoadStep::GiveUp);
+    assert_eq!(load_step(true, false, Some(false), false, 0, 90_000), LoadStep::Wait);
+    assert_eq!(load_step(true, false, Some(true), false, 0, 0), LoadStep::Try);
+    assert_eq!(load_step(true, false, Some(true), false, 1, 1_999), LoadStep::Wait);
+    assert_eq!(load_step(true, false, Some(true), false, 1, 2_000), LoadStep::Try);
+    assert_eq!(load_step(true, false, Some(true), false, 3, 2_000), LoadStep::GiveUp);
+    assert_eq!(load_step(true, false, Some(false), false, 3, 0), LoadStep::GiveUp);
+    assert_eq!(load_step(true, false, Some(true), true, 1, 2_000), LoadStep::GiveUp);
+    assert_eq!(load_step(true, false, Some(false), true, 0, 0), LoadStep::GiveUp);
+    let loader = include_str!("../runtime/features/move_names.rs");
+    assert!(loader.contains("arcrop_register_event_callback"));
+    let service = loader.split("pub fn service()").nth(1).unwrap().split("#[derive(Debug)]").next().unwrap();
+    assert!(service.contains("load_step("));
+    let (before, after) = service.split_once("LoadStep::Try =>").unwrap();
+    assert!(!before.contains("run_transient("));
+    assert_eq!(after.matches("run_transient(").count(), 1);
+    assert!(include_str!("../runtime/boot.rs").contains("move_names::register("));
+}
+
+fn only_selected_message_texts_are_decoded_and_compacted() {
+    let long = format!("{}é{}", "x".repeat(254), "y".repeat(20));
+    let entries = [
+        ("unrelated_label".to_owned(), vec![0xd800]),
+        ("nam_special_upper_00_alpha".to_owned(), long.encode_utf16().collect()),
+        ("nam_special_upper_16_alpha".to_owned(), vec![0xd800]),
+    ];
+    let names = Names::build(&message(&entries)).unwrap();
+    assert_eq!(names.bytes(), 7 + 254);
+    assert_eq!(names.special(key("alpha"), Slot::Up, 0), Some("x".repeat(254).as_str()));
+    assert_eq!(names.special(key("alpha"), Slot::Up, 16), None);
+    let mut unrelated_index = message(&entries);
+    let index = 0x20 + 16 + 12 + 1 + "unrelated_label".len();
+    unrelated_index[index..index + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+    assert!(Names::build(&unrelated_index).is_ok());
+    let bad = message(&[("nam_special_upper_00_alpha".into(), vec![0xd800])]);
+    assert!(Names::build(&bad).is_err());
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -545,6 +608,9 @@ fn case_table() {
         ("a_file_without_a_recorded_fighter_shows_the_common_names", a_file_without_a_recorded_fighter_shows_the_common_names as fn()),
         ("the_recorded_fighter_is_an_optional_key_older_builds_ignore", the_recorded_fighter_is_an_optional_key_older_builds_ignore as fn()),
         ("a_save_takes_the_identity_only_of_the_fighter_the_take_was_recorded_on", a_save_takes_the_identity_only_of_the_fighter_the_take_was_recorded_on as fn()),
+        ("the_variant_numbers_are_fixed_and_fit_five_bits", the_variant_numbers_are_fixed_and_fit_five_bits as fn()),
+        ("the_file_is_read_only_after_the_mod_filesystem_is_mounted", the_file_is_read_only_after_the_mod_filesystem_is_mounted as fn()),
+        ("only_selected_message_texts_are_decoded_and_compacted", only_selected_message_texts_are_decoded_and_compacted as fn()),
     ]);
 }
 }

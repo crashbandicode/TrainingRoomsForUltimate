@@ -109,11 +109,12 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
     let (out, name, stepped) = {
         let mut helper = HELPER.lock();
         let name = pull_staged().map(|staged| {
-            let (combo, text) = match staged {
-                Some((combo, text)) => (Some(combo), text),
-                None => (None, Text::EMPTY),
+            let (combo, text, fighter) = match staged {
+                Some((combo, text, fighter)) => (Some(combo), text, fighter),
+                None => (None, Text::EMPTY, None),
             };
             helper.set_target(combo);
+            crate::model::move_names::PUBLISHED.set_target(fighter);
             text
         });
         let mut plan = PLAN.lock();
@@ -527,9 +528,9 @@ pub fn saved(combo: &Combo) {
 
 /// A new target (worker): staged, so the helper starts over on it at the next frame, and the menu and the bar show its name at
 /// once (the bar's through `NAME_POSTED`, taken by the next game thread that reads `NAME`).
-pub fn set_target(target: Option<(Combo, &str)>) {
+pub fn set_target(target: Option<(Combo, &str, Option<crate::model::move_names::FighterId>)>) {
     stage_target(target);
-    let name = target.map_or("", |(_, name)| name);
+    let name = target.map_or("", |(_, name, _)| name);
     NAME_POSTED.publish(Text::new(name));
     LABELS.lock().target = Label::new(name);
 }
@@ -537,24 +538,24 @@ pub fn set_target(target: Option<(Combo, &str)>) {
 /// A drill the menu worker staged for the frame hook. The hook holds `HELPER`; the worker must not. `hos_lock::Published`: the
 /// worker publishes (it may wait for a reader to leave the other slot), the hook copies out what is newer than it last saw and
 /// never waits (docs lane review R1, finding 5: the hand-rolled seqlock here lacked its fences).
-static STAGED: hos_lock::Published<Option<(Combo, Text)>> = hos_lock::Published::new(None);
+static STAGED: hos_lock::Published<Option<(Combo, Text, Option<crate::model::move_names::FighterId>)>> = hos_lock::Published::new(None);
 /// The `STAGED` generation the frame hook installed last (0: nothing staged yet). The worker reads it to show a staged target's
 /// label once it is installed (`Labels::settle`).
 static STAGED_SEEN: AtomicU32 = AtomicU32::new(0);
 
 /// Publish a grade target without taking `HELPER` (the menu worker: the drill, `ui::worker`, and the combo panel's target,
 /// `set_target`). The next `after_strip` installs it, and the menu's target label becomes its name then.
-pub fn stage_target(target: Option<(Combo, &str)>) {
-    INPUT_TARGET.store(target.is_some_and(|(c, _)| c.input_only), Ordering::Release);
-    let name = target.map_or("", |(_, name)| name);
+pub fn stage_target(target: Option<(Combo, &str, Option<crate::model::move_names::FighterId>)>) {
+    INPUT_TARGET.store(target.is_some_and(|(c, _, _)| c.input_only), Ordering::Release);
+    let name = target.map_or("", |(_, name, _)| name);
     let mut labels = LABELS.lock();
     labels.settle();
-    STAGED.publish(target.map(|(combo, name)| (combo, Text::new(name))));
+    STAGED.publish(target.map(|(combo, name, fighter)| (combo, Text::new(name), fighter)));
     labels.pending = Some((STAGED.generation(), Label::new(name)));
 }
 
 /// `Some` when a staged target is ready: `Some(None)` clears, `Some(Some(_))` installs.
-fn pull_staged() -> Option<Option<(Combo, Text)>> {
+fn pull_staged() -> Option<Option<(Combo, Text, Option<crate::model::move_names::FighterId>)>> {
     STAGED.read_if_newer(&STAGED_SEEN)
 }
 
