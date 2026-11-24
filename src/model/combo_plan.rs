@@ -405,12 +405,13 @@ impl Captions {
 
     fn metrics(&self, pills: usize) -> Metrics {
         let len = |ink: Ink| ink.text.units().len();
+        let width = |ink: &Ink| super::notice_box::measure(ink.text.units().iter().copied(), super::panes::iv::FONT_SUB.0).0;
         Metrics {
             pills,
-            result: len(self.result),
-            reason: len(self.reason),
+            result: width(&self.result),
+            reason: width(&self.reason),
             reason_lines: self.reason.text.lines(),
-            previous: len(self.previous),
+            previous: width(&self.previous),
             streak: len(self.streak),
             best: len(self.best),
             links: len(self.links),

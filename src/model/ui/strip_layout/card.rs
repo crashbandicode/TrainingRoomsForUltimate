@@ -8,9 +8,9 @@ use super::{strip, Place};
 #[derive(Clone, Copy)]
 pub struct Metrics {
     pub pills: usize,
-    pub result: usize,
-    pub reason: usize,
-    pub previous: usize,
+    pub result: f32,
+    pub reason: f32,
+    pub previous: f32,
     pub streak: usize,
     pub best: usize,
     pub links: usize,
@@ -26,10 +26,10 @@ pub const REASON_LINES: usize = 2;
 impl Metrics {
     const EMPTY: Self = Self {
         pills: 0,
-        result: 0,
-        reason: 0,
+        result: 0.0,
+        reason: 0.0,
         reason_lines: 0,
-        previous: 0,
+        previous: 0.0,
         streak: 0,
         best: 0,
         links: 0,
@@ -372,11 +372,10 @@ impl CardSpec {
                 place.x = self.content_left() + size / 2.0 + (i - PILL) as f32 * pitch;
                 place.y = self.top - if split { pills_high } else { row };
             }
-        } else if (i == RESULT || i == REASON) && m.reason != 0 {
-            let result_width = self.estimating(m.result, false);
-            let reason_width = self.estimating(m.reason, false);
+        } else if (i == RESULT || i == REASON) && m.reason > 0.0 {
+            let result_width = m.result;
             // A wrapped reason has its own row; its box is centred half the extra height lower, so its first line stays there.
-            if m.reason_lines <= 1 && self.fits(result_width, reason_width) {
+            if m.reason_lines <= 1 && self.fits(result_width, m.reason) {
                 if i == REASON {
                     *place = self
                         .text(
@@ -399,9 +398,9 @@ impl CardSpec {
         let [previous_high, result_low] = self.sequence_extra_rows;
         let drop = self.wrap_drop(m.reason_lines);
         let stats = stats + drop;
-        if (i == RESULT || i == REASON || i == SEQ_LANDED) && m.previous != 0 {
-            let prev_width = self.estimating(m.previous, false);
-            let item_width = self.estimating(m.result.max(m.reason), false);
+        if (i == RESULT || i == REASON || i == SEQ_LANDED) && m.previous > 0.0 {
+            let prev_width = m.previous;
+            let item_width = m.result.max(m.reason);
             // A wrapped reason has its own row; its box is centred half the extra height lower, so its first line stays there.
             let shares = m.reason_lines <= 1 && self.fits(prev_width, item_width);
             if shares && i != SEQ_LANDED {

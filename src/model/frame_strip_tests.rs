@@ -723,7 +723,7 @@ fn a_link_keeps_both_moves_directions_and_the_special_a_travel_continues() {
 fn a_second_part_reaches_the_link_its_special_already_made() {
     use crate::model::frame_strip_plan::{folded_link, link_moves, SHORT_UNITS};
     let stun = || Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
-    let text = |line: crate::model::frame_strip_plan::LinkLine| String::from_utf16(line.units()).unwrap();
+    let text = |line: crate::model::frame_strip_plan::Text| String::from_utf16(line.units()).unwrap();
     // Frame 35: the travel is entered and hits, so Jab links into it before any direction is known.
     let mut tracker = linked_special(true);
     // 36..=38 travel 1 goes left; 39..=41 the status between the parts; 42..=43 travel 2 goes right.

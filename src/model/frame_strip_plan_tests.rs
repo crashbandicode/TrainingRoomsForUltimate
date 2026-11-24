@@ -146,11 +146,12 @@ fn the_last_row_and_the_link_line_name_the_direction_beside_the_move() {
     assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Jab > Side tilt ↑");
     let link = tracker.latest_link().unwrap();
     assert_eq!(String::from_utf16(folded_link(&link).units()).unwrap(), "TRUE · Jab > Side tilt ↑");
-    let (_, line, _) = Renderer::new().draw_with_spec(
+    let mut line = Text::EMPTY;
+    Renderer::new().draw_with_spec(
         &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: false, cells: false, spec: &C },
-        |_, _, _| {},
+        |i, look, _| if i == at::READ_SUB + 1 { line = look.text },
     );
-    assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), "TRUE · Jab > Side tilt ↑");
+    assert_eq!(String::from_utf16(line.units()).unwrap(), "TRUE · Jab > Side tilt ↑");
     let special = Link { to: Move::Other, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] }], ..link };
     assert_eq!(String::from_utf16(link_moves(&special, SHORT_UNITS).units()).unwrap(), "Jab > Up B ← →");
     let named = Link { to: Move::SideTilt, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(2), None] }], ..link };
@@ -181,7 +182,7 @@ fn runtime_and_archive_share_the_strip_layout() {
     alternate.strip.base_height += 20.0;
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
-        let (_, line, history) = Renderer::new().draw_with_spec(
+        let (_, history) = Renderer::new().draw_with_spec(
             &tracker, StripDraw { shown: true, spots: true, parry: None, history_enabled: true, cells: false, spec },
             |i, look, _| looks[i] = *look,
         );
@@ -194,14 +195,14 @@ fn runtime_and_archive_share_the_strip_layout() {
         }
         let rule = looks[at::SEPARATOR + 1];
         assert!(rule.visible && rule.x.abs() + rule.w / 2.0 <= spec.strip.width / 2.0);
-        (looks, line, history)
+        (looks, history)
     };
-    let (compact, line, history) = collect(&C);
-    let (other, other_line, other_history) = collect(&alternate);
+    let (compact, history) = collect(&C);
+    let (other, other_history) = collect(&alternate);
     assert_ne!((compact[0].y, compact[1].w), (other[0].y, other[1].w));
     assert_ne!(compact[at::READ_SUB + 1].x, other[at::READ_SUB + 1].x);
     assert_eq!(compact.map(|l| (l.visible, l.color, l.text)), other.map(|l| (l.visible, l.color, l.text)));
-    assert_eq!((line, history), (other_line, other_history));
+    assert_eq!(history, other_history);
 }
 
 #[test]
@@ -209,8 +210,10 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
     let tracker = true_combo();
     let mut renderer = Renderer::new();
     let mut draw = |on| {
-        let (_, line, history) = renderer.draw_with_spec(
-            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C }, |_, _, _| {},
+        let mut line = None;
+        let (_, history) = renderer.draw_with_spec(
+            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C },
+            |i, look, changed| if i == at::READ_SUB + 1 && changed.text { line = Some(look.text) },
         );
         let last = renderer.written(at::LAST_TEXT).unwrap().visible;
         let pill = renderer.written(at::PILL).unwrap().visible;
@@ -553,14 +556,15 @@ fn parrys_grade_words_are_shown_in_full() {
     let mut view = View::EMPTY;
     view.last[0] = Some(Attempt { grade: Grade::Unavailable, hit: 1, window: None });
     let mut looks = vec![Look::HIDDEN; COUNT];
-    let (_, line, _) = Renderer::new().draw_with_spec(
+    let mut renderer = Renderer::new();
+    renderer.draw_with_spec(
         &Tracker::new(),
         StripDraw { shown: true, spots: false, parry: Some(&view), history_enabled: true, cells: false, spec: &C },
         |i, look, _| looks[i] = *look,
     );
     let words = "Grading unavailable (not counted)";
     assert_eq!(String::from_utf16(looks[at::READ_SUB + 1].text.units()).unwrap(), words);
-    assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), words);
+    assert_eq!(String::from_utf16(renderer.written(at::READ_SUB + 1).unwrap().text.units()).unwrap(), words);
 }
 
 /// Capacity belongs to the line type. Only the lines whose real strings pass 24 units get the long box: the strip's

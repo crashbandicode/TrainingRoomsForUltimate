@@ -125,28 +125,6 @@ impl core::fmt::Write for Text {
     }
 }
 
-/// The LINK sub-line, written from the tracker's snapshot beside the pane cache. As long as its box.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LinkLine {
-    units: [u16; TEXT_UNITS],
-    len: usize,
-}
-
-impl LinkLine {
-    fn from_units(units: impl IntoIterator<Item = u16>) -> Self {
-        let mut line = Self { units: [0; TEXT_UNITS], len: 0 };
-        for (out, unit) in line.units.iter_mut().zip(units) {
-            *out = unit;
-            line.len += 1;
-        }
-        line
-    }
-
-    pub fn units(&self) -> &[u16] {
-        &self.units[..self.len]
-    }
-}
-
 /// The game's font has cardinal arrows, but not diagonal arrows.
 pub const fn arrow(dir: u8) -> &'static str {
     match dir {
@@ -176,7 +154,7 @@ pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
 }
 
 /// The two move names and their direction marks, fitted to the given capacity.
-pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
+fn append_moves(text: &mut Text, link: &Link, capacity: usize) {
     let moves = [link.from, link.to];
     let names = core::array::from_fn::<_, 2, _>(|i| link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]).name());
     let arrows = link.shown.map(|shown| shown.dirs.map(|dir| dir.map_or("", arrow)));
@@ -185,15 +163,20 @@ pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
                  names[1], space(arrows[1][0]), arrows[1][0], space(arrows[1][1]), arrows[1][1]];
     let tight = [names[0], "", arrows[0][0], "", arrows[0][1], ">", names[1], "", arrows[1][0], "", arrows[1][1]];
     let parts = if loose.iter().map(|s| s.encode_utf16().count()).sum::<usize>() <= capacity { loose } else { tight };
-    LinkLine::from_units(parts.into_iter().flat_map(str::encode_utf16))
+    for part in parts { let _ = text.write_str(part); }
 }
 
-pub fn folded_link(link: &Link) -> LinkLine {
-    let verdict = if matches!(link.verdict, Verdict::True(_)) { "TRUE" } else { "DROP" };
-    let prefix = [verdict, " · "];
-    let capacity = LINK_UNITS as usize - prefix.iter().map(|s| s.encode_utf16().count()).sum::<usize>();
-    let moves = link_moves(link, capacity);
-    LinkLine::from_units(prefix.into_iter().flat_map(str::encode_utf16).chain(moves.units().iter().copied()))
+pub fn link_moves(link: &Link, capacity: usize) -> Text {
+    let mut text = Text::EMPTY;
+    append_moves(&mut text, link, capacity);
+    text
+}
+
+pub fn folded_link(link: &Link) -> Text {
+    let mut text = Text::new(if matches!(link.verdict, Verdict::True(_)) { "TRUE · " } else { "DROP · " });
+    let budget = LINK_UNITS as usize - text.units().len();
+    append_moves(&mut text, link, budget);
+    text
 }
 
 /// What one pane shows.
@@ -279,6 +262,7 @@ struct Run {
 struct Content<'a> {
     spec: &'a StripSpec,
     history: bool,
+    fold_link: bool,
     cells: bool,
     tracker: &'a Tracker,
     aims: [Option<Aim>; 2],
@@ -294,14 +278,7 @@ struct Content<'a> {
 }
 
 impl<'a> Content<'a> {
-    fn new(
-        tracker: &'a Tracker,
-        spots: bool,
-        parry: Option<&'a super::parry::View>,
-        spec: &'a StripSpec,
-        history: bool,
-        cells: bool,
-    ) -> Self {
+    fn new(tracker: &'a Tracker, draw: StripDraw<'a>, history: bool) -> Self {
         let mut frames = [0u32; WINDOW];
         let mut sticks = [None; WINDOW];
         let first_slot = WINDOW - tracker.len();
@@ -346,7 +323,8 @@ impl<'a> Content<'a> {
                 }
             }
         }
-        Self { spec, history, cells, tracker, aims: aims_shown(tracker), frames, sticks, first_slot, runs, spots, parry }
+        Self { spec: &draw.spec.strip, history, fold_link: !draw.history_enabled, cells: draw.cells, tracker,
+            aims: aims_shown(tracker), frames, sticks, first_slot, runs, spots: draw.spots, parry: draw.parry }
     }
 
     /// The slot a frame is drawn in; a frame after the newest counts on past the right edge (a predicted free frame).
@@ -532,6 +510,7 @@ impl<'a> Content<'a> {
                 None => (Text::new("-"), Text::EMPTY, MUTED),
             },
             1 => match self.tracker.latest_link() {
+                Some(link) if sub && self.fold_link => (Text::EMPTY, folded_link(&link), TEXT),
                 Some(Link { verdict: Verdict::True(Some(link)), .. }) => (signed("", link), Text::new("TRUE combo"), GOOD),
                 Some(Link { verdict: Verdict::True(None), .. }) => (Text::new("TRUE"), Text::new("TRUE combo"), GOOD),
                 Some(Link { verdict: Verdict::Drop(link), .. }) => (signed("", link), Text::new("DROP"), BAD),
@@ -570,7 +549,7 @@ impl<'a> Content<'a> {
             (1, _) => Look::label(place, label.cut(SHORT_UNITS), INK),
             (_, None) => Look::HIDDEN,
             (_, Some(link)) => {
-                let t = Text::from_units(link_moves(&link, SHORT_UNITS).units());
+                let t = link_moves(&link, SHORT_UNITS);
                 Look::label(place, t, TEXT)
             }
         }
@@ -775,28 +754,19 @@ impl Renderer {
         self.draw_with_spec(tracker, StripDraw { shown, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
     }
 
-    /// The wide LINK line travels separately from the cached panes.
+    /// All text, including the folded link, travels through the pane cache.
     pub fn draw_with_spec(
         &mut self,
         tracker: &Tracker,
         draw: StripDraw<'_>,
         apply: impl FnMut(usize, &Look, Changed),
-    ) -> (usize, Option<LinkLine>, bool) {
-        let StripDraw { shown, spots, parry, history_enabled, cells, spec } = draw;
-        let history = spec.history_row(history_enabled, parry.is_some(), cells);
-        if !shown {
-            return (self.hide(at::CONTAINER, Look::HIDDEN, apply), None, history);
+    ) -> (usize, bool) {
+        let history = draw.spec.history_row(draw.history_enabled, draw.parry.is_some(), draw.cells);
+        if !draw.shown {
+            return (self.hide(at::CONTAINER, Look::HIDDEN, apply), history);
         }
-        let content = Content::new(tracker, spots, parry, &spec.strip, history, cells);
-        let line = if !history_enabled && parry.is_none() {
-            tracker.latest_link().as_ref().map(folded_link)
-        } else {
-            None
-        }.unwrap_or_else(|| {
-            let look = content.readout(1, true);
-            LinkLine::from_units(look.text.units().iter().copied())
-        });
-        (self.show(super::panes::iv::units, |i| content.look(i), apply), Some(line), history)
+        let content = Content::new(tracker, draw, history);
+        (self.show(super::panes::iv::units, |i| content.look(i), apply), history)
     }
 }
 
