@@ -600,16 +600,7 @@ struct Capture {
     frame: u32,
 }
 
-/// Keep the owner of the last captured link, not the fighter present when the file is saved.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CaptureOwner {
-    pub kind: i32,
-    pub fighter: Option<crate::model::move_names::FighterId>,
-}
-
-impl CaptureOwner {
-    pub const UNKNOWN: Self = Self { kind: -1, fighter: None };
-}
+pub use crate::model::move_names::CaptureOwner;
 
 /// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

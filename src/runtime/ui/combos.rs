@@ -154,9 +154,9 @@ impl Ui {
             Some(name) => name,
             None => default_name(&library.list().map_err(|e| e.to_string())?.entries),
         };
-        let recorded_on = (owner.kind >= 0).then(|| named_macros::fighter_label(owner.kind));
+        let recorded_on = (owner.kind() >= 0).then(|| named_macros::fighter_label(owner.kind()));
         let mut record = ComboRecord::new(name, combo, recorded_on);
-        record.fighter = owner.fighter;
+        record.fighter = owner.fighter();
         let id = library.save_new(&record).map_err(|e| e.to_string())?;
         live::set_draft("");
         live::saved(&combo);

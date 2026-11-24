@@ -259,7 +259,7 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let posted = if activate { take_record_start() } else { None };
     let start = posted.map(|p| p.start);
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
-    let fighter = posted.and_then(|p| p.fighter);
+    let fighter = posted.and_then(|p| p.owner.fighter());
     // F10: a directly recorded drill owns the macro file holding its take.
     let kept = if activate { keep_drill_take(root, start) } else { None };
     let saved = match kept {
@@ -423,12 +423,12 @@ static START_GATE: AtomicBool = AtomicBool::new(false);
 struct PostedStart {
     seq: u64,
     start: RecordStart,
-    fighter: Option<crate::model::move_names::FighterId>,
+    owner: CaptureOwner,
 }
 
 /// One game-thread writer (chord or placement poll), one recording-worker reader.
 static RECORD_STARTS: hos_lock::TripleBuffer<PostedStart> =
-    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, fighter: None });
+    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN });
 static START_SEQ: AtomicU64 = AtomicU64::new(0);
 static START_USED: AtomicU64 = AtomicU64::new(0);
 /// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
@@ -1033,7 +1033,7 @@ pub fn note_record_start(start: RecordStart) {
 
 pub fn post_record_start(start: RecordStart, fighter: Option<crate::model::move_names::FighterId>) {
     let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
-    RECORD_STARTS.write(PostedStart { seq, start, fighter });
+    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter) });
 }
 
 fn take_record_start() -> Option<PostedStart> {
@@ -2164,9 +2164,9 @@ fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
         return;
     };
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
-    let label = super::rr_runtime::fighter_name(owner.kind);
+    let label = super::rr_runtime::fighter_name(owner.kind());
     let recorded_on = (!label.is_empty()).then_some(label);
-    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, owner.fighter, unix_now()) {
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, owner.fighter(), unix_now()) {
         tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
     }
 }
@@ -4993,7 +4993,7 @@ mod tests {
         assert!(empty.notices.contains(&EMPTY_COMBO));
         assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
         PUBLISHED.set_player(Some((8, recorded)));
-        set_strip_sample((3, Some(sample_combo()), CaptureOwner { kind: 8, fighter: Some(recorded) }));
+        set_strip_sample((3, Some(sample_combo()), CaptureOwner::new(8, Some(recorded))));
         PUBLISHED.set_player(Some((7, later)));
         set_fighter_label("Fox");
         post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });

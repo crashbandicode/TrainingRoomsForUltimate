@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering};
 
 use super::frame_strip::Move;
 use super::hash40::hash40;
@@ -265,7 +265,6 @@ impl core::fmt::Display for Name<'_> {
 pub struct Published {
     on: AtomicBool,
     names: AtomicPtr<Names>,
-    kind: AtomicI32,
     player: AtomicU64,
     target: AtomicU64,
 }
@@ -290,10 +289,24 @@ fn unpack(bits: u64) -> Option<FighterId> {
     })
 }
 
+/// The captured fighter and Mii variants, with the kind in unused bits 48..62.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptureOwner(u64);
+
+impl CaptureOwner {
+    pub const UNKNOWN: Self = Self(0);
+    pub fn new(kind: i32, fighter: Option<FighterId>) -> Self {
+        if !(0..0x7fff).contains(&kind) { return Self::UNKNOWN; }
+        Self(pack(fighter) | ((kind as u64 + 1) << 48))
+    }
+    pub fn kind(self) -> i32 { ((self.0 >> 48) & 0x7fff) as i32 - 1 }
+    pub fn fighter(self) -> Option<FighterId> { unpack(self.0) }
+}
+
 impl Published {
     pub const fn new() -> Self {
         Self { on: AtomicBool::new(false), names: AtomicPtr::new(core::ptr::null_mut()),
-            kind: AtomicI32::new(-1), player: AtomicU64::new(0), target: AtomicU64::new(0) }
+            player: AtomicU64::new(0), target: AtomicU64::new(0) }
     }
     pub fn set_on(&self, on: bool) { self.on.store(on, Ordering::Release); }
     pub fn is_on(&self) -> bool { self.on.load(Ordering::Acquire) }
@@ -310,15 +323,11 @@ impl Published {
         unsafe { ptr.as_ref() }
     }
     pub fn set_player(&self, player: Option<(i32, FighterId)>) {
-        self.kind.store(-1, Ordering::SeqCst);
-        self.player.store(pack(player.map(|(_, id)| id)), Ordering::SeqCst);
-        self.kind.store(player.map_or(-1, |(kind, _)| kind), Ordering::SeqCst);
+        self.player.store(player.map_or(0, |(kind, id)| CaptureOwner::new(kind, Some(id)).0), Ordering::Release);
     }
     pub fn player(&self) -> Option<(i32, FighterId)> {
-        let before = self.kind.load(Ordering::SeqCst);
-        let id = unpack(self.player.load(Ordering::SeqCst))?;
-        let after = self.kind.load(Ordering::SeqCst);
-        (before >= 0 && before == after).then_some((before, id))
+        let owner = CaptureOwner(self.player.load(Ordering::Acquire));
+        Some((owner.kind(), owner.fighter()?))
     }
     pub fn set_target(&self, fighter: Option<FighterId>) { self.target.store(pack(fighter), Ordering::Release); }
     pub fn target(&self) -> Option<FighterId> { unpack(self.target.load(Ordering::Acquire)) }

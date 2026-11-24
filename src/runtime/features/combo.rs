@@ -139,7 +139,7 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         helper.retain_owner(before, || {
             let kind = p1_kind.unwrap_or(-1);
             let fighter = crate::model::move_names::recorded_identity(crate::model::move_names::PUBLISHED.player(), kind);
-            CaptureOwner { kind, fighter }
+            CaptureOwner::new(kind, fighter)
         });
         SAMPLE.write(Sample {
             seen: helper.seen(),

@@ -300,9 +300,9 @@ fn a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh() {
     let mut run = Run::new(with_target());
     let before = run.helper.seen();
     run.combo(JAB, &[(UP_TILT, 1)], ON);
-    let original = CaptureOwner { kind: 8, fighter: Some(crate::model::move_names::FighterId {
+    let original = CaptureOwner::new(8, Some(crate::model::move_names::FighterId {
         chara: crate::model::hash40::hash40("ui_chara_pikachu"), specials: [0; 4],
-    }) };
+    }));
     run.helper.retain_owner(before, || original);
     let before = run.helper.seen();
     // The strip clears while the load runs and starts counting again.
