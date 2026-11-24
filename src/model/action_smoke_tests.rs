@@ -226,9 +226,9 @@ fn a_reacted_release_round_trips() {
     assert_eq!(release_kind(&crop.combo), Kind::LetGo(Button::Attack));
     let mut two = InputCapture::new();
     two.step_late(Snap { buttons: A, ..Snap::empty(0) }, Late::NONE);
-    two.step_late(Snap::empty(2), Late { turned: Some(false), ..Late::NONE });
+    two.step_late(Snap::empty(2), Late { turned: Some(Some(0)), ..Late::NONE });
     two.step_late(Snap { buttons: B, ..Snap::empty(30) }, Late::NONE);
-    two.step_late(Snap::empty(40), Late { turned: Some(false), ..Late::NONE });
+    two.step_late(Snap::empty(40), Late { turned: Some(Some(30)), ..Late::NONE });
     let cropped = ComboRecord::new("Two".into(), two.combo, None).crop_units(1, 2).unwrap();
     assert_eq!(release_kind(&cropped.combo), Kind::LetGo(Button::Special));
     assert_eq!(cropped.combo.get(0).unwrap().events().map(|event| event.offset).collect::<Vec<_>>(), vec![0, 10]);
@@ -244,7 +244,7 @@ fn a_reacted_release_round_trips() {
     let mut input = InputCapture::new();
     input.step_late(Snap { buttons: A | B, ..Snap::empty(1) }, Late::NONE);
     input.step_late(Snap::empty(2), Late::NONE);
-    input.step_late(Snap::empty(3), Late { turned: Some(false), ..Late::NONE });
+    input.step_late(Snap::empty(3), Late { turned: Some(Some(1)), ..Late::NONE });
     let releases = input.combo.links().flat_map(LinkRec::events).filter_map(|event| match event.kind {
         Kind::LetGo(button) => Some(button),
         _ => None,
@@ -361,5 +361,112 @@ fn a_failed_attempt_is_not_taken_back_by_a_later_reset() {
     chord(&mut tracker, &mut helper, 8, true);
     clear_held_chord(&mut tracker, &mut helper);
     assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
+}
+
+fn charge_with_other(attack_hold: u32, special_hold: Option<u32>, target: Option<Combo>) -> (Combo, Option<Summary>) {
+    let mut tracker = Tracker::new();
+    let mut input = InputCapture::new();
+    let mut helper = Helper::new();
+    helper.set_target(target);
+    for frame in 1..=80 {
+        let attack_release = attack_hold + 1;
+        let p1 = if frame == 1 {
+            standing()
+        } else {
+            active(Move::SideSmash, if frame < attack_release { 0x2f } else { 0x30 })
+        };
+        let mut buttons = if frame < attack_release { A } else { 0 };
+        if special_hold.is_some_and(|hold| frame >= 20 && frame < 20 + hold) { buttons |= B; }
+        let mapped = MappedInputs { buttons, lstick_x: 60, ..MappedInputs::NEUTRAL };
+        tracker.step(p1, standing(), mapped);
+        input.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        helper.step(&tracker, Settings::factory());
+    }
+    let result = helper.results().next().copied();
+    (input.combo, result)
+}
+
+#[test]
+fn only_the_owning_press_reacts_to_its_actions_change() {
+    let (target, _) = charge_with_other(40, Some(21), None);
+    let releases = target.links().flat_map(LinkRec::events).filter_map(|event| match event.kind {
+        Kind::Release(_) | Kind::LetGo(_) => Some(event.kind),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(releases, vec![Kind::LetGo(Button::Attack), Kind::Release(Button::Special)]);
+    let (alone, _) = charge_with_other(40, None, None);
+    assert_eq!(release_kind(&alone), Kind::LetGo(Button::Attack));
+    for hold in [3, 30] {
+        assert!(charge_with_other(40, Some(hold), Some(target)).1.unwrap().clean, "{hold}");
+    }
+    assert_eq!(charge_with_other(33, Some(3), Some(target)).1.unwrap().fault,
+        Some((0, Reason::ReleaseOff(Button::Attack, -7))));
+}
+
+#[test]
+fn a_press_does_not_react_to_the_opening_of_its_own_action() {
+    let mut tracker = Tracker::new();
+    let mut input = InputCapture::new();
+    for frame in 1..=3 {
+        let (p1, mapped) = shape_frame(Shape::Tap, frame, 2, 0);
+        tracker.step(p1, standing(), mapped);
+        if frame == 2 {
+            assert_eq!(tracker.late().turned, Some(None));
+            assert_eq!(tracker.late().open, Some((Some(1), None)));
+        }
+        input.step_late(tracker.snaps().last().unwrap(), tracker.late());
+    }
+    assert_eq!(release_kind(&input.combo), Kind::Release(Button::Special));
+}
+
+#[test]
+fn a_held_moves_end_is_a_reaction_for_its_own_press() {
+    for new_action in [false, true] {
+        let mut tracker = Tracker::new();
+        let mut input = InputCapture::new();
+        for frame in 1..=15 {
+            let p1 = if frame == 1 { standing() }
+                else if frame < 10 { active(Move::UpSpecial, 0x1de) }
+                else if new_action { active(Move::Jab, 0x27) }
+                else { standing() };
+            let mut buttons = if frame < 10 { B } else { 0 };
+            if new_action && (7..13).contains(&frame) { buttons |= A; }
+            tracker.step(p1, standing(), MappedInputs { buttons, ..MappedInputs::NEUTRAL });
+            if frame == 10 {
+                assert_eq!(tracker.late().turned, Some(Some(1)));
+                if new_action { assert_eq!(tracker.late().open, Some((Some(7), None))); }
+                else { assert_eq!(tracker.late().open, None); }
+            }
+            input.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        }
+        let releases = input.combo.links().flat_map(LinkRec::events).filter_map(|event| match event.kind {
+            Kind::Release(_) | Kind::LetGo(_) => Some(event.kind),
+            _ => None,
+        }).collect::<Vec<_>>();
+        let expected = if new_action { vec![Kind::LetGo(Button::Special), Kind::Release(Button::Attack)] }
+            else { vec![Kind::LetGo(Button::Special)] };
+        assert_eq!(releases, expected);
+    }
+}
+
+#[test]
+fn a_recording_uses_the_selected_tolerance() {
+    for (delay, window, expected) in [
+        (1, 0, Kind::Release(Button::Attack)), (1, 1, Kind::LetGo(Button::Attack)),
+        (2, 1, Kind::Release(Button::Attack)), (2, 2, Kind::LetGo(Button::Attack)),
+    ] {
+        let mut tracker = Tracker::new();
+        let mut input = InputCapture::new();
+        for frame in 1..=80 {
+            let (p1, mapped) = shape_frame(Shape::Charge, frame, 41, delay);
+            tracker.step(p1, standing(), mapped);
+            input.set_window(window);
+            input.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        }
+        assert_eq!(release_kind(&input.combo), expected, "delay {delay}, window {window}");
+    }
+    let source = include_str!("../runtime/features/input_display.rs");
+    assert!(source.contains("let tolerance = super::combo::settings().tolerance;"));
+    assert!(source.contains("crate::engine::rr_host::observe_input(snap, tracker.late(), tolerance, tracker.contact_now())"));
 }
 }
