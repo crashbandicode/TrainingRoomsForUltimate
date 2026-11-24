@@ -414,6 +414,26 @@ fn a_malformed_message_file_is_refused_whole() {
     assert!(std::panic::catch_unwind(|| Names::build(&bad_tag)).unwrap().is_err(), "tag size");
 }
 
+fn the_kept_byte_budget_includes_the_index() {
+    // 64 distinct entries of 7 index bytes and 249 text bytes each.
+    let mut entries: Vec<_> = (0..64)
+        .map(|i| (format!("nam_final_arts_fiction{i}"), vec![0x61; 249]))
+        .collect();
+    assert_eq!(Names::build(&message(&entries)).unwrap().bytes(), 16 * 1024);
+    entries[63].1.push(0x62);
+    assert!(Names::build(&message(&entries)).is_err(), "one byte over the retained-table budget");
+}
+
+fn the_work_budget_counts_all_labels_and_only_selected_texts() {
+    let selected = "nam_final_arts_alpha";
+    let ignored = "unrelated";
+    let file = texts(&[(ignored, "not decoded"), (selected, "A🌟")]);
+    let cost = (5 + ignored.len()) + (5 + selected.len()) + 8; // Four UTF-16 units including NUL.
+    let names = Names::build_with_work_budget(&file, cost).unwrap();
+    assert_eq!(names.special(key("alpha"), Slot::Final, 0), Some("A🌟"));
+    assert!(Names::build_with_work_budget(&file, cost - 1).is_err());
+}
+
 fn control_tags_are_dropped_from_a_name() {
     let mut text: Vec<u16> = "テスト".encode_utf16().collect();
     text.extend_from_slice(&[0x0e, 1, 2, 4, 0x304b, 0x306a, 0x0f, 1, 2]);
@@ -600,6 +620,8 @@ fn case_table() {
         ("the_move_names_loader_runs_on_a_transient_stack_sized_for_the_arc_read", the_move_names_loader_runs_on_a_transient_stack_sized_for_the_arc_read as fn()),
         ("the_kept_table_is_one_small_block_and_the_file_is_not_kept", the_kept_table_is_one_small_block_and_the_file_is_not_kept as fn()),
         ("a_malformed_message_file_is_refused_whole", a_malformed_message_file_is_refused_whole as fn()),
+        ("the_kept_byte_budget_includes_the_index", the_kept_byte_budget_includes_the_index as fn()),
+        ("the_work_budget_counts_all_labels_and_only_selected_texts", the_work_budget_counts_all_labels_and_only_selected_texts as fn()),
         ("control_tags_are_dropped_from_a_name", control_tags_are_dropped_from_a_name as fn()),
         ("the_help_texts_are_not_names", the_help_texts_are_not_names as fn()),
         ("a_long_name_is_cut_at_a_character_boundary", a_long_name_is_cut_at_a_character_boundary as fn()),

@@ -98,37 +98,46 @@ pub struct Refused;
 
 pub struct Names { bytes: Box<[u8]> }
 
+// Stock's largest table, including its index, is 14.2 KiB.
+const MAX_KEPT: usize = 16 * 1024;
+
 fn u16_at(data: &[u8], at: usize) -> Result<u16, Refused> {
-    let end = at.checked_add(2).ok_or(Refused)?;
-    Ok(u16::from_le_bytes(data.get(at..end).ok_or(Refused)?.try_into().map_err(|_| Refused)?))
+    Ok(u16::from_le_bytes(*data.get(at..).and_then(|s| s.first_chunk()).ok_or(Refused)?))
 }
 
 fn u32_at(data: &[u8], at: usize) -> Result<u32, Refused> {
-    let end = at.checked_add(4).ok_or(Refused)?;
-    Ok(u32::from_le_bytes(data.get(at..end).ok_or(Refused)?.try_into().map_err(|_| Refused)?))
+    Ok(u32::from_le_bytes(*data.get(at..).and_then(|s| s.first_chunk()).ok_or(Refused)?))
 }
 
-fn decode_text(data: &[u8]) -> Result<String, Refused> {
-    let mut at: usize = 0;
-    let mut units = Vec::new();
+fn text_unit(data: &mut &[u8]) -> Option<u16> {
     loop {
-        let unit = u16_at(data, at)?;
-        at += 2;
-        match unit {
-            0 => break,
-            0x000e => {
-                let size = usize::from(u16_at(data, at.checked_add(4).ok_or(Refused)?)?);
-                at = at.checked_add(6).and_then(|at| at.checked_add(size)).ok_or(Refused)?;
-                if at > data.len() { return Err(Refused); }
-            }
-            0x000f => {
-                at = at.checked_add(4).ok_or(Refused)?;
-                if at > data.len() { return Err(Refused); }
-            }
-            _ => units.push(unit),
+        let (unit, rest) = data.split_first_chunk()?;
+        let skip = match u16::from_le_bytes(*unit) {
+            0x0e => 6 + usize::from(u16_at(rest, 4).ok()?),
+            0x0f => 4,
+            value => { *data = rest; return Some(value); }
+        };
+        *data = rest.get(skip..)?;
+    }
+}
+
+fn append_text(mut data: &[u8], out: &mut Vec<u8>) -> Result<u8, Refused> {
+    let start = out.len();
+    let mut terminated = false;
+    let units = core::iter::from_fn(|| match text_unit(&mut data) {
+        Some(0) => { terminated = true; None }
+        other => other,
+    });
+    let mut decoded = 0;
+    for scalar in char::decode_utf16(units) {
+        let ch = scalar.map_err(|_| Refused)?;
+        decoded += ch.len_utf8();
+        if decoded <= usize::from(u8::MAX) {
+            if start + decoded > MAX_KEPT { return Err(Refused); }
+            out.extend_from_slice(ch.encode_utf8(&mut [0; 4]).as_bytes());
         }
     }
-    String::from_utf16(&units).map_err(|_| Refused)
+    terminated.then_some((out.len() - start) as u8).ok_or(Refused)
 }
 
 fn label_key(label: &str) -> Option<(u64, Slot, u8)> {
@@ -151,18 +160,25 @@ fn label_key(label: &str) -> Option<(u64, Slot, u8)> {
 
 impl Names {
     pub fn build(msbt: &[u8]) -> Result<Self, Refused> {
+        Self::build_with_work_budget(msbt, msbt.len())
+    }
+
+    // Header/offset tables are scanned once. Charge nested label and text visits
+    // against one file length, including repeat visits to the same byte range.
+    fn build_with_work_budget(msbt: &[u8], mut remaining: usize) -> Result<Self, Refused> {
         if msbt.get(..8) != Some(&b"MsgStdBn"[..]) || msbt.get(8..10) != Some(&[0xff, 0xfe][..])
-            || msbt.get(0x0c) != Some(&1) || usize::try_from(u32_at(msbt, 0x12)?).map_err(|_| Refused)? != msbt.len()
+            || msbt.get(0x0c) != Some(&1) || u32_at(msbt, 0x12)? as usize != msbt.len()
         { return Err(Refused); }
         let count = usize::from(u16_at(msbt, 0x0e)?);
         let mut at = 0x20usize;
         let (mut labels, mut texts) = (None, None);
         for _ in 0..count {
             let body = at.checked_add(16).ok_or(Refused)?;
-            let size = usize::try_from(u32_at(msbt, at.checked_add(4).ok_or(Refused)?)?).map_err(|_| Refused)?;
+            let header = msbt.get(at..body).ok_or(Refused)?;
+            let size = u32_at(header, 4)? as usize;
             let end = body.checked_add(size).ok_or(Refused)?;
             let section = msbt.get(body..end).ok_or(Refused)?;
-            match msbt.get(at..at.checked_add(4).ok_or(Refused)?).ok_or(Refused)? {
+            match &header[..4] {
                 b"LBL1" if labels.is_none() => labels = Some(section),
                 b"TXT2" if texts.is_none() => texts = Some(section),
                 b"LBL1" | b"TXT2" => return Err(Refused),
@@ -172,15 +188,18 @@ impl Names {
             if at > msbt.len() { return Err(Refused); }
         }
         let (labels, texts) = (labels.ok_or(Refused)?, texts.ok_or(Refused)?);
-        let text_count = usize::try_from(u32_at(texts, 0)?).map_err(|_| Refused)?;
+        let text_count = u32_at(texts, 0)? as usize;
         let text_head = text_count.checked_mul(4).and_then(|n| n.checked_add(4)).ok_or(Refused)?;
         if text_head > texts.len() { return Err(Refused); }
-        for i in 0..text_count {
+        let text_at = |i: usize| {
+            if i >= text_count { return Err(Refused); }
             let start = u32_at(texts, 4 + i * 4)? as usize;
             let end = if i + 1 == text_count { texts.len() } else { u32_at(texts, 8 + i * 4)? as usize };
-            if start < text_head || start > end || end > texts.len() { return Err(Refused); }
-        }
-        let groups = usize::try_from(u32_at(labels, 0)?).map_err(|_| Refused)?;
+            if start < text_head { return Err(Refused); }
+            texts.get(start..end).ok_or(Refused)
+        };
+        for i in 0..text_count { text_at(i)?; }
+        let groups = u32_at(labels, 0)? as usize;
         let label_head = groups.checked_mul(8).and_then(|n| n.checked_add(4)).ok_or(Refused)?;
         if label_head > labels.len() { return Err(Refused); }
         let mut kept = Vec::new();
@@ -190,6 +209,7 @@ impl Names {
             if pos > labels.len() || (count != 0 && pos < label_head) || count > (labels.len() - pos) / 5 { return Err(Refused); }
             for _ in 0..count {
                 let len = usize::from(*labels.get(pos).ok_or(Refused)?);
+                remaining = remaining.checked_sub(5 + len).ok_or(Refused)?;
                 pos = pos.checked_add(1).ok_or(Refused)?;
                 let end = pos.checked_add(len).ok_or(Refused)?;
                 let bytes = labels.get(pos..end).ok_or(Refused)?;
@@ -198,16 +218,14 @@ impl Names {
                 let index = u32_at(labels, end)? as usize;
                 pos = end.checked_add(4).ok_or(Refused)?;
                 if let Some((chara, slot, variant)) = label_key(label) {
-                    if index >= text_count { return Err(Refused); }
-                    let start = u32_at(texts, 4 + index * 4)? as usize;
-                    let end = if index + 1 == text_count { texts.len() } else { u32_at(texts, 8 + index * 4)? as usize };
-                    let text = decode_text(texts.get(start..end).ok_or(Refused)?)?;
-                    let mut len = text.len().min(u8::MAX as usize);
-                    while !text.is_char_boundary(len) { len -= 1; }
+                    let text = text_at(index)?;
+                    remaining = remaining.checked_sub(text.len()).ok_or(Refused)?;
+                    if kept.len() > MAX_KEPT - 7 { return Err(Refused); }
                     kept.extend_from_slice(&chara.to_le_bytes()[..5]);
                     kept.push((slot as u8) | (variant << 4));
-                    kept.push(u8::try_from(len).map_err(|_| Refused)?);
-                    kept.extend_from_slice(&text.as_bytes()[..len]);
+                    let size_at = kept.len();
+                    kept.push(0);
+                    kept[size_at] = append_text(text, &mut kept)?;
                 }
             }
         }
