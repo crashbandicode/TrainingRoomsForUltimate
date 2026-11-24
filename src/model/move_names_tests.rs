@@ -108,7 +108,7 @@ fn isolated(name: &str, case: impl FnOnce()) {
 fn link(from: Move, to: Move) -> Link {
     Link {
         verdict: Verdict::True(None), hit: 0, free: None, actionable: 0, press: 0, input: 0,
-        window: None, from, to, shown: [Shown::default(); 2], owners: [0; 2], spot: None,
+        window: None, from, to, shown: [Shown::default(); 2], variants: [0; 2], owners: [0; 2], spot: None,
     }
 }
 

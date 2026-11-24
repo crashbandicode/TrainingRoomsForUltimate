@@ -172,7 +172,7 @@ fn the_strip_the_bar_and_the_menu_name_a_grab_a_throw_and_a_final_smash() {
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Throw");
     let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert!(crate::model::recording_menu::combo_link_lines(&combo)[0].starts_with("L1 jab → throw TRUE"));
+    assert!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0].starts_with("L1 jab → throw TRUE"));
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
     let mut texts = Vec::new();
