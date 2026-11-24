@@ -534,7 +534,7 @@ fn a_hit_combo_tells_an_angled_tilt_from_a_level_one() {
     assert!(!grade(&up, &up).wrong_move);
     let mut helper = Helper::new();
     helper.set_target(Some(Combo::from_links([up]).unwrap()));
-    helper.on_link(level, true, 1, &mut Out::default(), None);
+    helper.on_link(level, true, 1, &mut Out::default());
     assert_eq!(helper.results().next().unwrap().fault, Some((0, Reason::WrongMove(Move::SideTilt))));
     let special = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"up_special"}))).combo.get(0).unwrap();
     let other = *hit_record("jab", "other", empty(), Some(serde_json::json!({"of":"side_special"}))).combo.get(0).unwrap();
@@ -656,6 +656,23 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
         action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
     let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
     assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
+}
+
+#[test]
+fn a_finished_side_attack_keeps_its_animation_direction_in_the_take() {
+    for (mv, angle, expected) in [
+        (Move::SideTilt, Some(Angle::Up), Dir::ForwardUp),
+        (Move::SideSmash, Some(Angle::Down), Dir::ForwardDown),
+        (Move::SideTilt, None, Dir::Forward),
+    ] {
+        let (mut tracker, mut capture) = tilt((60, 0), angle, mv);
+        let press = |capture: &InputCapture| capture.combo.get(0).unwrap().events()
+            .find(|e| e.kind == Kind::Press(Button::Attack)).unwrap().dir;
+        assert_eq!(press(&capture), expected);
+        tracker.step(standing(), standing(), MappedInputs::NEUTRAL);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        assert_eq!(press(&capture), expected, "{mv:?} after returning to idle");
+    }
 }
 
 #[test]

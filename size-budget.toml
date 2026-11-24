@@ -2681,6 +2681,14 @@ approved_by = "tr-primary-2 ruling 2026-11-24 20:35:08Z (the merge-3 line budget
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 198144
+date = "2026-11-24"
+reason = "Delay a missing aim verdict while the active special can still supply it; leave press and release deadlines unchanged. Measured +8 implementation lines against c4c43b23."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:09:55Z: fix-only ceiling 198,144, subject to the full size receipt."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 198312
 date = "2026-11-24"
 reason = "Move names on install 4 merge 2 (0db4728c): measured 198312 on the merged tree (tools/sloc.py tree), which is merge 2's 197277 plus the move-name toggle's 1035, with no lines from the resolution."
@@ -2717,3 +2725,11 @@ ceiling = 199232
 date = "2026-11-24"
 reason = "Move names joined with the ACTION model (feat/action-model c4c43b23, the merge-3 candidate): measured 199232 with the variant joined (tools/sloc.py tree). Merge 3 is 198136 and the move names add 1098 on merge 2 (198375 less 197277); the joined tree is 2 lines under their sum, because the three print sites now share the ACTION model's one formatter."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199239
+date = "2026-11-24"
+reason = "Move names joined with the ACTION model on the install 4 merge-3 head e09fc3cf: measured 199239 (tools/sloc.py tree), which is the join's 199232 on the merge-3 candidate plus 7 of the two reviewer fixes merge 3 took (the pending-aim fix was approved at +8), with no lines from the merge."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above and its 21:09:55Z approval of the merge-3 reviewer fixes."

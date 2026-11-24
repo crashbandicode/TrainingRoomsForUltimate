@@ -814,7 +814,7 @@ impl Tracker {
                 self.push_aim(frame, angle.dir());
             }
         }
-        let side = matches!(self.action.mv, Move::SideTilt | Move::SideSmash).then_some(self.action.angle);
+        let side = matches!(p1.attack, Some(Move::SideTilt | Move::SideSmash)).then_some(p1.angle);
         if opened || (side.is_some() && side != self.action.told) {
             self.late.open = Some((self.action.origin, side));
             self.action.told = side;
