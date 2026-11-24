@@ -129,6 +129,20 @@ fn an_active_special_can_still_supply_a_nonfinal_steps_aim() {
 }
 
 #[test]
+fn waiting_for_direction_does_not_extend_a_button_deadline() {
+    let target = captured(Some(4), Some(0), true, false, true);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    for frame in 0..=17 {
+        let mut now = script(frame, None, None, true, false);
+        now.buttons = 2;
+        helper.step_inputs(now, &mut Out::default());
+    }
+    let summary = helper.results().next().expect("the saved release is already missing");
+    assert_eq!(summary.fault, Some((0, Reason::MissingRelease(Button::Special))));
+}
+
+#[test]
 fn an_attempt_that_adds_a_second_part_fails_a_one_part_drill_step() {
     let target = captured(Some(4), None, true, true, true);
     assert_eq!(target.len(), 2);
