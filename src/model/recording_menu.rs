@@ -3533,6 +3533,73 @@ mod tests {
         }
     }
 
+    fn a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it() {
+        use crate::model::bridge_state::{list_view, ListView};
+        for (group, section, label) in [
+            (SAVES_MACROS, 1, "+ New chain"), (COMBOS_SEQ, 0, "+ New sequence"),
+        ] {
+            let mut m = f9_new_menu(group, section, label);
+            let mut catalog = long_catalog();
+            if group == SAVES_MACROS {
+                catalog.macros.clear();
+            } else {
+                catalog.combos.clear();
+            }
+            m.recording_mut().set_catalog(catalog);
+            let rows = m.recording().section(Face::Page, group, section).rows;
+            let index = rows.iter().position(|row| row.name == label).unwrap();
+            m.recording_mut().set_cursor(Face::Page, group, section, index);
+            let id = format!("recording/page/{group}/{section}");
+            assert_eq!((m.depth(), list_view(&m).id), (0, id.clone()));
+            m.press(Button::A);
+            assert!(m.recording().picker_open());
+            assert_eq!(list_view(&m), ListView::default(), "{label}");
+            assert_eq!(m.depth(), 1);
+            m.press(Button::B);
+            assert!(!m.recording().picker_open());
+            assert_eq!((m.depth(), list_view(&m).id), (0, id));
+            assert!(!m.is_closed());
+        }
+
+        let mut keyboard = f9_new_menu(SAVES_MACROS, 1, "+ New chain");
+        keyboard.press(Button::A);
+        assert_eq!((keyboard.depth(), list_view(&keyboard).id), (1, "recording/picker".into()));
+        keyboard.press(Button::A);
+        keyboard.press(Button::X);
+        assert!(keyboard.recording().naming());
+        assert!(!keyboard.recording().picker_open());
+        assert_eq!(list_view(&keyboard), ListView::default());
+        assert_eq!(keyboard.depth(), 1);
+        keyboard.press(Button::B);
+        assert!(!keyboard.recording().naming());
+        assert_eq!((keyboard.depth(), list_view(&keyboard).id), (0, format!("recording/page/{SAVES_MACROS}/1")));
+        assert!(!keyboard.is_closed());
+
+        let mut file = f9_new_menu(SAVES_MACROS, 0, "Corner");
+        file.press(Button::A);
+        assert_eq!((file.depth(), list_view(&file).id), (1, "recording/file".into()));
+        file.recording_mut().set_loading();
+        assert!(file.recording().page_overlay_open());
+        assert_eq!(list_view(&file), ListView::default());
+        assert_eq!(file.depth(), 1);
+        file.press(Button::B);
+        assert!(!file.recording().page_overlay_open());
+        assert_eq!(file.depth(), 0);
+        assert!(!file.is_closed());
+
+        let mut ordinary = recording_list_menu();
+        for _ in 0..500 {
+            if ordinary.help_row().is_some_and(|row| row.id == "recording_crop") { break; }
+            ordinary.press(Button::Down);
+        }
+        assert!(ordinary.help_row().is_some_and(|row| row.id == "recording_crop"));
+        let page = list_view(&ordinary);
+        assert_eq!(page.id, "page");
+        assert!(page.index.is_some());
+        assert_eq!(ordinary.depth(), 0);
+        assert!(!ordinary.recording().page_overlay_open());
+    }
+
     fn every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists() {
         use crate::model::bridge_state::list_view;
         use std::collections::BTreeSet;
@@ -3565,6 +3632,7 @@ mod tests {
                 }
                 if m.recording().popup_open() || (m.page() == Page::Recording && m.screen().is_none()) {
                     let id = list_view(&m).id;
+                    assert!(!(m.recording().page_overlay_open() && id == "page"), "{face:?} {history:?}");
                     if !id.is_empty() { ids.insert(id); }
                     keyboard |= m.recording().naming();
                     deepest = deepest.max(m.depth());
@@ -3759,6 +3827,7 @@ mod tests {
             ("popup_background_holds_its_chrome", popup_background_holds_its_chrome as fn()),
             ("drills_are_a_filtered_combo_sublist_on_both_faces",drills_are_a_filtered_combo_sublist_on_both_faces as fn()),
             ("the_drills_sublist_is_its_own_list_one_level_down_on_both_faces", the_drills_sublist_is_its_own_list_one_level_down_on_both_faces as fn()),
+            ("a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it", a_recording_screen_with_no_row_publishes_no_list_not_the_page_under_it as fn()),
             ("every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists", every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists as fn()),
             ("x_previews_a_drill_that_has_its_take_on_both_faces", x_previews_a_drill_that_has_its_take_on_both_faces as fn()),
             ("a_cropped_made_drill_has_no_preview", a_cropped_made_drill_has_no_preview as fn()),
