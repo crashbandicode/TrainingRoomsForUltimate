@@ -2677,3 +2677,11 @@ ceiling = 198321
 date = "2026-11-24"
 reason = "Bound total move-name parsing work and retained bytes. UTF-16 decoding writes directly to the retained table; measured +9 on 68d14125."
 approved_by = "tr-primary-2, 2026-11-24 19:27:44Z, measured 198321."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198369
+date = "2026-11-24"
+reason = "Bind the retained exchange and directly recorded drill to their captured fighter and Mii loadout; carry the recorded owner through save and target selection."
+approved_by = "tr-primary-2, 2026-11-24 19:31:56Z (+57 on 68d14125, measured on 43b3a21d)."

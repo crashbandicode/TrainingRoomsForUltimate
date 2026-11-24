@@ -600,10 +600,13 @@ struct Capture {
     frame: u32,
 }
 
+pub use crate::model::move_names::CaptureOwner;
+
 /// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
     capture: Capture,
+    pub(crate) retained_owner: CaptureOwner,
     /// Links captured so far (wrapping; a clear keeps it): Make combo saves only an exchange captured after it began.
     seen: u32,
     target: Option<Combo>,
@@ -619,6 +622,7 @@ pub struct Helper {
 impl Helper {
     pub(crate) const fn new() -> Self {
         Self {
+            retained_owner: CaptureOwner::UNKNOWN,
             capture: Capture {
                 exchange: 0,
                 after: 0,
@@ -684,6 +688,10 @@ impl Helper {
     /// Links captured so far (wrapping). A change means `last_combo` holds a link captured since the count was read.
     pub fn seen(&self) -> u32 {
         self.seen
+    }
+
+    pub fn retain_owner(&mut self, before: u32, source: impl FnOnce() -> CaptureOwner) {
+        if self.seen != before { self.retained_owner = source(); }
     }
 
     pub fn attempt(&self) -> Option<&Attempt> {

@@ -1,19 +1,10 @@
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 
+use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::move_names::{load_step, FighterId, LoadStep, Names, PUBLISHED};
 use crate::model::thread_stacks::ThreadId;
 use crate::runtime::{game, threads};
 
-pub mod ids {
-    crate::model::cpu::ids::game_constants! {
-        Neutral = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_N_NO",
-        Side = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_S_NO",
-        Up = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_HI_NO",
-        Down = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_LW_NO",
-    }
-}
-
-static LAST_KIND: AtomicI32 = AtomicI32::new(-1);
 static ARCROPOLIS: AtomicBool = AtomicBool::new(false);
 static MOUNTED: AtomicBool = AtomicBool::new(false);
 static GIVE_UP: AtomicBool = AtomicBool::new(false);
@@ -143,32 +134,16 @@ fn read_exact(handle: skyline::nn::fs::FileHandle, offset: usize, buffer: &mut [
     Ok(())
 }
 
-/// Record P1's kind and identity without allocating or taking a lock.
-///
 /// # Safety
-/// `accessor` is Player 1's live module accessor on the game thread.
-pub unsafe fn note_player(accessor: usize, kind: Option<i32>, cleared: bool) {
-    let Some(kind) = kind.filter(|kind| *kind >= 0) else {
-        LAST_KIND.store(-1, Ordering::Release);
-        PUBLISHED.set_player(None);
-        return;
-    };
-    if !cleared && LAST_KIND.load(Ordering::Acquire) == kind { return; }
-    // SAFETY: the roster function checks its published seam before calling it.
-    let Some(chara) = (unsafe { crate::runtime::roster::character_roster::ui_chara_hash(kind as u32) }) else {
-        LAST_KIND.store(-1, Ordering::Release);
-        PUBLISHED.set_player(None);
-        return;
-    };
-    let mut table = ids::Table::unresolved();
-    // SAFETY: the lookup checks its own guard.
-    table.resolve(|key| unsafe { game::lua_const(key) });
-    let specials = [ids::C::Neutral, ids::C::Side, ids::C::Up, ids::C::Down].map(|id| {
-        if !table.resolved(id) { return 0; }
+/// The body with `kind` and its module accessor must be live on this game thread.
+pub unsafe fn fighter_id(accessor: usize, kind: i32) -> Option<FighterId> {
+    let chara = unsafe { crate::runtime::roster::character_roster::ui_chara_hash(u32::try_from(kind).ok()?) }?;
+    let specials = [C::CustomNeutral, C::CustomSide, C::CustomUp, C::CustomDown].map(|id| {
+        let work = super::cpu::konst(id);
+        if work == UNRESOLVED { return 0; }
         // SAFETY: the accessor is live and the native checks its own guard.
-        let value = unsafe { game::natives::get_int(accessor, table.get(id)) };
+        let value = unsafe { game::natives::get_int(accessor, work) };
         if (0..=2).contains(&value) { value as u8 } else { 0 }
     });
-    PUBLISHED.set_player(Some((kind, FighterId { chara, specials })));
-    LAST_KIND.store(kind, Ordering::Release);
+    Some(FighterId { chara, specials })
 }

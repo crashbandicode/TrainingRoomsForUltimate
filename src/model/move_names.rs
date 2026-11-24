@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering};
 
 use super::frame_strip::Move;
 use super::hash40::hash40;
@@ -265,32 +265,24 @@ impl Names {
 }
 
 #[derive(Clone, Copy)]
-pub struct Name {
-    bytes: [u8; 96],
-    len: usize,
-}
+pub struct Name<'a>(&'a str);
 
-impl Name {
-    pub fn new(source: &str) -> Self {
-        let mut out = Self { bytes: [0; 96], len: 0 };
-        for ch in source.chars() {
-            if out.len + ch.len_utf8() > out.bytes.len() { break; }
-            ch.encode_utf8(&mut out.bytes[out.len..]);
-            out.len += ch.len_utf8();
-        }
-        out
+impl<'a> Name<'a> {
+    pub fn new(source: &'a str) -> Self {
+        let mut end = source.len().min(96);
+        while !source.is_char_boundary(end) { end -= 1; }
+        Self(&source[..end])
     }
-    pub fn as_str(&self) -> &str { core::str::from_utf8(&self.bytes[..self.len]).unwrap_or("") }
+    pub fn as_str(&self) -> &'a str { self.0 }
 }
 
-impl core::fmt::Display for Name {
+impl core::fmt::Display for Name<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { f.write_str(self.as_str()) }
 }
 
 pub struct Published {
     on: AtomicBool,
     names: AtomicPtr<Names>,
-    kind: AtomicI32,
     player: AtomicU64,
     target: AtomicU64,
 }
@@ -315,10 +307,24 @@ fn unpack(bits: u64) -> Option<FighterId> {
     })
 }
 
+/// The captured fighter and Mii variants, with the kind in unused bits 48..62.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptureOwner(u64);
+
+impl CaptureOwner {
+    pub const UNKNOWN: Self = Self(0);
+    pub fn new(kind: i32, fighter: Option<FighterId>) -> Self {
+        if !(0..0x7fff).contains(&kind) { return Self::UNKNOWN; }
+        Self(pack(fighter) | ((kind as u64 + 1) << 48))
+    }
+    pub fn kind(self) -> i32 { ((self.0 >> 48) & 0x7fff) as i32 - 1 }
+    pub fn fighter(self) -> Option<FighterId> { unpack(self.0) }
+}
+
 impl Published {
     pub const fn new() -> Self {
         Self { on: AtomicBool::new(false), names: AtomicPtr::new(core::ptr::null_mut()),
-            kind: AtomicI32::new(-1), player: AtomicU64::new(0), target: AtomicU64::new(0) }
+            player: AtomicU64::new(0), target: AtomicU64::new(0) }
     }
     pub fn set_on(&self, on: bool) { self.on.store(on, Ordering::Release); }
     pub fn is_on(&self) -> bool { self.on.load(Ordering::Acquire) }
@@ -335,15 +341,18 @@ impl Published {
         unsafe { ptr.as_ref() }
     }
     pub fn set_player(&self, player: Option<(i32, FighterId)>) {
-        self.kind.store(-1, Ordering::SeqCst);
-        self.player.store(pack(player.map(|(_, id)| id)), Ordering::SeqCst);
-        self.kind.store(player.map_or(-1, |(kind, _)| kind), Ordering::SeqCst);
+        self.player.store(player.map_or(0, |(kind, id)| CaptureOwner::new(kind, Some(id)).0), Ordering::Release);
     }
     pub fn player(&self) -> Option<(i32, FighterId)> {
-        let before = self.kind.load(Ordering::SeqCst);
-        let id = unpack(self.player.load(Ordering::SeqCst))?;
-        let after = self.kind.load(Ordering::SeqCst);
-        (before >= 0 && before == after).then_some((before, id))
+        let owner = CaptureOwner(self.player.load(Ordering::Acquire));
+        Some((owner.kind(), owner.fighter()?))
+    }
+    /// Only the live publication is a cache; captured and target owners outlive a strip reset.
+    pub fn observe_player(&self, kind: Option<i32>, read: impl FnOnce(i32) -> Option<FighterId>) {
+        let kind = kind.filter(|k| *k >= 0);
+        if CaptureOwner(self.player.load(Ordering::Acquire)).kind() != kind.unwrap_or(-1) {
+            self.set_player(kind.and_then(|k| Some((k, read(k)?))));
+        }
     }
     pub fn set_target(&self, fighter: Option<FighterId>) { self.target.store(pack(fighter), Ordering::Release); }
     pub fn target(&self) -> Option<FighterId> { unpack(self.target.load(Ordering::Acquire)) }
@@ -367,7 +376,7 @@ impl<'a> Namer<'a> {
     pub fn target() -> Namer<'static> { Namer::new(PUBLISHED.is_on(), PUBLISHED.table(), PUBLISHED.target()) }
     pub fn recorded(fighter: Option<FighterId>) -> Namer<'static> { Namer::new(PUBLISHED.is_on(), PUBLISHED.table(), fighter) }
     pub fn is_on(&self) -> bool { self.on }
-    pub fn name(&self, mv: Move, normal: Normal) -> Name {
+    pub fn name(&self, mv: Move, normal: Normal) -> Name<'a> {
         if !self.on { return Name::new(mv.name()); }
         let special = match mv {
             Move::NeutralSpecial => Some((Slot::Neutral, 0, "Neutral special")),
@@ -378,18 +387,16 @@ impl<'a> Namer<'a> {
         };
         if let Some((slot, at, fallback)) = special {
             let found = self.names.zip(self.fighter).and_then(|(names, id)| {
-                names.special(id.chara, slot, id.specials[at]).or_else(|| names.special(id.chara, slot, 0))
+                let variant = id.specials[at];
+                names.special(id.chara, slot, variant).or_else(|| (variant != 0).then(|| names.special(id.chara, slot, 0)).flatten())
             });
             return Name::new(found.unwrap_or(fallback));
         }
         Name::new(normal.name().unwrap_or(match mv {
-            Move::Jab => "Jab", Move::DashAttack => "Dash attack", Move::SideTilt => "Forward tilt",
-            Move::UpTilt => "Up tilt", Move::DownTilt => "Down tilt", Move::SideSmash => "Forward smash",
-            Move::UpSmash => "Up smash", Move::DownSmash => "Down smash", Move::Aerial => "Aerial",
-            _ => "Move",
+            Move::SideTilt => "Forward tilt", Move::SideSmash => "Forward smash", _ => mv.name(),
         }))
     }
-    pub fn final_smash(&self) -> Name {
+    pub fn final_smash(&self) -> Name<'a> {
         let found = self.on.then(|| self.names.zip(self.fighter).and_then(|(names, id)| names.special(id.chara, Slot::Final, 0))).flatten();
         Name::new(found.unwrap_or("Final Smash"))
     }
