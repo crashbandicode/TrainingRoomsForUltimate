@@ -186,3 +186,11 @@ refused. Whether it should be is an open design question (§10).
   the row's naming is confirmed with the diag name hook the named library uses.
 - Pikachu's nair loop frame data, whether the strip marks Pikachu actionable between the jump and the nair, and the
   pane positions are unproven until the combined Eden session.
+
+## ACTION model (2026-11-24)
+
+The implemented rules for steps, clears, hold grading, the one move description and the fighter-agnostic outcome
+rule are recorded in [the ACTION model](../docs/design/action-model.md). For a file with events they are the rules
+that apply; a presses-only file keeps the step definition of §2 and the matching of §3. Described links compare move,
+continuation and angle; older links compare the kind of move. The design lists the host checks and what the trace
+evidence does and does not cover.

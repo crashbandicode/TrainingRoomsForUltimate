@@ -171,6 +171,10 @@ recorded one.
 
 - **TRUE is not required.** A link that is not a true combo still counts. TRUE stays on the bar as information. Drift,
   the stick you hold between the events, is shown and never graded.
+- **Angled moves and held buttons:** a combo saved with move descriptions tells an angled side tilt or side smash
+  from a level one, and names a fighter's own special status by its special. An older file has no descriptions and is
+  graded on the kind of move, as before. A release whose press is in the same link is graded on how long the button
+  was held.
 - **Match sweet/sour spot** (Off by default) also compares the spot: with it On a link counts only if it lands the
   spot the saved link landed. A link saved with no spot always matches.
 - **A follow-up's events end at its hit,** so a button you still hold when the hit lands is not graded for its release.
@@ -190,8 +194,24 @@ recorded one.
 
 - **Record directly:** choose **+ Record drill…**. The library closes and shows the configured Record chord. Press that chord to start recording Player 1, then press it again to stop and save the take straight as a drill. It becomes the current grading target. This one take uses Player 1 even if the pop-up's Record role is CPU; later ordinary recordings keep their selected role. Opening the library before starting cancels the armed take. The menu press and the Record chords are excluded. The take's inputs are kept with the drill in a file of its own; it is not listed under MACROS and is deleted with the drill.
 - **From a macro or chain:** Make combo saves an input drill when the pass touches no opponent. A pass with hit links keeps making a hit combo. The source and current grading target stay selected as before.
-- **Steps:** presses, releases, C-stick and stick flicks share a step until more than 20 frames pass without an input event. A step with 12 events continues in another step. The current shared combo capacity is 16 steps of up to 12 events; an overfull take saves nothing.
-- **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event starts the clock; later steps keep their recorded offsets, including idle gaps. Missing or late releases drop an input step. There is no move, hit, spot or TRUE requirement; the TRUE field stays blank.
+- **Steps:** a press, C-stick input or stick flick starts a new step when it comes more than 20 frames after the last
+  input. A release or a special's first direction does not itself start a step, however late; a second direction has
+  its own step. A step with 12 events continues in another step. The shared combo capacity is 16 steps of up to 12
+  events; an overfull take saves nothing.
+- **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event
+  starts the clock; later steps keep their recorded offsets, including idle gaps. A release is graded on the hold
+  length, not its frame or stick: the hold may differ by the On-time tolerance plus one frame per eight frames of the
+  saved hold, at most 15 extra frames. A release after the step's deadline is missing; missing or late releases drop
+  an input step. A special with saved directions is graded on them, not its press's stick direction. A side tilt or
+  smash uses the angle the game chose, not the stick position. There is no move, hit, spot or TRUE requirement; the
+  TRUE field stays blank.
+- **Directions of a special:** for any fighter, a special records a direction when the fighter starts to move a way
+  that is not the special's own and the stick pointed that way since the press (up to two per special, each graded on
+  its direction). A special that only goes its own way, such as a straight-up up special, records none.
+- **After a Training reset:** buttons held through the reset are not new presses, and the next input starts a fresh
+  attempt.
+- **Older drill files:** a step beginning with a release or first special direction joins the preceding step on load
+  if both fit in 12 events. Loading does not change the file.
 - **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
 - **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
 - **Preview:** on a drill's row, X plays the drill's recorded inputs once on Player 1 through Recording's playback. The menu hides while it plays; X or B stops it, and the page returns about a second after the last input. X does nothing while a macro is already playing on Player 1. Only a drill recorded directly in this build has its inputs: one recorded earlier, a crop, or one Make combo made shows "Re-record to preview" (a made drill's source macro can be played as a macro).
