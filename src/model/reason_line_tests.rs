@@ -22,6 +22,7 @@ const DELTAS: [i32; 6] = [1, -1, 96, -96, i32::MAX, -i32::MAX];
 fn reasons() -> Vec<Reason> {
     let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
         .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(BUTTONS.iter().map(|&b| Kind::LetGo(b)))
         .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
         .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
     let mut all = vec![Reason::Drop(1), Reason::Drop(96), Reason::MissingCStick];
@@ -176,6 +177,7 @@ fn dropped_reason_fits_beside_the_actual_previous_caption() {
 fn every_mark_under_a_step_is_shown_in_full() {
     let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
         .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(BUTTONS.iter().map(|&b| Kind::LetGo(b)))
         .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
         .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
     for kind in kinds {

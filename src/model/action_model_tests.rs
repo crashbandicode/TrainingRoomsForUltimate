@@ -29,6 +29,15 @@ fn recorded(script: &[(u32, u32)]) -> Combo {
     input.combo
 }
 
+fn reacted(mut combo: Combo) -> Combo {
+    for link in combo.links[..combo.len].iter_mut().flatten() {
+        for event in link.events.iter_mut().flatten() {
+            if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+        }
+    }
+    combo
+}
+
 fn standing() -> Sample {
     Sample { actionable: true, facing: 1, ..Sample::default() }
 }
@@ -53,7 +62,7 @@ fn a_cast_after_a_training_reset_is_graded() {
     assert_eq!(drill.len(), 1, "set-up: one step, A held 12 frames");
     let mut tracker = Tracker::new();
     let mut helper = Helper::new();
-    helper.set_target(Some(drill));
+    helper.set_target(Some(reacted(drill)));
     for _ in 0..10 {
         game_frame(&mut tracker, &mut helper, standing(), 0);
     }
@@ -166,7 +175,7 @@ fn a_held_buttons_release_stays_in_the_step_of_its_press() {
         vec![(Kind::Press(Button::Attack), 0), (Kind::Release(Button::Attack), 30)]
     );
     let mut helper = Helper::new();
-    helper.set_target(Some(drill));
+    helper.set_target(Some(reacted(drill)));
     let mut buttons = 0;
     for frame in 0..=55 {
         if let Some(&(_, now)) = script.iter().find(|(at, _)| *at == frame) {
@@ -371,19 +380,19 @@ fn run_drill(reference: Combo, script: &[(u32, u32)], end: u32) -> Summary {
 
 #[test]
 fn a_hold_is_graded_on_its_length_within_a_band() {
-    let reference = recorded(&[(0, ATTACK), (64, 0)]);
+    let reference = reacted(recorded(&[(0, ATTACK), (64, 0)]));
     assert!(run_drill(reference, &[(0, ATTACK), (72, 0)], 110).clean);
     assert!(run_drill(reference, &[(0, ATTACK), (55, 0)], 110).clean);
     assert_eq!(run_drill(reference, &[(0, ATTACK), (74, 0)], 110).fault, Some((0, Reason::MissingRelease(Button::Attack))));
     assert_eq!(run_drill(reference, &[(0, ATTACK), (54, 0)], 110).fault, Some((0, Reason::ReleaseOff(Button::Attack, -10))));
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     assert!(run_drill(reference, &[(0, SPECIAL), (2, 0), (11, ATTACK), (83, 0)], 110).clean);
 }
 
 #[test]
 fn a_short_hold_keeps_the_on_time_tolerance() {
-    let reference = recorded(&[(0, ATTACK), (4, 0)]);
+    let reference = reacted(recorded(&[(0, ATTACK), (4, 0)]));
     assert!(run_drill(reference, &[(0, ATTACK), (5, 0)], 20).clean);
     assert_eq!(run_drill(reference, &[(0, ATTACK), (6, 0)], 20).fault, Some((0, Reason::MissingRelease(Button::Attack))));
     assert_eq!(run_drill(reference, &[(0, ATTACK), (2, 0)], 20).fault, Some((0, Reason::ReleaseOff(Button::Attack, -2))));
@@ -391,7 +400,7 @@ fn a_short_hold_keeps_the_on_time_tolerance() {
 
 #[test]
 fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     let attack = |press, release| run_drill(reference, &[(0, SPECIAL), (2, 0), (press, ATTACK), (release, 0)], 120);
     assert!(attack(10, 83).clean, "on time, the longest hold in band");
@@ -401,7 +410,7 @@ fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
     assert_eq!(attack(9, 83).fault, Some((0, Reason::MissingRelease(Button::Attack))));
 
     // The press in one step, its release in the next: Attack 10..124 (hold 114: band 14), Special tapped at 60..62.
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (124, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (124, 0)]));
     assert_eq!(reference.len(), 2);
     let across = |press, release| run_drill(reference,
         &[(0, SPECIAL), (2, 0), (press, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (release, 0)], 170);
@@ -413,7 +422,7 @@ fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
 
 #[test]
 fn a_repeated_button_uses_its_matching_press_for_the_hold_deadline() {
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     assert!(run_drill(reference, &[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (11, ATTACK), (84, 0)], 120).clean);
     assert_eq!(
@@ -432,6 +441,7 @@ fn a_reference_release_without_its_press_is_not_graded() {
         cropped.get(0).unwrap().events().map(|e| (e.kind, e.offset)).collect::<Vec<_>>(),
         vec![(Kind::Press(Button::Special), 0), (Kind::Release(Button::Attack), 10), (Kind::Release(Button::Special), 12)]
     );
+    let cropped = reacted(cropped);
     assert!(run_drill(cropped, &[(0, SPECIAL), (12, 0)], 25).clean);
 }
 
@@ -451,7 +461,7 @@ fn a_split_step_file_reads_as_the_new_recorder_saves_it() {
     assert_eq!(parsed.combo, input.combo);
     let parsed: ComboRecord = serde_json::from_str(SPLIT_HOLD).unwrap();
     assert_eq!(parsed.combo.len(), 1, "the release is joined to the step of its press");
-    assert_eq!(parsed.combo, recorded(&[(0, ATTACK), (30, 0)]));
+    assert_eq!(parsed.combo, reacted(recorded(&[(0, ATTACK), (30, 0)])));
     let parsed: ComboRecord = serde_json::from_str(TWO_ZIPS).unwrap();
     let mut input = InputCapture::new();
     for frame in 0..=42 {
@@ -473,7 +483,7 @@ fn a_joined_file_is_written_back_unchanged() {
 #[test]
 fn a_release_records_its_hold_in_the_file() {
     use crate::model::combo_record::ComboRecord;
-    let record = ComboRecord::new("Drill".into(), recorded(&[(0, ATTACK), (30, 0)]), None);
+    let record = ComboRecord::new("Drill".into(), reacted(recorded(&[(0, ATTACK), (30, 0)])), None);
     let mut value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["input_steps"][0]["events"][1]["hold"], 30);
     let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
@@ -652,7 +662,7 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
     let mut capture = InputCapture::new();
     capture.step_late(Snap { buttons: ATTACK | CSTICK_ON, lstick_x: 60, lstick_y: 20,
         rstick_x: 60, rstick_y: 20, facing: 1, ..Snap::empty(1) },
-        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
+        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE });
     let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
     assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
 }
@@ -727,7 +737,7 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     helper.set_target(Some(target));
     for frame in 1..=4 {
         let late = if frame == 2 {
-            action::Late { open: Some((Some(1), Some(None))) }
+            action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }
         } else { action::Late::NONE };
         helper.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
             facing: 1, ..Snap::empty(frame) }, Some(late), &mut Out::default());
@@ -735,10 +745,10 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     assert_eq!(helper.attempt().unwrap().len(), 1);
     let mut out = Out::default();
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(5) },
-        Some(action::Late { open: Some((Some(1), Some(None))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }), &mut out);
     assert!(out.link.is_none() && out.resolved.is_none());
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(6) },
-        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE }), &mut out);
     assert_eq!(out.link.unwrap().0, 0);
     assert_eq!(out.resolved.unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
 
