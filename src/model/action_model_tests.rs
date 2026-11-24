@@ -157,7 +157,7 @@ fn a_second_aim_part_keeps_its_own_step() {
 /// drill is one step and the same hold grades clean as one step. Today the release starts a second step
 /// (`input_drill_tests::input_idle_groups_and_continuations_share_combo_bounds` pins that for a 21-frame hold).
 #[test]
-fn a_held_buttons_release_stays_in_its_presss_step() {
+fn a_held_buttons_release_stays_in_the_step_of_its_press() {
     let script = [(0, ATTACK), (30, 0)];
     let drill = recorded(&script);
     assert_eq!(drill.len(), 1, "a press and its own release are one step");
