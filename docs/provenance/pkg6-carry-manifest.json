@@ -12763,7 +12763,7 @@
       "dest": "src/runtime/roster/character_roster.rs",
       "crate": "root",
       "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-      "dest_sha256": "4cb64958be7009b62b0ccfe3d3d284ab28371736aca96bf5b2322dfd42cce130",
+      "dest_sha256": "9f01d171c913ad72eff71a6c3848509fd21fe605187cd1d2e8cf233597c587a0",
       "edits": [
         {
           "old": "fn notify(role: Role, message: String) {",
@@ -14411,6 +14411,11 @@
           "old": "    let owner = read::<u32>(entry, 0xe0);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "new": "    let owner = read::<u32>(entry, 0xe0);\n    crate::model::lra_reset::RESET_OWED.entry_destroyed(owner);\n    // R3-1: revoke both body registrations before body-bank/nested destruction.\n",
           "reason": "Reset-owed latch records each native entry's destruction before any roster locking."
+        },
+        {
+          "old": "// Both icon paths use this roster module's published, verified text base.\n",
+          "new": "pub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 { return None; }\n    // SAFETY: `BASE` is published only after the roster seam passes its guard.\n    let hash = unsafe { fighter_kind_hash(base, kind) };\n    let chara = hash & 0xff_ffff_ffff;\n    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)\n}\n\n// Both icon paths use this roster module's published, verified text base.\n",
+          "reason": "Move names (install 4): a fighter kind's ui_chara hash40 through the already guarded roster.kind_hash seam, for matching the game's special-name labels; no new site."
         }
       ]
     },

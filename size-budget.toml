@@ -2617,7 +2617,7 @@ approved_by = "tr-primary-2 ruling 2026-11-23 23:55:15Z (the Player-role line go
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 198084
+ceiling = 198086
 date = "2026-11-24"
-reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198084 on 823daadb plus the move-names implementation using tools/sloc.py tree."
+reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198086 (tools/sloc.py tree), 1034 above the base e7667f26 (197052)."
 approved_by = "tr-primary-2 ruling 2026-11-24 17:21:31Z (operator green light about 17:22Z, install 4: the move-name toggle), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."

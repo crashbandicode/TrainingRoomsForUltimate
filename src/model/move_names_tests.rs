@@ -20,7 +20,7 @@ fn section(file: &mut Vec<u8>, magic: &[u8; 4], body: &[u8]) {
     file.extend_from_slice(&(body.len() as u32).to_le_bytes());
     file.extend_from_slice(&[0; 8]);
     file.extend_from_slice(body);
-    while file.len() % 16 != 0 { file.push(0); }
+    while !file.len().is_multiple_of(16) { file.push(0); }
 }
 
 fn message(entries: &[(String, Vec<u16>)]) -> Vec<u8> {
