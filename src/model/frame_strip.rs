@@ -841,6 +841,7 @@ impl Tracker {
                     super::aim::follows(stick, heading, ground).then_some(stick)
                 })
         });
+        self.late.travel = self.rule.ended();
         if let Some(dir) = seen.dir.filter(|_| seen.part != 0) {
             self.push_aim(frame.saturating_sub(u32::from(seen.age)), dir);
         }
