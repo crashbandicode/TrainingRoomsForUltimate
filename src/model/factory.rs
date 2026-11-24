@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 176;
+pub const COUNT: usize = 177;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -228,6 +228,7 @@ pub static DEFS: [Def; COUNT] = [
     // appended like lobby_items.
     row!("spots_strip", Single, 2, [1]),
     row!("spots_combo", Single, 2, [1]),
+    row!("combo_stick", Single, 2, [1]),
     // rc.15 Mash out: stable ordinary attacker indices and Random89; reviewed moves append.
     row!("mashout", Single, 2, [0]),
     row!("mashout_state", Single, 6, [0]),
