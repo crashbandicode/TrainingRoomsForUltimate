@@ -4,6 +4,7 @@
 //! pane looks (`frame_strip_plan`). Fixed arrays only, so nothing here allocates.
 
 use super::input_delay::MappedInputs;
+use super::move_names::Normal;
 use super::spots::{self, Peak, Powers, Spot};
 use super::spacing::{Grade, Taken};
 
@@ -714,6 +715,11 @@ impl Tracker {
         *self = Self { buttons: self.buttons, stick: self.stick, ..Self::new() };
     }
 
+    pub fn clear_live_strip(&mut self, names: &super::move_names::Published) {
+        self.clear();
+        names.set_player(None);
+    }
+
     pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {
         if let Some(grade) = taken.earlier {
             self.push_tag(0, grade);
@@ -796,6 +802,11 @@ impl Tracker {
                     self.action.variant_known = true;
                 }
             }
+        } else if self.action.mv == Move::Jab && p1.attack == Some(Move::Jab) {
+            // ATTACK -> ATTACK_100 can change the hit's name without opening a new action.
+            if let rapid @ (Normal::RapidJab | Normal::RapidJabFinisher) = Normal::of(p1.motion) {
+                self.action.variant = rapid as u8;
+            }
         }
         if p1.named == Some(Move::Throw) && self.action.mv == Move::Grab {
             self.action.mv = Move::Throw;
@@ -847,6 +858,7 @@ impl Tracker {
                     super::aim::follows(stick, heading, ground).then_some(stick)
                 })
         });
+        self.late.travel = self.rule.ended();
         if let Some(dir) = seen.dir.filter(|_| seen.part != 0) {
             self.push_aim(frame.saturating_sub(u32::from(seen.age)), dir);
         }

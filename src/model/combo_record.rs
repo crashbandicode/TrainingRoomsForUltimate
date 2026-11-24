@@ -9,7 +9,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
-use super::action::ActionDesc;
+use super::action::{ActionDesc, Travel};
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
 use super::frame_strip::{Angle, Button, Move, Verdict};
 use super::spots::Spot;
@@ -94,6 +94,7 @@ pub struct ComboRecord {
     pub combo: Combo,
     /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
     pub recorded_on: Option<String>,
+    pub fighter: Option<super::move_names::FighterId>,
     /// The recording or chain this combo was made from. Absent on a combo saved by hand.
     pub made_from: Option<String>,
     /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
@@ -106,11 +107,12 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on, &self.made_from, &self.take)
+        (&self.name, &self.combo, &self.recorded_on, &self.fighter, &self.made_from, &self.take)
             == (
                 &other.name,
                 &other.combo,
                 &other.recorded_on,
+                &other.fighter,
                 &other.made_from,
                 &other.take,
             )
@@ -186,7 +188,15 @@ impl ComboRecord {
             link
         })).unwrap();
         combo.input_only = self.combo.input_only;
+        for old in start as usize..end as usize {
+            for event in 0..STEPS {
+                if let Some(travel) = self.combo.travel(old, event) {
+                    combo.attach_travel(old - start as usize, event, travel);
+                }
+            }
+        }
         let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
+        record.fighter = self.fighter;
         record.made_from = self.made_from.clone();
         Ok(record)
     }
@@ -197,6 +207,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: None,
             made_from: None,
             take: None,
             source: None,
@@ -206,6 +217,11 @@ impl ComboRecord {
     /// Made from a recording or a chain. The combo file keeps that id.
     pub fn with_made_from(mut self, source: impl Into<String>) -> Self {
         self.made_from = Some(source.into());
+        self
+    }
+
+    pub fn with_fighter(mut self, fighter: Option<super::move_names::FighterId>) -> Self {
+        self.fighter = fighter;
         self
     }
 
@@ -227,6 +243,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -237,6 +254,11 @@ impl ComboRecord {
             let mut object = source.clone();
             object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
+            if let Some(identity) = identity {
+                object.insert("recorded_fighter".into(), identity);
+            } else {
+                object.remove("recorded_fighter");
+            }
             return Value::Object(object);
         }
         let links: Vec<Value> = self
@@ -246,7 +268,7 @@ impl ComboRecord {
             .map(|(k, l)| {
                 let holds = if self.combo.input_only { self.combo.holds(k) } else { l.holds() };
                 if self.combo.input_only {
-                    let mut step = json!({"events": events_value(l, &holds)});
+                    let mut step = json!({"events": events_value(l, &holds, Some(&self.combo.travels(k)))});
                     for (side, key) in [(0, "from_shown"), (1, "to_shown")] {
                         if let Some(desc) = l.step_side(side) {
                             let mut shown = description_value(desc);
@@ -281,7 +303,7 @@ impl ComboRecord {
                     link["to_shown"] = description_value(l.desc(1));
                 }
                 if !l.presses_only {
-                    link["events"] = Value::Array(events_value(l, &holds));
+                    link["events"] = Value::Array(events_value(l, &holds, None));
                     if let Some(dir) = l.drift {
                         link["drift"] = json!(dir_key(dir));
                     }
@@ -294,6 +316,9 @@ impl ComboRecord {
         if self.combo.input_only { value["kind"] = json!("input_drill"); }
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
+        }
+        if let Some(identity) = identity {
+            value["recorded_fighter"] = identity;
         }
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
@@ -352,16 +377,44 @@ impl ComboRecord {
         }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
         combo.input_only = input;
         if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
-        if input { combo.join_split_steps(); }
+        if input {
+            for (link, value) in links.iter().enumerate() {
+                let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+                for (index, value) in events.iter().enumerate() {
+                    if matches!(combo.get(link).and_then(|link| link.events[index]), Some(Event { kind: Kind::Aim(_), .. }))
+                        && value.get("path").is_some()
+                    {
+                        let travel = parse_travel(value.as_object().ok_or("event")?)?;
+                        combo.attach_travel(link, index, travel);
+                    }
+                }
+            }
+            combo.join_split_steps();
+        }
         Ok(ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
             made_from,
             take,
             source: Some(object.clone()),
         })
     }
+}
+
+fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
+    let chara = value.get("ui_chara")?.as_str()?;
+    if chara.is_empty() || chara.len() > 10 || !chara.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+    let chara = u64::from_str_radix(chara, 16).ok()?;
+    if chara == 0 { return None; }
+    let values = value.get("specials")?.as_array()?;
+    if values.len() != 4 { return None; }
+    let mut specials = [0; 4];
+    for (out, value) in specials.iter_mut().zip(values) {
+        *out = u8::try_from(value.as_u64()?).ok().filter(|value| *value <= 2)?;
+    }
+    Some(super::move_names::FighterId { chara, specials })
 }
 
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
@@ -536,13 +589,43 @@ fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static
     Ok(Event { kind, dir, offset })
 }
 
-fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS]) -> Vec<Value> {
+fn parse_travel(event: &Map<String, Value>) -> Result<Travel, &'static str> {
+    let raw = event.get("path").and_then(Value::as_array).filter(|path| path.len() == 8).ok_or("path")?;
+    let mut path = [(0_i8, 0_i8); 8];
+    for (slot, point) in path.iter_mut().zip(raw) {
+        let pair = point.as_array().filter(|pair| pair.len() == 2).ok_or("path")?;
+        let coordinate = |value: &Value| {
+            int_value(value).filter(|value| (-127..=127).contains(value)).map(|value| value as i8).ok_or("path")
+        };
+        *slot = (coordinate(&pair[0])?, coordinate(&pair[1])?);
+    }
+    let angle = |value: Option<&Value>, key: &'static str| -> Result<u16, &'static str> {
+        let value = value.and_then(Value::as_f64).filter(|value| *value >= 0.0 && *value < 360.0).ok_or(key)?;
+        Ok(((value * 10.0).round() as u16) % 3600)
+    };
+    let heading = angle(event.get("heading"), "heading")?;
+    let distance = event.get("distance").and_then(Value::as_f64).filter(|value| *value >= 0.0).ok_or("distance")?;
+    let distance = (distance * 10.0).round().clamp(0.0, f64::from(u16::MAX)) as u16;
+    let stick = match event.get("stick") {
+        None => None,
+        Some(value) => {
+            let stick = value.as_object().ok_or("stick")?;
+            let angle = angle(stick.get("angle"), "stick")?;
+            let deflection = stick.get("deflection").and_then(Value::as_f64)
+                .filter(|value| *value >= 0.0 && *value <= 100.0).ok_or("stick")?;
+            Some((angle, deflection.round() as u8))
+        }
+    };
+    Ok(Travel { stick, heading, distance, path })
+}
+
+fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS], travels: Option<&[Option<Travel>; STEPS]>) -> Vec<Value> {
     link.events.iter().enumerate().filter_map(|(i, event)| {
-        event.map(|event| event_value(event, holds[i]))
+        event.map(|event| event_value(event, holds[i], travels.and_then(|travels| travels[i])))
     }).collect()
 }
 
-fn event_value(event: Event, hold: Option<u32>) -> Value {
+fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>) -> Value {
     let mut value =
         json!({"kind": kind_key(event.kind), "dir": dir_key(event.dir), "offset": event.offset});
     match event.kind {
@@ -554,7 +637,17 @@ fn event_value(event: Event, hold: Option<u32>) -> Value {
         }
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
-        Kind::Aim(part) => value["part"] = json!(part),
+        Kind::Aim(part) => {
+            value["part"] = json!(part);
+            if let Some(travel) = travel {
+                if let Some((angle, deflection)) = travel.stick {
+                    value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
+                }
+                value["heading"] = json!(f64::from(travel.heading) / 10.0);
+                value["distance"] = json!(f64::from(travel.distance) / 10.0);
+                value["path"] = json!(travel.path);
+            }
+        }
     }
     value
 }

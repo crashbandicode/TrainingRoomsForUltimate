@@ -10,7 +10,12 @@ use crate::model::frame_strip::Sample;
 use crate::model::frame_strip_plan::Text;
 use crate::model::input_delay::MappedInputs;
 use crate::model::panes::{cb, strip_layout::C};
-use crate::model::recording_menu::combo_link_lines;
+use crate::model::move_names::{Namer, Normal};
+use crate::model::recording_menu::combo_link_lines as named_combo_link_lines;
+
+fn combo_link_lines(combo: &Combo) -> Vec<String> {
+    named_combo_link_lines(combo, Namer::OFF)
+}
 
 fn idle() -> Sample {
     Sample { actionable: true, facing: 1, ..Sample::default() }
@@ -43,7 +48,7 @@ fn drill(steps: impl IntoIterator<Item = LinkRec>) -> Combo {
 
 fn title(step: &LinkRec, tight: bool) -> String {
     let mut text = String::new();
-    step.write_title(&mut text, tight, if tight { ">" } else { " > " }).unwrap();
+    step.write_title(&mut text, tight, if tight { ">" } else { " > " }, Namer::OFF).unwrap();
     text
 }
 
@@ -57,6 +62,59 @@ fn bar(combo: Combo) -> Vec<String> {
         }
     });
     titles
+}
+
+#[test]
+fn the_move_name_toggle_names_a_drill_step() {
+    const CHILD: &str = "TR_DRILL_NAMES_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "model::combo::drill_step_moves_tests::the_move_name_toggle_names_a_drill_step", "--nocapture"])
+            .env(CHILD, "1")
+            .output().unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success() && stdout.contains("running 1 test"), "{stdout}\n{stderr}");
+        return;
+    }
+    use crate::model::hash40::hash40;
+    use crate::model::move_names::{FighterId, Names, PUBLISHED};
+    let fighter = FighterId { chara: hash40("ui_chara_alpha") & 0xff_ffff_ffff, specials: [0; 4] };
+    let names = Names::build(&crate::model::move_names::tests::shared_file()).unwrap();
+    PUBLISHED.publish(Box::new(names));
+    PUBLISHED.set_target(Some(fighter));
+
+    let special = step([
+        event(Kind::Press(Button::Special), Dir::Up, 0),
+        event(Kind::Aim(1), Dir::Back, 1),
+    ], desc(Move::UpSpecial, None, None, 0));
+    let jab = step([event(Kind::Press(Button::Attack), Dir::Neutral, 30)],
+        desc(Move::Jab, None, None, Normal::of(hash40("attack_11")) as u8));
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 0x10, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { named: Some(Move::Grab), status: 0x37,
+        motion: hash40("catch"), facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, Sample { named: Some(Move::Throw), status: 0x40,
+        motion: hash40("throw_f"), facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    let mut throw = *capture.combo.get(0).unwrap();
+    for event in throw.events.iter_mut().flatten() { event.offset += 60; }
+    assert_eq!(throw.step_side(1).map(|desc| (desc.mv, desc.normal)),
+        Some((Move::Throw, Normal::ForwardThrow as u8)));
+    let shield = LinkRec { events: retain([event(Kind::Press(Button::Shield), Dir::Neutral, 90)]), ..LinkRec::INPUT };
+    let record = ComboRecord::new("Drill".into(), drill([special, jab, throw, shield]), None).with_fighter(Some(fighter));
+    let menu_heads = |namer| named_combo_link_lines(&record.combo, namer).into_iter()
+        .filter(|line| matches!(line.as_bytes().get(0..3), Some([b'S', b'1'..=b'4', b' ']))).collect::<Vec<_>>();
+
+    PUBLISHED.set_on(false);
+    let before = serde_json::to_vec(&record).unwrap();
+    assert_eq!(bar(record.combo)[..4], ["1 Up B ←", "2 Jab", "3 Throw", "4 Shield"]);
+    assert_eq!(menu_heads(Namer::recorded(record.fighter)), ["S1 up b ←", "S2 jab", "S3 throw", "S4 shield"]);
+    PUBLISHED.set_on(true);
+    assert_eq!(bar(record.combo)[..4], ["1 Test Rising Kick ←", "2 Jab 1", "3 Forward throw", "4 Shield"]);
+    assert_eq!(menu_heads(Namer::recorded(record.fighter)), ["S1 Test Rising Kick ←", "S2 Jab 1", "S3 Forward throw", "S4 Shield"]);
+    assert_eq!(serde_json::to_vec(&record).unwrap(), before);
+    PUBLISHED.set_on(false);
 }
 
 fn jab() -> Combo {
@@ -468,7 +526,7 @@ fn a_step_is_described_by_the_links_own_packing() {
     for expected in [
         desc(Move::SideTilt, None, Some(Angle::Up), 0),
         desc(Move::Other, Some(Move::UpSpecial), None, 0),
-        desc(Move::Throw, None, None, 22),
+        desc(Move::Throw, None, None, Normal::ForwardThrow as u8),
     ] {
         let mut rec = LinkRec::INPUT;
         rec.set_step_side(1, Some(expected));
@@ -480,7 +538,7 @@ fn a_step_is_described_by_the_links_own_packing() {
 #[test]
 fn a_step_description_adds_no_bytes() {
     assert_eq!(core::mem::size_of::<LinkRec>(), 124);
-    assert_eq!(core::mem::size_of::<Combo>(), 2000);
+    assert_eq!(core::mem::size_of::<Combo>(), 2000 + core::mem::size_of::<Detail>() * DETAILS);
 }
 
 #[test]
@@ -612,15 +670,40 @@ fn a_joined_split_step_keeps_its_move() {
 }
 
 #[test]
+fn a_joined_step_keeps_its_description_and_travel() {
+    let value = serde_json::json!({
+        "schema_version":4,"kind":"input_drill","name":"Drill",
+        "input_steps":[
+            {"to_shown":{"move":"up_special"},"events":[
+                {"kind":"press","button":"special","dir":"up","offset":0}]},
+            {"events":[{"kind":"aim","part":1,"dir":"back","offset":4,
+                "stick":{"angle":180.0,"deflection":100},"heading":180.0,"distance":8.0,
+                "path":[[-1,0],[-2,0],[-3,0],[-4,0],[-5,0],[-6,0],[-7,0],[-8,0]]}]}
+        ]
+    });
+    let read: ComboRecord = serde_json::from_value(value).unwrap();
+    assert_eq!(read.combo.len(), 1);
+    assert_eq!(bar(read.combo)[0], "1 Up B ←");
+    let travel = read.combo.travel(0, 1).unwrap();
+    assert_eq!((travel.stick, travel.heading, travel.distance), (Some((1800, 100)), 1800, 80));
+    let fresh = ComboRecord::new("Drill".into(), read.combo, None);
+    let written = serde_json::to_value(&fresh).unwrap();
+    assert_eq!(written["input_steps"][0]["to_shown"]["move"], "up_special");
+    assert_eq!(written["input_steps"][0]["events"][1]["path"],
+        serde_json::json!([[-1,0],[-2,0],[-3,0],[-4,0],[-5,0],[-6,0],[-7,0],[-8,0]]));
+    assert_eq!(serde_json::from_value::<ComboRecord>(written).unwrap(), fresh);
+}
+
+#[test]
 fn a_cropped_drill_keeps_each_steps_move() {
     let steps = [
         step([event(Kind::Press(Button::Attack), Dir::Neutral, 0)], desc(Move::Jab, None, None, 0)),
         step([event(Kind::Press(Button::Attack), Dir::ForwardUp, 30)], desc(Move::SideTilt, None, Some(Angle::Up), 0)),
-        step([event(Kind::Press(Button::Grab), Dir::Neutral, 60)], desc(Move::Grab, None, None, 18)),
+        step([event(Kind::Press(Button::Grab), Dir::Neutral, 60)], desc(Move::Grab, None, None, Normal::Grab as u8)),
     ];
     let cropped = ComboRecord::new("Drill".into(), drill(steps), None).crop_units(1, 3).unwrap();
     assert_eq!(cropped.combo.get(0).unwrap().step_side(1), Some(desc(Move::SideTilt, None, Some(Angle::Up), 0)));
-    assert_eq!(cropped.combo.get(1).unwrap().step_side(1), Some(desc(Move::Grab, None, None, 18)));
+    assert_eq!(cropped.combo.get(1).unwrap().step_side(1), Some(desc(Move::Grab, None, None, Normal::Grab as u8)));
     assert_eq!(combo_link_lines(&cropped.combo)[0], "S1 side tilt ↑");
     assert_eq!(combo_link_lines(&cropped.combo)[2], "S2 grab");
 }
@@ -662,15 +745,15 @@ fn a_grab_step_becomes_a_throw_when_it_throws() {
     let mut capture = InputCapture::new();
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 0x10, ..MappedInputs::NEUTRAL });
     for status in [0x37, 0x3c] {
-        tick(&mut tracker, &mut capture, Sample { named: Some(Move::Grab), status, motion: 0x05_c56b_7b64,
+        tick(&mut tracker, &mut capture, Sample { named: Some(Move::Grab), status, motion: crate::model::hash40::hash40("catch"),
             facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
     }
     assert_eq!(title(capture.combo.get(0).unwrap(), false), "Grab");
-    tick(&mut tracker, &mut capture, Sample { named: Some(Move::Throw), status: 0x40, motion: 0x07_49f7_09a8,
+    tick(&mut tracker, &mut capture, Sample { named: Some(Move::Throw), status: 0x40, motion: crate::model::hash40::hash40("throw_f"),
         facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
     assert_eq!(capture.combo.len(), 1);
     assert_eq!(title(capture.combo.get(0).unwrap(), false), "Throw");
-    assert_eq!(capture.combo.get(0).unwrap().step_side(1).unwrap().normal, 22);
+    assert_eq!(capture.combo.get(0).unwrap().step_side(1).unwrap().normal, Normal::ForwardThrow as u8);
 }
 
 #[test]

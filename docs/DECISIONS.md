@@ -1947,6 +1947,12 @@ fighter a drill borrowed (Mash out's attacker, a drill's own CPU fighter) comes 
 takes no fighter change while the menu owns the input, the rule a CPU Character picked in the menu follows. This is
 built on the item owner's default; the operator may overrule it.
 
+## Move names (2026-11-24)
+
+tr-primary-2's inbox ruling at 17:21:31Z and the operator's green light about 17:22Z, install 4: add an Off-by-default
+move-name toggle. Live views name Player 1's moves; saved views use the recorded fighter or common names when that
+identity is unavailable. Special and Final Smash names come from the message file served by ARCropolis.
+
 ## The ACTION model (2026-11-24): one fighter-agnostic model for recorded inputs — decided (operator)
 
 Decided by the operator on 2026-11-24 for the next build (relayed by tr-primary-2, inbox 17:21:31Z):

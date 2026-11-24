@@ -701,7 +701,8 @@ fn ordered_catalog() -> crate::model::recording_menu::Catalog {
             name: "One".into(),
             recorded_on: String::new(),
             made_from: None,
-            links: Vec::new(),
+            combo: Box::new(crate::model::combo::Combo::EMPTY),
+            fighter: None,
             span: 0,
         }],
         sequences: vec![SequenceFile {

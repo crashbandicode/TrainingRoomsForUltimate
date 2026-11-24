@@ -166,17 +166,18 @@ impl core::fmt::Write for Tally {
 
 /// The two move names and their direction marks, fitted to the given capacity.
 fn append_moves(text: &mut Text, link: &Link, capacity: usize) {
+    let namer = super::move_names::Namer::live();
     let desc = [
         super::action::ActionDesc::of(link.from, link.shown[0], link.variants[0]),
         super::action::ActionDesc::of(link.to, link.shown[1], link.variants[1]),
     ];
     let mut loose = Tally(" > ".len());
-    let _ = desc[0].write(&mut loose, false);
-    let _ = desc[1].write(&mut loose, false);
+    let _ = desc[0].write(&mut loose, false, namer);
+    let _ = desc[1].write(&mut loose, false, namer);
     let tight = loose.0 > capacity;
-    let _ = desc[0].write(&mut *text, tight);
+    let _ = desc[0].write(&mut *text, tight, namer);
     let _ = text.write_str(if tight { ">" } else { " > " });
-    let _ = desc[1].write(&mut *text, tight);
+    let _ = desc[1].write(&mut *text, tight, namer);
 }
 
 pub fn link_moves(link: &Link, capacity: usize) -> Text {

@@ -17,6 +17,7 @@ use skyline::hooks::InlineCtx;
 
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker};
+use crate::model::move_names::PUBLISHED;
 use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
@@ -460,8 +461,9 @@ pub unsafe fn sample_frame(player: usize) {
         GRADER.finish(false);
         return;
     };
-    if CLEAR_DUE.swap(false, Ordering::Relaxed) {
-        tracker.clear();
+    let cleared = CLEAR_DUE.swap(false, Ordering::Relaxed);
+    if cleared {
+        tracker.clear_live_strip(&PUBLISHED);
         super::parry::reset();
     }
     #[cfg(feature = "diag")]
@@ -472,6 +474,8 @@ pub unsafe fn sample_frame(player: usize) {
             crate::engine::rr_host::observe_input(snap, tracker.late(), tracker.contact_now());
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
+        // SAFETY: `player` is the live P1 accessor of this frame.
+        PUBLISHED.observe_player(p1_kind, |kind| unsafe { super::move_names::fighter_id(player, kind) });
         crate::runtime::features::combo::after_strip(&tracker, p1_kind);
     }
     if super::parry::on() {
@@ -644,7 +648,7 @@ pub fn session_clear() {
     LANES.set(1, None);
     CLEAR_DUE.store(false, Ordering::Relaxed);
     GRADER.skip();
-    TRACKER.lock().clear();
+    TRACKER.lock().clear_live_strip(&PUBLISHED);
     crate::runtime::features::combo::session_clear();
 }
 
@@ -654,7 +658,7 @@ pub fn session_clear() {
 #[inline(never)]
 pub fn fighter_initialised() {
     if ENABLED.load(Ordering::Acquire) {
-        TRACKER.lock().clear();
+        TRACKER.lock().clear_live_strip(&PUBLISHED);
     }
 }
 

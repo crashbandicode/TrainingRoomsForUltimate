@@ -1,8 +1,9 @@
 //! An action starts at an originating input and owns its later events.
 //! Its model is described in `docs/design/action-model.md`.
 
-use super::combo::{self, Dir, Kind};
+use super::combo::{self, Dir, Kind, Mark};
 use super::frame_strip::{Angle, Move, Shown};
+use super::move_names::{Namer, Normal};
 
 /// What the strip, the combo bar, the menu and the grader all read about one move. It holds kinds, never names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,9 +32,11 @@ impl ActionDesc {
         }
     }
 
-    /// Write the name, angle and parts, omitting spaces before arrows when tight.
-    pub fn write(&self, out: &mut impl core::fmt::Write, tight: bool) -> core::fmt::Result {
-        out.write_str(self.of.unwrap_or(self.mv).name())?;
+    /// Write the name as `namer` gives it, then the angle and parts, omitting spaces before arrows when tight.
+    pub fn write(&self, out: &mut impl core::fmt::Write, tight: bool, namer: Namer<'_>) -> core::fmt::Result {
+        let mv = self.of.unwrap_or(self.mv);
+        let name = if mv == Move::FinalSmash { namer.final_smash() } else { namer.name(mv, Normal::from_u8(self.normal)) };
+        out.write_str(name.as_str())?;
         let angle = self.angle.map(|angle| match angle { Angle::Up => Dir::Up, Angle::Down => Dir::Down });
         for dir in [angle, self.parts[0], self.parts[1]].into_iter().flatten() {
             let arrow = arrow(dir);
@@ -59,10 +62,61 @@ pub struct Late {
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
     /// The originating press and its known move, base and variant.
     pub named: Option<(Option<u32>, Move, Option<Move>, u8)>,
+    /// The part that ended on this frame and its measured travel.
+    pub travel: Option<(u8, Travel)>,
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None, named: None };
+    pub const NONE: Late = Late { open: None, travel: None, named: None };
+}
+
+/// A travel part: angles are facing-relative degrees in tenths, path offsets are facing-relative game units.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Travel {
+    /// The deciding stick's angle and deflection in percent.
+    pub stick: Option<(u16, u8)>,
+    /// The whole part's heading and straight-line distance in tenths of a unit.
+    pub heading: u16,
+    pub distance: u16,
+    /// Eight points at equal intervals along the path.
+    pub path: [(i8, i8); 8],
+}
+
+pub const PATH_ABS: f32 = 6.0;
+pub const PATH_REL: f32 = 0.30;
+pub const ANGLE_TOL: i16 = 10;
+pub const DEFLECTION_TOL: i16 = 15;
+
+pub fn path_off(reference: &Travel, attempt: &Travel) -> bool {
+    let mut length = 0.0;
+    let mut previous = (0.0, 0.0);
+    for &(x, y) in &reference.path {
+        let point = (f32::from(x), f32::from(y));
+        length += (point.0 - previous.0).hypot(point.1 - previous.1);
+        previous = point;
+    }
+    let tolerance = PATH_ABS.max(PATH_REL * length);
+    reference.path.iter().zip(attempt.path).any(|(&(x, y), (a, b))| {
+        (f32::from(a) - f32::from(x)).hypot(f32::from(b) - f32::from(y)) > tolerance
+    })
+}
+
+pub fn stick_off(reference: &Travel, attempt: &Travel) -> Option<Mark> {
+    let ((angle, deflection), (actual, magnitude)) = (reference.stick?, attempt.stick?);
+    let delta = (i32::from(actual) - i32::from(angle) + 1800).rem_euclid(3600) - 1800;
+    if delta.abs() > i32::from(ANGLE_TOL) * 10 {
+        return Some(Mark::Angle(delta as i16));
+    }
+    let delta = i16::from(magnitude) - i16::from(deflection);
+    (delta.abs() > DEFLECTION_TOL).then_some(Mark::Deflection(delta as i8))
+}
+
+pub fn stick_of(stick: (i8, i8), facing: i8) -> (u16, u8) {
+    let x = f32::from(i16::from(stick.0) * if facing < 0 { -1 } else { 1 });
+    let y = f32::from(stick.1);
+    let angle = ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600;
+    let deflection = (x.hypot(y) / 120.0 * 100.0).round().clamp(0.0, 100.0) as u8;
+    (angle, deflection)
 }
 
 /// A press's direction with the vertical part the animation chose.
@@ -107,15 +161,9 @@ impl Default for Action {
     fn default() -> Self { Self::new() }
 }
 
-/// The move variant identified by an animation.
-#[cfg(not(test))]
-pub fn variant(_motion: u64) -> u8 { 0 }
-
-/// Test stand-in for the move-name join (`Normal::of`): `catch` is Grab (18), `throw_f` is Forward throw (22).
-#[cfg(test)]
-pub fn variant(motion: u64) -> u8 {
-    match motion { 0x05_c56b_7b64 => 18, 0x07_49f7_09a8 => 22, _ => 0 }
-}
+/// The move variant identified by an animation: the move names' number for it (`Normal`), 0 when it is none of the
+/// engine-common ones.
+pub fn variant(motion: u64) -> u8 { Normal::of(motion) as u8 }
 
 /// A font-supported arrow for a direction.
 pub const fn arrow(dir: Dir) -> &'static str {

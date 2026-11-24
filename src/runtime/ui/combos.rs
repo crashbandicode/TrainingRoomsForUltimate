@@ -116,7 +116,7 @@ impl Ui {
     }
 
     fn apply_target(&mut self, target: Option<(String, ComboRecord)>) {
-        live::set_target(target.as_ref().map(|(_, r)| (r.combo, r.name.as_str())));
+        live::set_target(target.as_ref().map(|(_, r)| (r.combo, r.name.as_str(), r.fighter)));
         self.target = target.map(|(id, r)| (id, r.name));
     }
 
@@ -148,14 +148,15 @@ impl Ui {
     }
 
     fn save(&mut self) -> Result<String, String> {
-        let combo = live::last_combo().ok_or("No combo yet: land a hit and a follow-up first")?;
+        let (combo, owner) = live::last_combo().ok_or("No combo yet: land a hit and a follow-up first")?;
         let library = library();
         let name = match self.draft.take() {
             Some(name) => name,
             None => default_name(&library.list().map_err(|e| e.to_string())?.entries),
         };
-        let recorded_on = live::p1_kind().map(named_macros::fighter_label);
-        let record = ComboRecord::new(name, combo, recorded_on);
+        let recorded_on = (owner.kind() >= 0).then(|| named_macros::fighter_label(owner.kind()));
+        let mut record = ComboRecord::new(name, combo, recorded_on);
+        record.fighter = owner.fighter();
         let id = library.save_new(&record).map_err(|e| e.to_string())?;
         live::set_draft("");
         live::saved(&combo);

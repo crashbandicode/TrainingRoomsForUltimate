@@ -112,7 +112,7 @@ fn a_specials_first_aim_stays_in_its_step_however_late() {
         vec![Kind::Press(Button::Special), Kind::Release(Button::Special), Kind::Aim(1)]
     );
     assert_eq!(step.events().last().map(|e| e.dir), Some(Dir::BackUp));
-    let lines = crate::model::recording_menu::combo_link_lines(&drill);
+    let lines = crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::OFF);
     assert_eq!(lines.len(), 2, "the list shows one step and its one event line: {lines:?}");
     assert_eq!(lines[0], "S1 special ↑");
 }
@@ -515,7 +515,7 @@ fn the_bar_and_the_menu_name_a_link_as_the_strip_does() {
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
     let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo)[0], "L1 jab → side tilt ↑ TRUE");
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0], "L1 jab → side tilt ↑ TRUE");
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
     let mut texts = Vec::new();
@@ -581,7 +581,8 @@ fn a_link_record_keeps_its_size() {
 #[test]
 fn the_description_holds_no_names() {
     let source = include_str!("action.rs");
-    assert_eq!(source.matches(".name()").count(), 1);
+    assert_eq!(source.matches(".name()").count(), 0);
+    assert_eq!(source.matches("namer.name(").count(), 1, "the one name call goes through the move names");
     for name in [r#""Jab""#, r#""Up B""#, r#""Side tilt""#] {
         assert!(!source.contains(name));
     }
@@ -759,7 +760,329 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
     let value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["schema_version"], 2);
     assert_eq!(value["kind"], "input_drill");
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo), vec!["S1 side tilt ↑", "↑→ A · release"]);
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF), vec!["S1 side tilt ↑", "↑→ A · release"]);
+}
+
+fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
+    let (x, y) = (f32::from(end.0), f32::from(end.1));
+    action::Travel {
+        stick: Some(stick),
+        heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
+        distance: (x.hypot(y) * 10.0).round() as u16,
+        path: core::array::from_fn(|i| {
+            let t = (i + 1) as f32 / 8.0;
+            ((x * t).round() as i8, (y * t).round() as i8)
+        }),
+    }
+}
+
+fn steering_snap(frame: u32, second: bool) -> Snap {
+    Snap {
+        buttons: if frame < 2 { SPECIAL } else if second && frame == 43 { ATTACK } else { 0 },
+        facing: 1,
+        aim: Seen { inside: frame <= 3, part: if frame == 3 { 1 } else { 0 },
+            dir: (frame == 3).then_some(4), facing: 1, age: 0 },
+        ..Snap::empty(frame)
+    }
+}
+
+fn steering_capture(detail: action::Travel, second: bool) -> Combo {
+    let mut capture = InputCapture::new();
+    for frame in 0..=(if second { 43 } else { 4 }) {
+        capture.step_late(steering_snap(frame, second), action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        });
+    }
+    capture.combo
+}
+
+fn steering_attempt(reference: action::Travel, actual: action::Travel, match_stick: bool) -> Summary {
+    let mut helper = Helper::new();
+    helper.set_target(Some(steering_capture(reference, false)));
+    for frame in 0..=4 {
+        helper.settings = Settings { match_stick, ..Settings::factory() };
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, actual)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    let result = *helper.results().next().unwrap();
+    result
+}
+
+#[test]
+fn a_steered_part_is_graded_on_its_path_within_the_tolerance() {
+    let reference = travel((-40, 0), (1800, 100));
+    assert!(steering_attempt(reference, travel((-40, 8), (1800, 100)), false).clean);
+    let result = steering_attempt(reference, travel((-38, 14), (1800, 100)), false);
+    assert_eq!(result.fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(crate::model::combo_plan::reason_text(&result), crate::model::frame_strip_plan::Text::new("L1 1st path off"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Path, "1st direction", 1),
+        (crate::model::frame_strip_plan::Text::new("1st path off"), crate::model::frame_strip_plan::BAD));
+}
+
+#[test]
+fn a_short_warp_fails_a_long_warp_drill() {
+    let long = travel((-42, 42), (1350, 100));
+    let short = travel((-14, 14), (1350, 100));
+    assert_eq!(steering_attempt(long, short, false).fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(steering_attempt(short, long, false).fault, Some((0, Reason::AimPath(1))));
+}
+
+#[test]
+fn the_angle_and_deflection_toggle_grades_the_stick() {
+    let reference = travel((-40, 40), (1350, 100));
+    for stick in [(1150, 100), (1350, 50)] {
+        assert!(steering_attempt(reference, travel((-40, 40), stick), false).clean);
+    }
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1150, 100)), true).fault,
+        Some((0, Reason::AimAngle(1, -200))));
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1350, 50)), true).fault,
+        Some((0, Reason::AimDeflection(1, -50))));
+    assert!(steering_attempt(reference, travel((-40, 40), (1270, 90)), true).clean);
+    let around_zero = travel((40, 0), (3590, 50));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (90, 65))), None);
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (100, 50))), Some(Mark::Angle(110)));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (3590, 34))), Some(Mark::Deflection(-16)));
+    assert_eq!(action::stick_of((0, 0), -1), (0, 0));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Angle(-200), "1st direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("1st angle 20 off"));
+    // DESIGN section 4 words the fault "deflection", as the menu row does.
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(-50), "2nd direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("2nd deflection 50% low"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(30), "1st direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("1st deflection 30% high"));
+    let low = steering_attempt(reference, travel((-40, 40), (1350, 50)), true);
+    assert_eq!(crate::model::combo_plan::reason_text(&low),
+        crate::model::frame_strip_plan::Text::new("L1 1st deflection 50% low"));
+}
+
+#[test]
+fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
+    use crate::model::combo_plan::{mark_text, reason_text};
+    let reference = travel((-40, 0), (1800, 83));
+    for angle in [1700, 1900] {
+        assert!(steering_attempt(reference, travel((-40, 0), (angle, 83)), true).clean);
+    }
+    for (angle, degrees) in [(1698, "10.2"), (1902, "10.2"), (1600, "20")] {
+        let actual = travel((-40, 0), (angle, 83));
+        let result = steering_attempt(reference, actual, true);
+        let why = reason_text(&result);
+        assert_eq!(String::from_utf16(why.units()).unwrap(), format!("L1 1st angle {degrees} off"));
+        let mark = action::stick_off(&reference, &actual).unwrap();
+        let label = mark_text(mark, "1st direction", 1).0;
+        assert_eq!(String::from_utf16(label.units()).unwrap(), format!("1st angle {degrees} off"));
+    }
+}
+
+/// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
+/// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
+/// more code than the data it saved (`833913b3`), so every combo carries the table.
+#[test]
+fn the_travel_table_is_packed_into_96_bytes_a_combo() {
+    use core::mem::size_of;
+    let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
+    println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
+        size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
+    assert_eq!((entry, DETAILS * entry), (24, 96), "a travel detail and a combo's table");
+    assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
+}
+
+#[test]
+fn the_toggle_row_reads_its_setting_and_is_off_by_default() {
+    assert!(!Settings::factory().match_stick);
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    snapshot.set("combo_stick", &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).match_stick);
+    let rows = &crate::model::menu::table::ROWS;
+    let spot = rows.iter().position(|row| row.id == "spots_combo").unwrap();
+    assert_eq!(rows[spot + 1].id, "combo_stick");
+}
+
+#[test]
+fn a_travel_that_ends_after_its_step_was_graded_amends_the_grade() {
+    let reference = travel((-40, 0), (1800, 100));
+    let target = steering_capture(reference, true);
+    assert_eq!(target.len(), 2);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false),
+        (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 9).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1);
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 9 {
+                if clean { assert!(helper.results().next().is_none()); }
+                else {
+                    let result = helper.results().next().unwrap();
+                    assert_eq!((result.outcome, result.clean, result.fault),
+                        (Outcome::Completed, false, Some((0, Reason::AimPath(1)))));
+                }
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+#[test]
+fn aim_details_round_trip_in_optional_keys() {
+    let detail = travel((-40, 40), (1350, 100));
+    let combo = steering_capture(detail, false);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let value = serde_json::to_value(&record).unwrap();
+    let event = &value["input_steps"][0]["events"][2];
+    assert_eq!(event["stick"], serde_json::json!({"angle": 135.0, "deflection": 100}));
+    assert_eq!(event["heading"], 135.0);
+    assert_eq!(event["distance"], 56.6);
+    assert_eq!(event["path"].as_array().unwrap().len(), 8);
+    assert_eq!((event["kind"].as_str(), event["part"].as_u64(), event["dir"].as_str(), event["offset"].as_i64()),
+        (Some("aim"), Some(1), Some("back"), Some(3)));
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(read, record);
+    let mut helper = Helper::new();
+    helper.set_target(Some(read.combo));
+    for frame in 0..=4 {
+        helper.settings = Settings::factory();
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    assert!(helper.results().next().unwrap().clean);
+
+    let mut split = value.clone();
+    let events = value["input_steps"][0]["events"].as_array().unwrap();
+    split["input_steps"] = serde_json::json!([
+        {"events": [events[0].clone(), events[1].clone()]},
+        {"events": [events[2].clone()]}
+    ]);
+    let joined: crate::model::combo_record::ComboRecord = serde_json::from_value(split).unwrap();
+    assert_eq!(joined.combo.len(), 1);
+    assert_eq!(joined.combo.travel(0, 2), Some(detail));
+
+    let mut five = value.clone();
+    let events = five["input_steps"][0]["events"].as_array_mut().unwrap();
+    let aim = events[2].clone();
+    for offset in 4..=7 {
+        let mut event = aim.clone();
+        event["offset"] = serde_json::json!(offset);
+        events.push(event);
+    }
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(five).unwrap();
+    for index in 2..6 { assert_eq!(read.combo.travel(0, index), Some(detail)); }
+    assert_eq!(read.combo.travel(0, 6), None);
+    for (key, invalid) in [
+        ("path", serde_json::json!([1, 2])),
+        ("path", serde_json::json!([[128, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])),
+        ("heading", serde_json::json!(360)),
+        ("distance", serde_json::json!(-1)),
+        ("stick", serde_json::json!({"angle": 0, "deflection": 101})),
+    ] {
+        let mut bad = value.clone();
+        bad["input_steps"][0]["events"][2][key] = invalid;
+        assert!(serde_json::from_value::<crate::model::combo_record::ComboRecord>(bad).unwrap_err().to_string().contains(key));
+    }
+    let mut old = value;
+    old["input_steps"][0]["events"][2].as_object_mut().unwrap().remove("path");
+    old["input_steps"][0]["events"][2]["heading"] = serde_json::json!("ignored");
+    old["input_steps"][0]["events"][2]["stick"] = serde_json::json!("ignored");
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(old).unwrap();
+    assert_eq!(read.combo.travel(0, 2), None);
+}
+
+#[test]
+fn a_drill_keeps_details_for_its_first_four_aims() {
+    let mut combo = Combo::EMPTY;
+    combo.input_only = true;
+    for i in 0..5 {
+        let link = LinkRec { events: retain([Event { kind: Kind::Aim(1), dir: Dir::Back, offset: i * 10 }]),
+            ..LinkRec::INPUT };
+        assert!(combo.push(link));
+    }
+    let detail = travel((-40, 0), (1800, 100));
+    for i in 0..4 { assert!(combo.attach_travel(i, 0, detail)); }
+    assert!(!combo.attach_travel(4, 0, detail));
+    let replacement = travel((-30, 0), (1800, 100));
+    assert!(combo.attach_travel(0, 0, replacement));
+    assert_eq!(combo.travel(0, 0), Some(replacement));
+    assert!(combo.attach_travel(0, 0, detail));
+    for i in 0..4 { assert_eq!(combo.travel(i, 0), Some(detail)); }
+    assert_eq!(combo.travel(4, 0), None);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let crop = record.crop_units(1, 4).unwrap();
+    for i in 0..3 { assert_eq!(crop.combo.travel(i, 0), Some(detail)); }
+
+    let mut split = Combo::EMPTY;
+    split.input_only = true;
+    for event in [Event { kind: Kind::Press(Button::Special), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 1 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 2 }] {
+        assert!(split.push(LinkRec { events: retain([event]), ..LinkRec::INPUT }));
+    }
+    assert!(split.attach_travel(1, 0, detail));
+    assert!(split.attach_travel(2, 0, replacement));
+    split.join_split_steps();
+    assert_eq!(split.len(), 2);
+    assert_eq!(split.travel(0, 1), Some(detail));
+    assert_eq!(split.travel(1, 0), Some(replacement));
+
+    let mut unordered = Combo::from_links([LinkRec { events: retain([
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 1 },
+    ]), ..LinkRec::INPUT }]).unwrap();
+    unordered.input_only = true;
+    assert!(unordered.attach_travel(0, 1, replacement));
+    assert!(unordered.attach_travel(0, 0, detail));
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), unordered, None);
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
+}
+
+/// A saved link keeps no inputs before its first hit, so its first move's travel arrows are not in it. That move is
+/// the follow-up of the link before, which has them: a later link shows them, the combo's first link shows none, and
+/// a crop that makes a link the first one stops borrowing. Nothing is stored for it.
+#[test]
+fn a_later_links_first_move_borrows_its_travel_arrows() {
+    use crate::model::combo_plan::Renderer;
+    use crate::model::combo_record::ComboRecord;
+    use crate::model::frame_strip_plan::Text;
+    use crate::model::panes::strip_layout::C;
+    let empty = || Some(serde_json::json!({}));
+    let first = LinkRec { events: retain([
+        Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 1 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 10 },
+        Event { kind: Kind::Aim(2), dir: Dir::Forward, offset: 20 },
+    ]), ..*hit_record("jab", "up_special", empty(), empty()).combo.get(0).unwrap() };
+    let second = *hit_record("up_special", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
+    let combo = Combo::from_links([first, second]).unwrap();
+    let heads = |combo: &Combo| -> Vec<String> {
+        crate::model::recording_menu::combo_link_lines(combo, crate::model::move_names::Namer::OFF).into_iter()
+            .filter(|line| line.starts_with('L') && line.contains(" → ")).collect()
+    };
+    assert_eq!(heads(&combo), vec!["L1 jab → up b ← → TRUE", "L2 up b ← → → side tilt ↑ TRUE"]);
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let mut texts = Vec::new();
+    Renderer::new().draw(&helper, &Text::EMPTY, None, true, (&C, false), |_, look, _| {
+        if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); }
+    });
+    assert!(texts.iter().any(|text| text == "1 Jab>Up B ← →"), "{texts:?}");
+    assert!(texts.iter().any(|text| text == "2 Up B ← →>Side tilt ↑"), "{texts:?}");
+    // The crop's first link has no link before it.
+    let record = ComboRecord::new("Drill".into(), combo, None);
+    assert_eq!(heads(&record.crop_units(1, 2).unwrap().combo), vec!["L1 up b → side tilt ↑ TRUE"]);
+    // Nothing new is stored: the link keeps its size and the file reads back equal.
+    assert_eq!(core::mem::size_of::<LinkRec>(), 124);
+    let read: ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
 }
 
 }

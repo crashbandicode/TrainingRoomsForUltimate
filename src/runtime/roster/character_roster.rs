@@ -167,7 +167,12 @@ fn observe_mii_origin(role:Role,generation:u64,kind:u32,forms:Forms,
     let fresh = memory.observe(role as usize,WaitingValue {fighter,forms,cursor:None,
         configuration:Some(configuration),owned:true,original:true});
     drop(memory);
-    if fresh { crate::runtime::roster::kirby_hats::fresh_lobby(); }
+    if fresh { retire_waiting_lobby(); }
+}
+
+fn retire_waiting_lobby() {
+    crate::runtime::roster::kirby_hats::fresh_lobby();
+    training::named_macros::waiting_scene_changed(false);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1389,15 +1394,18 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
                         && (0x48..=0x4a).contains(&kind)
                         && ((role==Role::Player)
                             || (role==Role::Cpu));
-                    let fresh_lobby = current_scope.waiting()
-                        && !exact_origin_pending
-                        && WAITING_MEMORY
-                            .lock()
-                            .observe(role as usize, WaitingValue::ordinary(fighter,forms,None));
+                    let fresh_lobby = current_scope.waiting() && {
+                        let mut memory = WAITING_MEMORY.lock();
+                        if exact_origin_pending {
+                            // A Mii's exact origin is captured later; a different fighter is already a new pick.
+                            memory.arrived(role as usize, |origin| origin.fighter == fighter)
+                        } else {
+                            memory.observe(role as usize, WaitingValue::ordinary(fighter,forms,None))
+                        }
+                    };
                     if fresh_lobby {
-                        trace!("[CharacterRoster] fresh waiting entry lifetime; cleared both practice choices");
-                        crate::runtime::roster::kirby_hats::fresh_lobby();
-                        training::named_macros::waiting_scene_changed(false);
+                        trace!("[CharacterRoster] fresh waiting lobby; cleared both practice choices");
+                        retire_waiting_lobby();
                     }
                     role.sync_selection(fighter, live_owner(role, fighter.kind()));
                 }
@@ -2339,6 +2347,17 @@ pub(crate) unsafe fn menu_stock_icon_hash(kind: u32) -> Option<u64> {
     if base == 0 { return None; }
     let hash = fighter_picture_hash(base, kind, 0, 2);
     (hash & 0xffffffffff != 0).then_some(hash)
+}
+
+/// # Safety
+/// The guarded roster seam must be called from the game thread.
+pub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {
+    let base = BASE.load(Ordering::Acquire);
+    if base == 0 { return None; }
+    // SAFETY: `BASE` is published only after the roster seam passes its guard.
+    let hash = unsafe { fighter_kind_hash(base, kind) };
+    let chara = hash & 0xff_ffff_ffff;
+    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)
 }
 
 // Both icon paths use this roster module's published, verified text base.
