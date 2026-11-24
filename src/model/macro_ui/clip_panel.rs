@@ -1,7 +1,7 @@
 //! Clip selection. Native input consumption, not rendering, advances the preview.
 use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};
 use crate::engine::macro_ui::macro_panel::Pad;
-use crate::engine::macro_ui::clip_marks::{Span, SHOWN_MARKS};
+use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};
 use crate::model::combo_record::UnitKind;
 
 pub const CLIP_BAR_UNITS: u16 = 1600;
@@ -110,8 +110,10 @@ pub struct ClipHelp {
 
 /// Button text for the step the crop editor is actually on.
 pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipHelp {
-    let controls = format!("{}{}A save. B close.",
-        if view.context.fighters() { "D-pad Up/Down: fighter. " } else { "" },
+    let controls = format!("{}{}Y snap. A save. B close.",
+        if view.context.fighters() { "D-pad Up/Down: fighter. " }
+        else if matches!(view.context, ClipContext::Macro { .. }) { "D-pad Up/Down: plays on CPU or Player 1. " }
+        else { "" },
         if view.context.preview() { "X preview. " } else { "" });
     let (primary, follow) = match view.handle {
         Handle::Out => (
@@ -258,11 +260,6 @@ pub struct ClipView {
     pub move_text: String,
 }
 
-impl ClipView {
-    /// The page is hidden while a preview plays.
-    pub fn hides_page(&self) -> bool { self.playing }
-}
-
 pub struct ClipEditor {
     session: ReplaySession,
     file: Option<FileSource>,
@@ -279,6 +276,8 @@ pub struct ClipEditor {
     previous_name: String,
     open_guard: OpenInputGuard,
     error: Option<String>,
+    marks: Marks,
+    watch_base: u32,
 }
 
 fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
@@ -291,12 +290,13 @@ impl ClipEditor {
     pub fn new(session: ReplaySession, clean_statuses: Vec<i32>) -> Result<Self, String> {
         let session = prepare(session).ok_or("Play a saved replay in Vault first")?;
         let window = session.tracks[0].window()?;
+        let marks = Marks::from_inputs(session.tracks[0].frames.iter().map(|frame| frame.input));
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
-            open_guard, error: None })
+            open_guard, error: None, marks, watch_base: 0 })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -316,13 +316,19 @@ impl ClipEditor {
     }
 
     fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
+        let marks = match &file {
+            FileSource::Macro { recording, .. } => Marks::from_recording(recording),
+            FileSource::Combo(recording) => Marks::from_units(
+                crate::model::recording_menu::combo_link_lines(&recording.combo).into_iter()
+                    .filter(|line| crate::model::recording_menu::link_head(line))),
+        };
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
         Ok(Self { session: ReplaySession { tracks: Vec::new(), truncated: false, breaks: Vec::new() },
             file: Some(file), previous: None, previous_selected: false, track: 0,
             window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
-            source_name, previous_name: String::new(), open_guard, error: None })
+            source_name, previous_name: String::new(), open_guard, error: None, marks, watch_base: 0 })
     }
 
     pub fn context(&self) -> ClipContext {
@@ -416,12 +422,18 @@ impl ClipEditor {
                     track.quantized_analog)
             }
         };
+        let (marks, mark_count) = self.marks.shown(self.window.cursor(), self.window.total(), CLIP_BAR_UNITS);
+        let (at, out_handle) = match self.handle {
+            Handle::In => (self.window.start(), false),
+            Handle::Out => (self.window.end(), true),
+            Handle::Playhead => (self.window.cursor(), false),
+        };
         ClipView { context: self.context(), total: self.window.total(), start: self.window.start(), end: self.window.end(),
             cursor: self.window.cursor(), handle: self.handle, playing: self.playing,
             entry, fighter_kind, previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
             clean_start, move_start: self.move_start, quantized, truncated: self.session.truncated,
             source_name: self.source_name.clone(), error: self.error.clone(),
-            marks: [(0, 0); SHOWN_MARKS], mark_count: 0, move_text: String::new() }
+            marks, mark_count, move_text: self.marks.text(at, out_handle) }
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing
@@ -434,13 +446,21 @@ impl ClipEditor {
         if consumed >= end - start { self.playing = false; }
     }
 
-    pub fn watch(&mut self, _spans: &[Span]) {}
-    pub fn preview_cursor(&mut self, _consumed: u32) {}
+    pub fn watch(&mut self, spans: &[Span]) {
+        if self.playing { self.marks.watch(self.watch_base, spans); }
+    }
+    pub fn preview_cursor(&mut self, consumed: u32) {
+        if self.playing {
+            self.window.seek(self.window.start().saturating_add(consumed.saturating_sub(1)).min(self.window.end() - 1));
+        }
+    }
 
     fn start_preview(&mut self) -> ClipEffect {
         self.pause();
         self.window.seek(self.window.start());
         self.handle = Handle::Playhead;
+        self.watch_base = self.window.start();
+        self.marks.forget_watched(self.window.start(), self.window.end());
         if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {
             self.playing = true;
             return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player };
@@ -482,13 +502,17 @@ impl ClipEditor {
         window.seek(self.window.cursor().min(window.total() - 1));
         self.track = index;
         self.window = window;
+        self.marks = Marks::from_inputs(self.session.tracks[index].frames.iter().map(|frame| frame.input));
         self.playing = false;
         self.move_start = None;
     }
 
     pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {
-        if self.file.is_some() && matches!(action,
-            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
+        if self.file.is_some() && matches!(action, ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
+            return ClipEffect::None;
+        }
+        if matches!(self.file, Some(FileSource::Combo(_)))
+            && matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::SwapTarget) {
             return ClipEffect::None;
         }
         if !self.context().preview() && matches!(action, ClipAction::TogglePlay | ClipAction::Restart) {
@@ -502,7 +526,29 @@ impl ClipEditor {
 
     fn apply_action(&mut self, action: ClipAction) -> ClipEffect {
         match action {
-            ClipAction::Snap | ClipAction::SwapTarget => return ClipEffect::None,
+            ClipAction::Snap => {
+                let boundary = match self.handle {
+                    Handle::Playhead => return ClipEffect::Error("Press L for the start or R for the end, then Y to snap".into()),
+                    Handle::In => self.marks.snap_in(self.window.start()),
+                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),
+                };
+                let Some(boundary) = boundary else { return ClipEffect::Error("No move marks yet: X previews and marks them".into()) };
+                self.pause();
+                match self.handle {
+                    Handle::In => { self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start()); }
+                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }
+                    Handle::Playhead => {}
+                }
+            }
+            ClipAction::SwapTarget => {
+                if let Some(FileSource::Macro { player, .. }) = &mut self.file {
+                    *player = !*player;
+                    let playing = self.playing;
+                    self.pause();
+                    return if playing { ClipEffect::StopPreview } else { ClipEffect::None };
+                }
+                return ClipEffect::None;
+            }
             ClipAction::SelectIn | ClipAction::SelectOut => {
                 self.pause();
                 let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };
@@ -539,6 +585,9 @@ impl ClipEditor {
             }
             ClipAction::Restart => { return self.start_preview(); }
             ClipAction::PreviousFighter | ClipAction::NextFighter => {
+                if matches!(self.file, Some(FileSource::Macro { .. })) {
+                    return self.apply_action(ClipAction::SwapTarget);
+                }
                 let count = self.session.tracks.len();
                 let offset = if matches!(action, ClipAction::PreviousFighter) { count - 1 } else { 1 };
                 self.set_track((self.track + offset) % count);
@@ -550,6 +599,7 @@ impl ClipEditor {
                     self.previous_selected = !self.previous_selected;
                     self.track = 0;
                     self.window = self.session.tracks[0].window().expect("nonempty capture");
+                    self.marks = Marks::from_inputs(self.session.tracks[0].frames.iter().map(|frame| frame.input));
                     self.handle = Handle::Playhead;
                     self.move_start = None;
                     self.pause();
@@ -689,21 +739,20 @@ mod tests {
         e.on_action(ClipAction::SelectOut);
         e.on_action(ClipAction::Nudge(-3));
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { start: 2, end: 7, .. }));
-        assert!(e.view().playing && e.view().hides_page());
+        assert!(e.view().playing);
         assert_eq!(e.context(), ClipContext::Macro { player: true });
         assert_eq!(e.view().entry, 0);
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::StopPreview));
-        assert!(!e.view().playing && !e.view().hides_page());
+        assert!(!e.view().playing);
         e.on_action(ClipAction::TogglePlay);
         e.preview_progress(u32::MAX);
         assert!(!e.view().playing);
     }
 
-    /// The shared editor hides the page for a Vault preview too.
-    fn a_replay_preview_hides_the_page_too() {
+    fn a_replay_preview_stays_playing() {
         let mut e = editor();
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
-        assert!(e.view().hides_page());
+        assert!(e.view().playing);
     }
 
     /// The tail starts when the last input finishes and resets on a restart.
@@ -754,7 +803,7 @@ mod tests {
         }
         assert_eq!((e.view().start, e.view().end, e.view().handle), before);
         let help = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
-        assert_eq!(help.controls, "A save. B close.");
+        assert_eq!(help.controls, "Y snap. A save. B close.");
         assert!(!help.notice.contains("preview"));
     }
 
@@ -930,7 +979,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_saved_macro_previews_its_kept_window_on_its_role", a_saved_macro_previews_its_kept_window_on_its_role as fn()),
-            ("a_replay_preview_hides_the_page_too", a_replay_preview_hides_the_page_too as fn()),
+            ("a_replay_preview_stays_playing", a_replay_preview_stays_playing as fn()),
             ("the_preview_tail_waits_sixty_frames_after_the_last_input", the_preview_tail_waits_sixty_frames_after_the_last_input as fn()),
             ("replay_and_saved_macro_controls_have_parity", replay_and_saved_macro_controls_have_parity as fn()),
             ("combo_clip_handles_snap_to_whole_links", combo_clip_handles_snap_to_whole_links as fn()),

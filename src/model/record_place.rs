@@ -634,7 +634,7 @@ mod tests {
         let worker = include_str!("../runtime/ui/worker.rs");
         let clip = worker.split("if s.phase == Phase::Clip {").nth(1).unwrap().split("\n    }").next().unwrap();
         let store = clip.split("EXT_SHOWN.store(").nth(1).unwrap().split(';').next().unwrap();
-        assert!(store.contains("hides_page()"));
+        assert!(store.contains("v.playing"));
     }
 
     #[test]

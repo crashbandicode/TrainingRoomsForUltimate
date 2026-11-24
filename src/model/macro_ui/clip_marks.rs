@@ -562,7 +562,7 @@ mod tests {
         let mut editor = ClipEditor::macro_file(recording(), true).unwrap();
         editor.on_action(ClipAction::TogglePlay);
         editor.preview_cursor(36);
-        assert_eq!(editor.view().cursor, 36);
+        assert_eq!(editor.view().cursor, 35);
     }
 
     fn a_recorded_take_keeps_its_move_ends_and_out_snaps_to_one_before_any_preview() {

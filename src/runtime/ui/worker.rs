@@ -1232,7 +1232,7 @@ fn sync_panels(s: &mut Session) {
         }
     }
     if s.phase == Phase::Clip {
-        EXT_SHOWN.store(!crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page()), Ordering::Release);
+        EXT_SHOWN.store(true, Ordering::Release);
     }
     if open || s.phase == Phase::Clip || s.phase == Phase::Prompt {
         publish_frame(s);
