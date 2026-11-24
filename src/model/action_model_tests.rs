@@ -766,6 +766,7 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
 fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
     let (x, y) = (f32::from(end.0), f32::from(end.1));
     action::Travel {
+        entry: action::Entry::UNKNOWN,
         stick: Some(stick),
         heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
         distance: (x.hypot(y) * 10.0).round() as u16,
@@ -874,16 +875,16 @@ fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
     }
 }
 
-/// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
+/// The travel table's static cost: an entry is packed into 28 bytes, so the table adds 112 bytes to a combo, which
 /// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
 /// more code than the data it saved (`833913b3`), so every combo carries the table.
 #[test]
-fn the_travel_table_is_packed_into_96_bytes_a_combo() {
+fn the_travel_table_is_packed_into_112_bytes_a_combo() {
     use core::mem::size_of;
     let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
     println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
         size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
-    assert_eq!((entry, DETAILS * entry), (24, 96), "a travel detail and a combo's table");
+    assert_eq!((entry, DETAILS * entry), (28, 112), "a travel detail and a combo's table");
     assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
 }
 
@@ -1269,6 +1270,8 @@ fn entry_motion_on_a_steer_must_match_to_judge_the_stick() {
     for toggle in [false, true] {
         let run = |vx| airborne_cast(Some(saved), false, STRAIGHT_CAST, (vx, 0.0), toggle).1.unwrap();
         assert_eq!(run(0.25).fault, Some((0, Reason::Steer)), "matching entry still grades the steer");
+        assert_eq!(run(0.3125).fault, Some((0, Reason::Steer)), "at the inclusive velocity tolerance");
+        assert!(run(0.31640625).clean, "one recorded velocity unit past the tolerance");
         assert!(run(0.375).clean, "different entry cannot establish a steering error");
     }
 }
@@ -1285,6 +1288,13 @@ fn entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick() {
     let press = value["input_steps"][0]["events"][0].as_object_mut().unwrap();
     assert_eq!(press.remove("entry_x"), Some(serde_json::json!(0.25)));
     assert_eq!(press.remove("entry_y"), Some(serde_json::json!(-0.125)));
+    for (x, y) in [(serde_json::json!(0), None), (serde_json::json!(false), Some(0)), (serde_json::json!(128), Some(0))] {
+        let mut bad = value.clone();
+        let press = &mut bad["input_steps"][0]["events"][0];
+        press["entry_x"] = x;
+        if let Some(y) = y { press["entry_y"] = serde_json::json!(y); }
+        assert!(serde_json::from_value::<ComboRecord>(bad).is_err());
+    }
     let legacy: ComboRecord = serde_json::from_value(value).unwrap();
     assert!(legacy.combo.travel(0, 0).is_some());
     assert!(run(legacy.combo).clean);

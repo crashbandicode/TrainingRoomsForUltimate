@@ -333,7 +333,7 @@ impl LinkRec {
     }
 }
 
-/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 24 bytes.
+/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 28 bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Detail {
     /// The link in the high four bits and the event in the low four; `FREE` while unused.
@@ -343,6 +343,7 @@ struct Detail {
     angle: u16,
     heading: u16,
     distance: u16,
+    entry: action::Entry,
     path: [(i8, i8); 8],
 }
 
@@ -350,7 +351,8 @@ impl Detail {
     const FREE: u8 = 0xFF;
     const NO_STICK: u8 = 0xFF;
     const EMPTY: Detail =
-        Detail { at: Self::FREE, deflection: Self::NO_STICK, angle: 0, heading: 0, distance: 0, path: [(0, 0); 8] };
+        Detail { at: Self::FREE, deflection: Self::NO_STICK, angle: 0, heading: 0, distance: 0,
+            entry: action::Entry::UNKNOWN, path: [(0, 0); 8] };
 
     /// The key of an event; `link` is below `LINKS` and `event` below `STEPS`.
     const fn at(link: usize, event: usize) -> u8 {
@@ -359,11 +361,12 @@ impl Detail {
 
     fn of(at: u8, travel: Travel) -> Detail {
         let (angle, deflection) = travel.stick.unwrap_or((0, Self::NO_STICK));
-        Detail { at, deflection, angle, heading: travel.heading, distance: travel.distance, path: travel.path }
+        Detail { at, deflection, angle, heading: travel.heading, distance: travel.distance, entry: travel.entry, path: travel.path }
     }
 
     fn travel(&self) -> Travel {
         Travel {
+            entry: self.entry,
             stick: (self.deflection != Self::NO_STICK).then_some((self.angle, self.deflection)),
             heading: self.heading,
             distance: self.distance,

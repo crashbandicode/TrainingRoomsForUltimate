@@ -190,7 +190,7 @@ impl OpenPart {
             ((point.0 * mirror).round().clamp(-127.0, 127.0) as i8,
                 point.1.round().clamp(-127.0, 127.0) as i8)
         });
-        Travel { stick: self.stick, heading, distance, path }
+        Travel { entry: action::Entry::UNKNOWN, stick: self.stick, heading, distance, path }
     }
 }
 
@@ -213,6 +213,7 @@ pub struct Rule {
     /// The press that began the current special, and the one whose own travel ended last.
     press: u32,
     origin: u32,
+    entry: action::Entry,
     /// Frames the stick spent in each bin during the special's own travel, and the newest sample of each bin.
     held: [u8; 9],
     sticks: [(i8, i8); 9],
@@ -225,7 +226,7 @@ impl Rule {
         Self { family: None, facing: 0, onsets: 0, statuses: [None; 2], last_heading: None,
             window: 0, last_status: None, previous: None, previous2: None, previous_ground: true,
             candidate: None, part: None, ended: None, press: 0, origin: 0, held: [0; 9], sticks: [(0, 0); 9],
-            #[cfg(test)] keep_nominal: false }
+            entry: action::Entry::UNKNOWN, #[cfg(test)] keep_nominal: false }
     }
 
     /// Player 1 is inside a special as of the last step.
@@ -250,7 +251,7 @@ impl Rule {
             // The bin held longest; a tie goes to a direction before neutral. Neutral is kept as no deflection.
             let most = (0..9).rev().max_by_key(|&bin| self.held[bin]).unwrap_or(8);
             let stick = if most == 8 { (0, 0) } else { action::stick_of(self.sticks[most], part.facing) };
-            self.ended = Some((0, Travel { stick: Some(stick), ..part.measured() }));
+            self.ended = Some((0, Travel { entry: self.entry, stick: Some(stick), ..part.measured() }));
             self.origin = self.press;
         }
     }
@@ -293,6 +294,10 @@ impl Rule {
             self.window = now.press;
             self.candidate = None;
             self.press = now.press;
+            self.entry = self.previous.zip(self.previous2).and_then(|(p, before)| {
+                let dx = f64::from(p.0) - f64::from(before.0);
+                action::Entry::of(if now.facing < 0 { -dx } else { dx }, f64::from(p.1) - f64::from(before.1))
+            }).unwrap_or(action::Entry::UNKNOWN);
             self.held = [0; 9];
             self.sticks = [(0, 0); 9];
             self.part = self.previous.or(now.pos).map(|base| OpenPart::begun(0, now.status, base, now.facing, None));

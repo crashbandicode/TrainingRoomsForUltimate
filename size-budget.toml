@@ -2817,3 +2817,11 @@ ceiling = 199998
 date = "2026-11-24"
 reason = "Merge 3D of install 4: a special's own travel is measured, kept on its press and graded (path within the steering tolerance; beyond a 2-unit floor the stick most held, and with the stick toggle its angle and deflection). Measured 199998 on 3c5d0295, 174 above merge 4 (199824, 436c7a68)."
 approved_by = "tr-primary-2 ruling 2026-11-24 23:16:49Z (the 3D line budget approved at the measured 199,998, +174)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200051
+date = "2026-11-24"
+reason = "3D entry velocity: compare the stick only for comparable approaches to the special; save and read the optional velocity pair. Measured 200051, +53 against 19d26f8e."
+approved_by = "tr-primary-2 ruling 2026-11-24 23:31:00Z: entry motion root fix, line ceiling at the final measured value."

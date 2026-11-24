@@ -70,9 +70,36 @@ impl Late {
     pub const NONE: Late = Late { open: None, travel: None, press: 0 };
 }
 
+/// Facing-relative entry velocity, in 1/256 game units per unstopped frame. Unknown is distinct from standing still.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Entry(i16, i16);
+
+impl Entry {
+    pub const UNKNOWN: Self = Self(i16::MIN, i16::MIN);
+
+    pub fn of(x: f64, y: f64) -> Option<Self> {
+        let axis = |v: f64| {
+            let n = (v * 256.0).round();
+            ((-32767.0..=32767.0).contains(&n)).then_some(n as i16)
+        };
+        Some(Self(axis(x)?, axis(y)?))
+    }
+
+    pub fn units(self) -> Option<(f64, f64)> {
+        (self != Self::UNKNOWN).then(|| (f64::from(self.0) / 256.0, f64::from(self.1) / 256.0))
+    }
+
+    /// Inclusive radius of 1/16 unit/frame in the recorded velocity plane.
+    fn comparable(self, other: Self) -> bool {
+        let (x, y) = (i64::from(self.0) - i64::from(other.0), i64::from(self.1) - i64::from(other.1));
+        self != Self::UNKNOWN && other != Self::UNKNOWN && x * x + y * y <= 16 * 16
+    }
+}
+
 /// A travel part: angles are facing-relative degrees in tenths, path offsets are facing-relative game units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Travel {
+    pub entry: Entry,
     /// The deciding stick's angle and deflection in percent.
     pub stick: Option<(u16, u8)>,
     /// The whole part's heading and straight-line distance in tenths of a unit.
@@ -117,7 +144,7 @@ fn sector(stick: Option<(u16, u8)>) -> Option<u16> {
 /// compared eight-way, and with the toggle On its angle and deflection too. Only when the two paths differ by more
 /// than [`STEER_FLOOR`]: a special that ignores the stick has no fault here.
 pub fn steer_off(reference: &Travel, attempt: &Travel, match_stick: bool) -> Option<Mark> {
-    if !apart(reference, attempt, STEER_FLOOR) {
+    if !reference.entry.comparable(attempt.entry) || !apart(reference, attempt, STEER_FLOOR) {
         return None;
     }
     let saved = sector(reference.stick);

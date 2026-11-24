@@ -9,7 +9,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
-use super::action::{ActionDesc, Travel};
+use super::action::{ActionDesc, Entry, Travel};
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
 use super::frame_strip::{Angle, Button, Move, Verdict};
 use super::spots::Spot;
@@ -603,7 +603,12 @@ fn parse_travel(event: &Map<String, Value>) -> Result<Travel, &'static str> {
             Some((angle, deflection.round() as u8))
         }
     };
-    Ok(Travel { stick, heading, distance, path })
+    let entry = match (event.get("entry_x"), event.get("entry_y")) {
+        (None, None) => Entry::UNKNOWN,
+        (Some(x), Some(y)) => Entry::of(x.as_f64().ok_or("entry_x")?, y.as_f64().ok_or("entry_y")?).ok_or("entry velocity")?,
+        _ => return Err("entry velocity"),
+    };
+    Ok(Travel { entry, stick, heading, distance, path })
 }
 
 fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS], travels: Option<&[Option<Travel>; STEPS]>) -> Vec<Value> {
@@ -627,6 +632,10 @@ fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>) -> Value
         Kind::Aim(part) => value["part"] = json!(part),
     }
     if let Some(travel) = travel {
+        if let Some((x, y)) = travel.entry.units() {
+            value["entry_x"] = json!(x);
+            value["entry_y"] = json!(y);
+        }
         if let Some((angle, deflection)) = travel.stick {
             value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
         }
