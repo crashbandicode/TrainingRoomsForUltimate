@@ -2613,3 +2613,11 @@ ceiling = 197052
 date = "2026-11-24"
 reason = "F16 follow-up: a macro playing on Player 1 also lifts the menu's hold on the CPU. Measured 197052, 2 above the measured merged base 8d6ccf66 (197050)."
 approved_by = "tr-primary-2 ruling 2026-11-23 23:55:15Z (the Player-role line goes into the next build)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197121
+date = "2026-11-24"
+reason = "HUD text lines were cut at 24 UTF-16 units (the drill card read S1 Attack wrong directio): the strip and the combo card now have one text length of 40 units in the plans and the native boxes, a reason wider than the card wraps, and the card grows by the wrapped line. Measured 197121, 69 above the measured base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 16:34:13Z (line budget +69 approved at the measured value for fix/reason-line-full), after its rulings of 15:10:19Z and 15:29:13Z (the 24-unit text cut goes to tile-fix-g4 on a branch from e7667f26). NRO and BSS are reported with the gate."
