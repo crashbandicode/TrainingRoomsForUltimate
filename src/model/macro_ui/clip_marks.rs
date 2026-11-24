@@ -1,5 +1,7 @@
 use crate::engine::macros::{ActionMark, InputFrame, MacroRecording};
-use crate::model::frame_strip::Move;
+use crate::model::combo::{self, Kind, STEPS};
+use crate::model::combo_record::{move_key, move_of};
+use crate::model::frame_strip::{self, Button, Move, Snap};
 
 pub const SHOWN_MARKS: usize = 24;
 pub const WATCH_SPANS: usize = 32;
@@ -19,31 +21,245 @@ pub struct Span {
     pub mv: Option<Move>,
 }
 
-pub struct Watch;
+pub struct Watch {
+    run: u32,
+    spans: [Span; WATCH_SPANS],
+    len: usize,
+    open: bool,
+    last: Option<u32>,
+}
 impl Watch {
-    pub const fn new() -> Self { Self }
-    pub fn feed(&mut self, _run: u32, _index: u32, _busy: bool, _mv: Option<Move>) {}
-    pub fn run(&self) -> u32 { 0 }
-    pub fn spans(&self) -> &[Span] { &[] }
+    pub const fn new() -> Self {
+        Self { run: 0, spans: [Span { start: 0, end: None, mv: None }; WATCH_SPANS],
+            len: 0, open: false, last: None }
+    }
+    pub fn feed(&mut self, run: u32, index: u32, busy: bool, mv: Option<Move>) {
+        if self.run != run || self.last.is_some_and(|last| index < last) {
+            *self = Self::new();
+            self.run = run;
+        }
+        self.last = Some(index);
+        if busy {
+            if !self.open && self.len < WATCH_SPANS {
+                self.spans[self.len] = Span { start: index, end: None, mv };
+                self.len += 1;
+                self.open = true;
+            } else if self.open && self.spans[self.len - 1].mv.is_none() {
+                self.spans[self.len - 1].mv = mv;
+            }
+        } else if self.open {
+            self.spans[self.len - 1].end = Some(index);
+            self.open = false;
+        }
+    }
+    pub fn run(&self) -> u32 { self.run }
+    pub fn spans(&self) -> &[Span] { &self.spans[..self.len] }
 }
 
-pub struct Marks { list: Vec<Mark> }
+pub struct Marks {
+    list: Vec<Mark>,
+    origins: Vec<Option<String>>,
+    bindings: Vec<Option<u32>>,
+    keys: Vec<Option<String>>,
+    recorded: bool,
+}
 impl Marks {
-    pub fn new() -> Self { Self { list: Vec::new() } }
-    pub fn from_inputs(_frames: impl Iterator<Item = InputFrame>) -> Self { Self::new() }
-    pub fn from_units(_names: impl Iterator<Item = String>) -> Self { Self::new() }
-    pub fn from_recording(_recording: &MacroRecording) -> Self { Self::new() }
-    pub fn recorded(&self) -> bool { false }
-    pub fn capture(_frames: &[InputFrame], _spans: &[Span]) -> Vec<ActionMark> { Vec::new() }
-    pub fn window(_actions: &[ActionMark], _from: u32, _to: u32) -> Vec<ActionMark> { Vec::new() }
+    pub fn new() -> Self {
+        Self { list: Vec::new(), origins: Vec::new(), bindings: Vec::new(), keys: Vec::new(), recorded: false }
+    }
+
+    fn insert(&mut self, at: usize, mark: Mark, origin: Option<String>, binding: Option<u32>, key: Option<String>) {
+        self.list.insert(at, mark);
+        self.origins.insert(at, origin);
+        self.bindings.insert(at, binding);
+        self.keys.insert(at, key);
+    }
+
+    pub fn from_inputs(frames: impl Iterator<Item = InputFrame>) -> Self {
+        let mut marks = Self::new();
+        let mut previous = None;
+        let mut last = None;
+        for (index, input) in frames.enumerate() {
+            let mut snap = Snap::empty(index as u32);
+            snap.buttons = input.buttons;
+            snap.lstick_x = input.lstick_x;
+            snap.lstick_y = input.lstick_y;
+            snap.rstick_x = input.rstick_x;
+            snap.rstick_y = input.rstick_y;
+            snap.facing = 1;
+            if frame_strip::stick_axis(snap.lstick_y) < frame_strip::JUMP_STICK_Y {
+                snap.buttons &= !frame_strip::FLICK_JUMP;
+            }
+            let mut edges = [None; STEPS];
+            let mut count = 0;
+            combo::push_edges(&mut edges, &mut count, previous, snap, false);
+            previous = Some(snap);
+            for event in edges.into_iter().flatten() {
+                if crate::model::action::originates(event.kind)
+                    && (marks.list.is_empty() || last.is_some_and(|last| event.frame.saturating_sub(last) > frame_strip::DROP_MAX))
+                {
+                    let name = input_name(event.kind).to_owned();
+                    marks.insert(marks.list.len(), Mark { start: event.frame, end: None, name: name.clone() },
+                        Some(name), None, None);
+                }
+                last = Some(event.frame);
+            }
+        }
+        marks
+    }
+
+    pub fn from_units(names: impl Iterator<Item = String>) -> Self {
+        let mut marks = Self::new();
+        for (i, name) in names.enumerate() {
+            marks.insert(marks.list.len(), Mark { start: i as u32, end: Some(i as u32 + 1), name: name.clone() },
+                Some(name), None, None);
+        }
+        marks
+    }
+
+    pub fn from_recording(recording: &MacroRecording) -> Self {
+        let fallback = Self::from_inputs(recording.frames.iter().copied());
+        let mut last = None;
+        let valid = !recording.actions.is_empty() && recording.actions.iter().all(|action| {
+            let ok = (action.start as usize) < recording.frames.len()
+                && last.is_none_or(|last| last < action.start)
+                && action.end.is_none_or(|end| end > action.start && (end as usize) <= recording.frames.len());
+            last = Some(action.start);
+            ok
+        });
+        if !valid { return fallback; }
+        let mut marks = Self::new();
+        marks.recorded = true;
+        for action in &recording.actions {
+            let name = action.mv.as_deref().and_then(move_of).filter(|mv| *mv != Move::Other)
+                .map(|mv| mv.name().to_owned())
+                .or_else(|| fallback.list.iter().find(|mark| mark.start == action.start).map(|mark| mark.name.clone()))
+                .unwrap_or_else(|| "Move".into());
+            marks.insert(marks.list.len(), Mark { start: action.start, end: action.end, name }, None, None, action.mv.clone());
+        }
+        marks
+    }
+
+    pub fn recorded(&self) -> bool { self.recorded }
+
+    pub fn capture(frames: &[InputFrame], spans: &[Span]) -> Vec<ActionMark> {
+        let mut marks = Self::from_inputs(frames.iter().copied());
+        marks.watch(0, spans);
+        marks.list.iter().zip(&marks.keys).map(|(mark, key)| ActionMark {
+            start: mark.start,
+            end: mark.end.filter(|&end| end > mark.start && end <= frames.len() as u32),
+            mv: key.clone(),
+        }).collect()
+    }
+
+    pub fn window(actions: &[ActionMark], from: u32, to: u32) -> Vec<ActionMark> {
+        actions.iter().filter(|action| action.start >= from && action.start < to).map(|action| ActionMark {
+            start: action.start - from,
+            end: action.end.filter(|&end| end <= to).map(|end| end - from),
+            mv: action.mv.clone(),
+        }).collect()
+    }
     pub fn list(&self) -> &[Mark] { &self.list }
-    pub fn forget_watched(&mut self, _from: u32, _to: u32) {}
-    pub fn watch(&mut self, _base: u32, _spans: &[Span]) {}
-    pub fn snap_in(&self, _at: u32) -> Option<u32> { None }
-    pub fn snap_out(&self, _at: u32, _total: u32) -> Option<u32> { None }
-    pub fn text(&self, _at: u32, _out_handle: bool) -> String { String::new() }
-    pub fn shown(&self, _cursor: u32, _total: u32, _width: u16) -> ([(u16, u16); SHOWN_MARKS], u8) {
-        ([(0, 0); SHOWN_MARKS], 0)
+
+    pub fn forget_watched(&mut self, from: u32, to: u32) {
+        if self.recorded { return; }
+        for i in (0..self.list.len()).rev() {
+            if self.bindings[i].is_none_or(|start| start < from || start >= to) { continue; }
+            if let Some(name) = &self.origins[i] {
+                self.list[i].name = name.clone();
+                self.list[i].end = None;
+                self.bindings[i] = None;
+                self.keys[i] = None;
+            } else {
+                self.list.remove(i);
+                self.origins.remove(i);
+                self.bindings.remove(i);
+                self.keys.remove(i);
+            }
+        }
+    }
+
+    pub fn watch(&mut self, base: u32, spans: &[Span]) {
+        if self.recorded { return; }
+        for span in spans {
+            let start = base.saturating_add(span.start);
+            let existing = self.bindings.iter().position(|bound| *bound == Some(start));
+            let available = || self.list.iter().enumerate().rev().find(|(i, mark)| {
+                self.origins[*i].is_some() && self.bindings[*i].is_none()
+                    && mark.start <= start && start - mark.start <= frame_strip::INPUT_LOOKBACK
+            }).map(|(i, _)| i);
+            let index = match existing.or_else(available) {
+                Some(index) => index,
+                None => {
+                    let index = self.list.partition_point(|mark| mark.start <= start);
+                    self.insert(index, Mark { start, end: None, name: "Move".into() }, None, None, None);
+                    index
+                }
+            };
+            self.bindings[index] = Some(start);
+            self.list[index].end = span.end.map(|end| base.saturating_add(end));
+            if let Some(mv) = span.mv.filter(|mv| *mv != Move::Other) {
+                self.list[index].name = mv.name().into();
+                self.keys[index] = Some(move_key(mv).into());
+            }
+        }
+    }
+
+    pub fn snap_in(&self, at: u32) -> Option<u32> {
+        if self.list.is_empty() { return None; }
+        std::iter::once(0).chain(self.list.iter().map(|mark| mark.start))
+            .min_by_key(|&boundary| (boundary.abs_diff(at), boundary))
+    }
+
+    pub fn snap_out(&self, at: u32, total: u32) -> Option<u32> {
+        if self.list.is_empty() || total == 0 { return None; }
+        std::iter::once(total).chain(self.list.iter().enumerate().map(|(i, mark)| {
+            mark.end.unwrap_or_else(|| self.list.get(i + 1).map_or(total, |next| next.start)).min(total)
+        })).filter(|&boundary| boundary != 0)
+            .min_by_key(|&boundary| (boundary.abs_diff(at), std::cmp::Reverse(boundary)))
+    }
+
+    pub fn text(&self, at: u32, out_handle: bool) -> String {
+        if self.list.is_empty() { return "No move marks yet: X previews and marks them".into(); }
+        let start = || self.list.iter().find(|mark| mark.start == at).map(|mark| format!("Start of {}", mark.name));
+        let end = || self.list.iter().find(|mark| mark.end == Some(at)).map(|mark| format!("End of {}", mark.name));
+        if let Some(text) = if out_handle { end() } else { start() } { return text; }
+        for (i, mark) in self.list.iter().enumerate() {
+            let end = mark.end.or_else(|| self.list.get(i + 1).map(|next| next.start));
+            if at > mark.start && end.is_none_or(|end| at < end) {
+                let n = at - mark.start;
+                return format!("{n} frame{} into {}", if n == 1 { "" } else { "s" }, mark.name);
+            }
+        }
+        (if out_handle { start() } else { end() }).unwrap_or_else(|| "No move here".into())
+    }
+
+    pub fn shown(&self, cursor: u32, total: u32, width: u16) -> ([(u16, u16); SHOWN_MARKS], u8) {
+        let mut selected: Vec<_> = self.list.iter().collect();
+        selected.sort_by_key(|mark| (mark.start.abs_diff(cursor), mark.start));
+        selected.truncate(SHOWN_MARKS);
+        selected.sort_by_key(|mark| mark.start);
+        let mut shown = [(0, 0); SHOWN_MARKS];
+        let scale = |frame: u32| -> u16 {
+            if total == 0 { 0 } else { ((u64::from(frame.min(total)) * u64::from(width)) / u64::from(total)) as u16 }
+        };
+        for (slot, mark) in shown.iter_mut().zip(&selected) {
+            *slot = (scale(mark.start), scale(mark.end.unwrap_or(mark.start)));
+        }
+        (shown, selected.len() as u8)
+    }
+}
+
+fn input_name(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Press(Button::Attack) => "Attack",
+        Kind::Press(Button::Special) => "Special",
+        Kind::Press(Button::Jump) => "Jump",
+        Kind::Press(Button::Shield) => "Shield",
+        Kind::Press(Button::Grab) => "Grab",
+        Kind::CStick => "C-stick",
+        Kind::Flick(_) => "Flick",
+        _ => "Move",
     }
 }
 

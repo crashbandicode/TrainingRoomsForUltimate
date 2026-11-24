@@ -652,7 +652,7 @@ fn value_of<T: Copy>(table: &[(T, &'static str)], key: &str) -> Option<T> {
 pub fn move_key(m: Move) -> &'static str {
     key_of(&MOVES, m.legacy())
 }
-fn move_of(key: &str) -> Option<Move> {
+pub(crate) fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
 }
 fn button_key(b: Button) -> &'static str {
