@@ -1,11 +1,10 @@
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 
 use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::move_names::{load_step, FighterId, LoadStep, Names, PUBLISHED};
 use crate::model::thread_stacks::ThreadId;
 use crate::runtime::{game, threads};
 
-static LAST_KIND: AtomicI32 = AtomicI32::new(-1);
 static ARCROPOLIS: AtomicBool = AtomicBool::new(false);
 static MOUNTED: AtomicBool = AtomicBool::new(false);
 static GIVE_UP: AtomicBool = AtomicBool::new(false);
@@ -133,22 +132,6 @@ fn read_exact(handle: skyline::nn::fs::FileHandle, offset: usize, buffer: &mut [
         filled += got;
     }
     Ok(())
-}
-
-/// Record P1's kind and identity without allocating or taking a lock.
-///
-/// # Safety
-/// `accessor` is Player 1's live module accessor on the game thread.
-pub unsafe fn note_player(accessor: usize, kind: Option<i32>, cleared: bool) {
-    let Some(kind) = kind.filter(|kind| *kind >= 0) else {
-        LAST_KIND.store(-1, Ordering::Release);
-        PUBLISHED.set_player(None);
-        return;
-    };
-    if !cleared && LAST_KIND.load(Ordering::Acquire) == kind { return; }
-    let id = unsafe { fighter_id(accessor, kind) };
-    PUBLISHED.set_player(id.map(|id| (kind, id)));
-    LAST_KIND.store(if id.is_some() { kind } else { -1 }, Ordering::Release);
 }
 
 /// # Safety

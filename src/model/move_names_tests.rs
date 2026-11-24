@@ -548,6 +548,25 @@ fn live_strip_resets_share_the_identity_invalidation_boundary() {
     }
 }
 
+fn same_kind_after_a_strip_reset_reads_the_new_loadout() {
+    let names = Published::new();
+    let mut strip = Tracker::new();
+    let kind = 0x49;
+    let first = FighterId { specials: [0, 1, 2, 0], ..fighter("mii") };
+    let second = FighterId { specials: [2, 0, 1, 2], ..first };
+    names.observe_player(Some(kind), |_| Some(first));
+    let retained = CaptureOwner::new(kind, recorded_identity(names.player(), kind));
+    names.set_target(retained.fighter());
+    names.observe_player(Some(kind), |_| panic!("stable frames must not reread native work values"));
+    strip.clear_live_strip(&names);
+    assert_eq!(names.player(), None, "no frame from the new body yet");
+    names.observe_player(Some(kind), |_| None);
+    assert_eq!(names.player(), None, "unavailable native identity cannot reuse an old Mii");
+    names.observe_player(Some(kind), |_| Some(second));
+    assert_eq!(names.player(), Some((kind, second)));
+    assert_eq!((retained.fighter(), names.target()), (Some(first), Some(first)));
+}
+
 fn the_file_is_read_only_after_the_mod_filesystem_is_mounted() {
     assert_eq!(load_step(false, false, None, false, 0, 0), LoadStep::Idle);
     assert_eq!(load_step(true, true, None, false, 0, 0), LoadStep::Idle);
@@ -618,6 +637,7 @@ fn case_table() {
         ("a_save_takes_the_identity_only_of_the_fighter_the_take_was_recorded_on", a_save_takes_the_identity_only_of_the_fighter_the_take_was_recorded_on as fn()),
         ("the_variant_numbers_are_fixed_and_fit_five_bits", the_variant_numbers_are_fixed_and_fit_five_bits as fn()),
         ("live_strip_resets_share_the_identity_invalidation_boundary", live_strip_resets_share_the_identity_invalidation_boundary as fn()),
+        ("same_kind_after_a_strip_reset_reads_the_new_loadout", same_kind_after_a_strip_reset_reads_the_new_loadout as fn()),
         ("the_file_is_read_only_after_the_mod_filesystem_is_mounted", the_file_is_read_only_after_the_mod_filesystem_is_mounted as fn()),
         ("only_selected_message_texts_are_decoded_and_compacted", only_selected_message_texts_are_decoded_and_compacted as fn()),
     ]);

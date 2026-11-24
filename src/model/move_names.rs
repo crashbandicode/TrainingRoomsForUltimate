@@ -329,6 +329,13 @@ impl Published {
         let owner = CaptureOwner(self.player.load(Ordering::Acquire));
         Some((owner.kind(), owner.fighter()?))
     }
+    /// Only the live publication is a cache; captured and target owners outlive a strip reset.
+    pub fn observe_player(&self, kind: Option<i32>, read: impl FnOnce(i32) -> Option<FighterId>) {
+        let kind = kind.filter(|k| *k >= 0);
+        if CaptureOwner(self.player.load(Ordering::Acquire)).kind() != kind.unwrap_or(-1) {
+            self.set_player(kind.and_then(|k| Some((k, read(k)?))));
+        }
+    }
     pub fn set_target(&self, fighter: Option<FighterId>) { self.target.store(pack(fighter), Ordering::Release); }
     pub fn target(&self) -> Option<FighterId> { unpack(self.target.load(Ordering::Acquire)) }
 }

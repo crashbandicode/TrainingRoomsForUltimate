@@ -699,6 +699,11 @@ impl Tracker {
         *self = Self::new();
     }
 
+    pub fn clear_live_strip(&mut self, names: &super::move_names::Published) {
+        self.clear();
+        names.set_player(None);
+    }
+
     pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {
         if let Some(grade) = taken.earlier {
             self.push_tag(0, grade);
