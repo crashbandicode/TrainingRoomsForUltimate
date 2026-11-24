@@ -1877,7 +1877,7 @@ impl RecordingScreens {
             header,
             header_floppy: (header == "SAVE STATES").then_some(Floppy::On),
             header_loop: (header == "MACROS").then_some(self.loop_of(role)),
-            hairline_after: (file_count > 5).then_some(5 + lead),
+            hairline_after: (file_count > 5 && !place.in_recordings(group, section)).then_some(5 + lead),
             rows,
             cursor,
             files: file_count,
@@ -2977,7 +2977,7 @@ mod tests {
     fn f2_recording_file_wrap() {
         for section in [0, 1] {
             let mut m = recording_list_menu();
-            m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, section, 0);
+            m.recording_mut().set_cursor(Face::Page, SAVES_MACROS, section, usize::from(section == 1));
             m.press(Button::A);
             let len = m.recording().file_rows().len();
             assert!(len > 1);
@@ -3681,6 +3681,14 @@ mod tests {
         assert_eq!(rows[0].name, "Replay");
         assert_eq!(rows[0].sub, "P1 Mario · P2 Fox · 8299 frames");
         assert_eq!(rows[1].name, "Previous Vault capture (partial)");
+        screens.set_recordings((0..6).map(|i| {
+            let mut file = vault_file(vault_sides());
+            file.id = format!("saved:{i}");
+            file
+        }).collect());
+        let list = screens.section(Face::Page, SAVES_MACROS, 1);
+        assert!(list.hairline_after.is_none());
+        assert!(list.rows.iter().all(|row| !row.hot && !row.green));
     }
 
     fn a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill() {

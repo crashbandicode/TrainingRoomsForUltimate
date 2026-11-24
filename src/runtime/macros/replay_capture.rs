@@ -440,10 +440,10 @@ fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Res
 /// opening track. Returns true when a prompt now owns the selection. A prompt that
 /// cannot open degrades to Keep: the selection proceeds on the current CPU.
 fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
-    let (gate, recorded, unresolved) = {
+    let (gate, recorded, unresolved, player) = {
         let editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_ref() else { return false; };
-        if editor.request.is_some_and(|request| request.player) { return false; }
+        let player = editor.request.is_some_and(|request| request.player);
         if !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }) { return false; }
         let (entry, kind, previous) = match action {
             Some(action) => match editor.peek_selection(action) { Some(candidate) => candidate, None => return false },
@@ -452,7 +452,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
         let unresolved = matches!(editor.target_for(entry, kind, previous), Ok(None))
             .then(|| editor.raw_for(entry, kind, previous).ok().map(|raw| (entry as usize, raw)))
             .flatten();
-        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved)
+        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved, player)
     };
     // Resolve appearance metadata independently of the user's fighter choice.
     // Keep can then export the original Mii, and an already-matching Mii does not
@@ -479,7 +479,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
             }
         }
     }
-    if gate != FighterGate::Prompt { return false; }
+    if player || gate != FighterGate::Prompt { return false; }
     let revision = SELECTION_REVISION.load(Ordering::Acquire);
     *PENDING.lock().unwrap() = Some(Pending { revision, action });
     let opened = crate::runtime::macros::named_macros::open_clip_fighter_prompt(

@@ -3711,7 +3711,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "89eb76a116c0c778cdec701643cfd525c7f408eaa1ff15acda42aced9d533026",
+   "dest_sha256": "9657010eaf2fb94788de1c1d6b96faf075b46d4f0a6c04e85857ce2abb4d1c29",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4412,6 +4412,26 @@
      "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
      "old": "            match attach(recording) {\n",
      "new": "            match attach(recording) {\n                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>\n                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "    let (gate, recorded, unresolved) = {\n",
+     "new": "    let (gate, recorded, unresolved, player) = {\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "        if editor.request.is_some_and(|request| request.player) { return false; }\n",
+     "new": "        let player = editor.request.is_some_and(|request| request.player);\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved)\n",
+     "new": "        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved, player)\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "    if gate != FighterGate::Prompt { return false; }\n",
+     "new": "    if player || gate != FighterGate::Prompt { return false; }\n"
     }
    ]
   },
