@@ -368,6 +368,10 @@ impl Place {
     const fn new() -> Place {
         Place { drills: false, parent_at: 0, section: 0, at: [0, 0] }
     }
+
+    fn in_drills(self, group: u8, section: u8) -> bool {
+        self.drills && group == COMBOS_SEQ && section == 1
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -469,6 +473,17 @@ pub struct RecordingScreens {
 }
 
 impl RecordingScreens {
+    /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
+    pub fn depth(&self, face: Face, group: u8, on_library: bool) -> usize {
+        let overlays = if self.overlay_face == face {
+            usize::from(self.file.is_some()) + usize::from(self.picker.is_some()) + usize::from(self.keyboard.is_some())
+        } else {
+            0
+        };
+        let group = if face == Face::Popup { self.popup_group() } else { group };
+        overlays + usize::from((face == Face::Popup || on_library) && self.place(face, group).drills)
+    }
+
     /// The list the cursor rests in on `face` (the bridge snapshot): that face's open numbered picker or file screen,
     /// else, on the library (`on_library`; the pop-up always is), the current section of `group` (the pop-up uses its
     /// own group). `None`: the keyboard is up, the catalog is loading, the list is empty, or the page's cursor is not
@@ -501,7 +516,8 @@ impl RecordingScreens {
         let section = place.section;
         let count = self.items(face, group, section).len();
         let name = if face == Face::Popup { "popup" } else { "page" };
-        list(format!("recording/{name}/{group}/{section}"), count, place.at[usize::from(section)], String::new())
+        let suffix = if place.in_drills(group, section) { "/drills" } else { "" };
+        list(format!("recording/{name}/{group}/{section}{suffix}"), count, place.at[usize::from(section)], String::new())
     }
 
     pub(crate) fn new() -> RecordingScreens {
@@ -1755,7 +1771,7 @@ impl RecordingScreens {
         let cursor = place.at[usize::from(section)].min(items.len().saturating_sub(1));
         let focused = self.focused(face, group);
         let role = self.role(face);
-        let header = if group == COMBOS_SEQ && section == 1 && place.drills { "DRILLS" } else { header_of(group, section) };
+        let header = if place.in_drills(group, section) { "DRILLS" } else { header_of(group, section) };
         let rows = items
             .iter()
             .enumerate()

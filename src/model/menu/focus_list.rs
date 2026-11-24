@@ -22,9 +22,7 @@ impl Menu {
         }
         let screen = self.screen().copied();
         if screen.is_none() && self.page == Page::Recording {
-            let group = self.focus().map(group_of);
-            let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
-            let which = group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8;
+            let (which, on_library) = self.library_focus();
             if let Some(list) = self.recording.focus_list(Face::Page, which, on_library) {
                 return Some(list);
             }

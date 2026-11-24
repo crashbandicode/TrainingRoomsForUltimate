@@ -2613,3 +2613,11 @@ ceiling = 197052
 date = "2026-11-24"
 reason = "F16 follow-up: a macro playing on Player 1 also lifts the menu's hold on the CPU. Measured 197052, 2 above the measured merged base 8d6ccf66 (197050)."
 approved_by = "tr-primary-2 ruling 2026-11-23 23:55:15Z (the Player-role line goes into the next build)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197088
+date = "2026-11-24"
+reason = "The bridge publishes the true open recording list and depth. Measured 197088, 36 above base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 15:04:33Z (tr.menu publishes the true open sublist, for the next build); the raise itself awaits confirmation in the READY post"
