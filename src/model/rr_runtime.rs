@@ -112,6 +112,8 @@ pub struct Capture {
     on: bool,
     role: Role,
     frames: Vec<InputFrame>,
+    /// The action spans the watch logged while this take was open (Marks::capture).
+    spans: Vec<Span>,
 }
 
 impl Capture {
@@ -120,7 +122,12 @@ impl Capture {
             on: false,
             role: Role::Player,
             frames: Vec::new(),
+            spans: Vec::new(),
         }
+    }
+
+    pub fn set_spans(&mut self, spans: &[Span]) {
+        self.spans = spans.to_vec();
     }
 
     pub fn role(&self) -> Role {
@@ -188,7 +195,6 @@ pub fn finish_recording(
     speed: (f32, f32),
     at: u64,
     trim: bool,
-    spans: &[Span],
 ) -> Result<RecordStop, Error> {
     let mut frames = capture.frames.clone();
     if trim {
@@ -221,7 +227,7 @@ pub fn finish_recording(
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
-    recording.actions = kept_marks(&capture.frames, spans, recording.frames.len());
+    recording.actions = kept_marks(&capture.frames, &capture.spans, recording.frames.len());
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
@@ -1476,7 +1482,7 @@ mod tests {
     fn the_empty_recording_notice_stays() {
         let root = scratch("empty");
         let capture = Capture::idle();
-        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1, true, &[]).unwrap();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1, true).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());
@@ -1500,9 +1506,9 @@ mod tests {
             RecordStop::Saved { id, .. } => Library::new(root.join(MACROS_DIR)).load(&id).unwrap().frames.len(),
             RecordStop::Empty => 0,
         };
-        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 1, true, &[]).unwrap()), 2);
-        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 5, false, &[]).unwrap()), 5);
-        let stop = finish_recording(&root, &take(&idle), state(1), state(2), (0.0, 0.0), 9, true, &[]).unwrap();
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 1, true).unwrap()), 2);
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 5, false).unwrap()), 5);
+        let stop = finish_recording(&root, &take(&idle), state(1), state(2), (0.0, 0.0), 9, true).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
     }
 

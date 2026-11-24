@@ -1256,6 +1256,7 @@ pub fn service_at(
         for frame in frames {
             push_frame(&mut capture, role, frame);
         }
+        capture.set_spans(&spans[..count]);
         // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
         // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
         // stands in, at rest, as before.
@@ -1263,7 +1264,7 @@ pub fn service_at(
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire), &spans[..count])
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire))
         {
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);

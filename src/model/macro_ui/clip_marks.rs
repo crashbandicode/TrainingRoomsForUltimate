@@ -21,12 +21,26 @@ pub struct Span {
     pub mv: Option<Move>,
 }
 
+#[derive(Default)]
+pub struct Marks {
+    list: Vec<Mark>,
+    origins: Vec<Option<String>>,
+    bindings: Vec<Option<u32>>,
+    keys: Vec<Option<String>>,
+    recorded: bool,
+}
+
 pub struct Watch {
     run: u32,
     spans: [Span; WATCH_SPANS],
     len: usize,
     open: bool,
     last: Option<u32>,
+}
+impl Default for Watch {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl Watch {
     pub const fn new() -> Self {
@@ -56,16 +70,9 @@ impl Watch {
     pub fn spans(&self) -> &[Span] { &self.spans[..self.len] }
 }
 
-pub struct Marks {
-    list: Vec<Mark>,
-    origins: Vec<Option<String>>,
-    bindings: Vec<Option<u32>>,
-    keys: Vec<Option<String>>,
-    recorded: bool,
-}
 impl Marks {
     pub fn new() -> Self {
-        Self { list: Vec::new(), origins: Vec::new(), bindings: Vec::new(), keys: Vec::new(), recorded: false }
+        Self::default()
     }
 
     fn insert(&mut self, at: usize, mark: Mark, origin: Option<String>, binding: Option<u32>, key: Option<String>) {
@@ -328,8 +335,9 @@ mod tests {
         let mut capture = Capture::idle();
         rr_runtime::toggle_record(&mut capture, Role::Player);
         for &frame in frames { rr_runtime::push_frame(&mut capture, Role::Player, frame); }
+        capture.set_spans(spans);
         let RecordStop::Saved { id, .. } = rr_runtime::finish_recording(
-            root, &capture, saved_state(0), saved_state(1), (0.0, 0.0), 1, trim, spans).unwrap()
+            root, &capture, saved_state(0), saved_state(1), (0.0, 0.0), 1, trim).unwrap()
         else { panic!("recording not saved") };
         id
     }
@@ -360,9 +368,10 @@ mod tests {
         crate::editors::clip::clip_frame(&editor.view(), "Mario", 0, &mut frame);
         assert_eq!(frame.dialog_box().map(|v| v.0), Some(CLIP_STRIP));
         assert_eq!(CLIP_STRIP[1] - CLIP_STRIP[3] / 2.0, -540.0);
-        assert!(CLIP_STRIP[3] <= 1080.0 * 0.3);
+        const { assert!(CLIP_STRIP[3] <= 1080.0 * 0.3) };
         let lines = [CLIP_ROW_Y[0], CLIP_ROW_Y[1], CLIP_BAR_Y, CLIP_HELP_Y[0], CLIP_HELP_Y[1], CLIP_HINT_Y];
-        assert!(lines.iter().all(|&y| y >= CLIP_STRIP[1] - CLIP_STRIP[3] / 2.0 && y <= CLIP_STRIP[1] + CLIP_STRIP[3] / 2.0));
+        let strip = CLIP_STRIP[1] - CLIP_STRIP[3] / 2.0..=CLIP_STRIP[1] + CLIP_STRIP[3] / 2.0;
+        assert!(lines.iter().all(|y| strip.contains(y)));
         assert!(lines.windows(2).all(|p| p[0] - p[1] >= 44.0));
         let view = include_str!("../../runtime/ui/view.rs");
         assert!(view.contains("frame.dialog_box()") && view.contains("IDX_BG"));

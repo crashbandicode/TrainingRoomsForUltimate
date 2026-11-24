@@ -1399,7 +1399,7 @@ fn stage_label(i: usize) -> &'static str {
 fn publish_frame(s: &Session) {
     if PREVIEW_HIDES.load(Ordering::Acquire) {
         // A drill's take previews: the strip stands in for the hidden menu.
-        if let Some(view) = s.drill_clip.as_ref().map(|clip| clip.view()) {
+        if let Some(view) = s.drill_clip.as_ref().map(|editor| editor.view()) {
             use core::fmt::Write;
             let mut next = NEXT_FRAME.lock();
             next.reset();
