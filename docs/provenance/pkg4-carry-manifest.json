@@ -494,7 +494,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "b67bdc54948139bea25fba1e4dc8010975fef69e214f6c56cbee80420ebcf58e",
+   "dest_sha256": "628c5d6175d1fd063fa255b6e8b49a94fc8c8e18c885b7167a447538d8e25b40",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -544,6 +544,21 @@
      "old": "            Self::SnapshotFrame { selected, snapshot } => write!(\n                f,\n                \"start snapshot is for frame {snapshot}, but the selection starts at frame {selected}\"\n            ),\n",
      "new": "",
      "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "old": "    pub rstick_y: i8,\n}\n\n/// Fighter context",
+     "new": "    pub rstick_y: i8,\n}\n\nimpl crate::model::trim::Trim {\n    pub fn window(self, frames: &[InputFrame]) -> core::ops::Range<usize> {\n        let mut kept = frames.to_vec();\n        if self == Self::End {\n            crate::engine::macro_ui::macro_panel::crop_neutral_tail(&mut kept);\n        }\n        0..kept.len()\n    }\n\n    pub fn apply(self, frames: &mut Vec<InputFrame>) {\n        let range = self.window(frames);\n        *frames = frames[range].to_vec();\n    }\n}\n\n/// Fighter context",
+     "reason": "Red-stage trim API retains the existing End crop and leaves the other modes unimplemented."
+    },
+    {
+     "old": "    pub frames: Vec<InputFrame>,\n    /// Save id",
+     "new": "    pub frames: Vec<InputFrame>,\n    #[serde(default, skip_serializing_if = \"crate::model::trim::Trim::is_off\")]\n    pub trim: crate::model::trim::Trim,\n    /// Save id",
+     "reason": "Red-stage trim field reads legacy recordings as Off without changing their saved JSON."
+    },
+    {
+     "old": "            frames,\n            start_save: None,",
+     "new": "            frames,\n            trim: crate::model::trim::Trim::Off,\n            start_save: None,",
+     "reason": "New recordings default to Off for the per-file trim field."
     }
    ]
   },
