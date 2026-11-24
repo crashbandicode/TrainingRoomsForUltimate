@@ -14509,7 +14509,7 @@
         },
         {
           "old": "// Both icon paths use this roster module's published, verified text base.\n",
-          "new": "pub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 { return None; }\n    // SAFETY: `BASE` is published only after the roster seam passes its guard.\n    let hash = unsafe { fighter_kind_hash(base, kind) };\n    let chara = hash & 0xff_ffff_ffff;\n    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)\n}\n\n// Both icon paths use this roster module's published, verified text base.\n",
+          "new": "/// # Safety\n/// The guarded roster seam must be called from the game thread.\npub(crate) unsafe fn ui_chara_hash(kind: u32) -> Option<u64> {\n    let base = BASE.load(Ordering::Acquire);\n    if base == 0 { return None; }\n    // SAFETY: `BASE` is published only after the roster seam passes its guard.\n    let hash = unsafe { fighter_kind_hash(base, kind) };\n    let chara = hash & 0xff_ffff_ffff;\n    (hash >> 56 == 0xc1 && chara != 0).then_some(chara)\n}\n\n// Both icon paths use this roster module's published, verified text base.\n",
           "reason": "Move names (install 4): a fighter kind's ui_chara hash40 through the already guarded roster.kind_hash seam, for matching the game's special-name labels; no new site."
         }
       ]
