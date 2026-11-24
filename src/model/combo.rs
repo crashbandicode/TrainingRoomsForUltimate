@@ -413,6 +413,35 @@ impl Combo {
         link.holds_from(before)
     }
 
+    /// The button, ordinal and offset of the press that owns this release.
+    fn owner_press(&self, k: usize, i: usize) -> Option<(Button, usize, i32)> {
+        let Kind::Release(button) = self.get(k)?.events.get(i)?.as_ref()?.kind else { return None };
+        let mut count = 0;
+        let mut open = None;
+        for (step, link) in self.links().enumerate().take(k + 1) {
+            let end = if step == k { i } else { STEPS };
+            for event in link.events[..end].iter().flatten() {
+                match event.kind {
+                    Kind::Press(b) if b == button => {
+                        open = Some((count, event.offset));
+                        count += 1;
+                    }
+                    Kind::Release(b) if b == button => open = None,
+                    _ => {}
+                }
+            }
+        }
+        open.map(|(ordinal, offset)| (button, ordinal, offset))
+    }
+
+    /// The offset of the nth press of this button.
+    fn nth_press(&self, button: Button, n: usize) -> Option<i32> {
+        self.links().flat_map(LinkRec::events).filter_map(|event| match event.kind {
+            Kind::Press(b) if b == button => Some(event.offset),
+            _ => None,
+        }).nth(n)
+    }
+
     /// Special presses in step `k` that own an aim in this combo.
     pub fn owns_aim(&self, k: usize) -> [bool; STEPS] {
         let Some(link) = self.get(k) else { return [false; STEPS] };
@@ -1014,10 +1043,13 @@ impl Helper {
             let holds = target.holds(attempt.len);
             let deadline = reference.events.iter().enumerate().filter_map(|(i, event)| {
                 event.map(|event| {
-                    let band = holds[i].map_or(0, action::hold_band);
-                    event.offset.saturating_add(i32::from(band))
+                    let Some(hold) = holds[i] else { return event.offset };
+                    let shift = target.owner_press(attempt.len, i)
+                        .and_then(|(button, n, saved)| self.input.combo.nth_press(button, n).map(|pressed| pressed - saved))
+                        .unwrap_or(0);
+                    event.offset.saturating_add(i32::from(action::hold_band(hold))).saturating_add(shift)
                 })
-            }).max().unwrap_or(0).saturating_add(i32::from(self.settings.tolerance));
+            }).max().unwrap_or(0).saturating_add(i32::from(self.settings.tolerance)).max(0);
             if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
                 break;
             }

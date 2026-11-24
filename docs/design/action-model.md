@@ -46,10 +46,13 @@ both start fresh. Hit-combo clearing remains as before.
 | Release | Same button; direction is ignored. If both holds have owners, compare hold lengths; otherwise compare offsets where applicable. |
 | Aim | Part and facing-relative eight-way direction; for an aim-bearing target its timing delta is zero. |
 
-`Grade.band` adds `min(saved_hold / 8, 15)` frames to the chosen On-time tolerance. The drill deadline is the
-maximum reference event offset plus its hold band, then the tolerance. A release arriving after the deadline is
-missing. A reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit
-combos a release with no counterpart at the hit is not graded.
+`Grade.band` adds `min(saved_hold / 8, 15)` frames to the chosen On-time tolerance. A drill step is graded at its
+deadline: the latest of its reference events' offsets, plus the tolerance. A release with a saved hold counts from
+the frame the attempt pressed its button (`Combo::owner_press`, `Combo::nth_press`): its offset there is that press
+plus the saved hold and its band. So a button held longer than the saved hold plus the band and the tolerance drops
+the step: as a missing release, or, when another event of the step kept it open, as a release that is off. A
+reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit combos a
+release with no counterpart at the hit is not graded.
 
 ## One description
 
@@ -164,6 +167,8 @@ selected version and name.
   `a_clear_mid_attempt_is_cleared_and_the_next_cast_is_graded`, `unrelated_inputs_still_split_on_idle`.
 - Grading and files: `a_release_has_no_direction_to_grade`, `a_special_that_owns_aims_is_graded_by_its_aims_not_its_stick`,
   `a_hold_is_graded_on_its_length_within_a_band`, `a_short_hold_keeps_the_on_time_tolerance`,
+  `a_press_inside_the_tolerance_keeps_its_whole_hold_band`,
+  `a_repeated_button_uses_its_matching_press_for_the_hold_deadline`,
   `a_reference_release_without_its_press_is_not_graded`, `a_split_step_file_reads_as_the_new_recorder_saves_it`,
   `a_joined_file_is_written_back_unchanged`, `a_release_records_its_hold_in_the_file`.
 - Description and angle: `the_bar_and_the_menu_name_a_link_as_the_strip_does`,

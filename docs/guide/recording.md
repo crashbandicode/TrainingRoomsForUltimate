@@ -201,10 +201,10 @@ recorded one.
 - **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event
   starts the clock; later steps keep their recorded offsets, including idle gaps. A release is graded on the hold
   length, not its frame or stick: the hold may differ by the On-time tolerance plus one frame per eight frames of the
-  saved hold, at most 15 extra frames. A release after the step's deadline is missing; missing or late releases drop
-  an input step. A special with saved directions is graded on them, not its press's stick direction. A side tilt or
-  smash uses the angle the game chose, not the stick position. There is no move, hit, spot or TRUE requirement; the
-  TRUE field stays blank.
+  saved hold, at most 15 extra frames. A missing release, or a button held longer or shorter than that, drops the
+  step. A special with saved directions is graded on them, not its press's stick direction. A side tilt or smash uses
+  the angle the game chose, not the stick position. There is no move, hit, spot or TRUE requirement; the TRUE field
+  stays blank.
 - **Directions of a special:** for any fighter, a special records a direction when the fighter starts to move a way
   that is not the special's own and the stick pointed that way since the press (up to two per special, each graded on
   its direction). A special that only goes its own way, such as a straight-up up special, records none.
