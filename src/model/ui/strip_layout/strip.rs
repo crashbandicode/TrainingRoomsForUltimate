@@ -34,6 +34,7 @@ pub const BRACKET_TEXT_Y: f32 = LEG_Y - 18.0;
 pub const READ_X: f32 = 276.0;
 pub const READ_VALUE_Y: [f32; 3] = [TOP - 26.0, TOP - 68.5, TOP - 111.0];
 pub const READ_SUB_X: f32 = READ_X + 75.0;
+/// The units the folded LINK line is fitted to: what its box holds beside the readout.
 pub const LINK_UNITS: u16 = 32;
 pub const DIVIDER_X: f32 = 262.5;
 pub const DIVIDER_Y: f32 = TOP - 69.0;
@@ -274,7 +275,7 @@ impl StripSpec {
 /// A hidden text box of the frame strip.
 const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)) -> Spec {
     hidden(under(
-        text(name, [x, y, w, 30.0], align, font, iv::TEXT_UNITS, TEXT),
+        text(name, [x, y, w, 30.0], align, font, iv::SHORT_UNITS, TEXT),
         Name::new("TrIv"),
     ))
 }
@@ -283,7 +284,7 @@ const fn iv_text(name: Name, [x, y, w]: [f32; 3], align: Align, font: (f32, f32)
 /// start empty and are positioned by their slot on the first live update.
 pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name) -> Spec {
     use iv::at::*;
-    use iv::{BACKDROP_COLOR, FONT_SUB, FONT_TAG, FONT_VALUE, TEXT_UNITS};
+    use iv::{BACKDROP_COLOR, FONT_SUB, FONT_TAG, FONT_VALUE, SHORT_UNITS, TEXT_UNITS};
     let parent = Name::new("TrIv");
     match local {
         CONTAINER => container(
@@ -380,26 +381,22 @@ pub(in super::super) const fn iv_spec(spec: &StripSpec, local: usize, name: Name
                 with_height(spec.readout(i - READ_VALUE, 1), 40.0),
                 Align::Left,
                 FONT_VALUE,
+                SHORT_UNITS,
+                TEXT,
+            ),
+            parent,
+        )),
+        i if i < LAST_TEXT => hidden(under(
+            text(
+                name,
+                with_height(spec.readout(i - READ_SUB, 2), 30.0),
+                Align::Left,
+                FONT_SUB,
                 TEXT_UNITS,
                 TEXT,
             ),
             parent,
         )),
-        i if i < LAST_TEXT => {
-            let row = i - READ_SUB;
-            let capacity = if row == 1 { LINK_UNITS } else { TEXT_UNITS };
-            hidden(under(
-                text(
-                    name,
-                    with_height(spec.readout(row, 2), 30.0),
-                    Align::Left,
-                    FONT_SUB,
-                    capacity,
-                    TEXT,
-                ),
-                parent,
-            ))
-        }
         LAST_TEXT => iv_text(
             name,
             with_width(spec.last_label(), 60.0),

@@ -123,6 +123,17 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         combo::hud_tick(strip_shown, draw_settings.link_history, parry.is_some(), &mut drawn, |local, look, changed| {
             write_look(bar[local] as *mut Pane, p::IDX_CB + local, look, changed)
         });
+        // A reason that wrapped is taller than its row, and its card grows by the wrapped line.
+        if let Some(Some((sequence, lines))) = drawn {
+            let reason = bar[cb::at::REASON] as *mut Pane;
+            if !reason.is_null() {
+                pane::set_height(reason, C.card.reason_height(lines));
+            }
+            let plate = bar[if sequence { cb::at::SEQ_BACKDROP } else { cb::at::BACKDROP }] as *mut Pane;
+            if !plate.is_null() {
+                pane::set_height(plate, C.card.grown(sequence, lines)[3]);
+            }
+        }
         // This draw's own card; only a contended tick falls back to the last one drawn.
         drawn.unwrap_or_else(|| combo::card(strip_shown))
     } else {
@@ -143,22 +154,12 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
         let labels = [strip[iv::at::RUN_LABEL] != 0, strip[iv::at::RUN_LABEL + 1] != 0];
-        let (line, history, aims) = input_display::hud_tick(
-            strip_shown, draw_settings, parry.as_ref(), card.is_some(), labels, |local, look, mut changed| {
-                // The dedicated 32-unit LINK box is written from the same tracker snapshot below.
-                if local == iv::at::READ_SUB + 1 {
-                    changed.text = false;
-                }
+        let (history, aims) = input_display::hud_tick(
+            strip_shown, draw_settings, parry.as_ref(), card.is_some(), labels, |local, look, changed| {
                 write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
             },
         );
         crate::runtime::bridge_state::note_strip_aims(aims);
-        if let Some(line) = line {
-            let link = strip[iv::at::READ_SUB + 1] as *mut Pane;
-            if !link.is_null() {
-                pane::set_text(link, line.units());
-            }
-        }
         let backdrop = strip[iv::at::BACKDROP] as *mut Pane;
         if !backdrop.is_null() {
             pane::set_height(backdrop, C.strip.bounds(history, card.is_some())[3]);

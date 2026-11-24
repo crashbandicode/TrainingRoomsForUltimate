@@ -18,7 +18,7 @@ use skyline::hooks::InlineCtx;
 use crate::model::frame_strip::ids::{Table, C};
 use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker};
 use crate::model::spacing::{Grade, Grader, Lanes};
-use crate::model::frame_strip_plan::{Changed, LinkLine, StripDraw, Look, Renderer};
+use crate::model::frame_strip_plan::{Changed, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
 use crate::model::input_delay::{MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
@@ -672,9 +672,9 @@ pub fn hud_tick(
     cells: bool,
     labels: [bool; 2],
     mut apply: impl FnMut(usize, &Look, Changed),
-) -> (Option<LinkLine>, bool, [Option<u8>; 2]) {
+) -> (bool, [Option<u8>; 2]) {
     let tracker = *TRACKER.lock();
-    let (_, line, history) = RENDERER.lock().draw_with_spec(
+    let (_, history) = RENDERER.lock().draw_with_spec(
         &tracker, StripDraw { shown, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {
             #[cfg(feature = "diag")]
@@ -687,5 +687,5 @@ pub fn hud_tick(
         },
     );
     let aims = if shown { crate::model::frame_strip_plan::aims_drawn(&tracker, labels) } else { [None; 2] };
-    (line, history, aims)
+    (history, aims)
 }

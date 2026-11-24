@@ -6,9 +6,9 @@ use core::fmt::Write as _;
 use super::combo::{Dir, Flick, Grade, Helper, Kind, LinkRec, Mark, Outcome, Reason, Summary};
 use super::drill::{Advance, Stepped};
 use super::frame_strip::{Button, Verdict};
-use super::frame_strip_plan::{Changed, Look, Text, BAD, GOOD, MUTED, RULE, TEXT, WARN};
+use super::frame_strip_plan::{Changed, Look, Text, BAD, GOOD, MUTED, RULE, SHORT_UNITS, TEXT, WARN};
 use super::panes::cb::*;
-use super::panes::strip_layout::{card::{Detail, Metrics}, LayoutSpec};
+use super::panes::strip_layout::{card::{Detail, Metrics, REASON_LINES}, LayoutSpec};
 pub use super::panes::cb::{at, COUNT};
 
 pub const fn button_name(button: Button) -> &'static str {
@@ -229,7 +229,8 @@ fn chip_label(seq: &SeqView, c: usize) -> Text {
     let mut t = Text::EMPTY;
     let _ = write!(t, "{}  ", seq.first + c + 1);
     push_text(&mut t, &seq.chips[c]);
-    t
+    // A chip is no wider than the card: its label keeps the short length.
+    t.cut(SHORT_UNITS)
 }
 
 /// `tail` after `t`, cut where `t` is full.
@@ -371,7 +372,8 @@ impl Captions {
                     Some(s) if s.outcome == Outcome::Cleared => Text::new("cleared"),
                     _ => Text::new("the exchange ended"),
                 };
-                captions.previous = Ink::text(previous, BAD);
+                // A name beside its verb shares the card's row with the reason: it keeps the short length.
+                captions.previous = Ink::text(previous.cut(SHORT_UNITS), BAD);
                 captions.reason = Ink::text(reason, WARN);
             }
             waiting => {
@@ -380,7 +382,7 @@ impl Captions {
                 } else if attempt.is_some() && seq.last.is_some_and(|s| matches!(s.advance, Advance::Next(_))) {
                     push_text(&mut previous, &seq.last_name);
                     let _ = previous.write_str(" landed");
-                    captions.previous = Ink::text(previous, TEXT);
+                    captions.previous = Ink::text(previous.cut(SHORT_UNITS), TEXT);
                 }
                 captions.result = match (attempt, attempt.and_then(|a| a.summary)) {
                     (_, Some(s)) => Ink::text(result_text(&s), if s.clean { GOOD } else { TEXT }),
@@ -403,11 +405,13 @@ impl Captions {
 
     fn metrics(&self, pills: usize) -> Metrics {
         let len = |ink: Ink| ink.text.units().len();
+        let width = |ink: &Ink| super::notice_box::measure(ink.text.units().iter().copied(), super::panes::iv::FONT_SUB.0).0;
         Metrics {
             pills,
-            result: len(self.result),
-            reason: len(self.reason),
-            previous: len(self.previous),
+            result: width(&self.result),
+            reason: width(&self.reason),
+            reason_lines: self.reason.text.lines(),
+            previous: width(&self.previous),
             streak: len(self.streak),
             best: len(self.best),
             links: len(self.links),
@@ -566,7 +570,7 @@ impl Plan<'_> {
 }
 
 /// What was last written to each of the bar's panes (`frame_strip_plan::Panes`).
-pub type Renderer = super::frame_strip_plan::Panes<COUNT>;
+pub type Renderer = super::frame_strip_plan::Panes<COUNT, { super::panes::cb::LONG_LINES }>;
 
 /// Whether the bar is shown: the strip shown, the helper On and a target (`Renderer::draw`; the notice slot sits under it).
 pub fn shown(helper: &Helper, strip_shown: bool) -> bool {
@@ -576,7 +580,8 @@ pub fn shown(helper: &Helper, strip_shown: bool) -> bool {
 impl Renderer {
     /// One UI tick (the strip's rule): hidden writes only the container, once; shown writes every pane that changed.
     /// Shown needs the strip shown, the helper On and a target. `name` is the target's name. A drilled sequence
-    /// (`seq`) draws the sequence bar. Returns the writes. The flag indicates a visible history row above the cells.
+    /// (`seq`) draws the sequence bar. Returns the writes and the lines of the reason (0: none; each line after the
+    /// first grows the card). The flag indicates a visible history row above the cells.
     pub fn draw(
         &mut self,
         helper: &Helper,
@@ -585,21 +590,24 @@ impl Renderer {
         strip_shown: bool,
         (spec, history): (&LayoutSpec, bool),
         apply: impl FnMut(usize, &Look, Changed),
-    ) -> usize {
+    ) -> (usize, usize) {
         if !shown(helper, strip_shown) {
-            return self.hide(at::CONTAINER, Look::HIDDEN, apply);
+            return (self.hide(at::CONTAINER, Look::HIDDEN, apply), 0);
         }
-        let captions = match seq {
+        let mut captions = match seq {
             Some(seq) => Captions::sequence(helper, seq),
             None => Captions::single(helper, *name),
         };
+        // A reason wider than the card wraps at the card's width; the layout grows the card by the wrapped line.
+        captions.reason.text = captions.reason.text.fitted(spec.card.reason_width(), super::panes::iv::FONT_SUB.0, REASON_LINES);
         let metrics = captions.metrics(helper.results().count());
         let plan = Plan { helper, seq, captions };
-        self.show(|i| match plan.ink(i) {
+        let writes = self.show(super::panes::cb::units, |i| match plan.ink(i) {
             Some(ink) => Look { visible: true, text: ink.text, color: ink.color, ..Look::HIDDEN }
                 .at(spec.card.place(i, seq.is_some(), &spec.strip, history, metrics, ink.detail)),
             None => Look::HIDDEN,
-        }, apply)
+        }, apply);
+        (writes, metrics.reason_lines)
     }
 }
 
