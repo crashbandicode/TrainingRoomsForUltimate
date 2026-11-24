@@ -2661,3 +2661,11 @@ ceiling = 198087
 date = "2026-11-24"
 reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198087 (tools/sloc.py tree), 1035 above the base e7667f26 (197052)."
 approved_by = "tr-primary-2 ruling 2026-11-24 17:21:31Z (operator green light about 17:22Z, install 4: the move-name toggle), under the operator's measured LOC rule (TEST-FLOW-2026-11-22.md point 2). NRO and BSS delta reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198312
+date = "2026-11-24"
+reason = "Move names on install 4 merge 2 (0db4728c): measured 198312 on the merged tree (tools/sloc.py tree), which is merge 2's 197277 plus the move-name toggle's 1035, with no lines from the resolution."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its move-name ruling of 17:21:31Z and the two entries above."
