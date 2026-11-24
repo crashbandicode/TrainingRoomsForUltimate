@@ -422,14 +422,18 @@ fn file_trim_row_cycles_and_is_saved() {
             assert_eq!(screens.file_rows()[row.unwrap()].value, text);
             let effect = screens.take_effect();
             assert_eq!(effect, Effect::SetTrim { id: id.into(), kind, trim: expected });
+            if kind == FileKind::Macro { host::take_slots_dirty(); }
             host::post_effect(effect);
             tick(&root.0);
             let actual = if kind == FileKind::Macro { macros.load(id).unwrap().trim } else { combos.load(id).unwrap().trim };
             assert_eq!(actual, expected);
+            if kind == FileKind::Macro { assert_eq!(host::take_slots_dirty(), Some(false)); }
             if drill {
                 assert_eq!(macros.load(&take_id).unwrap().trim, expected);
             }
         }
+        let reopened = open_file(&root.0, group, name, drill);
+        assert_eq!(reopened.file_rows().iter().find(|row| row.title == "Trim").unwrap().value, "Both");
     }
 }
 

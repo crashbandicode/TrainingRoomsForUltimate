@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::model::recording_menu::{Catalog, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
+use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
 use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
@@ -593,17 +593,18 @@ pub fn unused_name(prefix: &str, names: &[String]) -> String {
 
 /// A catalog's entries are the files only. Hot lists and current selection are
 /// applied separately from a successfully read recording index.
-pub fn apply_catalog(catalog: &Catalog, index: &RecordingIndex, screens: &mut RecordingScreens) {
+pub fn apply_catalog(catalog: &CatalogBundle, index: &RecordingIndex, screens: &mut RecordingScreens) {
     let mut catalog = catalog.clone();
-    catalog.hot_macros = index.hot(Kind::Macro).to_vec();
-    catalog.hot_saves = index.hot(Kind::Save).to_vec();
-    catalog.hot_combos = [false, true]
+    catalog.catalog.hot_macros = index.hot(Kind::Macro).to_vec();
+    catalog.catalog.hot_saves = index.hot(Kind::Save).to_vec();
+    let hot_combos = [false, true]
         .into_iter()
         .flat_map(|input| index.hot_where(Kind::Combo, |id| {
             catalog.combos.iter().any(|file| file.id == id && file.input_only == input)
         }))
         .collect();
-    catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
+    catalog.catalog.hot_combos = hot_combos;
+    catalog.catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
     screens.set_catalog(catalog);
 }
 
@@ -622,20 +623,20 @@ pub fn apply_index(index: &RecordingIndex, screens: &mut RecordingScreens) {
 }
 
 #[cfg(test)]
-pub fn load_catalog(root: &Path) -> Result<Catalog, Error> {
+pub fn load_catalog(root: &Path) -> Result<CatalogBundle, Error> {
     let mut cache = CatalogCache::new(root);
     cache.want(0);
     while cache.step() {}
     let index = RecordingIndex::load(root)?;
     let mut screens = RecordingScreens::new();
     apply_catalog(cache.ready(0).unwrap(), &index, &mut screens);
-    Ok(screens.catalog().clone())
+    Ok(screens.catalog_bundle())
 }
 
 enum CatalogEntry {
-    Macro(MacroFile),
+    Macro(MacroFile, crate::model::trim::Trim),
     Save(SaveFile),
-    Combo(ComboFile),
+    Combo(ComboFile, crate::model::trim::Trim),
     Sequence(SequenceFile),
 }
 
@@ -644,9 +645,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
     let entry = match folder {
         0 => {
             let Some(file) = Library::new(dir).load_with_sibling::<Chain>(&id)? else { return Ok(None) };
-            CatalogEntry::Macro(match file {
-                Ok(file) => MacroFile {
-                    trim: file.trim,
+            let (file, trim) = match file {
+                Ok(file) => (MacroFile {
                     id,
                     name: file.name,
                     chain: false,
@@ -655,9 +655,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: fighter_name(file.start.fighter_kind),
                     span: file.frames.len() as u32,
-                },
-                Err(file) => MacroFile {
-                    trim: crate::model::trim::Trim::Off,
+                }, file.trim),
+                Err(file) => (MacroFile {
                     id,
                     name: file.name,
                     chain: true,
@@ -666,8 +665,9 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: String::new(),
                     span: 0,
-                },
-            })
+                }, crate::model::trim::Trim::Off),
+            };
+            CatalogEntry::Macro(file, trim)
         }
         1 => {
             let Some(save) = Store::<NamedSave>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
@@ -683,7 +683,6 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
         2 => {
             let Some(file) = ComboLibrary::new(dir).load_for_catalog(&id)? else { return Ok(None) };
             CatalogEntry::Combo(ComboFile {
-                trim: file.trim,
                 id,
                 name: file.name,
                 input_only: file.combo.input_only,
@@ -693,7 +692,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                 combo: Box::new(file.combo),
                 fighter: file.fighter,
                 span: file.combo.len() as u32,
-            })
+            }, file.trim)
         }
         _ => {
             let Some(file) = Store::<Sequence>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
@@ -730,7 +729,7 @@ struct FolderCheck {
 pub struct CatalogCache {
     root: PathBuf,
     generation: Option<u64>,
-    ready: Option<(u64, Catalog)>,
+    ready: Option<(u64, CatalogBundle)>,
     files: BTreeMap<(usize, String), CatalogFile>,
     pending: BTreeSet<(usize, String)>,
     /// New entries finish their cold read before repeatedly rewritten entries.
@@ -830,12 +829,18 @@ impl CatalogCache {
             file.entry = outcome.ok().flatten();
             return true;
         }
-        let mut catalog = Catalog::default();
+        let mut catalog = CatalogBundle::default();
         for file in self.files.values().filter_map(|file| file.entry.as_ref()) {
             match file {
-                CatalogEntry::Macro(file) => catalog.macros.push(file.clone()),
+                CatalogEntry::Macro(file, trim) => {
+                    catalog.macro_trims.insert(file.id.clone(), *trim);
+                    catalog.macros.push(file.clone());
+                }
                 CatalogEntry::Save(file) => catalog.saves.push(file.clone()),
-                CatalogEntry::Combo(file) => catalog.combos.push(file.clone()),
+                CatalogEntry::Combo(file, trim) => {
+                    catalog.drill_trims.insert(file.id.clone(), *trim);
+                    catalog.combos.push(file.clone());
+                }
                 CatalogEntry::Sequence(file) => catalog.sequences.push(file.clone()),
             }
         }
@@ -910,7 +915,7 @@ impl CatalogCache {
         core::mem::take(&mut self.external_changed)
     }
 
-    pub fn ready(&self, generation: u64) -> Option<&Catalog> {
+    pub fn ready(&self, generation: u64) -> Option<&CatalogBundle> {
         self.ready.as_ref().filter(|(ready, _)| *ready == generation).map(|(_, catalog)| catalog)
     }
 }
@@ -1559,7 +1564,6 @@ mod tests {
             }],
             macros: vec![
                 MacroFile {
-                    trim: crate::model::trim::Trim::Off,
                     id: "nair".into(),
                     name: "Nair".into(),
                     chain: false,
@@ -1570,7 +1574,6 @@ mod tests {
                     span: 0,
                 },
                 MacroFile {
-                    trim: crate::model::trim::Trim::Off,
                     id: "pressure".into(),
                     name: "Corner".into(),
                     chain: true,
@@ -1581,7 +1584,7 @@ mod tests {
                     span: 0,
                 },
             ],
-            combos: vec![ComboFile { trim: crate::model::trim::Trim::Off, input_only: false, take: None,
+            combos: vec![ComboFile { input_only: false, take: None,
                 id: "c1".into(),
                 name: "One".into(),
                 recorded_on: String::new(),
