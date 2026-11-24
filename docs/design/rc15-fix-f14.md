@@ -1,5 +1,8 @@
 # Direction marks in the frame strip (design, 2026-11-23)
 
+Superseded on 2026-11-24 by [the ACTION model](action-model.md): the travel table, `travel_status`, the fighter read
+for aims and the check `the_travel_statuses_are_the_traces` are removed. The tables below record what this design used.
+
 F14 adds Player 1's move direction to the existing frame strip in Training and waiting-room practice. The design and
 requirement trace are in `artifacts/phase23/fix-round-20261123/f14/DESIGN.md`, based on `152629cd`.
 

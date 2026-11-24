@@ -754,7 +754,12 @@ impl Tracker {
         // P1's action (SPEC-input-06 §2): it starts on the first frame P1 cannot act, or when a buffered press starts a
         // new attack without an actionable frame between (another move, or the same status from its motion's start).
         let p1_busy = !p1.actionable && !p1.hitstun && !p1.shieldstun;
-        let restarted = p1.attack.is_some_and(|m| {
+        // A grab or the Final Smash that follows another move with no actionable frame between is a new action; a
+        // throw continues its grab.
+        let named = p1.named.is_some_and(|m| {
+            m != self.action.mv && self.action.mv != Move::Other && !(m == Move::Throw && self.action.mv == Move::Grab)
+        });
+        let restarted = named || p1.attack.is_some_and(|m| {
             (m != self.action.mv && self.action.mv != Move::Other)
                 || (p1.status == self.p1_status
                     && p1.motion_frame < self.p1_motion_frame
@@ -793,6 +798,7 @@ impl Tracker {
         }
         if p1.named == Some(Move::Throw) && self.action.mv == Move::Grab {
             self.action.mv = Move::Throw;
+            self.action.variant = super::action::variant(p1.motion);
         }
         if p1_busy && p1.attack == Some(Move::Other) && self.action.mv == Move::Other {
             self.action.shown.of = self.action.base;
@@ -1242,3 +1248,7 @@ pub const fn strip_owns_advantage(enabled: bool, on: bool, panes: bool) -> bool 
 #[cfg(test)]
 #[path = "frame_strip_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "action_moves_tests.rs"]
+mod action_moves_tests;

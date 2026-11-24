@@ -156,7 +156,14 @@ impl Default for Action {
 }
 
 /// The move variant identified by an animation.
+#[cfg(not(test))]
 pub fn variant(_motion: u64) -> u8 { 0 }
+
+/// Test stand-in for the move-name join (`Normal::of`): `catch` is Grab (18), `throw_f` is Forward throw (22).
+#[cfg(test)]
+pub fn variant(motion: u64) -> u8 {
+    match motion { 0x05_c56b_7b64 => 18, 0x07_49f7_09a8 => 22, _ => 0 }
+}
 
 /// A font-supported arrow for a direction.
 pub const fn arrow(dir: Dir) -> &'static str {
