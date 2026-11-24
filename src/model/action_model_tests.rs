@@ -414,8 +414,10 @@ fn a_split_step_file_reads_as_the_new_recorder_saves_it() {
     for frame in 0..=70 {
         input.step(vanish(frame));
     }
+    assert_eq!(parsed.combo.len(), 1, "the aim is joined to the step of its special");
     assert_eq!(parsed.combo, input.combo);
     let parsed: ComboRecord = serde_json::from_str(SPLIT_HOLD).unwrap();
+    assert_eq!(parsed.combo.len(), 1, "the release is joined to the step of its press");
     assert_eq!(parsed.combo, recorded(&[(0, ATTACK), (30, 0)]));
     let parsed: ComboRecord = serde_json::from_str(TWO_ZIPS).unwrap();
     let mut input = InputCapture::new();
