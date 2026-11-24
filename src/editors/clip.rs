@@ -39,6 +39,8 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
         cursor: view.cursor,
         handle: handle_code(view.handle),
         playing: view.playing,
+        marks: [(0, 0); crate::engine::macro_ui::clip_marks::SHOWN_MARKS],
+        mark_count: 0,
     };
     let length = view.end.saturating_sub(view.start);
     if view.context.preview() { push(frame, "Fighter", fighter, Tone::Normal); }
@@ -94,6 +96,9 @@ mod tests {
             truncated: true,
             source_name: "Latest Vault capture".into(),
             error: None,
+            marks: [(0, 0); crate::engine::macro_ui::clip_marks::SHOWN_MARKS],
+            mark_count: 0,
+            move_text: String::new(),
         }
     }
 

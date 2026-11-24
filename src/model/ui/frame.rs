@@ -169,6 +169,8 @@ pub struct ClipBar {
     /// Which handle the Left / Right keys move: 0 the playhead, 1 the start, 2 the end.
     pub handle: u8,
     pub playing: bool,
+    pub marks: [(u16, u16); 24],
+    pub mark_count: u8,
 }
 
 /// One frame of the menu.
@@ -428,7 +430,8 @@ impl Frame {
             tile_stripes: [[false; super::panes::TILES]; 2],
             tile_solo: [false; 2],
             range: RangeView { set: false, min: 0, max: 0, top: 0, grey: false, focus: 0, editing: false },
-            clip: ClipBar { total: 0, start: 0, end: 0, cursor: 0, handle: 0, playing: false },
+            clip: ClipBar { total: 0, start: 0, end: 0, cursor: 0, handle: 0, playing: false,
+                marks: [(0, 0); 24], mark_count: 0 },
             title: Text::new(),
             tabs: [Text::new(); TABS],
             tab_count: 0,

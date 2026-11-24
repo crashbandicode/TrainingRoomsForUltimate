@@ -121,6 +121,15 @@ impl Placement {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ActionMark {
+    pub start: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<u32>,
+    #[serde(rename = "move", default, skip_serializing_if = "Option::is_none")]
+    pub mv: Option<String>,
+}
+
 /// A named, versioned, portable CPU macro.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MacroRecording {
@@ -133,6 +142,8 @@ pub struct MacroRecording {
     pub mii: Option<crate::engine::mii::lifetime::Configuration>,
     pub placement: Placement,
     pub frames: Vec<InputFrame>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<ActionMark>,
     /// Save id this macro starts from. Absent means the file never had one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_save: Option<String>,
@@ -158,6 +169,7 @@ impl MacroRecording {
             mii: None,
             placement: Placement::default(),
             frames,
+            actions: Vec::new(),
             start_save: None,
             start_save_on: true,
         };

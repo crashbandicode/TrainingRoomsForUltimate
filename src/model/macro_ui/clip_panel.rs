@@ -1,18 +1,21 @@
 //! Clip selection. Native input consumption, not rendering, advances the preview.
 use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};
 use crate::engine::macro_ui::macro_panel::Pad;
+use crate::engine::macro_ui::clip_marks::{Span, SHOWN_MARKS};
 use crate::model::combo_record::UnitKind;
+
+pub const CLIP_BAR_UNITS: u16 = 1600;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle { Playhead, In, Out }
 #[derive(Clone, Copy, Debug)]
 pub enum ClipAction {
-    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart,
+    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,
     PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,
 }
 pub enum ClipEffect {
     None, StopPreview, Preview(Box<MacroRecording>), Close,
-    PreviewFile { start: u32, end: u32 },
+    PreviewFile { start: u32, end: u32, player: bool },
     Export(Box<MacroRecording>), ExportCombo(Box<crate::model::combo_record::ComboRecord>), Error(String),
 }
 
@@ -250,6 +253,9 @@ pub struct ClipView {
     pub truncated: bool,
     pub source_name: String,
     pub error: Option<String>,
+    pub marks: [(u16, u16); SHOWN_MARKS],
+    pub mark_count: u8,
+    pub move_text: String,
 }
 
 impl ClipView {
@@ -414,7 +420,8 @@ impl ClipEditor {
             cursor: self.window.cursor(), handle: self.handle, playing: self.playing,
             entry, fighter_kind, previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
             clean_start, move_start: self.move_start, quantized, truncated: self.session.truncated,
-            source_name: self.source_name.clone(), error: self.error.clone() }
+            source_name: self.source_name.clone(), error: self.error.clone(),
+            marks: [(0, 0); SHOWN_MARKS], mark_count: 0, move_text: String::new() }
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing
@@ -427,13 +434,16 @@ impl ClipEditor {
         if consumed >= end - start { self.playing = false; }
     }
 
+    pub fn watch(&mut self, _spans: &[Span]) {}
+    pub fn preview_cursor(&mut self, _consumed: u32) {}
+
     fn start_preview(&mut self) -> ClipEffect {
         self.pause();
         self.window.seek(self.window.start());
         self.handle = Handle::Playhead;
-        if matches!(self.file.as_ref(), Some(FileSource::Macro { .. })) {
+        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {
             self.playing = true;
-            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end() };
+            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player };
         }
         match self.export_selection("Preview") {
             Ok(recording) => {
@@ -492,6 +502,7 @@ impl ClipEditor {
 
     fn apply_action(&mut self, action: ClipAction) -> ClipEffect {
         match action {
+            ClipAction::Snap | ClipAction::SwapTarget => return ClipEffect::None,
             ClipAction::SelectIn | ClipAction::SelectOut => {
                 self.pause();
                 let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };
@@ -658,7 +669,7 @@ mod tests {
             };
             let preview = e.on_action(ClipAction::TogglePlay);
             if macro_file {
-                assert!(matches!(preview, ClipEffect::PreviewFile { start: 2, end: 7 }));
+                assert!(matches!(preview, ClipEffect::PreviewFile { start: 2, end: 7, .. }));
             } else {
                 let ClipEffect::Preview(preview) = preview else { panic!("preview") };
                 assert_eq!(preview.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);
@@ -677,7 +688,7 @@ mod tests {
         e.on_action(ClipAction::Nudge(2));
         e.on_action(ClipAction::SelectOut);
         e.on_action(ClipAction::Nudge(-3));
-        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { start: 2, end: 7 }));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { start: 2, end: 7, .. }));
         assert!(e.view().playing && e.view().hides_page());
         assert_eq!(e.context(), ClipContext::Macro { player: true });
         assert_eq!(e.view().entry, 0);

@@ -287,7 +287,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>) -> Option<String> {
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now()).ok().flatten()
+    super::rr_runtime::save_drill_take(root, frames, state, RECORD_TRIM.load(Ordering::Acquire), unix_now(), &[]).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -1225,7 +1225,7 @@ pub fn service_at(
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire))
+        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), RECORD_TRIM.load(Ordering::Acquire), &[])
         {
             if let Some(text) = stop.notice() {
                 tick.notices.push(text);
@@ -4488,7 +4488,7 @@ mod tests {
         let file = active_plain_macro(&root, Role::Player, 70);
         let take = super::super::rr_runtime::save_drill_take(
             &root, vec![InputFrame { buttons: 90, ..InputFrame::default() }],
-            StartState::neutral(8, 0, 1.0), false, 1,
+            StartState::neutral(8, 0, 1.0), false, 1, &[],
         ).unwrap().unwrap();
         on_chords(false, true, false);
         assert!(!request_drill_preview(&take, 1), "a queued Play also blocks the preview");
@@ -4759,7 +4759,7 @@ mod tests {
         let root = scratch("drill-fed");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let frames = (1..=N).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
-        let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let (mut seen, mut lines, mut frame) = (FedSeen::default(), Vec::new(), 100);
 
         assert!(request_drill_preview(&take, N));
@@ -4857,7 +4857,7 @@ mod tests {
             let root = scratch(if stop { "drill-stop-bad-index" } else { "drill-bad-index" });
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
-            let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+            let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
             assert!(request_drill_preview(&take, 80));
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert_eq!(take_player_frame().unwrap().buttons, 1);

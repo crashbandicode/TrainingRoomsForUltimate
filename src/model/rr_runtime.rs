@@ -187,6 +187,7 @@ pub fn finish_recording(
     speed: (f32, f32),
     at: u64,
     trim: bool,
+    _spans: &[super::macro_ui::clip_marks::Span],
 ) -> Result<RecordStop, Error> {
     let mut frames = capture.frames.clone();
     if trim {
@@ -236,7 +237,7 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
 /// `None` when no frame is left.
-pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64) -> Result<Option<String>, Error> {
+pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64, _spans: &[super::macro_ui::clip_marks::Span]) -> Result<Option<String>, Error> {
     if trim {
         super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
     }
@@ -1020,7 +1021,7 @@ mod tests {
         let root = scratch("failed-drill-save");
         std::fs::write(root.join("combos"), b"not a directory").unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
-        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         assert_eq!(macros.list().unwrap().entries.len(), 1);
         let mut step = LinkRec::INPUT;
         step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
@@ -1044,7 +1045,7 @@ mod tests {
         std::fs::create_dir(root.join(INDEX_FILE)).unwrap();
         let first = vec![frame(1), frame(0)];
         let second = vec![frame(2), frame(0)];
-        let take1 = save_drill_take(&root, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take1 = save_drill_take(&root, first.clone(), StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         assert!(save_drill_with_take(&root, &input_drill(), None, take1.clone(), 1).is_err());
         let combos = ComboLibrary::new(root.join("combos"));
         let macros = Library::new(root.join(MACROS_DIR));
@@ -1054,7 +1055,7 @@ mod tests {
         assert_eq!(combos.load(&drill1).unwrap().take.as_deref(), Some(take1.as_str()));
         assert_eq!(macros.load(&take1).unwrap().frames, first);
         std::fs::remove_dir(root.join(INDEX_FILE)).unwrap();
-        let take2 = save_drill_take(&root, second.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take2 = save_drill_take(&root, second.clone(), StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill2 = save_drill_with_take(&root, &input_drill(), None, take2.clone(), 1).unwrap();
         assert_ne!(take1, take2);
         assert!(delete_combo(&root, &drill1));
@@ -1068,9 +1069,9 @@ mod tests {
         let b = scratch("drill-card-b");
         let first = vec![frame(1), frame(0)];
         let second = vec![frame(2), frame(0)];
-        let take_a = save_drill_take(&a, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take_a = save_drill_take(&a, first.clone(), StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill_a = save_drill_with_take(&a, &input_drill(), None, take_a.clone(), 1).unwrap();
-        let take_b = save_drill_take(&b, second, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take_b = save_drill_take(&b, second, StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill_b = save_drill_with_take(&b, &input_drill(), None, take_b.clone(), 1).unwrap();
         assert_ne!(take_a, take_b);
         std::fs::copy(b.join("combos").join(format!("{drill_b}.json")), a.join("combos").join("copied.json")).unwrap();
@@ -1085,7 +1086,7 @@ mod tests {
 
     fn a_take_two_drill_files_name_survives_the_first_delete() {
         let root = scratch("drill-shared-take");
-        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
         std::fs::copy(root.join("combos").join(format!("{drill}.json")), root.join("combos").join("copied.json")).unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
@@ -1097,7 +1098,7 @@ mod tests {
 
     fn a_skipped_combo_file_does_not_keep_a_deleted_drills_take() {
         let root = scratch("drill-skipped-combo");
-        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill = save_drill_with_take(&root, &input_drill(), None, take, 1).unwrap();
         let typo = root.join("combos").join("typo.json");
         std::fs::write(&typo, br#"{"schema_version":1,"name":"Typo","links":[{"from":"aerial","to":"aeria","verdict":{"kind":"true","link":-2},"steps":[{"button":"jump","aim":"neutral","offset":2}]}]}"#).unwrap();
@@ -1112,7 +1113,7 @@ mod tests {
 
     fn a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair() {
         let root = scratch("drill-unreadable-combos");
-        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
+        let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1, &[]).unwrap().unwrap();
         let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
         let dir = root.join("combos");
         let held = root.join("combos-held");
@@ -1462,7 +1463,7 @@ mod tests {
     fn the_empty_recording_notice_stays() {
         let root = scratch("empty");
         let capture = Capture::idle();
-        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1, true).unwrap();
+        let stop = finish_recording(&root, &capture, state(1), state(2), (0.0, 0.0), 1, true, &[]).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
         assert!(stop.cursor().is_none());
         assert!(!root.join(MACROS_DIR).exists());
@@ -1486,9 +1487,9 @@ mod tests {
             RecordStop::Saved { id, .. } => Library::new(root.join(MACROS_DIR)).load(&id).unwrap().frames.len(),
             RecordStop::Empty => 0,
         };
-        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 1, true).unwrap()), 2);
-        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 5, false).unwrap()), 5);
-        let stop = finish_recording(&root, &take(&idle), state(1), state(2), (0.0, 0.0), 9, true).unwrap();
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 1, true, &[]).unwrap()), 2);
+        assert_eq!(saved(finish_recording(&root, &take(&frames), state(1), state(2), (0.0, 0.0), 5, false, &[]).unwrap()), 5);
+        let stop = finish_recording(&root, &take(&idle), state(1), state(2), (0.0, 0.0), 9, true, &[]).unwrap();
         assert_eq!(stop.notice(), Some("Recording was empty"));
     }
 

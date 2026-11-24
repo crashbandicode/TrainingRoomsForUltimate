@@ -919,7 +919,7 @@ fn apply_action(action: ClipAction) {
                 crate::engine::rr_host::request_clip_preview(*recording);
             }
         },
-        Some(ClipEffect::PreviewFile { start, end }) => {
+        Some(ClipEffect::PreviewFile { start, end, player: _ }) => {
             if let Some((id, player)) = source {
                 TAIL.lock().unwrap().restart();
                 let role = if player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };
