@@ -1,4 +1,5 @@
 //! EXPECTED RED on e09fc3cf: drill step descriptions, titles, persistence, aim, tilt and throw.
+//! EXPECTED RED on 4e701753: first/last actions, their file keys and special aim ownership.
 //! GUARDS: the packed sizes do not grow and a press outside the take describes no step.
 
 lib_unit_tests! {
@@ -103,18 +104,136 @@ fn a_drill_step_stores_the_move_its_press_became() {
     assert_eq!(jab().get(0).unwrap().step_desc().map(|d| d.mv), Some(Move::Jab));
 }
 
-#[test]
-fn the_first_move_in_a_step_is_not_replaced_by_a_later_press() {
+fn two_described() -> Combo {
     let mut tracker = Tracker::new();
     let mut capture = InputCapture::new();
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
     tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Jab), status: 0x27, facing: 1,
         ..Sample::default() }, MappedInputs::NEUTRAL);
     tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 2, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::NeutralSpecial), status: 0x1dc,
+        facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    capture.combo
+}
+
+fn side(link: &LinkRec, side: usize) -> Option<ActionDesc> {
+    (link.description_bits(side) & 31 != 0).then(|| link.desc(side))
+}
+
+#[test]
+fn a_step_with_two_actions_shows_both() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 4, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { status: 0x19, facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Aerial), status: 0x36, facing: 1,
+        ..Sample::default() }, MappedInputs::NEUTRAL);
+    assert_eq!(capture.combo.len(), 1);
+    assert_eq!(bar(capture.combo)[0], "1 Jump > Aerial");
+    assert_eq!(combo_link_lines(&capture.combo)[0], "S1 jump → aerial");
+    let step = capture.combo.get(0).unwrap();
+    assert_eq!(side(step, 0), None);
+    assert_eq!(side(step, 1).map(|d| d.mv), Some(Move::Aerial));
+
+    let combo = two_described();
+    assert_eq!(combo.len(), 1);
+    assert_eq!(bar(combo)[0], "1 Jab > Neutral B");
+    let step = combo.get(0).unwrap();
+    assert_eq!((step.from, step.to), (Move::Jab, Move::NeutralSpecial));
+}
+
+#[test]
+fn a_step_with_three_actions_shows_the_first_and_the_last() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Jab), status: 0x27, facing: 1,
+        ..Sample::default() }, MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 4, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { status: 0x19, facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 2, ..MappedInputs::NEUTRAL });
+    assert_eq!(capture.combo.len(), 1);
+    assert_eq!(bar(capture.combo)[0], "1 Jab > Special");
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::NeutralSpecial), status: 0x1dc,
+        facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    assert_eq!(bar(capture.combo)[0], "1 Jab > Neutral B");
+    assert_eq!(combo_link_lines(&capture.combo)[0], "S1 jab → neutral b");
+}
+
+#[test]
+fn two_described_actions_survive_saving_and_reloading() {
+    let record = ComboRecord::new("Drill".into(), two_described(), None);
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["input_steps"][0]["from_shown"], serde_json::json!({"move":"jab"}));
+    assert_eq!(value["input_steps"][0]["to_shown"], serde_json::json!({"move":"neutral_special"}));
+    let read: ComboRecord = serde_json::from_value(value).unwrap();
+    assert_eq!(read, record);
+    let crop = read.crop_units(0, 1).unwrap();
+    assert_eq!((side(crop.combo.get(0).unwrap(), 0).map(|d| d.mv),
+        side(crop.combo.get(0).unwrap(), 1).map(|d| d.mv)), (Some(Move::Jab), Some(Move::NeutralSpecial)));
+    let one = serde_json::to_value(ComboRecord::new("Drill".into(), jab(), None)).unwrap();
+    assert!(one["input_steps"][0].get("from_shown").is_none());
+    assert_eq!(one["input_steps"][0]["to_shown"], serde_json::json!({"move":"jab"}));
+}
+
+#[test]
+fn joining_a_split_step_reseats_the_descriptions_of_both_inputs() {
+    let value = serde_json::json!({
+        "schema_version":2,"kind":"input_drill","name":"Drill",
+        "input_steps":[
+            {"to_shown":{"move":"jab"},"events":[
+                {"kind":"press","button":"attack","dir":"neutral","offset":0}]},
+            {"to_shown":{"move":"neutral_special"},"events":[
+                {"kind":"release","button":"attack","dir":"neutral","offset":2},
+                {"kind":"press","button":"special","dir":"neutral","offset":4}]}
+        ]
+    });
+    let record: ComboRecord = serde_json::from_value(value).unwrap();
+    assert_eq!(record.combo.len(), 1);
+    let step = record.combo.get(0).unwrap();
+    assert_eq!((side(step, 0).map(|d| d.mv), side(step, 1).map(|d| d.mv)),
+        (Some(Move::Jab), Some(Move::NeutralSpecial)));
+    assert_eq!(bar(record.combo)[0], "1 Jab > Neutral B");
+}
+
+#[test]
+fn a_specials_aim_arrow_stays_with_it_when_a_later_input_is_aerial() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    for frame in 0..14 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::UpSpecial, None),
+            MappedInputs { buttons: if frame < 3 { 2 } else { 0 }, lstick_y: 127, ..MappedInputs::NEUTRAL });
+    }
+    for frame in 0..5 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((-11.0 * frame as f32, 0.0))),
+            MappedInputs { lstick_x: -100, ..MappedInputs::NEUTRAL });
+    }
+    tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Aerial), status: 0x36, facing: 1,
+        ..Sample::default() }, MappedInputs::NEUTRAL);
+    assert_eq!(capture.combo.len(), 1);
+    assert!(capture.combo.get(0).unwrap().events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Back));
+    assert_eq!(bar(capture.combo)[0], "1 Up B ← > Aerial");
+    assert_eq!(combo_link_lines(&capture.combo)[0], "S1 up b ← → aerial");
+}
+
+#[test]
+fn an_own_status_updates_the_same_press_without_losing_its_base() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 2, lstick_y: 127, ..MappedInputs::NEUTRAL });
     tick(&mut tracker, &mut capture, zip_sample(Move::UpSpecial, None), MappedInputs::NEUTRAL);
-    assert_eq!(capture.combo.len(), 1);
-    assert_eq!(capture.combo.get(0).unwrap().step_desc().map(|d| d.mv), Some(Move::Jab));
+    assert_eq!(capture.combo.get(0).unwrap().step_desc().map(|d| d.mv), Some(Move::UpSpecial));
+    tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((0.0, 0.0))), MappedInputs::NEUTRAL);
+    let described = capture.combo.get(0).unwrap().step_desc();
+    assert_eq!(described.map(|d| (d.mv, d.of)), Some((Move::Other, Some(Move::UpSpecial))));
+    assert_eq!(title(capture.combo.get(0).unwrap(), false), "Up B");
 }
 
 #[test]
@@ -187,6 +306,25 @@ fn a_step_whose_action_never_opened_shows_its_input() {
 }
 
 #[test]
+fn undescribed_titles_name_originating_gestures_and_fall_back_to_the_first_event() {
+    for (kind, dir, expected) in [
+        (Kind::CStick, Dir::Forward, "C-stick →"),
+        (Kind::Flick(Flick::Dash), Dir::Forward, "Dash →"),
+        (Kind::Flick(Flick::FastFall), Dir::Down, "Fast-fall ↓"),
+        (Kind::Flick(Flick::TapJump), Dir::Up, "Tap-jump ↑"),
+        (Kind::Aim(2), Dir::Forward, "2nd direction →"),
+    ] {
+        let rec = LinkRec { events: retain([event(kind, dir, 0)]), ..LinkRec::INPUT };
+        assert_eq!(title(&rec, false), expected);
+    }
+    let rec = LinkRec { events: retain([
+        event(Kind::Release(Button::Jump), Dir::Neutral, 0),
+        event(Kind::Press(Button::Shield), Dir::Up, 1),
+    ]), ..LinkRec::INPUT };
+    assert_eq!(title(&rec, false), "Shield ↑");
+}
+
+#[test]
 fn a_step_title_follows_the_combo_cells_capacity_rule() {
     let rec = step([
         event(Kind::Press(Button::Special), Dir::Up, 0),
@@ -209,7 +347,7 @@ fn a_steps_move_survives_saving_and_reloading() {
         desc(Move::SideTilt, None, Some(Angle::Up), 0));
     let record = ComboRecord::new("Drill".into(), drill([step]), None);
     let value = serde_json::to_value(&record).unwrap();
-    assert_eq!(value["input_steps"][0]["shown"], serde_json::json!({"move":"side_tilt","angle":"up"}));
+    assert_eq!(value["input_steps"][0]["to_shown"], serde_json::json!({"move":"side_tilt","angle":"up"}));
     let read: ComboRecord = serde_json::from_value(value).unwrap();
     assert_eq!(read, record);
     assert_eq!(read.combo.get(0).unwrap().step_desc(), step.step_desc());
@@ -217,11 +355,36 @@ fn a_steps_move_survives_saving_and_reloading() {
 }
 
 #[test]
+fn a_steps_shown_requires_a_valid_move_and_accepts_all_move_keys() {
+    for (mv, key) in [
+        (Move::Jab, "jab"), (Move::DashAttack, "dash_attack"), (Move::SideTilt, "side_tilt"),
+        (Move::UpTilt, "up_tilt"), (Move::DownTilt, "down_tilt"), (Move::SideSmash, "side_smash"),
+        (Move::UpSmash, "up_smash"), (Move::DownSmash, "down_smash"), (Move::Aerial, "aerial"),
+        (Move::NeutralSpecial, "neutral_special"), (Move::SideSpecial, "side_special"),
+        (Move::UpSpecial, "up_special"), (Move::DownSpecial, "down_special"), (Move::Grab, "grab"),
+        (Move::Throw, "throw"), (Move::FinalSmash, "final_smash"), (Move::Other, "other"),
+    ] {
+        let rec = step([event(Kind::Press(Button::Attack), Dir::Neutral, 0)], desc(mv, None, None, 0));
+        let record = ComboRecord::new("Drill".into(), drill([rec]), None);
+        let value = serde_json::to_value(&record).unwrap();
+        assert_eq!(value["input_steps"][0]["to_shown"]["move"], key);
+        assert_eq!(serde_json::from_value::<ComboRecord>(value).unwrap(), record);
+    }
+    for shown in [serde_json::json!({}), serde_json::json!({"move":"not_a_move"}), serde_json::json!(null)] {
+        let value = serde_json::json!({
+            "schema_version":2,"kind":"input_drill","name":"Drill",
+            "input_steps":[{"to_shown":shown,"events":[{"kind":"press","button":"attack","dir":"neutral","offset":0}]}]
+        });
+        assert!(serde_json::from_value::<ComboRecord>(value).is_err());
+    }
+}
+
+#[test]
 fn a_joined_split_step_keeps_its_move() {
     let value = serde_json::json!({
         "schema_version":4,"kind":"input_drill","name":"Drill",
         "input_steps":[
-            {"shown":{"move":"up_special"},"events":[
+            {"to_shown":{"move":"up_special"},"events":[
                 {"kind":"press","button":"special","dir":"up","offset":0},
                 {"kind":"release","button":"special","dir":"back","offset":3}]},
             {"events":[{"kind":"aim","part":1,"dir":"back","offset":16}]}
