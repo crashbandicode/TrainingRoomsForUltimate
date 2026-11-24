@@ -2685,3 +2685,11 @@ ceiling = 198369
 date = "2026-11-24"
 reason = "Bind the retained exchange and directly recorded drill to their captured fighter and Mii loadout; carry the recorded owner through save and target selection."
 approved_by = "tr-primary-2, 2026-11-24 19:31:56Z (+57 on 68d14125, measured on 43b3a21d)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198375
+date = "2026-11-24"
+reason = "Move names with both reviewed corrections in one tree (fix/rv-move-name-loader c480dd8c and fix/rv-mii-owner-refresh 711d59fe on 68d14125): measured 198375 (tools/sloc.py tree), which is 198312 plus the loader correction's 9 and the identity corrections' 54, with no lines from the merges."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 19:27:44Z (+9) and 19:31:56Z (+57)."
