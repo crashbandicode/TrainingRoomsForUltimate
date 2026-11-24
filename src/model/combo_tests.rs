@@ -295,6 +295,94 @@ fn with_target() -> Helper {
     helper
 }
 
+#[test]
+fn a_hit_combo_load_is_not_deferred() {
+    let mut helper = with_target();
+    let settings = Settings { load_after: true, ..ON };
+    helper.settings = settings;
+    let summary = Summary { outcome: Outcome::Completed, graded: 1, true_links: 1,
+        total: 1, clean: true, fault: None };
+    helper.record(summary, &mut Out::default());
+    assert!(helper.pending_load);
+    let tracker = Tracker::new();
+    assert!(helper.step(&tracker, settings).load);
+    assert!(!helper.step(&tracker, settings).load);
+}
+
+#[test]
+fn two_provisional_results_restore_a_distinct_full_history_in_order() {
+    let mut helper = Helper::new();
+    let mut target = Combo::EMPTY;
+    target.input_only = true;
+    helper.set_target(Some(target));
+    let history = core::array::from_fn(|i| Some(Summary {
+        outcome: Outcome::Completed, graded: RESULTS as u8, true_links: i as u8,
+        total: RESULTS as u8, clean: true, fault: None,
+    }));
+    helper.results = history;
+    helper.streak = RESULTS as u16;
+    helper.best = (RESULTS - 1) as u8;
+    let failed = Summary { outcome: Outcome::Completed, graded: 1, true_links: 0,
+        total: 1, clean: false, fault: Some((0, Reason::Missing(Button::Special))) };
+    helper.input.step(Snap { buttons: 0x8, ..Snap::empty(1) });
+    helper.record(failed, &mut Out::default());
+    helper.input.restart();
+    helper.input.step(Snap { buttons: 0x9, ..Snap::empty(30) });
+    helper.record(failed, &mut Out::default());
+    assert_eq!(helper.results[0..2], [Some(failed); 2]);
+    helper.clear();
+    assert_eq!(helper.results, history);
+    assert_eq!((helper.streak(), helper.best()), (RESULTS as u16, (RESULTS - 1) as u8));
+}
+
+#[test]
+fn a_release_finalizes_a_result_after_capture_overflows() {
+    let mut reference = LinkRec::INPUT;
+    reference.events[0] = Some(Event { kind: Kind::Press(Button::Special), dir: Dir::Neutral, offset: 0 });
+    let mut target = Combo::from_links([reference]).unwrap();
+    target.input_only = true;
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    let mut tracker = Tracker::new();
+    let settings = Settings { load_after: true, ..ON };
+    for _ in 0..2 {
+        tracker.step(idle(), idle(), MappedInputs { buttons: 0x8, ..NONE });
+        assert!(!helper.step(&tracker, settings).load);
+    }
+    assert_eq!(helper.results().count(), 1);
+    for i in 0..200 {
+        let buttons = 0x8 | if i % 2 == 0 { 1 } else { 0 };
+        tracker.step(idle(), idle(), MappedInputs { buttons, ..NONE });
+        assert!(!helper.step(&tracker, settings).load);
+    }
+    assert!(helper.input.combo.overflow);
+    tracker.step(idle(), idle(), NONE);
+    assert!(helper.step(&tracker, settings).load);
+    helper.clear();
+    assert_eq!(helper.results().count(), 1);
+}
+
+#[test]
+fn a_new_final_result_keeps_an_older_deferred_load() {
+    let mut helper = Helper::new();
+    let mut target = Combo::EMPTY;
+    target.input_only = true;
+    helper.set_target(Some(target));
+    let failed = Summary { outcome: Outcome::Completed, graded: 1, true_links: 0,
+        total: 1, clean: false, fault: Some((0, Reason::Missing(Button::Special))) };
+    helper.settings.load_after = true;
+    helper.input.step(Snap { buttons: 0x8, ..Snap::empty(1) });
+    helper.record(failed, &mut Out::default());
+    assert!(!helper.pending_load);
+    helper.input.restart();
+    helper.input.step(Snap { buttons: 0x9, ..Snap::empty(30) });
+    helper.input.step(Snap { buttons: 0x8, ..Snap::empty(31) });
+    helper.settings.load_after = false;
+    helper.record(failed, &mut Out::default());
+    assert!(helper.pending_load);
+    assert!(helper.provisional.iter().all(Option::is_none));
+}
+
 fn a_save_state_load_clears_the_attempt_and_the_next_one_starts_fresh() {
     let mut run = Run::new(with_target());
     run.combo(JAB, &[(UP_TILT, 1)], ON);

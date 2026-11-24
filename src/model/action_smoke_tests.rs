@@ -282,25 +282,137 @@ fn clear_held_chord(tracker: &mut Tracker, helper: &mut Helper) {
 fn a_reset_chord_alone_leaves_no_result() {
     for (button, x, y, hold) in [(A, 60, 60, 2), (B, 0, 60, 3)] {
         for count in [0, 2, RESULTS] {
-            let mut tracker = Tracker::new();
-            let mut helper = Helper::new();
-            helper.set_target(Some(target(button, x, y, hold)));
-            for _ in 0..10 { advance(&mut tracker, &mut helper, standing(), 0, 0, 0, Settings::factory()); }
-            for _ in 0..count { clean_attempt(&mut tracker, &mut helper, button, x, y, hold); }
-            let before = helper.results().copied().collect::<Vec<_>>();
-            let stats = (helper.streak(), helper.best());
-            assert_eq!(before.len(), count);
-            assert!(before.iter().all(|result| result.clean));
-            assert_eq!(stats.0, count as u16);
-            chord(&mut tracker, &mut helper, 8, true);
-            assert_eq!(helper.results().count(), (count + 1).min(RESULTS), "the chord resolved before clear");
-            assert!(!helper.results().next().unwrap().clean);
-            clear_held_chord(&mut tracker, &mut helper);
-            assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
-            assert_eq!((helper.streak(), helper.best()), stats);
-            assert!(helper.attempt().is_none());
+            for frames in [8, 20, 21, 22, 30, 90] {
+                let mut tracker = Tracker::new();
+                let mut helper = Helper::new();
+                helper.set_target(Some(target(button, x, y, hold)));
+                for _ in 0..10 { advance(&mut tracker, &mut helper, standing(), 0, 0, 0, Settings::factory()); }
+                for _ in 0..count { clean_attempt(&mut tracker, &mut helper, button, x, y, hold); }
+                let before = helper.results().copied().collect::<Vec<_>>();
+                let stats = (helper.streak(), helper.best());
+                assert_eq!(before.len(), count);
+                assert!(before.iter().all(|result| result.clean));
+                assert_eq!(stats.0, count as u16);
+                chord(&mut tracker, &mut helper, frames, true);
+                assert_eq!(helper.results().count(), (count + 1).min(RESULTS), "the chord resolved before clear");
+                assert!(!helper.results().next().unwrap().clean);
+                clear_held_chord(&mut tracker, &mut helper);
+                assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
+                assert_eq!((helper.streak(), helper.best()), stats);
+                assert!(helper.attempt().is_none());
+            }
         }
     }
+}
+
+fn probe_step(tracker: &mut Tracker, helper: &mut Helper, buttons: u32, y: i8, settings: Settings) -> Out {
+    tracker.step(standing(), standing(), MappedInputs { buttons, lstick_y: y, ..MappedInputs::NEUTRAL });
+    helper.step(tracker, settings)
+}
+
+#[test]
+fn a_staggered_chord_takes_back_both_results() {
+    for count in [2, RESULTS] {
+        let mut tracker = Tracker::new();
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        for _ in 0..count { clean_attempt(&mut tracker, &mut helper, B, 0, 60, 3); }
+        let before = helper.results().copied().collect::<Vec<_>>();
+        let stats = (helper.streak(), helper.best());
+        assert_eq!(before.len(), count);
+        assert!(before.iter().all(|result| result.clean));
+        assert_eq!(stats.0, count as u16);
+        for _ in 0..30 { probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory()); }
+        assert_eq!(helper.results().count(), (count + 1).min(RESULTS));
+        assert!(!helper.results().next().unwrap().clean);
+        assert_eq!(helper.streak(), 0);
+        for _ in 0..8 { probe_step(&mut tracker, &mut helper, RESET, 0, Settings::factory()); }
+        assert_eq!(helper.results().count(), (count + 2).min(RESULTS));
+        clear_held_chord(&mut tracker, &mut helper);
+        assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
+        assert_eq!((helper.streak(), helper.best()), stats);
+    }
+}
+
+#[test]
+fn a_released_press_makes_its_result_final() {
+    let setup = || {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        (Tracker::new(), helper)
+    };
+    let (mut tracker, mut helper) = setup();
+    for _ in 0..10 { probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory()); }
+    for _ in 0..6 { probe_step(&mut tracker, &mut helper, 0, 0, Settings::factory()); }
+    let before = helper.results().copied().collect::<Vec<_>>();
+    assert_eq!(before.len(), 1);
+    assert!(!before[0].clean);
+    tracker.clear();
+    probe_step(&mut tracker, &mut helper, 0, 0, Settings::factory());
+    assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
+    assert_eq!(helper.streak(), 0);
+
+    let (mut tracker, mut helper) = setup();
+    for _ in 0..30 { probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory()); }
+    for _ in 0..2 { probe_step(&mut tracker, &mut helper, RESET, 0, Settings::factory()); }
+    for _ in 0..26 { probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory()); }
+    let before = helper.results().copied().collect::<Vec<_>>();
+    assert_eq!(before.len(), 2);
+    assert!(before.iter().all(|result| !result.clean));
+    tracker.clear();
+    probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory());
+    assert_eq!(helper.results().copied().collect::<Vec<_>>(), before);
+
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(target(A, 0, 0, 2)));
+    for _ in 0..30 { probe_step(&mut tracker, &mut helper, 0x8, 0, Settings::factory()); }
+    let shield = helper.results().copied().collect::<Vec<_>>();
+    assert_eq!(shield.len(), 1);
+    assert!(!shield[0].clean);
+    for _ in 0..8 { probe_step(&mut tracker, &mut helper, RESET, 0, Settings::factory()); }
+    assert_eq!(helper.results().count(), 2);
+    assert!(helper.results().next().unwrap().clean);
+    probe_step(&mut tracker, &mut helper, A, 0, Settings::factory());
+    tracker.clear();
+    for _ in 0..4 { probe_step(&mut tracker, &mut helper, A, 0, Settings::factory()); }
+    probe_step(&mut tracker, &mut helper, 0, 0, Settings::factory());
+    assert_eq!(helper.results().copied().collect::<Vec<_>>(), shield);
+    assert_eq!(helper.streak(), 0);
+}
+
+#[test]
+fn a_load_after_waits_for_a_provisional_result() {
+    let settings = Settings { load_after: true, ..Settings::factory() };
+    let setup = || {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        (Tracker::new(), helper)
+    };
+    let (mut tracker, mut helper) = setup();
+    assert!(!probe_step(&mut tracker, &mut helper, B, 60, settings).load);
+    let tap = probe_step(&mut tracker, &mut helper, 0, 60, settings);
+    assert!(tap.resolved.is_some() && tap.load);
+    assert!(!probe_step(&mut tracker, &mut helper, 0, 60, settings).load);
+
+    let (mut tracker, mut helper) = setup();
+    for _ in 0..90 { assert!(!probe_step(&mut tracker, &mut helper, RESET, 0, settings).load); }
+    assert_eq!(helper.results().count(), 1);
+    tracker.clear();
+    for _ in 0..4 { assert!(!probe_step(&mut tracker, &mut helper, RESET, 0, settings).load); }
+    for _ in 0..10 { assert!(!probe_step(&mut tracker, &mut helper, 0, 0, settings).load); }
+    assert_eq!(helper.results().count(), 0);
+
+    let (mut tracker, mut helper) = setup();
+    let mut resolved = false;
+    for _ in 0..8 {
+        let out = probe_step(&mut tracker, &mut helper, B, 60, settings);
+        resolved |= out.resolved.is_some();
+        assert!(!out.load);
+    }
+    assert!(resolved);
+    assert!(probe_step(&mut tracker, &mut helper, 0, 60, settings).load);
+    assert!(!probe_step(&mut tracker, &mut helper, 0, 60, settings).load);
 }
 
 #[test]
@@ -447,6 +559,31 @@ fn a_held_moves_end_is_a_reaction_for_its_own_press() {
             else { vec![Kind::LetGo(Button::Special)] };
         assert_eq!(releases, expected);
     }
+}
+
+#[test]
+fn a_change_after_the_action_ended_is_no_reaction() {
+    // A is held through a tilt that ends on frame 10; Player 1 then stands, able to act, with A still down.
+    let take = |release: u32, walk: bool| {
+        let mut tracker = Tracker::new();
+        let mut input = InputCapture::new();
+        for frame in 1..=40 {
+            let p1 = if frame == 1 { standing() }
+                else if frame < 10 { active(Move::SideTilt, 0x2a) }
+                else if walk && frame >= release { Sample { status: 0x3, ..standing() } }
+                else { standing() };
+            let buttons = if frame < release { A } else { 0 };
+            tracker.step(p1, standing(), MappedInputs { buttons, lstick_x: 60, ..MappedInputs::NEUTRAL });
+            if frame == release && frame > 10 {
+                assert_eq!(tracker.late().turned, walk.then_some(None::<u32>));
+            }
+            input.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        }
+        release_kind(&input.combo)
+    };
+    assert_eq!(take(10, false), Kind::LetGo(Button::Attack), "released as the tilt ends");
+    assert_eq!(take(30, false), Kind::Release(Button::Attack), "released while standing");
+    assert_eq!(take(30, true), Kind::Release(Button::Attack), "the release starts a walk: the tilt is long over");
 }
 
 #[test]
