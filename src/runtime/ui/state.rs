@@ -28,6 +28,8 @@ pub static MENU_SHOWN: AtomicBool = AtomicBool::new(false);
 /// gives Player 1's presses to the preview alone. Set and cleared by the worker.
 /// A lost renderer leaves it to the worker's next pass, which also stops the player.
 pub static PREVIEW_HIDES: AtomicBool = AtomicBool::new(false);
+/// The worker published the previewed take's strip: the tick draws that frame while `PREVIEW_HIDES` hides the menu.
+pub static PREVIEW_STRIP: AtomicBool = AtomicBool::new(false);
 /// A panel the menu does not own is on screen with the menu closed (the replay window's clip editor): the tick draws the frame.
 pub static EXT_SHOWN: AtomicBool = AtomicBool::new(false);
 /// The layer's fighter question is up with the menu closed (`flow::Phase::Prompt`): the tick draws the worker's frame and the
