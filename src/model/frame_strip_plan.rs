@@ -5,7 +5,7 @@
 
 use core::fmt::Write as _;
 
-use super::frame_strip::{Aim, Cell, Link, Move, Tracker, Verdict, WINDOW};
+use super::frame_strip::{Aim, Cell, Link, Tracker, Verdict, WINDOW};
 use super::panes::strip_layout::{LayoutSpec, Place, strip::StripSpec};
 #[cfg(test)]
 use super::panes::strip_layout::C;
@@ -97,21 +97,32 @@ impl LinkLine {
     }
 
     pub fn units(&self) -> &[u16] {
-        &self.units[..self.len]
+        &self.units[..self.len.min(self.units.len())]
+    }
+}
+
+impl core::fmt::Write for LinkLine {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for unit in s.encode_utf16() {
+            if let Some(slot) = self.units.get_mut(self.len) { *slot = unit; }
+            self.len += 1;
+        }
+        Ok(())
     }
 }
 
 /// The game's font has cardinal arrows, but not diagonal arrows.
 pub const fn arrow(dir: u8) -> &'static str {
+    use super::combo::Dir;
     match dir {
-        0 => "→",
-        1 => "↑→",
-        2 => "↑",
-        3 => "↑←",
-        4 => "←",
-        5 => "↓←",
-        6 => "↓",
-        7 => "↓→",
+        0 => super::action::arrow(Dir::Forward),
+        1 => super::action::arrow(Dir::ForwardUp),
+        2 => super::action::arrow(Dir::Up),
+        3 => super::action::arrow(Dir::BackUp),
+        4 => super::action::arrow(Dir::Back),
+        5 => super::action::arrow(Dir::BackDown),
+        6 => super::action::arrow(Dir::Down),
+        7 => super::action::arrow(Dir::ForwardDown),
         _ => "",
     }
 }
@@ -131,15 +142,19 @@ pub fn aims_drawn(tracker: &Tracker, boxes: [bool; 2]) -> [Option<u8>; 2] {
 
 /// The two move names and their direction marks, fitted to the given capacity.
 pub fn link_moves(link: &Link, capacity: usize) -> LinkLine {
-    let moves = [link.from, link.to];
-    let names = core::array::from_fn::<_, 2, _>(|i| link.shown[i].of.filter(|_| moves[i] == Move::Other).unwrap_or(moves[i]).name());
-    let arrows = link.shown.map(|shown| shown.dirs.map(|dir| dir.map_or("", arrow)));
-    let space = |s: &str| if s.is_empty() { "" } else { " " };
-    let loose = [names[0], space(arrows[0][0]), arrows[0][0], space(arrows[0][1]), arrows[0][1], " > ",
-                 names[1], space(arrows[1][0]), arrows[1][0], space(arrows[1][1]), arrows[1][1]];
-    let tight = [names[0], "", arrows[0][0], "", arrows[0][1], ">", names[1], "", arrows[1][0], "", arrows[1][1]];
-    let parts = if loose.iter().map(|s| s.encode_utf16().count()).sum::<usize>() <= capacity { loose } else { tight };
-    LinkLine::from_units(parts.into_iter().flat_map(str::encode_utf16))
+    let desc = [
+        super::action::ActionDesc::of(link.from, link.shown[0], link.variants[0]),
+        super::action::ActionDesc::of(link.to, link.shown[1], link.variants[1]),
+    ];
+    let render = |tight| {
+        let mut line = LinkLine { units: [0; LINK_UNITS as usize], len: 0 };
+        let _ = desc[0].write(&mut line, tight);
+        let _ = line.write_str(if tight { ">" } else { " > " });
+        let _ = desc[1].write(&mut line, tight);
+        line
+    };
+    let loose = render(false);
+    if loose.len <= capacity { loose } else { render(true) }
 }
 
 pub fn folded_link(link: &Link) -> LinkLine {

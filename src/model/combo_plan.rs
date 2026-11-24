@@ -522,7 +522,10 @@ impl Plan<'_> {
                 if input {
                     let _ = write!(text, "Step {}", k + 1);
                 } else {
-                    let _ = write!(text, "{} {}>{}", k + 1, reference.from.name(), reference.to.name());
+                    let _ = write!(text, "{} ", k + 1);
+                    let _ = reference.desc(0).write(&mut text, false);
+                    let _ = text.write_str(">");
+                    let _ = reference.desc(1).write(&mut text, false);
                 }
                 Ink::text(text, MUTED)
             }

@@ -2,9 +2,9 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
-use super::action;
+use super::action::{self, ActionDesc};
 use super::frame_strip::{
-    bin_stick, stick_axis, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
+    bin_stick, stick_axis, Angle, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
     DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
 };
 use super::spots::Spot;
@@ -176,7 +176,15 @@ pub struct LinkRec {
     pub drift: Option<Dir>,
     /// The spot the follow-up hit landed (rc.14, SP4); None for an older file or a hit whose spot could not be told.
     pub spot: Option<Spot>,
+    pub(crate) shown: [u8; 3],
 }
+
+const DESC_MOVES: [Move; 17] = [
+    Move::Jab, Move::DashAttack, Move::SideTilt, Move::UpTilt, Move::DownTilt,
+    Move::SideSmash, Move::UpSmash, Move::DownSmash, Move::Aerial, Move::NeutralSpecial,
+    Move::SideSpecial, Move::UpSpecial, Move::DownSpecial, Move::Other,
+    Move::Grab, Move::Throw, Move::FinalSmash,
+];
 
 impl LinkRec {
     pub const INPUT: Self = Self {
@@ -188,12 +196,13 @@ impl LinkRec {
         presses_only: false,
         drift: None,
         spot: None,
+        shown: [0; 3],
     };
     /// The follow-up's events from the tracker's snaps in `(after, hit]`. The first 12 are kept.
     pub fn of(link: &Link, tracker: &Tracker, after: u32, aims: bool) -> LinkRec {
         let a1 = link.actionable as i32;
         let (events, drift) = events_between(tracker, after, link.hit, a1, aims);
-        LinkRec {
+        let mut rec = LinkRec {
             from: link.from,
             to: link.to,
             verdict: link.verdict,
@@ -204,7 +213,13 @@ impl LinkRec {
             presses_only: false,
             drift,
             spot: link.spot,
-        }
+            shown: [0; 3],
+        };
+        rec.set_descriptions([
+            ActionDesc::of(link.from, link.shown[0], link.variants[0]),
+            ActionDesc::of(link.to, link.shown[1], link.variants[1]),
+        ]);
+        rec
     }
 
     /// A presses-only link, the shape an old file grades as.
@@ -225,7 +240,46 @@ impl LinkRec {
             presses_only: true,
             drift: None,
             spot: None,
+            shown: [0; 3],
         }
+    }
+
+    fn description_bits(&self, side: usize) -> u32 {
+        let bits = u32::from(self.shown[0]) | (u32::from(self.shown[1]) << 8) | (u32::from(self.shown[2]) << 16);
+        (bits >> (side * 12)) & 0xfff
+    }
+
+    pub(crate) fn set_descriptions(&mut self, desc: [ActionDesc; 2]) {
+        let mut bits = 0u32;
+        for (side, desc) in desc.into_iter().enumerate() {
+            let of = desc.of.and_then(|mv| DESC_MOVES.iter().position(|&candidate| candidate == mv))
+                .map_or(1, |index| index as u32 + 2);
+            let angle = match desc.angle { None => 0, Some(Angle::Up) => 1, Some(Angle::Down) => 2 };
+            bits |= (of | (angle << 5) | (u32::from(desc.normal.min(31)) << 7)) << (side * 12);
+        }
+        self.shown = [bits as u8, (bits >> 8) as u8, (bits >> 16) as u8];
+    }
+
+    /// Whether both moves have descriptions.
+    pub fn described(&self) -> bool {
+        self.description_bits(0) & 31 != 0 && self.description_bits(1) & 31 != 0
+    }
+
+    /// A move's saved description, with the follow-up's aim events.
+    pub fn desc(&self, side: usize) -> ActionDesc {
+        let bits = self.description_bits(side);
+        let code = bits & 31;
+        let of = code.checked_sub(2).and_then(|index| DESC_MOVES.get(index as usize)).copied();
+        let angle = match (bits >> 5) & 3 { 1 => Some(Angle::Up), 2 => Some(Angle::Down), _ => None };
+        let mut parts = [None; 2];
+        if side == 1 {
+            for event in self.events() {
+                if let Kind::Aim(part @ 1..=2) = event.kind {
+                    parts[usize::from(part - 1)] = Some(event.dir);
+                }
+            }
+        }
+        ActionDesc { mv: if side == 0 { self.from } else { self.to }, of, angle, normal: ((bits >> 7) & 31) as u8, parts }
     }
 
     pub fn events(&self) -> impl Iterator<Item = Event> + '_ {
@@ -532,7 +586,11 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
         input_only,
         link: *attempt,
         reference: *reference,
-        wrong_move: !input_only && attempt.to != reference.to,
+        wrong_move: !input_only && if reference.described() && attempt.described() {
+            !reference.desc(1).same_move(&attempt.desc(1))
+        } else {
+            attempt.to.legacy() != reference.to.legacy()
+        },
         marks,
         band,
         extra,
@@ -985,7 +1043,9 @@ impl Helper {
             .as_ref()
             .is_some_and(|a| a.open() && a.exchange == exchange);
         if !open {
-            if !first || target.get(0).is_none_or(|r| r.from != rec.from) {
+            if !first || target.get(0).is_none_or(|r| {
+                if r.described() { r.from != rec.from } else { r.from.legacy() != rec.from.legacy() }
+            }) {
                 return;
             }
             self.attempt = Some(Attempt::new(exchange, false));
@@ -995,8 +1055,10 @@ impl Helper {
         };
         if attempt.junction {
             attempt.junction = false;
-            let first = target.get(0).map(|r| r.from);
-            if first != Some(rec.to) {
+            let matches = target.get(0).is_some_and(|r| {
+                if r.described() { r.from == rec.to } else { r.from.legacy() == rec.to.legacy() }
+            });
+            if !matches {
                 let summary = Summary {
                     outcome: Outcome::Stopped,
                     graded: 0,

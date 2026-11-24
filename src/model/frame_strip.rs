@@ -74,6 +74,9 @@ pub enum Move {
     SideSpecial,
     UpSpecial,
     DownSpecial,
+    Grab,
+    Throw,
+    FinalSmash,
     /// A fighter's own attack status, or one this list does not name.
     Other,
 }
@@ -94,7 +97,18 @@ impl Move {
             Move::SideSpecial => "Side B",
             Move::UpSpecial => "Up B",
             Move::DownSpecial => "Down B",
+            Move::Grab => "Grab",
+            Move::Throw => "Throw",
+            Move::FinalSmash => "Final Smash",
             Move::Other => "Move",
+        }
+    }
+
+    /// The move understood by older combo files.
+    pub const fn legacy(self) -> Move {
+        match self {
+            Move::Grab | Move::Throw | Move::FinalSmash => Move::Other,
+            _ => self,
         }
     }
 }
@@ -143,6 +157,10 @@ pub struct Sample {
     pub active: bool,
     /// P1 only: the status is an attack, and which.
     pub attack: Option<Move>,
+    /// P1 only: the status is a grab, a throw or the Final Smash (`ids::Table::named`).
+    pub named: Option<Move>,
+    /// P1 only: the animation's hash40; 0 when it was not read.
+    pub motion: u64,
     /// P1 only: the angle of a side attack.
     pub angle: Option<Angle>,
     /// P1 only: its position during a directional special's travel status.
@@ -391,6 +409,7 @@ pub struct Link {
     pub from: Move,
     pub to: Move,
     pub shown: [Shown; 2],
+    pub variants: [u8; 2],
     /// The displayed move each of `shown` was copied from; a direction that arrives later reaches the copy.
     pub(crate) owners: [u32; 2],
     /// The spot the follow-up hit landed (rc.14, SP4), `None` when it could not be told.
@@ -456,6 +475,7 @@ struct Hit {
     action: u32,
     mv: Move,
     shown: Shown,
+    variant: u8,
     owner: u32,
     spot: Option<Spot>,
     /// P1's and the CPU's first actionable frames after it.
@@ -473,13 +493,9 @@ pub struct Tracker {
     press_head: usize,
     aims: [Option<Aim>; AIMS],
     aim_head: usize,
-    angle: Option<Angle>,
     travel: bool,
     aim_from: Option<(u32, (f32, f32))>,
     parts: super::aim::Parts,
-    shown: Shown,
-    shown_id: u32,
-    base: Option<Move>,
     history: [Option<Link>; HISTORY],
     advantage: Option<Advantage>,
     frame: u32,
@@ -489,10 +505,8 @@ pub struct Tracker {
     stick: Option<u8>,
     // P1's action.
     p1_was_actionable: bool,
-    action: u32,
-    action_start: u32,
+    action: super::action::Action,
     active_seen: bool,
-    action_move: Move,
     p1_status: i32,
     p1_motion_frame: f32,
     // The CPU.
@@ -537,13 +551,9 @@ impl Tracker {
             press_head: 0,
             aims: [None; AIMS],
             aim_head: 0,
-            angle: None,
             travel: false,
             aim_from: None,
             parts: super::aim::Parts::new(),
-            shown: Shown { of: None, dirs: [None; 2] },
-            shown_id: 0,
-            base: None,
             history: [None; HISTORY],
             advantage: None,
             frame: 0,
@@ -551,10 +561,8 @@ impl Tracker {
             buttons: 0,
             stick: None,
             p1_was_actionable: true,
-            action: 0,
-            action_start: 0,
+            action: super::action::Action::new(),
             active_seen: false,
-            action_move: Move::Other,
             p1_status: -1,
             p1_motion_frame: 0.0,
             cpu_was_stop: false,
@@ -603,11 +611,11 @@ impl Tracker {
     }
 
     fn push_aim(&mut self, frame: u32, dir: u8) {
-        let slot = usize::from(self.shown.dirs[0].is_some());
-        self.shown.dirs[slot] = Some(dir);
+        let slot = usize::from(self.action.shown.dirs[0].is_some());
+        self.action.shown.dirs[slot] = Some(dir);
         self.aims[self.aim_head] = Some(Aim { frame, dir });
         self.aim_head = (self.aim_head + 1) % AIMS;
-        let (shown, id) = (self.shown, self.shown_id);
+        let (shown, id) = (self.action.shown, self.action.shown_id);
         if let Some(hit) = self.last_hit.as_mut().filter(|hit| hit.owner == id) {
             hit.shown = shown;
         }
@@ -623,6 +631,11 @@ impl Tracker {
     /// The frames stepped since the last clear.
     pub fn frame(&self) -> u32 {
         self.frame
+    }
+
+    /// The press that opened the current action, if it was seen.
+    pub fn origin(&self) -> Option<u32> {
+        self.action.origin
     }
 
     /// How many exchanges started since the last clear, and the frame of the open one's first hit. A hit the strip does
@@ -740,32 +753,48 @@ impl Tracker {
         // new attack without an actionable frame between (another move, or the same status from its motion's start).
         let p1_busy = !p1.actionable && !p1.hitstun && !p1.shieldstun;
         let restarted = p1.attack.is_some_and(|m| {
-            (m != self.action_move && self.action_move != Move::Other)
+            (m != self.action.mv && self.action.mv != Move::Other)
                 || (p1.status == self.p1_status
                     && p1.motion_frame < self.p1_motion_frame
                     && !p1.stop)
         });
         if p1_busy && (self.p1_was_actionable || restarted) {
             if self.p1_was_actionable {
-                self.base = None;
-            } else if self.action_move != Move::Other {
-                self.base = Some(self.action_move);
+                self.action.base = None;
+            } else if self.action.mv != Move::Other {
+                self.action.base = Some(self.action.mv);
             }
             if !(self.travel && p1.travel.is_some()) {
-                self.shown = Shown::default();
-                self.shown_id = self.shown_id.wrapping_add(1);
+                self.action.shown = Shown::default();
+                self.action.shown_id = self.action.shown_id.wrapping_add(1);
             }
-            self.angle = None;
-            self.action = self.action.wrapping_add(1);
-            self.action_start = frame;
+            self.action.angle = None;
+            self.action.id = self.action.id.wrapping_add(1);
+            self.action.start = frame;
+            let origin = self.presses().find(|p| p.frame <= frame && frame - p.frame <= INPUT_LOOKBACK).map(|p| p.frame);
+            self.action.origin = origin;
+            self.action.variant = 0;
+            self.action.variant_known = false;
             self.active_seen = false;
-            self.action_move = Move::Other;
+            self.action.mv = Move::Other;
         }
-        if p1_busy && self.action_move == Move::Other {
-            self.action_move = p1.attack.unwrap_or(Move::Other);
+        if p1_busy && self.action.mv == Move::Other {
+            if let Some(mv) = p1.attack.or(p1.named) {
+                self.action.mv = mv;
+                if !self.action.variant_known {
+                    self.action.variant = super::action::variant(p1.motion);
+                    self.action.variant_known = true;
+                }
+            }
         }
-        if p1.angle != self.angle {
-            self.angle = p1.angle;
+        if p1.named == Some(Move::Throw) && self.action.mv == Move::Grab {
+            self.action.mv = Move::Throw;
+        }
+        if p1_busy && p1.attack == Some(Move::Other) && self.action.mv == Move::Other {
+            self.action.shown.of = self.action.base;
+        }
+        if p1.angle != self.action.angle {
+            self.action.angle = p1.angle;
             if let Some(angle) = p1.angle {
                 self.push_aim(frame, angle.dir());
             }
@@ -774,8 +803,8 @@ impl Tracker {
         let entered = p1.travel.is_some() && !self.travel;
         if entered {
             self.aim_from = p1.travel.map(|pos| (frame, pos));
-            if self.action_move == Move::Other {
-                self.shown.of = self.base;
+            if self.action.mv == Move::Other {
+                self.action.shown.of = self.action.base;
             }
         } else if p1.travel.is_none() {
             self.aim_from = None;
@@ -924,12 +953,12 @@ impl Tracker {
         let follow_up = self.last_hit.filter(|prev| {
             !prev.on_shield
                 && !on_shield
-                && prev.action != self.action
+                && prev.action != self.action.id
                 && prev
                     .cpu_free
                     .is_none_or(|free| frame.saturating_sub(free) <= DROP_MAX)
         });
-        if follow_up.is_none() && self.last_hit.is_none_or(|prev| prev.action != self.action) {
+        if follow_up.is_none() && self.last_hit.is_none_or(|prev| prev.action != self.action.id) {
             self.exchange = self.exchange.wrapping_add(1);
             self.exchange_hit = frame;
         }
@@ -937,8 +966,8 @@ impl Tracker {
             // A buffered follow-up starts on the first frame P1 could act, without an actionable sample between.
             let actionable = prev
                 .p1_free
-                .unwrap_or(self.action_start)
-                .min(self.action_start);
+                .unwrap_or(self.action.start)
+                .min(self.action.start);
             let (verdict, free) = match prev.cpu_free {
                 Some(free) if free < frame => (Verdict::Drop((frame - free) as i32), Some(free)),
                 _ => match self.reaction.and_then(|r| predicted_free(frame - 1, r)) {
@@ -948,18 +977,13 @@ impl Tracker {
                     _ => (Verdict::True(None), None),
                 },
             };
-            let press = self
-                .presses()
-                .find(|p| {
-                    p.frame <= self.action_start && self.action_start - p.frame <= INPUT_LOOKBACK
-                })
-                .map_or(self.action_start, |p| p.frame);
+            let press = self.action.origin.unwrap_or(self.action.start);
             let link = match verdict {
                 Verdict::True(link) => link,
                 Verdict::Drop(link) => Some(link),
             };
             let window = link.and_then(|link| {
-                let end = self.action_start as i64 - i64::from(link);
+                let end = self.action.start as i64 - i64::from(link);
                 (end >= i64::from(actionable)).then_some((actionable, end as u32))
             });
             let item = Link {
@@ -971,9 +995,10 @@ impl Tracker {
                 input: press as i32 - actionable as i32,
                 window,
                 from: prev.mv,
-                to: self.action_move,
-                shown: [prev.shown, self.shown],
-                owners: [prev.owner, self.shown_id],
+                to: self.action.mv,
+                shown: [prev.shown, self.action.shown],
+                variants: [prev.variant, self.action.variant],
+                owners: [prev.owner, self.action.shown_id],
                 spot,
             };
             self.history.copy_within(0..HISTORY - 1, 1);
@@ -983,10 +1008,11 @@ impl Tracker {
         self.last_hit = Some(Hit {
             frame,
             on_shield,
-            action: self.action,
-            mv: self.action_move,
-            shown: self.shown,
-            owner: self.shown_id,
+            action: self.action.id,
+            mv: self.action.mv,
+            shown: self.action.shown,
+            variant: self.action.variant,
+            owner: self.action.shown_id,
             spot,
             p1_free: None,
             cpu_free: None,
@@ -1046,6 +1072,9 @@ pub mod ids {
         AttackHi4Start = "FIGHTER_STATUS_KIND_ATTACK_HI4_START",
         AttackHi4 = "FIGHTER_STATUS_KIND_ATTACK_HI4",
         AttackAir = "FIGHTER_STATUS_KIND_ATTACK_AIR",
+        Catch = "FIGHTER_STATUS_KIND_CATCH",
+        CatchAttack = "FIGHTER_STATUS_KIND_CATCH_ATTACK",
+        Throw = "FIGHTER_STATUS_KIND_THROW",
         SpecialN = "FIGHTER_STATUS_KIND_SPECIAL_N",
         SpecialS = "FIGHTER_STATUS_KIND_SPECIAL_S",
         SpecialHi = "FIGHTER_STATUS_KIND_SPECIAL_HI",
@@ -1062,6 +1091,15 @@ pub mod ids {
             self.resolved(from)
                 && self.resolved(to)
                 && (self.get(from)..=self.get(to)).contains(&status)
+        }
+
+        /// Named non-attack statuses.
+        pub fn named_move(&self, status: i32) -> Option<super::Move> {
+            use super::Move;
+            if self.within(C::Catch, C::CatchAttack, status) { Some(Move::Grab) }
+            else if self.is(C::Throw, status) { Some(Move::Throw) }
+            else if self.is(C::Final, status) { Some(Move::FinalSmash) }
+            else { None }
         }
 
         /// Hitstun: `DAMAGE ..< DAMAGE_FALL` (the range of the CPU specs' predicate, tumble included).

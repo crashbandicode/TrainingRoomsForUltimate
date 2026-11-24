@@ -9,8 +9,9 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
+use super::action::ActionDesc;
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
-use super::frame_strip::{Button, Move, Verdict};
+use super::frame_strip::{Angle, Button, Move, Verdict};
 use super::spots::Spot;
 use super::store::{default_id, Record, SkippedFile, Store, StoreError};
 
@@ -265,6 +266,10 @@ impl ComboRecord {
                 if let Some(spot) = l.spot {
                     link["spot"] = json!(spot.name().to_ascii_lowercase());
                 }
+                if l.described() {
+                    link["from_shown"] = description_value(l.desc(0));
+                    link["to_shown"] = description_value(l.desc(1));
+                }
                 if !l.presses_only {
                     link["events"] = Value::Array(events_value(l, &holds));
                     if let Some(dir) = l.drift {
@@ -419,7 +424,9 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
         Some(Value::String(text)) => Some(dir_of(text).ok_or("drift")?),
         Some(_) => return Err("drift"),
     };
-    Ok(LinkRec {
+    let from_shown = o.get("from_shown").map(|value| parse_description(value, from, "from_shown")).transpose()?;
+    let to_shown = o.get("to_shown").map(|value| parse_description(value, to, "to_shown")).transpose()?;
+    let mut rec = LinkRec {
         from,
         to,
         verdict,
@@ -431,7 +438,58 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
             .get("spot")
             .and_then(Value::as_str)
             .and_then(Spot::from_key),
-    })
+        shown: [0; 3],
+    };
+    if let (Some(from), Some(to)) = (from_shown, to_shown) {
+        rec.from = from.mv;
+        rec.to = to.mv;
+        rec.set_descriptions([from, to]);
+    }
+    Ok(rec)
+}
+
+fn parse_description(value: &Value, mv: Move, key: &'static str) -> Result<ActionDesc, &'static str> {
+    let object = value.as_object().ok_or(key)?;
+    let exact = match object.get("move") {
+        None => mv,
+        Some(value) => {
+            let found = value.as_str().and_then(move_of).ok_or(key)?;
+            if mv != Move::Other || !matches!(found, Move::Grab | Move::Throw | Move::FinalSmash) { return Err(key); }
+            found
+        }
+    };
+    let of = match object.get("of") {
+        None => None,
+        Some(value) => Some(value.as_str().and_then(move_of).ok_or(key)?),
+    };
+    let angle = match object.get("angle") {
+        None => None,
+        Some(Value::String(angle)) if angle == "up" => Some(Angle::Up),
+        Some(Value::String(angle)) if angle == "down" => Some(Angle::Down),
+        Some(_) => return Err(key),
+    };
+    let normal = match object.get("variant") {
+        None => 0,
+        Some(value) => value.as_u64().filter(|&normal| normal <= 31).ok_or(key)? as u8,
+    };
+    Ok(ActionDesc { mv: exact, of, angle, normal, parts: [None; 2] })
+}
+
+fn description_value(desc: ActionDesc) -> Value {
+    let mut object = Map::new();
+    if matches!(desc.mv, Move::Grab | Move::Throw | Move::FinalSmash) {
+        object.insert("move".into(), json!(key_of(&MOVES, desc.mv)));
+    }
+    if let Some(of) = desc.of {
+        object.insert("of".into(), json!(key_of(&MOVES, of)));
+    }
+    if let Some(angle) = desc.angle {
+        object.insert("angle".into(), json!(match angle { Angle::Up => "up", Angle::Down => "down" }));
+    }
+    if desc.normal != 0 {
+        object.insert("variant".into(), json!(desc.normal));
+    }
+    Value::Object(object)
 }
 
 fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static str> {
@@ -485,7 +543,7 @@ fn event_value(event: Event, hold: Option<u32>) -> Value {
     value
 }
 
-const MOVES: [(Move, &str); 14] = [
+const MOVES: [(Move, &str); 17] = [
     (Move::Jab, "jab"),
     (Move::DashAttack, "dash_attack"),
     (Move::SideTilt, "side_tilt"),
@@ -500,6 +558,9 @@ const MOVES: [(Move, &str); 14] = [
     (Move::UpSpecial, "up_special"),
     (Move::DownSpecial, "down_special"),
     (Move::Other, "other"),
+    (Move::Grab, "grab"),
+    (Move::Throw, "throw"),
+    (Move::FinalSmash, "final_smash"),
 ];
 const BUTTONS: [(Button, &str); 5] = [
     (Button::Attack, "attack"),
@@ -527,7 +588,7 @@ fn value_of<T: Copy>(table: &[(T, &'static str)], key: &str) -> Option<T> {
 }
 
 pub fn move_key(m: Move) -> &'static str {
-    key_of(&MOVES, m)
+    key_of(&MOVES, m.legacy())
 }
 fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)

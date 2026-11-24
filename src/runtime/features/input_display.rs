@@ -342,6 +342,8 @@ unsafe fn sample(accessor: usize, ids: &Table, p1: bool, spots: bool) -> Sample 
         dealt: struck.map_or(0.0, |(_, _, dealt)| dealt),
         object_id: if spots { ((accessor + natives::ACCESSOR_OBJECT_ID_FIELD) as *const u32).read() } else { 0 },
         attack,
+        named: if p1 { ids.named_move(status) } else { None },
+        motion: 0,
         angle: if p1 && matches!(attack, Some(Move::SideTilt | Move::SideSmash)) { angle(accessor) } else { None },
         travel: if p1 { travel(accessor, status) } else { None },
         aimer: p1 && aimer(accessor),

@@ -717,7 +717,9 @@ fn a_link_keeps_both_moves_directions_and_the_special_a_travel_continues() {
                  Sample { stop: true, hitstun: true, reaction: Some(50.0), ..Sample::default() }, NONE);
     assert_eq!(tracker.latest_link().map(|l| l.shown[0]),
                Some(Shown { of: Some(Move::UpSpecial), dirs: [Some(4), None] }));
-    assert_eq!(linked_special(false).latest_link().map(|l| l.shown[1]), Some(Shown::default()));
+    // A fighter-own status that continues a special is named by it, with or without a travel.
+    assert_eq!(linked_special(false).latest_link().map(|l| l.shown[1]),
+               Some(Shown { of: Some(Move::UpSpecial), dirs: [None; 2] }));
 }
 
 fn a_second_part_reaches_the_link_its_special_already_made() {
@@ -807,11 +809,11 @@ fn the_action_takes_its_origin_when_it_opens() {
 fn a_throw_stays_in_the_action_of_its_grab() {
     use super::ids::{Table, C};
     let t = Table::with(&[(C::Catch, 0x30), (C::CatchAttack, 0x36), (C::Throw, 0x37), (C::Final, 0x1e0)]);
-    assert_eq!(t.named(0x30), Some(Move::Grab));
-    assert_eq!(t.named(0x36), Some(Move::Grab));
-    assert_eq!(t.named(0x37), Some(Move::Throw));
-    assert_eq!(t.named(0x1e0), Some(Move::FinalSmash));
-    assert_eq!(t.named(0x1e1), None);
+    assert_eq!(t.named_move(0x30), Some(Move::Grab));
+    assert_eq!(t.named_move(0x36), Some(Move::Grab));
+    assert_eq!(t.named_move(0x37), Some(Move::Throw));
+    assert_eq!(t.named_move(0x1e0), Some(Move::FinalSmash));
+    assert_eq!(t.named_move(0x1e1), None);
     let mut tracker = Tracker::new();
     let stun = Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
     let hit = Sample { stop: true, ..stun };
