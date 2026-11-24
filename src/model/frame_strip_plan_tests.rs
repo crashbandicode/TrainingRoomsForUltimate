@@ -146,17 +146,18 @@ fn the_last_row_and_the_link_line_name_the_direction_beside_the_move() {
     assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Jab > Side tilt ↑");
     let link = tracker.latest_link().unwrap();
     assert_eq!(String::from_utf16(folded_link(&link).units()).unwrap(), "TRUE · Jab > Side tilt ↑");
-    let (_, line, _) = Renderer::new().draw_with_spec(
+    let mut line = Text::EMPTY;
+    Renderer::new().draw_with_spec(
         &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: false, cells: false, spec: &C },
-        |_, _, _| {},
+        |i, look, _| if i == at::READ_SUB + 1 { line = look.text },
     );
-    assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), "TRUE · Jab > Side tilt ↑");
+    assert_eq!(String::from_utf16(line.units()).unwrap(), "TRUE · Jab > Side tilt ↑");
     let special = Link { to: Move::Other, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(4), Some(0)] }], ..link };
-    assert_eq!(String::from_utf16(link_moves(&special, TEXT_UNITS).units()).unwrap(), "Jab > Up B ← →");
+    assert_eq!(String::from_utf16(link_moves(&special, SHORT_UNITS).units()).unwrap(), "Jab > Up B ← →");
     let named = Link { to: Move::SideTilt, shown: [Shown::default(), Shown { of: Some(Move::UpSpecial), dirs: [Some(2), None] }], ..link };
-    assert_eq!(String::from_utf16(link_moves(&named, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
+    assert_eq!(String::from_utf16(link_moves(&named, SHORT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
     let plain = Link { shown: [Shown::default(); 2], ..link };
-    assert_eq!(String::from_utf16(link_moves(&plain, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt");
+    assert_eq!(String::from_utf16(link_moves(&plain, SHORT_UNITS).units()).unwrap(), "Jab > Side tilt");
 }
 
 #[test]
@@ -181,7 +182,7 @@ fn runtime_and_archive_share_the_strip_layout() {
     alternate.strip.base_height += 20.0;
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
-        let (_, line, history) = Renderer::new().draw_with_spec(
+        let (_, history) = Renderer::new().draw_with_spec(
             &tracker, StripDraw { shown: true, spots: true, parry: None, history_enabled: true, cells: false, spec },
             |i, look, _| looks[i] = *look,
         );
@@ -194,14 +195,14 @@ fn runtime_and_archive_share_the_strip_layout() {
         }
         let rule = looks[at::SEPARATOR + 1];
         assert!(rule.visible && rule.x.abs() + rule.w / 2.0 <= spec.strip.width / 2.0);
-        (looks, line, history)
+        (looks, history)
     };
-    let (compact, line, history) = collect(&C);
-    let (other, other_line, other_history) = collect(&alternate);
+    let (compact, history) = collect(&C);
+    let (other, other_history) = collect(&alternate);
     assert_ne!((compact[0].y, compact[1].w), (other[0].y, other[1].w));
     assert_ne!(compact[at::READ_SUB + 1].x, other[at::READ_SUB + 1].x);
     assert_eq!(compact.map(|l| (l.visible, l.color, l.text)), other.map(|l| (l.visible, l.color, l.text)));
-    assert_eq!((line, history), (other_line, other_history));
+    assert_eq!(history, other_history);
 }
 
 #[test]
@@ -209,12 +210,16 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
     let tracker = true_combo();
     let mut renderer = Renderer::new();
     let mut draw = |on| {
-        let (_, line, history) = renderer.draw_with_spec(
-            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C }, |_, _, _| {},
+        let mut line = None;
+        let (_, history) = renderer.draw_with_spec(
+            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C },
+            |i, look, changed| if i == at::READ_SUB + 1 && changed.text { line = Some(look.text) },
         );
         let last = renderer.written(at::LAST_TEXT).unwrap().visible;
         let pill = renderer.written(at::PILL).unwrap().visible;
         assert_eq!((history, last, pill), (on, on, on));
+        assert_eq!(renderer.written(at::READ_SUB + 1).unwrap().text.units(), line.unwrap().units(),
+            "the cached native write must carry the final folded or unfolded string");
         String::from_utf16(line.unwrap().units()).unwrap()
     };
     assert_eq!(draw(true), "TRUE combo");
@@ -247,23 +252,23 @@ fn compact_bounds_and_fade_follow_the_scene_and_visible_rows() {
     assert_eq!(C.strip.bounds(true, false), [0.0, 23.0, 1296.0, 170.0]);
     assert_eq!(C.strip.bounds(false, false), [0.0, 39.0, 1296.0, 138.0]);
     assert_eq!(C.strip.bounds(false, true), [0.0, 7.0, 1296.0, 202.0]);
-    let seen = C.opacity(0.0, false, Some(true), [[0.0, 535.0]]);
+    let seen = C.opacity(0.0, false, Some((true, 1)), [[0.0, 535.0]]);
     assert_eq!(seen, u8::MAX);
     assert_eq!(
-        C.opacity(0.0, false, Some(true), [[0.0, 500.0]]),
+        C.opacity(0.0, false, Some((true, 1)), [[0.0, 500.0]]),
         C.covered_alpha
     );
     assert_eq!(
-        C.opacity(0.0, false, Some(true), [[804.0, 400.0]]),
+        C.opacity(0.0, false, Some((true, 1)), [[804.0, 400.0]]),
         C.covered_alpha
     );
     assert_eq!(C.opacity(0.0, false, None, [[804.0, 400.0]]), u8::MAX);
     assert_eq!(
-        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 500.0]]),
+        C.opacity(C.scene_drop(true), false, Some((true, 1)), [[804.0, 500.0]]),
         u8::MAX
     );
     assert_eq!(
-        C.opacity(C.scene_drop(true), false, Some(true), [[804.0, 400.0]]),
+        C.opacity(C.scene_drop(true), false, Some((true, 1)), [[804.0, 400.0]]),
         C.covered_alpha
     );
 }
@@ -475,17 +480,19 @@ fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
 }
 
 fn deferred_cached_looks_match_direct_visible_writes() {
-    let mut direct = Panes::<1>::new();
-    let mut deferred = Panes::<1>::new();
+    let mut direct = Panes::<1, 1>::new();
+    let mut deferred = Panes::<1, 1>::new();
     let shown = Look::text(3.0, 4.0, Text::new("Step 40"), [1, 2, 3, 255]);
+    // A long line: its units past a short line's come back from the cache's tail.
+    let long = Look::text(3.0, 4.0, Text::new("Grading unavailable (not counted)"), [1, 2, 3, 255]);
     for invalidate in [false, true] {
         if invalidate { direct.invalidate(); deferred.invalidate(); }
-        for look in [shown, shown, Look::HIDDEN, Look::HIDDEN, shown] {
+        for look in [shown, shown, Look::HIDDEN, Look::HIDDEN, shown, long, long, shown, long, Look::HIDDEN, long] {
             let mut expected = Vec::new();
-            let count = direct.show(|_| look, |i, look, change| expected.push((i, *look, change)));
+            let count = direct.show(|_| 40, |_| look, |i, look, change| expected.push((i, *look, change)));
             let mut changes = [None];
-            assert_eq!(deferred.show(|_| look, |i, _, change| changes[i] = Some(change)), count);
-            let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, *deferred.written(i).unwrap(), c))).collect();
+            assert_eq!(deferred.show(|_| 40, |_| look, |i, _, change| changes[i] = Some(change)), count);
+            let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, deferred.written(i).unwrap(), c))).collect();
             assert_eq!(expected.len(), actual.len());
             for ((i, want, changed), (j, got, flags)) in expected.into_iter().zip(actual) {
                 assert_eq!((i, changed, want.visible), (j, flags, got.visible));
@@ -539,6 +546,118 @@ fn parry_window_uses_the_strip_frames() {
     let mut looks = vec![Look::HIDDEN; COUNT];
     Renderer::new().draw_parry(&tracker, true, false, Some(&view), |i, look, _| looks[i] = *look);
     assert!(looks[at::WINDOW_BAR].visible, "the window bar is on the strip's frames");
+}
+
+/// Parry practice's readout line carries Tech's words for the grade, whole.
+#[test]
+fn parrys_grade_words_are_shown_in_full() {
+    use crate::model::parry::{Attempt, View};
+    use crate::model::tech::session::Grade;
+    let mut view = View::EMPTY;
+    view.last[0] = Some(Attempt { grade: Grade::Unavailable, hit: 1, window: None });
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    let mut renderer = Renderer::new();
+    renderer.draw_with_spec(
+        &Tracker::new(),
+        StripDraw { shown: true, spots: false, parry: Some(&view), history_enabled: true, cells: false, spec: &C },
+        |i, look, _| looks[i] = *look,
+    );
+    let words = "Grading unavailable (not counted)";
+    assert_eq!(String::from_utf16(looks[at::READ_SUB + 1].text.units()).unwrap(), words);
+    assert_eq!(String::from_utf16(renderer.written(at::READ_SUB + 1).unwrap().text.units()).unwrap(), words);
+}
+
+/// Capacity belongs to the line type. Only the lines whose real strings pass 24 units get the long box: the strip's
+/// three readout lines, and the card's reason, link titles and marks. Every other line keeps 24 units; the two-unit
+/// boxes are single glyphs.
+#[test]
+fn only_the_long_line_types_get_long_boxes() {
+    use crate::model::panes::{cb, iv, spec, Kind, IDX_CB, IDX_IV};
+    let boxes = |from: usize, count: usize| -> Vec<(usize, u16)> {
+        (0..count)
+            .filter_map(|local| match spec(from + local).kind {
+                Kind::Text { chars, .. } => Some((local, chars)),
+                _ => None,
+            })
+            .collect()
+    };
+    let long = |boxes: &[(usize, u16)]| -> Vec<usize> {
+        boxes.iter().filter(|(_, chars)| *chars == 40).map(|(local, _)| *local).collect()
+    };
+    let (strip, card) = (boxes(IDX_IV, iv::COUNT), boxes(IDX_CB, cb::COUNT));
+    assert_eq!(long(&strip), (at::READ_SUB..at::LAST_TEXT).collect::<Vec<_>>(), "the strip's three readout lines");
+    let mut expected: Vec<usize> =
+        (cb::at::TITLE..cb::at::VERDICT).chain(cb::at::OFFSET..cb::at::RULER).chain([cb::at::REASON]).collect();
+    expected.sort_unstable();
+    assert_eq!(long(&card), expected, "the card's link titles, marks and reason");
+    // The boxes are declared from the same tables the pane caches read.
+    assert!(strip.iter().all(|(local, chars)| iv::units(*local) == *chars), "the strip's boxes follow its table");
+    assert!(card.iter().all(|(local, chars)| cb::units(*local) == *chars), "the card's boxes follow its table");
+    assert_eq!((iv::LONG_LINES, cb::LONG_LINES), (3, 9));
+    let other: Vec<u16> = strip.iter().chain(&card).map(|(_, chars)| *chars).filter(|chars| *chars != 40).collect();
+    assert!(other.iter().all(|chars| matches!(chars, 2 | 24)), "{other:?}");
+    assert_eq!(other.iter().filter(|chars| **chars == 24).count(), 68 - 12, "every other line keeps 24 units");
+}
+
+/// A pane's cached look holds 24 units, as it did before any line was long: only the long lines add to a cache.
+#[test]
+fn the_pane_caches_do_not_pay_for_the_long_lines() {
+    use crate::model::combo_plan;
+    use core::mem::size_of;
+    let (strip, card) = (size_of::<Renderer>(), size_of::<combo_plan::Renderer>());
+    assert!(strip <= COUNT * 72 + 3 * 40, "the strip's cache is {strip} B for {COUNT} panes");
+    assert!(card <= combo_plan::COUNT * 72 + 9 * 40, "the card's cache is {card} B for {} panes", combo_plan::COUNT);
+}
+
+/// Lines whose place cannot grow keep 24 units: a name on the card, Parry's pills and the LAST row's moves.
+#[test]
+fn lines_that_cannot_grow_keep_their_24_units() {
+    use crate::model::drill::{Advance, Stepped};
+    use crate::model::{combo, combo_plan, frame_strip::Button};
+    let long = "A thirty character combo name!";
+    assert_eq!((long.len(), SHORT_UNITS), (30, 24));
+    assert_eq!(Short::new(long).text(), Text::new(&long[..SHORT_UNITS]));
+
+    // A sequence's card: the name beside "landed", and a chip.
+    let link = combo::LinkRec::presses(Move::Jab, Move::UpTilt, Verdict::True(None), None,
+        &[combo::Event::press(Button::Attack, combo::Aim::Neutral, 0)]);
+    let target = combo::Combo::from_links([link]).unwrap();
+    let mut helper = combo::Helper::new();
+    helper.set_target(Some(target));
+    helper.step(&Tracker::new(), combo::Settings { on: true, ..combo::Settings::factory() });
+    helper.continue_with(target);
+    let clean = combo::Summary { outcome: combo::Outcome::Completed, graded: 1, true_links: 1, total: 1, clean: true, fault: None };
+    let mut chips = [Text::EMPTY; crate::model::panes::cb::CHIPS];
+    chips[0] = Text::new(long);
+    let seq = combo_plan::SeqView {
+        name: Short::new(long).text(),
+        at: 1,
+        steps: 2,
+        streak: 0,
+        best: 0,
+        first: 0,
+        chips,
+        last: Some(Stepped { step: 0, summary: clean, advance: Advance::Next(1) }),
+        last_name: Text::new(long),
+    };
+    let mut card = vec![Look::HIDDEN; combo_plan::COUNT];
+    combo_plan::Renderer::new().draw(&helper, &Text::EMPTY, Some(&seq), true, (&C, false), |i, look, _| card[i] = *look);
+    let on_card = |i: usize| String::from_utf16(card[i].text.units()).unwrap();
+    assert_eq!(on_card(combo_plan::at::SEQ_LANDED), long[..SHORT_UNITS]);
+    assert_eq!(on_card(combo_plan::at::SEQ_CHIP_TEXT), format!("1  {}", &long[..SHORT_UNITS - 3]));
+
+    // Parry's pill is 96 units wide: Tech's words keep their first 24 units there.
+    use crate::model::parry::{Attempt, View};
+    let mut view = View::EMPTY;
+    view.last[0] = Some(Attempt { grade: crate::model::tech::session::Grade::Unavailable, hit: 1, window: None });
+    let mut strip = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw_parry(&Tracker::new(), true, false, Some(&view), |i, look, _| strip[i] = *look);
+    assert_eq!(String::from_utf16(strip[at::PILL_TEXT].text.units()).unwrap(), "Grading unavailable (not");
+
+    // The LAST row's moves are fitted to the gap before the next pill.
+    let tracker = directional_combo(Move::DashAttack, Move::DashAttack, None, None);
+    let (_, seen) = draw_all(&mut Renderer::new(), &tracker, true);
+    assert_eq!(String::from_utf16(look_at(&seen, at::MOVE_TEXT).text.units()).unwrap(), "Dash attack>Dash attack");
 }
 
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.

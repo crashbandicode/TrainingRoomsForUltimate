@@ -46,16 +46,17 @@ impl LayoutSpec {
         }
     }
 
-    /// Fighter anchors and pane bounds use the HUD canvas, with y increasing upward.
+    /// Fighter anchors and pane bounds use the HUD canvas, with y increasing upward. `card`: the card drawn (a
+    /// sequence's or a single combo's) and the lines of its reason, which grow it.
     pub fn opacity(
         &self,
         drop: f32,
         history: bool,
-        card: Option<bool>,
+        card: Option<(bool, usize)>,
         anchors: impl IntoIterator<Item = [f32; 2]>,
     ) -> u8 {
         let strip = self.strip.bounds(history, card.is_some());
-        let card = card.map(|sequence| self.card.bounds(sequence));
+        let card = card.map(|(sequence, reason_lines)| self.card.grown(sequence, reason_lines));
         let hits = |[x, y, w, h]: [f32; 4], [fx, fy]: [f32; 2]| {
             (fx - (x + self.strip.origin_x)).abs() <= w / 2.0
                 && (fy - (y + self.strip.origin_y - drop)).abs() <= h / 2.0
