@@ -349,6 +349,7 @@ fn run_inner() {
         cpu_core_on && recording_on && state_on && hitbox_on && capabilities::unit_usable(Feature::RecordPlace, &usable)
     );
 
+    crate::runtime::features::move_names::register();
     // Package 5: the menu's layout archive hook, UI anchors and input callers (only when the closure holds).
     let ui_install = if capabilities::unit_usable(Feature::Ui, &usable) {
         ui::install(&*loaded, input_delay_on, ui_found)

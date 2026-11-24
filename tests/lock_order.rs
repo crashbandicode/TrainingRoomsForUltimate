@@ -1016,6 +1016,7 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("cpu_common::change_status_body", "the game enters change_status_hook; its assembly tail branch is followed through tech_callbacks::EDGES"),
     ("imp::detached", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
     ("imp::joined", "a plugin thread's start (runtime::threads); its thread is walked from model::thread_stacks"),
+    ("move_names::mounted", "ARCropolis's ModFilesystemMounted callback, run on ARCropolis's thread: one atomic store, no lock and no call"),
     ("native_service::training_mod_native_service_pre", NATIVE_SERVICE_HALF),
     ("native_service::training_mod_native_service_post", NATIVE_SERVICE_HALF),
     ("inline_keyboard::changed", KEYBOARD_CALLBACK),

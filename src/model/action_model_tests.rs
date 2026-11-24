@@ -112,7 +112,7 @@ fn a_specials_first_aim_stays_in_its_step_however_late() {
         vec![Kind::Press(Button::Special), Kind::Release(Button::Special), Kind::Aim(1)]
     );
     assert_eq!(step.events().last().map(|e| e.dir), Some(Dir::BackUp));
-    let lines = crate::model::recording_menu::combo_link_lines(&drill);
+    let lines = crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::OFF);
     assert_eq!(lines.len(), 2, "the list shows one step and its one event line: {lines:?}");
     assert_eq!(lines[0], "S1 Step 1");
 }
@@ -515,7 +515,7 @@ fn the_bar_and_the_menu_name_a_link_as_the_strip_does() {
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
     let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo)[0], "L1 jab → side tilt ↑ TRUE");
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0], "L1 jab → side tilt ↑ TRUE");
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
     let mut texts = Vec::new();
@@ -581,7 +581,8 @@ fn a_link_record_keeps_its_size() {
 #[test]
 fn the_description_holds_no_names() {
     let source = include_str!("action.rs");
-    assert_eq!(source.matches(".name()").count(), 1);
+    assert_eq!(source.matches(".name()").count(), 0);
+    assert_eq!(source.matches("namer.name(").count(), 1, "the one name call goes through the move names");
     for name in [r#""Jab""#, r#""Up B""#, r#""Side tilt""#] {
         assert!(!source.contains(name));
     }
@@ -759,7 +760,7 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
     let value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["schema_version"], 2);
     assert_eq!(value["kind"], "input_drill");
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo), vec!["S1 Step 1", "↑→ A · release"]);
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF), vec!["S1 Step 1", "↑→ A · release"]);
 }
 
 fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
@@ -1063,7 +1064,7 @@ fn a_later_links_first_move_borrows_its_travel_arrows() {
     let second = *hit_record("up_special", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
     let combo = Combo::from_links([first, second]).unwrap();
     let heads = |combo: &Combo| -> Vec<String> {
-        crate::model::recording_menu::combo_link_lines(combo).into_iter()
+        crate::model::recording_menu::combo_link_lines(combo, crate::model::move_names::Namer::OFF).into_iter()
             .filter(|line| line.starts_with('L') && line.contains(" → ")).collect()
     };
     assert_eq!(heads(&combo), vec!["L1 jab → up b ← → TRUE", "L2 up b ← → → side tilt ↑ TRUE"]);

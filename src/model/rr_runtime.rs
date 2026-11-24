@@ -368,19 +368,19 @@ pub struct MakeComboPass {
 }
 
 /// The strip's combo, named Combo N, marked made from `source`. The drill is not written.
-pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
-    save_combo(root, combo, source, recorded_on, None, at)
+pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, at: u64) -> Result<String, Error> {
+    save_combo(root, combo, source, recorded_on, fighter, None, at)
 }
 
 /// A directly recorded input drill (F10): saved as Drill N like a made combo, with the macro file that holds its
 /// take named in the drill's `take`. No source: `made_from` stays empty.
 /// If the drill file cannot be written the take is deleted, so no take is left under MACROS. Once the drill file
 /// exists both files stay, also when the index update then fails.
-pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, take: String, at: u64) -> Result<String, Error> {
-    save_combo(root, combo, "", recorded_on, Some(take), at)
+pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: String, at: u64) -> Result<String, Error> {
+    save_combo(root, combo, "", recorded_on, fighter, Some(take), at)
 }
 
-fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, take: Option<String>, at: u64) -> Result<String, Error> {
+fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: Option<String>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let cleanup = || {
         if let Some(take) = take.as_deref() {
@@ -391,6 +391,7 @@ fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<Stri
     let prefix = if combo.input_only { "Drill" } else { "Combo" };
     let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
     let mut made = ComboRecord::new(name, *combo, recorded_on);
+    made.fighter = fighter;
     if !source.is_empty() { made = made.with_made_from(source); }
     if let Some(take) = take.as_deref() { made = made.with_take(take); }
     let id = library.save_new(&made).map_err(|err| { cleanup(); record(err) })?;
@@ -430,13 +431,15 @@ pub fn delete_combo(root: &Path, id: &str) -> bool {
 
 /// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange, named `name` (empty:
 /// Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md: "makes it the drill").
-pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, at: u64) -> Result<String, Error> {
+pub fn save_last_combo(root: &Path, combo: &Combo, name: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let name = match clean_name(name) {
         Some(name) => name,
         None => default_name(&library.list().map_err(record)?.entries),
     };
-    let id = library.save_new(&ComboRecord::new(name, *combo, recorded_on)).map_err(record)?;
+    let mut made = ComboRecord::new(name, *combo, recorded_on);
+    made.fighter = fighter;
+    let id = library.save_new(&made).map_err(record)?;
     RecordingIndex::update(root, |index| {
         index.note_use(Kind::Combo, &id, Use::Recorded, at)?;
         index.set_drill(Some(super::library::Drill { kind: super::library::DrillKind::Combo, id: id.clone() }), at)?;
@@ -684,7 +687,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                 recorded_on: file.recorded_on.unwrap_or_default(),
                 made_from: file.made_from,
                 take: file.take,
-                links: crate::model::recording_menu::combo_link_lines(&file.combo),
+                combo: Box::new(file.combo),
+                fighter: file.fighter,
                 span: file.combo.len() as u32,
             })
         }
@@ -1026,7 +1030,7 @@ mod tests {
         step.events[0] = Some(Event::press(Button::Jump, Aim::Neutral, 0));
         let mut combo = Combo::from_links([step]).unwrap();
         combo.input_only = true;
-        assert!(save_drill_with_take(&root, &combo, None, take, 1).is_err());
+        assert!(save_drill_with_take(&root, &combo, None, None, take, 1).is_err());
         assert!(macros.list().unwrap().entries.is_empty());
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -1045,7 +1049,7 @@ mod tests {
         let first = vec![frame(1), frame(0)];
         let second = vec![frame(2), frame(0)];
         let take1 = save_drill_take(&root, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        assert!(save_drill_with_take(&root, &input_drill(), None, take1.clone(), 1).is_err());
+        assert!(save_drill_with_take(&root, &input_drill(), None, None, take1.clone(), 1).is_err());
         let combos = ComboLibrary::new(root.join("combos"));
         let macros = Library::new(root.join(MACROS_DIR));
         let entries = combos.list().unwrap().entries;
@@ -1055,7 +1059,7 @@ mod tests {
         assert_eq!(macros.load(&take1).unwrap().frames, first);
         std::fs::remove_dir(root.join(INDEX_FILE)).unwrap();
         let take2 = save_drill_take(&root, second.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill2 = save_drill_with_take(&root, &input_drill(), None, take2.clone(), 1).unwrap();
+        let drill2 = save_drill_with_take(&root, &input_drill(), None, None, take2.clone(), 1).unwrap();
         assert_ne!(take1, take2);
         assert!(delete_combo(&root, &drill1));
         assert!(macros.load(&take1).is_err());
@@ -1069,9 +1073,9 @@ mod tests {
         let first = vec![frame(1), frame(0)];
         let second = vec![frame(2), frame(0)];
         let take_a = save_drill_take(&a, first.clone(), StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill_a = save_drill_with_take(&a, &input_drill(), None, take_a.clone(), 1).unwrap();
+        let drill_a = save_drill_with_take(&a, &input_drill(), None, None, take_a.clone(), 1).unwrap();
         let take_b = save_drill_take(&b, second, StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill_b = save_drill_with_take(&b, &input_drill(), None, take_b.clone(), 1).unwrap();
+        let drill_b = save_drill_with_take(&b, &input_drill(), None, None, take_b.clone(), 1).unwrap();
         assert_ne!(take_a, take_b);
         std::fs::copy(b.join("combos").join(format!("{drill_b}.json")), a.join("combos").join("copied.json")).unwrap();
         let combos = ComboLibrary::new(a.join("combos"));
@@ -1086,7 +1090,7 @@ mod tests {
     fn a_take_two_drill_files_name_survives_the_first_delete() {
         let root = scratch("drill-shared-take");
         let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, None, take.clone(), 1).unwrap();
         std::fs::copy(root.join("combos").join(format!("{drill}.json")), root.join("combos").join("copied.json")).unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
         assert!(delete_combo(&root, "copied"));
@@ -1098,7 +1102,7 @@ mod tests {
     fn a_skipped_combo_file_does_not_keep_a_deleted_drills_take() {
         let root = scratch("drill-skipped-combo");
         let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill = save_drill_with_take(&root, &input_drill(), None, take, 1).unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, None, take, 1).unwrap();
         let typo = root.join("combos").join("typo.json");
         std::fs::write(&typo, br#"{"schema_version":1,"name":"Typo","links":[{"from":"aerial","to":"aeria","verdict":{"kind":"true","link":-2},"steps":[{"button":"jump","aim":"neutral","offset":2}]}]}"#).unwrap();
         let combos = ComboLibrary::new(root.join("combos"));
@@ -1113,7 +1117,7 @@ mod tests {
     fn a_combo_folder_that_cannot_be_read_refuses_the_delete_and_keeps_the_pair() {
         let root = scratch("drill-unreadable-combos");
         let take = save_drill_take(&root, vec![frame(1), frame(0)], StartState::neutral(8, 0, 1.0), false, 1).unwrap().unwrap();
-        let drill = save_drill_with_take(&root, &input_drill(), None, take.clone(), 1).unwrap();
+        let drill = save_drill_with_take(&root, &input_drill(), None, None, take.clone(), 1).unwrap();
         let dir = root.join("combos");
         let held = root.join("combos-held");
         let hook_dir = dir.clone();
@@ -1577,7 +1581,8 @@ mod tests {
                 name: "One".into(),
                 recorded_on: String::new(),
                 made_from: None,
-                links: Vec::new(),
+                combo: Box::new(Combo::EMPTY),
+                fighter: None,
                 span: 0,
             }],
             sequences: vec![SequenceFile {

@@ -409,6 +409,10 @@ game_constants! {
     WorkFlagNameCursor = "FIGHTER_INSTANCE_WORK_ID_FLAG_NAME_CURSOR",
     // Fix round 2026-11-23 (F11): the game shows its off-screen magnifier for this fighter (set by `main+0x62a560`).
     WorkFlagIsLoupe = "FIGHTER_INSTANCE_WORK_ID_FLAG_IS_LOUPE",
+    CustomNeutral = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_N_NO",
+    CustomSide = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_S_NO",
+    CustomUp = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_HI_NO",
+    CustomDown = "FIGHTER_INSTANCE_WORK_ID_INT_CUSTOMIZE_SPECIAL_LW_NO",
 }
 
 /// The statuses of the clatter list, in the spec's order.
