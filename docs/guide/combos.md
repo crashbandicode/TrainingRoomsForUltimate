@@ -175,7 +175,8 @@ a release or first aim does not split on that gap. A second aim starts a step, a
 another. On load, a step beginning with a release or first aim joins its predecessor if both fit in 12 events; the
 file is not changed by loading. A whole-step crop rebases the retained events from the new first event. An optional
 `from_shown` and `to_shown` on each step store the first and last move's `move` and optional `of`, `angle` and
-`variant` for display; a single input uses `to_shown`. Grading still checks inputs.
+`variant` for display; a single input uses `to_shown`. A later special direction keeps the continued special in
+`from_shown` and any last input of its own in `to_shown`. Grading still checks inputs.
 No hit, spot, window or TRUE verdict is stored or graded. A release is required when its press is in the drill. Optional
 `recorded_on` and `made_from` have the same meaning as on hit combos; direct recordings have no `made_from`.
 Renaming preserves the kind and unknown metadata. Schema-1 files remain readable.

@@ -526,10 +526,10 @@ impl Plan<'_> {
                 if input {
                     let mut count = super::frame_strip_plan::Tally(0);
                     let _ = write!(count, "{} ", k + 1);
-                    let _ = reference.write_title(&mut count, false);
+                    let _ = reference.write_title(&mut count, false, " > ");
                     let tight = count.0 > usize::from(super::panes::cb::units(TITLE + c));
                     let _ = write!(text, "{} ", k + 1);
-                    let _ = reference.write_title(&mut text, tight);
+                    let _ = reference.write_title(&mut text, tight, if tight { ">" } else { " > " });
                 } else {
                     let _ = write!(text, "{} ", k + 1);
                     let _ = reference.desc(0).write(&mut text, false);

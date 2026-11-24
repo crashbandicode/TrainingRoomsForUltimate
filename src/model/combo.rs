@@ -269,14 +269,6 @@ impl LinkRec {
         self.description_bits(0) & 31 != 0 && self.description_bits(1) & 31 != 0
     }
 
-    pub fn step_desc(&self) -> Option<ActionDesc> {
-        self.step_side(1)
-    }
-
-    pub fn set_step(&mut self, desc: ActionDesc) {
-        self.set_step_side(1, Some(desc));
-    }
-
     fn is_special(desc: ActionDesc) -> bool {
         desc.of.is_some() || matches!(desc.mv,
             Move::NeutralSpecial | Move::SideSpecial | Move::UpSpecial | Move::DownSpecial)
@@ -308,37 +300,80 @@ impl LinkRec {
         if side == 0 { self.from = mv; } else { self.to = mv; }
     }
 
-    fn origin_ends(&self) -> (Option<Event>, Option<Event>) {
-        let mut origins = self.events().filter(|event| action::originates(event.kind));
-        (origins.next(), origins.last())
+    fn title_buttons(&self) -> bool {
+        self.events().any(|event| matches!(event.kind, Kind::Press(_) | Kind::CStick))
     }
 
-    fn origin_side(&self, origin: Event) -> Option<usize> {
-        let (first, last) = self.origin_ends();
+    fn aim_led(&self) -> bool {
+        matches!(self.events().next().map(|event| event.kind), Some(Kind::Aim(2..)))
+    }
+
+    fn title_ends(&self) -> (Option<Event>, Option<Event>) {
+        let buttons = self.title_buttons();
+        let mut first = None;
+        let mut last: Option<Event> = None;
+        for event in self.events().filter(|event| {
+            if buttons { matches!(event.kind, Kind::Press(_) | Kind::CStick) }
+            else { matches!(event.kind, Kind::Flick(_)) }
+        }) {
+            if let Some(previous) = last {
+                if previous.offset != event.offset {
+                    if first.is_none() { first = Some(previous); }
+                    last = Some(event);
+                } else if event.kind == Kind::CStick {
+                    last = Some(event);
+                }
+            } else {
+                last = Some(event);
+            }
+        }
+        if first.is_some() { (first, last) } else { (last, None) }
+    }
+
+    fn title_side(&self, offset: i32) -> Option<usize> {
+        let (first, last) = self.title_ends();
+        if self.aim_led() {
+            return last.or(first).filter(|event| event.offset == offset).map(|_| 1);
+        }
         match (first, last) {
-            (Some(first), Some(_)) if first == origin => Some(0),
-            (_, Some(last)) if last == origin => Some(1),
-            (Some(first), None) if first == origin => Some(1),
+            (Some(first), Some(_)) if first.offset == offset => Some(0),
+            (_, Some(last)) if last.offset == offset => Some(1),
+            (Some(first), None) if first.offset == offset => Some(1),
             _ => None,
         }
     }
 
-    pub fn write_title(&self, out: &mut impl core::fmt::Write, tight: bool) -> core::fmt::Result {
-        match self.origin_ends() {
+    pub fn write_title(&self, out: &mut impl core::fmt::Write, tight: bool, separator: &str) -> core::fmt::Result {
+        let (first, last) = self.title_ends();
+        if self.aim_led() {
+            if let Some(desc) = self.step_side(0) {
+                desc.write(out, tight)?;
+                if let Some(event) = last.or(first) {
+                    out.write_str(separator)?;
+                    return Self::write_step_input(out, self.step_side(1), event, tight);
+                }
+                return Ok(());
+            }
+            if let Some(event) = last.or(first) {
+                return Self::write_step_input(out, self.step_side(1), event, tight);
+            }
+        }
+        match (first, last) {
             (Some(first), Some(last)) => {
                 Self::write_step_input(out, self.step_side(0), first, tight)?;
-                out.write_str(if tight { ">" } else { " > " })?;
+                out.write_str(separator)?;
                 Self::write_step_input(out, self.step_side(1), last, tight)
             }
             (Some(first), None) => Self::write_step_input(out, self.step_side(1), first, tight),
             (None, _) => {
-                if let Some(desc) = self.step_side(1) { return desc.write(out, tight); }
+                if let Some(desc) = self.step_side(1).or_else(|| self.step_side(0)) { return desc.write(out, tight); }
                 if let Some(event) = self.events().next() { return Self::write_step_input(out, None, event, tight); }
                 Ok(())
             }
         }
     }
 
+    /// Title flick names are capitalised; `event_label` uses mid-sentence fault words.
     fn write_step_input(out: &mut impl core::fmt::Write, desc: Option<ActionDesc>, event: Event, tight: bool) -> core::fmt::Result {
         if let Some(desc) = desc { return desc.write(out, tight); }
         let label = match event.kind {
@@ -550,23 +585,27 @@ impl Combo {
             if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::Aim(1)))
                 && count + current.events().count() <= STEPS
             {
-                let (p_first, p_last) = previous.origin_ends();
-                let (c_first, c_last) = current.origin_ends();
-                let (from, to) = match (p_first, p_last, c_first, c_last) {
-                    (Some(_), last, Some(_), _) =>
-                        (if last.is_some() { previous.step_side(0) } else { previous.step_side(1) }, current.step_side(1)),
-                    (Some(_), last, None, _) =>
-                        (last.and_then(|_| previous.step_side(0)), previous.step_side(1)),
-                    (None, _, Some(_), last) =>
-                        (last.and_then(|_| current.step_side(0)), current.step_side(1)),
-                    (None, _, None, _) => (None, previous.step_side(1).or_else(|| current.step_side(1))),
-                };
-                let previous = self.links[k - 1].as_mut().unwrap();
-                for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
+                let merged = self.links[k - 1].as_mut().unwrap();
+                for (slot, event) in merged.events[count..].iter_mut().zip(current.events()) {
                     *slot = Some(event);
                 }
-                previous.set_step_side(0, from);
-                previous.set_step_side(1, to);
+                let buttons = merged.title_buttons();
+                let description = |event: Option<Event>| event.and_then(|event| {
+                    [current, previous].into_iter().find_map(|link| {
+                        if buttons && !link.title_buttons() { return None; }
+                        link.title_side(event.offset).and_then(|side| link.step_side(side))
+                    })
+                });
+                let (first, last) = merged.title_ends();
+                let (from, to) = if merged.aim_led() {
+                    (previous.step_side(0), description(last.or(first)))
+                } else if last.is_some() {
+                    (description(first), description(last))
+                } else {
+                    (None, description(first))
+                };
+                merged.set_step_side(0, from);
+                merged.set_step_side(1, to);
                 self.links.copy_within(k + 1..self.len, k);
                 self.len -= 1;
                 self.links[self.len] = None;
@@ -1689,43 +1728,43 @@ impl InputCapture {
                 } else { None };
                 if !self.combo.push(LinkRec::INPUT) { return None; }
                 if let Some(desc) = previous {
-                    self.combo.links[self.combo.len - 1].as_mut().unwrap().set_step(desc);
+                    self.combo.links[self.combo.len - 1].as_mut().unwrap().set_step_side(0, Some(desc));
                 }
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
-            if action::originates(event.kind) {
-                let (first, last) = link.origin_ends();
-                if first.is_some() && last.is_none() {
-                    link.set_step_side(0, link.step_side(1));
-                } else if first.is_none() {
-                    link.set_step_side(0, None);
+            let offset = (event.frame - start) as i32;
+            let buttons = link.title_buttons();
+            let button = matches!(event.kind, Kind::Press(_) | Kind::CStick);
+            if button || (!buttons && matches!(event.kind, Kind::Flick(_))) {
+                let (first, last) = link.title_ends();
+                let old_last = last.or(first);
+                if button && !buttons && first.is_some() {
+                    if !link.aim_led() { link.set_step_side(0, None); }
+                    link.set_step_side(1, None);
+                } else if old_last.is_none_or(|old| old.offset != offset) {
+                    if !link.aim_led() {
+                        if first.is_some() && last.is_none() {
+                            link.set_step_side(0, link.step_side(1));
+                        } else if first.is_none() {
+                            link.set_step_side(0, None);
+                        }
+                    }
+                    link.set_step_side(1, None);
                 }
-                link.set_step_side(1, None);
             }
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
                 kind: event.kind,
                 dir: event.dir,
-                offset: (event.frame - start) as i32,
+                offset,
             });
             self.last = Some(event.frame);
         }
         if let Some((Some(press), mv, of, normal)) = late.named {
             if let Some(first) = self.first.filter(|&first| press >= first) {
                 let offset = (press - first) as i32;
-                let pressed = self.combo.links().flat_map(|link| link.events()).find(|event| {
-                    event.offset == offset && matches!(event.kind, Kind::Press(_))
+                let found = self.combo.links().enumerate().find_map(|(step, link)| {
+                    link.title_side(offset).map(|side| (step, side))
                 });
-                let gesture = pressed.and_then(|event| match event.kind {
-                    Kind::Press(Button::Attack) => Some(Kind::CStick),
-                    Kind::Press(Button::Jump) => Some(Kind::Flick(Flick::TapJump)),
-                    _ => None,
-                });
-                let origin = gesture.and_then(|kind| {
-                    self.combo.links().flat_map(|link| link.events()).find(|event| event.offset == offset && event.kind == kind)
-                }).or(pressed);
-                let found = origin.and_then(|origin| self.combo.links().enumerate().find_map(|(step, link)| {
-                    link.origin_side(origin).map(|side| (step, side))
-                }));
                 if let Some((step, side)) = found {
                     let link = self.combo.links[step].as_mut().unwrap();
                     let angle = link.step_side(side).filter(|desc| desc.mv == mv).and_then(|desc| desc.angle);
@@ -1747,7 +1786,7 @@ impl InputCapture {
                 });
                 if let Some((step, index)) = chosen {
                     let link = self.combo.links[step].as_mut().unwrap();
-                    if let Some(side) = link.events[index].and_then(|event| link.origin_side(event)) {
+                    if let Some(side) = link.title_side(offset) {
                         if let Some(mut desc) = link.step_side(side) {
                             desc.angle = angle;
                             link.set_step_side(side, Some(desc));

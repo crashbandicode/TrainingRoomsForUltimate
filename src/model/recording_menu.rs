@@ -2276,8 +2276,8 @@ pub fn combo_link_lines(combo: &Combo) -> Vec<String> {
     combo.links().enumerate().flat_map(|(index, link)| {
         if combo.input_only {
             let mut title = String::new();
-            let _ = link.write_title(&mut title, false);
-            let mut lines = vec![format!("S{} {}", index + 1, title.replace(" > ", " → ").to_ascii_lowercase())];
+            let _ = link.write_title(&mut title, false, " → ");
+            let mut lines = vec![format!("S{} {}", index + 1, title.to_ascii_lowercase())];
             if let Some(events) = event_line(link) { lines.push(events); }
             lines
         } else { link_panel_lines(index, link) }

@@ -177,7 +177,8 @@ More: [Combos](../guide/recording.md#combos),
 
 Practise movement without hitting the opponent: **A** on **COMBOS → DRILLS > → + Record drill…** arms a Player 1 take, then **ZR + D-pad Down** starts and stops it with the default Record chord.
 
-Each step shows its first and last moves, or the originating inputs when no move was recorded; grading still checks inputs.
+Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
+as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
 
 The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
 

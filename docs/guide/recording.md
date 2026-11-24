@@ -192,7 +192,8 @@ recorded one.
 
 **DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Crop and Delete, plus Made from when a macro or chain made it.
 
-Each step shows its first and last moves, or the originating inputs when no move was recorded; grading still checks inputs.
+Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
+as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
 
 - **Record directly:** choose **+ Record drill…**. The library closes and shows the configured Record chord. Press that chord to start recording Player 1, then press it again to stop and save the take straight as a drill. It becomes the current grading target. This one take uses Player 1 even if the pop-up's Record role is CPU; later ordinary recordings keep their selected role. Opening the library before starting cancels the armed take. The menu press and the Record chords are excluded. The take's inputs are kept with the drill in a file of its own; it is not listed under MACROS and is deleted with the drill.
 - **From a macro or chain:** Make combo saves an input drill when the pass touches no opponent. A pass with hit links keeps making a hit combo. The source and current grading target stay selected as before.

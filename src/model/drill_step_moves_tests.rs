@@ -31,7 +31,7 @@ fn event(kind: Kind, dir: Dir, offset: i32) -> Event {
 
 fn step(events: impl IntoIterator<Item = Event>, description: ActionDesc) -> LinkRec {
     let mut step = LinkRec { events: retain(events), ..LinkRec::INPUT };
-    step.set_step(description);
+    step.set_step_side(1, Some(description));
     step
 }
 
@@ -43,7 +43,7 @@ fn drill(steps: impl IntoIterator<Item = LinkRec>) -> Combo {
 
 fn title(step: &LinkRec, tight: bool) -> String {
     let mut text = String::new();
-    step.write_title(&mut text, tight).unwrap();
+    step.write_title(&mut text, tight, if tight { ">" } else { " > " }).unwrap();
     text
 }
 
@@ -75,10 +75,10 @@ fn zip_sample(attack: Move, pos: Option<(f32, f32)>) -> Sample {
         pos: Some(pos.unwrap_or((0.0, 0.0))), facing: 1, ..Sample::default() }
 }
 
-fn zips_capture(second: bool) -> (Tracker, InputCapture) {
+fn zips_capture(second: bool, startup: usize) -> (Tracker, InputCapture) {
     let mut tracker = Tracker::new();
     let mut capture = InputCapture::new();
-    for frame in 0..14 {
+    for frame in 0..startup {
         tick(&mut tracker, &mut capture, zip_sample(Move::UpSpecial, None),
             MappedInputs { buttons: if frame < 3 { 2 } else { 0 }, lstick_y: 127, ..MappedInputs::NEUTRAL });
     }
@@ -100,12 +100,12 @@ fn zips_capture(second: bool) -> (Tracker, InputCapture) {
 }
 
 fn zips(second: bool) -> Combo {
-    zips_capture(second).1.combo
+    zips_capture(second, 14).1.combo
 }
 
 #[test]
 fn a_drill_step_stores_the_move_its_press_became() {
-    assert_eq!(jab().get(0).unwrap().step_desc().map(|d| d.mv), Some(Move::Jab));
+    assert_eq!(jab().get(0).unwrap().step_side(1).map(|d| d.mv), Some(Move::Jab));
 }
 
 fn two_described() -> Combo {
@@ -122,7 +122,7 @@ fn two_described() -> Combo {
 }
 
 fn side(link: &LinkRec, side: usize) -> Option<ActionDesc> {
-    (link.description_bits(side) & 31 != 0).then(|| link.desc(side))
+    link.step_side(side)
 }
 
 #[test]
@@ -249,13 +249,18 @@ fn a_stick_flick_is_a_title_input_only_without_a_button() {
 
 #[test]
 fn a_later_aim_parts_step_keeps_its_special_before_a_new_press() {
-    let (mut tracker, mut capture) = zips_capture(true);
+    let (mut tracker, mut capture) = zips_capture(true, 18);
     let plain = ComboRecord::new("Drill".into(), capture.combo, None);
     let value = serde_json::to_value(&plain).unwrap();
     assert_eq!(bar(plain.combo)[1], "2 Up B →");
     assert_eq!(value["input_steps"][1]["from_shown"], serde_json::json!({"move":"up_special"}));
     assert!(value["input_steps"][1].get("to_shown").is_none());
     assert_eq!(serde_json::from_value::<ComboRecord>(value).unwrap(), plain);
+    let own = ComboRecord::new("Drill".into(), zips(true), None);
+    let value = serde_json::to_value(&own).unwrap();
+    assert_eq!(value["input_steps"][1]["from_shown"],
+        serde_json::json!({"move":"other", "of":"up_special"}));
+    assert_eq!(bar(own.combo)[1], "2 Up B →");
 
     tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
@@ -438,9 +443,9 @@ fn an_own_status_updates_the_same_press_without_losing_its_base() {
     let mut capture = InputCapture::new();
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 2, lstick_y: 127, ..MappedInputs::NEUTRAL });
     tick(&mut tracker, &mut capture, zip_sample(Move::UpSpecial, None), MappedInputs::NEUTRAL);
-    assert_eq!(capture.combo.get(0).unwrap().step_desc().map(|d| d.mv), Some(Move::UpSpecial));
+    assert_eq!(capture.combo.get(0).unwrap().step_side(1).map(|d| d.mv), Some(Move::UpSpecial));
     tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((0.0, 0.0))), MappedInputs::NEUTRAL);
-    let described = capture.combo.get(0).unwrap().step_desc();
+    let described = capture.combo.get(0).unwrap().step_side(1);
     assert_eq!(described.map(|d| (d.mv, d.of)), Some((Move::Other, Some(Move::UpSpecial))));
     assert_eq!(title(capture.combo.get(0).unwrap(), false), "Up B");
 }
@@ -455,7 +460,7 @@ fn a_move_buffered_before_the_take_does_not_describe_a_later_step() {
     tick(&mut tracker, &mut capture, idle(), MappedInputs::NEUTRAL);
     tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 8, ..MappedInputs::NEUTRAL });
     assert_eq!(capture.combo.len(), 1);
-    assert_eq!(capture.combo.get(0).unwrap().step_desc(), None);
+    assert_eq!(capture.combo.get(0).unwrap().step_side(1), None);
 }
 
 #[test]
@@ -466,8 +471,8 @@ fn a_step_is_described_by_the_links_own_packing() {
         desc(Move::Throw, None, None, 22),
     ] {
         let mut rec = LinkRec::INPUT;
-        rec.set_step(expected);
-        assert_eq!(rec.step_desc(), Some(expected));
+        rec.set_step_side(1, Some(expected));
+        assert_eq!(rec.step_side(1), Some(expected));
     }
     assert_eq!(core::mem::size_of::<LinkRec>(), 124);
 }
@@ -507,8 +512,8 @@ fn a_step_whose_action_never_opened_shows_its_input() {
     capture.step(Snap { buttons: 4, lstick_y: 127, facing: 1, ..Snap::empty(30) });
     let combo = capture.combo;
     assert_eq!(combo.len(), 2);
-    assert_eq!(combo.get(0).unwrap().step_desc(), None);
-    assert_eq!(combo.get(1).unwrap().step_desc(), None);
+    assert_eq!(combo.get(0).unwrap().step_side(1), None);
+    assert_eq!(combo.get(1).unwrap().step_side(1), None);
     assert_eq!(bar(combo)[..2], ["1 Shield", "2 Jump ↑"]);
     assert_eq!(combo_link_lines(&combo)[0], "S1 shield");
     assert_eq!(combo_link_lines(&combo)[2], "S2 jump ↑");
@@ -559,7 +564,7 @@ fn a_steps_move_survives_saving_and_reloading() {
     assert_eq!(value["input_steps"][0]["to_shown"], serde_json::json!({"move":"side_tilt","angle":"up"}));
     let read: ComboRecord = serde_json::from_value(value).unwrap();
     assert_eq!(read, record);
-    assert_eq!(read.combo.get(0).unwrap().step_desc(), step.step_desc());
+    assert_eq!(read.combo.get(0).unwrap().step_side(1), step.step_side(1));
     assert_eq!(combo_link_lines(&read.combo), combo_link_lines(&record.combo));
 }
 
@@ -601,7 +606,7 @@ fn a_joined_split_step_keeps_its_move() {
     });
     let read: ComboRecord = serde_json::from_value(value).unwrap();
     assert_eq!(read.combo.len(), 1);
-    assert_eq!(read.combo.get(0).unwrap().step_desc().map(|d| (d.mv, d.parts[0])),
+    assert_eq!(read.combo.get(0).unwrap().step_side(1).map(|d| (d.mv, d.parts[0])),
         Some((Move::UpSpecial, Some(Dir::Back))));
     assert_eq!(combo_link_lines(&read.combo)[0], "S1 up b ←");
 }
@@ -614,8 +619,8 @@ fn a_cropped_drill_keeps_each_steps_move() {
         step([event(Kind::Press(Button::Grab), Dir::Neutral, 60)], desc(Move::Grab, None, None, 18)),
     ];
     let cropped = ComboRecord::new("Drill".into(), drill(steps), None).crop_units(1, 3).unwrap();
-    assert_eq!(cropped.combo.get(0).unwrap().step_desc(), Some(desc(Move::SideTilt, None, Some(Angle::Up), 0)));
-    assert_eq!(cropped.combo.get(1).unwrap().step_desc(), Some(desc(Move::Grab, None, None, 18)));
+    assert_eq!(cropped.combo.get(0).unwrap().step_side(1), Some(desc(Move::SideTilt, None, Some(Angle::Up), 0)));
+    assert_eq!(cropped.combo.get(1).unwrap().step_side(1), Some(desc(Move::Grab, None, None, 18)));
     assert_eq!(combo_link_lines(&cropped.combo)[0], "S1 side tilt ↑");
     assert_eq!(combo_link_lines(&cropped.combo)[2], "S2 grab");
 }
@@ -665,7 +670,7 @@ fn a_grab_step_becomes_a_throw_when_it_throws() {
         facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
     assert_eq!(capture.combo.len(), 1);
     assert_eq!(title(capture.combo.get(0).unwrap(), false), "Throw");
-    assert_eq!(capture.combo.get(0).unwrap().step_desc().unwrap().normal, 22);
+    assert_eq!(capture.combo.get(0).unwrap().step_side(1).unwrap().normal, 22);
 }
 
 #[test]
@@ -681,7 +686,7 @@ fn an_old_drill_file_shows_its_inputs_and_is_written_back_unchanged() {
             }));
         }
         let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
-        assert_eq!(read.combo.get(0).unwrap().step_desc(), None);
+        assert_eq!(read.combo.get(0).unwrap().step_side(1), None);
         assert_eq!(bar(read.combo)[0], "1 Special ↑");
         assert_eq!(combo_link_lines(&read.combo)[0], "S1 special ↑");
         if version == 4 {
