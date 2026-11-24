@@ -247,7 +247,7 @@ fn the_same_content_can_be_placed_in_a_second_layout() {
     use crate::model::{frame_strip::Tracker, frame_strip_plan as strip_plan};
     second.keep_drill_history = true;
     let mut rule = strip_plan::Look::HIDDEN;
-    let (_, _, history) = strip_plan::Renderer::new().draw_with_spec(
+    let (_, history) = strip_plan::Renderer::new().draw_with_spec(
         &Tracker::new(), strip_plan::StripDraw { shown: true, spots: false, parry: None, history_enabled: true, cells: true, spec: &second },
         |i, look, _| {
             if i == strip_plan::at::SEPARATOR + 1 {

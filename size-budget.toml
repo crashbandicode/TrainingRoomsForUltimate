@@ -2617,6 +2617,46 @@ approved_by = "tr-primary-2 ruling 2026-11-23 23:55:15Z (the Player-role line go
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 197088
+date = "2026-11-24"
+reason = "The bridge publishes the true open recording list and depth. Measured 197088, 36 above base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 15:47:29Z (line budget +36 approved for fix/bridge-open-list; the change was ordered 15:04:33Z)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197089
+date = "2026-11-24"
+reason = "A Recording screen with no row publishes no list instead of the page under it. Measured 197089, 1 above f6a9be34's measured 197088."
+approved_by = "tr-primary-2 ruling 2026-11-24 15:56:58Z (line-budget raise at the measured value approved for the empty-overlay fix on fix/bridge-open-list)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197121
+date = "2026-11-24"
+reason = "HUD text lines were cut at 24 UTF-16 units (the drill card read S1 Attack wrong directio): the strip and the combo card now have one text length of 40 units in the plans and the native boxes, a reason wider than the card wraps, and the card grows by the wrapped line. Measured 197121, 69 above the measured base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 16:34:13Z (line budget +69 approved at the measured value for fix/reason-line-full), after its rulings of 15:10:19Z and 15:29:13Z (the 24-unit text cut goes to tile-fix-g4 on a branch from e7667f26). NRO and BSS are reported with the gate."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197287
+date = "2026-11-24"
+reason = "The HUD text fix gives capacity to the line type instead of one 40-unit length for every pane: one capacity table per bar, read by the native boxes and by a two-part pane cache (a short line per pane, a tail per long line), and a 24-unit name type. It costs lines and saves memory. Measured 197287, 235 above the measured base e7667f26 (197052)."
+approved_by = "tr-primary-2 ruling 2026-11-24 17:47:51Z (line budget approved at the measured 197,287 for the per-line-type text capacity; memory outranks line count), after its ruling that capacity is a property of the line type."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197277
+date = "2026-11-24"
+reason = "Install 4 integration, merge 2: the open-list bridge fix (fix/bridge-open-list ffdff909) and the per-line-type HUD text capacity (fix/reason-line-reviewed a8608671) in one tree. Measured 197277 on the merged tree, 225 above base e7667f26 (197052): +37 from the open-list entries and +188 from the text fix as corrected in review (its own entry allows +235)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its approvals of 15:47:29Z and 15:56:58Z (open list, +36 and +1) and 17:47:51Z (text capacity, 197287 on the base)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 198087
 date = "2026-11-24"
 reason = "Move names: the optional toggle, message-file loader, fighter identity and saved-combo naming. Measured 198087 (tools/sloc.py tree), 1035 above the base e7667f26 (197052)."

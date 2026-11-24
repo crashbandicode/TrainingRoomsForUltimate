@@ -22,11 +22,10 @@ impl Menu {
         }
         let screen = self.screen().copied();
         if screen.is_none() && self.page == Page::Recording {
-            let group = self.focus().map(group_of);
-            let on_library = group.is_some_and(|g| g == usize::from(table::SAVES_MACROS) || g == usize::from(table::COMBOS_SEQ));
-            let which = group.unwrap_or(usize::from(table::SAVES_MACROS)) as u8;
-            if let Some(list) = self.recording.focus_list(Face::Page, which, on_library) {
-                return Some(list);
+            let (which, on_library) = self.library_focus();
+            let list = self.recording.focus_list(Face::Page, which, on_library);
+            if list.is_some() || self.recording.page_overlay_open() {
+                return list;
             }
         }
         let (id, count, index, row) = match screen {

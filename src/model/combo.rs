@@ -1312,3 +1312,7 @@ mod input_drill_tests;
 #[cfg(test)]
 #[path = "aim_steps_tests.rs"]
 mod aim_steps_tests;
+
+#[cfg(test)]
+#[path = "reason_line_tests.rs"]
+mod reason_line_tests;

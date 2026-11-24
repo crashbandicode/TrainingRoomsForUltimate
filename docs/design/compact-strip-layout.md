@@ -16,6 +16,27 @@ settings and both card modes. In Eden, check the card against the native damage
 and Waiting panels and move a fighter behind the panel to check that the
 backdrops, text and marks fade together.
 
+## Text length (2026-11-24)
+
+A line's capacity belongs to its type. Each bar has one table
+(`panes::iv::units`, `panes::cb::units`): 40 UTF-16 units for the strip's three
+readout lines and the card's reason, link titles and marks, 24 for every other
+line. The native boxes are declared from the table and the pane cache keeps
+each line by it, so a pane costs a short line and only a long line adds its
+tail. Every line was 24 units before, and the card cut its reason there. The
+longest line is a reason of 37 units. To make another line long, add it to its
+bar's table and rebuild both recipes.
+
+A reason wider than the card's content width wraps to a second line
+(`Text::fitted`, the notice box's wrap). The card grows by one line pitch
+(`CardSpec::grown`): the reason's first line stays on its row, a sequence's
+statistics move down, and the fade uses the grown plate. Not yet seen in a game.
+
+Lines whose place cannot grow keep 24 units (`SHORT_UNITS`): a name on the card
+(the title, a sequence's name, chips, `landed` and `dropped`), Parry's pills and
+the LAST row's moves. The mark under a step shares its row with a hit combo's
+verdict and can run under it.
+
 ## Requirement trace
 
 | Operator clause | Design | Test |
