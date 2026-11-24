@@ -3590,7 +3590,7 @@ mod tests {
         let mut ordinary = recording_list_menu();
         for _ in 0..500 {
             if ordinary.help_row().is_some_and(|row| row.id == "recording_crop") { break; }
-            ordinary.press(Button::Down);
+            ordinary.press(if list_view(&ordinary).id.starts_with("recording/page/") { Button::JumpDown } else { Button::Down });
         }
         assert!(ordinary.help_row().is_some_and(|row| row.id == "recording_crop"));
         let page = list_view(&ordinary);
