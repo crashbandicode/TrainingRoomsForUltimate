@@ -545,9 +545,11 @@ impl Plan<'_> {
                     let _ = write!(text, "Step {}", k + 1);
                 } else {
                     let _ = write!(text, "{} ", k + 1);
-                    let _ = reference.desc(0).write(&mut text, false);
+                    let [first, follow] = self.helper.target().and_then(|target| target.descs(k))
+                        .unwrap_or([reference.desc(0), reference.desc(1)]);
+                    let _ = first.write(&mut text, false);
                     let _ = text.write_str(">");
-                    let _ = reference.desc(1).write(&mut text, false);
+                    let _ = follow.write(&mut text, false);
                 }
                 Ink::text(text, MUTED)
             }

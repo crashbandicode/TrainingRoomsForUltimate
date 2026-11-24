@@ -2274,16 +2274,17 @@ fn link_head(line: &str) -> bool {
 /// An older presses-only file shows its presses and no drift.
 pub fn combo_link_lines(combo: &Combo) -> Vec<String> {
     combo.links().enumerate().flat_map(|(index, link)| {
-        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(index, link) }
+        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(combo, index, link) }
     }).collect()
 }
 
-fn link_panel_lines(index: usize, link: &super::combo::LinkRec) -> Vec<String> {
+fn link_panel_lines(combo: &Combo, index: usize, link: &super::combo::LinkRec) -> Vec<String> {
     let word = if link.is_true() { "TRUE" } else { "FALSE" };
     let mut from = String::new();
     let mut to = String::new();
-    let _ = link.desc(0).write(&mut from, false);
-    let _ = link.desc(1).write(&mut to, false);
+    let [first, follow] = combo.descs(index).unwrap_or([link.desc(0), link.desc(1)]);
+    let _ = first.write(&mut from, false);
+    let _ = follow.write(&mut to, false);
     let mut lines = vec![format!(
         "L{} {} → {} {word}",
         index + 1,

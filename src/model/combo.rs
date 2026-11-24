@@ -440,6 +440,20 @@ impl Combo {
         self.links().any(|link| link.events().any(|event| matches!(event.kind, Kind::Aim(_))))
     }
 
+    /// Link `k`'s two moves as the saved views show them. A link keeps no inputs before its first hit, so its
+    /// first move's travel arrows come from the link before it, whose follow-up is the same action. The combo's
+    /// first link has none.
+    pub fn descs(&self, k: usize) -> Option<[ActionDesc; 2]> {
+        let link = self.get(k)?;
+        let mut first = link.desc(0);
+        if let Some(before) = k.checked_sub(1).and_then(|k| self.get(k)).map(|before| before.desc(1)) {
+            if before.same_move(&first) {
+                first.parts = before.parts;
+            }
+        }
+        Some([first, link.desc(1)])
+    }
+
     pub fn travel(&self, link: usize, event: usize) -> Option<Travel> {
         if link >= LINKS || event >= STEPS {
             return None;
