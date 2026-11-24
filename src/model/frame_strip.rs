@@ -492,6 +492,7 @@ pub struct Tracker {
     aims: [Option<Aim>; AIMS],
     aim_head: usize,
     rule: super::aim::Rule,
+    late: super::action::Late,
     history: [Option<Link>; HISTORY],
     advantage: Option<Advantage>,
     frame: u32,
@@ -548,6 +549,7 @@ impl Tracker {
             aims: [None; AIMS],
             aim_head: 0,
             rule: super::aim::Rule::new(),
+            late: super::action::Late::NONE,
             history: [None; HISTORY],
             advantage: None,
             frame: 0,
@@ -630,6 +632,11 @@ impl Tracker {
     /// The press that opened the current action, if it was seen.
     pub fn origin(&self) -> Option<u32> {
         self.action.origin
+    }
+
+    /// The action decision reported on the latest frame.
+    pub fn late(&self) -> super::action::Late {
+        self.late
     }
 
     /// How many exchanges started since the last clear, and the frame of the open one's first hit. A hit the strip does
@@ -722,6 +729,7 @@ impl Tracker {
 
     /// One game frame: P1's and the CPU's samples and P1's mapped inputs.
     pub fn step(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs) {
+        self.late = super::action::Late::NONE;
         self.frame = self.frame.wrapping_add(1);
         let frame = self.frame;
         self.snaps[self.snap_head] = Snap {
@@ -752,7 +760,8 @@ impl Tracker {
                     && p1.motion_frame < self.p1_motion_frame
                     && !p1.stop)
         });
-        if p1_busy && (self.p1_was_actionable || restarted) {
+        let opened = p1_busy && (self.p1_was_actionable || restarted);
+        if opened {
             if self.p1_was_actionable {
                 self.action.base = None;
             } else if self.action.mv != Move::Other {
@@ -767,6 +776,7 @@ impl Tracker {
             self.action.start = frame;
             let origin = self.presses().find(|p| p.frame <= frame && frame - p.frame <= INPUT_LOOKBACK).map(|p| p.frame);
             self.action.origin = origin;
+            self.action.told = None;
             self.action.variant = 0;
             self.action.variant_known = false;
             self.active_seen = false;
@@ -792,6 +802,11 @@ impl Tracker {
             if let Some(angle) = p1.angle {
                 self.push_aim(frame, angle.dir());
             }
+        }
+        let side = matches!(self.action.mv, Move::SideTilt | Move::SideSmash).then_some(self.action.angle);
+        if opened || (side.is_some() && side != self.action.told) {
+            self.late.open = Some((self.action.origin, side));
+            self.action.told = side;
         }
         let start = match p1.attack {
             Some(Move::NeutralSpecial) => Some(super::aim::Family::Neutral),

@@ -2,10 +2,10 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
-use super::action::{self, ActionDesc};
+use super::action::{self, ActionDesc, Late};
 use super::frame_strip::{
     bin_stick, stick_axis, Angle, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
-    DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
+    DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, INPUT_LOOKBACK, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
 };
 use super::spots::Spot;
 
@@ -607,6 +607,18 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
     }
 }
 
+fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extra: Option<u8>) -> Option<Grade> {
+    let reference = target.get(index)?;
+    let context = GradeContext {
+        ref_holds: target.holds(index),
+        att_holds: actual.holds(index),
+        owns_aim: target.owns_aim(index),
+    };
+    let mut grade = grade_with(reference, rec, true, target.has_aim(), context);
+    grade.extra_aim = grade.extra_aim.or(extra);
+    Some(grade)
+}
+
 fn event_matches(want: Event, got: Event, presses_only: bool) -> bool {
     if presses_only {
         return matches!((want.kind, got.kind), (Kind::Press(a), Kind::Press(b)) if a == b)
@@ -928,7 +940,7 @@ impl Helper {
         }
         if input_only {
             if let Some(snap) = tracker.snaps().last() {
-                self.step_inputs(snap, &mut out);
+                self.step_inputs_late(snap, Some(tracker.late()), &mut out);
             }
             if self.pending_load {
                 self.pending_load = false;
@@ -958,7 +970,12 @@ impl Helper {
         }
     }
 
+    #[cfg(test)]
     fn step_inputs(&mut self, snap: Snap, out: &mut Out) {
+        self.step_inputs_late(snap, None, out);
+    }
+
+    fn step_inputs_late(&mut self, snap: Snap, late: Option<Late>, out: &mut Out) {
         if !self.settings.on {
             return;
         }
@@ -971,18 +988,29 @@ impl Helper {
             self.input.restart();
             self.attempt = None;
         }
-        self.input.step_mode(snap, false, self.target.as_ref().is_some_and(Combo::has_aim));
+        let aims = self.target.as_ref().is_some_and(Combo::has_aim);
+        let amended = self.input.step_with(snap, late.unwrap_or(Late::NONE), false, aims);
         let Some(start) = self.input.first else {
             return;
         };
         if self.attempt.is_none() {
             self.attempt = Some(Attempt::new(start, false));
         }
+        if let Some(j) = amended {
+            self.regrade(j, out);
+        }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
             let target = self.target.as_ref().unwrap();
             let aims = target.has_aim();
             let last = attempt.len + 1 == target.len();
             let reference = target.get(attempt.len).copied().unwrap();
+            let angular = reference.events().any(|event| {
+                matches!(event.kind, Kind::Press(Button::Attack) | Kind::CStick)
+                    && matches!(event.dir, Dir::Forward | Dir::Back | Dir::ForwardUp | Dir::ForwardDown | Dir::BackUp | Dir::BackDown)
+            });
+            if late.is_some() && angular && self.input.undecided(attempt.len, snap.frame) {
+                break;
+            }
             let holds = target.holds(attempt.len);
             let deadline = reference.events.iter().enumerate().filter_map(|(i, event)| {
                 event.map(|event| {
@@ -1012,6 +1040,23 @@ impl Helper {
             {
                 self.input.combo.push(LinkRec::INPUT);
             }
+        }
+    }
+
+    fn regrade(&mut self, j: usize, out: &mut Out) {
+        let grade = self.target.as_ref().filter(|target| target.input_only).and_then(|target| {
+            let attempt = self.attempt.as_ref().filter(|attempt| attempt.open() && j < attempt.len)?;
+            let previous = attempt.grades[j]?;
+            let actual = self.input.combo.get(j).copied()?;
+            let mut grade = input_grade(target, &self.input.combo, j, &actual, previous.extra_aim)?;
+            grade.extra_aim = previous.extra_aim;
+            Some(grade)
+        });
+        let Some(grade) = grade else { return };
+        self.attempt.as_mut().unwrap().grades[j] = Some(grade);
+        out.link = Some((j, grade));
+        if !grade.clean(self.settings.tolerance) {
+            self.resolve_open(Outcome::Completed, out);
         }
     }
 
@@ -1074,17 +1119,15 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let context = if target.input_only {
-            GradeContext {
-                ref_holds: target.holds(attempt.len),
-                att_holds: self.input.combo.holds(attempt.len),
-                owns_aim: target.owns_aim(attempt.len),
-            }
+        let g = if target.input_only {
+            let Some(g) = input_grade(target, &self.input.combo, attempt.len, &rec, extra) else { return };
+            g
         } else {
-            GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() }
+            let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() };
+            let mut g = grade_with(reference, &rec, false, target.has_aim(), context);
+            g.extra_aim = g.extra_aim.or(extra);
+            g
         };
-        let mut g = grade_with(reference, &rec, target.input_only, target.has_aim(), context);
-        g.extra_aim = g.extra_aim.or(extra);
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
         attempt.len += 1;
@@ -1431,6 +1474,7 @@ pub struct InputCapture {
     prev: Option<Snap>,
     first: Option<u32>,
     last: Option<u32>,
+    decided: Option<u32>,
 }
 impl InputCapture {
     pub const fn new() -> Self {
@@ -1442,6 +1486,7 @@ impl InputCapture {
             prev: None,
             first: None,
             last: None,
+            decided: None,
         }
     }
     fn restart(&mut self) {
@@ -1451,13 +1496,20 @@ impl InputCapture {
         };
     }
     pub fn step(&mut self, snap: Snap) {
-        self.step_mode(snap, true, true);
+        self.step_late(snap, Late::NONE);
     }
-    fn step_mode(&mut self, mut snap: Snap, group_idle: bool, aims: bool) {
+    pub fn step_late(&mut self, snap: Snap, late: Late) {
+        self.step_with(snap, late, true, true);
+    }
+    #[cfg(test)]
+    fn step_mode(&mut self, snap: Snap, group_idle: bool, aims: bool) {
+        self.step_with(snap, Late::NONE, group_idle, aims);
+    }
+    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> Option<usize> {
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
-        if self.combo.overflow { return; }
+        if self.combo.overflow { return None; }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
@@ -1483,7 +1535,7 @@ impl InputCapture {
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
                 && !self.combo.push(LinkRec::INPUT)
             {
-                return;
+                return None;
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
@@ -1493,6 +1545,38 @@ impl InputCapture {
             });
             self.last = Some(event.frame);
         }
+        if let Some((Some(press), side)) = late.open {
+            self.decided = Some(press);
+            if let (Some(angle), Some(first)) = (side, self.first.filter(|&first| press >= first)) {
+                let offset = (press - first) as i32;
+                let chosen = [Kind::CStick, Kind::Press(Button::Attack)].into_iter().find_map(|kind| {
+                    self.combo.links[..self.combo.len].iter().enumerate().find_map(|(step, link)| {
+                        link.as_ref()?.events.iter().position(|event| {
+                            event.is_some_and(|event| event.offset == offset && event.kind == kind)
+                        }).map(|index| (step, index))
+                    })
+                });
+                if let Some((step, index)) = chosen {
+                    let event = self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap();
+                    let direction = action::angled(event.dir, angle);
+                    if direction != event.dir {
+                        event.dir = direction;
+                        return Some(step);
+                    }
+                }
+            }
+        }
+        None
+    }
+    fn undecided(&self, k: usize, now: u32) -> bool {
+        let Some(first) = self.first else { return false };
+        self.combo.get(k).is_some_and(|step| step.events().any(|event| {
+            matches!(event.kind, Kind::Press(Button::Attack) | Kind::CStick)
+                && u32::try_from(i64::from(first) + i64::from(event.offset)).ok().is_some_and(|frame| {
+                    self.decided.is_none_or(|decided| decided < frame)
+                        && now.saturating_sub(frame) < INPUT_LOOKBACK
+                })
+        }))
     }
 }
 impl Default for InputCapture {

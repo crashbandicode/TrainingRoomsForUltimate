@@ -469,7 +469,7 @@ pub unsafe fn sample_frame(player: usize) {
     tracker.step_graded(p1, cpu, inputs, taken);
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
-            crate::engine::rr_host::observe_input(snap, tracker.contact_now());
+            crate::engine::rr_host::observe_input(snap, tracker.late(), tracker.contact_now());
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         crate::runtime::features::combo::after_strip(&tracker, p1_kind);

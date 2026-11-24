@@ -51,6 +51,31 @@ impl ActionDesc {
     }
 }
 
+/// What the game decided on one frame for an earlier input. The drill capture attaches it to that input's event.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Late {
+    /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
+    /// (`Some(None)` for a level side attack).
+    pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+}
+
+impl Late {
+    pub const NONE: Late = Late { open: None };
+}
+
+/// A press's direction with the vertical part the animation chose.
+pub const fn angled(dir: Dir, angle: Option<Angle>) -> Dir {
+    let back = matches!(dir, Dir::Back | Dir::BackUp | Dir::BackDown);
+    match (back, angle) {
+        (false, None) => Dir::Forward,
+        (true, None) => Dir::Back,
+        (false, Some(Angle::Up)) => Dir::ForwardUp,
+        (true, Some(Angle::Up)) => Dir::BackUp,
+        (false, Some(Angle::Down)) => Dir::ForwardDown,
+        (true, Some(Angle::Down)) => Dir::BackDown,
+    }
+}
+
 /// The current action and the input that opened it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Action {
@@ -64,12 +89,14 @@ pub struct Action {
     pub variant: u8,
     pub origin: Option<u32>,
     pub(crate) variant_known: bool,
+    pub(crate) told: Option<Option<Angle>>,
 }
 
 impl Action {
     pub const fn new() -> Self {
         Self { id: 0, start: 0, mv: Move::Other, base: None, angle: None,
-            shown: Shown { of: None, dirs: [None; 2] }, shown_id: 0, variant: 0, origin: None, variant_known: false }
+            shown: Shown { of: None, dirs: [None; 2] }, shown_id: 0, variant: 0, origin: None, variant_known: false,
+            told: None }
     }
 }
 
