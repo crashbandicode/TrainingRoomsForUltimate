@@ -3536,6 +3536,7 @@ mod tests {
     fn every_b_that_goes_back_takes_one_off_depth_on_the_recording_lists() {
         use crate::model::bridge_state::list_view;
         use std::collections::BTreeSet;
+        use std::io::Write;
         let buttons = [Button::A, Button::B, Button::Up, Button::Down, Button::Left, Button::Right,
             Button::JumpDown, Button::JumpUp, Button::X, Button::ZR];
         for face in [Face::Page, Face::Popup] {
@@ -3556,9 +3557,8 @@ mod tests {
                 let button = prefix.get(step).copied().unwrap_or(buttons[((seed >> 16) as usize) % buttons.len()]);
                 history.push(button);
                 m.press(button);
-                let effect = m.recording_mut().take_effect();
-                if m.is_closed() || (face == Face::Popup && !m.recording().popup_open())
-                    || matches!(effect, Effect::OpenCrop { .. } | Effect::MakeCombo { .. }) {
+                m.recording_mut().take_effect();
+                if m.is_closed() || (face == Face::Popup && !m.recording().popup_open()) {
                     m = bridge_drills_menu(face);
                     history.clear();
                     continue;
@@ -3584,7 +3584,7 @@ mod tests {
                     }
                 }
             }
-            eprintln!("recording walk {face:?}: ids={ids:?} depth={deepest} keyboard={keyboard}");
+            writeln!(std::io::stderr(), "recording walk {face:?}: ids={ids:?} depth={deepest} keyboard={keyboard}").unwrap();
             assert!(ids.contains("recording/picker"), "{face:?}: {ids:?}");
             if face == Face::Page { assert!(ids.contains("recording/file"), "{ids:?}"); }
             assert!(ids.iter().any(|id| id.ends_with("/drills")), "{face:?}: {ids:?}");
