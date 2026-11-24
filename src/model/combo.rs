@@ -313,12 +313,12 @@ impl LinkRec {
         (origins.next(), origins.last())
     }
 
-    fn origin_side(&self, offset: i32) -> Option<usize> {
+    fn origin_side(&self, origin: Event) -> Option<usize> {
         let (first, last) = self.origin_ends();
         match (first, last) {
-            (Some(first), Some(_)) if first.offset == offset => Some(0),
-            (_, Some(last)) if last.offset == offset => Some(1),
-            (Some(first), None) if first.offset == offset => Some(1),
+            (Some(first), Some(_)) if first == origin => Some(0),
+            (_, Some(last)) if last == origin => Some(1),
+            (Some(first), None) if first == origin => Some(1),
             _ => None,
         }
     }
@@ -1712,9 +1712,20 @@ impl InputCapture {
         if let Some((Some(press), mv, of, normal)) = late.named {
             if let Some(first) = self.first.filter(|&first| press >= first) {
                 let offset = (press - first) as i32;
-                let found = self.combo.links().enumerate().find_map(|(step, link)| {
-                    link.origin_side(offset).map(|side| (step, side))
+                let pressed = self.combo.links().flat_map(|link| link.events()).find(|event| {
+                    event.offset == offset && matches!(event.kind, Kind::Press(_))
                 });
+                let gesture = pressed.and_then(|event| match event.kind {
+                    Kind::Press(Button::Attack) => Some(Kind::CStick),
+                    Kind::Press(Button::Jump) => Some(Kind::Flick(Flick::TapJump)),
+                    _ => None,
+                });
+                let origin = gesture.and_then(|kind| {
+                    self.combo.links().flat_map(|link| link.events()).find(|event| event.offset == offset && event.kind == kind)
+                }).or(pressed);
+                let found = origin.and_then(|origin| self.combo.links().enumerate().find_map(|(step, link)| {
+                    link.origin_side(origin).map(|side| (step, side))
+                }));
                 if let Some((step, side)) = found {
                     let link = self.combo.links[step].as_mut().unwrap();
                     let angle = link.step_side(side).filter(|desc| desc.mv == mv).and_then(|desc| desc.angle);
@@ -1736,7 +1747,7 @@ impl InputCapture {
                 });
                 if let Some((step, index)) = chosen {
                     let link = self.combo.links[step].as_mut().unwrap();
-                    if let Some(side) = link.origin_side(offset) {
+                    if let Some(side) = link.events[index].and_then(|event| link.origin_side(event)) {
                         if let Some(mut desc) = link.step_side(side) {
                             desc.angle = angle;
                             link.set_step_side(side, Some(desc));
