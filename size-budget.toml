@@ -2713,7 +2713,7 @@ approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceili
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 199231
+ceiling = 199232
 date = "2026-11-24"
-reason = "Move names joined with the ACTION model (feat/action-model c4c43b23, the merge-3 candidate): measured 199231 on the merged tree (tools/sloc.py tree). Merge 3 is 198136 and the move names add 1098 on merge 2 (198375 less 197277); the merged tree is 3 lines under their sum, because the three print sites now share the ACTION model's one formatter."
+reason = "Move names joined with the ACTION model (feat/action-model c4c43b23, the merge-3 candidate): measured 199232 with the variant joined (tools/sloc.py tree). Merge 3 is 198136 and the move names add 1098 on merge 2 (198375 less 197277); the joined tree is 2 lines under their sum, because the three print sites now share the ACTION model's one formatter."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above."
