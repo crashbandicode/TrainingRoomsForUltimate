@@ -390,6 +390,39 @@ fn a_short_hold_keeps_the_on_time_tolerance() {
 }
 
 #[test]
+fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
+    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]);
+    assert_eq!(reference.len(), 1);
+    let attack = |press, release| run_drill(reference, &[(0, SPECIAL), (2, 0), (press, ATTACK), (release, 0)], 120);
+    assert!(attack(10, 83).clean, "on time, the longest hold in band");
+    assert!(attack(11, 84).clean, "one frame late, the same 73-frame hold");
+    assert_eq!(attack(11, 85).fault, Some((0, Reason::MissingRelease(Button::Attack))));
+    assert!(attack(9, 82).clean, "one frame early, the same hold");
+    assert_eq!(attack(9, 83).fault, Some((0, Reason::MissingRelease(Button::Attack))));
+
+    // The press in one step, its release in the next: Attack 10..124 (hold 114: band 14), Special tapped at 60..62.
+    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (124, 0)]);
+    assert_eq!(reference.len(), 2);
+    let across = |press, release| run_drill(reference,
+        &[(0, SPECIAL), (2, 0), (press, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (release, 0)], 170);
+    let whole = across(10, 139);
+    assert!(whole.clean && whole.graded == 2);
+    assert!(across(11, 140).clean);
+    assert_eq!(across(11, 141).fault, Some((1, Reason::MissingRelease(Button::Attack))));
+}
+
+#[test]
+fn a_repeated_button_uses_its_matching_press_for_the_hold_deadline() {
+    let reference = recorded(&[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (10, ATTACK), (74, 0)]);
+    assert_eq!(reference.len(), 1);
+    assert!(run_drill(reference, &[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (11, ATTACK), (84, 0)], 120).clean);
+    assert_eq!(
+        run_drill(reference, &[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (11, ATTACK), (85, 0)], 120).fault,
+        Some((0, Reason::MissingRelease(Button::Attack)))
+    );
+}
+
+#[test]
 fn a_reference_release_without_its_press_is_not_graded() {
     use crate::model::combo_record::ComboRecord;
     let full = recorded(&[(0, ATTACK), (30, ATTACK | SPECIAL), (40, SPECIAL), (42, 0)]);
