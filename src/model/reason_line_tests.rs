@@ -41,17 +41,22 @@ fn reasons() -> Vec<Reason> {
     all.extend(DELTAS.iter().map(|&d| Reason::CStickOff(d)));
     all.extend(kinds.map(Reason::WrongDir));
     for part in [1, 2] {
-        all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part), Reason::AimPath(part)]);
+        all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part)]);
+    }
+    // Part 0 is the special's own travel, kept on its press.
+    for part in [0, 1, 2] {
+        all.push(Reason::AimPath(part));
         // Include the smallest rejected angle and the widest fractional label.
         all.extend([101, -101, 1799, -1799, -1800].map(|d| Reason::AimAngle(part, d)));
         all.extend([16, -16, 100, -100].map(|d| Reason::AimDeflection(part, d)));
     }
+    all.push(Reason::Steer);
     all
 }
 
-/// A travel part as its faults name it.
+/// A travel as its faults name it: an aim part's, or as part 0 the special's own.
 fn ordinal(part: u8) -> &'static str {
-    if part == 1 { "1st" } else { "2nd" }
+    match part { 0 => "Special", 1 => "1st", _ => "2nd" }
 }
 
 /// The sentence the card owes for a fault, written out here a second time.
@@ -79,6 +84,7 @@ fn sentence(unit: &str, link: u8, reason: Reason) -> String {
         Reason::AimDeflection(part, d) => {
             format!("{} deflection {}% {}", ordinal(part), d.unsigned_abs(), if d < 0 { "low" } else { "high" })
         }
+        Reason::Steer => "Special steer wrong".to_owned(),
     };
     format!("{unit}{} {fault}", u32::from(link) + 1)
 }
@@ -198,9 +204,18 @@ fn every_mark_under_a_step_is_shown_in_full() {
         marks.extend(DELTAS.iter().map(|&d| {
             (Mark::At(d), format!("{name} {}f {}", d.abs(), if d > 0 { "late" } else { "early" }))
         }));
-        // A travel part's own marks: its path, and with the stick toggle its angle and deflection.
-        if let Kind::Aim(part) = kind {
-            let part = ordinal(part);
+        // A travel's own marks: its path, and with the stick toggle its angle and deflection. An aim part keeps one;
+        // so does the press that began a special, which can also be steered wrong.
+        let travel = match kind {
+            Kind::Aim(part) => Some(ordinal(part)),
+            Kind::Press(Button::Special) => Some("Special"),
+            Kind::CStick => Some("C-stick"),
+            _ => None,
+        };
+        if let Some(part) = travel {
+            if !matches!(kind, Kind::Aim(_)) {
+                marks.push((Mark::Steer, format!("{part} steer wrong")));
+            }
             marks.push((Mark::Path, format!("{part} path off")));
             marks.extend([(101, "10.1"), (-1799, "179.9"), (-1800, "180")]
                 .map(|(d, deg)| (Mark::Angle(d), format!("{part} angle {deg} off"))));

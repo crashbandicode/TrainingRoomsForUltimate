@@ -100,8 +100,21 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
                 delta.unsigned_abs(), if delta < 0 { "low" } else { "high" });
             BAD
         }
+        Mark::Steer => {
+            let _ = write!(t, "{} steer wrong", name.split_whitespace().next().unwrap_or(name));
+            BAD
+        }
     };
     (t, color)
+}
+
+/// Whose travel a fault names: an aim part's, or as part 0 the special's own.
+const fn travel_name(part: u8) -> &'static str {
+    match part {
+        0 => "Special",
+        1 => "1st",
+        _ => "2nd",
+    }
 }
 
 /// Drift, shown and never graded. The font draws `>` and `<` for the two sideways holds.
@@ -189,11 +202,12 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
         Reason::MissingAim(part) => write!(t, "{unit}{n} {} missing", event_label(Kind::Aim(part))),
         Reason::WrongAim(part) => write!(t, "{unit}{n} {} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => write!(t, "{unit}{n} extra {}", event_label(Kind::Aim(part))),
-        Reason::AimPath(part) => write!(t, "{unit}{n} {} path off", if part == 1 { "1st" } else { "2nd" }),
+        Reason::AimPath(part) => write!(t, "{unit}{n} {} path off", travel_name(part)),
         Reason::AimAngle(part, delta) => write!(t, "{unit}{n} ")
-            .and_then(|()| write_angle(&mut t, if part == 1 { "1st" } else { "2nd" }, delta)),
+            .and_then(|()| write_angle(&mut t, travel_name(part), delta)),
         Reason::AimDeflection(part, delta) => write!(t, "{unit}{n} {} deflection {}% {}",
-            if part == 1 { "1st" } else { "2nd" }, delta.unsigned_abs(), if delta < 0 { "low" } else { "high" }),
+            travel_name(part), delta.unsigned_abs(), if delta < 0 { "low" } else { "high" }),
+        Reason::Steer => write!(t, "{unit}{n} {} steer wrong", travel_name(0)),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
         Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
     };

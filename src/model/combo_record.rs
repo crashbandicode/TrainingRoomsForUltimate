@@ -350,9 +350,10 @@ impl ComboRecord {
             for (link, value) in links.iter().enumerate() {
                 let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
                 for (index, value) in events.iter().enumerate() {
-                    if matches!(combo.get(link).and_then(|link| link.events[index]), Some(Event { kind: Kind::Aim(_), .. }))
-                        && value.get("path").is_some()
-                    {
+                    // An aim part's travel, or on the press that began a special that special's own.
+                    let kept = matches!(combo.get(link).and_then(|link| link.events[index]).map(|event| event.kind),
+                        Some(Kind::Aim(_) | Kind::Press(Button::Special) | Kind::CStick));
+                    if kept && value.get("path").is_some() {
                         let travel = parse_travel(value.as_object().ok_or("event")?)?;
                         combo.attach_travel(link, index, travel);
                     }
@@ -590,17 +591,15 @@ fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>) -> Value
         }
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
-        Kind::Aim(part) => {
-            value["part"] = json!(part);
-            if let Some(travel) = travel {
-                if let Some((angle, deflection)) = travel.stick {
-                    value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
-                }
-                value["heading"] = json!(f64::from(travel.heading) / 10.0);
-                value["distance"] = json!(f64::from(travel.distance) / 10.0);
-                value["path"] = json!(travel.path);
-            }
+        Kind::Aim(part) => value["part"] = json!(part),
+    }
+    if let Some(travel) = travel {
+        if let Some((angle, deflection)) = travel.stick {
+            value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
         }
+        value["heading"] = json!(f64::from(travel.heading) / 10.0);
+        value["distance"] = json!(f64::from(travel.distance) / 10.0);
+        value["path"] = json!(travel.path);
     }
     value
 }

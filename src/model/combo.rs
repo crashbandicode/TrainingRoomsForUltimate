@@ -466,6 +466,19 @@ impl Combo {
         core::array::from_fn(|event| self.travel(link, event))
     }
 
+    /// Whether some event of the combo keeps a travel.
+    pub fn has_travel(&self) -> bool {
+        self.details.iter().any(|entry| entry.at != Detail::FREE)
+    }
+
+    /// Whether the event a detail belongs to is an aim.
+    fn on_aim(&self, at: u8) -> bool {
+        self.get(usize::from(at >> 4)).and_then(|link| link.events.get(usize::from(at & 0xF)).copied().flatten())
+            .is_some_and(|event| matches!(event.kind, Kind::Aim(_)))
+    }
+
+    /// Keep a travel with its event. When the table is full an aim's travel takes the place of the last one kept on
+    /// a press; a press's travel is dropped.
     pub(crate) fn attach_travel(&mut self, link: usize, event: usize, travel: Travel) -> bool {
         if link >= self.len || event >= STEPS || self.links[link].is_none_or(|l| l.events[event].is_none()) {
             return false;
@@ -475,7 +488,15 @@ impl Combo {
             self.details[slot] = detail;
             return true;
         }
-        let Some(mut slot) = self.details.iter().position(|entry| entry.at == Detail::FREE) else { return false };
+        let mut slot = match self.details.iter().position(|entry| entry.at == Detail::FREE) {
+            Some(free) => free,
+            None if self.on_aim(detail.at) => {
+                let Some(press) = self.details.iter().rposition(|entry| !self.on_aim(entry.at)) else { return false };
+                self.details.copy_within(press + 1.., press);
+                DETAILS - 1
+            }
+            None => return false,
+        };
         while slot > 0 && self.details[slot - 1].at > detail.at {
             self.details[slot] = self.details[slot - 1];
             slot -= 1;
@@ -579,6 +600,8 @@ pub enum Mark {
     /// Signed shortest difference, in tenths of a degree.
     Angle(i16),
     Deflection(i8),
+    /// A special's own travel went another way and the stick was held in another direction.
+    Steer,
 }
 
 /// One attempted link against its reference link.
@@ -622,7 +645,9 @@ impl Grade {
     }
 
     pub fn detail(&self) -> Option<usize> {
-        self.marks.iter().position(|m| matches!(m, Some(Mark::Path | Mark::Angle(_) | Mark::Deflection(_))))
+        self.marks.iter().position(|m| {
+            matches!(m, Some(Mark::Path | Mark::Angle(_) | Mark::Deflection(_) | Mark::Steer))
+        })
     }
 
     /// The step with the largest offset outside the tolerance, with that offset.
@@ -718,14 +743,18 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                     } else {
                         got.offset - want.offset
                     };
-                    if matches!(want.kind, Kind::Aim(_)) && got.dir == want.dir {
-                        if let (Some(reference), Some(attempt)) = (context.ref_travels[index], context.att_travels[i]) {
-                            if action::path_off(&reference, &attempt) {
-                                Mark::Path
-                            } else if context.match_stick {
-                                action::stick_off(&reference, &attempt).unwrap_or(Mark::At(delta))
-                            } else { Mark::At(delta) }
-                        } else { Mark::At(delta) }
+                    // A travel kept on both sides: an aim part's, or on a press the special's own.
+                    let aim = matches!(want.kind, Kind::Aim(_));
+                    let travels = (context.ref_travels[index], context.att_travels[i]);
+                    if let ((Some(reference), Some(attempt)), true) = (travels, !aim || got.dir == want.dir) {
+                        let fault = if action::path_off(&reference, &attempt) {
+                            Some(Mark::Path)
+                        } else if !aim {
+                            action::steer_off(&reference, &attempt, context.match_stick)
+                        } else if context.match_stick {
+                            action::stick_off(&reference, &attempt)
+                        } else { None };
+                        fault.unwrap_or(Mark::At(delta))
                     } else { Mark::At(delta) }
                 } else {
                     Mark::WrongDir
@@ -817,10 +846,13 @@ pub enum Reason {
     MissingAim(u8),
     WrongAim(u8),
     ExtraAim(u8),
+    /// The travel's part; in this and the next two, part 0 is the special's own travel, kept on its press.
     AimPath(u8),
     /// Part number and the signed angle difference in tenths of a degree.
     AimAngle(u8, i16),
     AimDeflection(u8, i8),
+    /// A special's own travel went another way and the stick was held in another direction.
+    Steer,
 }
 
 /// An attempt's result.
@@ -1190,7 +1222,8 @@ impl Helper {
                     event.offset.saturating_add(i32::from(action::hold_band(hold))).saturating_add(shift)
                 })
             }).max().unwrap_or(0).saturating_add(i32::from(self.settings.tolerance)).max(0);
-            if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
+            // The last step waits for the special to end: an aim, or the travel kept on its press, can still come.
+            if (snap.frame - start) < deadline as u32 || ((aims || target.has_travel()) && last && snap.aim.inside) {
                 break;
             }
             let actual = self
@@ -1396,11 +1429,12 @@ fn summarize(
     let extra_aim = || grades().find_map(|(i, g)| g.extra_aim.map(|part| (i as u8, Reason::ExtraAim(part))));
     let detail = || grades().find_map(|(i, g)| {
         let index = g.detail()?;
-        let Kind::Aim(part) = event(g, index)?.kind else { return None };
+        let part = match event(g, index)?.kind { Kind::Aim(part) => part, _ => 0 };
         let reason = match g.marks[index]? {
             Mark::Path => Reason::AimPath(part),
             Mark::Angle(delta) => Reason::AimAngle(part, delta),
             Mark::Deflection(delta) => Reason::AimDeflection(part, delta),
+            Mark::Steer => Reason::Steer,
             _ => return None,
         };
         Some((i as u8, reason))
@@ -1757,9 +1791,15 @@ impl InputCapture {
             }
         }
         if let Some((part, travel)) = late.travel {
+            // An aim part's travel belongs to its newest aim event; a special's own travel to the press that began it.
+            let press = self.first.and_then(|first| late.press.checked_sub(first)).map(|offset| offset as i32);
             let chosen = self.combo.links[..self.combo.len].iter().enumerate().rev().find_map(|(step, link)| {
                 link.as_ref()?.events.iter().enumerate().rev().find_map(|(index, event)| {
-                    event.is_some_and(|event| event.kind == Kind::Aim(part)).then_some((step, index))
+                    event.is_some_and(|event| if part == 0 {
+                        Some(event.offset) == press && matches!(event.kind, Kind::Press(Button::Special) | Kind::CStick)
+                    } else {
+                        event.kind == Kind::Aim(part)
+                    }).then_some((step, index))
                 })
             });
             if let Some((step, index)) = chosen {

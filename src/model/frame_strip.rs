@@ -832,6 +832,7 @@ impl Tracker {
             facing: p1.facing,
             grounded: !p1.airborne,
             press: self.action.origin.unwrap_or(frame),
+            stick: (inputs.lstick_x, inputs.lstick_y),
         }, |from, heading, ground| {
             (0..len)
                 .map(|i| snaps[(head + SNAP_RING - 1 - i) % SNAP_RING])
@@ -842,6 +843,9 @@ impl Tracker {
                 })
         });
         self.late.travel = self.rule.ended();
+        if let Some((0, _)) = self.late.travel {
+            self.late.press = self.rule.own_press();
+        }
         if let Some(dir) = seen.dir.filter(|_| seen.part != 0) {
             self.push_aim(frame.saturating_sub(u32::from(seen.age)), dir);
         }

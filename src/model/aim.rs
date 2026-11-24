@@ -101,6 +101,14 @@ pub struct Now {
     pub facing: i8,
     pub grounded: bool,
     pub press: u32,
+    /// The left stick on this frame.
+    pub stick: (i8, i8),
+}
+
+/// The stick's eight-way bin on one frame; 8 inside the dead zone.
+fn bin(stick: (i8, i8)) -> usize {
+    let (x, y) = (f32::from(stick.0), f32::from(stick.1));
+    if x * x + y * y < f32::from(DEAD) * f32::from(DEAD) { 8 } else { ((angle(x, y) + 22.5) / 45.0) as usize % 8 }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -113,6 +121,7 @@ struct Candidate {
     ground: bool,
 }
 
+/// A travel being measured: an aim part, or as number 0 the special's own travel.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct OpenPart {
     number: u8,
@@ -128,6 +137,16 @@ struct OpenPart {
 }
 
 impl OpenPart {
+    fn begun(number: u8, status: i32, base: (f32, f32), facing: i8, stick: Option<(u16, u8)>) -> Self {
+        Self { number, status, base, facing, stick, last: (0.0, 0.0), trail: [(0.0, 0.0); 16], len: 0, stride: 1, tick: 0 }
+    }
+
+    /// Whether some kept position is far enough from the base to be a travel.
+    fn has_moved(&self) -> bool {
+        self.trail[..usize::from(self.len)].iter().chain(core::iter::once(&self.last))
+            .any(|point| point.0 * point.0 + point.1 * point.1 >= MOVED * MOVED)
+    }
+
     fn sample_part(&mut self, pos: (f32, f32)) {
         self.last = (pos.0 - self.base.0, pos.1 - self.base.1);
         self.tick += 1;
@@ -191,6 +210,12 @@ pub struct Rule {
     candidate: Option<Candidate>,
     part: Option<OpenPart>,
     ended: Option<(u8, Travel)>,
+    /// The press that began the current special, and the one whose own travel ended last.
+    press: u32,
+    origin: u32,
+    /// Frames the stick spent in each bin during the special's own travel, and the newest sample of each bin.
+    held: [u8; 9],
+    sticks: [(i8, i8); 9],
     #[cfg(test)]
     pub(crate) keep_nominal: bool,
 }
@@ -199,7 +224,8 @@ impl Rule {
     pub const fn new() -> Self {
         Self { family: None, facing: 0, onsets: 0, statuses: [None; 2], last_heading: None,
             window: 0, last_status: None, previous: None, previous2: None, previous_ground: true,
-            candidate: None, part: None, ended: None, #[cfg(test)] keep_nominal: false }
+            candidate: None, part: None, ended: None, press: 0, origin: 0, held: [0; 9], sticks: [(0, 0); 9],
+            #[cfg(test)] keep_nominal: false }
     }
 
     /// Player 1 is inside a special as of the last step.
@@ -208,28 +234,73 @@ impl Rule {
     /// The entry of a status whose movement may still show.
     pub fn pending(&self) -> Option<u32> { self.candidate.map(|candidate| candidate.entry) }
 
+    /// The travel that ended on the last step and its part. Part 0 is the special's own travel: where the fighter
+    /// went from the special's start to its end or to its first aim part, with the stick most held on the way.
     pub fn ended(&self) -> Option<(u8, Travel)> { self.ended }
+
+    /// The press that began the special whose own travel ended last.
+    pub fn own_press(&self) -> u32 { self.origin }
+
+    /// End the open travel. An aim part is handed over as measured; the special's own travel only if it moved.
+    fn finish_travel(&mut self) {
+        let Some(part) = self.part.take() else { return };
+        if part.number != 0 {
+            self.ended = Some((part.number, part.measured()));
+        } else if part.has_moved() {
+            // The bin held longest; a tie goes to a direction before neutral. Neutral is kept as no deflection.
+            let most = (0..9).rev().max_by_key(|&bin| self.held[bin]).unwrap_or(8);
+            let stick = if most == 8 { (0, 0) } else { action::stick_of(self.sticks[most], part.facing) };
+            self.ended = Some((0, Travel { stick: Some(stick), ..part.measured() }));
+            self.origin = self.press;
+        }
+    }
+
+    fn tally_stick(&mut self, stick: (i8, i8)) {
+        let bin = bin(stick);
+        self.held[bin] = self.held[bin].saturating_add(1);
+        self.sticks[bin] = stick;
+    }
 
     /// Advance the rule, looking back for the newest matching stick sample.
     pub fn step(&mut self, now: Now, mut stick: impl FnMut(u32, f32, bool) -> Option<(i8, i8)>) -> Seen {
         self.ended = None;
-        if let Some(part) = self.part.as_mut() {
-            if now.status == part.status && (now.start.is_some() || now.own) {
-                if let Some(pos) = now.pos.filter(|_| !now.stop) { part.sample_part(pos); }
-            } else {
-                self.ended = Some((part.number, part.measured()));
-                self.part = None;
+        let restart = now.start.is_some() && self.last_status != Some(now.status);
+        let leaves = self.family.is_some() && now.start.is_none() && !now.own;
+        let entering = self.family.is_some() && now.own && self.last_status != Some(now.status);
+        let lasts = self.part.is_some_and(|part| if part.number == 0 {
+            !restart && !leaves
+        } else {
+            now.status == part.status && (now.start.is_some() || now.own)
+        });
+        if !lasts {
+            self.finish_travel();
+        } else if self.part.is_some_and(|part| part.number == 0) {
+            // The own travel stops sampling while an entry may turn out to be an aim part.
+            self.tally_stick(now.stick);
+            let measuring = !entering && self.candidate.is_none() && !now.stop;
+            if let (Some(part), Some(pos)) = (self.part.as_mut(), now.pos.filter(|_| measuring)) {
+                part.sample_part(pos);
             }
+        } else if let (Some(part), Some(pos)) = (self.part.as_mut(), now.pos.filter(|_| !now.stop)) {
+            part.sample_part(pos);
         }
-        if let Some(family) = now.start.filter(|_| self.last_status != Some(now.status)) {
-            self.family = Some(family);
+        if restart {
+            self.family = now.start;
             self.facing = now.facing;
             self.onsets = 0;
             self.statuses = [None; 2];
             self.last_heading = None;
             self.window = now.press;
             self.candidate = None;
-        } else if self.family.is_some() && now.start.is_none() && !now.own {
+            self.press = now.press;
+            self.held = [0; 9];
+            self.sticks = [(0, 0); 9];
+            self.part = self.previous.or(now.pos).map(|base| OpenPart::begun(0, now.status, base, now.facing, None));
+            self.tally_stick(now.stick);
+            if let (Some(part), Some(pos)) = (self.part.as_mut(), now.pos.filter(|_| !now.stop)) {
+                part.sample_part(pos);
+            }
+        } else if leaves {
             self.family = None;
             self.candidate = None;
         }
@@ -278,10 +349,11 @@ impl Rule {
                             seen.part = self.onsets;
                             seen.dir = self::heading(dx, dy);
                             seen.age = now.frame.saturating_sub(candidate.entry).min(u32::from(u8::MAX)) as u8;
-                            let mut part = OpenPart { number: seen.part, status: now.status, base: candidate.base,
-                                facing: self.facing, stick: deciding.map(|sample| action::stick_of(sample, self.facing)),
-                                last: (0.0, 0.0), trail: [(0.0, 0.0); 16], len: 0, stride: 1, tick: 0 };
+                            let mut part = OpenPart::begun(seen.part, now.status, candidate.base, self.facing,
+                                deciding.map(|sample| action::stick_of(sample, self.facing)));
                             part.sample_part(pos);
+                            // The special's own travel ends where its first aim part begins.
+                            self.finish_travel();
                             self.part = Some(part);
                         }
                         self.window = now.frame.saturating_add(1);

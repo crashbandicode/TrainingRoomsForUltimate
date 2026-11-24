@@ -57,12 +57,14 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
-    /// The part that ended on this frame and its measured travel.
+    /// The part that ended on this frame and its measured travel. Part 0 is the special's own travel.
     pub travel: Option<(u8, Travel)>,
+    /// With part 0: the press that began that special.
+    pub press: u32,
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None, travel: None };
+    pub const NONE: Late = Late { open: None, travel: None, press: 0 };
 }
 
 /// A travel part: angles are facing-relative degrees in tenths, path offsets are facing-relative game units.
@@ -81,6 +83,15 @@ pub const PATH_ABS: f32 = 6.0;
 pub const PATH_REL: f32 = 0.30;
 pub const ANGLE_TOL: i16 = 10;
 pub const DEFLECTION_TOL: i16 = 15;
+/// Two own travels of a special count as steered differently only when some path point is farther apart than this.
+pub const STEER_FLOOR: f32 = 2.0;
+
+/// Whether some path point of the attempt is farther from the reference's than the tolerance.
+fn apart(reference: &Travel, attempt: &Travel, tolerance: f32) -> bool {
+    reference.path.iter().zip(attempt.path).any(|(&(x, y), (a, b))| {
+        (f32::from(a) - f32::from(x)).hypot(f32::from(b) - f32::from(y)) > tolerance
+    })
+}
 
 pub fn path_off(reference: &Travel, attempt: &Travel) -> bool {
     let mut length = 0.0;
@@ -90,10 +101,27 @@ pub fn path_off(reference: &Travel, attempt: &Travel) -> bool {
         length += (point.0 - previous.0).hypot(point.1 - previous.1);
         previous = point;
     }
-    let tolerance = PATH_ABS.max(PATH_REL * length);
-    reference.path.iter().zip(attempt.path).any(|(&(x, y), (a, b))| {
-        (f32::from(a) - f32::from(x)).hypot(f32::from(b) - f32::from(y)) > tolerance
-    })
+    apart(reference, attempt, PATH_ABS.max(PATH_REL * length))
+}
+
+/// The eight-way direction a kept stick is held in; `None` inside the dead zone (`aim::DEAD`) or when none was kept.
+fn sector(stick: Option<(u16, u8)>) -> Option<u16> {
+    let dead = (super::aim::DEAD * 100 / 120) as u8;
+    stick.filter(|&(_, deflection)| deflection >= dead).map(|(angle, _)| (angle + 225) / 450 % 8)
+}
+
+/// The fault of a special's own travel against the saved one, once neither path is off: the stick most held is
+/// compared eight-way, and with the toggle On its angle and deflection too. Only when the two paths differ by more
+/// than [`STEER_FLOOR`]: a special that ignores the stick has no fault here.
+pub fn steer_off(reference: &Travel, attempt: &Travel, match_stick: bool) -> Option<Mark> {
+    if !apart(reference, attempt, STEER_FLOOR) {
+        return None;
+    }
+    let saved = sector(reference.stick);
+    if saved != sector(attempt.stick) {
+        return Some(Mark::Steer);
+    }
+    if match_stick && saved.is_some() { stick_off(reference, attempt) } else { None }
 }
 
 pub fn stick_off(reference: &Travel, attempt: &Travel) -> Option<Mark> {
