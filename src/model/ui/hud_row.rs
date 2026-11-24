@@ -97,7 +97,7 @@ pub fn hud_row(take: Option<Take>, playing: [bool; 2], line: &str) -> Option<Hud
             break;
         }
     }
-    let role_color = take.map(Take::color).or_else(|| match playing {
+    let role_color = take.map(Take::color).or(match playing {
         [true, false] => Some(PLAYER_COLOR),
         [_, true] => Some(CPU_COLOR),
         _ => None,

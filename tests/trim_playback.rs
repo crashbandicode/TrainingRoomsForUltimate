@@ -17,8 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
-#[path = "../src/model/rr_host.rs"]
-mod host;
+use crate::engine::rr_host as host;
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 static HOST: Mutex<()> = Mutex::new(());
@@ -124,7 +123,7 @@ fn open(screens: &mut RecordingScreens, group: u8, section: u8, name: &str) {
 
 fn open_file(root: &Path, group: u8, name: &str, drill: bool) -> RecordingScreens {
     let mut screens = RecordingScreens::new();
-    screens.set_catalog(rr_runtime::load_catalog(root).unwrap());
+    screens.set_catalog_bundle(rr_runtime::load_catalog(root).unwrap());
     if drill {
         open(&mut screens, COMBOS_SEQ, 1, "DRILLS >");
         open(&mut screens, COMBOS_SEQ, 1, name);
@@ -362,7 +361,7 @@ fn macro_and_drill_screens_have_a_trim_row() {
         (COMBOS_SEQ, 0, "Sequence"),
     ] {
         let mut screens = RecordingScreens::new();
-        screens.set_catalog(rr_runtime::load_catalog(&root.0).unwrap());
+        screens.set_catalog_bundle(rr_runtime::load_catalog(&root.0).unwrap());
         open(&mut screens, group, section, name);
         assert!(screens.file_open());
         assert!(!screens.file_rows().iter().any(|row| row.title == "Trim"), "{name}");

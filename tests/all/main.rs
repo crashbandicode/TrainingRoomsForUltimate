@@ -25,9 +25,6 @@ pub mod engine;
 mod allocation;
 #[path = "../../src/test_table.rs"]
 mod test_table;
-#[path = "../trim_playback.rs"]
-mod trim_playback;
-
 #[path = "../build_tag.rs"]
 mod build_tag;
 #[path = "../capabilities.rs"]

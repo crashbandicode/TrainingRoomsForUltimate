@@ -605,7 +605,7 @@ pub fn apply_catalog(catalog: &CatalogBundle, index: &RecordingIndex, screens: &
         .collect();
     catalog.catalog.hot_combos = hot_combos;
     catalog.catalog.hot_sequences = index.hot(Kind::Sequence).to_vec();
-    screens.set_catalog(catalog);
+    screens.set_catalog_bundle(catalog);
 }
 
 pub fn apply_index(index: &RecordingIndex, screens: &mut RecordingScreens) {
@@ -1653,7 +1653,7 @@ mod tests {
         let refresh = |screens: &mut RecordingScreens, watch: CatalogWatch, generation: u64| {
             let (watch, due) = watch.take_load(generation);
             if due {
-                screens.set_catalog(load_catalog(&root).unwrap());
+                screens.set_catalog_bundle(load_catalog(&root).unwrap());
                 apply_index(&RecordingIndex::load(&root).unwrap(), screens);
             }
             watch
@@ -1710,7 +1710,7 @@ mod tests {
         let root = library_card("obsolete-file", 1);
         let loaded = load_catalog(&root).unwrap();
         let mut screens = RecordingScreens::new();
-        screens.set_catalog(loaded);
+        screens.set_catalog_bundle(loaded);
         open_row(&mut screens, SAVES_MACROS, 1, "Take 0");
         let rename = screens.file_rows().iter().position(|row| row.title == "Rename").unwrap();
         screens.set_file_cursor(rename);

@@ -6179,7 +6179,7 @@ mod tests {
                 post_effect(screens.take_effect());
                 let _ = service_at(&root, &none(), "2026-11-14", state(8), state(7));
             };
-            let reload = |screens: &mut RecordingScreens| screens.set_catalog(super::super::rr_runtime::load_catalog(&root).unwrap());
+            let reload = |screens: &mut RecordingScreens| screens.set_catalog_bundle(super::super::rr_runtime::load_catalog(&root).unwrap());
             let file_switch = |id: &str| match chain {
                 true => Store::<Chain>::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,
                 false => Library::new(root.join(MACROS_DIR)).load(id).unwrap().start_save_on,

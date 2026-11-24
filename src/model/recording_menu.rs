@@ -614,8 +614,12 @@ impl RecordingScreens {
         self.overlay_open() && self.overlay_face == Face::Page
     }
 
-    pub fn set_catalog(&mut self, catalog: impl Into<CatalogBundle>) {
-        let CatalogBundle { mut catalog, macro_trims, drill_trims } = catalog.into();
+    pub fn set_catalog(&mut self, catalog: Catalog) {
+        self.set_catalog_bundle(catalog.into());
+    }
+
+    pub fn set_catalog_bundle(&mut self, bundle: CatalogBundle) {
+        let CatalogBundle { mut catalog, macro_trims, drill_trims } = bundle;
         self.macro_trims = macro_trims;
         self.drill_trims = drill_trims;
         self.takes.clear();
