@@ -1,0 +1,189 @@
+//! The card's reason line (`combo_plan`, pane `REASON`): every fault the grader can name is drawn whole, inside the pane
+//! as the card places it. A child of `combo`, so a finished attempt can be put on the helper directly.
+lib_unit_tests! {
+use super::*;
+use crate::model::combo_plan::{at, button_name, event_label, Renderer, SeqView, COUNT};
+use crate::model::drill::{Advance, Stepped};
+use crate::model::frame_strip_plan::{Look, Text};
+use crate::model::notice_box;
+use crate::model::panes::{cb::CHIPS, iv::FONT_SUB, strip_layout::C};
+
+const BUTTONS: [Button; 5] = [Button::Attack, Button::Special, Button::Jump, Button::Shield, Button::Grab];
+const FLICKS: [Flick; 3] = [Flick::FastFall, Flick::Dash, Flick::TapJump];
+const MOVES: [Move; 14] = [
+    Move::Jab, Move::DashAttack, Move::SideTilt, Move::UpTilt, Move::DownTilt, Move::SideSmash, Move::UpSmash,
+    Move::DownSmash, Move::Aerial, Move::NeutralSpecial, Move::SideSpecial, Move::UpSpecial, Move::DownSpecial, Move::Other,
+];
+const SPOTS: [Spot; 3] = [Spot::Sweet, Spot::Sour, Spot::Late];
+/// One frame, the tracker's whole ring, and the widest number an offset's type holds.
+const DELTAS: [i32; 6] = [1, -1, 96, -96, i32::MAX, -i32::MAX];
+
+/// Every fault a `Reason` can carry.
+fn reasons() -> Vec<Reason> {
+    let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
+        .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
+        .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
+    let mut all = vec![Reason::Drop(1), Reason::Drop(96), Reason::MissingCStick];
+    all.extend(MOVES.iter().map(|&m| Reason::WrongMove(m)));
+    for saved in SPOTS {
+        all.push(Reason::WrongSpot(None, saved));
+        all.extend(SPOTS.iter().map(|&got| Reason::WrongSpot(Some(got), saved)));
+    }
+    for b in BUTTONS {
+        all.extend([Reason::Missing(b), Reason::MissingRelease(b)]);
+        all.extend(DELTAS.iter().flat_map(|&d| [Reason::Off(b, d), Reason::ReleaseOff(b, d)]));
+    }
+    for f in FLICKS {
+        all.push(Reason::MissingFlick(f));
+        all.extend(DELTAS.iter().map(|&d| Reason::FlickOff(f, d)));
+    }
+    all.extend(DELTAS.iter().map(|&d| Reason::CStickOff(d)));
+    all.extend(kinds.map(Reason::WrongDir));
+    for part in [1, 2] {
+        all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part)]);
+    }
+    all
+}
+
+/// The sentence the card owes for a fault, written out here a second time.
+fn sentence(unit: &str, link: u8, reason: Reason) -> String {
+    let off = |d: i32| format!("{}f {}", d.abs(), if d > 0 { "late" } else { "early" });
+    let fault = match reason {
+        Reason::Drop(d) => format!("DROP +{d}"),
+        Reason::WrongMove(m) => format!("wrong move: {}", m.name()),
+        Reason::WrongSpot(Some(got), saved) => format!("{}, saved {}", got.name(), saved.name()),
+        Reason::WrongSpot(None, saved) => format!("no spot, saved {}", saved.name()),
+        Reason::Missing(b) => format!("{} missing", button_name(b)),
+        Reason::Off(b, d) => format!("{} {}", button_name(b), off(d)),
+        Reason::MissingRelease(b) => format!("{} release missing", button_name(b)),
+        Reason::ReleaseOff(b, d) => format!("{} release {}", button_name(b), off(d)),
+        Reason::MissingFlick(f) => format!("{} missing", event_label(Kind::Flick(f))),
+        Reason::FlickOff(f, d) => format!("{} {}", event_label(Kind::Flick(f)), off(d)),
+        Reason::MissingCStick => "C-stick missing".to_owned(),
+        Reason::CStickOff(d) => format!("C-stick {}", off(d)),
+        Reason::WrongDir(kind) => format!("{} wrong direction", event_label(kind)),
+        Reason::MissingAim(part) => format!("{} missing", event_label(Kind::Aim(part))),
+        Reason::WrongAim(part) => format!("{} wrong", event_label(Kind::Aim(part))),
+        Reason::ExtraAim(part) => format!("extra {}", event_label(Kind::Aim(part))),
+    };
+    format!("{unit}{} {fault}", u32::from(link) + 1)
+}
+
+fn faulted(link: u8, reason: Reason) -> Summary {
+    Summary { outcome: Outcome::Completed, graded: 2, true_links: 0, total: 2, clean: false, fault: Some((link, reason)) }
+}
+
+/// A helper whose last attempt ended with `summary`: a drill (`input_only`) or a hit combo.
+fn graded(input_only: bool, summary: Summary) -> Helper {
+    let link = LinkRec::presses(
+        Move::Jab,
+        Move::UpTilt,
+        Verdict::True(Some(-3)),
+        Some((0, 4)),
+        &[Event::press(Button::Attack, Aim::Up, 1)],
+    );
+    let mut h = Helper::new();
+    h.set_target(Some(Combo { input_only, ..Combo::from_links([link, link]).unwrap() }));
+    h.step(&Tracker::new(), Settings { on: true, ..Settings::factory() });
+    h.attempt = Some(Attempt { summary: Some(summary), ..Attempt::new(0, false) });
+    h
+}
+
+/// A sequence whose last combo dropped with `summary`.
+fn dropped(summary: Summary) -> SeqView {
+    SeqView {
+        name: Text::new("Corner to kill"),
+        at: 0,
+        steps: 2,
+        streak: 0,
+        best: 0,
+        first: 0,
+        chips: [Text::EMPTY; CHIPS],
+        last: Some(Stepped { step: 0, summary, advance: Advance::Dropped }),
+        last_name: Text::new("Ryu BnB"),
+    }
+}
+
+/// What the card puts on its reason line, and the pane as placed.
+fn shown(h: &Helper, seq: Option<&SeqView>) -> (String, Look) {
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw(h, &Text::new("Jab loop"), seq, true, (&C, false), |i, look, _| looks[i] = *look);
+    let look = looks[at::REASON];
+    (String::from_utf16(look.text.units()).unwrap(), look)
+}
+
+/// The whole sentence, on at most two lines, each no wider than the pane at the reason's font.
+fn check(text: &str, look: Look, want: &str) {
+    assert!(look.visible, "{want}: the reason line is shown");
+    assert_eq!(text.replace('\n', " "), want, "the whole sentence");
+    let lines: Vec<&str> = text.split('\n').collect();
+    assert!(lines.len() <= 2, "{want}: {} lines", lines.len());
+    for line in lines {
+        let (width, _) = notice_box::measure(line.encode_utf16(), FONT_SUB.0);
+        assert!(width <= look.w, "{want}: {line:?} is {width} wide in a pane of {}", look.w);
+    }
+}
+
+#[test]
+fn every_reason_the_grader_can_give_is_shown_in_full_at_the_cards_width() {
+    let mut seen = 0;
+    for reason in reasons() {
+        for link in [0u8, 15] {
+            let summary = faulted(link, reason);
+            // A drill counts steps and a combo links.
+            for (unit, input_only) in [("S", true), ("L", false)] {
+                let (text, look) = shown(&graded(input_only, summary), None);
+                check(&text, look, &sentence(unit, link, reason));
+            }
+            // A dropped sequence names the fault on the sequence card.
+            let mut waiting = graded(false, summary);
+            waiting.attempt = None;
+            let (text, look) = shown(&waiting, Some(&dropped(summary)));
+            check(&text, look, &sentence("L", link, reason));
+            seen += 3;
+        }
+    }
+    assert_eq!(seen, reasons().len() * 2 * 3, "every reason, at link 1 and link 16, on the three cards");
+}
+
+/// The mark under a step or link (`mark_text`, pane `OFFSET`): the first recorded event's name and what was wrong.
+#[test]
+fn every_mark_under_a_step_is_shown_in_full() {
+    let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
+        .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
+        .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
+    for kind in kinds {
+        let name = event_label(kind);
+        let wrong = if name.ends_with("direction") { format!("{name} wrong") } else { format!("{name} wrong direction") };
+        let mut marks = vec![(Mark::Missing, format!("{name} missing")), (Mark::WrongDir, wrong)];
+        marks.extend(DELTAS.iter().map(|&d| {
+            (Mark::At(d), format!("{name} {}f {}", d.abs(), if d > 0 { "late" } else { "early" }))
+        }));
+        for (mark, want) in marks {
+            let (text, _) = crate::model::combo_plan::mark_text(mark, name, 0);
+            assert_eq!(String::from_utf16(text.units()).unwrap(), want);
+        }
+    }
+}
+
+/// A link cell's title (pane `TITLE`): its number and both moves.
+#[test]
+fn a_links_title_names_both_moves_in_full() {
+    let link = LinkRec::presses(
+        Move::DashAttack,
+        Move::DashAttack,
+        Verdict::True(Some(-3)),
+        Some((0, 4)),
+        &[Event::press(Button::Attack, Aim::Neutral, 1)],
+    );
+    let mut h = Helper::new();
+    h.set_target(Combo::from_links([link, link]));
+    h.step(&Tracker::new(), Settings { on: true, ..Settings::factory() });
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    Renderer::new().draw(&h, &Text::new("Jab loop"), None, true, (&C, false), |i, look, _| looks[i] = *look);
+    assert!(looks[at::TITLE].visible);
+    assert_eq!(String::from_utf16(looks[at::TITLE].text.units()).unwrap(), "1 Dash attack>Dash attack");
+}
+}

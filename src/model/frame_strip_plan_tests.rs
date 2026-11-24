@@ -541,6 +541,24 @@ fn parry_window_uses_the_strip_frames() {
     assert!(looks[at::WINDOW_BAR].visible, "the window bar is on the strip's frames");
 }
 
+/// Parry practice's readout line carries Tech's words for the grade, whole.
+#[test]
+fn parrys_grade_words_are_shown_in_full() {
+    use crate::model::parry::{Attempt, View};
+    use crate::model::tech::session::Grade;
+    let mut view = View::EMPTY;
+    view.last[0] = Some(Attempt { grade: Grade::Unavailable, hit: 1, window: None });
+    let mut looks = vec![Look::HIDDEN; COUNT];
+    let (_, line, _) = Renderer::new().draw_with_spec(
+        &Tracker::new(),
+        StripDraw { shown: true, spots: false, parry: Some(&view), history_enabled: true, cells: false, spec: &C },
+        |i, look, _| looks[i] = *look,
+    );
+    let words = "Grading unavailable (not counted)";
+    assert_eq!(String::from_utf16(looks[at::READ_SUB + 1].text.units()).unwrap(), words);
+    assert_eq!(String::from_utf16(line.unwrap().units()).unwrap(), words);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
