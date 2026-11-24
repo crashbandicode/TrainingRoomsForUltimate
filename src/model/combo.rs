@@ -576,6 +576,7 @@ pub enum Mark {
     /// The same kind of event, in order, with a different direction.
     WrongDir,
     Path,
+    /// Signed shortest difference, in tenths of a degree.
     Angle(i16),
     Deflection(i8),
 }
@@ -817,6 +818,7 @@ pub enum Reason {
     WrongAim(u8),
     ExtraAim(u8),
     AimPath(u8),
+    /// Part number and the signed angle difference in tenths of a degree.
     AimAngle(u8, i16),
     AimDeflection(u8, i8),
 }

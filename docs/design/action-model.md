@@ -142,7 +142,8 @@ path points in game units from where the part began. Everything is facing-relati
   `action::stick_off` then fails it with `Mark::Angle` when the stick's angle is more than `ANGLE_TOL` (10°) off, else
   with `Mark::Deflection` when its deflection is more than `DEFLECTION_TOL` (15 points) off. The reasons are
   `AimPath`, `AimAngle` and `AimDeflection` ("S1 1st path off", "S1 1st angle 12 off", "S1 1st deflection 30% low"),
-  reported after an extra aim and before a timing fault.
+  reported after an extra aim and before a timing fault. The angle mark and reason use the same tenth of a degree
+  that was graded: a 10.2-degree miss shows `10.2 off`, not `10 off`.
 - **Late travel.** A part can end after its step was graded; `Helper::regrade` grades that step again, as for a late
   angle.
 - **The toggle.** Recording › Options, *Match angle and deflection* (`combo_stick`, Off by default), read into

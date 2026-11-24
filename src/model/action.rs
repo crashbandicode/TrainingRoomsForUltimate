@@ -100,7 +100,7 @@ pub fn stick_off(reference: &Travel, attempt: &Travel) -> Option<Mark> {
     let ((angle, deflection), (actual, magnitude)) = (reference.stick?, attempt.stick?);
     let delta = (i32::from(actual) - i32::from(angle) + 1800).rem_euclid(3600) - 1800;
     if delta.abs() > i32::from(ANGLE_TOL) * 10 {
-        return Some(Mark::Angle((delta as f32 / 10.0).round() as i16));
+        return Some(Mark::Angle(delta as i16));
     }
     let delta = i16::from(magnitude) - i16::from(deflection);
     (delta.abs() > DEFLECTION_TOL).then_some(Mark::Deflection(delta as i8))

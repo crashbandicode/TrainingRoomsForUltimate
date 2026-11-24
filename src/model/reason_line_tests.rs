@@ -42,8 +42,8 @@ fn reasons() -> Vec<Reason> {
     all.extend(kinds.map(Reason::WrongDir));
     for part in [1, 2] {
         all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part), Reason::AimPath(part)]);
-        // The stick's angle is off by 11 to 180 degrees and its deflection by 16 to 100 points.
-        all.extend([11, -11, 180, -180].map(|d| Reason::AimAngle(part, d)));
+        // Include the smallest rejected angle and the widest fractional label.
+        all.extend([101, -101, 1799, -1799, -1800].map(|d| Reason::AimAngle(part, d)));
         all.extend([16, -16, 100, -100].map(|d| Reason::AimDeflection(part, d)));
     }
     all
@@ -75,7 +75,7 @@ fn sentence(unit: &str, link: u8, reason: Reason) -> String {
         Reason::WrongAim(part) => format!("{} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => format!("extra {}", event_label(Kind::Aim(part))),
         Reason::AimPath(part) => format!("{} path off", ordinal(part)),
-        Reason::AimAngle(part, d) => format!("{} angle {} off", ordinal(part), d.unsigned_abs()),
+        Reason::AimAngle(part, d) => format!("{} angle {} off", ordinal(part), f32::from(d.unsigned_abs()) / 10.0),
         Reason::AimDeflection(part, d) => {
             format!("{} deflection {}% {}", ordinal(part), d.unsigned_abs(), if d < 0 { "low" } else { "high" })
         }
@@ -202,7 +202,8 @@ fn every_mark_under_a_step_is_shown_in_full() {
         if let Kind::Aim(part) = kind {
             let part = ordinal(part);
             marks.push((Mark::Path, format!("{part} path off")));
-            marks.extend([11, -180].map(|d: i16| (Mark::Angle(d), format!("{part} angle {} off", d.unsigned_abs()))));
+            marks.extend([(101, "10.1"), (-1799, "179.9"), (-1800, "180")]
+                .map(|(d, deg)| (Mark::Angle(d), format!("{part} angle {deg} off"))));
             marks.extend([16, -100].map(|d: i8| {
                 (Mark::Deflection(d), format!("{part} deflection {}% {}", d.unsigned_abs(), if d < 0 { "low" } else { "high" }))
             }));
@@ -212,6 +213,26 @@ fn every_mark_under_a_step_is_shown_in_full() {
             assert_eq!(String::from_utf16(text.units()).unwrap(), want);
         }
     }
+}
+
+#[test]
+fn the_widest_fractional_angle_reaches_both_card_panes() {
+    let reference = LinkRec {
+        events: retain([Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 0 }]),
+        ..LinkRec::INPUT
+    };
+    let mut h = Helper::new();
+    h.set_target(Some(Combo { input_only: true, ..Combo::from_links([reference; LINKS]).unwrap() }));
+    let mut g = grade(&reference, &reference);
+    g.marks[0] = Some(Mark::Angle(-1799));
+    h.attempt = Some(Attempt { grades: [Some(g); LINKS], len: LINKS,
+        summary: Some(faulted(15, Reason::AimAngle(2, -1799))), ..Attempt::new(0, false) });
+    let (card, _) = drawn(&h, None);
+    let why = card[at::REASON];
+    check(&String::from_utf16(why.text.units()).unwrap(), why, "S16 2nd angle 179.9 off");
+    let mark = card[at::RULER - 1];
+    assert!(mark.visible);
+    assert_eq!(String::from_utf16(mark.text.units()).unwrap(), "2nd angle 179.9 off");
 }
 
 /// A link cell's title (pane `TITLE`): its number and both moves.

@@ -2685,3 +2685,11 @@ ceiling = 198679
 date = "2026-11-24"
 reason = "Merge 3C of install 4: travel parts (deciding stick, heading, distance, eight-point path), steering and the Match angle and deflection toggle, their marks and texts, the packed travel table, and a later link's first move borrowing its travel arrows. Measured 198679 on 1a55481f, 535 above merge 3 (198144, e09fc3cf)."
 approved_by = "tr-primary-2 ruling 2026-11-24 20:31:04Z (the 3C line budget is approved at the folded head's measured value under the 17:59:40Z rule)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 198682
+date = "2026-11-24"
+reason = "Keep the measured angle miss in tenths for the shared mark and reason text; +3 implementation lines on 3C a77cb42e."
+approved_by = "tr-primary-2 ruling 2026-11-24 21:46:20Z: measured fix-only increases up to 60 lines."

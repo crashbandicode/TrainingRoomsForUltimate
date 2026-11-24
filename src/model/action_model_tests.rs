@@ -834,16 +834,16 @@ fn the_angle_and_deflection_toggle_grades_the_stick() {
         assert!(steering_attempt(reference, travel((-40, 40), stick), false).clean);
     }
     assert_eq!(steering_attempt(reference, travel((-40, 40), (1150, 100)), true).fault,
-        Some((0, Reason::AimAngle(1, -20))));
+        Some((0, Reason::AimAngle(1, -200))));
     assert_eq!(steering_attempt(reference, travel((-40, 40), (1350, 50)), true).fault,
         Some((0, Reason::AimDeflection(1, -50))));
     assert!(steering_attempt(reference, travel((-40, 40), (1270, 90)), true).clean);
     let around_zero = travel((40, 0), (3590, 50));
     assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (90, 65))), None);
-    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (100, 50))), Some(Mark::Angle(11)));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (100, 50))), Some(Mark::Angle(110)));
     assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (3590, 34))), Some(Mark::Deflection(-16)));
     assert_eq!(action::stick_of((0, 0), -1), (0, 0));
-    assert_eq!(crate::model::combo_plan::mark_text(Mark::Angle(-20), "1st direction", 1).0,
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Angle(-200), "1st direction", 1).0,
         crate::model::frame_strip_plan::Text::new("1st angle 20 off"));
     // DESIGN section 4 words the fault "deflection", as the menu row does.
     assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(-50), "2nd direction", 1).0,

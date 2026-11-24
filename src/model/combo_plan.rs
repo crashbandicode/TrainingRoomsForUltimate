@@ -49,6 +49,15 @@ pub fn event_label(kind: Kind) -> &'static str {
     }
 }
 
+fn write_angle(text: &mut Text, ordinal: &str, tenths: i16) -> core::fmt::Result {
+    let magnitude = tenths.unsigned_abs();
+    write!(text, "{ordinal} angle {}", magnitude / 10)?;
+    if !magnitude.is_multiple_of(10) {
+        write!(text, ".{}", magnitude % 10)?;
+    }
+    text.write_str(" off")
+}
+
 /// A reference event's mark: "on time", "Jump 2f late", "Jump release missing", "C-stick wrong direction".
 pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
     let mut t = Text::EMPTY;
@@ -83,7 +92,7 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
             BAD
         }
         Mark::Angle(delta) => {
-            let _ = write!(t, "{} angle {} off", name.split_whitespace().next().unwrap_or(name), delta.unsigned_abs());
+            let _ = write_angle(&mut t, name.split_whitespace().next().unwrap_or(name), delta);
             BAD
         }
         Mark::Deflection(delta) => {
@@ -181,8 +190,8 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
         Reason::WrongAim(part) => write!(t, "{unit}{n} {} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => write!(t, "{unit}{n} extra {}", event_label(Kind::Aim(part))),
         Reason::AimPath(part) => write!(t, "{unit}{n} {} path off", if part == 1 { "1st" } else { "2nd" }),
-        Reason::AimAngle(part, delta) => write!(t, "{unit}{n} {} angle {} off",
-            if part == 1 { "1st" } else { "2nd" }, delta.unsigned_abs()),
+        Reason::AimAngle(part, delta) => write!(t, "{unit}{n} ")
+            .and_then(|()| write_angle(&mut t, if part == 1 { "1st" } else { "2nd" }, delta)),
         Reason::AimDeflection(part, delta) => write!(t, "{unit}{n} {} deflection {}% {}",
             if part == 1 { "1st" } else { "2nd" }, delta.unsigned_abs(), if delta < 0 { "low" } else { "high" }),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
