@@ -13,11 +13,11 @@
 //!   the order and at the point it did when the worker wrote it under the lock; the worker reads copies (`SAMPLE`,
 //!   `PROGRESS`) and keeps the menu's labels itself (`LABELS`).
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::Mutex;
 
-use crate::model::combo::{Combo, Helper, Label, Mark, Out, Outcome, Settings};
+use crate::model::combo::{CaptureOwner, Combo, Helper, Label, Mark, Out, Outcome, Settings};
 use crate::model::combo_plan::{self, Renderer, SeqView};
 use crate::model::drill::{Advance, SequenceRun, SequenceWalk, Stepped};
 use crate::model::frame_strip::{Tracker, Verdict};
@@ -34,6 +34,7 @@ static SAMPLE: hos_lock::TripleBuffer<Sample> = hos_lock::TripleBuffer::new(Samp
     seen: 0,
     strip_valid: false,
     last: None,
+    owner: CaptureOwner::UNKNOWN,
 });
 
 #[derive(Clone, Copy)]
@@ -44,6 +45,7 @@ struct Sample {
     strip_valid: bool,
     /// *Save last combo*'s: the helper's, which it keeps across a clear.
     last: Option<Combo>,
+    owner: CaptureOwner,
 }
 // Changed flags share the renderer's static ownership; native pane writes run after HELPER is dropped.
 static RENDERER: Mutex<(Renderer, [Option<Changed>; combo_plan::COUNT])> =
@@ -95,8 +97,6 @@ fn take_posted_name(name: &mut Short) {
         *name = posted;
     }
 }
-/// P1's fighter kind at the strip's last sample (-1 none): *Save last combo* writes its name as `recorded_on`.
-static P1_KIND: AtomicI32 = AtomicI32::new(-1);
 
 fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.combo)
@@ -105,9 +105,9 @@ fn settings() -> Settings {
 /// One frame, right after the strip's tracker stepped (game thread, inside the fighter's frame). `p1_kind` is the
 /// fighter P1 is now: kept for the next save's `recorded_on` only; the helper grades whatever fighter P1 is.
 pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
-    P1_KIND.store(p1_kind.unwrap_or(-1), Ordering::Relaxed);
     let (out, name, stepped) = {
         let mut helper = HELPER.lock();
+        let before = helper.seen();
         let name = pull_staged().map(|staged| {
             let (combo, text, fighter) = match staged {
                 Some((combo, text, fighter)) => (Some(combo), text, fighter),
@@ -123,7 +123,9 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
             Some(plan) => {
                 let mut run = RUN.lock();
                 let run = sequence_run(&mut run, plan, &mut helper);
-                run.step(&mut helper, &plan.steps, tracker, settings())
+                let result = run.step(&mut helper, &plan.steps, tracker, settings());
+                if result.1.is_some() { plan.install_owner(run.walk().cursor()); }
+                result
             }
             None => {
                 *RUN.lock() = None;
@@ -134,10 +136,16 @@ pub fn after_strip(tracker: &Tracker, p1_kind: Option<i32>) {
         drop(plan);
         let stepped = stepped.map(|(s, generation)| note_step(s, generation));
         let last = helper.last_combo();
+        helper.retain_owner(before, || {
+            let kind = p1_kind.unwrap_or(-1);
+            let fighter = crate::model::move_names::recorded_identity(crate::model::move_names::PUBLISHED.player(), kind);
+            CaptureOwner { kind, fighter }
+        });
         SAMPLE.write(Sample {
             seen: helper.seen(),
             strip_valid: true,
             last,
+            owner: helper.retained_owner,
         });
         (out, name, stepped)
     };
@@ -170,6 +178,7 @@ fn sequence_run<'a>(
             plan.best,
         ));
         fresh.start(helper, &plan.steps);
+        plan.install_owner(fresh.walk().cursor());
         *run = Some((plan.generation, fresh));
     }
     match run {
@@ -189,6 +198,7 @@ pub fn session_clear() {
                 let mut run = RUN.lock();
                 let run = sequence_run(&mut run, plan, &mut helper);
                 let (out, stepped) = run.clear(&mut helper, &plan.steps);
+                if stepped.is_some() { plan.install_owner(run.walk().cursor()); }
                 (out, stepped.map(|s| (s, plan.generation)))
             }
             None => (helper.clear(), None),
@@ -198,6 +208,7 @@ pub fn session_clear() {
             seen: helper.seen(),
             strip_valid: false,
             last: helper.last_combo(),
+            owner: helper.retained_owner,
         });
         (out, stepped)
     };
@@ -262,9 +273,15 @@ pub struct SequenceStage {
     pub generation: u32,
     pub name: Short,
     pub steps: Vec<Combo>,
-    pub names: Vec<Short>,
+    pub names: Vec<(Short, Option<crate::model::move_names::FighterId>)>,
     pub streak: u32,
     pub best: u32,
+}
+
+impl SequenceStage {
+    fn install_owner(&self, at: usize) {
+        crate::model::move_names::PUBLISHED.set_target(self.names.get(at).and_then(|step| step.1));
+    }
 }
 
 /// The staged plan as game threads see it (game threads only). Each one that takes it installs a plan the worker posted first
@@ -308,7 +325,7 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
             names: plan
                 .steps
                 .iter()
-                .map(|step| Short::new(&step.name))
+                .map(|step| (Short::new(&step.name), step.fighter))
                 .collect(),
             streak: plan.streak,
             best: plan.best,
@@ -322,7 +339,7 @@ pub fn stage_sequence(plan: Option<(&crate::engine::rr_host::SequencePlan, bool)
             stage.streak,
             stage.best,
         );
-        NAME_POSTED.publish(stage.names.first().copied().unwrap_or(Short::EMPTY));
+        NAME_POSTED.publish(stage.names.first().map_or(Short::EMPTY, |step| step.0));
         let mut labels = LABELS.lock();
         labels.settle();
         labels.target = Label::new(&plan.map_or(String::new(), |(plan, _)| plan.name.clone()));
@@ -352,7 +369,7 @@ fn seq_view() -> Option<Option<SeqView>> {
     let first = SeqView::first_chip(at, steps);
     let mut chips = [Text::EMPTY; crate::model::panes::cb::CHIPS];
     for (c, chip) in chips.iter_mut().enumerate() {
-        *chip = plan.names.get(first + c).map_or(Text::EMPTY, Short::text);
+        *chip = plan.names.get(first + c).map_or(Text::EMPTY, |step| step.0.text());
     }
     let last = run.and_then(|run| run.last());
     Some(Some(SeqView {
@@ -366,7 +383,7 @@ fn seq_view() -> Option<Option<SeqView>> {
         last,
         last_name: last
             .and_then(|s| plan.names.get(s.step))
-            .map_or(Text::EMPTY, Short::text),
+            .map_or(Text::EMPTY, |step| step.0.text()),
     }))
 }
 
@@ -479,22 +496,16 @@ pub extern "C" fn tr_combo_fighter_v1(event: u32, recorded: u32, current: u32, d
     core::hint::black_box((0x4647_4854_u32, event, recorded, current, detail));
 }
 
-/// P1's fighter kind at the strip's last sample, for a save's `recorded_on` (worker).
-pub fn p1_kind() -> Option<i32> {
-    let kind = P1_KIND.load(Ordering::Relaxed);
-    (kind >= 0).then_some(kind)
-}
-
 /// *Save last combo* (worker): the open exchange when it has a link, else the one before, as of the last frame. Read in place
 /// (`with_latest`): a whole `Sample` is two combos, and `tr-menu`'s deepest path cannot carry the copy (`final-surface-cov-4e336da4`).
-pub fn last_combo() -> Option<Combo> {
-    SAMPLE.with_latest(|sample, _| sample.last)
+pub fn last_combo() -> Option<(Combo, CaptureOwner)> {
+    SAMPLE.with_latest(|sample, _| sample.last.map(|combo| (combo, sample.owner)))
 }
 
 /// The last combo published by the strip and the count of links captured (worker; the recording host's tick, on `tr-menu`'s
 /// deepest path), read in place as `last_combo`.
-pub fn strip_sample() -> (u32, Option<Combo>) {
-    SAMPLE.with_latest(|sample, _| (sample.seen, sample.last.filter(|_| sample.strip_valid)))
+pub fn strip_sample() -> (u32, Option<Combo>, CaptureOwner) {
+    SAMPLE.with_latest(|sample, _| (sample.seen, sample.last.filter(|_| sample.strip_valid), sample.owner))
 }
 
 /// The worker read the saved-combo list (`tr_combo_listed_v1`).

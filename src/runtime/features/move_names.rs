@@ -154,12 +154,15 @@ pub unsafe fn note_player(accessor: usize, kind: Option<i32>, cleared: bool) {
         return;
     };
     if !cleared && LAST_KIND.load(Ordering::Acquire) == kind { return; }
-    // SAFETY: the roster function checks its published seam before calling it.
-    let Some(chara) = (unsafe { crate::runtime::roster::character_roster::ui_chara_hash(kind as u32) }) else {
-        LAST_KIND.store(-1, Ordering::Release);
-        PUBLISHED.set_player(None);
-        return;
-    };
+    let id = unsafe { fighter_id(accessor, kind) };
+    PUBLISHED.set_player(id.map(|id| (kind, id)));
+    LAST_KIND.store(if id.is_some() { kind } else { -1 }, Ordering::Release);
+}
+
+/// # Safety
+/// The body with `kind` and its module accessor must be live on this game thread.
+pub unsafe fn fighter_id(accessor: usize, kind: i32) -> Option<FighterId> {
+    let chara = unsafe { crate::runtime::roster::character_roster::ui_chara_hash(u32::try_from(kind).ok()?) }?;
     let mut table = ids::Table::unresolved();
     // SAFETY: the lookup checks its own guard.
     table.resolve(|key| unsafe { game::lua_const(key) });
@@ -169,6 +172,5 @@ pub unsafe fn note_player(accessor: usize, kind: Option<i32>, cleared: bool) {
         let value = unsafe { game::natives::get_int(accessor, table.get(id)) };
         if (0..=2).contains(&value) { value as u8 } else { 0 }
     });
-    PUBLISHED.set_player(Some((kind, FighterId { chara, specials })));
-    LAST_KIND.store(kind, Ordering::Release);
+    Some(FighterId { chara, specials })
 }

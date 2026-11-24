@@ -247,25 +247,18 @@ impl Names {
 }
 
 #[derive(Clone, Copy)]
-pub struct Name {
-    bytes: [u8; 96],
-    len: usize,
-}
+pub struct Name<'a>(&'a str);
 
-impl Name {
-    pub fn new(source: &str) -> Self {
-        let mut out = Self { bytes: [0; 96], len: 0 };
-        for ch in source.chars() {
-            if out.len + ch.len_utf8() > out.bytes.len() { break; }
-            ch.encode_utf8(&mut out.bytes[out.len..]);
-            out.len += ch.len_utf8();
-        }
-        out
+impl<'a> Name<'a> {
+    pub fn new(source: &'a str) -> Self {
+        let mut end = source.len().min(96);
+        while !source.is_char_boundary(end) { end -= 1; }
+        Self(&source[..end])
     }
-    pub fn as_str(&self) -> &str { core::str::from_utf8(&self.bytes[..self.len]).unwrap_or("") }
+    pub fn as_str(&self) -> &'a str { self.0 }
 }
 
-impl core::fmt::Display for Name {
+impl core::fmt::Display for Name<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { f.write_str(self.as_str()) }
 }
 
@@ -349,7 +342,7 @@ impl<'a> Namer<'a> {
     pub fn target() -> Namer<'static> { Namer::new(PUBLISHED.is_on(), PUBLISHED.table(), PUBLISHED.target()) }
     pub fn recorded(fighter: Option<FighterId>) -> Namer<'static> { Namer::new(PUBLISHED.is_on(), PUBLISHED.table(), fighter) }
     pub fn is_on(&self) -> bool { self.on }
-    pub fn name(&self, mv: Move, normal: Normal) -> Name {
+    pub fn name(&self, mv: Move, normal: Normal) -> Name<'a> {
         if !self.on { return Name::new(mv.name()); }
         let special = match mv {
             Move::NeutralSpecial => Some((Slot::Neutral, 0, "Neutral special")),
@@ -360,18 +353,16 @@ impl<'a> Namer<'a> {
         };
         if let Some((slot, at, fallback)) = special {
             let found = self.names.zip(self.fighter).and_then(|(names, id)| {
-                names.special(id.chara, slot, id.specials[at]).or_else(|| names.special(id.chara, slot, 0))
+                let variant = id.specials[at];
+                names.special(id.chara, slot, variant).or_else(|| (variant != 0).then(|| names.special(id.chara, slot, 0)).flatten())
             });
             return Name::new(found.unwrap_or(fallback));
         }
         Name::new(normal.name().unwrap_or(match mv {
-            Move::Jab => "Jab", Move::DashAttack => "Dash attack", Move::SideTilt => "Forward tilt",
-            Move::UpTilt => "Up tilt", Move::DownTilt => "Down tilt", Move::SideSmash => "Forward smash",
-            Move::UpSmash => "Up smash", Move::DownSmash => "Down smash", Move::Aerial => "Aerial",
-            _ => "Move",
+            Move::SideTilt => "Forward tilt", Move::SideSmash => "Forward smash", _ => mv.name(),
         }))
     }
-    pub fn final_smash(&self) -> Name {
+    pub fn final_smash(&self) -> Name<'a> {
         let found = self.on.then(|| self.names.zip(self.fighter).and_then(|(names, id)| names.special(id.chara, Slot::Final, 0))).flatten();
         Name::new(found.unwrap_or("Final Smash"))
     }

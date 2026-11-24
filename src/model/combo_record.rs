@@ -235,6 +235,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -245,8 +246,8 @@ impl ComboRecord {
             let mut object = source.clone();
             object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
-            if let Some(fighter) = self.fighter {
-                object.insert("recorded_fighter".into(), json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials}));
+            if let Some(identity) = identity {
+                object.insert("recorded_fighter".into(), identity);
             } else {
                 object.remove("recorded_fighter");
             }
@@ -292,8 +293,8 @@ impl ComboRecord {
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
         }
-        if let Some(fighter) = self.fighter {
-            value["recorded_fighter"] = json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials});
+        if let Some(identity) = identity {
+            value["recorded_fighter"] = identity;
         }
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
