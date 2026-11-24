@@ -2601,7 +2601,7 @@ approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrato
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197047
+ceiling = 197050
 date = "2026-11-24"
-reason = "F15-4: a release of the waiting-room partner holds practice whatever the draw pass stored for the layout's readiness. Measured 197047, 10 above the measured base 71158421 (197037)."
+reason = "F15-4: a release of the waiting-room partner holds practice whatever the draw pass stored for the layout's readiness. Measured 197050, 13 above the measured base 71158421 (197037)."
 approved_by = "tr-primary-2 ruling 2026-11-24 00:52:41Z (edge-juggle-sol leads the F15-4 cause and fix, on a branch off 71158421 for the next build)."

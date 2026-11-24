@@ -60,6 +60,11 @@ fn practice_setting(on: bool) -> bool {
     on || RELEASING.load(Ordering::Acquire)
 }
 
+/// The room's readiness as practice reads it: the layout's, or a release under way (`lobby_flag::released_clock`).
+fn ui_ready() -> bool {
+    UI_READY.load(Ordering::Acquire) || RELEASING.load(Ordering::Acquire)
+}
+
 pub fn requested() -> bool {
     practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()
 }
@@ -71,11 +76,11 @@ pub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
 
 /// The same request and readiness facts as `active`, without waiting on menu edits.
 pub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {
-    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))
+    Ok(try_requested()? && ui_ready())
 }
 
 pub fn active() -> bool {
-    requested() && UI_READY.load(Ordering::Acquire)
+    requested() && ui_ready()
 }
 
 pub fn set_ui_ready(ready: bool) {

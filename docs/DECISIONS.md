@@ -1883,8 +1883,10 @@ Turning Lobby Practice Off while a drill runs stops it first; the partner gets i
 The menu's draw pass reads the Lobby Practice setting itself and drops the room's readiness as soon as it is Off. When
 it ran before the game thread's next update, practice ended in the very update that armed the release, and the drill's
 borrowed fighter and CPU type stayed in the room. While a release is under way the game thread now counts the room as
-ready (`lobby_flag::released_clock`). Leaving the room still ends practice at once, and the draw pass is unchanged.
-Seen once on `71158421` in a waiting room; the code on this path is the same in the build before it. Host tests only so far.
+ready (`lobby_flag::released_clock`). The room's other readers of that readiness follow the same rule, so the practice
+session and the game speed do not drop for a frame during the give-back. Leaving the room still ends practice at once,
+and the draw pass is unchanged. Seen once on `71158421` in a waiting room; the code on this path is the same in the
+build before it. Host tests only so far.
 
 ## Record placement · RP4 missed-tech face
 

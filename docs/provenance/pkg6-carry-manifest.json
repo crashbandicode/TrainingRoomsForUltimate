@@ -28947,7 +28947,7 @@
       "dest": "src/runtime/lobby/training/lobby.rs",
       "crate": "root",
       "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-      "dest_sha256": "5de529c46e50a80fa95e6c707d3474ee7561be120862e1c7317caa0cd7d5702f",
+      "dest_sha256": "2a5a89a57ff82093288cd06932ae8c57ac0274e2d8f2b480e76aeaa67d22c150",
       "edits": [
         {
           "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -29028,6 +29028,11 @@
           "old": "    let (next, decision) = crate::model::lobby_flag::step(clock, observed, practice_on);\n",
           "new": "    let (next, decision) = crate::model::lobby_flag::step(crate::model::lobby_flag::released_clock(clock, releasing), observed, practice_on);\n",
           "reason": "Count the room as ready while a release is under way, even if the draw pass has dropped layout readiness."
+        },
+        {
+          "old": "fn practice_setting(on: bool) -> bool {\n    on || RELEASING.load(Ordering::Acquire)\n}\n\npub fn requested() -> bool {\n    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(practice_setting(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n",
+          "new": "fn practice_setting(on: bool) -> bool {\n    on || RELEASING.load(Ordering::Acquire)\n}\n\n/// The room's readiness as practice reads it: the layout's, or a release under way (`lobby_flag::released_clock`).\nfn ui_ready() -> bool {\n    UI_READY.load(Ordering::Acquire) || RELEASING.load(Ordering::Acquire)\n}\n\npub fn requested() -> bool {\n    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && ui_ready())\n}\n\npub fn active() -> bool {\n    requested() && ui_ready()\n}\n",
+          "reason": "Keep the room's practice readers ready during a partner release even when the layout readiness has dropped."
         }
       ]
     },
