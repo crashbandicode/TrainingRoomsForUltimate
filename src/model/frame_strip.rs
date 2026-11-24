@@ -766,6 +766,7 @@ impl Tracker {
                     && !p1.stop)
         });
         let opened = p1_busy && (self.p1_was_actionable || restarted);
+        self.late.turned = (p1.status != self.p1_status).then_some(opened);
         if opened {
             if self.p1_was_actionable {
                 self.action.base = None;

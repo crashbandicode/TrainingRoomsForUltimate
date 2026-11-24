@@ -90,6 +90,7 @@ pub enum Flick {
 pub enum Kind {
     Press(Button),
     Release(Button),
+    LetGo(Button),
     CStick,
     Flick(Flick),
     /// A part of a directional special took its direction; the part number.
@@ -289,9 +290,9 @@ impl LinkRec {
     fn holds_from(&self, before: impl Iterator<Item = Event> + Clone) -> [Option<u32>; STEPS] {
         let mut holds = [None; STEPS];
         for (i, event) in self.events.iter().enumerate() {
-            let Some(Event { kind: Kind::Release(button), offset, .. }) = event else { continue };
+            let Some(Event { kind: Kind::Release(button) | Kind::LetGo(button), offset, .. }) = event else { continue };
             let owner = self.events[..i].iter().rev().flatten().copied().chain(before.clone())
-                .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == *button));
+                .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) | Kind::LetGo(b) if b == *button));
             if let Some(Event { kind: Kind::Press(_), offset: press, .. }) = owner {
                 holds[i] = u32::try_from(i64::from(*offset) - i64::from(press)).ok();
             }
@@ -401,7 +402,7 @@ impl Combo {
     pub fn unreleased(&self, button: Button) -> bool {
         self.links[..self.len].iter().rev().flatten()
             .flat_map(|link| link.events.iter().rev().flatten())
-            .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == button))
+            .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) | Kind::LetGo(b) if b == button))
             .is_some_and(|event| matches!(event.kind, Kind::Press(_)))
     }
 
@@ -415,7 +416,7 @@ impl Combo {
 
     /// The button, ordinal and offset of the press that owns this release.
     fn owner_press(&self, k: usize, i: usize) -> Option<(Button, usize, i32)> {
-        let Kind::Release(button) = self.get(k)?.events.get(i)?.as_ref()?.kind else { return None };
+        let (Kind::Release(button) | Kind::LetGo(button)) = self.get(k)?.events.get(i)?.as_ref()?.kind else { return None };
         let mut count = 0;
         let mut open = None;
         for (step, link) in self.links().enumerate().take(k + 1) {
@@ -426,7 +427,7 @@ impl Combo {
                         open = Some((count, event.offset));
                         count += 1;
                     }
-                    Kind::Release(b) if b == button => open = None,
+                    Kind::Release(b) | Kind::LetGo(b) if b == button => open = None,
                     _ => {}
                 }
             }
@@ -456,7 +457,7 @@ impl Combo {
             let previous = self.links[k - 1].unwrap();
             let current = self.links[k].unwrap();
             let count = previous.events().count();
-            if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::Aim(1)))
+            if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::LetGo(_) | Kind::Aim(1)))
                 && count + current.events().count() <= STEPS
             {
                 let previous = self.links[k - 1].as_mut().unwrap();
@@ -577,17 +578,20 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
     let mut from = 0;
     for (index, (mark, want)) in marks.iter_mut().zip(reference.events.iter()).enumerate() {
         let Some(want) = want else { continue };
-        if input_only && matches!(want.kind, Kind::Release(_)) && context.ref_holds[index].is_none() {
+        if input_only && (matches!(want.kind, Kind::Release(_))
+            || (matches!(want.kind, Kind::LetGo(_)) && context.ref_holds[index].is_none())) {
             continue;
         }
         let found = (from..STEPS).find(|&i| {
             !used[i]
                 && attempt.events[i]
-                    .is_some_and(|got| event_matches(*want, got, reference.presses_only))
+                    .is_some_and(|got| event_matches(*want, got, reference.presses_only)
+                        || (input_only && matches!((want.kind, got.kind),
+                            (Kind::LetGo(a), Kind::Release(b)) if a == b)))
         });
         // rc.12: the follow-up's events end at its hit, so a button still held when the hit lands has no release here.
         // Holding it longer does not change the move that came out: a release with no counterpart is not graded.
-        if !input_only && found.is_none() && matches!(want.kind, Kind::Release(_)) {
+        if !input_only && found.is_none() && matches!(want.kind, Kind::Release(_) | Kind::LetGo(_)) {
             continue;
         }
         *mark = Some(match found {
@@ -595,10 +599,10 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                 used[i] = true;
                 from = i + 1;
                 let got = attempt.events[i].unwrap();
-                if reference.presses_only || got.dir == want.dir || matches!(want.kind, Kind::Release(_))
+                if reference.presses_only || got.dir == want.dir || matches!(want.kind, Kind::Release(_) | Kind::LetGo(_))
                     || (matches!(want.kind, Kind::Press(Button::Special)) && context.owns_aim[index])
                 {
-                    let delta = if let (Kind::Release(_), Some(saved), Some(actual)) =
+                    let delta = if let (Kind::Release(_) | Kind::LetGo(_), Some(saved), Some(actual)) =
                         (want.kind, context.ref_holds[index], context.att_holds[i])
                     {
                         band[index] = action::hold_band(saved);
@@ -828,6 +832,9 @@ pub struct Helper {
     results: [Option<Summary>; RESULTS],
     streak: u16,
     best: u8,
+    attempt_streak: u16,
+    attempt_best: u8,
+    displaced_result: Option<Summary>,
     pending_load: bool,
     settings: Settings,
     input: InputCapture,
@@ -852,6 +859,9 @@ impl Helper {
             results: [None; RESULTS],
             streak: 0,
             best: 0,
+            attempt_streak: 0,
+            attempt_best: 0,
+            displaced_result: None,
             pending_load: false,
             settings: Settings::factory(),
             input: InputCapture::new(),
@@ -1026,15 +1036,19 @@ impl Helper {
             self.attempt = None;
         }
         let aims = self.target.as_ref().is_some_and(Combo::has_aim);
+        self.input.window = self.settings.tolerance;
         let amended = self.input.step_with(snap, late.unwrap_or(Late::NONE), false, aims);
         let Some(start) = self.input.first else {
             return;
         };
         if self.attempt.is_none() {
+            self.attempt_streak = self.streak;
+            self.attempt_best = self.best;
+            self.displaced_result = None;
             self.attempt = Some(Attempt::new(start, false));
         }
-        if let Some(j) = amended {
-            self.regrade(j, out);
+        for j in 0..LINKS {
+            if amended & (1u16 << j) != 0 { self.regrade(j, out); }
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
             let target = self.target.as_ref().unwrap();
@@ -1050,7 +1064,7 @@ impl Helper {
             }
             let holds = target.holds(attempt.len);
             let deadline = reference.events.iter().enumerate().filter_map(|(i, event)| {
-                event.map(|event| {
+                event.filter(|event| !matches!(event.kind, Kind::Release(_))).map(|event| {
                     let Some(hold) = holds[i] else { return event.offset };
                     let shift = target.owner_press(attempt.len, i)
                         .and_then(|(button, n, saved)| self.input.combo.nth_press(button, n).map(|pressed| pressed - saved))
@@ -1108,8 +1122,33 @@ impl Helper {
 
     fn on_clear(&mut self, out: &mut Out) {
         let input_only = self.target.as_ref().is_some_and(|target| target.input_only);
-        if !input_only || self.attempt.as_ref().is_none_or(|attempt| !attempt.open() || !attempt.is_empty()) {
-            self.resolve_open(Outcome::Cleared, out);
+        let gesture_only = input_only && self.attempt.is_some()
+            && self.input.combo.links().any(|link| link.events().next().is_some())
+            && self.input.combo.links().enumerate().filter(|(_, link)| link.events().next().is_some())
+                .all(|(k, _)| self.input.gesture_step(k));
+        if gesture_only {
+            if let Some(summary) = self.attempt.and_then(|attempt| attempt.summary) {
+                if self.results[0] == Some(summary) {
+                    self.results.copy_within(1..RESULTS, 0);
+                    self.results[RESULTS - 1] = self.displaced_result;
+                    self.streak = self.attempt_streak;
+                    self.best = self.attempt_best;
+                }
+            }
+        } else {
+            if input_only {
+                if let Some(k) = self.input.combo.len().checked_sub(1) {
+                    if self.attempt.as_ref().is_some_and(|attempt| attempt.open() && k >= attempt.len)
+                        && self.input.gesture_step(k)
+                    {
+                        self.input.combo.links[k] = None;
+                        self.input.combo.len -= 1;
+                    }
+                }
+            }
+            if !input_only || self.attempt.as_ref().is_none_or(|attempt| !attempt.open() || !attempt.is_empty()) {
+                self.resolve_open(Outcome::Cleared, out);
+            }
         }
         if input_only {
             self.attempt = None;
@@ -1199,6 +1238,9 @@ impl Helper {
         if let Some(attempt) = self.attempt.as_mut() {
             attempt.summary = Some(summary);
         }
+        if self.target.as_ref().is_some_and(|target| target.input_only) && self.attempt.is_some() {
+            self.displaced_result = self.results[RESULTS - 1];
+        }
         self.results.copy_within(0..RESULTS - 1, 1);
         self.results[0] = Some(summary);
         // Streak follows `clean`, so a non-true link still counts. Best stays the most true links in one
@@ -1219,7 +1261,7 @@ impl Helper {
 fn missing_reason(event: Event) -> Reason {
     match event.kind {
         Kind::Press(button) => Reason::Missing(button),
-        Kind::Release(button) => Reason::MissingRelease(button),
+        Kind::Release(button) | Kind::LetGo(button) => Reason::MissingRelease(button),
         Kind::CStick => Reason::MissingCStick,
         Kind::Flick(flick) => Reason::MissingFlick(flick),
         Kind::Aim(part) => Reason::MissingAim(part),
@@ -1229,7 +1271,7 @@ fn missing_reason(event: Event) -> Reason {
 fn off_reason(event: Event, delta: i32) -> Reason {
     match event.kind {
         Kind::Press(button) => Reason::Off(button, delta),
-        Kind::Release(button) => Reason::ReleaseOff(button, delta),
+        Kind::Release(button) | Kind::LetGo(button) => Reason::ReleaseOff(button, delta),
         Kind::CStick => Reason::CStickOff(delta),
         Kind::Flick(flick) => Reason::FlickOff(flick, delta),
         Kind::Aim(part) => Reason::WrongAim(part),
@@ -1519,6 +1561,7 @@ pub struct InputCapture {
     first: Option<u32>,
     last: Option<u32>,
     decided: Option<u32>,
+    window: u8,
 }
 impl InputCapture {
     pub const fn new() -> Self {
@@ -1531,6 +1574,7 @@ impl InputCapture {
             first: None,
             last: None,
             decided: None,
+            window: Settings::factory().tolerance,
         }
     }
     fn restart(&mut self) {
@@ -1549,11 +1593,12 @@ impl InputCapture {
     fn step_mode(&mut self, snap: Snap, group_idle: bool, aims: bool) {
         self.step_with(snap, Late::NONE, group_idle, aims);
     }
-    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> Option<usize> {
+    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> u16 {
+        let mut amended = 0u16;
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
-        if self.combo.overflow { return None; }
+        if self.combo.overflow { return amended; }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
@@ -1579,7 +1624,7 @@ impl InputCapture {
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
                 && !self.combo.push(LinkRec::INPUT)
             {
-                return None;
+                return amended;
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
@@ -1605,12 +1650,44 @@ impl InputCapture {
                     let direction = action::angled(event.dir, angle);
                     if direction != event.dir {
                         event.dir = direction;
-                        return Some(step);
+                        amended |= 1u16 << step;
                     }
                 }
             }
         }
-        None
+        if let (Some(_), Some(first)) = (late.turned, self.first) {
+            for (_, button) in PRESS_BITS {
+                let latest = self.combo.links[..self.combo.len].iter().enumerate().rev().find_map(|(step, link)| {
+                    link.as_ref()?.events.iter().enumerate().rev().find_map(|(index, event)| {
+                        let event = (*event)?;
+                        matches!(event.kind, Kind::Release(b) | Kind::LetGo(b) if b == button)
+                            .then_some((step, index, event))
+                    })
+                });
+                let Some((step, index, event)) = latest else { continue };
+                if !matches!(event.kind, Kind::Release(_)) { continue; }
+                let Ok(released) = u32::try_from(i64::from(first) + i64::from(event.offset)) else { continue };
+                if snap.frame.checked_sub(released).is_none_or(|age| age > u32::from(self.window)) { continue; }
+                let Some((_, _, offset)) = self.combo.owner_press(step, index) else { continue };
+                let Ok(press) = u32::try_from(i64::from(first) + i64::from(offset)) else { continue };
+                if late.turned == Some(true) && late.open.is_some_and(|(origin, _)| origin == Some(press)) {
+                    continue;
+                }
+                self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap().kind = Kind::LetGo(button);
+                amended |= 1u16 << step;
+            }
+        }
+        amended
+    }
+    fn gesture_step(&self, k: usize) -> bool {
+        let Some(Kind::Press(button)) = self.combo.get(k).and_then(|link| link.events().next()).map(|event| event.kind)
+            else { return false };
+        let down = PRESS_BITS.iter().find(|(_, b)| *b == button)
+            .is_some_and(|(mask, _)| self.prev.is_some_and(|snap| held(snap.buttons, *mask)));
+        down && !self.combo.links().skip(k).enumerate().any(|(index, link)| {
+            link.events().skip(if index == 0 { 1 } else { 0 })
+                .any(|event| matches!(event.kind, Kind::Release(b) | Kind::LetGo(b) if b == button))
+        })
     }
     fn undecided(&self, k: usize, now: u32) -> bool {
         let Some(first) = self.first else { return false };
@@ -1644,3 +1721,7 @@ mod action_model_tests;
 #[cfg(test)]
 #[path = "reason_line_tests.rs"]
 mod reason_line_tests;
+
+#[cfg(test)]
+#[path = "action_smoke_tests.rs"]
+mod action_smoke_tests;

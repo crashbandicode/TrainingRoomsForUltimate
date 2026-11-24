@@ -31,9 +31,12 @@ A button already held when a take starts is a press.
 
 ## Clear
 
-`Tracker::clear` retains `buttons` and `stick`, clearing its other state. `Helper::on_clear` closes an open drill
-attempt with a graded step as cleared, but discards an open drill attempt with no graded step without recording it;
-both start fresh. Hit-combo clearing remains as before.
+`Tracker::clear` retains `buttons` and `stick`, clearing its other state. A drill step opened by a press still held
+at clear, with no release after that press, belongs to the clear gesture. When every captured step belongs to it,
+`Helper::on_clear` discards the attempt and takes back its result if already resolved, restoring its earlier streak,
+best and displaced history entry. Otherwise it removes an ungraded final gesture step and closes an open attempt
+with a graded step as cleared; an open attempt without a graded step is discarded. Both start fresh. Hit-combo
+clearing remains as before.
 
 ## Grading
 
@@ -43,16 +46,19 @@ both start fresh. Hit-combo clearing remains as before.
 | --- | --- |
 | Press, C-stick, flick | Kind, direction and offset; an old presses-only link matches button and its four-way aim. |
 | Special press owning aims | Kind and offset, not its stick direction; the aim events carry the direction. |
-| Release | Same button; direction is ignored. If both holds have owners, compare hold lengths; otherwise compare offsets where applicable. |
+| Release | In a drill, only a reference release marked as reacted is graded, by its owned hold; direction is ignored. A hit link compares releases as before. |
 | Aim | Part and facing-relative eight-way direction; for an aim-bearing target its timing delta is zero. |
 
 `Grade.band` adds `min(saved_hold / 8, 15)` frames to the chosen On-time tolerance. A drill step is graded at its
-deadline: the latest of its reference events' offsets, plus the tolerance. A release with a saved hold counts from
+deadline: the latest reference event's offset other than an unreacted release, plus the tolerance. A reacted release
+with a saved hold counts from
 the frame the attempt pressed its button (`Combo::owner_press`, `Combo::nth_press`): its offset there is that press
 plus the saved hold and its band. So a button held longer than the saved hold plus the band and the tolerance drops
 the step: as a missing release, or, when another event of the step kept it open, as a release that is off. A
 reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit combos a
-release with no counterpart at the hit is not graded.
+release with no counterpart at the hit is not graded. `Tracker::late` reports status changes; a captured release
+becomes `LetGo` if a status changes on that frame or within the On-time tolerance afterwards, except an action opening
+attributed to the same press. An ordinary `Release` stays recorded but contributes no mark or deadline in a drill.
 
 ## One description
 
@@ -130,6 +136,10 @@ No hook, native site, lock or static was added for the ACTION model.
 
 On input-drill load, a step beginning with a release or `Aim(1)` joins its predecessor if their events fit in 12;
 the original file is not rewritten by loading. A release may write unsigned `hold`, checked for type on reading.
+This build writes `reacted: true` for an input-drill `LetGo` and `reacted: false` for an ordinary release; a
+non-boolean is rejected. For a legacy release without `reacted`, an owned hold under eight frames stays ungraded,
+while a hold of eight or more is graded in its band. An unowned release remains ungraded. Re-recording a drill gives
+it the causal rule.
 Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (the three
 new kinds), `of` (a move key), `angle` (`up` or `down`) and `variant` (0–31). Both objects are needed for a described
 link; `{}` is valid. `from` and `to` write `other` for Grab, Throw and Final Smash for older readers.
@@ -159,6 +169,9 @@ selected version and name.
   move they show the base special and the angle only, where the live strip also shows its travel arrows.
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
+- A status change near a release can be unrelated to that release and still mark it reacted. Hit-combo link grading
+  remains unchanged.
+- Older drill files lack reaction evidence, so their hold-length compatibility rule cannot establish causality.
 
 ## Host checks
 
@@ -173,6 +186,12 @@ selected version and name.
   `a_repeated_button_uses_its_matching_press_for_the_hold_deadline`,
   `a_reference_release_without_its_press_is_not_graded`, `a_split_step_file_reads_as_the_new_recorder_saves_it`,
   `a_joined_file_is_written_back_unchanged`, `a_release_records_its_hold_in_the_file`.
+- Smoke regressions: `a_tap_is_not_graded_on_its_length`, `a_charge_release_is_graded_on_its_hold`,
+  `a_held_special_that_ignores_its_release_is_not_graded`, `a_status_change_outside_the_tolerance_is_no_reaction`,
+  `an_older_files_tap_is_not_graded_and_its_long_hold_is`, `a_new_file_says_whether_the_game_reacted`,
+  `a_reacted_release_round_trips`, `a_reset_chord_alone_leaves_no_result`,
+  `a_reset_before_the_deadline_leaves_no_result`, `a_real_attempt_then_a_reset_records_as_today`,
+  `a_failed_attempt_is_not_taken_back_by_a_later_reset`.
 - Description and angle: `the_bar_and_the_menu_name_a_link_as_the_strip_does`,
   `a_hit_combo_tells_an_angled_tilt_from_a_level_one`, `a_link_without_descriptions_grades_as_before`,
   `link_descriptions_round_trip_in_optional_keys`, `a_link_record_keeps_its_size`,

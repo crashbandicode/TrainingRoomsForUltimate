@@ -199,19 +199,22 @@ recorded one.
   its own step. A step with 12 events continues in another step. The shared combo capacity is 16 steps of up to 12
   events; an overfull take saves nothing.
 - **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event
-  starts the clock; later steps keep their recorded offsets, including idle gaps. A release is graded on the hold
-  length, not its frame or stick: the hold may differ by the On-time tolerance plus one frame per eight frames of the
-  saved hold, at most 15 extra frames. A missing release, or a button held longer or shorter than that, drops the
-  step. A special with saved directions is graded on them, not its press's stick direction. A side tilt or smash uses
+  starts the clock; later steps keep their recorded offsets, including idle gaps. In a new recording, a release is
+  graded on its hold only when the game reacted to it. The hold may differ by the On-time tolerance plus one frame per
+  eight frames of the saved hold, at most 15 extra frames. A missing graded release, or a button held longer or shorter than that, drops
+  the step; a release marked as unreacted is not graded. A special with saved directions is graded on them, not
+  its press's stick direction. A side tilt or smash uses
   the angle the game chose, not the stick position. There is no move, hit, spot or TRUE requirement; the TRUE field
   stays blank.
 - **Directions of a special:** for any fighter, a special records a direction when the fighter starts to move a way
   that is not the special's own and the stick pointed that way since the press (up to two per special, each graded on
   its direction). A special that only goes its own way, such as a straight-up up special, records none.
-- **After a Training reset:** buttons held through the reset are not new presses, and the next input starts a fresh
-  attempt.
-- **Older drill files:** a step beginning with a release or first special direction joins the preceding step on load
-  if both fit in 12 events. Loading does not change the file.
+- **After a Training reset:** the reset's own presses held at clear do not make an attempt; buttons held through the
+  reset are not new presses, and the next input starts a fresh attempt.
+- **Older drill files:** they did not record whether the game reacted. A saved hold under eight frames is a tap and is
+  not graded; a hold of eight or more is graded in its band. Re-recording the drill grades releases by the game's
+  reaction instead. A step beginning with a release or first special direction joins the preceding step on load if
+  both fit in 12 events. Loading does not change the file.
 - **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
 - **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
 - **Preview:** on a drill's row, X plays the drill's recorded inputs once on Player 1 through Recording's playback. The menu hides while it plays; X or B stops it, and the page returns about a second after the last input. X does nothing while a macro is already playing on Player 1. Only a drill recorded directly in this build has its inputs: one recorded earlier, a crop, or one Make combo made shows "Re-record to preview" (a made drill's source macro can be played as a macro).

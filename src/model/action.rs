@@ -57,10 +57,12 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+    /// A status change, with whether it opened a new action.
+    pub turned: Option<bool>,
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None };
+    pub const NONE: Late = Late { open: None, turned: None };
 }
 
 /// A press's direction with the vertical part the animation chose.
