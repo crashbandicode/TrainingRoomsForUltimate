@@ -107,6 +107,42 @@ fn the_two_zip_drill_passes_only_with_both_directions() {
 }
 
 #[test]
+fn an_active_special_can_still_supply_a_nonfinal_steps_aim() {
+    let target = captured(Some(4), Some(0), true, false, true);
+    for (first, expected) in [(Some(4), None), (Some(2), Some(Reason::WrongAim(1))), (None, Some(Reason::MissingAim(1)))] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=36 {
+            let mut now = script(frame, None, Some(0), true, false);
+            if frame == 19 && first.is_some() {
+                now.aim = Seen { part: 1, dir: first, ..now.aim };
+            }
+            helper.step_inputs(now, &mut Out::default());
+            if frame < 19 {
+                assert!(helper.results().next().is_none(), "the first part could still arrive at frame {frame}");
+            }
+        }
+        let summary = helper.results().next().expect("the special ended");
+        assert_eq!(summary.clean, expected.is_none());
+        assert_eq!(summary.fault, expected.map(|why| (0, why)));
+    }
+}
+
+#[test]
+fn waiting_for_direction_does_not_extend_a_button_deadline() {
+    let target = captured(Some(4), Some(0), true, false, true);
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    for frame in 0..=17 {
+        let mut now = script(frame, None, None, true, false);
+        now.buttons = 2;
+        helper.step_inputs(now, &mut Out::default());
+    }
+    let summary = helper.results().next().expect("the saved release is already missing");
+    assert_eq!(summary.fault, Some((0, Reason::MissingRelease(Button::Special))));
+}
+
+#[test]
 fn an_attempt_that_adds_a_second_part_fails_a_one_part_drill_step() {
     let target = captured(Some(4), None, true, true, true);
     assert_eq!(target.len(), 2);

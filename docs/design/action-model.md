@@ -155,6 +155,8 @@ selected version and name.
 - The re-entry shortcut of rule B remembers two statuses per special.
 - The stick search of rule C reaches back no further than the tracker keeps frames (`SNAP_RING`, 96).
 - Hit-combo aim events retain eight-way direction grading.
+- A saved link stores no travel arrows. The bar and the menu show the follow-up's from its aim events; for the first
+  move they show the base special and the angle only, where the live strip also shows its travel arrows.
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
 

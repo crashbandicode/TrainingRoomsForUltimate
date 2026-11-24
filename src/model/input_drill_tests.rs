@@ -133,7 +133,7 @@ fn full_capacity_both_kinds_grade_and_seventeenth_refuses() {
     let hit = LinkRec { verdict: Verdict::True(None), ..LinkRec::INPUT };
     let combo = Combo::from_links([hit;LINKS]).unwrap();
     let mut helper=Helper::new(); helper.set_target(Some(combo));
-    for i in 0..LINKS { helper.on_link(hit,i==0,1,&mut Out::default(),None); }
+    for i in 0..LINKS { helper.on_link(hit,i==0,1,&mut Out::default()); }
     assert_eq!(helper.results().next().unwrap().graded,LINKS as u8); assert_eq!((helper.best(),helper.streak()),(LINKS as u8,1));
     let script=(0..LINKS as u32).flat_map(|i| [(i*22,1),(i*22+1,0)]).collect::<Vec<_>>();
     let drill=capture(&script); assert_eq!(drill.len(),LINKS);
