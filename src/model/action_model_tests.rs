@@ -1164,7 +1164,8 @@ fn attempted_cast(reference: Combo, cast: Cast, match_stick: bool) -> Summary {
         tracker.step(sample, standing(), inputs);
         let _out = helper.step(&tracker, settings);
     }
-    *helper.results().next().expect("the drill resolved")
+    let result = *helper.results().next().expect("the drill resolved");
+    result
 }
 
 fn why(result: &Summary) -> String {
