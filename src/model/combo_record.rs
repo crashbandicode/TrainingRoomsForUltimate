@@ -241,8 +241,10 @@ impl ComboRecord {
         let links: Vec<Value> = self
             .combo
             .links()
-            .map(|l| {
-                if self.combo.input_only { return json!({"events": l.events().map(event_value).collect::<Vec<_>>()}); }
+            .enumerate()
+            .map(|(k, l)| {
+                let holds = if self.combo.input_only { self.combo.holds(k) } else { l.holds() };
+                if self.combo.input_only { return json!({"events": events_value(l, &holds)}); }
                 let mut link = json!({
                     "from": move_key(l.from),
                     "to": move_key(l.to),
@@ -264,7 +266,7 @@ impl ComboRecord {
                     link["spot"] = json!(spot.name().to_ascii_lowercase());
                 }
                 if !l.presses_only {
-                    link["events"] = Value::Array(l.events().map(event_value).collect());
+                    link["events"] = Value::Array(events_value(l, &holds));
                     if let Some(dir) = l.drift {
                         link["drift"] = json!(dir_key(dir));
                     }
@@ -330,6 +332,7 @@ impl ComboRecord {
         }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
         combo.input_only = input;
         if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
+        if input { combo.join_split_steps(); }
         Ok(ComboRecord {
             name,
             combo,
@@ -441,6 +444,7 @@ fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static 
 }
 
 fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static str> {
+    if event.get("hold").is_some_and(|hold| hold.as_u64().is_none()) { return Err("hold"); }
     let name = |k: &'static str| event.get(k).and_then(Value::as_str).ok_or(k);
     let dir = dir_of(name("dir")?).ok_or("dir")?;
     let offset = int(event, "offset")?;
@@ -458,11 +462,22 @@ fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static
     Ok(Event { kind, dir, offset })
 }
 
-fn event_value(event: Event) -> Value {
+fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS]) -> Vec<Value> {
+    link.events.iter().enumerate().filter_map(|(i, event)| {
+        event.map(|event| event_value(event, holds[i]))
+    }).collect()
+}
+
+fn event_value(event: Event, hold: Option<u32>) -> Value {
     let mut value =
         json!({"kind": kind_key(event.kind), "dir": dir_key(event.dir), "offset": event.offset});
     match event.kind {
-        Kind::Press(button) | Kind::Release(button) => value["button"] = json!(button_key(button)),
+        Kind::Press(button) | Kind::Release(button) => {
+            value["button"] = json!(button_key(button));
+            if let (Kind::Release(_), Some(hold)) = (event.kind, hold) {
+                value["hold"] = json!(hold);
+            }
+        }
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
         Kind::Aim(part) => value["part"] = json!(part),

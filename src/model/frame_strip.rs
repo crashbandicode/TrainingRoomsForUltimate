@@ -695,8 +695,9 @@ impl Tracker {
     }
 
     /// Leaving the scene, a hot swap, a save-state load: nothing on screen happened in this timeline any more.
+    /// Keep the pad state so a held input is not a new press.
     pub fn clear(&mut self) {
-        *self = Self::new();
+        *self = Self { buttons: self.buttons, stick: self.stick, ..Self::new() };
     }
 
     pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {

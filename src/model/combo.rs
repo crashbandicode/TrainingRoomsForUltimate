@@ -2,6 +2,7 @@
 //! strip links, kept as combos; a saved reference; and each attempt graded link by link against it. Pure and
 //! allocation-free: it steps once per frame right after the strip's tracker (`model::frame_strip`), on fixed arrays.
 
+use super::action;
 use super::frame_strip::{
     bin_stick, stick_axis, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
     DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
@@ -231,6 +232,40 @@ impl LinkRec {
         self.events.iter().flatten().copied()
     }
 
+    fn holds_from(&self, before: impl Iterator<Item = Event> + Clone) -> [Option<u32>; STEPS] {
+        let mut holds = [None; STEPS];
+        for (i, event) in self.events.iter().enumerate() {
+            let Some(Event { kind: Kind::Release(button), offset, .. }) = event else { continue };
+            let owner = self.events[..i].iter().rev().flatten().copied().chain(before.clone())
+                .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == *button));
+            if let Some(Event { kind: Kind::Press(_), offset: press, .. }) = owner {
+                holds[i] = u32::try_from(i64::from(*offset) - i64::from(press)).ok();
+            }
+        }
+        holds
+    }
+
+    /// Holds owned by presses in this link.
+    pub fn holds(&self) -> [Option<u32>; STEPS] {
+        self.holds_from(core::iter::empty())
+    }
+
+    fn owns_aim_from(&self, after: impl Iterator<Item = Event> + Clone) -> [bool; STEPS] {
+        let mut owns = [false; STEPS];
+        for (i, event) in self.events.iter().enumerate() {
+            if !matches!(event, Some(Event { kind: Kind::Press(Button::Special), .. })) { continue; }
+            let next = self.events[i + 1..].iter().flatten().copied().chain(after.clone())
+                .find(|event| matches!(event.kind, Kind::Press(Button::Special) | Kind::Aim(_)));
+            owns[i] = next.is_some_and(|event| matches!(event.kind, Kind::Aim(_)));
+        }
+        owns
+    }
+
+    /// Special presses that own an aim in this link.
+    pub fn owns_aim(&self) -> [bool; STEPS] {
+        self.owns_aim_from(core::iter::empty())
+    }
+
     /// Presses an older reader can store, capped at [`LEGACY_STEPS`].
     pub fn legacy_presses(&self) -> impl Iterator<Item = Event> + '_ {
         self.events()
@@ -307,6 +342,52 @@ impl Combo {
     pub fn has_aim(&self) -> bool {
         self.links().any(|link| link.events().any(|event| matches!(event.kind, Kind::Aim(_))))
     }
+
+    /// Whether the newest event for this button is an unreleased press.
+    pub fn unreleased(&self, button: Button) -> bool {
+        self.links[..self.len].iter().rev().flatten()
+            .flat_map(|link| link.events.iter().rev().flatten())
+            .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == button))
+            .is_some_and(|event| matches!(event.kind, Kind::Press(_)))
+    }
+
+    /// Holds in step `k`, including presses owned by an earlier step.
+    pub fn holds(&self, k: usize) -> [Option<u32>; STEPS] {
+        let Some(link) = self.get(k) else { return [None; STEPS] };
+        let before = self.links[..k].iter().rev().flatten()
+            .flat_map(|link| link.events.iter().rev().flatten().copied());
+        link.holds_from(before)
+    }
+
+    /// Special presses in step `k` that own an aim in this combo.
+    pub fn owns_aim(&self, k: usize) -> [bool; STEPS] {
+        let Some(link) = self.get(k) else { return [false; STEPS] };
+        let after = self.links[k + 1..self.len].iter().flatten()
+            .flat_map(|link| link.events.iter().flatten().copied());
+        link.owns_aim_from(after)
+    }
+
+    pub(crate) fn join_split_steps(&mut self) {
+        let mut k = 1;
+        while k < self.len {
+            let previous = self.links[k - 1].unwrap();
+            let current = self.links[k].unwrap();
+            let count = previous.events().count();
+            if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::Aim(1)))
+                && count + current.events().count() <= STEPS
+            {
+                let previous = self.links[k - 1].as_mut().unwrap();
+                for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
+                    *slot = Some(event);
+                }
+                self.links.copy_within(k + 1..self.len, k);
+                self.len -= 1;
+                self.links[self.len] = None;
+            } else {
+                k += 1;
+            }
+        }
+    }
 }
 
 /// A reference event's match in an attempt: the attempt's offset minus the reference's, or no such event.
@@ -328,6 +409,7 @@ pub struct Grade {
     pub wrong_move: bool,
     /// Per reference step, in order.
     pub marks: [Option<Mark>; STEPS],
+    pub band: [u8; STEPS],
     /// The attempt's steps no reference step matched.
     pub extra: u8,
     pub extra_aim: Option<u8>,
@@ -354,7 +436,7 @@ impl Grade {
         let mut worst: Option<(usize, i32)> = None;
         for (i, mark) in self.marks.iter().enumerate() {
             if let Some(Mark::At(d)) = mark {
-                if d.unsigned_abs() > u32::from(tolerance)
+                if d.unsigned_abs() > u32::from(tolerance) + u32::from(self.band[i])
                     && worst.is_none_or(|(_, w)| d.unsigned_abs() > w.unsigned_abs())
                 {
                     worst = Some((i, *d));
@@ -384,11 +466,29 @@ pub fn grade(reference: &LinkRec, attempt: &LinkRec) -> Grade {
 }
 
 fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool) -> Grade {
+    grade_with(reference, attempt, input_only, aims, GradeContext {
+        ref_holds: reference.holds(),
+        att_holds: attempt.holds(),
+        owns_aim: reference.owns_aim(),
+    })
+}
+
+struct GradeContext {
+    ref_holds: [Option<u32>; STEPS],
+    att_holds: [Option<u32>; STEPS],
+    owns_aim: [bool; STEPS],
+}
+
+fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool, context: GradeContext) -> Grade {
     let mut used = [false; STEPS];
     let mut marks = [None; STEPS];
+    let mut band = [0; STEPS];
     let mut from = 0;
-    for (mark, want) in marks.iter_mut().zip(reference.events.iter()) {
+    for (index, (mark, want)) in marks.iter_mut().zip(reference.events.iter()).enumerate() {
         let Some(want) = want else { continue };
+        if input_only && matches!(want.kind, Kind::Release(_)) && context.ref_holds[index].is_none() {
+            continue;
+        }
         let found = (from..STEPS).find(|&i| {
             !used[i]
                 && attempt.events[i]
@@ -404,8 +504,20 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                 used[i] = true;
                 from = i + 1;
                 let got = attempt.events[i].unwrap();
-                if reference.presses_only || got.dir == want.dir {
-                    Mark::At(if aims && matches!(want.kind, Kind::Aim(_)) { 0 } else { got.offset - want.offset })
+                if reference.presses_only || got.dir == want.dir || matches!(want.kind, Kind::Release(_))
+                    || (matches!(want.kind, Kind::Press(Button::Special)) && context.owns_aim[index])
+                {
+                    let delta = if let (Kind::Release(_), Some(saved), Some(actual)) =
+                        (want.kind, context.ref_holds[index], context.att_holds[i])
+                    {
+                        band[index] = action::hold_band(saved);
+                        (i64::from(actual) - i64::from(saved)).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                    } else if aims && matches!(want.kind, Kind::Aim(_)) {
+                        0
+                    } else {
+                        got.offset - want.offset
+                    };
+                    Mark::At(delta)
                 } else {
                     Mark::WrongDir
                 }
@@ -422,6 +534,7 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
         reference: *reference,
         wrong_move: !input_only && attempt.to != reference.to,
         marks,
+        band,
         extra,
         extra_aim: aims.then(|| attempt.events.iter().enumerate().find_map(|(i, event)| {
             match event {
@@ -812,8 +925,13 @@ impl Helper {
             let aims = target.has_aim();
             let last = attempt.len + 1 == target.len();
             let reference = target.get(attempt.len).copied().unwrap();
-            let deadline =
-                reference.events().last().unwrap().offset + i32::from(self.settings.tolerance);
+            let holds = target.holds(attempt.len);
+            let deadline = reference.events.iter().enumerate().filter_map(|(i, event)| {
+                event.map(|event| {
+                    let band = holds[i].map_or(0, action::hold_band);
+                    event.offset.saturating_add(i32::from(band))
+                })
+            }).max().unwrap_or(0).saturating_add(i32::from(self.settings.tolerance));
             if (snap.frame - start) < deadline as u32 || (aims && last && snap.aim.inside) {
                 break;
             }
@@ -840,9 +958,15 @@ impl Helper {
     }
 
     fn on_clear(&mut self, out: &mut Out) {
-        self.resolve_open(Outcome::Cleared, out);
+        let input_only = self.target.as_ref().is_some_and(|target| target.input_only);
+        if !input_only || self.attempt.as_ref().is_none_or(|attempt| !attempt.open() || !attempt.is_empty()) {
+            self.resolve_open(Outcome::Cleared, out);
+        }
+        if input_only {
+            self.attempt = None;
+        }
         self.pending_load = false;
-        self.input = InputCapture::new();
+        self.input.restart();
         if !self.capture.current.is_empty() {
             self.capture.previous = self.capture.current;
         }
@@ -888,7 +1012,16 @@ impl Helper {
         let Some(reference) = target.get(attempt.len) else {
             return;
         };
-        let mut g = grade_mode(reference, &rec, target.input_only, target.has_aim());
+        let context = if target.input_only {
+            GradeContext {
+                ref_holds: target.holds(attempt.len),
+                att_holds: self.input.combo.holds(attempt.len),
+                owns_aim: target.owns_aim(attempt.len),
+            }
+        } else {
+            GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim() }
+        };
+        let mut g = grade_with(reference, &rec, target.input_only, target.has_aim(), context);
         g.extra_aim = g.extra_aim.or(extra);
         attempt.grades[attempt.len] = Some(g);
         out.link = Some((attempt.len, g));
@@ -1268,6 +1401,9 @@ impl InputCapture {
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
         self.prev = Some(snap);
         for event in edges.into_iter().flatten() {
+            if matches!(event.kind, Kind::Release(button) if !self.combo.unreleased(button)) {
+                continue;
+            }
             let start = *self.first.get_or_insert(event.frame);
             let full = self
                 .combo
@@ -1279,6 +1415,7 @@ impl InputCapture {
             if (full
                 || next_part
                 || (group_idle
+                    && action::originates(event.kind)
                     && self
                         .last
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
