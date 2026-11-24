@@ -123,7 +123,7 @@ fn input_bar_names_steps_and_has_no_hit_verdict_or_window() {
 #[test]
 fn capacity_layout_receipt() {
     use core::mem::size_of;
-    println!("CAPACITY_LAYOUT units={} LinkRec={} Combo={} Grade={} Attempt={} Helper={} InputCapture={} triple_combo={}", LINKS, size_of::<LinkRec>(), size_of::<Combo>(),size_of::<Grade>(),size_of::<Attempt>(),size_of::<Helper>(),size_of::<InputCapture>(),size_of::<hos_lock::TripleBuffer<Combo>>());
+    println!("CAPACITY_LAYOUT units={} LinkRec={} Combo={} Grade={} Attempt={} Helper={} InputCapture={} triple_combo={} Travel={} Rule={}", LINKS, size_of::<LinkRec>(), size_of::<Combo>(),size_of::<Grade>(),size_of::<Attempt>(),size_of::<Helper>(),size_of::<InputCapture>(),size_of::<hos_lock::TripleBuffer<Combo>>(),size_of::<crate::model::action::Travel>(),size_of::<crate::model::aim::Rule>());
     assert_eq!(STEPS,12);
 }
 

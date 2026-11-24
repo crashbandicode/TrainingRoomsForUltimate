@@ -619,7 +619,7 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
     let mut capture = InputCapture::new();
     capture.step_late(Snap { buttons: ATTACK | CSTICK_ON, lstick_x: 60, lstick_y: 20,
         rstick_x: 60, rstick_y: 20, facing: 1, ..Snap::empty(1) },
-        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
+        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE });
     let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
     assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
 }
@@ -677,7 +677,7 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     helper.set_target(Some(target));
     for frame in 1..=4 {
         let late = if frame == 2 {
-            action::Late { open: Some((Some(1), Some(None))) }
+            action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }
         } else { action::Late::NONE };
         helper.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
             facing: 1, ..Snap::empty(frame) }, Some(late), &mut Out::default());
@@ -685,10 +685,10 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     assert_eq!(helper.attempt().unwrap().len(), 1);
     let mut out = Out::default();
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(5) },
-        Some(action::Late { open: Some((Some(1), Some(None))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }), &mut out);
     assert!(out.link.is_none() && out.resolved.is_none());
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(6) },
-        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE }), &mut out);
     assert_eq!(out.link.unwrap().0, 0);
     assert_eq!(out.resolved.unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
 
@@ -710,6 +710,252 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
     assert_eq!(value["schema_version"], 2);
     assert_eq!(value["kind"], "input_drill");
     assert_eq!(crate::model::recording_menu::combo_link_lines(&combo), vec!["S1 Step 1", "↑→ A · release"]);
+}
+
+fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
+    let (x, y) = (f32::from(end.0), f32::from(end.1));
+    action::Travel {
+        stick: Some(stick),
+        heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
+        distance: (x.hypot(y) * 10.0).round() as u16,
+        path: core::array::from_fn(|i| {
+            let t = (i + 1) as f32 / 8.0;
+            ((x * t).round() as i8, (y * t).round() as i8)
+        }),
+    }
+}
+
+fn steering_snap(frame: u32, second: bool) -> Snap {
+    Snap {
+        buttons: if frame < 2 { SPECIAL } else if second && frame == 43 { ATTACK } else { 0 },
+        facing: 1,
+        aim: Seen { inside: frame <= 3, part: if frame == 3 { 1 } else { 0 },
+            dir: (frame == 3).then_some(4), facing: 1, age: 0 },
+        ..Snap::empty(frame)
+    }
+}
+
+fn steering_capture(detail: action::Travel, second: bool) -> Combo {
+    let mut capture = InputCapture::new();
+    for frame in 0..=(if second { 43 } else { 4 }) {
+        capture.step_late(steering_snap(frame, second), action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        });
+    }
+    capture.combo
+}
+
+fn steering_attempt(reference: action::Travel, actual: action::Travel, match_stick: bool) -> Summary {
+    let mut helper = Helper::new();
+    helper.set_target(Some(steering_capture(reference, false)));
+    for frame in 0..=4 {
+        helper.settings = Settings { match_stick, ..Settings::factory() };
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, actual)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    let result = *helper.results().next().unwrap();
+    result
+}
+
+#[test]
+fn a_steered_part_is_graded_on_its_path_within_the_tolerance() {
+    let reference = travel((-40, 0), (1800, 100));
+    assert!(steering_attempt(reference, travel((-40, 8), (1800, 100)), false).clean);
+    let result = steering_attempt(reference, travel((-38, 14), (1800, 100)), false);
+    assert_eq!(result.fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(crate::model::combo_plan::reason_text(&result), crate::model::frame_strip_plan::Text::new("L1 1st path off"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Path, "1st direction", 1),
+        (crate::model::frame_strip_plan::Text::new("1st path off"), crate::model::frame_strip_plan::BAD));
+}
+
+#[test]
+fn a_short_warp_fails_a_long_warp_drill() {
+    let long = travel((-42, 42), (1350, 100));
+    let short = travel((-14, 14), (1350, 100));
+    assert_eq!(steering_attempt(long, short, false).fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(steering_attempt(short, long, false).fault, Some((0, Reason::AimPath(1))));
+}
+
+#[test]
+fn the_angle_and_deflection_toggle_grades_the_stick() {
+    let reference = travel((-40, 40), (1350, 100));
+    for stick in [(1150, 100), (1350, 50)] {
+        assert!(steering_attempt(reference, travel((-40, 40), stick), false).clean);
+    }
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1150, 100)), true).fault,
+        Some((0, Reason::AimAngle(1, -20))));
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1350, 50)), true).fault,
+        Some((0, Reason::AimDeflection(1, -50))));
+    assert!(steering_attempt(reference, travel((-40, 40), (1270, 90)), true).clean);
+    let around_zero = travel((40, 0), (3590, 50));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (90, 65))), None);
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (100, 50))), Some(Mark::Angle(11)));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (3590, 34))), Some(Mark::Deflection(-16)));
+    assert_eq!(action::stick_of((0, 0), -1), (0, 0));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Angle(-20), "1st direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("1st angle 20 off"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(-50), "2nd direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("2nd stick 50% low"));
+}
+
+#[test]
+fn the_toggle_row_reads_its_setting_and_is_off_by_default() {
+    assert!(!Settings::factory().match_stick);
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    snapshot.set("combo_stick", &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).match_stick);
+    let rows = &crate::model::menu::table::ROWS;
+    let spot = rows.iter().position(|row| row.id == "spots_combo").unwrap();
+    assert_eq!(rows[spot + 1].id, "combo_stick");
+}
+
+#[test]
+fn a_travel_that_ends_after_its_step_was_graded_amends_the_grade() {
+    let reference = travel((-40, 0), (1800, 100));
+    let target = steering_capture(reference, true);
+    assert_eq!(target.len(), 2);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false),
+        (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 9).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1);
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 9 {
+                if clean { assert!(helper.results().next().is_none()); }
+                else {
+                    let result = helper.results().next().unwrap();
+                    assert_eq!((result.outcome, result.clean, result.fault),
+                        (Outcome::Completed, false, Some((0, Reason::AimPath(1)))));
+                }
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+#[test]
+fn aim_details_round_trip_in_optional_keys() {
+    let detail = travel((-40, 40), (1350, 100));
+    let combo = steering_capture(detail, false);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let value = serde_json::to_value(&record).unwrap();
+    let event = &value["input_steps"][0]["events"][2];
+    assert_eq!(event["stick"], serde_json::json!({"angle": 135.0, "deflection": 100}));
+    assert_eq!(event["heading"], 135.0);
+    assert_eq!(event["distance"], 56.6);
+    assert_eq!(event["path"].as_array().unwrap().len(), 8);
+    assert_eq!((event["kind"].as_str(), event["part"].as_u64(), event["dir"].as_str(), event["offset"].as_i64()),
+        (Some("aim"), Some(1), Some("back"), Some(3)));
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(read, record);
+    let mut helper = Helper::new();
+    helper.set_target(Some(read.combo));
+    for frame in 0..=4 {
+        helper.settings = Settings::factory();
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    assert!(helper.results().next().unwrap().clean);
+
+    let mut split = value.clone();
+    let events = value["input_steps"][0]["events"].as_array().unwrap();
+    split["input_steps"] = serde_json::json!([
+        {"events": [events[0].clone(), events[1].clone()]},
+        {"events": [events[2].clone()]}
+    ]);
+    let joined: crate::model::combo_record::ComboRecord = serde_json::from_value(split).unwrap();
+    assert_eq!(joined.combo.len(), 1);
+    assert_eq!(joined.combo.travel(0, 2), Some(detail));
+
+    let mut five = value.clone();
+    let events = five["input_steps"][0]["events"].as_array_mut().unwrap();
+    let aim = events[2].clone();
+    for offset in 4..=7 {
+        let mut event = aim.clone();
+        event["offset"] = serde_json::json!(offset);
+        events.push(event);
+    }
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(five).unwrap();
+    for index in 2..6 { assert_eq!(read.combo.travel(0, index), Some(detail)); }
+    assert_eq!(read.combo.travel(0, 6), None);
+    for (key, invalid) in [
+        ("path", serde_json::json!([1, 2])),
+        ("path", serde_json::json!([[128, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])),
+        ("heading", serde_json::json!(360)),
+        ("distance", serde_json::json!(-1)),
+        ("stick", serde_json::json!({"angle": 0, "deflection": 101})),
+    ] {
+        let mut bad = value.clone();
+        bad["input_steps"][0]["events"][2][key] = invalid;
+        assert!(serde_json::from_value::<crate::model::combo_record::ComboRecord>(bad).unwrap_err().to_string().contains(key));
+    }
+    let mut old = value;
+    old["input_steps"][0]["events"][2].as_object_mut().unwrap().remove("path");
+    old["input_steps"][0]["events"][2]["heading"] = serde_json::json!("ignored");
+    old["input_steps"][0]["events"][2]["stick"] = serde_json::json!("ignored");
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(old).unwrap();
+    assert_eq!(read.combo.travel(0, 2), None);
+}
+
+#[test]
+fn a_drill_keeps_details_for_its_first_four_aims() {
+    let mut combo = Combo::EMPTY;
+    combo.input_only = true;
+    for i in 0..5 {
+        let link = LinkRec { events: retain([Event { kind: Kind::Aim(1), dir: Dir::Back, offset: i * 10 }]),
+            ..LinkRec::INPUT };
+        assert!(combo.push(link));
+    }
+    let detail = travel((-40, 0), (1800, 100));
+    for i in 0..4 { assert!(combo.attach_travel(i, 0, detail)); }
+    assert!(!combo.attach_travel(4, 0, detail));
+    let replacement = travel((-30, 0), (1800, 100));
+    assert!(combo.attach_travel(0, 0, replacement));
+    assert_eq!(combo.travel(0, 0), Some(replacement));
+    assert!(combo.attach_travel(0, 0, detail));
+    for i in 0..4 { assert_eq!(combo.travel(i, 0), Some(detail)); }
+    assert_eq!(combo.travel(4, 0), None);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let crop = record.crop_units(1, 4).unwrap();
+    for i in 0..3 { assert_eq!(crop.combo.travel(i, 0), Some(detail)); }
+
+    let mut split = Combo::EMPTY;
+    split.input_only = true;
+    for event in [Event { kind: Kind::Press(Button::Special), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 1 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 2 }] {
+        assert!(split.push(LinkRec { events: retain([event]), ..LinkRec::INPUT }));
+    }
+    assert!(split.attach_travel(1, 0, detail));
+    assert!(split.attach_travel(2, 0, replacement));
+    split.join_split_steps();
+    assert_eq!(split.len(), 2);
+    assert_eq!(split.travel(0, 1), Some(detail));
+    assert_eq!(split.travel(1, 0), Some(replacement));
+
+    let mut unordered = Combo::from_links([LinkRec { events: retain([
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 1 },
+    ]), ..LinkRec::INPUT }]).unwrap();
+    unordered.input_only = true;
+    assert!(unordered.attach_travel(0, 1, replacement));
+    assert!(unordered.attach_travel(0, 0, detail));
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), unordered, None);
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
 }
 
 }
