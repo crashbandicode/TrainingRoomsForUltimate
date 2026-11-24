@@ -843,6 +843,26 @@ fn no_fighter_table_is_left() {
     assert!(!input.contains("aimer") && !input.contains("travel_status"));
 }
 
+fn the_tracker_reports_an_action_when_it_opens() {
+    let mut tracker = Tracker::new();
+    tracker.step(idle(), idle(), NONE);
+    tracker.step(idle(), idle(), NONE);
+    tracker.step(idle(), idle(), A);
+    tracker.step(attack(Move::Jab, 1, 0.0), idle(), NONE);
+    assert_eq!(tracker.late().open, Some((Some(3), None)));
+    tracker.step(attack(Move::Jab, 1, 1.0), idle(), NONE);
+    assert_eq!(tracker.late().open, None);
+
+    let mut smash = Tracker::new();
+    smash.step(idle(), idle(), A);
+    smash.step(attack(Move::SideSmash, 2, 0.0), idle(), NONE);
+    assert_eq!(smash.late().open, Some((Some(1), Some(None))));
+    smash.step(attack(Move::SideSmash, 2, 1.0), idle(), NONE);
+    assert_eq!(smash.late().open, None);
+    smash.step(Sample { angle: Some(Angle::Down), ..attack(Move::SideSmash, 2, 2.0) }, idle(), NONE);
+    assert_eq!(smash.late().open, Some((Some(1), Some(Some(Angle::Down)))));
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -887,6 +907,7 @@ fn case_table() {
         ("a_throw_stays_in_the_action_of_its_grab", a_throw_stays_in_the_action_of_its_grab as fn()),
         ("any_fighters_special_can_aim", any_fighters_special_can_aim as fn()),
         ("no_fighter_table_is_left", no_fighter_table_is_left as fn()),
+        ("the_tracker_reports_an_action_when_it_opens", the_tracker_reports_an_action_when_it_opens as fn()),
         ("the_runtime_reads_the_angle_and_the_travel_behind_their_gates", the_runtime_reads_the_angle_and_the_travel_behind_their_gates as fn()),
     ]);
 }

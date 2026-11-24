@@ -569,4 +569,147 @@ fn stick_flicks_inside_any_special_are_not_events() {
     }
 }
 
+fn tilt(stick: (i8, i8), angle: Option<Angle>, mv: Move) -> (Tracker, InputCapture) {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    for frame in 1..=6 {
+        let p1 = if frame == 1 {
+            standing()
+        } else {
+            Sample { attack: Some(mv), angle, status: 2, motion_frame: (frame - 2) as f32,
+                facing: 1, ..Sample::default() }
+        };
+        let inputs = MappedInputs { buttons: if frame < 3 { ATTACK } else { 0 },
+            lstick_x: stick.0, lstick_y: stick.1, ..MappedInputs::NEUTRAL };
+        tracker.step(p1, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+    }
+    (tracker, capture)
+}
+
+#[test]
+fn a_side_tilts_drill_direction_comes_from_its_animation() {
+    for (stick, angle, mv, expected) in [
+        ((60, 20), Some(Angle::Up), Move::SideTilt, Dir::ForwardUp),
+        ((60, 60), None, Move::SideTilt, Dir::Forward),
+        ((-60, 20), Some(Angle::Down), Move::SideSmash, Dir::BackDown),
+        ((60, 20), None, Move::Jab, Dir::Forward),
+        ((0, 0), Some(Angle::Up), Move::SideTilt, Dir::ForwardUp),
+    ] {
+        let (_, capture) = tilt(stick, angle, mv);
+        let press = capture.combo.get(0).unwrap().events()
+            .find(|e| e.kind == Kind::Press(Button::Attack)).unwrap();
+        assert_eq!(press.dir, expected);
+    }
+    for (dir, level, up, down) in [
+        (Dir::Neutral, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::Forward, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::ForwardUp, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::Up, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::BackUp, Dir::Back, Dir::BackUp, Dir::BackDown),
+        (Dir::Back, Dir::Back, Dir::BackUp, Dir::BackDown),
+        (Dir::BackDown, Dir::Back, Dir::BackUp, Dir::BackDown),
+        (Dir::Down, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::ForwardDown, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+        (Dir::Side, Dir::Forward, Dir::ForwardUp, Dir::ForwardDown),
+    ] {
+        assert_eq!([action::angled(dir, None), action::angled(dir, Some(Angle::Up)),
+            action::angled(dir, Some(Angle::Down))], [level, up, down]);
+    }
+    let mut capture = InputCapture::new();
+    capture.step_late(Snap { buttons: ATTACK | CSTICK_ON, lstick_x: 60, lstick_y: 20,
+        rstick_x: 60, rstick_y: 20, facing: 1, ..Snap::empty(1) },
+        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
+    let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
+    assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
+}
+
+#[test]
+fn the_strip_mark_and_the_drill_direction_agree() {
+    for (angle, mark, dir) in [(Some(Angle::Up), Some(2), Dir::ForwardUp),
+        (Some(Angle::Down), Some(6), Dir::ForwardDown), (None, None, Dir::Forward)] {
+        let (tracker, capture) = tilt((60, 20), angle, Move::SideTilt);
+        assert_eq!(tracker.aims().next().map(|aim| aim.dir), mark);
+        assert_eq!(capture.combo.get(0).unwrap().events()
+            .find(|e| e.kind == Kind::Press(Button::Attack)).unwrap().dir, dir);
+    }
+}
+
+#[test]
+fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
+    let target = tilt((60, 20), Some(Angle::Up), Move::SideTilt).1.combo;
+    let events = target.get(0).unwrap().events().map(|e| (e.kind, e.dir, e.offset)).collect::<Vec<_>>();
+    assert_eq!(events, vec![(Kind::Press(Button::Attack), Dir::ForwardUp, 0),
+        (Kind::Release(Button::Attack), Dir::Forward, 2)]);
+    for angle in [Some(Angle::Up), None] {
+        let mut tracker = Tracker::new();
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 1..=24 {
+            let p1 = if frame <= 17 {
+                Sample { attack: Some(Move::Jab), status: 1, motion_frame: (frame - 1) as f32,
+                    facing: 1, ..Sample::default() }
+            } else {
+                Sample { attack: Some(Move::SideTilt), angle, status: 2, motion_frame: (frame - 18) as f32,
+                    facing: 1, ..Sample::default() }
+            };
+            let inputs = MappedInputs { buttons: if (10..=11).contains(&frame) { ATTACK } else { 0 },
+                lstick_x: if frame >= 10 { 60 } else { 0 }, lstick_y: if frame >= 10 { 20 } else { 0 },
+                ..MappedInputs::NEUTRAL };
+            tracker.step(p1, standing(), inputs);
+            helper.step(&tracker, Settings::factory());
+            if (10..=17).contains(&frame) {
+                assert!(helper.results().next().is_none(), "frame {frame}");
+            }
+            if frame == 18 {
+                let result = helper.results().next().expect("graded after animation");
+                assert_eq!(result.outcome, Outcome::Completed);
+                if angle.is_some() { assert!(result.clean); }
+                else { assert_eq!(result.fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack))))); }
+            }
+        }
+    }
+
+    let mut target = tilt((60, 20), None, Move::SideTilt).1.combo;
+    assert!(target.push(LinkRec { events: retain([Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 50 }]),
+        ..LinkRec::INPUT }));
+    let mut helper = Helper::new();
+    helper.set_target(Some(target));
+    for frame in 1..=4 {
+        let late = if frame == 2 {
+            action::Late { open: Some((Some(1), Some(None))) }
+        } else { action::Late::NONE };
+        helper.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
+            facing: 1, ..Snap::empty(frame) }, Some(late), &mut Out::default());
+    }
+    assert_eq!(helper.attempt().unwrap().len(), 1);
+    let mut out = Out::default();
+    helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(5) },
+        Some(action::Late { open: Some((Some(1), Some(None))) }), &mut out);
+    assert!(out.link.is_none() && out.resolved.is_none());
+    helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(6) },
+        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) }), &mut out);
+    assert_eq!(out.link.unwrap().0, 0);
+    assert_eq!(out.resolved.unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
+
+    let mut timeout = Helper::new();
+    timeout.set_target(Some(tilt((60, 20), Some(Angle::Up), Move::SideTilt).1.combo));
+    for frame in 1..=16 {
+        timeout.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
+            facing: 1, ..Snap::empty(frame) }, Some(action::Late::NONE), &mut Out::default());
+        if frame < 16 { assert!(timeout.results().next().is_none(), "frame {frame}"); }
+    }
+    assert_eq!(timeout.results().next().unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
+}
+
+#[test]
+fn kirbys_angled_tilt_still_saves_as_version_two() {
+    let combo = tilt((60, 20), Some(Angle::Up), Move::SideTilt).1.combo;
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, Some("Kirby".into()));
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["schema_version"], 2);
+    assert_eq!(value["kind"], "input_drill");
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo), vec!["S1 Step 1", "↑→ A · release"]);
+}
+
 }
