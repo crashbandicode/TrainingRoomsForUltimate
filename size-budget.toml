@@ -1,7 +1,7 @@
 # Code-size ratchet of the clean room. Operator 2026-11-02: RC ratchets only; next version >=15% below fork after rustfmt normalization.
 # Counted by tools/sloc.py (the primary's sloc4.py rules since 2026-11-02: Rust lines without blanks, comments and tests,
 # test-gated module files and host-only simulator code apart; third_party/ excluded). Entries before the sloc4 entry
-# were counted with sloc3's rules. Gate: python3 -I tools/size_gate.py (also run by tests/size_budget.rs).
+# were counted with sloc3's rules. Gate: python3 -I tools/size_gate.py (a gate step of its own; tests/size_budget.rs runs its host tests).
 # Append entries, never edit old ones. The last entry of a scope is its ceiling. The first ceiling of a scope and
 # every raise need approved_by (the lead); a cut needs only a reason. Plan and history: docs/SIZE-PLAN.md.
 
@@ -2601,7 +2601,15 @@ approved_by = "tr-primary-2 ruling 2026-11-23 18:36:49Z (the install 2 integrato
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 197039
-date = "2026-11-23"
-reason = "F16 follow-up: a macro playing on Player 1 also lifts the menu's hold on the CPU. Measured 197039, 2 above the measured base 71158421 (197037)."
-approved_by = "tr-primary-2 ruling 2026-11-23 20:02:57Z (add the Player-role line if the fact exists); not merged until tr-primary-2 rules on the build it goes into."
+ceiling = 197050
+date = "2026-11-24"
+reason = "F15-4: a release of the waiting-room partner holds practice whatever the draw pass stored for the layout's readiness. Measured 197050, 13 above the measured base 71158421 (197037)."
+approved_by = "tr-primary-2 ruling 2026-11-24 00:52:41Z (edge-juggle-sol leads the F15-4 cause and fix, on a branch off 71158421 for the next build)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 197052
+date = "2026-11-24"
+reason = "F16 follow-up: a macro playing on Player 1 also lifts the menu's hold on the CPU. Measured 197052, 2 above the measured merged base 8d6ccf66 (197050)."
+approved_by = "tr-primary-2 ruling 2026-11-23 23:55:15Z (the Player-role line goes into the next build)."

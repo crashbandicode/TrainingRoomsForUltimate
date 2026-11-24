@@ -18,8 +18,9 @@ tables instead of repeated arms/structs, shared abstractions for the carried eng
 implementation per concept.
 
 Count: `python3 -I tools/sloc.py git <repo> <rev> 3` (the primary's `sloc4.py` rules since 2026-11-02; `third_party/`
-excluded and reported apart). Numbers below marked sloc3 were counted before the switch. Gate: `python3 -I tools/size_gate.py` against `size-budget.toml`, run by `cargo test`
-(`tests/size_budget.rs`). "M" = measured, "E" = estimate. File:line references are at `7bb86fd`.
+excluded and reported apart). Numbers below marked sloc3 were counted before the switch. Gate:
+`python3 -I tools/size_gate.py` against `size-budget.toml`, a gate step of its own (docs/BUILD.md); `cargo test`
+runs its host tests (`tests/size_budget.rs`). "M" = measured, "E" = estimate. File:line references are at `7bb86fd`.
 
 ## 1. Where the count stands
 

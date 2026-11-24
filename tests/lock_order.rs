@@ -187,6 +187,7 @@ struct Ctx<'g> {
     locks_by_name: BTreeMap<String, Vec<usize>>,
     /// `Graph::callees` per function: the scanner's own resolution (imports, aliases), which a path call must also pass.
     callees: Vec<BTreeSet<usize>>,
+    resolved: std::cell::OnceCell<Vec<Vec<(usize, usize)>>>,
 }
 
 impl<'g> Ctx<'g> {
@@ -200,7 +201,16 @@ impl<'g> Ctx<'g> {
             locks_by_name.entry(name.clone()).or_default().push(i);
         }
         let callees = (0..graph.funcs.len()).map(|f| graph.callees(f)).collect();
-        Ctx { graph, by_name, locks, locks_by_name, callees }
+        Ctx { graph, by_name, locks, locks_by_name, callees, resolved: std::cell::OnceCell::new() }
+    }
+
+    /// Per function: `(token position, callee)` of every call `resolve` follows, in body order. Computed once per `Ctx`.
+    fn resolved(&self) -> &[Vec<(usize, usize)>] {
+        self.resolved.get_or_init(|| {
+            (0..self.graph.funcs.len())
+                .map(|f| calls(&self.graph.funcs[f].body).iter().flat_map(|c| self.resolve(f, c).into_iter().map(move |t| (c.at, t))).collect())
+                .collect()
+        })
     }
 
     /// The callees a call can mean (`hook_locks.rs` `edges`: a path call as `Graph::callees` resolves it, then by its
@@ -706,13 +716,8 @@ fn scan_with_locks(graph: &Graph, locks: Vec<(String, String)>, include_try: boo
         takes: (0..n).map(|f| takes_mode(&ctx, f, include_try)).collect(),
         ..Scan::default()
     };
-    let callees: Vec<BTreeSet<usize>> = (0..n)
-        .map(|f| {
-            calls(&graph.funcs[f].body)
-                .iter()
-                .flat_map(|c| ctx.resolve(f, c))
-                .collect()
-        })
+    let callees: Vec<BTreeSet<usize>> = ctx.resolved().iter()
+        .map(|edges| edges.iter().map(|&(_, to)| to).collect())
         .collect();
     s.reach = s
         .takes
@@ -1160,7 +1165,7 @@ fn typed_static_callees(graph: &Graph, f: usize) -> Vec<(usize, usize)> {
     let mut out = Vec::new();
     for i in 0..body.len() {
         let Some(helper) = ident(body.get(i)) else { continue };
-        if !TYPED_STATIC_CALLS.iter().any(|(_, h, _)| *h == helper) || !punct(body.get(i + 1), '(') || !punct(body.get(i + 2), '&') {
+        if !punct(body.get(i + 1), '(') || !punct(body.get(i + 2), '&') || !TYPED_STATIC_CALLS.iter().any(|(_, h, _)| *h == helper) {
             continue;
         }
         let mut k = i + 3;
@@ -1254,14 +1259,10 @@ fn shared_locks(ctx: &Ctx, s: &Scan) -> Shared {
     let n = graph.funcs.len();
     let dispatch: Vec<_> = graph.funcs.iter().map(|f| callgraph::thread_dispatch(&f.body)).collect();
     // Per function: (token position, callee) for path and method calls and typed-static helpers.
-    let mut callees: Vec<Vec<(usize, usize)>> = (0..n)
-        .map(|f| {
-            let mut out: Vec<(usize, usize)> =
-                calls(&graph.funcs[f].body).iter().flat_map(|c| ctx.resolve(f, c).into_iter().map(move |t| (c.at, t))).collect();
-            out.extend(typed_static_callees(graph, f));
-            out
-        })
-        .collect();
+    let mut callees = ctx.resolved().to_vec();
+    for (f, edges) in callees.iter_mut().enumerate() {
+        edges.extend(typed_static_callees(graph, f));
+    }
     for (from, to) in callback_edges(graph) {
         callees[from].push((0, to));
     }
@@ -1383,12 +1384,12 @@ fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
         ("hitbox::perfect_visualizer_height", "cpu::on_frame", "hitbox::perfect_visualizer_height"),
         ("hitbox::forget_fighter", "reset_hub::on_init", "hitbox::forget_fighter"),
     ];
+    let (_, scan) = scan_with_locks(&graph, locks.clone(), false);
     for (entry, hook, seed) in callbacks {
         let at = graph.find(entry);
         let seed = graph.find(seed);
         assert_eq!(at.len(), 1, "{entry}");
         assert_eq!(seed.len(), 1, "{entry} seed");
-        let (_, scan) = scan_with_locks(&graph, locks.clone(), false);
         assert!(scan.reach[at[0]].is_empty(), "{entry} can wait on {:?}", scan.reach[at[0]]);
         let original = graph.funcs[seed[0]].body.clone();
         graph.funcs[seed[0]].body.extend(callgraph::lex("STORE.lock();"));
@@ -1918,12 +1919,10 @@ impl<'g> EditWaits<'g> {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
         let ctx = Ctx::new(graph, static_locks(&dir));
         let edited = ctx.locks.iter().position(|(file, name)| file == "compat/menu.rs" && name == "EDITED").expect("EDITED lock");
-        let mut edges: Vec<Vec<(usize, usize)>> = (0..graph.funcs.len()).map(|f| {
-            let mut edges: Vec<_> = calls(&graph.funcs[f].body).iter()
-                .flat_map(|call| ctx.resolve(f, call).into_iter().map(move |to| (call.at, to))).collect();
+        let mut edges = ctx.resolved().to_vec();
+        for (f, edges) in edges.iter_mut().enumerate() {
             edges.extend(typed_static_callees(graph, f));
-            edges
-        }).collect();
+        }
         for (from, to) in callback_edges(graph) { edges[from].push((0, to)); }
         for (from, at, to) in value_edges(graph) { edges[from].push((at, to)); }
         let dispatch = graph.funcs.iter().map(|f| callgraph::thread_dispatch(&f.body)).collect();

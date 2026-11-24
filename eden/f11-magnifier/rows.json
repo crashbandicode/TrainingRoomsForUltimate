@@ -351,7 +351,7 @@
       ]
     },
     {
-      "id": "f11-t5",
+      "id": "f11-c5",
       "start": "training",
       "end": "training",
       "role": "test",
@@ -362,7 +362,7 @@
           "run": "f11.py:floor_attach",
           "args": {
             "ident": "6",
-            "name": "floor-attach",
+            "name": "p1-placement-control",
             "cpu": [
               -100,
               -20
