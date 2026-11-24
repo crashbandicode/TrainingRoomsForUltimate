@@ -604,8 +604,12 @@ fn parse_travel(event: &Map<String, Value>) -> Result<Travel, &'static str> {
         }
     };
     let entry = match (event.get("entry_x"), event.get("entry_y")) {
-        (None, None) => Entry::UNKNOWN,
-        (Some(x), Some(y)) => Entry::of(x.as_f64().ok_or("entry_x")?, y.as_f64().ok_or("entry_y")?).ok_or("entry velocity")?,
+        (None, None) if !event.contains_key("entry_change") => Entry::UNKNOWN,
+        (Some(x), Some(y)) => {
+            let change = event.get("entry_change").map_or(Ok(0.0), |v| v.as_f64().ok_or("entry_change"))?;
+            Entry::of(x.as_f64().ok_or("entry_x")?, y.as_f64().ok_or("entry_y")?)
+                .and_then(|entry| entry.with_change(change)).ok_or("entry velocity")?
+        }
         _ => return Err("entry velocity"),
     };
     Ok(Travel { entry, stick, heading, distance, path })
@@ -635,6 +639,7 @@ fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>) -> Value
         if let Some((x, y)) = travel.entry.units() {
             value["entry_x"] = json!(x);
             value["entry_y"] = json!(y);
+            if travel.entry.change() != 0.0 { value["entry_change"] = json!(travel.entry.change()); }
         }
         if let Some((angle, deflection)) = travel.stick {
             value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});

@@ -333,7 +333,7 @@ impl LinkRec {
     }
 }
 
-/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 28 bytes.
+/// One travel detail as a combo's table keeps it: the event it belongs to and its travel, in 30 bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Detail {
     /// The link in the high four bits and the event in the low four; `FREE` while unused.
@@ -696,6 +696,7 @@ fn grade_mode(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
         ref_travels: [None; STEPS],
         att_travels: [None; STEPS],
         match_stick: false,
+        tolerance: 0,
     })
 }
 
@@ -706,6 +707,7 @@ struct GradeContext {
     ref_travels: [Option<Travel>; STEPS],
     att_travels: [Option<Travel>; STEPS],
     match_stick: bool,
+    tolerance: u8,
 }
 
 fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bool, context: GradeContext) -> Grade {
@@ -753,7 +755,7 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                         let fault = if action::path_off(&reference, &attempt) {
                             Some(Mark::Path)
                         } else if !aim {
-                            action::steer_off(&reference, &attempt, context.match_stick)
+                            action::steer_off(&reference, &attempt, context.match_stick, context.tolerance)
                         } else if context.match_stick {
                             action::stick_off(&reference, &attempt)
                         } else { None };
@@ -794,7 +796,7 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
     }
 }
 
-fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extra: Option<u8>, match_stick: bool) -> Option<Grade> {
+fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extra: Option<u8>, settings: Settings) -> Option<Grade> {
     let reference = target.get(index)?;
     let context = GradeContext {
         ref_holds: target.holds(index),
@@ -802,7 +804,8 @@ fn input_grade(target: &Combo, actual: &Combo, index: usize, rec: &LinkRec, extr
         owns_aim: target.owns_aim(index),
         ref_travels: target.travels(index),
         att_travels: actual.travels(index),
-        match_stick,
+        match_stick: settings.match_stick,
+        tolerance: settings.tolerance,
     };
     let mut grade = grade_with(reference, rec, true, target.has_aim(), context);
     grade.extra_aim = grade.extra_aim.or(extra);
@@ -1253,7 +1256,7 @@ impl Helper {
                 None
             };
             let k = attempt.len;
-            let Some(grade) = input_grade(target, &self.input.combo, k, &actual, later, self.settings.match_stick) else { break };
+            let Some(grade) = input_grade(target, &self.input.combo, k, &actual, later, self.settings) else { break };
             // A non-final step can still receive its aim until the special ends or the next step opens.
             if snap.aim.inside && self.input.combo.len() == k + 1 && grade.missing_only_aims(self.settings.tolerance) {
                 break;
@@ -1273,7 +1276,7 @@ impl Helper {
             let attempt = self.attempt.as_ref().filter(|attempt| attempt.open() && j < attempt.len)?;
             let previous = attempt.grades[j]?;
             let actual = self.input.combo.get(j).copied()?;
-            let mut grade = input_grade(target, &self.input.combo, j, &actual, previous.extra_aim, self.settings.match_stick)?;
+            let mut grade = input_grade(target, &self.input.combo, j, &actual, previous.extra_aim, self.settings)?;
             grade.extra_aim = previous.extra_aim;
             Some(grade)
         });
@@ -1345,7 +1348,7 @@ impl Helper {
             return;
         };
         let context = GradeContext { ref_holds: reference.holds(), att_holds: rec.holds(), owns_aim: reference.owns_aim(),
-            ref_travels: [None; STEPS], att_travels: [None; STEPS], match_stick: false };
+            ref_travels: [None; STEPS], att_travels: [None; STEPS], match_stick: false, tolerance: 0 };
         let g = grade_with(reference, &rec, false, target.has_aim(), context);
         self.record_grade(g, out);
     }

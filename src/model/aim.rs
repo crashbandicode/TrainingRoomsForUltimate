@@ -206,6 +206,7 @@ pub struct Rule {
     last_status: Option<i32>,
     previous: Option<(f32, f32)>,
     previous2: Option<(f32, f32)>,
+    previous3: Option<(f32, f32)>,
     previous_ground: bool,
     candidate: Option<Candidate>,
     part: Option<OpenPart>,
@@ -224,7 +225,7 @@ pub struct Rule {
 impl Rule {
     pub const fn new() -> Self {
         Self { family: None, facing: 0, onsets: 0, statuses: [None; 2], last_heading: None,
-            window: 0, last_status: None, previous: None, previous2: None, previous_ground: true,
+            window: 0, last_status: None, previous: None, previous2: None, previous3: None, previous_ground: true,
             candidate: None, part: None, ended: None, press: 0, origin: 0, held: [0; 9], sticks: [(0, 0); 9],
             entry: action::Entry::UNKNOWN, #[cfg(test)] keep_nominal: false }
     }
@@ -296,7 +297,12 @@ impl Rule {
             self.press = now.press;
             self.entry = self.previous.zip(self.previous2).and_then(|(p, before)| {
                 let dx = f64::from(p.0) - f64::from(before.0);
-                action::Entry::of(if now.facing < 0 { -dx } else { dx }, f64::from(p.1) - f64::from(before.1))
+                let dy = f64::from(p.1) - f64::from(before.1);
+                let entry = action::Entry::of(if now.facing < 0 { -dx } else { dx }, dy)?;
+                let change = self.previous3.map_or(0.0, |older| {
+                    (dx - (f64::from(before.0) - f64::from(older.0))).hypot(dy - (f64::from(before.1) - f64::from(older.1)))
+                });
+                entry.with_change(change)
             }).unwrap_or(action::Entry::UNKNOWN);
             self.held = [0; 9];
             self.sticks = [(0, 0); 9];
@@ -374,6 +380,7 @@ impl Rule {
         }
         self.last_status = Some(now.status);
         if !now.stop {
+            self.previous3 = self.previous2;
             self.previous2 = self.previous;
             self.previous = now.pos;
             self.previous_ground = now.grounded;

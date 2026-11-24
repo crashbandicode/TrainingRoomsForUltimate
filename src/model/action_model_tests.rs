@@ -875,16 +875,16 @@ fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
     }
 }
 
-/// The travel table's static cost: an entry is packed into 28 bytes, so the table adds 112 bytes to a combo, which
+/// The travel table's static cost: an entry is packed into 30 bytes, so the table adds 120 bytes to a combo, which
 /// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
 /// more code than the data it saved (`833913b3`), so every combo carries the table.
 #[test]
-fn the_travel_table_is_packed_into_112_bytes_a_combo() {
+fn the_travel_table_is_packed_into_120_bytes_a_combo() {
     use core::mem::size_of;
     let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
     println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
         size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
-    assert_eq!((entry, DETAILS * entry), (28, 112), "a travel detail and a combo's table");
+    assert_eq!((entry, DETAILS * entry), (30, 120), "a travel detail and a combo's table");
     assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
 }
 
@@ -1285,6 +1285,14 @@ fn entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick() {
     let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
     let run = |target| airborne_cast(Some(target), false, STRAIGHT_CAST, (0.25, -0.125), true).1.unwrap();
     assert_eq!(run(read.combo).fault, Some((0, Reason::Steer)));
+    let mut falling = value.clone();
+    let press = &mut falling["input_steps"][0]["events"][0];
+    press["entry_y"] = serde_json::json!(-0.25);
+    assert!(run(serde_json::from_value::<ComboRecord>(falling.clone()).unwrap().combo).clean);
+    falling["input_steps"][0]["events"][0]["entry_change"] = serde_json::json!(0.125);
+    let accelerated: ComboRecord = serde_json::from_value(falling).unwrap();
+    assert_eq!(accelerated.combo.travel(0, 0).unwrap().entry.change(), 0.125);
+    assert_eq!(run(accelerated.combo).fault, Some((0, Reason::Steer)));
     let press = value["input_steps"][0]["events"][0].as_object_mut().unwrap();
     assert_eq!(press.remove("entry_x"), Some(serde_json::json!(0.25)));
     assert_eq!(press.remove("entry_y"), Some(serde_json::json!(-0.125)));
