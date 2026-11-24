@@ -2733,3 +2733,11 @@ ceiling = 199239
 date = "2026-11-24"
 reason = "Move names joined with the ACTION model on the install 4 merge-3 head e09fc3cf: measured 199239 (tools/sloc.py tree), which is the join's 199232 on the merge-3 candidate plus 7 of the two reviewer fixes merge 3 took (the pending-aim fix was approved at +8), with no lines from the merge."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals cited by the entries above and its 21:09:55Z approval of the merge-3 reviewer fixes."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 199244
+date = "2026-11-24"
+reason = "Name a rapid jab or finisher on a continued Jab action without changing its ownership. Measured +5 on e143d22d."
+approved_by = "tr-primary-2 2026-11-24 21:46:20Z approved 199244."
