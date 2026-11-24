@@ -182,7 +182,8 @@ fn the_move_names_row_reads_its_setting() {
     let rows = &crate::model::menu::table::ROWS;
     let at = rows.iter().position(|row| row.id == ROW_MOVE_NAMES).expect("move names row");
     assert_eq!(rows[at].title, "Move names");
-    assert_eq!(rows[at - 1].id, "spots_combo");
+    assert_eq!(rows[at - 1].id, "combo_stick");
+    assert_eq!(rows[at - 2].id, "spots_combo");
     assert_eq!(rows[at].group, rows[at - 1].group);
     assert!(matches!(rows[at].control, crate::model::menu::table::Control::Toggle));
     assert_eq!(rows[at].help, "On: moves show their names. Specials and Final Smashes use\nthe game's own names. Off: the short names.");
