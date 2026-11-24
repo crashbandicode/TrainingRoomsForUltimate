@@ -89,6 +89,10 @@ pub fn publish(snapshot: &Snapshot, rerolls: u8, picks: [Option<u32>; 2]) {
         combo: crate::model::combo::Settings::from_snapshot(snapshot),
         menu,
     };
+    crate::model::move_names::PUBLISHED.set_on(live.combo.move_names);
+    if live.combo.move_names && crate::model::move_names::PUBLISHED.table().is_none() {
+        crate::runtime::ui::worker::wake();
+    }
     crate::runtime::features::states::set_flags(&live.states);
     REROLLS.fetch_or(rerolls, Ordering::AcqRel);
     LIVE.publish(Some(live));

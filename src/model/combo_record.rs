@@ -94,6 +94,7 @@ pub struct ComboRecord {
     pub combo: Combo,
     /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
     pub recorded_on: Option<String>,
+    pub fighter: Option<super::move_names::FighterId>,
     /// The recording or chain this combo was made from. Absent on a combo saved by hand.
     pub made_from: Option<String>,
     /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
@@ -106,11 +107,12 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on, &self.made_from, &self.take)
+        (&self.name, &self.combo, &self.recorded_on, &self.fighter, &self.made_from, &self.take)
             == (
                 &other.name,
                 &other.combo,
                 &other.recorded_on,
+                &other.fighter,
                 &other.made_from,
                 &other.take,
             )
@@ -194,6 +196,7 @@ impl ComboRecord {
             }
         }
         let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
+        record.fighter = self.fighter;
         record.made_from = self.made_from.clone();
         Ok(record)
     }
@@ -204,6 +207,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: None,
             made_from: None,
             take: None,
             source: None,
@@ -213,6 +217,11 @@ impl ComboRecord {
     /// Made from a recording or a chain. The combo file keeps that id.
     pub fn with_made_from(mut self, source: impl Into<String>) -> Self {
         self.made_from = Some(source.into());
+        self
+    }
+
+    pub fn with_fighter(mut self, fighter: Option<super::move_names::FighterId>) -> Self {
+        self.fighter = fighter;
         self
     }
 
@@ -234,6 +243,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -244,6 +254,11 @@ impl ComboRecord {
             let mut object = source.clone();
             object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
+            if let Some(identity) = identity {
+                object.insert("recorded_fighter".into(), identity);
+            } else {
+                object.remove("recorded_fighter");
+            }
             return Value::Object(object);
         }
         let links: Vec<Value> = self
@@ -294,6 +309,9 @@ impl ComboRecord {
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
         }
+        if let Some(identity) = identity {
+            value["recorded_fighter"] = identity;
+        }
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
         }
@@ -330,20 +348,21 @@ impl ComboRecord {
         let key = if input { "input_steps" } else { "links" };
         let links = object.get(key).and_then(Value::as_array).ok_or(key)?;
         if links.is_empty() || links.len() > LINKS { return Err(key); }
+        let mut record = ComboRecord {
+            name,
+            combo: Combo::EMPTY,
+            recorded_on,
+            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
+            made_from,
+            take,
+            source: None,
+        };
+        let combo = &mut record.combo;
         let mut previous = 0;
-        let mut combo = Combo::from_links(links.iter().map(|value| {
-            if !input { return link_of(value, aims); }
-            let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
-            if events.is_empty() || events.len() > STEPS { return Err("events"); }
-            let mut link = LinkRec::INPUT;
-            for (slot, event) in link.events.iter_mut().zip(events) {
-                let event = parse_event(event.as_object().ok_or("event")?, aims)?;
-                if event.offset < previous { return Err("offset"); }
-                previous = event.offset;
-                *slot = Some(event);
-            }
-            Ok(link)
-        }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
+        for value in links {
+            let link = if input { input_step(value, aims, &mut previous)? } else { link_of(value, aims)? };
+            if !combo.push(link) { return Err(key); }
+        }
         combo.input_only = input;
         if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
         if input {
@@ -360,15 +379,23 @@ impl ComboRecord {
             }
             combo.join_split_steps();
         }
-        Ok(ComboRecord {
-            name,
-            combo,
-            recorded_on,
-            made_from,
-            take,
-            source: Some(object.clone()),
-        })
+        record.source = Some(object.clone());
+        Ok(record)
     }
+}
+
+fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
+    let chara = value.get("ui_chara")?.as_str()?;
+    if chara.is_empty() || chara.len() > 10 || !chara.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+    let chara = u64::from_str_radix(chara, 16).ok()?;
+    if chara == 0 { return None; }
+    let values = value.get("specials")?.as_array()?;
+    if values.len() != 4 { return None; }
+    let mut specials = [0; 4];
+    for (out, value) in specials.iter_mut().zip(values) {
+        *out = u8::try_from(value.as_u64()?).ok().filter(|value| *value <= 2)?;
+    }
+    Some(super::move_names::FighterId { chara, specials })
 }
 
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
@@ -376,6 +403,20 @@ fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static s
         .get(key)
         .and_then(int_value)
         .ok_or(key)
+}
+
+/// One input drill step: its events in file order. `previous` carries the last offset across steps.
+fn input_step(value: &Value, aims: bool, previous: &mut i32) -> Result<LinkRec, &'static str> {
+    let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+    if events.is_empty() || events.len() > STEPS { return Err("events"); }
+    let mut link = LinkRec::INPUT;
+    for (slot, event) in link.events.iter_mut().zip(events) {
+        let event = parse_event(event.as_object().ok_or("event")?, aims)?;
+        if event.offset < *previous { return Err("offset"); }
+        *previous = event.offset;
+        *slot = Some(event);
+    }
+    Ok(link)
 }
 
 fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {

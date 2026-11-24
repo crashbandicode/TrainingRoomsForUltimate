@@ -36,6 +36,14 @@ where
     imp::run_joined(id, f)
 }
 
+pub fn run_transient<F, T>(id: ThreadId, f: F) -> io::Result<T>
+where
+    F: FnOnce() -> T + Send,
+    T: Send,
+{
+    imp::run_transient(id, f)
+}
+
 /// Whether the calling thread is one this module started (a plugin thread), not a game thread or Skyline's boot thread. A plugin
 /// thread must never take a lock game-thread hooks take (stream/sync): the game's MainThread can starve it while it holds one, and a
 /// hook in a game task then waits for it (rc.6 QP freeze, `rc6-qpf3`). No allocation, no lock: hooks may call it.
@@ -44,7 +52,7 @@ pub use imp::on_plugin_thread;
 #[cfg(target_os = "switch")]
 mod imp {
     use core::cell::UnsafeCell;
-    use core::sync::atomic::{AtomicBool, Ordering};
+    use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
     use std::io;
 
     use skyline::nn;
@@ -55,6 +63,7 @@ mod imp {
     struct Stack<const N: usize>(UnsafeCell<[u8; N]>);
     #[repr(C, align(16))]
     struct Object(UnsafeCell<[u8; THREAD_OBJECT_BYTES]>);
+    static TRANSIENT: AtomicPtr<nn::os::ThreadType> = AtomicPtr::new(core::ptr::null_mut());
 
     /// One thread's static stack and thread object; `busy` while a thread uses them.
     struct Slot<const N: usize> {
@@ -104,6 +113,7 @@ mod imp {
             // stays exhaustive and a new `ThreadId` without a slot does not compile.
             fn parts(id: ThreadId) -> Option<(Parts, &'static core::ffi::CStr)> {
                 match id {
+                    ThreadId::MoveNames => None,
                     $( ThreadId::$sid => Some(($sname.parts(), const { thread_stacks::of(ThreadId::$sid).c_name })), )+
                     $( $(#[cfg($cfg)])? ThreadId::$id => Some(($name.parts(), const { thread_stacks::of(ThreadId::$id).c_name })), )*
                     $( $( #[cfg(not($cfg))] ThreadId::$id => None, )? )*
@@ -134,7 +144,8 @@ mod imp {
     pub fn on_plugin_thread() -> bool {
         // SAFETY: GetCurrentThread reads the calling thread's own object pointer (its TLS); nothing is written.
         let me = unsafe { nn::os::GetCurrentThread() };
-        thread_stacks::THREADS.iter().any(|row| parts(row.id).is_some_and(|(parts, _)| core::ptr::eq(parts.object, me)))
+        core::ptr::eq(TRANSIENT.load(Ordering::Acquire), me)
+            || thread_stacks::THREADS.iter().any(|row| parts(row.id).is_some_and(|(parts, _)| core::ptr::eq(parts.object, me)))
     }
 
     /// Create `id`'s thread on its static stack, running `entry(argument)`, and name it. `busy` is held on success.
@@ -251,6 +262,52 @@ mod imp {
         parts.busy.store(false, Ordering::Release);
         packet.out.ok_or_else(|| io::Error::other("the joined thread returned nothing"))
     }
+
+    pub fn run_transient<F: FnOnce() -> T + Send, T: Send>(id: ThreadId, f: F) -> io::Result<T> {
+        if !thread_stacks::transient(id) { return Err(io::Error::other("not a transient thread")); }
+        let row = thread_stacks::of(id);
+        let layout = std::alloc::Layout::from_size_align(row.bytes, 4096).map_err(|_| io::Error::other("invalid stack layout"))?;
+        // SAFETY: the layout is nonzero and is used again for deallocation after the thread is destroyed.
+        let stack = unsafe { std::alloc::alloc(layout) };
+        if stack.is_null() { return Err(io::Error::other("transient stack allocation failed")); }
+        let object = Object(UnsafeCell::new([0; THREAD_OBJECT_BYTES]));
+        let thread = object.0.get().cast::<nn::os::ThreadType>();
+        if TRANSIENT.compare_exchange(core::ptr::null_mut(), thread, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            // SAFETY: no thread owns this allocation.
+            unsafe { std::alloc::dealloc(stack, layout) };
+            return Err(io::Error::new(io::ErrorKind::ResourceBusy, "transient thread is in use"));
+        }
+        let mut packet = Joined { id, f: Some(f), out: None };
+        // SAFETY: stack, object and packet stay alive until the new thread has been joined and destroyed.
+        let result = unsafe {
+            let priority = nn::os::GetThreadPriority(nn::os::GetCurrentThread());
+            nn::os::CreateThread(thread, joined::<F, T>, (&mut packet as *mut Joined<F, T>).cast(), stack, row.bytes, priority)
+        };
+        if result == 0 {
+            // SAFETY: the thread has just been created and is not yet running.
+            unsafe {
+                let available = nn::os::GetThreadAvailableCoreMask();
+                if let Some((ideal, mask)) = thread_stacks::plugin_core_mask(available, thread_stacks::MAIN_CORE) {
+                    SetThreadCoreMask(thread, ideal, mask);
+                }
+                #[cfg(feature = "diag")]
+                crate::engine::compat::logging::diagnostic(format_args!(
+                    "[ThreadCores] name={} available={available:#x} cores={:?}",
+                    row.c_name.to_str().unwrap_or("?"),
+                    thread_stacks::plugin_core_mask(available, thread_stacks::MAIN_CORE)
+                ));
+                nn::os::SetThreadNamePointer(thread, row.c_name.as_ptr().cast());
+                nn::os::StartThread(thread);
+                nn::os::WaitThread(thread);
+                nn::os::DestroyThread(thread);
+            }
+        }
+        TRANSIENT.store(core::ptr::null_mut(), Ordering::Release);
+        // SAFETY: creation failed or the thread was joined and destroyed.
+        unsafe { std::alloc::dealloc(stack, layout) };
+        if result != 0 { return Err(io::Error::other(format!("nn::os::CreateThread failed: {result:#x}"))); }
+        packet.out.ok_or_else(|| io::Error::other("the transient thread returned nothing"))
+    }
 }
 
 /// Host builds (only `tests/runtime_diag_log.rs` compiles this file there): plain std threads with the table's sizes.
@@ -284,6 +341,18 @@ mod imp {
                 f()
             })?.join()
                 .map_err(|_| io::Error::other("the joined thread panicked"))
+        })
+    }
+
+    pub fn run_transient<F: FnOnce() -> T + Send, T: Send>(id: ThreadId, f: F) -> io::Result<T> {
+        if !thread_stacks::transient(id) { return Err(io::Error::other("not a transient thread")); }
+        let row = thread_stacks::of(id);
+        std::thread::scope(|scope| {
+            std::thread::Builder::new().name(row.name.into()).stack_size(row.bytes).spawn_scoped(scope, move || {
+                PLUGIN.with(|plugin| plugin.set(true));
+                f()
+            })?.join()
+                .map_err(|_| io::Error::other("the transient thread panicked"))
         })
     }
 }
