@@ -374,6 +374,10 @@ the side that plays it.
 the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch
 loads that exact Mii on the CPU. Its keys are in the [menu reference](../menu/recording.md#replay-window).
 
+2026-11-24. On the Recording page, **Save states & Macros > RECORDINGS >** also opens Vault and saved captures. Choose
+the recorded side and the role to play it, then preview it or make a macro, combo, or drill. Replays > Replay window
+remains available.
+
 ![Replay capture flips On; after a 1-stock match the Save Replay question is answered Yes and "Replay saved" shows; the Replay window then lists the capture](../media/rc13-replay-capture.gif)<br>
 *With Replay capture On, a 1-stock match is played and its replay saved: A, A, Y on the results opens "Save a replay of this battle?", Right and A answer Yes ("Replay saved"), and Recording > Replays > Replay window then lists the capture with its name and length. The loads, the match and the menus between the clips are cut. Eden, rc.13 (untested on hardware).*
 

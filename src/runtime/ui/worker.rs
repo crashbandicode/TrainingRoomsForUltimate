@@ -856,6 +856,10 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
+        Effect::ListRecordings => menu.recording_mut().set_recordings(crate::runtime::macros::replay_capture::recordings()),
+        Effect::OpenRecording { id, entry, player, make, play } => {
+            crate::runtime::macros::replay_capture::open_recording(&id, crate::engine::macro_ui::recordings::OpenRequest { entry, player, make, play });
+        }
         Effect::OpenCrop { source, combo, player } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
@@ -1366,7 +1370,7 @@ fn publish_frame(s: &Session) {
         let Some(view) = replay_capture::clip_view() else { return };
         let mut next = NEXT_FRAME.lock();
         next.reset();
-        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
+        clip_frame(&view, &replay_capture::clip_fighter_label(&view), replay_capture::scrub_pace(), &mut next);
         hand_over(&next);
         return;
     }

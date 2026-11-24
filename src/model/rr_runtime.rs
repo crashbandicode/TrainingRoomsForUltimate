@@ -338,8 +338,20 @@ pub enum ClipFile { Macro(Box<MacroRecording>), Combo(Box<ComboRecord>) }
 
 pub enum Generated { Macro(String), Pass(super::rr_host::MakeAsk) }
 
-pub fn generate(root: &Path, recording: MacroRecording, typed: &str, _make: crate::model::recording_menu::Make, _role: Role, _at: u64) -> Result<Generated, Error> {
-    save_clip_file(root, ClipFile::Macro(Box::new(recording)), typed, None).map(Generated::Macro)
+pub fn generate(root: &Path, recording: MacroRecording, typed: &str, make: crate::model::recording_menu::Make, role: Role, at: u64) -> Result<Generated, Error> {
+    use crate::model::recording_menu::Make;
+    if make == Make::Drill {
+        let source = save_drill_take(root, recording.frames, recording.start, false, at)?
+            .ok_or_else(|| Error::Record(EMPTY_RECORDING.into()))?;
+        return Ok(Generated::Pass(super::rr_host::MakeAsk { source, role, drill: Some(typed.trim().into()) }));
+    }
+    let id = save_clip_file(root, ClipFile::Macro(Box::new(recording)), typed, None)?;
+    if make == Make::Macro {
+        RecordingIndex::update(root, |index| { index.set_active(role, Some(&id), at)?; Ok(true) })?;
+        Ok(Generated::Macro(id))
+    } else {
+        Ok(Generated::Pass(super::rr_host::MakeAsk { source: id, role, drill: None }))
+    }
 }
 
 /// Always creates a fresh id; empty keyboard text chooses the next unused number.
@@ -383,23 +395,28 @@ pub fn save_made_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Op
 /// If the drill file cannot be written the take is deleted, so no take is left under MACROS. Once the drill file
 /// exists both files stay, also when the index update then fails.
 pub fn save_drill_with_take(root: &Path, combo: &Combo, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: String, at: u64) -> Result<String, Error> {
-    save_combo(root, combo, "", recorded_on, fighter, Some(take), at)
+    save_drill_with_take_named(root, combo, recorded_on, fighter, take, "", at)
 }
 
-fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: Option<String>, at: u64) -> Result<String, Error> {
+pub fn save_drill_with_take_named(root: &Path, combo: &Combo, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: String, name: &str, at: u64) -> Result<String, Error> {
+    save_combo(root, combo, "", recorded_on, fighter, Some((take, name)), at)
+}
+
+fn save_combo(root: &Path, combo: &Combo, source: &str, recorded_on: Option<String>, fighter: Option<crate::model::move_names::FighterId>, take: Option<(String, &str)>, at: u64) -> Result<String, Error> {
     let library = ComboLibrary::new(root.join("combos"));
     let cleanup = || {
-        if let Some(take) = take.as_deref() {
+        if let Some((take, _)) = take.as_ref() {
             let _ = Library::new(root.join(MACROS_DIR)).delete(take);
         }
     };
     let entries = library.list().map_err(|err| { cleanup(); record(err) })?.entries;
     let prefix = if combo.input_only { "Drill" } else { "Combo" };
-    let name = crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str()));
+    let name = clean_name(take.as_ref().map_or("", |(_, name)| *name))
+        .unwrap_or_else(|| crate::model::store::lowest_free(|n| format!("{prefix} {n}"), entries.iter().map(|e| e.name.as_str())));
     let mut made = ComboRecord::new(name, *combo, recorded_on);
     made.fighter = fighter;
     if !source.is_empty() { made = made.with_made_from(source); }
-    if let Some(take) = take.as_deref() { made = made.with_take(take); }
+    if let Some((take, _)) = take.as_ref() { made = made.with_take(take); }
     let id = library.save_new(&made).map_err(|err| { cleanup(); record(err) })?;
     RecordingIndex::update(root, |index| {
         index.note_use(Kind::Combo, &id, Use::Recorded, at)?;

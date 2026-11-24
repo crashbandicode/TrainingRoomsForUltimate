@@ -1,19 +1,46 @@
-use crate::engine::macro_ui::{clip_browser, clip_browser::ClipBrowser};
+use crate::engine::macro_ui::{clip_browser, clip_browser::ClipBrowser, macro_panel::{LibraryRow, Pad}};
 use crate::engine::macros::{CaptureEntry, ReplaySession};
-use crate::model::recording_menu::{Make, RecordingFile};
+use crate::model::recording_menu::{Make, RecordingFile, RecordingSide};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpenRequest { pub entry: u8, pub player: bool, pub make: Make, pub play: bool }
 
-pub fn rows(_latest: Option<&ReplaySession>, _previous: Option<&ReplaySession>, _saved: &[CaptureEntry],
-    _fighter: impl Fn(i32) -> String) -> Vec<RecordingFile> {
-    Vec::new()
+pub fn rows(latest: Option<&ReplaySession>, previous: Option<&ReplaySession>, saved: &[CaptureEntry],
+    fighter: impl Fn(i32) -> String) -> Vec<RecordingFile> {
+    let sides = |values: Vec<(i32, i32)>| {
+        let mut result: Vec<_> = values.into_iter().filter_map(|(entry, kind)| {
+            u8::try_from(entry).ok().map(|entry| RecordingSide { entry, fighter: fighter(kind) })
+        }).collect();
+        result.sort_by_key(|side| side.entry);
+        result
+    };
+    let mut files = Vec::new();
+    for (id, name, session) in [("latest", "Latest Vault capture", latest), ("previous", "Previous Vault capture", previous)] {
+        if let Some(session) = session {
+            let frames = session.tracks.iter().map(|track| track.frames.len()).max().unwrap_or(0);
+            let entries = session.tracks.iter().filter_map(|track|
+                track.frames.first().map(|frame| (track.entry, frame.start.fighter_kind))).collect();
+            if frames > 0 {
+                files.push(RecordingFile { id: id.into(), name: name.into(), frames: frames as u32,
+                    partial: session.truncated, sides: sides(entries) });
+            }
+        }
+    }
+    files.extend(saved.iter().filter(|entry| entry.frames > 0).map(|entry| RecordingFile {
+        id: format!("saved:{}", entry.id), name: entry.replay_name.clone(), frames: entry.frames as u32,
+        partial: entry.truncated, sides: sides(entry.sides.clone()),
+    }));
+    files
 }
 
-pub fn editor_label(_entry: i32, fighter: &str, _player: bool) -> String { fighter.to_owned() }
+pub fn editor_label(entry: i32, fighter: &str, player: bool) -> String {
+    format!("P{} {fighter} · plays on {}", entry + 1, if player { "Player 1" } else { "CPU" })
+}
 
-pub fn open_one(_id: &str, _waiting: bool) -> (ClipBrowser, clip_browser::Effect) {
-    (ClipBrowser::new(Vec::new(), 0), clip_browser::Effect::None)
+pub fn open_one(id: &str, waiting: bool) -> (ClipBrowser, clip_browser::Effect) {
+    let mut browser = ClipBrowser::new(vec![LibraryRow { id: id.into(), label: id.into() }], 0);
+    let effect = browser.on_pad(Pad::Confirm, waiting);
+    (browser, effect)
 }
 
 #[cfg(test)]

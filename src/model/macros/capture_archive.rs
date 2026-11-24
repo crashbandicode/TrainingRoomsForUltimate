@@ -5,7 +5,7 @@
 
 use std::{
     fs::{self, File, FileType, OpenOptions},
-    io::{self, BufReader, BufWriter, Read, Write},
+    io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -88,7 +88,7 @@ impl CaptureArchive {
         Self { dir: dir.into() }
     }
 
-    /// Lists bounded metadata only; frame payloads are not read or validated.
+    /// Lists bounded metadata and the first record of each track.
     /// A missing directory is an empty archive and invalid files are reported
     /// in `skipped` without being changed or removed.
     pub fn list(&self) -> io::Result<CaptureListing> {
@@ -130,7 +130,14 @@ impl CaptureArchive {
                 if !shared && !item.file_type()?.is_file() {
                     return Err(invalid_data("capture path is not a regular file"));
                 }
-                let (_, header) = open_capture(&path, id)?;
+                let (mut capture, header) = open_capture(&path, id)?;
+                let mut sides = Vec::with_capacity(header.tracks.len());
+                for track in &header.tracks {
+                    let mut first = [0u8; CAPTURE_RECORD_BYTES];
+                    read_exact_capture(&mut capture, &mut first, "sample data")?;
+                    sides.push((track.entry, read_i32(&first, 8)));
+                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;
+                }
                 Ok(Some(CaptureEntry {
                     id: id.to_owned(),
                     replay_name: header.replay_name,
@@ -143,7 +150,7 @@ impl CaptureArchive {
                         .max()
                         .unwrap_or(0),
                     truncated: header.truncated,
-                    sides: Vec::new(),
+                    sides,
                 }))
             })();
 

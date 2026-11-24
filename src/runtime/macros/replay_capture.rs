@@ -39,11 +39,11 @@ static CLOSE_TRACE_ID: AtomicU64 = AtomicU64::new(0);
 #[cfg(feature = "named-input-trace")]
 const CLOSE_TRACE_LIMIT: u64 = 600;
 use crate::engine::mii::{inventory::MiiClass, lifetime::Configuration, replay::{RawMii,Target}};
-struct Browser { ui: ClipBrowser, revision: u64 }
+struct Browser { ui: ClipBrowser, revision: u64, request: Option<crate::engine::macro_ui::recordings::OpenRequest> }
 /// `switch` is set only by an answered Switch prompt: the recorded fighter is then
 /// requested once, and cleared when that request settles, fails or is cancelled. An
 /// editor without it never changes the CPU, whatever fighter the track recorded.
-struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)> }
+struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }
 impl std::ops::Deref for Editor {type Target=ClipEditor;fn deref(&self)->&ClipEditor {&self.clip}}
 impl std::ops::DerefMut for Editor {fn deref_mut(&mut self)->&mut ClipEditor {&mut self.clip}}
 impl Editor {
@@ -221,8 +221,37 @@ fn open_browser(expected_revision: Option<u64>) {
             !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
         if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
         *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
-            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });
+            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });
     }
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+}
+
+pub fn recordings() -> Vec<crate::model::recording_menu::RecordingFile> {
+    use crate::engine::macro_ui::recordings::rows;
+    let mut result = {
+        let capture = CAPTURE.lock().unwrap();
+        rows(Some(&capture.session), capture.previous.as_ref(), &[], kind_label)
+    };
+    match crate::runtime::macros::replay_store::archive().list() {
+        Ok(listing) => result.extend(rows(None, None, &listing.entries, kind_label)),
+        Err(error) => notify(format!("Saved capture library: {error}")),
+    }
+    result
+}
+
+pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {
+    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()
+        || crate::runtime::lobby::training::recording_or_playback()
+        || crate::runtime::macros::save_states::is_loading()
+        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()
+    {
+        notify("Open the replay window in idle practice".into());
+        return;
+    }
+    let (ui, effect) = crate::engine::macro_ui::recordings::open_one(id, crate::runtime::ui::facts::fact_waiting_scene());
+    let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;
+    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });
+    browser_effect(effect, revision);
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
@@ -236,7 +265,7 @@ struct CaptureSource {
 
 fn open_capture(id: &str, revision: u64) -> Result<(), String> {
     let source = read_capture_source(id)?;
-    install_capture_source(source, revision)
+    install_capture_source(source, revision, id)
 }
 
 /// A saved file uses the Replay window's editor and keyboard.
@@ -252,7 +281,7 @@ pub fn open_file_editor(id: &str, combo: bool, player: bool) {
     let editor = match result { Ok(editor) => editor, Err(error) => { notify(error); return; } };
     if !capture_ready() { return; }
     *EDITOR.lock().unwrap() = Some(Editor { clip: editor,
-        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)) });
+        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)), request: None });
     PENDING.lock().unwrap().take();
     SELECTION_REVISION.fetch_add(1, Ordering::AcqRel);
     REVISION.fetch_add(1, Ordering::Relaxed);
@@ -270,6 +299,11 @@ fn name_file(file: crate::engine::rr_runtime::ClipFile) {
             crate::model::combo_record::UnitKind::Step => "Name drill",
         }, recording.name.as_str()),
     };
+    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {
+        Some(request) if request.make == crate::model::recording_menu::Make::Drill => "Name drill",
+        Some(_) => "Name macro",
+        None => title,
+    };
     crate::runtime::macros::named_macros::offer_external_name_titled(
         crate::engine::macro_ui::macro_panel::CLIP_NAME_TOKEN, title, name, "Save as a new file");
     *FILE_NAME.lock().unwrap() = Some(file);
@@ -280,6 +314,17 @@ fn service_file_name() {
     if let Some(name) = crate::runtime::macros::named_macros::take_confirmed_name_for(token) {
         let file = FILE_NAME.lock().unwrap().take();
         if let Some(file) = file {
+            let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);
+            if let (Some(request), crate::engine::rr_runtime::ClipFile::Macro(recording)) = (request, &file) {
+                let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };
+                match crate::engine::rr_runtime::generate(std::path::Path::new(crate::model::storage::ROOT), (**recording).clone(), &name, request.make, role, at) {
+                    Ok(crate::engine::rr_runtime::Generated::Macro(id)) => crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}")),
+                    Ok(crate::engine::rr_runtime::Generated::Pass(ask)) => { close_editor(); crate::engine::rr_host::request_make(ask); }
+                    Err(error) => notify(error.to_string()),
+                }
+                return;
+            }
             let source = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.clone());
             let follow = source.as_ref().and_then(|(id, player)| {
                 matches!(file, crate::engine::rr_runtime::ClipFile::Macro(_))
@@ -327,7 +372,7 @@ fn read_capture_source(id: &str) -> Result<CaptureSource, String> {
 
 /// The editor publication fence and its payload live only after decoding has unwound.
 #[inline(never)]
-fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), String> {
+fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Result<(), String> {
     let CaptureSource { session, name, previous, miis } = source;
     // Inspect the full owned session once, before ClipEditor selects/crops a track.
     let association=std::array::from_fn(|entry| {
@@ -357,9 +402,14 @@ fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), St
             if !crate::runtime::ui::facts::fact_cpu_status().is_some_and(|status| clean_statuses().contains(&status)) {
                 return Err("Open the clip editor while the CPU is idle or falling".into());
             }
-            editor.select_kind(current);
+            let request = browser.as_ref().and_then(|b| b.request);
+            if let Some(request) = request {
+                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }
+            } else {
+                editor.select_kind(current);
+            }
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
-                association,resolved:[None;8],resolve_failed:0,switch:false,source:None});
+                association,resolved:[None;8],resolve_failed:0,switch:false,source:None,request});
             PENDING.lock().unwrap().take();
             browser.take();
             drop(browser);
@@ -372,6 +422,12 @@ fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), St
             // The opening track is the first explicit selection. The editor stays
             // inert behind the prompt; nothing reloads the CPU unless Switch is chosen.
             gate_selection(None, Some(current));
+            if let Some(request) = request {
+                crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] recording id={id} entry={} plays_on={} make={} play={}",
+                    request.entry, if request.player { "player" } else { "cpu" },
+                    match request.make { crate::model::recording_menu::Make::Macro => "macro", crate::model::recording_menu::Make::Combo => "combo", crate::model::recording_menu::Make::Drill => "drill" },
+                    u8::from(request.play)));
+            }
         }
         Err(error) => return Err(error),
     }
@@ -387,6 +443,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
     let (gate, recorded, unresolved) = {
         let editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_ref() else { return false; };
+        if editor.request.is_some_and(|request| request.player) { return false; }
         if !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }) { return false; }
         let (entry, kind, previous) = match action {
             Some(action) => match editor.peek_selection(action) { Some(candidate) => candidate, None => return false },
@@ -779,8 +836,35 @@ pub fn clip_view() -> Option<ClipView> {
     EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())
 }
 
+pub fn clip_play_role() -> crate::engine::library::Role {
+    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {
+        crate::engine::library::Role::Player
+    } else { crate::engine::library::Role::Cpu }
+}
+
+pub fn clip_fighter_label(view: &ClipView) -> String {
+    let fighter = kind_label(view.fighter_kind);
+    match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {
+        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),
+        None => fighter,
+    }
+}
+
 pub fn worker_preview_notices() {
     service_file_name();
+    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {
+        let play = {
+            let mut editor = EDITOR.lock().unwrap();
+            editor.as_mut().is_some_and(|editor| {
+                if editor.switch { return false; }
+                if let Some(request) = editor.request.as_mut().filter(|request| request.play) {
+                    request.play = false;
+                    true
+                } else { false }
+            })
+        };
+        if play { apply_action(ClipAction::TogglePlay); }
+    }
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
         if editor.view().playing
             && TAIL.lock().unwrap().over(crate::engine::rr_host::preview_running(), crate::runtime::ui::facts::fact_frame_number()) {
@@ -916,7 +1000,7 @@ fn apply_action(action: ClipAction) {
             Err(error) => preview_failed(&error.to_string()),
             Ok(()) => {
                 TAIL.lock().unwrap().restart();
-                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);
+                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());
             }
         },
         Some(ClipEffect::PreviewFile { start, end }) => {
@@ -936,6 +1020,8 @@ fn apply_action(action: ClipAction) {
                 return;
             }
             match attach(recording) {
+                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>
+                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),
                 Ok(recording)=>crate::runtime::macros::named_macros::offer_replay_recording(*recording),Err(error)=>notify(error),
             }
         }

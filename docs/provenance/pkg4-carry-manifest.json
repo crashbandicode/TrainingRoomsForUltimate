@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "3aa03a5f8d419bf1871b69d839f917396b0d5524a3bfdba4fdccf39868cacc93",
+   "dest_sha256": "8ac01983b1297429c973cc0c2bd5e1e4c7edf746c0d0a11bbe80aa068f64ed96",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -152,6 +152,26 @@
      "reason": "Vault Recordings: role and capture selection regression slice",
      "old": "        crate::test_table::run(&[\n",
      "new": "        crate::test_table::run(&[\n            (\"a_saved_capture_lists_each_side_with_its_fighter\", a_saved_capture_lists_each_side_with_its_fighter as fn()),\n            (\"a_capture_file_with_no_new_key_reads_back_both_sides\", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),\n            (\"a_capture_being_written_is_not_listed_until_it_is_committed\", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    io::{self, BufReader, BufWriter, Read, Write},\n",
+     "new": "    io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    /// Lists bounded metadata only; frame payloads are not read or validated.\n",
+     "new": "    /// Lists bounded metadata and the first record of each track.\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                let (_, header) = open_capture(&path, id)?;\n",
+     "new": "                let (mut capture, header) = open_capture(&path, id)?;\n                let mut sides = Vec::with_capacity(header.tracks.len());\n                for track in &header.tracks {\n                    let mut first = [0u8; CAPTURE_RECORD_BYTES];\n                    read_exact_capture(&mut capture, &mut first, \"sample data\")?;\n                    sides.push((track.entry, read_i32(&first, 8)));\n                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;\n                }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                    sides: Vec::new(),\n",
+     "new": "                    sides,\n"
     }
    ]
   },
@@ -1200,7 +1220,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "77959949764027b81028d0f7de56dad3ed08ba00125b911957cdea5d7f19c57d",
+   "dest_sha256": "54084fa171b88e05e410527cf1ff812592d33b9f12c6cab5549e15e5ce0508ad",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1447,6 +1467,11 @@
      "reason": "Vault Recordings: role and capture selection regression slice",
      "old": "            self.set_track(index);\n        }\n    }\n",
      "new": "            self.set_track(index);\n        }\n    }\n\n    pub fn select_entry(&mut self, _entry: i32) -> bool { false }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    pub fn select_entry(&mut self, _entry: i32) -> bool { false }\n",
+     "new": "    pub fn select_entry(&mut self, entry: i32) -> bool {\n        if self.file.is_some() { return false; }\n        let Some(index) = self.session.tracks.iter().position(|track| track.entry == entry) else { return false };\n        self.set_track(index);\n        true\n    }\n"
     }
    ]
   },
@@ -3686,7 +3711,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "9f56dac3febce3c6c589c2a6fdcc79176c399159ad97d2b82fc5413606270382",
+   "dest_sha256": "89eb76a116c0c778cdec701643cfd525c7f408eaa1ff15acda42aced9d533026",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4302,6 +4327,91 @@
      "reason": "Vault Recordings: role and capture selection regression slice",
      "old": "                crate::engine::rr_host::request_clip_preview(*recording);\n",
      "new": "                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "struct Browser { ui: ClipBrowser, revision: u64 }\n",
+     "new": "struct Browser { ui: ClipBrowser, revision: u64, request: Option<crate::engine::macro_ui::recordings::OpenRequest> }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)> }\n",
+     "new": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });\n",
+     "new": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n",
+     "new": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n\npub fn recordings() -> Vec<crate::model::recording_menu::RecordingFile> {\n    use crate::engine::macro_ui::recordings::rows;\n    let mut result = {\n        let capture = CAPTURE.lock().unwrap();\n        rows(Some(&capture.session), capture.previous.as_ref(), &[], kind_label)\n    };\n    match crate::runtime::macros::replay_store::archive().list() {\n        Ok(listing) => result.extend(rows(None, None, &listing.entries, kind_label)),\n        Err(error) => notify(format!(\"Saved capture library: {error}\")),\n    }\n    result\n}\n\npub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    let (ui, effect) = crate::engine::macro_ui::recordings::open_one(id, crate::runtime::ui::facts::fact_waiting_scene());\n    let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;\n    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    install_capture_source(source, revision)\n",
+     "new": "    install_capture_source(source, revision, id)\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)) });\n",
+     "new": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)), request: None });\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        }, recording.name.as_str()),\n    };\n",
+     "new": "        }, recording.name.as_str()),\n    };\n    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n        Some(request) if request.make == crate::model::recording_menu::Make::Drill => \"Name drill\",\n        Some(_) => \"Name macro\",\n        None => title,\n    };\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        if let Some(file) = file {\n",
+     "new": "        if let Some(file) = file {\n            let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);\n            if let (Some(request), crate::engine::rr_runtime::ClipFile::Macro(recording)) = (request, &file) {\n                let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());\n                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };\n                match crate::engine::rr_runtime::generate(std::path::Path::new(crate::model::storage::ROOT), (**recording).clone(), &name, request.make, role, at) {\n                    Ok(crate::engine::rr_runtime::Generated::Macro(id)) => crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] saved_new={id}\")),\n                    Ok(crate::engine::rr_runtime::Generated::Pass(ask)) => { close_editor(); crate::engine::rr_host::request_make(ask); }\n                    Err(error) => notify(error.to_string()),\n                }\n                return;\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), String> {\n",
+     "new": "fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Result<(), String> {\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            editor.select_kind(current);\n",
+     "new": "            let request = browser.as_ref().and_then(|b| b.request);\n            if let Some(request) = request {\n                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n            } else {\n                editor.select_kind(current);\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                association,resolved:[None;8],resolve_failed:0,switch:false,source:None});\n",
+     "new": "                association,resolved:[None;8],resolve_failed:0,switch:false,source:None,request});\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            gate_selection(None, Some(current));\n",
+     "new": "            gate_selection(None, Some(current));\n            if let Some(request) = request {\n                crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] recording id={id} entry={} plays_on={} make={} play={}\",\n                    request.entry, if request.player { \"player\" } else { \"cpu\" },\n                    match request.make { crate::model::recording_menu::Make::Macro => \"macro\", crate::model::recording_menu::Make::Combo => \"combo\", crate::model::recording_menu::Make::Drill => \"drill\" },\n                    u8::from(request.play)));\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        let Some(editor) = editor.as_ref() else { return false; };\n",
+     "new": "        let Some(editor) = editor.as_ref() else { return false; };\n        if editor.request.is_some_and(|request| request.player) { return false; }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())\n}\n\n",
+     "new": "    EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())\n}\n\npub fn clip_play_role() -> crate::engine::library::Role {\n    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {\n        crate::engine::library::Role::Player\n    } else { crate::engine::library::Role::Cpu }\n}\n\npub fn clip_fighter_label(view: &ClipView) -> String {\n    let fighter = kind_label(view.fighter_kind);\n    match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),\n        None => fighter,\n    }\n}\n\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    service_file_name();\n",
+     "new": "    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n            let mut editor = EDITOR.lock().unwrap();\n            editor.as_mut().is_some_and(|editor| {\n                if editor.switch { return false; }\n                if let Some(request) = editor.request.as_mut().filter(|request| request.play) {\n                    request.play = false;\n                    true\n                } else { false }\n            })\n        };\n        if play { apply_action(ClipAction::TogglePlay); }\n    }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);\n",
+     "new": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            match attach(recording) {\n",
+     "new": "            match attach(recording) {\n                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>\n                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n"
     }
    ]
   },

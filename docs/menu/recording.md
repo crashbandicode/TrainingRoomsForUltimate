@@ -46,6 +46,7 @@ After a restart, Record uses the remembered pop-up role even before you open the
 Your save states and your macros, in two lists one above the other, four rows of each at a time. The left column shows
 the number of files, such as "Save states & Macros (7)".
 
+
 - **SAVE STATES** lists every save state, with its fighters on a dim line. The green row is the *bound* save, the one
   the Save and Load chords use. New saves come from the Save chord (ZL + D-pad Down) and from Record, which saves where
   the fighters stood as "Macro N · start".
@@ -75,6 +76,15 @@ the number of files, such as "Save states & Macros (7)".
 ![The Recording page, Player view: the hot five outlined, the bound save and the active macro green, orange floppies, CONNECTIONS filled](../media/rc13-recording-page.png)<br>
 *The Recording page with the cursor on Walk and jab: the five used last are outlined in each list, the bound save (Jab start) and the active macro (P1 jab) are green, the floppy marks a macro with a start save, "2" marks Chain 1's second step, and CONNECTIONS says "Starts from Jab start | Chain 1 · step 2 | Recorded on Mario". Eden, rc.13 (untested on hardware).*
 
+### Recordings
+
+2026-11-24. **RECORDINGS >** is the first row of MACROS on the Recording page, in either view. It opens the latest and
+previous Vault captures and saved captures, with their fighter sides and length; B returns to MACROS. A capture's
+screen has **Inputs from**, **Plays on**, **Play back**, **Make macro…**, **Make combo…**, and **Make drill…**.
+Choose the recorded side and whether the inputs play on Player 1 or the CPU. Play back opens the clip editor and
+starts its preview. Make macro saves the selected clip as that role's active macro. Make combo plays it on that role
+to capture a combo, or an input drill when no hit is made. Make drill always saves an input drill and its take.
+
 More: [Recording a macro](../guide/recording.md#recording-a-macro-and-its-start-save),
 [Chains](../guide/recording.md#chains), [Save states](../guide/save-states.md)
 
@@ -87,6 +97,7 @@ don't turn the page while a file's screen is open.
 | --- | --- |
 | Save state | Bind to Save / Load, Duplicate, Rename, Delete |
 | Macro | Start save (only if it has one), Set active, Playback slot, Rename, Crop, Make combo, Delete |
+| Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill… |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
 | Input drill | Drill, Made from (only if made from a macro or chain), Rename, Crop, Delete |

@@ -354,6 +354,10 @@ pub struct FileRow {
 enum ItemKind {
     Drills,
     RecordDrill,
+    Recordings,
+    Captured,
+    CapturePending,
+    CaptureEmpty,
     Save,
     Recording,
     Combo,
@@ -367,7 +371,8 @@ enum ItemKind {
 impl ItemKind {
     /// A row that does something instead of naming a file.
     const fn action(self) -> bool {
-        matches!(self, ItemKind::Drills | ItemKind::RecordDrill | ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo)
+        matches!(self, ItemKind::Drills | ItemKind::RecordDrill | ItemKind::Recordings | ItemKind::CapturePending | ItemKind::CaptureEmpty
+            | ItemKind::NewChain | ItemKind::NewSequence | ItemKind::SaveLastCombo)
     }
 }
 
@@ -380,6 +385,7 @@ struct Item {
 #[derive(Clone, Copy, Debug)]
 struct Place {
     drills: bool,
+    recordings: bool,
     parent_at: usize,
     section: u8,
     at: [usize; 2],
@@ -387,11 +393,15 @@ struct Place {
 
 impl Place {
     const fn new() -> Place {
-        Place { drills: false, parent_at: 0, section: 0, at: [0, 0] }
+        Place { drills: false, recordings: false, parent_at: 0, section: 0, at: [0, 0] }
     }
 
     fn in_drills(self, group: u8, section: u8) -> bool {
         self.drills && group == COMBOS_SEQ && section == 1
+    }
+
+    fn in_recordings(self, group: u8, section: u8) -> bool {
+        self.recordings && group == SAVES_MACROS && section == 1
     }
 }
 
@@ -400,6 +410,8 @@ struct FileScreen {
     id: String,
     kind: ItemKind,
     cursor: usize,
+    capture_side: usize,
+    capture_player: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -454,6 +466,9 @@ enum Act {
     Drill,
     DrillCombo,
     Info,
+    CaptureSide,
+    CaptureTarget,
+    CaptureOpen(Make, bool),
 }
 
 struct BuiltRow {
@@ -477,6 +492,7 @@ pub struct RecordingScreens {
     keyboard: Option<Keyboard>,
     overlay_face: Face,
     catalog: Catalog,
+    recordings: Option<Vec<RecordingFile>>,
     /// Macros that drills own as their takes (F10), named with the take prefix and key, with their frame counts: taken out of the catalog's macros in
     /// `set_catalog`, so no list, picker, name or count shows them.
     takes: Vec<(String, u32)>,
@@ -494,7 +510,11 @@ pub struct RecordingScreens {
 }
 
 impl RecordingScreens {
-    pub fn set_recordings(&mut self, _files: Vec<RecordingFile>) {}
+    pub fn set_recordings(&mut self, mut files: Vec<RecordingFile>) {
+        for file in &mut files { file.sides.sort_by_key(|side| side.entry); }
+        files.retain(|file| !file.sides.is_empty());
+        self.recordings = Some(files);
+    }
 
     /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
     pub fn depth(&self, face: Face, group: u8, on_library: bool) -> usize {
@@ -504,7 +524,8 @@ impl RecordingScreens {
             0
         };
         let group = if face == Face::Popup { self.popup_group() } else { group };
-        overlays + usize::from((face == Face::Popup || on_library) && self.place(face, group).drills)
+        overlays + usize::from((face == Face::Popup || on_library) &&
+            (self.place(face, group).drills || self.place(face, group).recordings))
     }
 
     /// The list the cursor rests in on `face` (the bridge snapshot): that face's open numbered picker or file screen,
@@ -539,7 +560,8 @@ impl RecordingScreens {
         let section = place.section;
         let count = self.items(face, group, section).len();
         let name = if face == Face::Popup { "popup" } else { "page" };
-        let suffix = if place.in_drills(group, section) { "/drills" } else { "" };
+        let suffix = if place.in_drills(group, section) { "/drills" }
+            else if place.in_recordings(group, section) { "/recordings" } else { "" };
         list(format!("recording/{name}/{group}/{section}{suffix}"), count, place.at[usize::from(section)], String::new())
     }
 
@@ -556,6 +578,7 @@ impl RecordingScreens {
             keyboard: None,
             overlay_face: Face::Page,
             catalog: Catalog::default(),
+            recordings: None,
             takes: Vec::new(),
             bound: None,
             active: [None, None],
@@ -643,6 +666,7 @@ impl RecordingScreens {
             ItemKind::Save => self.save_by_id(id).is_some(),
             ItemKind::Combo => self.combo_by_id(id).is_some(),
             ItemKind::Sequence => self.catalog.sequences.iter().any(|file| file.id == id),
+            ItemKind::Captured => self.recording_by_id(id).is_some(),
             _ => false,
         }
     }
@@ -790,6 +814,7 @@ impl RecordingScreens {
         let Some(file) = &self.file else { return String::new() };
         let role = if self.page_role == ViewRole::Cpu { "CPU view" } else { "Player view" };
         let group = match file.kind {
+            ItemKind::Captured => "Save states & Macros  >  Recordings",
             ItemKind::Combo if self.combo_by_id(&file.id).is_some_and(|f| f.input_only) => "Combos & Sequences  >  Drills",
             ItemKind::Combo | ItemKind::Sequence => "Combos & Sequences",
             _ => "Save states & Macros",
@@ -1066,13 +1091,14 @@ impl RecordingScreens {
         let header = if view.header_floppy == Some(Floppy::On) { "on" } else { "off" };
         let active = self.active[role.index()].as_deref().unwrap_or("");
         let group_name = if group == COMBOS_SEQ { "combos-sequences" } else { "saves-macros" };
+        let sublist = if self.place(face, group).in_recordings(group, self.current_section(face, group)) { " recordings=1" } else { "" };
         let tab = if self.tab() == 0 { "saves" } else { "combos" };
         let screen = match face {
             Face::Popup => "recording-popup",
             Face::Page => "recording-page",
         };
         format!(
-            "screen={screen} role={} tab={tab} loop={} hot={hot} hairline={hair} floppy={floppy} header={header} active={active} group={group_name}",
+            "screen={screen} role={} tab={tab} loop={} hot={hot} hairline={hair} floppy={floppy} header={header} active={active} group={group_name}{sublist}",
             role.diag(),
             self.loop_of(role).label(),
         )
@@ -1122,6 +1148,7 @@ impl RecordingScreens {
             return if self.press_overlay(button, Face::Page) { PageHit::Consumed } else { PageHit::Ignored };
         }
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
+        if button == Button::B && on_library && self.place(Face::Page, group).recordings { self.toggle_recordings(group); return PageHit::Consumed; }
         match button {
             Button::X => {
                 if on_library && self.in_macros(Face::Page, group) {
@@ -1238,7 +1265,7 @@ impl RecordingScreens {
     }
 
     fn in_macros(&self, face: Face, group: u8) -> bool {
-        group == SAVES_MACROS && self.place(face, group).section == 1
+        group == SAVES_MACROS && self.place(face, group).section == 1 && !self.place(face, group).recordings
     }
 
     fn cycle_x(&mut self, role: ViewRole) {
@@ -1307,13 +1334,27 @@ impl RecordingScreens {
         core::mem::swap(&mut place.at[1], &mut place.parent_at); place.section = 1;
     }
 
+    fn toggle_recordings(&mut self, group: u8) {
+        let place = self.place_mut(Face::Page, group);
+        place.recordings = !place.recordings;
+        core::mem::swap(&mut place.at[1], &mut place.parent_at);
+        place.section = 1;
+    }
+
     fn activate(&mut self, face: Face, group: u8) {
         let Some(item) = self.focused(face, group) else { return };
         match (face, item.kind) {
             (_, ItemKind::Drills) => self.toggle_drills(face, group),
+            (Face::Page, ItemKind::Recordings) => {
+                self.toggle_recordings(group);
+                self.recordings = None;
+                self.last_effect = Effect::ListRecordings;
+            }
+            (_, ItemKind::Recordings | ItemKind::CapturePending | ItemKind::CaptureEmpty) => {}
             (_, ItemKind::RecordDrill) => { self.last_effect = Effect::RecordDrill; self.popup_open = false; }
             (Face::Popup, ItemKind::Save) => self.set_bound(&item.id, true),
             (Face::Popup, ItemKind::Recording) => self.set_active(self.popup_role, &item.id, true),
+            (Face::Popup, ItemKind::Captured) => {}
             (Face::Popup, ItemKind::Combo | ItemKind::Sequence) => self.set_drill(item.kind, item.id),
             (Face::Popup, ItemKind::NewChain) => self.open_picker(PickerKind::NewChain, Face::Popup, None),
             (Face::Popup, ItemKind::NewSequence) => self.open_picker(PickerKind::NewSequence, Face::Popup, None),
@@ -1332,7 +1373,7 @@ impl RecordingScreens {
             self.close_chain_gap(&id);
         }
         self.overlay_face = Face::Page;
-        self.file = Some(FileScreen { id, kind, cursor: 0 });
+        self.file = Some(FileScreen { id, kind, cursor: 0, capture_side: 0, capture_player: self.page_role == ViewRole::Player });
         self.picker = None;
         self.keyboard = None;
     }
@@ -1412,6 +1453,8 @@ impl RecordingScreens {
             Act::SetActive => self.set_active(self.page_role, &id, on),
             Act::StartSave => self.set_start(kind, &id, on),
             Act::PlaybackSlot => self.step_slot(&id, on),
+            Act::CaptureSide => self.step_capture_side(on),
+            Act::CaptureTarget => if let Some(file) = self.file.as_mut() { file.capture_player = !file.capture_player; },
             _ => {}
         }
     }
@@ -1439,6 +1482,13 @@ impl RecordingScreens {
                 self.set_start(kind, &id, on);
             }
             Act::PlaybackSlot => self.step_slot(&id, true),
+            Act::CaptureSide => self.step_capture_side(true),
+            Act::CaptureTarget => if let Some(file) = self.file.as_mut() { file.capture_player = !file.capture_player; },
+            Act::CaptureOpen(make, play) => {
+                let Some(file) = self.file.as_ref() else { return };
+                let Some(side) = self.recording_by_id(&id).and_then(|recording| recording.sides.get(file.capture_side)) else { return };
+                self.last_effect = Effect::OpenRecording { id, entry: side.entry, player: file.capture_player, make, play };
+            }
             Act::Duplicate => {
                 self.duplicate_save(&id);
                 if kind == ItemKind::Save {
@@ -1480,6 +1530,16 @@ impl RecordingScreens {
 
     fn open_crop(&mut self, kind: ItemKind, source: String) {
         self.last_effect = Effect::OpenCrop { source, combo: kind == ItemKind::Combo, player: self.page_role == ViewRole::Player };
+    }
+
+    fn step_capture_side(&mut self, forward: bool) {
+        let Some(file) = self.file.as_ref() else { return };
+        let Some(recording) = self.recording_by_id(&file.id) else { return };
+        let len = recording.sides.len();
+        if len > 0 {
+            let next = stepped(file.capture_side, len, forward);
+            if let Some(file) = self.file.as_mut() { file.capture_side = next; }
+        }
     }
 
     fn set_bound(&mut self, id: &str, on: bool) {
@@ -1759,10 +1819,18 @@ impl RecordingScreens {
                 .collect();
         }
         if !combos {
+            if self.place(face, group).in_recordings(group, section) {
+                return match &self.recordings {
+                    None => vec![Item { kind: ItemKind::CapturePending, id: String::new() }],
+                    Some(files) if files.is_empty() => vec![Item { kind: ItemKind::CaptureEmpty, id: String::new() }],
+                    Some(files) => files.iter().map(|file| Item { kind: ItemKind::Captured, id: file.id.clone() }).collect(),
+                };
+            }
             let mut rows: Vec<Item> = ordered(&self.catalog.macros, &self.catalog.hot_macros, |file| &file.id, |file| &file.name)
                 .into_iter()
                 .map(|file| Item { kind: ItemKind::Recording, id: file.id.clone() })
                 .collect();
+            if face == Face::Page { rows.insert(0, Item { kind: ItemKind::Recordings, id: String::new() }); }
             rows.push(Item { kind: ItemKind::NewChain, id: String::new() });
             return rows;
         }
@@ -1795,7 +1863,8 @@ impl RecordingScreens {
         let cursor = place.at[usize::from(section)].min(items.len().saturating_sub(1));
         let focused = self.focused(face, group);
         let role = self.role(face);
-        let header = if place.in_drills(group, section) { "DRILLS" } else { header_of(group, section) };
+        let header = if place.in_drills(group, section) { "DRILLS" }
+            else if place.in_recordings(group, section) { "RECORDINGS" } else { header_of(group, section) };
         let rows = items
             .iter()
             .enumerate()
@@ -1834,6 +1903,11 @@ impl RecordingScreens {
         let recorded = |on: &str| if on.is_empty() { String::new() } else { format!("Recorded on {on}") };
         match item.kind {
             ItemKind::Save => self.save_by_id(&item.id).map(|file| file.fighters.clone()).unwrap_or_default(),
+            ItemKind::Captured => self.recording_by_id(&item.id).map(|file| {
+                let mut parts: Vec<String> = file.sides.iter().map(|side| format!("P{} {}", side.entry + 1, side.fighter)).collect();
+                parts.push(format!("{} frames", file.frames));
+                parts.join(" · ")
+            }).unwrap_or_default(),
             ItemKind::Recording => match self.macro_by_id(&item.id) {
                 Some(file) if file.chain => {
                     file.steps.iter().filter_map(|id| self.macro_by_id(id).map(|step| step.name.as_str())).collect::<Vec<_>>().join(" → ")
@@ -1915,6 +1989,11 @@ impl RecordingScreens {
         match item.kind {
             ItemKind::Drills => "DRILLS >".to_string(),
             ItemKind::RecordDrill => "+ Record drill…".to_string(),
+            ItemKind::Recordings => "RECORDINGS >".to_string(),
+            ItemKind::CapturePending => "Reading recordings…".to_string(),
+            ItemKind::CaptureEmpty => "No recordings yet".to_string(),
+            ItemKind::Captured => self.recording_by_id(&item.id).map(|file|
+                format!("{}{}", file.name, if file.partial { " (partial)" } else { "" })).unwrap_or_default(),
             ItemKind::NewChain => "+ New chain".to_string(),
             ItemKind::NewSequence => "+ New sequence".to_string(),
             ItemKind::SaveLastCombo => "+ Save last combo…".to_string(),
@@ -1977,6 +2056,7 @@ impl RecordingScreens {
             ItemKind::Sequence => self.sequence_lines(&item.id),
             ItemKind::Drills => vec![line("Input drills")],
             ItemKind::RecordDrill => vec![line("Record Player 1 directly as an input drill.")],
+            ItemKind::Recordings | ItemKind::Captured | ItemKind::CapturePending | ItemKind::CaptureEmpty => Vec::new(),
             ItemKind::NewChain => vec![line("A new chain")],
             ItemKind::NewSequence => vec![line("A new sequence")],
             ItemKind::SaveLastCombo => vec![line("Saves the strip's latest exchange as a combo and drills it. A names it.")],
@@ -2080,12 +2160,29 @@ impl RecordingScreens {
         let id = file.id.as_str();
         match file.kind {
             ItemKind::Save => self.save_file_rows(id),
+            ItemKind::Captured => self.capture_file_rows(file),
             ItemKind::Recording if self.macro_by_id(id).is_some_and(|m| m.chain) => self.chain_file_rows(id),
             ItemKind::Recording => self.macro_file_rows(id),
             ItemKind::Combo => self.combo_file_rows(id),
             ItemKind::Sequence => self.sequence_file_rows(id),
             _ => Vec::new(),
         }
+    }
+
+    fn recording_by_id(&self, id: &str) -> Option<&RecordingFile> {
+        self.recordings.as_ref()?.iter().find(|file| file.id == id)
+    }
+
+    fn capture_file_rows(&self, file: &FileScreen) -> Vec<BuiltRow> {
+        let Some(side) = self.recording_by_id(&file.id).and_then(|recording| recording.sides.get(file.capture_side)) else { return Vec::new() };
+        vec![
+            row("Inputs from", format!("P{} · {}", side.entry + 1, side.fighter), Act::CaptureSide),
+            row("Plays on", if file.capture_player { "Player 1" } else { "CPU" }, Act::CaptureTarget),
+            row("Play back", "", Act::CaptureOpen(Make::Macro, true)),
+            row("Make macro…", "", Act::CaptureOpen(Make::Macro, false)),
+            row("Make combo…", "", Act::CaptureOpen(Make::Combo, false)),
+            row("Make drill…", "", Act::CaptureOpen(Make::Drill, false)),
+        ]
     }
 
     fn save_file_rows(&self, id: &str) -> Vec<BuiltRow> {
