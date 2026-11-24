@@ -78,6 +78,37 @@ fn a_buffered_grab_is_its_own_action() {
 }
 
 #[test]
+fn a_numbered_jab_becoming_rapid_names_the_hit_without_opening_another_action() {
+    use crate::model::hash40::hash40;
+    use crate::model::move_names::Namer;
+
+    for (motions, expected) in [
+        (&["attack_100_start"][..], "Rapid jab"),
+        (&["attack_100"][..], "Rapid jab"),
+        (&["attack_100", "attack_100_end"][..], "Rapid jab finisher"),
+    ] {
+        let mut tracker = Tracker::new();
+        tracker.step(attack(Move::DashAttack, ATTACK_DASH, 0.0), hit(), NONE);
+        tracker.step(idle(), stun(), NONE);
+        tracker.step(Sample { motion: hash40("attack_12"), ..attack(Move::Jab, ATTACK, 8.0) }, stun(), NONE);
+        let id = tracker.action.id;
+        for (frame, motion) in motions.iter().enumerate() {
+            let cpu = if frame + 1 == motions.len() { hit() } else { stun() };
+            tracker.step(Sample { motion: hash40(motion), ..attack(Move::Jab, 0x28, frame as f32) }, cpu, NONE);
+            assert_eq!(tracker.action.id, id, "a change of name is not a new action");
+        }
+        let link = tracker.latest_link().expect("dash attack into the rapid hit");
+        let desc = ActionDesc::of(link.to, link.shown[1], link.variants[1]);
+        let mut name = String::new();
+        desc.write(&mut name, false, Namer::OFF).unwrap();
+        assert_eq!(name, "Jab");
+        name.clear();
+        desc.write(&mut name, false, Namer::new(true, None, None)).unwrap();
+        assert_eq!(name, expected, "hit on {motions:?}");
+    }
+}
+
+#[test]
 fn a_throw_takes_its_variant_when_it_begins() {
     let mut tracker = Tracker::new();
     tracker.step(attack(Move::Jab, ATTACK, 0.0), hit(), NONE);
@@ -152,7 +183,7 @@ fn own_statuses_after_a_final_smash_or_a_throw_keep_its_name() {
         let desc = ActionDesc::of(link.to, link.shown[1], link.variants[1]);
         assert_eq!(desc.of, Some(mv));
         let mut text = String::new();
-        desc.write(&mut text, false).unwrap();
+        desc.write(&mut text, false, crate::model::move_names::Namer::OFF).unwrap();
         assert_eq!(text, name);
     }
 }
@@ -172,7 +203,7 @@ fn the_strip_the_bar_and_the_menu_name_a_grab_a_throw_and_a_final_smash() {
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Throw");
     let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert!(crate::model::recording_menu::combo_link_lines(&combo)[0].starts_with("L1 jab → throw TRUE"));
+    assert!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0].starts_with("L1 jab → throw TRUE"));
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
     let mut texts = Vec::new();

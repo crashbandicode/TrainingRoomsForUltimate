@@ -15,6 +15,7 @@ pub mod hitbox;
 pub mod hud_draw;
 pub mod input_delay;
 pub mod input_display;
+pub mod move_names;
 pub mod item_bridge;
 pub mod lra_reset;
 pub mod mashout;
