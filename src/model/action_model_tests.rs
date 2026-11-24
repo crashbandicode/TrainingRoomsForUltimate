@@ -1064,7 +1064,7 @@ fn a_later_links_first_move_borrows_its_travel_arrows() {
     let second = *hit_record("up_special", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
     let combo = Combo::from_links([first, second]).unwrap();
     let heads = |combo: &Combo| -> Vec<String> {
-        crate::model::recording_menu::combo_link_lines(combo).into_iter()
+        crate::model::recording_menu::combo_link_lines(combo, crate::model::move_names::Namer::OFF).into_iter()
             .filter(|line| line.starts_with('L') && line.contains(" → ")).collect()
     };
     assert_eq!(heads(&combo), vec!["L1 jab → up b ← → TRUE", "L2 up b ← → → side tilt ↑ TRUE"]);
