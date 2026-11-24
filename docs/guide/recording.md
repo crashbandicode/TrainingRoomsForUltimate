@@ -47,9 +47,9 @@ rename it on its own screen). The Record presses themselves are not in the recor
   macro remembers that save, and the fighter's facing and speed at that moment.
 - **Start save switch** (on the macro's own screen, On by default): On warps both fighters to the start save once,
   then plays. Off plays from where the fighters stand; the connection stays, so On again warps next time.
-- **Idle frames at the end** are dropped when Recording › Options ›
-  [Crop trailing neutral](../menu/recording.md#crop-trailing-neutral) is On (the default). A take that is idle
-  throughout saves nothing ("Recording was empty").
+- **Idle frames** are dropped at the Start, End (the default), or Both sides according to Recording › Options ›
+  [Trim trailing neutral](../menu/recording.md#trim-trailing-neutral); Off keeps them. An entirely idle take saves
+  nothing unless the setting is Off.
 - **Length:** the capture stops taking frames at 36,000 (10 minutes). A recording that long is kept, and one frame more
   is not saved.
 - **No start save:** macros made from replays, and ones carried over from the old numbered slots, have none and no
@@ -192,7 +192,7 @@ recorded one.
 
 ### Input drills
 
-**DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Crop and Delete, plus Made from when a macro or chain made it.
+**DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Trim, Crop and Delete, plus Made from when a macro or chain made it. Macro and drill Trim skips neutral frames during playback without removing them; hit combos have no Trim row because they have no idle input frames.
 
 - **Record directly:** choose **+ Record drill…**. The library closes and shows the configured Record chord. Press that chord to start recording Player 1, then press it again to stop and save the take straight as a drill. It becomes the current grading target. This one take uses Player 1 even if the pop-up's Record role is CPU; later ordinary recordings keep their selected role. Opening the library before starting cancels the armed take. The menu press and the Record chords are excluded. The take's inputs are kept with the drill in a file of its own; it is not listed under MACROS and is deleted with the drill.
 - **From a macro or chain:** Make combo saves an input drill when the pass touches no opponent. A pass with hit links keeps making a hit combo. The source and current grading target stay selected as before.

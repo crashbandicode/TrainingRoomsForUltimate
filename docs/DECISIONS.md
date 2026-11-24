@@ -1,5 +1,9 @@
 # Decisions for the operator
 
+2026-11-24. Replace rc.12 TR7's two-value crop setting with Start, End, Both and Off, and add the playback
+indicator (inbox 22:10:39Z). A macro's or input drill's own Trim applies at play time without changing its stored
+frames; hit combos have no Trim row (inbox 22:29:37Z).
+
 2026-11-01. This page lists every operator decision of the menu proposal, one illustration per decision. In each
 picture the recommended option has a **green outline**. The images are in [`decisions/`](decisions) and are drawn
 by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep

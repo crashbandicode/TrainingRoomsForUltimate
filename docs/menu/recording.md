@@ -86,10 +86,10 @@ don't turn the page while a file's screen is open.
 | File | Rows |
 | --- | --- |
 | Save state | Bind to Save / Load, Duplicate, Rename, Delete |
-| Macro | Start save (only if it has one), Set active, Playback slot, Rename, Crop, Make combo, Delete |
+| Macro | Start save (only if it has one), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
-| Input drill | Drill, Made from (only if made from a macro or chain), Rename, Crop, Delete |
+| Input drill | Drill, Made from (only if made from a macro or chain), Rename, Trim, Crop, Delete |
 | Sequence | Drill sequence, a row for each of its combos (A drills that combo alone), Edit combos, Rename, Delete |
 
 | Row | What it does |
@@ -100,11 +100,14 @@ don't turn the page while a file's screen is open.
 | Set active | On makes this the active macro of the view you're in, replacing the one before. Off clears it. |
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
+| Trim | Start, End, Both or Off: skip neutral frames at those sides during playback, without changing the saved frames. A, Left or Right cycles. |
 | Crop | Opens the [clip editor](#replay-window). L picks In, R picks Out; Left/Right move it. Macros use frames and X previews through Play on the role of the view; combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays, and a crop of the role's active macro becomes active. B leaves. |
 | Make combo | Plays the file once on Player 1 from its start save: hits make a combo; a pass with no hits makes an input drill. |
 | Drill, Drill sequence | Makes this the one combo or sequence the combo helper grades. |
 | Edit chain, Edit combos | Opens the numbered picker. |
 | Delete | Removes the file at once, without asking. |
+
+Hit combos have no Trim row because their files contain links, not idle input frames.
 
 ![A save's own screen: Duplicate makes the copy Save 1 (the count 13 to 14); on the copy, Delete removes it (back to 13)](../media/rc13-save-duplicate-delete.gif)<br>
 *A on the save Center opens its screen. A on Duplicate adds a copy, and the left-hand count goes from 13 to 14. B to the list, A on the copy ("Save 1"), Down three times to Delete, A: it is gone and the count is 13 again. Each press is named in a box. Eden, rc.13 (untested on hardware).*
@@ -290,18 +293,27 @@ closes. X, Y and *Reset page to defaults* don't change it. If you have Online De
 
 How macros play, and how the combo helper grades.
 
-### Crop trailing neutral
+<a id="crop-trailing-neutral"></a>
+### Trim trailing neutral
 
-On: a macro made with Record (ZR + D-pad Down) drops the idle frames at its end, where no button is held and both
-sticks rest in the middle. Off: it keeps every frame up to the stop; use this for a macro meant to end standing
-still. A take that is idle throughout saves nothing ("Recording was empty"). To cut a macro anywhere, use Crop on
-its own screen ([above](#a-file-s-own-screen)).
+Record drops neutral frames at the Start, End, or Both sides of the take; Off keeps them. Neutral means no button
+other than flick jump and sticks within the dead zone. An all-neutral take saves nothing unless Trim is Off.
+The older On setting migrates to End and Off stays Off. Each macro or input drill also has a separate file Trim
+for playback; Crop's preview still addresses the complete file.
 
-![Side by side, the same macro on Loop 2 with Crop trailing neutral Off and On: On starts again every 1.22 s, while Off waits out the recorded idle and starts again every 4.07 s](../media/rc12-crop-trailing-neutral.gif)
+![The same macro on Loop 2, with End and Off](../media/rc12-crop-trailing-neutral.gif)
+
+- **Values:** Start, End, Both, Off
+- **Default:** End
+- **How:** A opens the list; Left or Right cycles.
+
+### Show playback indicator
+
+On shows PLAY P1, PLAY CPU, or PLAY P1 + CPU while the roles play a recording, alongside REC when a take is open.
+Off hides the playback indicator.
 
 - **Values:** On, Off
 - **Default:** On
-- **How:** A, Left or Right flips it.
 
 ### Place fighters before Record
 
