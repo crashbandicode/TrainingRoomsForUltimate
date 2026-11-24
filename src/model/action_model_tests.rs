@@ -1010,4 +1010,43 @@ fn a_drill_keeps_details_for_its_first_four_aims() {
     assert_eq!(read, record);
 }
 
+/// A saved link keeps no inputs before its first hit, so its first move's travel arrows are not in it. That move is
+/// the follow-up of the link before, which has them: a later link shows them, the combo's first link shows none, and
+/// a crop that makes a link the first one stops borrowing. Nothing is stored for it.
+#[test]
+fn a_later_links_first_move_borrows_its_travel_arrows() {
+    use crate::model::combo_plan::Renderer;
+    use crate::model::combo_record::ComboRecord;
+    use crate::model::frame_strip_plan::Text;
+    use crate::model::panes::strip_layout::C;
+    let empty = || Some(serde_json::json!({}));
+    let first = LinkRec { events: retain([
+        Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 1 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 10 },
+        Event { kind: Kind::Aim(2), dir: Dir::Forward, offset: 20 },
+    ]), ..*hit_record("jab", "up_special", empty(), empty()).combo.get(0).unwrap() };
+    let second = *hit_record("up_special", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
+    let combo = Combo::from_links([first, second]).unwrap();
+    let heads = |combo: &Combo| -> Vec<String> {
+        crate::model::recording_menu::combo_link_lines(combo).into_iter()
+            .filter(|line| line.starts_with('L') && line.contains(" → ")).collect()
+    };
+    assert_eq!(heads(&combo), vec!["L1 jab → up b ← → TRUE", "L2 up b ← → → side tilt ↑ TRUE"]);
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let mut texts = Vec::new();
+    Renderer::new().draw(&helper, &Text::EMPTY, None, true, (&C, false), |_, look, _| {
+        if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); }
+    });
+    assert!(texts.iter().any(|text| text == "1 Jab>Up B ← →"), "{texts:?}");
+    assert!(texts.iter().any(|text| text == "2 Up B ← →>Side tilt ↑"), "{texts:?}");
+    // The crop's first link has no link before it.
+    let record = ComboRecord::new("Drill".into(), combo, None);
+    assert_eq!(heads(&record.crop_units(1, 2).unwrap().combo), vec!["L1 up b → side tilt ↑ TRUE"]);
+    // Nothing new is stored: the link keeps its size and the file reads back equal.
+    assert_eq!(core::mem::size_of::<LinkRec>(), 124);
+    let read: ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
+}
+
 }
