@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "3f6bd716f03fbfb30df7da1249c7c76dbb4358e1f04a46336ad075cb98f91ddf",
+   "dest_sha256": "3aa03a5f8d419bf1871b69d839f917396b0d5524a3bfdba4fdccf39868cacc93",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -132,6 +132,26 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "    pub truncated: bool,\n",
+     "new": "    pub truncated: bool,\n    pub sides: Vec<(i32, i32)>,\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "                    truncated: header.truncated,\n",
+     "new": "                    truncated: header.truncated,\n                    sides: Vec::new(),\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "            assert!(archive.load(&id).is_err());\n        }\n    }\n\n",
+     "new": "            assert!(archive.load(&id).is_err());\n        }\n    }\n\n    fn two_sides() -> ReplaySession {\n        let frame = |buttons, kind| ReplayFrame {\n            input: InputFrame { buttons, ..InputFrame::default() },\n            start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,\n        };\n        ReplaySession { tracks: vec![\n            ReplayTrack { entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },\n            ReplayTrack { entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },\n        ], truncated: false, breaks: Vec::new() }\n    }\n\n    fn a_saved_capture_lists_each_side_with_its_fighter() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let id = archive.save(\"two-sides\", \"Match\", \"13.0.5\", &two_sides()).unwrap();\n        let listing = archive.list().unwrap();\n        assert_eq!(listing.entries.len(), 1);\n        assert_eq!(listing.entries[0].id, id);\n        assert_eq!(listing.entries[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn a_capture_file_with_no_new_key_reads_back_both_sides() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let id = encode_file_id(\"old-file\");\n        let header = br#\"{\"schema_version\":1,\"replay_id\":\"old-file\",\"replay_name\":\"Old\",\"game_version\":\"13.0.5\",\"truncated\":false,\"tracks\":[{\"entry\":0,\"frames\":2,\"quantized_analog\":false},{\"entry\":1,\"frames\":2,\"quantized_analog\":false}]}\"#;\n        let mut bytes = capture_file(header);\n        for (buttons, kind) in [(1u32, 7i32), (2, 7), (101, 8), (102, 8)] {\n            let mut record = [0u8; 44];\n            record[0..4].copy_from_slice(&buttons.to_le_bytes());\n            record[8..12].copy_from_slice(&kind.to_le_bytes());\n            record[16..20].copy_from_slice(&1.0f32.to_le_bytes());\n            bytes.extend_from_slice(&record);\n        }\n        fs::write(temp.0.join(format!(\"{id}.tmrc\")), bytes).unwrap();\n        let saved = archive.load(&id).unwrap();\n        assert_eq!(saved.session.tracks[0].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [1, 2]);\n        assert_eq!(saved.session.tracks[1].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [101, 102]);\n        assert_eq!(archive.list().unwrap().entries[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn a_capture_being_written_is_not_listed_until_it_is_committed() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let session = two_sides();\n        let id = encode_file_id(\"staged\");\n        let header = CaptureHeader { schema_version: 1, replay_id: \"staged\".into(), replay_name: \"Staged\".into(),\n            game_version: \"13.0.5\".into(), miis: None, truncated: false, breaks: Vec::new(),\n            tracks: session.tracks.iter().map(|track| TrackHeader {\n                entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,\n            }).collect() };\n        let staged = write_capture_temp(&temp.0, &id, &serde_json::to_vec(&header).unwrap(), &session).unwrap();\n        assert!(archive.list().unwrap().entries.is_empty());\n        fs::rename(staged, temp.0.join(format!(\"{id}.tmrc\"))).unwrap();\n        let listed = archive.list().unwrap().entries;\n        assert_eq!(listed.len(), 1);\n        assert_eq!(listed[0].id, id);\n        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"a_saved_capture_lists_each_side_with_its_fighter\", a_saved_capture_lists_each_side_with_its_fighter as fn()),\n            (\"a_capture_file_with_no_new_key_reads_back_both_sides\", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),\n            (\"a_capture_being_written_is_not_listed_until_it_is_committed\", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),\n"
     }
    ]
   },
@@ -986,7 +1006,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "b8c235314329819c0cb5177a0dbb8a644c9178949f4ddac171b750ea42c8d9a7",
+   "dest_sha256": "f957a98362c9245a2598275b03041798087084883c650392be4df5895ff7b313",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -1103,6 +1123,16 @@
      "old": "mod test_util;\n\n",
      "new": "mod test_util;\n",
      "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "pub use capture_archive::{CaptureArchive, CaptureSaveOutcome, SavedCapture};\n",
+     "new": "pub use capture_archive::{CaptureArchive, CaptureEntry, CaptureSaveOutcome, SavedCapture};\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "pub use capture_archive::{CaptureEntry, CaptureListing};\n",
+     "new": "pub use capture_archive::CaptureListing;\n"
     }
    ]
   },
@@ -1170,7 +1200,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "cf9ac9e2a9e869d78f674c9bfd2838601c8f61671e1549f477528b61471c0366",
+   "dest_sha256": "77959949764027b81028d0f7de56dad3ed08ba00125b911957cdea5d7f19c57d",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1412,6 +1442,11 @@
      "old": "        crate::test_table::run(&[\n",
      "new": "        crate::test_table::run(&[\n            (\"a_saved_macro_previews_its_kept_window_on_its_role\", a_saved_macro_previews_its_kept_window_on_its_role as fn()),\n            (\"a_replay_preview_hides_the_page_too\", a_replay_preview_hides_the_page_too as fn()),\n            (\"the_preview_tail_waits_sixty_frames_after_the_last_input\", the_preview_tail_waits_sixty_frames_after_the_last_input as fn()),\n",
      "reason": "F7: play saved crop previews on their selected Recording role."
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "            self.set_track(index);\n        }\n    }\n",
+     "new": "            self.set_track(index);\n        }\n    }\n\n    pub fn select_entry(&mut self, _entry: i32) -> bool { false }\n"
     }
    ]
   },
@@ -3651,7 +3686,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "3fcf524a741169ff3b13e744ce6687f6623d61328239a89c22496670ac43ad1e",
+   "dest_sha256": "9f56dac3febce3c6c589c2a6fdcc79176c399159ad97d2b82fc5413606270382",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4262,6 +4297,11 @@
      "old": "fn capture_ready() -> bool {",
      "new": "pub(crate) fn capture_ready() -> bool {",
      "reason": "F10: the Recording menu worker reuses the Crop preview readiness gate for input drill previews."
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording);\n",
+     "new": "                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);\n"
     }
    ]
   },

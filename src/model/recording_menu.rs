@@ -130,6 +130,8 @@ impl Floppy {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
     None,
+    ListRecordings,
+    OpenRecording { id: String, entry: u8, player: bool, make: Make, play: bool },
     RecordDrill,
     Keyboard { header: &'static str, draft: String },
     MakeCombo { source: String, chain: bool },
@@ -158,6 +160,24 @@ pub enum Effect {
     /// Start save flipped on a macro's or a chain's screen. The host writes the switch into the file (Play reads it there).
     SetStartSave { id: String, chain: bool, on: bool },
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordingSide {
+    pub entry: u8,
+    pub fighter: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordingFile {
+    pub id: String,
+    pub name: String,
+    pub frames: u32,
+    pub partial: bool,
+    pub sides: Vec<RecordingSide>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Make { Macro, Combo, Drill }
 
 /// The file kinds Delete removes through [`Effect::DeleteFile`]. A save state has its own effect.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -474,6 +494,8 @@ pub struct RecordingScreens {
 }
 
 impl RecordingScreens {
+    pub fn set_recordings(&mut self, _files: Vec<RecordingFile>) {}
+
     /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
     pub fn depth(&self, face: Face, group: u8, on_library: bool) -> usize {
         let overlays = if self.overlay_face == face {
@@ -3470,6 +3492,126 @@ mod tests {
         assert_eq!(screens.take_effect(), Effect::SaveLastCombo { name: String::new() });
     }
 
+    fn vault_file(sides: Vec<RecordingSide>) -> RecordingFile {
+        RecordingFile { id: "saved:01".into(), name: "Replay".into(), frames: 8299, partial: false, sides }
+    }
+
+    fn vault_sides() -> Vec<RecordingSide> {
+        vec![RecordingSide { entry: 0, fighter: "Mario".into() }, RecordingSide { entry: 1, fighter: "Fox".into() }]
+    }
+
+    fn enter_recordings(screens: &mut RecordingScreens) {
+        screens.set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).rows[0].name, "RECORDINGS >");
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::ListRecordings);
+    }
+
+    fn open_vault_file(screens: &mut RecordingScreens, sides: Vec<RecordingSide>) {
+        enter_recordings(screens);
+        screens.set_recordings(vec![vault_file(sides)]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.file_open());
+    }
+
+    fn a_capture_with_no_player_one_track_offers_only_the_sides_it_has() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vec![RecordingSide { entry: 1, fighter: "Fox".into() }]);
+        assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+        for button in [Button::Left, Button::Right, Button::A] {
+            screens.handle_page(button, true, SAVES_MACROS);
+            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+        }
+        screens.set_file_cursor(2);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(matches!(screens.take_effect(), Effect::OpenRecording { entry: 1, .. }));
+    }
+
+    fn the_recording_screen_offers_inputs_from_and_plays_on() {
+        for role in [ViewRole::Player, ViewRole::Cpu] {
+            let mut screens = screens();
+            screens.set_roles([ViewRole::Player, role]);
+            open_vault_file(&mut screens, vault_sides());
+            let rows = screens.file_rows();
+            assert_eq!(rows.iter().map(|row| row.title.as_str()).collect::<Vec<_>>(),
+                ["Inputs from", "Plays on", "Play back", "Make macro…", "Make combo…", "Make drill…"]);
+            assert_eq!(rows[0].value, "P1 · Mario");
+            assert_eq!(rows[1].value, role.label());
+            screens.handle_page(Button::Left, true, SAVES_MACROS);
+            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+            screens.handle_page(Button::Right, true, SAVES_MACROS);
+            assert_eq!(screens.file_rows()[0].value, "P1 · Mario");
+            screens.handle_page(Button::A, true, SAVES_MACROS);
+            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+            screens.set_file_cursor(1);
+            for button in [Button::Left, Button::Right, Button::A] {
+                let before = screens.file_rows()[1].value.clone();
+                screens.handle_page(button, true, SAVES_MACROS);
+                assert_ne!(screens.file_rows()[1].value, before);
+            }
+        }
+    }
+
+    fn recordings_has_its_own_row_in_macros_like_drills() {
+        for role in [ViewRole::Player, ViewRole::Cpu] {
+            let mut screens = screens();
+            screens.set_roles([role, role]);
+            let popup = screens.section(Face::Popup, SAVES_MACROS, 1);
+            let before = popup.rows.iter().map(|row| (&row.name, row.hot)).collect::<Vec<_>>();
+            enter_recordings(&mut screens);
+            assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).header, "RECORDINGS");
+            assert!(screens.focus_list(Face::Page, SAVES_MACROS, true).unwrap().id.ends_with("/recordings"));
+            screens.handle_page(Button::B, true, SAVES_MACROS);
+            assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).header, "MACROS");
+            let after = screens.section(Face::Popup, SAVES_MACROS, 1);
+            assert_eq!(before, after.rows.iter().map(|row| (&row.name, row.hot)).collect::<Vec<_>>());
+            assert!(!popup.rows.iter().any(|row| row.name == "RECORDINGS >"));
+        }
+    }
+
+    fn the_recordings_list_names_each_recording_with_its_sides_and_length() {
+        let mut screens = screens();
+        enter_recordings(&mut screens);
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).rows[0].name, "Reading recordings…");
+        screens.set_recordings(Vec::new());
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).rows[0].name, "No recordings yet");
+        let mut partial = vault_file(vault_sides());
+        partial.id = "previous".into();
+        partial.name = "Previous Vault capture".into();
+        partial.partial = true;
+        screens.set_recordings(vec![vault_file(vault_sides()), partial]);
+        let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
+        assert_eq!(rows[0].name, "Replay");
+        assert_eq!(rows[0].sub, "P1 Mario · P2 Fox · 8299 frames");
+        assert_eq!(rows[1].name, "Previous Vault capture (partial)");
+    }
+
+    fn a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill() {
+        for (index, make, play) in [(2, Make::Macro, true), (3, Make::Macro, false),
+            (4, Make::Combo, false), (5, Make::Drill, false)] {
+            let mut screens = screens();
+            open_vault_file(&mut screens, vault_sides());
+            screens.set_file_cursor(index);
+            screens.handle_page(Button::A, true, SAVES_MACROS);
+            assert_eq!(screens.take_effect(), Effect::OpenRecording {
+                id: "saved:01".into(), entry: 0, player: true, make, play,
+            });
+        }
+    }
+
+    fn play_back_opens_the_recording_playing_on_the_target() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vault_sides());
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        screens.set_file_cursor(1);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.set_file_cursor(2);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::OpenRecording {
+            id: "saved:01".into(), entry: 1, player: false, make: Make::Macro, play: true,
+        });
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     fn drills_are_a_filtered_combo_sublist_on_both_faces() {
         for face in [Face::Page,Face::Popup] {
@@ -3812,6 +3954,12 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_capture_with_no_player_one_track_offers_only_the_sides_it_has", a_capture_with_no_player_one_track_offers_only_the_sides_it_has as fn()),
+            ("the_recording_screen_offers_inputs_from_and_plays_on", the_recording_screen_offers_inputs_from_and_plays_on as fn()),
+            ("recordings_has_its_own_row_in_macros_like_drills", recordings_has_its_own_row_in_macros_like_drills as fn()),
+            ("the_recordings_list_names_each_recording_with_its_sides_and_length", the_recordings_list_names_each_recording_with_its_sides_and_length as fn()),
+            ("a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill", a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill as fn()),
+            ("play_back_opens_the_recording_playing_on_the_target", play_back_opens_the_recording_playing_on_the_target as fn()),
             ("f9_b_backs_out_of_a_new_picker", f9_b_backs_out_of_a_new_picker as fn()),
             ("f9_x_is_done_and_asks_the_name", f9_x_is_done_and_asks_the_name as fn()),
             ("f9_b_keeps_the_old_chain_on_edit", f9_b_keeps_the_old_chain_on_edit as fn()),

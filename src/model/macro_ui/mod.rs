@@ -5,6 +5,7 @@ pub mod clip_browser;
 pub mod clip_panel;
 pub mod drill_preview;
 pub mod macro_panel;
+pub mod recordings;
 #[cfg(test)]
 pub mod replay_panel;
 pub mod replay_target;

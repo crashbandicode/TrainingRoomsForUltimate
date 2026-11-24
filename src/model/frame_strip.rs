@@ -8,6 +8,8 @@ use super::move_names::Normal;
 use super::spots::{self, Peak, Powers, Spot};
 use super::spacing::{Grade, Taken};
 
+pub fn acting(_cpu_pass: bool) -> [usize; 2] { [0, 1] }
+
 /// Frames on screen and links kept for the LAST row (the pane table's numbers).
 pub const WINDOW: usize = super::panes::iv::WINDOW;
 pub const HISTORY: usize = super::panes::iv::HISTORY;

@@ -2,6 +2,8 @@
 //! part of this owner; native adapters supply freshly qualified identities.
 use super::record::SavedState;
 
+pub fn playing_index(_player: bool) -> usize { 1 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
     Missing,

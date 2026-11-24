@@ -466,6 +466,13 @@ struct MakeJob {
     since: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MakeAsk { pub source: String, pub role: Role, pub drill: Option<String> }
+
+pub fn request_make(_ask: MakeAsk) {}
+pub fn make_actor_cpu() -> bool { false }
+pub fn make_cpu_inputs() -> MappedInputs { MappedInputs::NEUTRAL }
+
 struct Resident {
     id: String,
     frames: Vec<InputFrame>,
@@ -488,7 +495,7 @@ static REFUSAL_SEEN: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HomeWarp {
-    Start { air: bool },
+    Start { air: bool, player: bool },
     Return,
 }
 
@@ -555,7 +562,7 @@ pub fn request_drill_preview(source: &str, frames: u32) -> bool {
     true
 }
 
-pub fn request_clip_preview(recording: MacroRecording) {
+pub fn request_clip_preview(recording: MacroRecording, _role: Role) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
     *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: CLIP_ID.to_owned(), role: Role::Cpu, frames: 0..len });
@@ -2109,7 +2116,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
         return;
     }
     match effect {
-        Effect::None | Effect::RecordDrill => {}
+        Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::OpenRecording { .. } => {}
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
@@ -2326,6 +2333,7 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
                     air: book.start_state(CLIP_ID).is_some_and(|start| start.situation == SITUATION_AIR),
+                    player: false,
                 });
                 WARP_HOLD.store(true, Ordering::Release);
                 play_start_speed(book, CLIP_ID, Placement::default())
@@ -3149,10 +3157,10 @@ mod tests {
         let root = scratch("vault-preview-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
-        request_clip_preview(clip);
+        request_clip_preview(clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(preview_away());
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(land_pair([state(8), state(7)], false));
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
         stop_preview();
@@ -3168,9 +3176,9 @@ mod tests {
         let mut cpu = state(7); cpu.x = 30.0;
         service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
-        request_clip_preview(clip.clone());
+        request_clip_preview(clip.clone(), Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(land_pair([player.clone(), cpu.clone()], false));
         service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(take_cpu_frame().is_some());
@@ -3182,9 +3190,9 @@ mod tests {
         assert!(!previewing() && !pending());
 
         player.x = 90.0; cpu.x = 99.0;
-        request_clip_preview(clip);
+        request_clip_preview(clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", player, cpu);
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
     }
 
     fn a_crop_preview_owes_the_start_speed_as_play_does() {
@@ -3232,12 +3240,12 @@ mod tests {
         let mut player = state(8); player.x = 10.0;
         let mut cpu = state(7); cpu.x = 30.0;
         let home = [player.clone(), cpu.clone()];
-        request_clip_preview(clip.clone());
+        request_clip_preview(clip.clone(), Role::Cpu);
         assert!(previewing());
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(previewing());
         assert!(tick.warp.is_none());
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
         assert!(land_pair(home.clone(), false));
         let mut received = Vec::new();
@@ -3251,9 +3259,9 @@ mod tests {
         service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
         assert!(!preview_running() && preview_away() && previewing());
         player.x = 90.0; cpu.x = 99.0;
-        request_clip_preview(clip.clone());
+        request_clip_preview(clip.clone(), Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(land_pair(home.clone(), false));
         stop_preview();
         let tick = service_at(&root, &none(), "2026-11-23", player.clone(), cpu.clone());
@@ -3270,9 +3278,9 @@ mod tests {
 
         let mut air_clip = clip;
         air_clip.start.situation = SITUATION_AIR;
-        request_clip_preview(air_clip);
+        request_clip_preview(air_clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", player, cpu);
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: true }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: true, player: false }));
     }
 
     fn a_refused_vault_preview_says_why_and_ends() {
@@ -3281,9 +3289,9 @@ mod tests {
         let root = scratch("vault-preview-refused");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
-        request_clip_preview(clip);
+        request_clip_preview(clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        assert_eq!(tick.home, Some(HomeWarp::Start { air: false }));
+        assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(take_cpu_frame().is_none());
         let text = "Let the CPU settle to idle and leave the ledge before previewing";
         preview_refused(text);
@@ -3306,7 +3314,7 @@ mod tests {
         let root = scratch("vault-preview-refused-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
-        request_clip_preview(clip);
+        request_clip_preview(clip, Role::Cpu);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         preview_refused(text);
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
@@ -6204,10 +6212,152 @@ mod tests {
         assert_eq!(tick.keyboard.unwrap().header, "Rename macro");
     }
 
+    fn vault_make(root: &Path, entry: i32, role: Role, kind: crate::model::recording_menu::Make) -> MakeAsk {
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
+        let track = |entry: i32, base: u32| ReplayTrack {
+            entry, quantized_analog: false,
+            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+                start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
+        };
+        let session = ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() };
+        let mut editor = ClipEditor::new(session, vec![0]).unwrap();
+        assert!(editor.select_entry(entry));
+        let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected exported clip") };
+        let made = super::super::rr_runtime::generate(root, *recording, "Typed", kind, role, 1).unwrap();
+        let super::super::rr_runtime::Generated::Pass(ask) = made else { panic!("expected pass") };
+        ask
+    }
+
+    fn consume_make(root: &Path, role: Role, hit: bool) -> Vec<u32> {
+        let mut received = Vec::new();
+        for frame in 1..=8 {
+            service_at(root, &none(), "2026-11-24", state(8), state(7));
+            let got = if role == Role::Player {
+                assert!(take_cpu_frame().is_none());
+                let mut input = MappedInputs::NEUTRAL;
+                unsafe { on_player_poll(&mut input) }.then_some(to_frame(input))
+            } else {
+                assert!(take_player_frame().is_none());
+                take_cpu_frame()
+            };
+            if let Some(input) = got {
+                received.push(input.buttons);
+                observe_input(Snap { buttons: input.buttons, facing: 1, ..Snap::empty(frame) }, Late::NONE, hit);
+                if hit { set_strip_sample((1, Some(sample_combo()), CaptureOwner::UNKNOWN)); }
+            }
+        }
+        received
+    }
+
+    fn each_source_and_target_makes_a_combo_on_that_role() {
+        let _hold = hold();
+        for entry in [0, 1] {
+            for role in [Role::Player, Role::Cpu] {
+                reset_host();
+                let root = scratch("vault-combo");
+                let ask = vault_make(&root, entry, role, crate::model::recording_menu::Make::Combo);
+                let source = ask.source.clone();
+                request_make(ask);
+                let base = if entry == 0 { 1 } else { 101 };
+                assert_eq!(consume_make(&root, role, true), [base, base + 1, base + 2]);
+                let lib = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+                let list = lib.list().unwrap().entries;
+                assert_eq!(list.len(), 1);
+                let combo = lib.load(&list[0].id).unwrap();
+                assert!(!combo.combo.input_only);
+                assert_eq!(combo.made_from.as_deref(), Some(source.as_str()));
+            }
+        }
+    }
+
+    fn each_source_and_target_makes_a_drill_on_that_role() {
+        let _hold = hold();
+        for entry in [0, 1] {
+            for role in [Role::Player, Role::Cpu] {
+                reset_host();
+                let root = scratch("vault-drill");
+                let ask = vault_make(&root, entry, role, crate::model::recording_menu::Make::Drill);
+                let source = ask.source.clone();
+                request_make(ask);
+                let base = if entry == 0 { 1 } else { 101 };
+                assert_eq!(consume_make(&root, role, false), [base, base + 1, base + 2]);
+                let lib = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+                let list = lib.list().unwrap().entries;
+                assert_eq!(list.len(), 1);
+                let drill = lib.load(&list[0].id).unwrap();
+                assert!(drill.combo.input_only);
+                assert_eq!(drill.name, "Typed");
+                assert_eq!(drill.take.as_deref(), Some(source.as_str()));
+            }
+        }
+    }
+
+    fn make_drill_saves_a_drill_even_when_the_pass_hits() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("vault-drill-hit");
+        let ask = vault_make(&root, 0, Role::Player, crate::model::recording_menu::Make::Drill);
+        request_make(ask);
+        assert_eq!(consume_make(&root, Role::Player, true), [1, 2, 3]);
+        let lib = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
+        let list = lib.list().unwrap().entries;
+        assert_eq!(list.len(), 1);
+        assert!(lib.load(&list[0].id).unwrap().combo.input_only);
+    }
+
+    fn a_cpu_pass_gives_the_strip_the_cpu_as_the_acting_fighter() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("vault-cpu-actor");
+        let ask = vault_make(&root, 1, Role::Cpu, crate::model::recording_menu::Make::Combo);
+        request_make(ask);
+        service_at(&root, &none(), "2026-11-24", state(8), state(7));
+        assert!(make_actor_cpu());
+        assert_eq!(crate::model::frame_strip::acting(true), [1, 0]);
+        let frame = take_cpu_frame().unwrap();
+        assert_eq!(make_cpu_inputs(), to_mapped(frame));
+        observe_input(Snap { buttons: frame.buttons, facing: 1, ..Snap::empty(1) }, Late::NONE, false);
+        consume_make(&root, Role::Cpu, false);
+        assert!(!make_actor_cpu());
+        assert_eq!(crate::model::frame_strip::acting(false), [0, 1]);
+        let ask = vault_make(&root, 0, Role::Player, crate::model::recording_menu::Make::Combo);
+        request_make(ask);
+        service_at(&root, &none(), "2026-11-24", state(8), state(7));
+        assert!(!make_actor_cpu());
+        assert!(include_str!("../runtime/features/input_display.rs").contains("frame_strip::acting("));
+    }
+
+    fn a_vault_clip_previews_on_player_one_or_the_cpu() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let root = scratch("vault-role-preview");
+            let mut start = StartState::neutral(7, 0, 1.0);
+            start.situation = SITUATION_AIR;
+            let frames = vec![InputFrame { buttons: 101, ..InputFrame::default() }];
+            let recording = MacroRecording::new("Clip", "13.0.5", start, frames.clone()).unwrap();
+            request_clip_preview(recording, role);
+            let tick = service_at(&root, &none(), "2026-11-24", state(8), state(7));
+            assert_eq!(tick.home, Some(HomeWarp::Start { air: true, player: role == Role::Player }));
+            assert_eq!(crate::model::state::preview::playing_index(role == Role::Player), usize::from(role == Role::Cpu));
+            assert!(land_pair([state(8), state(7)], false));
+            service_at(&root, &none(), "2026-11-24", state(8), state(7));
+            let (player, cpu) = (take_player_frame(), take_cpu_frame());
+            assert_eq!(if role == Role::Player { player } else { cpu }, Some(frames[0]));
+            assert_eq!(if role == Role::Player { cpu } else { player }, None);
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("each_source_and_target_makes_a_combo_on_that_role", each_source_and_target_makes_a_combo_on_that_role as fn()),
+            ("each_source_and_target_makes_a_drill_on_that_role", each_source_and_target_makes_a_drill_on_that_role as fn()),
+            ("make_drill_saves_a_drill_even_when_the_pass_hits", make_drill_saves_a_drill_even_when_the_pass_hits as fn()),
+            ("a_cpu_pass_gives_the_strip_the_cpu_as_the_acting_fighter", a_cpu_pass_gives_the_strip_the_cpu_as_the_acting_fighter as fn()),
+            ("a_vault_clip_previews_on_player_one_or_the_cpu", a_vault_clip_previews_on_player_one_or_the_cpu as fn()),
             ("a_playback_slot_run_plays_its_macro_through_the_cpu_pad", a_playback_slot_run_plays_its_macro_through_the_cpu_pad as fn()),
             ("a_play_on_cpu_frame_ends_a_slot_run", a_play_on_cpu_frame_ends_a_slot_run as fn()),
             ("a_slot_waits_for_a_running_cpu_macro", a_slot_waits_for_a_running_cpu_macro as fn()),

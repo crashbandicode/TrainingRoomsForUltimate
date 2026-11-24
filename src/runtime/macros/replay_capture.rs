@@ -916,7 +916,7 @@ fn apply_action(action: ClipAction) {
             Err(error) => preview_failed(&error.to_string()),
             Ok(()) => {
                 TAIL.lock().unwrap().restart();
-                crate::engine::rr_host::request_clip_preview(*recording);
+                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);
             }
         },
         Some(ClipEffect::PreviewFile { start, end }) => {

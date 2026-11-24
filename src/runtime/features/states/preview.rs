@@ -27,8 +27,8 @@ pub(super) fn clear() {
 
 pub(crate) fn request_home(home: HomeWarp) {
     let ask = match home {
-        HomeWarp::Start { air: false } => 1,
-        HomeWarp::Start { air: true } => 2,
+        HomeWarp::Start { air: false, .. } => 1,
+        HomeWarp::Start { air: true, .. } => 2,
         HomeWarp::Return => 3,
     };
     ASK.store(ask, Ordering::Release);
