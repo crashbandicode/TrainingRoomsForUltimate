@@ -262,7 +262,7 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 
 **Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
 
-- A macro recorded on this build keeps its moves in its file (the optional ctions key: each moves start frame, the first frame the fighter could act again, and the move), so the marks are there when the editor opens.
+- A macro recorded on this build keeps its moves in its file (the optional `actions` key: each move's start frame, the first frame the fighter could act again, and the move), so the marks are there when the editor opens.
 - An older macro and a Replay window capture show a tick for every press, C-stick input or flick that starts a move. Their ends and names appear as a preview plays past them.
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
