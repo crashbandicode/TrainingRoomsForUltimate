@@ -279,6 +279,7 @@ const ON: Settings = Settings {
     tolerance: 1,
     load_after: false,
     match_spot: false,
+    move_names: false,
 };
 
 /// The reference: a jab and three up tilts, each pressed one frame after P1 could act.
@@ -336,7 +337,8 @@ fn settings_read_the_three_rows() {
             on: true,
             tolerance: 2,
             load_after: true,
-            match_spot: false
+            match_spot: false,
+            move_names: false
         }
     );
     snapshot.set(crate::model::spots::ROW_COMBO, &[1, 0]).unwrap();

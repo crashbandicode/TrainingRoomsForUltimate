@@ -40,6 +40,7 @@ pub enum ThreadId {
     MiiCatalog,
     PracticeTrace,
     StallWatch,
+    MoveNames,
 }
 
 /// One row: what runs on the thread and the numbers its size is checked against.
@@ -68,7 +69,7 @@ const KIB: usize = 1024;
 // Menu catalog v2: max of exact release and diag c5a5740c (2026-11-19) for Menu, IniWriter, TraceWriter, Archive, MacroDiag.
 // Intermediate c7c17f3e (2026-11-23): SettingsLoad from diag, Menu from release.
 // Runtime paint marks and stack allocations retain their recorded provenance below.
-pub const THREADS: [ThreadStack; 18] = [
+pub const THREADS: [ThreadStack; 19] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
     // deeper step, `p1::service` 5,168 B (diag ELF of the rc.6 hook-allocation fix; report_late's path was 5696 in all); measured11184 dominates.
     // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
@@ -118,6 +119,7 @@ pub const THREADS: [ThreadStack; 18] = [
     // The static bound is the `diag,hang-trace` ELF's: `held_locks` puts 32 `owners::Held` (768 B) in the frame. At "z" it is
     // 4,016 B (plain diag 3,344; at "s" 3,776 and 3,104: B's rc.8 review, then the docs lane's), so 24 KiB.
     row(ThreadId::StallWatch, c"tr-stall-watch", 24 * KIB, 4_016, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
+    row(ThreadId::MoveNames, c"tr-move-names", 204 * KIB, 3_440, 0, "", "move_names::load").with_external(143_376),
 ];
 
 const fn row(
@@ -171,6 +173,8 @@ pub const BOOT_STACK: [ThreadId; 4] = [ThreadId::Import, ThreadId::SettingsLoad,
 pub const fn joined(id: ThreadId) -> bool {
     matches!(id, ThreadId::Import | ThreadId::SettingsLoad | ThreadId::StateLoad)
 }
+
+pub const fn transient(id: ThreadId) -> bool { matches!(id, ThreadId::MoveNames) }
 
 /// The size of the static stack shared by `ids`: the largest of their rows.
 pub const fn slot_bytes(ids: &[ThreadId]) -> usize {

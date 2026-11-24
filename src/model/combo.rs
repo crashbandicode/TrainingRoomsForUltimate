@@ -538,6 +538,7 @@ pub struct Settings {
     pub load_after: bool,
     /// *Match sweet/sour spot* (decision SP4, `spots::ROW_COMBO`): a link counts only when it lands the saved link's spot.
     pub match_spot: bool,
+    pub move_names: bool,
 }
 
 impl Default for Settings {
@@ -554,6 +555,7 @@ impl Settings {
             tolerance: 1,
             load_after: false,
             match_spot: false,
+            move_names: false,
         }
     }
 
@@ -569,6 +571,7 @@ impl Settings {
             tolerance: choice(ROW_TOLERANCE).map_or(factory.tolerance, |i| i.min(2) as u8),
             load_after: choice(ROW_AFTER).map_or(factory.load_after, |i| i == 1),
             match_spot: super::spots::row_on(snapshot, super::spots::ROW_COMBO),
+            move_names: false,
         }
     }
 }

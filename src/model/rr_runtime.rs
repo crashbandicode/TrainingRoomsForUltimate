@@ -684,7 +684,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                 recorded_on: file.recorded_on.unwrap_or_default(),
                 made_from: file.made_from,
                 take: file.take,
-                links: crate::model::recording_menu::combo_link_lines(&file.combo),
+                combo: Box::new(file.combo),
+                fighter: file.fighter,
                 span: file.combo.len() as u32,
             })
         }
@@ -1577,7 +1578,8 @@ mod tests {
                 name: "One".into(),
                 recorded_on: String::new(),
                 made_from: None,
-                links: Vec::new(),
+                combo: Box::new(Combo::EMPTY),
+                fighter: None,
                 span: 0,
             }],
             sequences: vec![SequenceFile {

@@ -63,6 +63,8 @@ pub mod ini_files;
 pub mod input_delay;
 #[path = "model/frame_strip.rs"]
 pub mod frame_strip;
+#[path = "model/move_names.rs"]
+pub mod move_names;
 #[path = "model/aim.rs"]
 pub mod aim;
 #[path = "model/frame_strip_plan.rs"]

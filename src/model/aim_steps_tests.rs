@@ -627,7 +627,7 @@ fn old_drill_file_roundtrips_and_refuses_an_aim_in_version_two() {
 fn the_drill_reads_its_directions_and_names_its_faults() {
     use crate::model::frame_strip_plan::Text;
     let drill = captured(Some(4), Some(0), true, false, true);
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&drill), vec!["S1 Step 1", "↑ B · release · 1st ←", "S2 Step 2", "2nd →"]);
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::OFF), vec!["S1 Step 1", "↑ B · release · 1st ←", "S2 Step 2", "2nd →"]);
     assert_eq!(crate::model::combo_plan::mark_text(Mark::WrongDir, "1st direction", 1).0, Text::new("1st direction wrong"));
     assert_eq!(crate::model::combo_plan::mark_text(Mark::WrongDir, "C-stick", 1).0, Text::new("C-stick wrong direction"));
 }

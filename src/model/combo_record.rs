@@ -93,6 +93,7 @@ pub struct ComboRecord {
     pub combo: Combo,
     /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
     pub recorded_on: Option<String>,
+    pub fighter: Option<super::move_names::FighterId>,
     /// The recording or chain this combo was made from. Absent on a combo saved by hand.
     pub made_from: Option<String>,
     /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
@@ -196,6 +197,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: None,
             made_from: None,
             take: None,
             source: None,
@@ -207,6 +209,8 @@ impl ComboRecord {
         self.made_from = Some(source.into());
         self
     }
+
+    pub fn with_fighter(self, _: Option<super::move_names::FighterId>) -> Self { self }
 
     /// Give a directly recorded drill ownership of the macro file holding its take.
     pub fn with_take(mut self, id: impl Into<String>) -> Self {
@@ -334,6 +338,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: None,
             made_from,
             take,
             source: Some(object.clone()),

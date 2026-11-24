@@ -104,6 +104,7 @@ mod imp {
             // stays exhaustive and a new `ThreadId` without a slot does not compile.
             fn parts(id: ThreadId) -> Option<(Parts, &'static core::ffi::CStr)> {
                 match id {
+                    ThreadId::MoveNames => None,
                     $( ThreadId::$sid => Some(($sname.parts(), const { thread_stacks::of(ThreadId::$sid).c_name })), )+
                     $( $(#[cfg($cfg)])? ThreadId::$id => Some(($name.parts(), const { thread_stacks::of(ThreadId::$id).c_name })), )*
                     $( $( #[cfg(not($cfg))] ThreadId::$id => None, )? )*
