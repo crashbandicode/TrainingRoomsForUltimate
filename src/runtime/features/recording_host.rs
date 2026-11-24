@@ -19,7 +19,8 @@ pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, pl
     // (RECORDING-REDESIGN, "Start save"), and the macro keeps the recorded role's speed (PLAY-MOMENTUM).
     if record && rr_host::capture_role() == 0 {
         // SAFETY: the chord step runs on the game thread (the AI epilogue) with the CPU body it resolved this frame.
-        rr_host::note_record_start(unsafe { record_start(cpu) });
+        let (start, fighter) = unsafe { record_start(cpu) };
+        rr_host::post_record_start(start, fighter);
     }
     rr_host::on_chords(record, play_player, play_cpu);
 }
@@ -40,8 +41,11 @@ pub fn capturing() -> bool {
 ///
 /// # Safety
 /// Game thread; `cpu` was resolved this frame.
-unsafe fn record_start(cpu: super::recorder::Body) -> rr_host::RecordStart {
-    rr_host::RecordStart::at_chord([live_body(super::recorder::body_of(0)), live_body(Some(cpu))])
+unsafe fn record_start(cpu: super::recorder::Body) -> (rr_host::RecordStart, Option<crate::model::move_names::FighterId>) {
+    let player = super::recorder::body_of(0);
+    let start = rr_host::RecordStart::at_chord([live_body(player), live_body(Some(cpu))]);
+    let fighter = player.and_then(|body| super::move_names::fighter_id(body.accessor, start.poses[0].fighter_kind));
+    (start, fighter)
 }
 
 /// A role body's kind, pose and summed speed, read from the game now (`None` without a body). The kind is the fighter

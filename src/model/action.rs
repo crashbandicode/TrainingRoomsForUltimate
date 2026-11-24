@@ -3,6 +3,7 @@
 
 use super::combo::{self, Dir, Kind, Mark};
 use super::frame_strip::{Angle, Move, Shown};
+use super::move_names::{Namer, Normal};
 
 /// What the strip, the combo bar, the menu and the grader all read about one move. It holds kinds, never names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,9 +32,11 @@ impl ActionDesc {
         }
     }
 
-    /// Write the name, angle and parts, omitting spaces before arrows when tight.
-    pub fn write(&self, out: &mut impl core::fmt::Write, tight: bool) -> core::fmt::Result {
-        out.write_str(self.of.unwrap_or(self.mv).name())?;
+    /// Write the name as `namer` gives it, then the angle and parts, omitting spaces before arrows when tight.
+    pub fn write(&self, out: &mut impl core::fmt::Write, tight: bool, namer: Namer<'_>) -> core::fmt::Result {
+        let mv = self.of.unwrap_or(self.mv);
+        let name = if mv == Move::FinalSmash { namer.final_smash() } else { namer.name(mv, Normal::from_u8(self.normal)) };
+        out.write_str(name.as_str())?;
         let angle = self.angle.map(|angle| match angle { Angle::Up => Dir::Up, Angle::Down => Dir::Down });
         for dir in [angle, self.parts[0], self.parts[1]].into_iter().flatten() {
             let arrow = arrow(dir);
@@ -183,15 +186,9 @@ impl Default for Action {
     fn default() -> Self { Self::new() }
 }
 
-/// The move variant identified by an animation.
-#[cfg(not(test))]
-pub fn variant(_motion: u64) -> u8 { 0 }
-
-/// Test stand-in for the move-name join (`Normal::of`): `catch` is Grab (18), `throw_f` is Forward throw (22).
-#[cfg(test)]
-pub fn variant(motion: u64) -> u8 {
-    match motion { 0x05_c56b_7b64 => 18, 0x07_49f7_09a8 => 22, _ => 0 }
-}
+/// The move variant identified by an animation: the move names' number for it (`Normal`), 0 when it is none of the
+/// engine-common ones.
+pub fn variant(motion: u64) -> u8 { Normal::of(motion) as u8 }
 
 /// A font-supported arrow for a direction.
 pub const fn arrow(dir: Dir) -> &'static str {

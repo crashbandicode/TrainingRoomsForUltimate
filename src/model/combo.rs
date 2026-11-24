@@ -917,6 +917,7 @@ pub struct Settings {
     /// *Match sweet/sour spot* (decision SP4, `spots::ROW_COMBO`): a link counts only when it lands the saved link's spot.
     pub match_spot: bool,
     pub match_stick: bool,
+    pub move_names: bool,
 }
 
 impl Default for Settings {
@@ -934,6 +935,7 @@ impl Settings {
             load_after: false,
             match_spot: false,
             match_stick: false,
+            move_names: false,
         }
     }
 
@@ -950,6 +952,7 @@ impl Settings {
             load_after: choice(ROW_AFTER).map_or(factory.load_after, |i| i == 1),
             match_spot: super::spots::row_on(snapshot, super::spots::ROW_COMBO),
             match_stick: super::spots::row_on(snapshot, ROW_STICK),
+            move_names: super::spots::row_on(snapshot, super::move_names::ROW_MOVE_NAMES),
         }
     }
 }
@@ -978,10 +981,13 @@ struct Capture {
     frame: u32,
 }
 
+pub use crate::model::move_names::CaptureOwner;
+
 /// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
     capture: Capture,
+    pub(crate) retained_owner: CaptureOwner,
     /// Links captured so far (wrapping; a clear keeps it): Make combo saves only an exchange captured after it began.
     seen: u32,
     target: Option<Combo>,
@@ -997,6 +1003,7 @@ pub struct Helper {
 impl Helper {
     pub(crate) const fn new() -> Self {
         Self {
+            retained_owner: CaptureOwner::UNKNOWN,
             capture: Capture {
                 exchange: 0,
                 after: 0,
@@ -1062,6 +1069,10 @@ impl Helper {
     /// Links captured so far (wrapping). A change means `last_combo` holds a link captured since the count was read.
     pub fn seen(&self) -> u32 {
         self.seen
+    }
+
+    pub fn retain_owner(&mut self, before: u32, source: impl FnOnce() -> CaptureOwner) {
+        if self.seen != before { self.retained_owner = source(); }
     }
 
     pub fn attempt(&self) -> Option<&Attempt> {
