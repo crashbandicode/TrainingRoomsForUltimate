@@ -28947,7 +28947,7 @@
       "dest": "src/runtime/lobby/training/lobby.rs",
       "crate": "root",
       "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-      "dest_sha256": "2af67fdd1d27dbaead6401ad5c86c1191875ba6510d80aabeebab856653148da",
+      "dest_sha256": "5de529c46e50a80fa95e6c707d3474ee7561be120862e1c7317caa0cd7d5702f",
       "edits": [
         {
           "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -29023,6 +29023,11 @@
           "old": "    let practice_on = read(&MENU).lobby_practice == OnOff::ON;\n",
           "new": "    let setting_on = read(&MENU).lobby_practice == OnOff::ON;\n    let (practice_on, releasing, stop) = if !setting_on && clock.was_active {\n        let holds = crate::runtime::features::edge_juggle::holds_partner();\n        crate::model::lobby_flag::release(setting_on, clock.was_active, holds, RELEASING.load(Ordering::Acquire))\n    } else {\n        (setting_on, false, false)\n    };\n    RELEASING.store(releasing, Ordering::Release);\n    if stop {\n        crate::runtime::features::edge_juggle::stop_for_release();\n    }\n",
           "reason": "Stop the drill and wait for the partner to be given back before practice ends when Lobby Practice is turned off."
+        },
+        {
+          "old": "    let (next, decision) = crate::model::lobby_flag::step(clock, observed, practice_on);\n",
+          "new": "    let (next, decision) = crate::model::lobby_flag::step(crate::model::lobby_flag::released_clock(clock, releasing), observed, practice_on);\n",
+          "reason": "Count the room as ready while a release is under way, even if the draw pass has dropped layout readiness."
         }
       ]
     },

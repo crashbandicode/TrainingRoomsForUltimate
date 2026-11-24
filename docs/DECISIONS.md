@@ -1879,6 +1879,13 @@ the game's own setter and gives the room's Training Partner Behavior back at Sto
 The room's L + R + A also restarts the drill's set. Eden rows for both scenes are in the combined run.
 Turning Lobby Practice Off while a drill runs stops it first; the partner gets its behavior and fighter back, then practice ends. If the partner cannot be given back, practice stays on in that room until the room ends.
 
+**Lobby Practice Off while a partner is owed: the release does not depend on the layout's readiness (F15-4, 2026-11-24).**
+The menu's draw pass reads the Lobby Practice setting itself and drops the room's readiness as soon as it is Off. When
+it ran before the game thread's next update, practice ended in the very update that armed the release, and the drill's
+borrowed fighter and CPU type stayed in the room. While a release is under way the game thread now counts the room as
+ready (`lobby_flag::released_clock`). Leaving the room still ends practice at once, and the draw pass is unchanged.
+Seen once on `71158421` in a waiting room; the code on this path is the same in the build before it. Host tests only so far.
+
 ## Record placement · RP4 missed-tech face
 
 DOWN's entry picks the missed-tech face from the fighter's pose. On the same frame, immediately after entry,

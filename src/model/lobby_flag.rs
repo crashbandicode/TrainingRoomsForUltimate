@@ -75,8 +75,11 @@ pub const fn release(setting_on: bool, was_active: bool, holds: bool, releasing:
     (true, true, !releasing)
 }
 
-pub const fn released_clock(clock: FlagClock, _releasing: bool) -> FlagClock {
-    clock
+/// The clock `step` takes: while a release is under way the room counts as ready. The draw pass drops `ui_ready` as
+/// soon as it reads the setting Off, which can be before `lobby::update` has armed the release, and the give-back
+/// needs no layout. A changed scene still clears the readiness inside `step`, so a departure ends practice as before.
+pub const fn released_clock(clock: FlagClock, releasing: bool) -> FlagClock {
+    FlagClock { ui_ready: clock.ui_ready || releasing, ..clock }
 }
 
 /// Advance the clock. `scene == None` is "the mode words are not readable": the key stays, practice
