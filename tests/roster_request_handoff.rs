@@ -155,9 +155,7 @@ fn raw_string_end(bytes: &[u8], start: usize) -> Option<usize> {
 
 #[test]
 fn a_late_new_mii_retires_the_same_setup_session_as_an_ordinary_new_pick() {
-    use crate::engine::swap::character_memory::WaitingSession;
-
-    let mut memory = WaitingSession::empty();
+    let mut memory = crate::engine::swap::character_memory::WaitingSession::empty();
     let first = (0x49, [0, 1, 2, 0]);
     let second = (0x49, [2, 0, 1, 2]);
     memory.scene_changed(true, 0x0d, 0x07010101);
