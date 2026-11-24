@@ -210,8 +210,9 @@ recorded one.
 - **Directions of a special:** for any fighter, a special records a direction when the fighter starts to move a way
   that is not the special's own and the stick pointed that way since the press (up to two per special, each graded on
   its direction). A special that only goes its own way, such as a straight-up up special, records none.
-- **After a Training reset:** the reset's own presses held at clear do not make an attempt; buttons held through the
-  reset are not new presses, and the next input starts a fresh attempt.
+- **After a Training reset:** the reset's own presses held at clear leave no result, however long they are held.
+  Buttons held through the reset are not new presses, and the next input starts a fresh attempt. With Load after on,
+  an attempt whose opening buttons are still held loads when one is released; a reset withdraws it without loading.
 - **Older drill files:** they did not record whether the game reacted. A saved hold under eight frames is a tap and is
   not graded; a hold of eight or more is graded in its band. Re-recording the drill grades releases by the game's
   reaction instead. A step beginning with a release or first special direction joins the preceding step on load if

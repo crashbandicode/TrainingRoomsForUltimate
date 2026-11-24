@@ -821,6 +821,15 @@ struct Capture {
     frame: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Provisional {
+    buttons: u8,
+    streak: u16,
+    best: u8,
+    displaced: Option<Summary>,
+    load: bool,
+}
+
 /// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
@@ -832,9 +841,7 @@ pub struct Helper {
     results: [Option<Summary>; RESULTS],
     streak: u16,
     best: u8,
-    attempt_streak: u16,
-    attempt_best: u8,
-    displaced_result: Option<Summary>,
+    provisional: [Option<Provisional>; PRESS_BITS.len()],
     pending_load: bool,
     settings: Settings,
     input: InputCapture,
@@ -859,9 +866,7 @@ impl Helper {
             results: [None; RESULTS],
             streak: 0,
             best: 0,
-            attempt_streak: 0,
-            attempt_best: 0,
-            displaced_result: None,
+            provisional: [None; PRESS_BITS.len()],
             pending_load: false,
             settings: Settings::factory(),
             input: InputCapture::new(),
@@ -876,6 +881,7 @@ impl Helper {
         self.results = [None; RESULTS];
         self.streak = 0;
         self.best = 0;
+        self.provisional = [None; PRESS_BITS.len()];
         self.pending_load = false;
     }
 
@@ -893,6 +899,7 @@ impl Helper {
     pub fn restart_with(&mut self, target: Option<Combo>) {
         self.target = target;
         self.attempt = None;
+        self.provisional = [None; PRESS_BITS.len()];
     }
 
     pub fn target(&self) -> Option<&Combo> {
@@ -1038,13 +1045,20 @@ impl Helper {
         let aims = self.target.as_ref().is_some_and(Combo::has_aim);
         self.input.window = self.settings.tolerance;
         let amended = self.input.step_with(snap, late.unwrap_or(Late::NONE), false, aims);
+        let buttons = self.input.prev.map_or(0, |prev| prev.buttons);
+        if let Some(i) = self.provisional.iter().position(|entry| entry.is_some_and(|entry| {
+            PRESS_BITS.iter().enumerate().any(|(n, (mask, _))| {
+                entry.buttons & (1u8 << n) != 0 && !held(buttons, *mask)
+            })
+        })) {
+            for entry in &mut self.provisional[i..] {
+                if entry.take().is_some_and(|entry| entry.load) { self.pending_load = true; }
+            }
+        }
         let Some(start) = self.input.first else {
             return;
         };
         if self.attempt.is_none() {
-            self.attempt_streak = self.streak;
-            self.attempt_best = self.best;
-            self.displaced_result = None;
             self.attempt = Some(Attempt::new(start, false));
         }
         for j in 0..LINKS {
@@ -1122,20 +1136,22 @@ impl Helper {
 
     fn on_clear(&mut self, out: &mut Out) {
         let input_only = self.target.as_ref().is_some_and(|target| target.input_only);
-        let gesture_only = input_only && self.attempt.is_some()
-            && self.input.combo.links().any(|link| link.events().next().is_some())
-            && self.input.combo.links().enumerate().filter(|(_, link)| link.events().next().is_some())
-                .all(|(k, _)| self.input.gesture_step(k));
-        if gesture_only {
-            if let Some(summary) = self.attempt.and_then(|attempt| attempt.summary) {
-                if self.results[0] == Some(summary) {
-                    self.results.copy_within(1..RESULTS, 0);
-                    self.results[RESULTS - 1] = self.displaced_result;
-                    self.streak = self.attempt_streak;
-                    self.best = self.attempt_best;
+        if input_only {
+            let n = self.provisional.iter().take_while(|entry| entry.is_some()).count();
+            if n > 0 {
+                self.results.copy_within(n..RESULTS, 0);
+                for (j, entry) in self.provisional[..n].iter().enumerate() {
+                    self.results[RESULTS - n + j] = entry.unwrap().displaced;
                 }
+                let oldest = self.provisional[n - 1].unwrap();
+                self.streak = oldest.streak;
+                self.best = oldest.best;
+                self.provisional = [None; PRESS_BITS.len()];
             }
-        } else {
+        }
+        let gesture_only = input_only && self.attempt.as_ref().is_some_and(Attempt::open)
+            && self.input.held_only().is_some();
+        if !gesture_only {
             if input_only {
                 if let Some(k) = self.input.combo.len().checked_sub(1) {
                     if self.attempt.as_ref().is_some_and(|attempt| attempt.open() && k >= attempt.len)
@@ -1235,14 +1251,27 @@ impl Helper {
     /// Closes the open attempt with `summary`: the history, the streak, best and the load after it.
     fn record(&mut self, summary: Summary, out: &mut Out) {
         let outcome = summary.outcome;
+        let before = (self.streak, self.best, self.results[RESULTS - 1]);
+        let held = if outcome != Outcome::Cleared && self.target.as_ref().is_some_and(|target| target.input_only) {
+            self.input.held_only()
+        } else {
+            None
+        };
         if let Some(attempt) = self.attempt.as_mut() {
             attempt.summary = Some(summary);
         }
-        if self.target.as_ref().is_some_and(|target| target.input_only) && self.attempt.is_some() {
-            self.displaced_result = self.results[RESULTS - 1];
-        }
         self.results.copy_within(0..RESULTS - 1, 1);
         self.results[0] = Some(summary);
+        if let Some(buttons) = held {
+            if self.provisional[PRESS_BITS.len() - 1].is_some_and(|entry| entry.load) { self.pending_load = true; }
+            self.provisional.copy_within(0..PRESS_BITS.len() - 1, 1);
+            self.provisional[0] = Some(Provisional { buttons, streak: before.0, best: before.1,
+                displaced: before.2, load: self.settings.load_after });
+        } else {
+            if self.provisional.iter().flatten().any(|entry| entry.load) { self.pending_load = true; }
+            self.provisional = [None; PRESS_BITS.len()];
+            if outcome != Outcome::Cleared && self.settings.load_after { self.pending_load = true; }
+        }
         // Streak follows `clean`, so a non-true link still counts. Best stays the most true links in one
         // attempt (operator 2026-11-06, question 2: a single combo's best stays as today).
         self.streak = if summary.clean {
@@ -1251,9 +1280,6 @@ impl Helper {
             0
         };
         self.best = self.best.max(summary.true_links);
-        if outcome != Outcome::Cleared && self.settings.load_after {
-            self.pending_load = true;
-        }
         out.resolved = Some(summary);
     }
 }
@@ -1601,7 +1627,10 @@ impl InputCapture {
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
-        if self.combo.overflow { return amended; }
+        if self.combo.overflow {
+            self.prev = Some(snap);
+            return amended;
+        }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
@@ -1679,6 +1708,17 @@ impl InputCapture {
             }
         }
         amended
+    }
+    fn held_only(&self) -> Option<u8> {
+        let mut bits = 0u8;
+        for (k, link) in self.combo.links().enumerate() {
+            let Some(event) = link.events().next() else { continue };
+            if !self.gesture_step(k) { return None; }
+            let Kind::Press(button) = event.kind else { return None };
+            let n = PRESS_BITS.iter().position(|(_, b)| *b == button)?;
+            bits |= 1u8 << n;
+        }
+        (bits != 0).then_some(bits)
     }
     fn gesture_step(&self, k: usize) -> bool {
         let Some(Kind::Press(button)) = self.combo.get(k).and_then(|link| link.events().next()).map(|event| event.kind)

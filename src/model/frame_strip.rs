@@ -766,7 +766,9 @@ impl Tracker {
                     && !p1.stop)
         });
         let opened = p1_busy && (self.p1_was_actionable || restarted);
-        self.late.turned = (p1.status != self.p1_status).then_some(self.action.origin);
+        // A status left while Player 1 could already act is no longer part of the action.
+        self.late.turned = (p1.status != self.p1_status)
+            .then_some(if self.p1_was_actionable { None } else { self.action.origin });
         if opened {
             if self.p1_was_actionable {
                 self.action.base = None;

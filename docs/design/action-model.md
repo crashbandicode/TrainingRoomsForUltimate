@@ -32,11 +32,13 @@ A button already held when a take starts is a press.
 ## Clear
 
 `Tracker::clear` retains `buttons` and `stick`, clearing its other state. A drill step opened by a press still held
-at clear, with no release after that press, belongs to the clear gesture. When every captured step belongs to it,
-`Helper::on_clear` discards the attempt and takes back its result if already resolved, restoring its earlier streak,
-best and displaced history entry. Otherwise it removes an ungraded final gesture step and closes an open attempt
-with a graded step as cleared; an open attempt without a graded step is discarded. Both start fresh. Hit-combo
-clearing remains as before.
+at clear, with no release after that press, belongs to the clear gesture. A result is provisional while all presses
+that opened its steps remain held, even after the attempt is forgotten. A clear withdraws the leading provisional
+results and restores their displaced history, streak and best; an open gesture-only attempt is discarded. Releasing
+an opening button makes its result and older provisional results final. Load after waits for a provisional result to
+become final and is dropped if the clear withdraws it. Otherwise an ungraded final gesture step is removed and an
+open attempt with a graded step is cleared; an open attempt without a graded step is discarded. Hit-combo clearing
+remains as before.
 
 ## Grading
 
@@ -58,8 +60,9 @@ the step: as a missing release, or, when another event of the step kept it open,
 reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit combos a
 release with no counterpart at the hit is not graded. `Tracker::late` reports the originating press of the action
 whose status changed, before any new action opens. Its release becomes `LetGo` if that change occurs on the release
-frame or within the selected On-time tolerance afterwards. A change with no known origin upgrades nothing. An ordinary
-`Release` stays recorded but contributes no mark or deadline in a drill.
+frame or within the selected On-time tolerance afterwards. A change with no known origin upgrades nothing, and a
+status left while Player 1 could already act belongs to no action: a release that starts a walk long after its move
+ended is not a reaction. An ordinary `Release` stays recorded but contributes no mark or deadline in a drill.
 
 ## One description
 
@@ -173,6 +176,7 @@ selected version and name.
 - A recording take spanning a Training reset is unchanged.
 - An origin identifies a press frame, not a button: simultaneous presses share that frame and cannot be distinguished
   by the reaction rule. Hit-combo link grading remains unchanged.
+- A result under a newer final result is final too, even if its own opening buttons remain held.
 - Older drill files lack reaction evidence, so their hold-length compatibility rule cannot establish causality.
 
 ## Host checks
@@ -195,7 +199,12 @@ selected version and name.
   `a_reset_before_the_deadline_leaves_no_result`, `a_real_attempt_then_a_reset_records_as_today`,
   `a_failed_attempt_is_not_taken_back_by_a_later_reset`, `only_the_owning_press_reacts_to_its_actions_change`,
   `a_press_does_not_react_to_the_opening_of_its_own_action`, `a_held_moves_end_is_a_reaction_for_its_own_press`,
-  `a_recording_uses_the_selected_tolerance`, `the_recording_host_passes_its_selected_reaction_window`.
+  `a_change_after_the_action_ended_is_no_reaction`, `a_recording_uses_the_selected_tolerance`,
+  `the_recording_host_passes_its_selected_reaction_window`,
+  `a_staggered_chord_takes_back_both_results`, `a_released_press_makes_its_result_final`,
+  `a_load_after_waits_for_a_provisional_result`, `a_hit_combo_load_is_not_deferred`,
+  `two_provisional_results_restore_a_distinct_full_history_in_order`,
+  `a_release_finalizes_a_result_after_capture_overflows`, `a_new_final_result_keeps_an_older_deferred_load`.
 - Description and angle: `the_bar_and_the_menu_name_a_link_as_the_strip_does`,
   `a_hit_combo_tells_an_angled_tilt_from_a_level_one`, `a_link_without_descriptions_grades_as_before`,
   `link_descriptions_round_trip_in_optional_keys`, `a_link_record_keeps_its_size`,
