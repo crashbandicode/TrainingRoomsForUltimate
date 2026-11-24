@@ -1195,7 +1195,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "58c862a6bead0a43c8ab7b2c7d8983c6d0ee8fd1c5b0d91e7736a516bbb7b179",
+   "dest_sha256": "cc7db406ae7074818eb5941f541ffd86bf5db60a438efc5ff08585e166460b41",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1581,6 +1581,11 @@
     {
      "old": "use crate::engine::macro_ui::macro_panel::Pad;\nuse crate::model::combo_record::UnitKind;",
      "new": "use crate::engine::macro_ui::macro_panel::Pad;\nuse crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                crate::model::recording_menu::combo_link_lines(&recording.combo).into_iter()",
+     "new": "                crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

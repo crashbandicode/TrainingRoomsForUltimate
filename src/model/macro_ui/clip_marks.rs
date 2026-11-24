@@ -562,7 +562,7 @@ mod tests {
     fn a_combo_crop_marks_every_link_and_names_it() {
         let editor = combo_editor(false);
         let view = editor.view();
-        let expected = crate::model::recording_menu::combo_link_lines(&combo(false));
+        let expected = crate::model::recording_menu::combo_link_lines(&combo(false), crate::model::move_names::Namer::recorded(None));
         assert_eq!(view.mark_count, 2);
         assert!(view.move_text.contains(&expected[0]));
     }

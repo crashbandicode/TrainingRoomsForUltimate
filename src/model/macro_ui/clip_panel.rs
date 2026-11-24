@@ -319,7 +319,7 @@ impl ClipEditor {
         let marks = match &file {
             FileSource::Macro { recording, .. } => Marks::from_recording(recording),
             FileSource::Combo(recording) => Marks::from_units(
-                crate::model::recording_menu::combo_link_lines(&recording.combo).into_iter()
+                crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()
                     .filter(|line| crate::model::recording_menu::link_head(line))),
         };
         let mut open_guard = OpenInputGuard::new();
