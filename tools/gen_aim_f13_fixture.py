@@ -19,7 +19,6 @@ lines = [
     'pub struct Row { pub rel: i16, pub status: i32, pub air: bool, pub lr: i8, pub x: f32, pub y: f32, pub lx: i8, pub ly: i8 }',
     '/// `parts`: (part, direction bin) with rule D; `all`: without it, which is the travel table\'s answer at `e7667f26`.',
     'pub struct Cast { pub name: &\'static str, pub rows: &\'static [Row], pub parts: &\'static [(u8, u8)], pub all: &\'static [(u8, u8)] }',
-    'const fn r(rel: i16, status: i32, air: bool, lr: i8, x: f32, y: f32, lx: i8, ly: i8) -> Row { Row { rel, status, air, lr, x, y, lx, ly } }',
     '',
 ]
 casts = []
@@ -31,7 +30,7 @@ for name in sorted(want):
             row = dict(zip(head, line.rstrip('\n').split('\t')))
             if not row['status']:
                 continue   # three casts have no status on their first row, four frames before the press
-            rows.append('    r({}, {}, {}, {}, {:.4}, {:.4}, {}, {}),'.format(
+            rows.append('    Row {{ rel: {}, status: {}, air: {}, lr: {}, x: {:.4}, y: {:.4}, lx: {}, ly: {} }},'.format(
                 int(row['rel']), row['status'].split()[0], 'true' if row['situation'] == '2' else 'false',
                 int(row['lr']), float(row['x']), float(row['y']), int(row['lx']), int(row['ly'])))
     ident = 'ROWS_' + ''.join(c if c.isalnum() else '_' for c in name).upper()
@@ -40,4 +39,4 @@ for name in sorted(want):
     casts.append(f'    Cast {{ name: "{name}", rows: &{ident}, parts: &[{pairs("osf")}], all: &[{pairs("osf_keep_default")}] }},')
 lines += ['', f'pub const CASTS: [Cast; {len(casts)}] = ['] + casts + ['];', '']
 open(out, 'w').write('\n'.join(lines))
-print(f'{len(casts)} casts, {sum(1 for l in lines if l.startswith("    r("))} rows -> {out}')
+print(f'{len(casts)} casts, {sum(1 for l in lines if l.startswith("    Row {"))} rows -> {out}')
