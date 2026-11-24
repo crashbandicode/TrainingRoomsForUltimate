@@ -18,9 +18,14 @@ backdrops, text and marks fade together.
 
 ## Text length (2026-11-24)
 
-A line of the strip or the card holds 40 UTF-16 units, in the plans' `Text` and
-in every native text box (`panes::iv::TEXT_UNITS`); both were 24, and the card
-cut its reason there. The longest line is a reason of 37 units.
+A line's capacity belongs to its type. Each bar has one table
+(`panes::iv::units`, `panes::cb::units`): 40 UTF-16 units for the strip's three
+readout lines and the card's reason, link titles and marks, 24 for every other
+line. The native boxes are declared from the table and the pane cache keeps
+each line by it, so a pane costs a short line and only a long line adds its
+tail. Every line was 24 units before, and the card cut its reason there. The
+longest line is a reason of 37 units. To make another line long, add it to its
+bar's table and rebuild both recipes.
 
 A reason wider than the card's content width wraps to a second line
 (`Text::fitted`, the notice box's wrap). The card grows by one line pitch
