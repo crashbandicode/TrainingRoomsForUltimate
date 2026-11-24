@@ -475,16 +475,18 @@ fn a_hit_block_carries_its_spot_label_when_the_row_is_on() {
 }
 
 fn deferred_cached_looks_match_direct_visible_writes() {
-    let mut direct = Panes::<1>::new();
-    let mut deferred = Panes::<1>::new();
+    let mut direct = Panes::<1, 1>::new();
+    let mut deferred = Panes::<1, 1>::new();
     let shown = Look::text(3.0, 4.0, Text::new("Step 40"), [1, 2, 3, 255]);
+    // A long line: its units past a short line's come back from the cache's tail.
+    let long = Look::text(3.0, 4.0, Text::new("Grading unavailable (not counted)"), [1, 2, 3, 255]);
     for invalidate in [false, true] {
         if invalidate { direct.invalidate(); deferred.invalidate(); }
-        for look in [shown, shown, Look::HIDDEN, Look::HIDDEN, shown] {
+        for look in [shown, shown, Look::HIDDEN, Look::HIDDEN, shown, long, long, shown, long, Look::HIDDEN, long] {
             let mut expected = Vec::new();
-            let count = direct.show(|_| look, |i, look, change| expected.push((i, *look, change)));
+            let count = direct.show(|_| 40, |_| look, |i, look, change| expected.push((i, *look, change)));
             let mut changes = [None];
-            assert_eq!(deferred.show(|_| look, |i, _, change| changes[i] = Some(change)), count);
+            assert_eq!(deferred.show(|_| 40, |_| look, |i, _, change| changes[i] = Some(change)), count);
             let actual: Vec<_> = changes.iter().enumerate().filter_map(|(i, c)| c.map(|c| (i, deferred.written(i).unwrap(), c))).collect();
             assert_eq!(expected.len(), actual.len());
             for ((i, want, changed), (j, got, flags)) in expected.into_iter().zip(actual) {
