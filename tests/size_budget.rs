@@ -1,9 +1,10 @@
-//! Code-size gate (docs/SIZE-PLAN.md): runs the host tests of the counter and the gate
-//! (`tools/test_size_gate.py`), then `tools/size_gate.py`, which counts the working tree with the operator's
-//! rules (`tools/sloc.py`) and fails above `size-budget.toml` or when that file records a raise without the
-//! lead's approval.
+//! This file runs the host tests of the counter and the gate (docs/SIZE-PLAN.md, `tools/test_size_gate.py`).
+//! The gate itself (`tools/size_gate.py`) counts the working tree with the operator's rules (`tools/sloc.py`) and fails
+//! above `size-budget.toml` or when that file records a raise without the lead's approval. It is a gate step of its
+//! own, run on every gated head beside this suite (docs/BUILD.md, "Size gate"), and is no longer a second test here
+//! because that step runs the same script on the same tree.
 //!
-//! The gate shells out to Python on purpose: the count must be the primary's counter itself (sloc4), the one that
+//! The test shells out to Python on purpose: the count must be the primary's counter itself (sloc4), the one that
 //! measured the fork, not a second implementation in Rust that could drift from it. A missing Python (or one
 //! older than 3.11, without `tomllib`) fails this test; there is no skip switch, because a gate that can be
 //! skipped is not a gate. The interpreter is `/usr/bin/python3`.
@@ -34,9 +35,4 @@ fn python(script: &str) {
 #[test]
 fn the_counter_and_the_gate_pass_their_host_tests() {
     python("test_size_gate.py");
-}
-
-#[test]
-fn the_implementation_is_within_its_size_budget() {
-    python("size_gate.py");
 }

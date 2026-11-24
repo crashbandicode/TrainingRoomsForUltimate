@@ -20,7 +20,8 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
   primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above
-  `size-budget.toml`, or when that file records a raise without the lead's approval. `cargo test` runs it
+  `size-budget.toml`, or when that file records a raise without the lead's approval. It is a gate step of its own, run
+  on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests
   (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch). The budget only ratchets
   down; the plan is `docs/SIZE-PLAN.md`.
 - **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
