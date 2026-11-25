@@ -79,7 +79,7 @@ practice changes speed; the room's own timers keep their pace, and a match alway
 | The name keyboard | It opens in Quickplay's room as in a local wireless room. A match closes the keyboard and nothing typed is applied; back in the same room it reopens with what you typed. |
 | Leaving Quickplay | While the TrainingRooms menu is open, Plus doesn't reach the game. Close the menu (B) before you open the game's menu to Leave Battle. |
 | The game's menu | While it is open, the chords don't fire, and a fighter swap is refused with the notice "Close the current game menu before swapping". |
-| The CPU pilot | While it plays Player 1, Record, Play on Player 1 and L + R + A are refused. See [Controls › When the CPU pilot plays Player 1](controls.md#when-the-cpu-pilot-plays-player-1). |
+| The CPU pilot | While it plays Player 1, Play on Player 1 and L + R + A are refused; Record works. See [Controls › When the CPU pilot plays Player 1](controls.md#when-the-cpu-pilot-plays-player-1). |
 ## When the match starts
 
 ![Practice in a waiting room, then the match: the speed is back to x1, the level isn't applied and the match uses the fighters you picked; back in the room your practice fighters and Kirby's hat return](../diagrams/waiting-room-match.png)

@@ -3093,7 +3093,15 @@ approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 203632
+ceiling = 203599
 date = "2026-11-25"
-reason = "Preview stop and the Recording pop-up's configured chord line: measured 203632 (tools/sloc.py tree), 47 above 203585."
+reason = "Combo files name grab, throw and the ledge, get-up and trip attacks in a link's from and to: the reader takes both forms, and a named endpoint without descriptions is compared by its name. Measured 203599 on main a945b0c1 (203585): +14."
+approved_by = "tr-primary-2 ruling 2026-11-25 14:34:17Z (line budget +14 for feat/named-grab-throw-keys)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203649
+date = "2026-11-25"
+reason = "Preview stop and the Recording pop-up's configured chord line on main 76c00df3: measured 203649 (tools/sloc.py tree), 50 above 203599."
 approved_by = "tr-primary-2 standing rule of 2026-11-24 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)"

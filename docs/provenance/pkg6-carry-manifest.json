@@ -11523,7 +11523,7 @@
       "dest": "src/runtime/p1/cpu_pilot.rs",
       "crate": "root",
       "src_sha256": "0bfe37e127df332d23e818bf2705fdf577fafbfbd5fd965a5b421d44ec35d9ed",
-      "dest_sha256": "1925470d6f81aaaf888dcb9f63544ee51ef37ffc011a97659660b1bc19fdb463",
+      "dest_sha256": "d0a0b0de732cc550746c24a0f6ea292defd4df65ca877198849fd3d0a4b546f1",
       "edits": [
         {
           "old": "pub(crate) fn thinking() -> bool {\n    THINKING.load(Ordering::Acquire)\n}\n",
@@ -11744,6 +11744,16 @@
           "old": "}\n\nfn menu_busy() -> bool {\n    crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)\n        || crate::runtime::compat::replay_preview::occupied()\n        || crate::runtime::lobby::training::recording_or_playback()\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n",
           "new": "}\n\nfn menu_busy() -> bool {\n    crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)\n        || crate::runtime::lobby::training::recording_or_playback()\n}\n\n/// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).\npub(crate) fn installed() -> bool {\n",
           "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+        },
+        {
+          "reason": "Record with an AI on Player 1 (2026-11-25): the fallback pilot plays through a take and waits for a menu or a Playback Slot run",
+          "old": "    crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)\n        || crate::runtime::lobby::training::recording_or_playback()\n",
+          "new": "    use crate::{engine::rr_host, model::recording::{fallback_waits, RecorderUse}};\n    let recorder = match (rr_host::slot_running(), rr_host::taking()) {\n        (true, _) => RecorderUse::Playback,\n        (false, true) => RecorderUse::Take,\n        (false, false) => RecorderUse::Idle,\n    };\n    let menu = crate::runtime::compat::common::menu::captures_input()\n        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE);\n    fallback_waits(menu, recorder)\n"
+        },
+        {
+          "reason": "Record with an AI on Player 1 (2026-11-25): the fallback pilot plays through a take and waits for a menu or a Playback Slot run",
+          "old": "/// is off, not installed, or paused for a menu, a recording or a playback.\n",
+          "new": "/// is off, not installed, or paused for a menu or a playback.\n"
         }
       ]
     },
