@@ -168,6 +168,18 @@ pub enum Effect {
     /// Start save flipped on a macro's or a chain's screen. The host writes the switch into the file (Play reads it there).
     SetStartSave { id: String, chain: bool, on: bool },
     SetTrim { id: String, kind: FileKind, trim: super::trim::Trim },
+    /// The Momentum row of a macro's screen (operator 2026-11-25, PC6 A): the host writes it into the macro's file.
+    SetMomentum { id: String, rest: bool },
+    /// A on the Offset row: the host clears the macro's stored start offset, and nothing else of the file.
+    ClearOffset { id: String },
+}
+
+/// A macro's stored start offset (the bits of its two `f32` values, so the catalog stays comparable) and whether
+/// Play starts it at rest. Play adds the offset to the start save's spot; the placement picker never changes it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MacroPlace {
+    pub offset: [u32; 2],
+    pub rest: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -270,6 +282,7 @@ pub struct CatalogBundle {
     pub catalog: Catalog,
     pub macro_trims: BTreeMap<String, super::trim::Trim>,
     pub drill_trims: BTreeMap<String, super::trim::Trim>,
+    pub macro_places: BTreeMap<String, MacroPlace>,
 }
 
 impl From<Catalog> for CatalogBundle {
@@ -532,6 +545,7 @@ pub struct RecordingScreens {
     overlay_face: Face,
     catalog: Catalog,
     macro_trims: BTreeMap<String, super::trim::Trim>,
+    macro_places: BTreeMap<String, MacroPlace>,
     drill_trims: BTreeMap<String, super::trim::Trim>,
     recordings: Option<Vec<RecordingFile>>,
     opening: bool,
@@ -628,6 +642,7 @@ impl RecordingScreens {
             overlay_face: Face::Page,
             catalog: Catalog::default(),
             macro_trims: BTreeMap::new(),
+            macro_places: BTreeMap::new(),
             drill_trims: BTreeMap::new(),
             recordings: None,
             opening: false,
@@ -687,7 +702,8 @@ impl RecordingScreens {
     }
 
     pub fn set_catalog_bundle(&mut self, bundle: CatalogBundle) {
-        let CatalogBundle { mut catalog, macro_trims, drill_trims } = bundle;
+        let CatalogBundle { mut catalog, macro_trims, drill_trims, macro_places } = bundle;
+        self.macro_places = macro_places;
         self.macro_trims = macro_trims;
         self.drill_trims = drill_trims;
         self.takes.clear();
@@ -739,7 +755,12 @@ impl RecordingScreens {
     }
 
     pub fn catalog_bundle(&self) -> CatalogBundle {
-        CatalogBundle { catalog: self.catalog.clone(), macro_trims: self.macro_trims.clone(), drill_trims: self.drill_trims.clone() }
+        CatalogBundle {
+            catalog: self.catalog.clone(),
+            macro_trims: self.macro_trims.clone(),
+            drill_trims: self.drill_trims.clone(),
+            macro_places: self.macro_places.clone(),
+        }
     }
 
     pub fn selection(&self) -> Selection {
@@ -2839,6 +2860,52 @@ mod tests {
         }
     }
 
+    /// Operator 2026-11-25, PC6 A: the key grid goes; "Momentum row; an Offset row shows an old offset, and A clears
+    /// it". Both rows are on the macro's own screen, with its start save: Play uses them only when it warps there.
+    fn a_macro_shows_its_momentum_and_an_old_offset_and_a_clears_it() {
+        fn shown(screens: &RecordingScreens) -> Vec<(String, String)> {
+            screens.file_rows().iter().map(|row| (row.title.clone(), row.value.clone())).collect()
+        }
+        let mut bundle = CatalogBundle::from(example());
+        bundle.macro_places.insert("nair".into(), MacroPlace { offset: [(-40.0f32).to_bits(), 0.0f32.to_bits()], rest: false });
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog_bundle(bundle.clone());
+        assert_eq!(screens.catalog_bundle().macro_places, bundle.macro_places);
+        screens.open_file("nair".into(), ItemKind::Recording);
+        let rows = shown(&screens);
+        assert_eq!(rows[1], ("Change placement".to_owned(), String::new()));
+        assert_eq!(rows[2], ("Momentum".to_owned(), "Keep recorded speed".to_owned()));
+        assert_eq!(rows[3], ("Offset".to_owned(), "X -40 · A clears".to_owned()));
+        assert_eq!(rows[4].0, "Set active");
+        // Left, Right and A flip Momentum; the host writes it into the macro's file.
+        screens.set_file_cursor(2);
+        screens.handle_page(Button::Right, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::SetMomentum { id: "nair".into(), rest: true });
+        assert_eq!(shown(&screens)[2].1, "Start at rest");
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::SetMomentum { id: "nair".into(), rest: false });
+        // Left and Right do nothing on Offset. A clears it: the row goes, and Momentum is as it was.
+        screens.set_file_cursor(3);
+        screens.handle_page(Button::Left, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::None);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::ClearOffset { id: "nair".into() });
+        let rows = shown(&screens);
+        assert!(!rows.iter().any(|row| row.0 == "Offset"));
+        assert_eq!((rows[2].1.as_str(), rows[3].0.as_str()), ("Keep recorded speed", "Set active"));
+        // Both axes are shown when both are set.
+        bundle.macro_places.insert("nair".into(), MacroPlace { offset: [1.25f32.to_bits(), (-3.0f32).to_bits()], rest: true });
+        screens.set_catalog_bundle(bundle);
+        let rows = shown(&screens);
+        assert_eq!((rows[2].1.as_str(), rows[3].1.as_str()), ("Start at rest", "X 1.25 Y -3 · A clears"));
+        // A macro with no start save is not warped, so it has neither row; a chain plays its macro 1's.
+        for id in ["dash", "pressure"] {
+            screens.file = None;
+            screens.open_file(id.into(), ItemKind::Recording);
+            assert!(!shown(&screens).iter().any(|row| row.0 == "Momentum" || row.0 == "Offset"), "{id}");
+        }
+    }
+
     /// PC2: X on a save in the pop-up opens the picker on it; the pop-up closes.
     fn the_pop_up_opens_change_placement_with_x_on_a_save() {
         let mut screens = screens();
@@ -4498,6 +4565,7 @@ mod tests {
             ("change_placement_is_a_row_of_the_saves_own_screen", change_placement_is_a_row_of_the_saves_own_screen as fn()),
             ("a_macro_and_a_chain_open_their_start_save", a_macro_and_a_chain_open_their_start_save as fn()),
             ("the_pop_up_opens_change_placement_with_x_on_a_save", the_pop_up_opens_change_placement_with_x_on_a_save as fn()),
+            ("a_macro_shows_its_momentum_and_an_old_offset_and_a_clears_it", a_macro_shows_its_momentum_and_an_old_offset_and_a_clears_it as fn()),
             ("popup_zr_toggles_the_role_like_the_page", popup_zr_toggles_the_role_like_the_page as fn()),
             ("popup_l_r_zl_switch_tabs_and_never_set_the_role", popup_l_r_zl_switch_tabs_and_never_set_the_role as fn()),
             ("popup_footer_names_zr_role_and_tab_keys", popup_footer_names_zr_role_and_tab_keys as fn()),

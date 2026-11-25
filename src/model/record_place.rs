@@ -2376,6 +2376,29 @@ mod tests {
         assert!(open.contains("rule: super::recorder::settings().shared,") && !open.contains("SharedStart::Prompt"));
     }
 
+    /// Operator 2026-11-25, PC6 A: "the grid goes". Nothing opens the Replays key grid on a macro any more, and the
+    /// offset kept for a session, with its static, goes with it. A macro's stored offset stays in its file.
+    #[test]
+    fn the_replays_key_grid_is_gone() {
+        let host = include_str!("rr_host.rs");
+        for gone in [concat!("KEPT_", "PLACEMENT"), concat!("fn keep_", "placement("), concat!("fn placement_", "written(")] {
+            assert!(!host.contains(gone), "{gone}");
+        }
+        let play = host.split("fn play_placement(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(play.contains("book.placement(first)"), "Play still adds the file's own offset");
+        let external = include_str!("../runtime/ui/external.rs");
+        assert!(!external.contains("EditPlacement") && !external.contains("named_macros::open_editor"));
+        assert!(!include_str!("../runtime/macros/diag.rs").contains("named_macros::open_editor"));
+        let layer = include_str!("../runtime/macros/named_macros.rs");
+        for gone in ["pub fn open_editor()", ".open_placement(", "KeepPlacement", "placement_written("] {
+            assert!(!layer.contains(gone), "{gone}");
+        }
+        let panel = include_str!("macro_ui/macro_panel.rs");
+        for gone in ["pub fn open_placement(", "KeepPlacement", "struct Editing", "editing: Option<Editing>"] {
+            assert!(!panel.contains(gone), "{gone}");
+        }
+    }
+
     #[test]
     fn a_shared_start_save_asks_change_or_copy() {
         use crate::model::chords::logical::{A, B, DPAD_DOWN, DPAD_UP, PLUS, X};

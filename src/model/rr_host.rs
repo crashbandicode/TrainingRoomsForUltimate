@@ -2409,6 +2409,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             }
         }
         Effect::SetTrim { .. } => {}
+        Effect::SetMomentum { .. } | Effect::ClearOffset { .. } => {}
     }
 }
 
@@ -6351,6 +6352,45 @@ mod tests {
         assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
     }
 
+    /// Operator 2026-11-25, PC6 A: "Momentum row; an Offset row shows an old offset, and A clears it". Each row
+    /// writes its one field into the macro's file; the menu's catalog carries both for the rows.
+    fn the_momentum_and_offset_rows_write_only_their_field() {
+        use crate::model::recording_menu::MacroPlace;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-rows");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let before = library.load(&macros[0]).unwrap();
+        let other = file_bytes(&root, MACROS_DIR, &macros[1]);
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [5.0f32.to_bits(), 0.0f32.to_bits()], rest: false }));
+        assert_eq!(places.get(&macros[1]), Some(&MacroPlace::default()));
+        post_effect(Effect::SetMomentum { id: macros[0].clone(), rest: true });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut rest = library.load(&macros[0]).unwrap();
+        assert_eq!(rest.placement, Placement { momentum: MomentumMode::AtRest, ..before.placement });
+        rest.placement = before.placement;
+        assert_eq!(rest, before, "nothing else of the file changes");
+        post_effect(Effect::ClearOffset { id: macros[0].clone() });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut cleared = library.load(&macros[0]).unwrap();
+        assert_eq!(cleared.placement, Placement { momentum: MomentumMode::AtRest, ..Placement::default() }, "Momentum stays");
+        cleared.placement = before.placement;
+        assert_eq!(cleared, before, "inputs, start save and name are as they were");
+        assert_eq!(file_bytes(&root, MACROS_DIR, &macros[1]), other, "the other macro's file is untouched");
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [0, 0], rest: true }));
+        // Play after the clear warps to the save's own spot, at rest.
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.warp.as_deref(), Some(save.as_str()));
+        assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x, place.momentum)), Some((Role::Cpu, 0.0, MomentumMode::AtRest)));
+    }
+
     fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
         use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
         let saved = classify(&RawSlot {
@@ -7410,6 +7450,7 @@ mod tests {
             ("a_chain_copy_keeps_the_first_macros_own_start_save_switch", a_chain_copy_keeps_the_first_macros_own_start_save_switch as fn()),
             ("a_failed_relink_leaves_the_old_link_and_no_copy", a_failed_relink_leaves_the_old_link_and_no_copy as fn()),
             ("the_replays_row_opens_the_active_macros_start_save", the_replays_row_opens_the_active_macros_start_save as fn()),
+            ("the_momentum_and_offset_rows_write_only_their_field", the_momentum_and_offset_rows_write_only_their_field as fn()),
             ("switch_on_an_exact_mii_macro_asks_for_that_mii", switch_on_an_exact_mii_macro_asks_for_that_mii as fn()),
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),
