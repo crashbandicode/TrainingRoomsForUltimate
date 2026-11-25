@@ -1,6 +1,6 @@
 //! Diag probe ordered by tr-primary-2, 2026-11-25 17:15:18Z and 19:08:38Z.
 //! On a new Training floor run or reset, logs `[StageGeometry] probe` ray and classification results; a run that
-//! cannot be read is logged too (`probe no-run`, `probe unavailable`), so a silent row means no look was taken.
+//! cannot be read is logged too (`probe no-run`, `probe no-read`), so a silent row means no look was taken.
 use super::stage_geometry::RayProbe;
 use crate::model::stage_geometry::Probe;
 use crate::runtime::game;
@@ -51,7 +51,7 @@ pub(super) unsafe fn frame(fighter: usize) {
     let (Some(blast), Some(mut stage)) = (blast, stage) else {
         if fresh(1, [0.0; 4]) {
             diagnostic(format_args!(
-                "[StageGeometry] probe unavailable stage={} p1=({:.3},{:.3}) blast={} ray={}",
+                "[StageGeometry] probe no-read stage={} p1=({:.3},{:.3}) blast={} ray={}",
                 natives::stage_id(), at[0], at[1], read[0], read[1]
             ));
         }

@@ -256,6 +256,8 @@ impl<R: Record> Store<R> {
     /// here, each [`ListCursor::step`] reads and decodes one file, and [`ListCursor::finish`] sorts.
     pub fn list_cursor(&self) -> Result<ListCursor<R>, R::Error> {
         let mut skipped = Vec::new();
+        #[cfg(test)]
+        count_directory_read();
         let read_dir = match fs::read_dir(&self.dir) {
             Ok(read_dir) => read_dir,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -444,6 +446,8 @@ pub struct CatalogListing {
 
 impl CatalogListing {
     pub fn open(path: &Path) -> Self {
+        #[cfg(test)]
+        count_directory_read();
         match fs::read_dir(path) {
             Ok(entries) => Self { entries: Some(entries), files: Some(BTreeMap::new()) },
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
@@ -522,6 +526,8 @@ fn encode<R: Record>(rec: &R) -> Result<Vec<u8>, R::Error> {
 #[cfg(test)]
 thread_local! {
     static FILE_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static INDEX_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static DIRECTORY_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static METADATA_READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static FAIL_PAYLOAD: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
     static BEFORE_LIST: core::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { core::cell::RefCell::new(None) };
@@ -531,6 +537,26 @@ thread_local! {
 #[cfg(test)]
 pub(crate) fn file_reads() -> usize {
     FILE_READS.with(|reads| reads.get())
+}
+
+#[cfg(test)]
+pub(crate) fn count_index_read() {
+    INDEX_READS.with(|reads| reads.set(reads.get() + 1));
+}
+
+#[cfg(test)]
+pub fn index_reads() -> usize {
+    INDEX_READS.with(core::cell::Cell::get)
+}
+
+#[cfg(test)]
+fn count_directory_read() {
+    DIRECTORY_READS.with(|reads| reads.set(reads.get() + 1));
+}
+
+#[cfg(test)]
+pub fn directory_reads() -> usize {
+    DIRECTORY_READS.with(core::cell::Cell::get)
 }
 
 #[cfg(test)]

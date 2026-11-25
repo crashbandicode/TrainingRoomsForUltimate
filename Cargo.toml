@@ -21,6 +21,10 @@ path = "tests/all/main.rs"
 name = "trim_playback"
 path = "tests/trim_playback_main.rs"
 
+[[test]]
+name = "playback_immediate"
+path = "tests/playback_immediate_main.rs"
+
 # These probes compile production runtime files against crate-root native shims.
 [[test]]
 name = "parry_start_fresh_set"

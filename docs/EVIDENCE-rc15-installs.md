@@ -150,10 +150,15 @@ plugins are left out, except the first, which was made in Training and turned ou
 
 ## The next build
 
-Merges after `a945b0c1` are listed in the release notes. Each merged head passed the six gate steps on a build host
-(`artifacts/phase23/next-build/gate-<commit>/`); none has run in Eden or on a console. The plan for this build
-(inbox 2026-11-25 17:06:54Z, tr-primary-2) is one short Eden smoke boot on the merged build, then the operator's full
-test on the console. Neither has happened yet.
+Merges after `a945b0c1` are listed in the release notes. Each head in the table passed the six gate steps on a build
+host (`artifacts/phase23/next-build/gate-<commit>/`). The five feature changes have host-test evidence; merely booting
+one of those builds does not test those changes.
+
+On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
+**before** the off-stage changes. Guard the Edge and Juggler did not start there. This was not a test of the proposed
+fix or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
+17:39:04Z report from training-offstage. The plan remains one short Eden smoke run on the finished build, then the
+operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is claimed here.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
