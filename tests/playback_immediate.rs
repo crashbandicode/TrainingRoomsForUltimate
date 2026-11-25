@@ -748,6 +748,22 @@ fn the_held_files_heap_is_reported() {
 }
 
 #[test]
+fn cpu_controller_holds_neutral_until_a_buffered_short_macro_starts() {
+    let _guard = HostGuard::new();
+    let f = fixture(false, LoopCount::Finite(1), &[2]);
+    tick(&f.root);
+    let controller = || host::cpu_controller(host::take_cpu_frame);
+    assert_eq!(controller(), None);
+    delayed_chord(&f, Role::Cpu, 10, false);
+    for poll in 0..10 {
+        assert_eq!(controller(), Some(crate::model::recording::Inject::NEUTRAL), "held CPU poll {poll}");
+    }
+    assert_eq!(controller().map(|pad| pad.buttons), Some(1));
+    assert_eq!(controller().map(|pad| pad.buttons), Some(2));
+    assert_eq!(controller(), None, "after the tail, the stock CPU regains control");
+}
+
+#[test]
 fn player_one_is_neutral_during_its_own_delay() {
     let _guard = HostGuard::new();
     let f = small(false);
