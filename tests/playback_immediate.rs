@@ -2,7 +2,7 @@ use crate::engine::library::{Chain, LoopCount, NamedSave, RecordingIndex, Role, 
 use crate::engine::macros::{InputFrame, Library, MacroRecording, StartState};
 use crate::engine::playback::{Book, Playback};
 use crate::engine::rr_host as host;
-use crate::model::menu::table::{Control, OPTIONS, ROWS};
+use crate::model::menu::table::{Control, ROWS};
 use crate::model::recording::RecorderSettings;
 use crate::model::settings::{self, Snapshot};
 use crate::model::state::record::SavedState;
@@ -315,13 +315,14 @@ fn playback_delay_row_lists_its_frames() {
     let row = ROWS.iter().find(|row| row.id == "playback_delay");
     assert!(row.is_some(), "Playback delay must exist");
     let row = row.unwrap();
-    assert_eq!((row.title, row.group), ("Playback delay", OPTIONS));
+    let options = ROWS.iter().find(|other| other.id == "recording_crop").unwrap().group;
+    assert_eq!((row.title, row.group), ("Playback delay", options));
     assert!(matches!(row.control, Control::Dropdown(options) if options == [
         "None", "10 frames", "20 frames", "30 frames", "45 frames", "60 frames", "90 frames", "120 frames"
     ]));
     assert_eq!(row.help.lines().count(), 2);
     assert!(row.help.contains("60 frames is one second"));
-    assert_eq!(ROWS.iter().filter(|other| other.group == OPTIONS).last().unwrap().id, "playback_delay");
+    assert_eq!(ROWS.iter().filter(|other| other.group == options).last().unwrap().id, "playback_delay");
 }
 
 #[test]
