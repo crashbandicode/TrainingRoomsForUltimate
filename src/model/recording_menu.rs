@@ -2825,6 +2825,23 @@ mod tests {
         }
     }
 
+    fn placement_uses_the_open_file_kind_when_ids_collide() {
+        let mut catalog = example();
+        catalog.saves[0].id = "nair".into();
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(catalog);
+        for (kind, save, relink) in [
+            (ItemKind::Recording, "nair-start", Some("nair")),
+            (ItemKind::Save, "nair", None),
+        ] {
+            screens.open_file("nair".into(), kind);
+            let row = screens.file_rows().iter().position(|row| row.title == "Change placement").unwrap();
+            screens.set_file_cursor(row);
+            assert!(matches!(screens.handle_page(Button::A, true, SAVES_MACROS), PageHit::Close));
+            assert_eq!(screens.take_effect(), Effect::ChangePlacement { save: save.into(), relink: relink.map(str::to_owned) });
+        }
+    }
+
     /// PC2: X on a save in the pop-up opens the picker on it; the pop-up closes.
     fn the_pop_up_opens_change_placement_with_x_on_a_save() {
         let mut screens = screens();
@@ -4368,6 +4385,7 @@ mod tests {
             ("change_placement_is_a_row_of_the_saves_own_screen", change_placement_is_a_row_of_the_saves_own_screen as fn()),
             ("a_macro_and_a_chain_open_their_start_save", a_macro_and_a_chain_open_their_start_save as fn()),
             ("the_pop_up_opens_change_placement_with_x_on_a_save", the_pop_up_opens_change_placement_with_x_on_a_save as fn()),
+            ("placement_uses_the_open_file_kind_when_ids_collide", placement_uses_the_open_file_kind_when_ids_collide as fn()),
             ("popup_zr_toggles_the_role_like_the_page", popup_zr_toggles_the_role_like_the_page as fn()),
             ("popup_l_r_zl_switch_tabs_and_never_set_the_role", popup_l_r_zl_switch_tabs_and_never_set_the_role as fn()),
             ("popup_footer_names_zr_role_and_tab_keys", popup_footer_names_zr_role_and_tab_keys as fn()),
