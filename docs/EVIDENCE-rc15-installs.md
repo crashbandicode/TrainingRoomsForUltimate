@@ -182,8 +182,8 @@ Two rows, the eggs zone and placement, passed on a later try in the same boot, a
 corrected (it looked for a row named Stop, and expected the placement card to open on Spot). The build did not change
 between tries.
 
-A pass on a Start row means the set-up opened on its CPU page with no refusal. **No drill was played through**: no
-CPU was launched and no attempt was scored.
+For Guard the Edge and Juggler, Start opened the set-up on its CPU page with no refusal. **Neither drill was played
+through**: no CPU was launched and no attempt was scored.
 
 | Row | Verdict | What was read |
 | --- | --- | --- |
@@ -192,12 +192,12 @@ CPU was launched and no attempt was scored.
 | Guard the Edge from the island (`s2b-guard-island`) | pass | with Player 1 on the island's floor the set-up opened beside its left ledge, and Y moved it to the right one |
 | Juggler, Training stage (`s3-juggler-training`) | pass | Start opened the set-up on the CPU page at (−45, 140) |
 | Eggs-ercise's off-stage zone (`s4-eggs-offstage`) | pass | one zone, in the gap between the island and the long floor; the game started with Off stage only and no "No usable Off stage zone" |
-| Placement's Off stage switch (`s5-place-offstage`) | pass | Player 1's spot went from on stage at (−30, 0) to off stage at (−125, −68); D-pad Right then moved it to (−124, −68) |
+| Recording picker's Off stage switch (`s5-place-offstage`) | pass | Player 1's spot went from on stage at (−30, 0) to off stage at (−125, −68); D-pad Right then moved it to (−124, −68). No placement was saved or loaded |
 | Play on Player 1 (`s6-playback`) | pass | a 64-frame take was played: 64 of 64 frames delivered. The time to start was not measured |
 | The clip editor (`s7-marks-preview`) | pass | the editor opened with four marks; X played the preview to its end |
 | Guard the Edge, Battlefield (`s8-guard-battlefield`) | pass | the set-up opened with CPU midair jumps set to Used; the setting was put back |
 | The waiting room (`s9-lobby`) | **not run** | the test's route stopped at the main menu before its first input, twice; the cause is in the test bridge, not shown to be in TrainingRooms. Nothing about the waiting room was tested |
-| Settings after the rows (`z-audit`) | pass | no setting differed from its factory value |
+| Settings after the rows (`z-audit`) | pass | none of the toggles compared differed from its factory value; 21 keys, including rosters and ranges, were not checked |
 
 Not covered by the smoke boot:
 
@@ -207,9 +207,9 @@ Not covered by the smoke boot:
   replay captures, the form names on the editor's marks, the Playback delay option, and Change placement's save with
   its shared start save question.
 
-For this page, each row file's `pass` field and the values quoted in the table were read from the row files, and the
-frame of the first row was looked at. The other frames are dup-audit's reads; its result file says which frames it
-read and that one frame (`s8-guard-battlefield`) does not show the set-up card.
+The table uses the row files for verdicts and values. The first Guard the Edge frame was also checked for this page.
+On Battlefield the frame shows a fighter-preload notice, not the set-up card; the bridge recorded the wizard and its
+jump setting. The closing settings verdict comes from the audit, not its screenshot.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
