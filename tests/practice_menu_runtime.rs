@@ -463,10 +463,14 @@ fn edge_wizard_points_only_where_the_notice_shows_the_cpu() {
 fn edge_juggle_remembers_whether_the_start_was_moved() {
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let poll = item(&runtime, "pub unsafe fn poll(");
-    assert!(poll.contains("wizard.unmoved()"));
+    // The kept setup carries whether the start was moved, and Start's reuse of it restores an unmoved default.
+    assert!(poll.contains("wizard.kept(run.stage)"));
     assert!(poll.contains("wizard.back_to_defaults(run.defaults)"));
     assert!(!poll.contains("wizard.setup = run.defaults"));
-    assert!(item(&runtime, "pub unsafe fn frame(").contains("wizard.remembered("));
+    assert!(item(&runtime, "pub unsafe fn frame(").contains("wizard.kept_setup(stage, kept, config.options)"));
+    let model = src("src/model/edge_juggle.rs");
+    assert!(model.contains("Kept { run: stage.ledges, setup: self.setup, unmoved: self.unmoved(), under: self.under }"));
+    assert!(model.contains("self.remembered(stage, kept.setup, kept.unmoved)"));
 }
 
 #[test]

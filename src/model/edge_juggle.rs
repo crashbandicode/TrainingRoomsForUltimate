@@ -1190,8 +1190,10 @@ impl Wizard {
     /// saved ends are compared), and a CPU start that A confirmed under the stage only while that option is On.
     /// Nothing is read again. `None`: Start opens the wizard at this run's defaults.
     pub fn kept_setup(&self, stage: Stage, kept: Kept, options: StartOptions) -> Option<Setup> {
-        let beside = self.drill == Drill::Juggler || options.under || stage.off_stage(kept.setup.cpu).is_some();
-        (kept.run == stage.ledges && beside).then(|| self.remembered(stage, kept.setup, kept.unmoved))
+        let taken = self.drill == Drill::Juggler
+            || options.under
+            || !kept.under && stage.off_stage(kept.setup.cpu).is_some();
+        (kept.run == stage.ledges && taken).then(|| self.remembered(stage, kept.setup, kept.unmoved))
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
