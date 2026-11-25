@@ -461,8 +461,6 @@ static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
 static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
 /// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
 static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
-/// Edit placement's Keep: a file id and the offset Play uses for it instead of the file's.
-static KEPT_PLACEMENT: Mutex<Option<(String, Placement)>> = Mutex::new(None);
 
 /// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
 #[derive(Clone, Debug, PartialEq)]
@@ -1637,34 +1635,13 @@ pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
         Role::Cpu => &save.cpu,
     };
     let anchor = (at.x, at.y);
-    let mut recording = recording;
-    if let Some(placement) = kept_placement(&id) {
-        recording.placement = placement;
-    }
     Ok(PlacementTarget { role, id, recording, anchor })
 }
 
-/// Keep on Edit placement: Play uses this offset for that file until the game closes. The file is unchanged.
-pub fn keep_placement(id: &str, placement: Placement) {
-    *lock(&KEPT_PLACEMENT) = Some((id.to_owned(), placement));
-}
-
-/// Write over put an offset into the file: a kept one for that file no longer applies.
-pub fn placement_written(id: &str) {
-    let mut kept = lock(&KEPT_PLACEMENT);
-    if kept.as_ref().is_some_and(|(kept, _)| kept == id) {
-        *kept = None;
-    }
-}
-
-fn kept_placement(id: &str) -> Option<Placement> {
-    lock(&KEPT_PLACEMENT).as_ref().filter(|(kept, _)| kept == id).map(|(_, placement)| *placement)
-}
-
-/// The placement a Play of `id` warps with: a kept one, else the file's (a chain: macro 1's, whose start save it is).
+/// The placement a Play of `id` warps with: the file's own (a chain: macro 1's, whose start save it is).
 fn play_placement(book: &Book, id: &str) -> Placement {
     let first = book.first_recording(id).unwrap_or(id);
-    kept_placement(first).unwrap_or_else(|| book.placement(first))
+    book.placement(first)
 }
 
 /// The pair a Play warps to: the start save, with the file's placement added to the playing role's saved position
@@ -2409,7 +2386,14 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             }
         }
         Effect::SetTrim { .. } => {}
-        Effect::SetMomentum { .. } | Effect::ClearOffset { .. } => {}
+        // The macro's own screen (operator 2026-11-25, PC6 A): each row writes its one field into the macro's file.
+        Effect::SetMomentum { id, rest } => {
+            let momentum = if rest { MomentumMode::AtRest } else { MomentumMode::PreserveRecorded };
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| file.placement.momentum = momentum);
+        }
+        Effect::ClearOffset { id } => {
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| (file.placement.delta_x, file.placement.delta_y) = (0.0, 0.0));
+        }
     }
 }
 
@@ -3015,7 +2999,6 @@ pub(crate) fn reset_host() {
     *lock(&BOUND_APPLIED) = None;
     *lock(&SAVED_PAIR) = None;
     SLOT_RESYNC.store(false, Ordering::Release);
-    *lock(&KEPT_PLACEMENT) = None;
     for slot in ROLE_KIND.iter().chain(&LIVE_KIND) {
         slot.store(-1, Ordering::Release);
     }
@@ -6107,15 +6090,6 @@ mod tests {
         );
         assert_eq!((lifted[1].y, lifted[1].situation_kind), (5.0, SITUATION_AIR), "a raised start is in the air");
 
-        keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
-        warp_landed();
-        on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
-        assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
-
         // A chain warps to macro 1's start save and plays with macro 1's placement, so Edit placement edits macro 1.
         let chain = Chain::new("Pressure", vec![id.clone(), loose.clone()]).unwrap();
         let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
@@ -6938,13 +6912,13 @@ mod tests {
         if start_save {
             recording.set_start_save(Some(&save)).unwrap();
         }
+        if let Some(placement) = placement {
+            recording.set_placement(placement).unwrap();
+        }
         let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Player, Some(&id), 1).unwrap();
         index.save(&root).unwrap();
-        if let Some(placement) = placement {
-            keep_placement(&id, placement);
-        }
         on_chords(false, true, false);
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(take_start_speed(Role::Player).is_none(), "{tag}: nothing before the run's first input");

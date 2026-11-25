@@ -164,9 +164,6 @@ pub enum Effect {
     ComboFighter(Option<FighterChoice>),
     /// Result of a prompt opened for a recording, a combo drill, or a chain's macro 1. `None` is Cancel.
     RecordingFighter(Option<FighterChoice>),
-    /// Keep on Edit placement for a role's active macro: Play uses this offset until the game closes; the file is
-    /// unchanged.
-    KeepPlacement { id: String, placement: Placement },
 }
 
 /// Everything the runtime knows about the selection being loaded. The panel
@@ -247,12 +244,6 @@ struct Loaded {
     id: Option<String>,
     recording: MacroRecording,
     plays: Plays,
-}
-
-/// The role's active macro on Edit placement, and where its start save puts that role.
-struct Editing {
-    id: String,
-    recording: MacroRecording,
 }
 
 /// A selection waiting for the user's fighter choice. Nothing is committed yet,
@@ -347,8 +338,6 @@ enum Screen {
 pub struct MacroUi {
     screen: Screen,
     loaded: Option<Loaded>,
-    /// Edit placement's file while its page is open (primary 2026-11-08 #70 (a)); the named selection is not changed.
-    editing: Option<Editing>,
     /// Library page the last A choice came from, for a Cancelled fighter prompt.
     picked: Option<Box<LibraryPage>>,
     /// Id and name of a library load a fighter prompt just committed, until the
@@ -374,7 +363,6 @@ impl MacroUi {
         Self {
             screen: Screen::Closed,
             loaded: None,
-            editing: None,
             picked: None,
             prompt_commit: None,
             held_save: None,
@@ -554,7 +542,7 @@ impl MacroUi {
                         draft.working.delta_x,
                         draft.working.delta_y,
                         momentum_label(draft.working.momentum),
-                        if self.editing.is_some() { "where the start save puts this role" } else { "the restored CPU position" }
+                        "the restored CPU position"
                     ),
                     draft.cursor,
                 )
@@ -730,26 +718,6 @@ impl MacroUi {
         true
     }
 
-    /// Edit placement on a role's active macro, the file Play plays (primary 2026-11-08 #70 (a)). `anchor` is where the
-    /// macro's start save puts that role, the warp Play makes; the offset is added to it. The named selection and the
-    /// CPU are left alone.
-    pub fn open_placement(&mut self, id: String, recording: MacroRecording, anchor: (f32, f32)) -> bool {
-        if recording.validate().is_err() {
-            return false;
-        }
-        let working = recording.placement;
-        self.editing = Some(Editing { id, recording });
-        self.edit_anchor = Some(anchor);
-        self.playback_on = false;
-        self.held_save = None;
-        self.screen = Screen::Place(Box::new(PlaceDraft {
-            working,
-            cursor: 1,
-            from_save: false,
-        }));
-        true
-    }
-
     pub fn on_pad(&mut self, pad: Pad) -> Effect {
         if matches!(self.screen, Screen::Fighter(_)) {
             return self.fighter_pad(pad);
@@ -842,7 +810,7 @@ impl MacroUi {
         let Screen::Place(draft) = &self.screen else {
             return None;
         };
-        let anchor = if self.editing.is_some() { self.edit_anchor } else { self.anchor.or(self.edit_anchor) }?;
+        let anchor = self.anchor.or(self.edit_anchor)?;
         Some(draft.working.apply(anchor))
     }
 
@@ -899,7 +867,6 @@ impl MacroUi {
 
     pub fn close_transient(&mut self) {
         self.screen = Screen::Closed;
-        self.editing = None;
         self.picked = None;
         self.prompt_commit = None;
         self.held_save = None;
@@ -1385,10 +1352,6 @@ impl MacroUi {
         if from_save {
             return self.restore_save_from_place(placement);
         }
-        if let Some(editing) = self.editing.take() {
-            self.screen = Screen::Closed;
-            return Effect::KeepPlacement { id: editing.id, placement };
-        }
         if let Some(loaded) = self.loaded.as_mut() {
             if loaded.recording.set_placement(placement).is_err() {
                 return Effect::Notify("Placement is not usable".to_owned());
@@ -1403,14 +1366,6 @@ impl MacroUi {
             Screen::Place(draft) => draft.working,
             _ => return Effect::None,
         };
-        if let Some(editing) = self.editing.as_mut() {
-            if editing.recording.set_placement(placement).is_err() {
-                return Effect::Notify("Placement is not usable".to_owned());
-            }
-            let Some(Editing { id, recording }) = self.editing.take() else { return Effect::None };
-            self.screen = Screen::Closed;
-            return Effect::Overwrite { id, recording: Box::new(recording) };
-        }
         let Some(id) = self.loaded.as_ref().and_then(|loaded| loaded.id.clone()) else {
             return Effect::Notify("Save the recording before overwriting a file".to_owned());
         };
@@ -1430,8 +1385,7 @@ impl MacroUi {
             Screen::Place(draft) => draft.working,
             _ => return Effect::None,
         };
-        let editing = self.editing.take();
-        let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {
+        let Some(source) = self.loaded.as_ref().map(|loaded| &loaded.recording) else {
             return Effect::Notify("Nothing to save".to_owned());
         };
         let draft = NameDraft::from_recording(source, placement);
@@ -1469,7 +1423,6 @@ impl MacroUi {
 
     fn discard(&mut self) -> Effect {
         self.held_save = None;
-        self.editing = None;
         self.screen = Screen::Closed;
         Effect::None
     }
@@ -1902,39 +1855,6 @@ mod tests {
         assert!(!ui.open_editor(None));
     }
 
-    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden
-    /// rc6-covrec-diag2 cov-edit-placement: with a macro active the row refused "Load a macro and restore a Training
-    /// state first", because it looked for the retired named layer's macro.
-    fn edit_placement_opens_on_the_active_macro_and_writes_that_file() {
-        let mut ui = MacroUi::new();
-        let original = sample(Placement::default());
-        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
-        assert!(ui.is_open());
-        assert_eq!(ui.marker(), Some((10.0, 0.0)), "the marker starts on the start save's position");
-        assert_eq!(ui.loaded_id(), None, "the named selection is not changed");
-        ui.on_pad(Pad::Confirm);
-        assert_eq!(ui.marker(), Some((11.0, 0.0)));
-        goto(&mut ui, 10);
-        let Effect::Overwrite { id, recording } = ui.on_pad(Pad::Confirm) else { panic!("Write over the active file") };
-        assert_eq!(id, "active-1");
-        assert_eq!(recording.placement.delta_x, 1.0);
-        assert_eq!(recording.frames, original.frames, "inputs stay recorded");
-        assert!(!ui.is_open());
-        assert_eq!(ui.loaded_id(), None);
-
-        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
-        ui.on_pad(Pad::Confirm);
-        goto(&mut ui, 9);
-        let Effect::KeepPlacement { id, placement } = ui.on_pad(Pad::Confirm) else { panic!("Keep for this session") };
-        assert_eq!((id.as_str(), placement.delta_x), ("active-1", 1.0));
-        assert!(!ui.is_open());
-
-        assert!(ui.open_placement("active-1".into(), original, (10.0, 0.0)));
-        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
-        assert!(!ui.is_open());
-        assert_eq!(ui.marker(), None);
-    }
-
     fn native_checkpoint_survives_repeated_interruption_without_commit() {
         let mut ui = MacroUi::new();
         let mut original = sample(Placement { delta_x: 7.0, delta_y: -2.0, ..Placement::default() });
@@ -2340,7 +2260,6 @@ mod tests {
             ("library_pages_and_cancel_keeps_the_previous_choice", library_pages_and_cancel_keeps_the_previous_choice as fn()),
             ("placement_edit_keeps_inputs_and_can_stay_temporary", placement_edit_keeps_inputs_and_can_stay_temporary as fn()),
             ("placement_needs_restored_reference_and_save_keeps_it", placement_needs_restored_reference_and_save_keeps_it as fn()),
-            ("edit_placement_opens_on_the_active_macro_and_writes_that_file", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),
             ("native_checkpoint_survives_repeated_interruption_without_commit", native_checkpoint_survives_repeated_interruption_without_commit as fn()),
             ("save_dialog_placement_round_trip_and_momentum", save_dialog_placement_round_trip_and_momentum as fn()),
             ("character_request_is_once_and_playback_does_not_double_advance", character_request_is_once_and_playback_does_not_double_advance as fn()),

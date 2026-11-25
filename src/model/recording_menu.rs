@@ -508,6 +508,8 @@ enum Act {
     Trim,
     Bind,
     Placement,
+    Momentum,
+    Offset,
     Duplicate,
     Rename,
     Crop,
@@ -1565,6 +1567,7 @@ impl RecordingScreens {
             Act::StartSave => self.set_start(kind, &id, on),
             Act::PlaybackSlot => self.step_slot(&id, on),
             Act::Trim => self.step_trim(kind, &id, on),
+            Act::Momentum => self.flip_momentum(&id),
             Act::CaptureSide => self.step_capture_side(on),
             Act::CaptureTarget => if let Some(file) = self.file.as_mut() { file.capture_player = !file.capture_player; },
             _ => {}
@@ -1595,6 +1598,13 @@ impl RecordingScreens {
             }
             Act::PlaybackSlot => self.step_slot(&id, true),
             Act::Trim => self.step_trim(kind, &id, true),
+            Act::Momentum => self.flip_momentum(&id),
+            Act::Offset => {
+                if let Some(place) = self.macro_places.get_mut(&id) {
+                    place.offset = [0; 2];
+                }
+                self.last_effect = Effect::ClearOffset { id };
+            }
             Act::CaptureSide => self.step_capture_side(true),
             Act::CaptureTarget => if let Some(file) = self.file.as_mut() { file.capture_player = !file.capture_player; },
             Act::CaptureOpen(make, play) => {
@@ -2337,6 +2347,13 @@ impl RecordingScreens {
                 let name = self.save_name(save).unwrap_or_else(|| save.clone());
                 rows.push(row("Start save", if file.start_save_on { format!("{name} · On") } else { "Off".into() }, Act::StartSave));
                 rows.push(row("Change placement", "", Act::Placement));
+                // What Play does at that warp (operator 2026-11-25, PC6 A): the start speed, and an offset an older
+                // build's key grid stored, which Play still adds to the save's spot until it is cleared here.
+                let place = self.macro_places.get(id).copied().unwrap_or_default();
+                rows.push(row("Momentum", if place.rest { "Start at rest" } else { "Keep recorded speed" }, Act::Momentum));
+                if let Some(offset) = offset_label(place) {
+                    rows.push(row("Offset", offset, Act::Offset));
+                }
             }
         }
         rows.push(self.active_row(id));
@@ -2427,6 +2444,13 @@ impl RecordingScreens {
         self.catalog.combos.iter().find(|file| file.id == id)
     }
 
+    /// The Momentum row has two values, so Left, Right and A all flip it. The host writes it into the macro's file.
+    fn flip_momentum(&mut self, id: &str) {
+        let place = self.macro_places.entry(id.to_owned()).or_default();
+        place.rest = !place.rest;
+        self.last_effect = Effect::SetMomentum { id: id.to_owned(), rest: place.rest };
+    }
+
     fn step_trim(&mut self, kind: ItemKind, id: &str, forward: bool) {
         let (trims, file_kind) = match kind {
             ItemKind::Recording if self.catalog.macros.iter().any(|file| file.id == id && !file.chain) =>
@@ -2509,6 +2533,13 @@ fn fill_ranks(ids: &[String], order: &[String]) -> Vec<u8> {
 /// A Connections line with no floppy.
 fn line(text: impl Into<String>) -> ConnLine {
     ConnLine { text: text.into(), floppy: None }
+}
+
+/// The Offset row's value: each axis that is not zero, as the file holds it. `None`: no offset, so no row.
+fn offset_label(place: MacroPlace) -> Option<String> {
+    let [x, y] = place.offset.map(f32::from_bits);
+    let axes: Vec<String> = [("X", x), ("Y", y)].iter().filter(|(_, value)| *value != 0.0).map(|(axis, value)| format!("{axis} {value}")).collect();
+    (!axes.is_empty()).then(|| format!("{} · A clears", axes.join(" ")))
 }
 
 /// A file row that drills nothing.

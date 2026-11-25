@@ -2220,7 +2220,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "7dfe566aa22c575ab6149ed1471d67291acb709d4082820b305efdb472d1e98e",
+   "dest_sha256": "081724d3c034ff24e712f12fb61de9e8b765e37cb7b5a2f2eed49ea9a5db10d8",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -2978,6 +2978,76 @@
      "old": "    actions: Vec<crate::engine::macros::ActionMark>,\n}",
      "new": "    actions: Vec<crate::engine::macros::ActionMark>,\n    recorded_fighter: Option<crate::model::move_names::FighterId>,\n}",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    /// Keep on Edit placement for a role's active macro: Play uses this offset until the game closes; the file is\n    /// unchanged.\n    KeepPlacement { id: String, placement: Placement },\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "/// The role's active macro on Edit placement, and where its start save puts that role.\nstruct Editing {\n    id: String,\n    recording: MacroRecording,\n}\n\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "    /// Edit placement's file while its page is open (primary 2026-11-08 #70 (a)); the named selection is not changed.\n    editing: Option<Editing>,\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "            editing: None,\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "                        if self.editing.is_some() { \"where the start save puts this role\" } else { \"the restored CPU position\" }\n",
+     "new": "                        \"the restored CPU position\"\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "delete_from": "    /// Edit placement on a role's active macro, the file Play plays (primary 2026-11-08 #70 (a)). `anchor` is where the\n",
+     "delete_to": "    pub fn on_pad(&mut self, pad: Pad) -> Effect {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        let anchor = if self.editing.is_some() { self.edit_anchor } else { self.anchor.or(self.edit_anchor) }?;\n",
+     "new": "        let anchor = self.anchor.or(self.edit_anchor)?;\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        self.screen = Screen::Closed;\n        self.editing = None;\n        self.picked = None;\n",
+     "new": "        self.screen = Screen::Closed;\n        self.picked = None;\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        if let Some(editing) = self.editing.take() {\n            self.screen = Screen::Closed;\n            return Effect::KeepPlacement { id: editing.id, placement };\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        if let Some(editing) = self.editing.as_mut() {\n            if editing.recording.set_placement(placement).is_err() {\n                return Effect::Notify(\"Placement is not usable\".to_owned());\n            }\n            let Some(Editing { id, recording }) = self.editing.take() else { return Effect::None };\n            self.screen = Screen::Closed;\n            return Effect::Overwrite { id, recording: Box::new(recording) };\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        let editing = self.editing.take();\n        let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {\n",
+     "new": "        let Some(source) = self.loaded.as_ref().map(|loaded| &loaded.recording) else {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        self.held_save = None;\n        self.editing = None;\n        self.screen = Screen::Closed;\n        Effect::None\n",
+     "new": "        self.held_save = None;\n        self.screen = Screen::Closed;\n        Effect::None\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "delete_from": "    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden\n",
+     "delete_to": "    fn native_checkpoint_survives_repeated_interruption_without_commit() {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "            (\"edit_placement_opens_on_the_active_macro_and_writes_that_file\", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
     }
    ]
   },
@@ -3273,7 +3343,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "9c6ec46e0daded40d0a6fd725bda741f206cdbd530a71033bba5f26d5c8db457",
+   "dest_sha256": "4255c5088c9d068aecd75b4ff33857ade99851ef3996eec74d55a3429a543181",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -4269,6 +4339,21 @@
      "old": "    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page())",
      "new": "    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.playing)",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "delete_from": "/// Edit placement edits the Recording pop-up role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor\n",
+     "delete_to": "fn practice_ready() -> bool {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        Effect::KeepPlacement { id, placement } => {\n            crate::engine::rr_host::keep_placement(&id, placement);\n            notify(\"Placement kept for this session\");\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        Ok(()) => {\n            crate::engine::rr_host::placement_written(&id);\n            notify(\"Placement written\");\n        }\n",
+     "new": "        Ok(()) => notify(\"Placement written\"),\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
     }
    ]
   },
