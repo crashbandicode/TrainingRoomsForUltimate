@@ -1,0 +1,19 @@
+# Guard the Edge
+
+Works in Training and in the [waiting room](waiting-rooms.md). Keep the CPU from recovering and take its stock. In [Practice games](../menu/practice-games.md#guard-the-edge), choose **CPU fighter and mode**, **Reaction**, **CPU percent**, **Attempts** and **Start**.
+
+On the first start, or with **Set up…**, place the CPU off stage and Player 1 above the main floor, then preview both points. The crosshair refuses invalid picks immediately: “Pick a point off the stage” or “Pick a point above a floor”. The input display strip is hidden while setup is open. Later starts remember the setup for the current stage; **Set up…** changes it.
+
+Each KO is secured; a ledge catch or landing is a recovery. The notice shows the result, count and streak; an unresolved attempt does not count. Against Hero's **Zoom**, hit or grab him on the way down or within **Zoom landing window** after landing to win.
+
+<!-- CLIP guard-edge-setup-and-score: Place both start points, preview them, then show a secured stock and the result. -->
+
+| Button | What it does |
+| --- | --- |
+| A | Open a fighter, cycle its mode, advance setup or start from Preview. |
+| X | Change CPU level in its popup; restore the default CPU start on its setup page, or restore the whole setup and preview it on later pages. |
+| Y | Choose the other side's default CPU start. |
+| Stick or D-pad | Move the setup crosshair. |
+| B | Go back in setup, or cancel on the first page. |
+| + | Start from Preview. |
+| L + R + A | Restart the set when **L+R+A Reset** is On. |
