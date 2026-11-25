@@ -285,7 +285,8 @@ on the [Recording page's pop-up section](../menu/recording.md#the-recording-pop-
 
 - While it is open it takes your buttons. B closes it and leaves the bound save, the active macros and the cursor as
   they were. That B never reaches your fighter, tapped or held; your buttons stay with the pop-up until you let go.
-- L Player and CPU R choose the side you are working on. That side is the one Record records and Edit placement edits.
+- ZR switches between Player 1 and CPU, as on the Recording page. The ZR cap sits beside the role tabs; the lit side
+  is the one Record records and Edit placement edits. ZL, L and R switch the pop-up's tabs; on CPU there is only one.
 - A acts at once: no file screens. Renaming, cropping and deleting are on the page.
 
 The pop-up role and the Recording page's ZR view are remembered separately across menu closes, leaving Training and a
