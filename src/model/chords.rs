@@ -89,6 +89,10 @@ impl Buttons {
     pub const fn r(self) -> bool { self.has(bit::R) }
     pub const fn zl(self) -> bool { self.has(bit::ZL) }
     pub const fn zr(self) -> bool { self.has(bit::ZR) }
+    /// Anything but ZR is held: another button, a d-pad direction or a stick's digital direction.
+    pub const fn other_than_zr(self) -> bool {
+        self.0 & !bit::ZR != 0
+    }
     pub const fn dpad_up(self) -> bool { self.has(bit::DPAD_UP) }
     pub const fn dpad_down(self) -> bool { self.has(bit::DPAD_DOWN) }
     pub const fn dpad_left(self) -> bool { self.has(bit::DPAD_LEFT) }

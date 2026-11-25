@@ -404,4 +404,4 @@ impl<'a> Namer<'a> {
 
 #[cfg(test)]
 #[path = "move_names_tests.rs"]
-mod tests;
+pub(crate) mod tests;

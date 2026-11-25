@@ -210,7 +210,11 @@ impl Panes {
         let panel = if frame.view == View::Chips { selected_panel(frame) } else { [None; ROWS] };
         // The r8 pop-up's list column (left of CONNECTIONS); the page keeps its own.
         // Both boxes sit inside the list's outline and cursor with a pad (`panes::ROW_PAD`), the same for every list.
-        let ((label_x, label_w), (value_x, value_w)) = (p::row_label_box(frame.popup), p::row_value_box(frame.popup));
+        let ((label_x, label_w), (value_x, value_w)) = if frame.view == View::Clip {
+            (p::CLIP_LABEL_BOX, p::CLIP_VALUE_BOX)
+        } else {
+            (p::row_label_box(frame.popup), p::row_value_box(frame.popup))
+        };
         for (i, line) in panel.into_iter().enumerate() {
             let sub = list && i < usize::from(frame.row_count) && !frame.rows[i].sub.is_empty();
             if sub {
@@ -222,8 +226,9 @@ impl Panes {
             if list && i < usize::from(frame.row_count) {
                 let row = &frame.rows[i];
                 let rise = if sub { SUB_RISE } else { 0.0 };
-                self.place(p::row_label_index(i), label_x, p::row_y(i) + rise, label_w);
-                self.place(p::row_value_index(i), value_x, p::row_y(i) - VALUE_DROP + rise, value_w);
+                let y = if frame.view == View::Clip { p::CLIP_ROW_Y[i.min(1)] } else { p::row_y(i) };
+                self.place(p::row_label_index(i), label_x, y + rise, label_w);
+                self.place(p::row_value_index(i), value_x, y - VALUE_DROP + rise, value_w);
                 self.text(p::row_label_index(i), row.label.units(), tone_color(row.label_tone));
                 self.text(p::row_value_index(i), row.value.units(), tone_color(row.value_tone));
             } else if frame.view == View::Delay && i < 4 {
@@ -881,9 +886,8 @@ impl Panes {
     }
 }
 // ---- the clip editor (the replay window): its lines are the list rows, the timeline sits under them ------------------
-const CLIP_BAR_L: f32 = -300.0;
-const CLIP_BAR_W: f32 = 1000.0;
-const CLIP_BAR_Y: f32 = -90.0;
+const CLIP_BAR_L: f32 = -800.0;
+const CLIP_BAR_W: f32 = 1600.0;
 
 /// The x of frame `at` of a capture of `total` frames on the timeline.
 fn clip_x(at: u32, total: u32) -> f32 {
@@ -895,15 +899,14 @@ impl Panes {
         if frame.view != View::Clip {
             return;
         }
-        use core::fmt::Write;
         let bar = frame.clip;
         let (start, end, now) = (clip_x(bar.start, bar.total), clip_x(bar.end, bar.total), clip_x(bar.cursor, bar.total));
         let held = |handle: u8| if bar.handle == handle { ACCENT_RING } else { TEXT };
-        self.rect_at(IDX_CHIP, CLIP_BAR_L + CLIP_BAR_W / 2.0, CLIP_BAR_Y, CLIP_BAR_W, 8.0, [70, 78, 92, 255]);
-        self.rect_at(IDX_CHIP + 1, (start + end) / 2.0, CLIP_BAR_Y, (end - start).max(4.0), 8.0, ACCENT);
-        self.rect_at(IDX_CHIP + 2, start, CLIP_BAR_Y, 22.0, 44.0, held(1));
-        self.rect_at(IDX_CHIP + 3, end, CLIP_BAR_Y, 22.0, 44.0, held(2));
-        self.rect_at(IDX_CHIP + 4, now, CLIP_BAR_Y, 6.0, 96.0, if bar.playing { TEXT_ON } else { held(0) });
+        self.rect_at(IDX_CHIP, CLIP_BAR_L + CLIP_BAR_W / 2.0, p::CLIP_BAR_Y, CLIP_BAR_W, 8.0, [70, 78, 92, 255]);
+        self.rect_at(IDX_CHIP + 1, (start + end) / 2.0, p::CLIP_BAR_Y, (end - start).max(4.0), 8.0, ACCENT);
+        self.rect_at(IDX_CHIP + 2, start, p::CLIP_BAR_Y, 22.0, 44.0, held(1));
+        self.rect_at(IDX_CHIP + 3, end, p::CLIP_BAR_Y, 22.0, 44.0, held(2));
+        self.rect_at(IDX_CHIP + 4, now, p::CLIP_BAR_Y, 6.0, 36.0, if bar.playing { TEXT_ON } else { held(0) });
         for i in 5..CHIPS {
             self.hide(IDX_CHIP + i);
         }
@@ -911,15 +914,24 @@ impl Panes {
         for i in 0..CHIPS {
             self.hide(IDX_CHIP_BADGE + i);
             self.hide(IDX_CHIP_NEEDLE + i);
-            if i >= 3 {
-                self.hide(IDX_CHIP_LABEL + i);
-            }
+            self.hide(IDX_CHIP_LABEL + i);
         }
-        let marks = [(start, CLIP_BAR_Y - 52.0, bar.start, "in"), (end, CLIP_BAR_Y - 52.0, bar.end, "out"), (now, CLIP_BAR_Y + 70.0, bar.cursor, "now")];
-        for (slot, (x, y, frames, name)) in marks.into_iter().enumerate() {
-            let mut text = Text::<16>::new();
-            let _ = write!(text, "{name} {frames}");
-            self.label(IDX_CHIP_LABEL + slot, text.units(), x, y, 200.0, TEXT_DIM);
+        for (i, &(from, to)) in bar.marks.iter().enumerate() {
+            let tick = IDX_TILE_STRIPE + 2 * i;
+            let band = tick + 1;
+            if i >= usize::from(frame.clip.mark_count) {
+                self.hide(tick);
+                self.hide(band);
+                continue;
+            }
+            let left = CLIP_BAR_L + f32::from(from);
+            let right = CLIP_BAR_L + f32::from(to);
+            self.rect_at(tick, left, p::CLIP_BAR_Y, 4.0, 28.0, TEXT);
+            if to > from {
+                self.rect_at(band, (left + right) / 2.0, p::CLIP_BAR_Y + 12.0, right - left, 4.0, TEXT);
+            } else {
+                self.hide(band);
+            }
         }
     }
 }
