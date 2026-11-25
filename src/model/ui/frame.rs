@@ -1292,14 +1292,14 @@ mod tests {
     }
 
     /// Primary 2026-11-08 15:55Z, the r8 pop-up as drawn (`RECORDING-REDESIGN-r8-popup-combo.png`): the title
-    /// "Recording" with the L/R role tabs, each section header with its file count, CONNECTIONS as kind boxes in a tree,
+    /// "Recording" with the ZR role key, each section header with its file count, CONNECTIONS as kind boxes in a tree,
     /// and the r8 footer.
     fn the_popup_has_the_r8_title_counts_boxes_and_footer() {
         use crate::model::menu::table::COMBOS_SEQ;
         use crate::model::recording_menu::{ConnKind, Face, FileTag};
         let mut menu = recording_menu_with_files();
         menu.recording_mut().toggle_popup();
-        menu.recording_mut().press_popup(Button::ZR);
+        menu.recording_mut().press_popup(Button::ZL);
         menu.recording_mut().set_cursor(Face::Popup, COMBOS_SEQ, 1, 1);
         let mut frame = Frame::new();
         page_frame(&menu, &mut frame);
@@ -1312,10 +1312,10 @@ mod tests {
         assert_eq!(frame.conn_kind[1], ConnKind::Heading);
         assert_eq!(frame.conn_kind[2], ConnKind::Child(FileTag::Sequence));
         assert!(frame.hint.string_lossy().starts_with("A drill   Left/Right section"));
-        menu.recording_mut().press_popup(Button::R);
+        menu.recording_mut().press_popup(Button::ZR);
         let mut frame = Frame::new();
         page_frame(&menu, &mut frame);
-        assert_eq!(frame.role_tab, Some(1), "R lights the CPU's tab");
+        assert_eq!(frame.role_tab, Some(1), "ZR lights the CPU's tab");
         let mut page = Frame::new();
         menu.recording_mut().toggle_popup();
         page_frame(&menu, &mut page);
@@ -1349,11 +1349,28 @@ mod tests {
         assert_eq!((f.role_tab, f.role_keys), (Some(1), RoleKeys::ZR));
         menu.recording_mut().toggle_popup();
         page_frame(&menu, &mut f);
-        assert_eq!((f.role_tab, f.role_keys), (Some(0), RoleKeys::LR));
+        assert_eq!((f.role_tab, f.role_keys), (Some(0), RoleKeys::ZR));
         menu.recording_mut().toggle_popup();
         menu.press(Button::R);
         page_frame(&menu, &mut f);
         assert_eq!((f.role_tab, f.role_keys), (None, RoleKeys::None));
+    }
+
+    fn popup_frame_shows_the_zr_cap() {
+        use super::super::panes::RoleKeys;
+        use crate::model::menu::table::SAVES_MACROS;
+        use crate::model::recording_menu::Face;
+        let mut menu = recording_menu_with_files();
+        menu.recording_mut().toggle_popup();
+        let mut f = Frame::new();
+        page_frame(&menu, &mut f);
+        assert_eq!(f.role_keys, RoleKeys::ZR);
+        let last = menu.recording().section(Face::Popup, SAVES_MACROS, 1).rows.len() - 1;
+        menu.recording_mut().set_cursor(Face::Popup, SAVES_MACROS, 1, last);
+        assert!(menu.press_outcome(Button::A));
+        assert!(menu.recording().picker_open());
+        page_frame(&menu, &mut f);
+        assert_eq!(f.role_keys, RoleKeys::None);
     }
 
     fn a_file_screen_keeps_the_role_tabs_without_the_zr_cap() {
@@ -1523,6 +1540,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("the_recording_page_shows_its_role_like_the_popup", the_recording_page_shows_its_role_like_the_popup as fn()),
+            ("popup_frame_shows_the_zr_cap", popup_frame_shows_the_zr_cap as fn()),
             ("a_file_screen_keeps_the_role_tabs_without_the_zr_cap", a_file_screen_keeps_the_role_tabs_without_the_zr_cap as fn()),
             ("the_page_tabs_end_left_of_the_role_plate", the_page_tabs_end_left_of_the_role_plate as fn()),
             ("a_loading_section_says_so_in_its_header", a_loading_section_says_so_in_its_header as fn()),

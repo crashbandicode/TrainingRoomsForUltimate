@@ -1102,9 +1102,8 @@ mod role_tests {
 
     fn role_caps_reuse_the_two_cap_panes() {
         assert_eq!(role_caps(RoleKeys::None), [None, None]);
-        assert_eq!(role_caps(RoleKeys::LR), [Some((&[76][..], ROLE_CAP)), Some((&[82][..], ROLE_CAP))]);
         assert_eq!(role_caps(RoleKeys::ZR), [None, Some((&[90, 82][..], ROLE_CAP_ZR))]);
-        for keys in [RoleKeys::None, RoleKeys::LR, RoleKeys::ZR] {
+        for keys in [RoleKeys::None, RoleKeys::ZR] {
             for (i, cap) in role_caps(keys).iter().enumerate() {
                 let Kind::Text { chars, .. } = spec(IDX_ROLE_KEY + i).kind else { panic!("key pane is text") };
                 assert_eq!(chars, 2);

@@ -2424,6 +2424,10 @@ mod picker_divider_tests;
 mod navigation_tests;
 
 #[cfg(test)]
+#[path = "slider_tests.rs"]
+mod slider_tests;
+
+#[cfg(test)]
 #[path = "practice_menu_tests.rs"]
 mod practice_menu_tests;
 

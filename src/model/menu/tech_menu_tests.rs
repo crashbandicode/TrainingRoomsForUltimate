@@ -178,11 +178,11 @@ fn tech_slider_edits_and_draws_public_units() {
     m.put("tech_start", &[0,1,0]);
     m.put("tech_start_range", &[0,240]);
     m.activate(row("tech_start_range"));
-    m.press(Button::Right);
+    m.press(Button::Down);
     m.press(Button::A);
-    m.press(Button::Right);
+    m.press(Button::Up);
     assert_eq!(m.get("tech_start_range"), &[0,240]);
-    m.press(Button::Left);
+    m.press(Button::Down);
     assert_eq!(m.get("tech_start_range"), &[0,239]);
     let mut f=crate::model::frame::Frame::new();
     crate::model::screens::frame_of(&m,&mut f,|_| "Stage");
