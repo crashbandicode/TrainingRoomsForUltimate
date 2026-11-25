@@ -470,7 +470,9 @@ Known limits:
 - Whether a fighter's own moves give the jumps back after the start is not known. A second resource, such as a float,
   is not touched.
 
-Not yet seen in a game.
+In an Eden smoke boot on install 5 (2026-11-25) the set-up opened with **Under the stage** On, and on Battlefield with
+**CPU midair jumps** set to Used. The drill was not played, so what the CPU does with either option has not been seen
+in a game. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 2026-11-25. Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with
 more than one piece of ground, such as the Training stage, stand on the piece you want to use and choose **Start**.
@@ -495,7 +497,11 @@ When a start cannot happen, a message says why and the menu row reads **Start** 
 
 In the setup, **A** on a CPU point the drill cannot use shows "Pick a point over the stage or beside it" for
 Juggler or "Pick a point off the stage" for Guard the Edge. You stay on the CPU page: move the crosshair and
-press **A** again. Not yet seen in a game.
+press **A** again.
+
+In an Eden smoke boot on install 5 (2026-11-25), Start opened the set-up on its CPU page with no refusal: for Guard the
+Edge on the Training stage's long floor, from its island and on Battlefield, and for Juggler on the Training stage.
+Neither drill was played through, and none of these messages has been seen in a game. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
 is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
@@ -562,6 +568,9 @@ the one zone is the gap between the long floor and the island.
 A target appears only in the air off stage: never inside another part of the stage, and never above a floor or a
 platform. The stage is read when the zone is first needed on it. A platform that moves afterwards is not
 followed, and a piece of the stage narrower than 10 units can be missed.
+
+In an Eden smoke boot on install 5 (2026-11-25) the zone editor on the Training stage showed that one zone, in the gap,
+and the game started with only the Off stage area chosen. Where the targets then appeared was not checked. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 A break on an Off stage target shows **Recover!**. Get offstage and then grab a ledge or land on the main stage floor
 to add it to the score. A KO cancels the hit. With **Hit streak** on, a cancellation clears the current streak and

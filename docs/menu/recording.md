@@ -294,7 +294,9 @@ visit keeps the save's own values.
   adds an existing offset on top of the save's spot until you clear it with the Offset row of the macro's
   [own screen](#a-file-s-own-screen).
 
-Host tests only; not yet seen in a game.
+In an Eden smoke boot on install 5 (2026-11-25), in the picker that Record opens, switching Player 1 to Off stage
+moved the spot beside the ledge, and one D-pad step moved it on. No placement was saved or loaded, and Change
+placement was not opened on a save; those rest on host tests. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 More: [Change placement and the Replay window](../guide/recording.md#change-placement-and-the-replay-window)
 

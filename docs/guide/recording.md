@@ -407,7 +407,9 @@ Break the Targets crosshair, and A or + writes the save. The pages and keys are 
   starts it from standstill. Both rows are there only for a macro with a start save, because they apply with the
   warp to it.
 
-Host tests only; not yet seen in a game.
+In an Eden smoke boot on install 5 (2026-11-25), in the picker that Record opens, switching Player 1 to Off stage
+moved the spot beside the ledge, and one D-pad step moved it on. No placement was saved or loaded, and Change
+placement was not opened on a save; those rest on host tests. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 **The Replay window** lists your saved match captures. A opens the clip editor on one: the fighter, the crop window,
 the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch
