@@ -56,6 +56,10 @@ On Battlefield the rule marks the same area and the same two ledges as today.
 
 ## 5. Three choices
 
+**Answered 2026-11-25 about 17:05Z:** T1 A; T2 an option in Guard the Edge to start the CPU under the stage (and one for
+the CPU's midair jumps already used); T3 in this build. Recorded in `docs/DECISIONS.md`, "Off stage, found from the
+stage's own lines".
+
 The recommended option is A in each. They can be answered as, for example, `T1 A, T2 A, T3 A`.
 
 | | Choice | A (recommended) | B |
