@@ -281,8 +281,8 @@ static NOTICE_VISIBLE: AtomicBool = AtomicBool::new(false);
 static RECORDING_INDICATOR: AtomicU64 = AtomicU64::new(0);
 /// The direction marks drawn by the strip's last pass (`m::aims_stamp`).
 static STRIP_AIMS: AtomicU64 = AtomicU64::new(0);
-/// The scroll distance drawn by the strip's last pass (`m::scroll_stamp`).
-static STRIP_SCROLL: AtomicU64 = AtomicU64::new(0);
+/// The serialized HUD tick publishes; only the menu worker reads. Neither waits.
+static STRIP_SCROLL: hos_lock::TripleBuffer<m::ScrollStamp> = hos_lock::TripleBuffer::new(m::scroll_stamp(0, 0, 0));
 
 /// The current notice, written by the game thread, read by the worker; whoever finds it busy skips (never waits).
 struct Notice {
@@ -356,13 +356,13 @@ pub fn strip_aims(now_ms: u64) -> [Option<u8>; 2] {
 /// The scroll distance drawn by the strip on this pass.
 pub fn note_strip_scroll(drawn: (u32, u32)) {
     if FOUND.load(Ordering::Relaxed) {
-        STRIP_SCROLL.store(m::scroll_stamp(crate::runtime::clock::uptime_ms(), drawn.0, drawn.1), Ordering::Relaxed);
+        STRIP_SCROLL.write(m::scroll_stamp(crate::runtime::clock::uptime_ms(), drawn.0, drawn.1));
     }
 }
 
 /// The strip's scroll distance on its last fresh pass.
-pub fn strip_scroll(now_ms: u64) -> (u32, u32) {
-    m::strip_scroll(STRIP_SCROLL.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
+pub fn strip_scroll(now_ms: u64) -> (u32, u64) {
+    m::strip_scroll(STRIP_SCROLL.read().0, now_ms, SCENE_FRESH_MS)
 }
 
 /// The notice the HUD draws (game thread). Skipped when the worker is reading it or no bridge was found.

@@ -60,6 +60,27 @@ fn the_history_tells_how_many_columns_back_a_view_is() {
 }
 
 #[test]
+fn rv_scroll_time_after_a_long_idle_matches_the_kept_view() {
+    use crate::model::bridge_state::{scroll_stamp, strip_scroll};
+    let mut tracker = Tracker::new();
+    let mut back = Back::new();
+    busy(&mut tracker, &mut back, 90);
+    let anchor = back.span().0;
+    for _ in 0..18_000 {
+        tracker.step(idle(), idle(), MappedInputs::NEUTRAL);
+        back.record(&tracker);
+    }
+    busy(&mut tracker, &mut back, 1);
+    let columns = back.columns_back(anchor);
+    assert!(columns > 0 && columns <= 32, "quiet columns should freeze, got {columns}");
+    let frames = back.rewind(&mut tracker, anchor).unwrap();
+    assert_eq!(frames, 18_001);
+    let stamp = scroll_stamp(500_000, columns, frames);
+    assert_eq!(strip_scroll(stamp, 500_001, 500), (columns, 300_016));
+    assert_eq!(strip_scroll(stamp, 500_501, 500), (0, 0));
+}
+
+#[test]
 fn a_missed_frame_is_caught_up() {
     let mut tracker = Tracker::new();
     let mut back = Back::new();
