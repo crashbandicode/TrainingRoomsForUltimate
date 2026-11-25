@@ -3109,7 +3109,15 @@ approved_by = "tr-primary-2 standing rule of 2026-11-24 21:46:20Z (a lead's fix 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 204053
+ceiling = 203763
 date = "2026-11-25"
-reason = "Mark variants: a replay-editor mark keeps and names its move variant and angle; a take, a Vault capture and a capture written for the Recordings list keep the fighter they were recorded on (recorded_fighter), read where every take start is posted and once per captured entry. Measured 204053 on the head merged with main d807f1e4 (203649): +404, the same growth as on a945b0c1 (203989 against 203585)."
+reason = "Replay captures can be deleted: a Delete row on the screen of a recording and Y in the Replay window, the archive delete, the Vault capture drop and the lists rebuilt from storage. The archive delete is all or nothing for what the list shows. Measured 203763 on main d807f1e4 (203649): +114."
+approved_by = "tr-primary-2 ruling 2026-11-25 15:04:02Z (feat/capture-delete DESIGN accepted; line budget up to +130)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 204167
+date = "2026-11-25"
+reason = "Mark variants: a replay-editor mark keeps and names its move variant and angle; a take, a Vault capture and a capture written for the Recordings list keep the fighter they were recorded on (recorded_fighter), read where every take start is posted and once per captured entry. Measured 204167 on the head merged with main 3fd708bc (203763): +404, the same growth as on a945b0c1 (203989 against 203585)."
 approved_by = "tr-primary-2 2026-11-25 13:43:24Z (the item, operator 13:30Z) with the rulings of 13:54:02Z, 14:33:53Z, 14:41:51Z and 14:51:40Z that grew its scope; no line number was approved in advance, so the measured growth is flagged in the READY post."

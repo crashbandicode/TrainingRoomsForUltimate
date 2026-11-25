@@ -38,6 +38,15 @@ impl VaultArchive {
     pub fn note_loss(&mut self, last_lost_epoch: u64) {
         if last_lost_epoch != 0 && self.epoch <= last_lost_epoch { self.session.truncated = true; }
     }
+    /// Drops one Vault capture of this boot: the latest, or the previous.
+    pub fn forget(&mut self, latest: bool) {
+        if latest {
+            // More of the same replay after this is a partial capture, never a whole one.
+            self.session = crate::engine::macros::ReplaySession { truncated: true, ..Default::default() };
+        } else {
+            self.previous = None;
+        }
+    }
     pub fn apply(&mut self, event: VaultEvent, last_lost_epoch: u64) {
         use crate::engine::macros::{ReplayTrack, MAX_FRAMES};
         let epoch = match event {
@@ -392,6 +401,33 @@ name").is_none());
         assert!(archive.session.tracks.is_empty());
     }
 
+    fn forgetting_a_vault_capture_drops_only_that_one() {
+        use super::{VaultArchive, VaultEvent};
+        use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
+        let sample = ReplayFrame { input: InputFrame { buttons: 7, ..InputFrame::default() },
+            start: StartState::neutral(8, 0, 1.0), x: 12.0, y: 4.0 };
+        let two = || {
+            let mut archive = VaultArchive::new();
+            archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+            archive.apply(VaultEvent::Sample { epoch: 1, entry: 3, sample, quantized: false }, 0);
+            archive.apply(VaultEvent::Begin { epoch: 2 }, 0);
+            archive.apply(VaultEvent::Sample { epoch: 2, entry: 1, sample, quantized: false }, 0);
+            archive
+        };
+        let mut latest = two();
+        latest.forget(true);
+        assert!(latest.session.tracks.is_empty(), "the latest is gone");
+        assert_eq!(latest.previous.as_ref().unwrap().tracks[0].entry, 3, "the previous stays the previous");
+        // More of the same replay after the delete is a partial capture, never a whole one.
+        latest.apply(VaultEvent::Sample { epoch: 2, entry: 1, sample, quantized: false }, 0);
+        assert!(latest.session.truncated);
+        let mut previous = two();
+        previous.forget(false);
+        assert!(previous.previous.is_none(), "the previous is gone");
+        assert_eq!(previous.session.tracks[0].entry, 1, "the latest is untouched");
+        assert!(!previous.session.truncated);
+    }
+
     fn the_replay_mailboxes_hold_a_stall_watchdog_gap_of_eight_samples_a_frame() {
         // rc.8 R4: 8 fighter entries, one sample each per frame at 60 frames a second, for the watchdog's STALL_MS.
         let gap = 8 * 60 * crate::model::stall_watch::STALL_MS as usize / 1000;
@@ -438,6 +474,7 @@ name").is_none());
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("forgetting_a_vault_capture_drops_only_that_one", forgetting_a_vault_capture_drops_only_that_one as fn()),
             ("a_capture_keeps_one_track_per_entry_player_one_included", a_capture_keeps_one_track_per_entry_player_one_included as fn()),
             ("an_open_recording_is_a_copy_that_later_samples_do_not_change", an_open_recording_is_a_copy_that_later_samples_do_not_change as fn()),
             ("live_worker_handoff_preserves_bound_saves_across_reset_and_refuses_event_loss", live_worker_handoff_preserves_bound_saves_across_reset_and_refuses_event_loss as fn()),

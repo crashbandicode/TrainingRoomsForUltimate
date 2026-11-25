@@ -196,6 +196,26 @@ fn open_browser(expected_revision: Option<u64>) {
         notify("Open the replay window in idle practice".into());
         return;
     }
+    let (rows, skipped) = browser_rows();
+    if rows.is_empty() {
+        notify("Save a replay with match capture on, or play one in Vault first".into());
+        return;
+    }
+    {
+        let mut browser = BROWSER.lock().unwrap();
+        // A refusal may rescan the library, but must not reopen after Cancel or
+        // interruption while that I/O was in flight.
+        if expected_revision.is_some_and(|revision|
+            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
+        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
+            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });
+    }
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+}
+
+/// The Replay window's rows as storage has them now, and how many files were skipped.
+fn browser_rows() -> (Vec<LibraryRow>, usize) {
     let mut rows = Vec::new();
     {
         let capture = CAPTURE.lock().unwrap();
@@ -218,21 +238,23 @@ fn open_browser(expected_revision: Option<u64>) {
         }
         Err(error) => notify(format!("Saved capture library: {error}")),
     }
-    if rows.is_empty() {
-        notify("Save a replay with match capture on, or play one in Vault first".into());
-        return;
+    (rows, skipped)
+}
+
+/// Deletes one capture: a Vault capture of this boot from memory, a saved one from the card. A failure is reported and
+/// leaves it in storage; the caller lists again afterwards.
+pub fn delete_recording(id: &str) {
+    let deleted = match id {
+        "latest" | "previous" => {
+            CAPTURE.lock().unwrap().forget(id == "latest");
+            Ok(true)
+        }
+        _ => id.strip_prefix("saved:").ok_or_else(|| "Unknown replay capture".to_owned())
+            .and_then(|id| crate::runtime::macros::replay_store::archive().delete(id).map_err(|error| error.to_string())),
+    };
+    if let Err(error) = deleted {
+        notify(format!("Saved capture library: {error}"));
     }
-    {
-        let mut browser = BROWSER.lock().unwrap();
-        // A refusal may rescan the library, but must not reopen after Cancel or
-        // interruption while that I/O was in flight.
-        if expected_revision.is_some_and(|revision|
-            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
-        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
-            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });
-    }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 pub fn recordings() -> Vec<crate::model::recording_menu::RecordingFile> {
@@ -579,6 +601,14 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
             }
         }
         BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }
+        BrowserEffect::Delete(id) => {
+            delete_recording(&id);
+            let (rows, skipped) = browser_rows();
+            let listed = BROWSER.lock().unwrap().as_mut().is_some_and(|b| b.revision == revision && b.ui.relist(rows, skipped));
+            if !listed {
+                close_editor_revision(false, Some(revision));
+            }
+        }
         BrowserEffect::TimedOut => {
             let recording = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.revision == revision && b.request.is_some());
             if close_editor_revision(false, Some(revision)) {

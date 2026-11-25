@@ -2315,6 +2315,11 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
         FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
         FileKind::Combo => super::rr_runtime::delete_combo(root, id),
         FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
+        // A saved capture's files. Captures are in no index, so nothing else is touched.
+        FileKind::Capture => {
+            return id.strip_prefix("saved:")
+                .is_some_and(|id| super::macros::CaptureArchive::new(root.join("replay_captures")).delete(id).unwrap_or(false));
+        }
     };
     if !deleted {
         return false;
@@ -6570,6 +6575,65 @@ mod tests {
         received
     }
 
+    fn capture_session() -> crate::engine::macros::ReplaySession {
+        use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
+        let track = |entry: i32, base: u32| ReplayTrack {
+            fighter: None,
+            entry, quantized_analog: false,
+            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+                start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
+        };
+        ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() }
+    }
+
+    fn the_host_deletes_a_saved_capture_through_the_file_delete() {
+        use crate::model::recording_menu::FileKind;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("capture-delete");
+        // The folder the runtime's archive reads (`replay_store::archive`).
+        assert!(include_str!("../runtime/macros/replay_store.rs").contains("\"{}/replay_captures\""));
+        let archive = crate::engine::macros::CaptureArchive::new(root.join("replay_captures"));
+        let id = archive.save("native", "Match", "13.0.5", &capture_session()).unwrap();
+        let kept = archive.save("other", "Other", "13.0.5", &capture_session()).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Capture, id: format!("saved:{id}") });
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let left = archive.list().unwrap().entries;
+        assert_eq!(left.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);
+        // A Vault capture of this boot has no file, and a bare id is not a saved capture's: nothing is removed.
+        for id in ["latest".to_owned(), "previous".to_owned(), kept.clone()] {
+            post_effect(Effect::DeleteFile { kind: FileKind::Capture, id });
+            service_at(&root, &none(), "2026-11-25", state(8), state(7));
+            assert_eq!(archive.list().unwrap().entries.len(), 1);
+        }
+    }
+
+    fn a_macro_made_from_a_capture_outlives_its_delete() {
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::model::recording_menu::{FileKind, Make};
+        let _hold = hold();
+        reset_host();
+        let root = scratch("capture-made");
+        let archive = crate::engine::macros::CaptureArchive::new(root.join("replay_captures"));
+        let id = archive.save("native", "Match", "13.0.5", &capture_session()).unwrap();
+        let mut editor = ClipEditor::new(archive.load(&id).unwrap().session, vec![0]).unwrap();
+        assert!(editor.select_entry(0));
+        let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected exported clip") };
+        let made = super::super::rr_runtime::generate(&root, *recording, "From capture", Make::Macro, Role::Player, 1).unwrap();
+        let super::super::rr_runtime::Generated::Macro(made) = made else { panic!("expected a macro") };
+        // One pass first: the host's own first pass settles the index (its migration mark).
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let before = RecordingIndex::load(&root).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Capture, id: format!("saved:{id}") });
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert!(archive.list().unwrap().entries.is_empty(), "the capture is gone");
+        assert_eq!(RecordingIndex::load(&root).unwrap(), before, "captures are not in the index: the delete changes nothing in it");
+        let kept = Library::new(root.join(MACROS_DIR)).load(&made).unwrap();
+        assert_eq!(kept.name, "From capture");
+        assert_eq!(kept.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(RecordingIndex::load(&root).unwrap().active(Role::Player), Some(made.as_str()), "and it is still the active pick");
+    }
+
     fn each_source_and_target_makes_a_combo_on_that_role() {
         let _hold = hold();
         for entry in [0, 1] {
@@ -6753,6 +6817,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("an_owed_slot_does_not_show_the_playback_indicator", an_owed_slot_does_not_show_the_playback_indicator as fn()),
+            ("the_host_deletes_a_saved_capture_through_the_file_delete", the_host_deletes_a_saved_capture_through_the_file_delete as fn()),
+            ("a_macro_made_from_a_capture_outlives_its_delete", a_macro_made_from_a_capture_outlives_its_delete as fn()),
             ("each_source_and_target_makes_a_combo_on_that_role", each_source_and_target_makes_a_combo_on_that_role as fn()),
             ("each_source_and_target_makes_a_drill_on_that_role", each_source_and_target_makes_a_drill_on_that_role as fn()),
             ("make_drill_saves_a_drill_even_when_the_pass_hits", make_drill_saves_a_drill_even_when_the_pass_hits as fn()),

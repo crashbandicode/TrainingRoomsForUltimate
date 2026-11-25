@@ -559,6 +559,97 @@ mod tests {
         ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }
     }
 
+    fn bytes_in(dir: &Path) -> BTreeMap<String, Vec<u8>> {
+        fs::read_dir(dir).unwrap().map(|item| {
+            let item = item.unwrap();
+            (item.file_name().to_string_lossy().into_owned(), fs::read(item.path()).unwrap())
+        }).collect()
+    }
+
+    /// A real saved bundle with an older plain file of the same id beside it. The folder that holds the captures
+    /// cannot be changed, so the delete cannot start: every byte stays and the shared archive still loads.
+    fn a_delete_that_cannot_start_changes_nothing_in_a_real_bundle() {
+        use std::os::unix::fs::PermissionsExt;
+        let f = Fixture::new();
+        let dir = f.publish(&session());
+        let id = encode_file_id("native-id");
+        let archive = CaptureArchive::new(&f.0);
+        let twin = f.0.join(format!("{id}.tmrc"));
+        fs::copy(dir.join(format!("{id}.tmrc")), &twin).unwrap();
+        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());
+        assert!(before.len() >= 3, "the manifest, the timeline and the editor's file");
+        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();
+        let locked = fs::write(f.0.join("probe"), b"").is_err();
+        let result = archive.delete(&id);
+        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o755)).unwrap();
+        if !locked {
+            return; // a process that may write anywhere: nothing to show here
+        }
+        assert!(result.is_err());
+        assert_eq!(bytes_in(&dir), before);
+        assert_eq!(fs::read(&twin).unwrap(), twin_before);
+        assert!(f.load().is_ok(), "the shared archive loads");
+        assert_eq!(archive.list().unwrap().entries.len(), 1);
+        assert!(archive.delete(&id).unwrap(), "the same delete then finishes");
+        assert!(!dir.exists() && !twin.exists() && archive.list().unwrap().entries.is_empty());
+    }
+
+    /// The same bundle, whose own files cannot be removed. Either nothing changed, or the capture left the list in one
+    /// step with its twin and what could not be removed is whole under a name the list ignores. Another delete's
+    /// leftover is never touched.
+    fn a_delete_is_all_or_nothing_for_a_real_bundle() {
+        use std::os::unix::fs::PermissionsExt;
+        let f = Fixture::new();
+        let dir = f.publish(&session());
+        let id = encode_file_id("native-id");
+        let archive = CaptureArchive::new(&f.0);
+        let twin = f.0.join(format!("{id}.tmrc"));
+        fs::copy(dir.join(format!("{id}.tmrc")), &twin).unwrap();
+        let foreign = f.0.join(format!(".{id}.smd-0.del"));
+        fs::create_dir(&foreign).unwrap();
+        fs::write(foreign.join("keep"), b"kept").unwrap();
+        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+        let locked = fs::write(dir.join("probe"), b"").is_err();
+        let result = archive.delete(&id);
+        let moved = f.0.join(format!(".{id}.smd-1.del"));
+        for path in [&dir, &moved] {
+            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));
+        }
+        if !locked {
+            return; // a process that may write anywhere: nothing to show here
+        }
+        assert!(result.is_err());
+        let listed = archive.list().unwrap();
+        assert!(listed.skipped.is_empty(), "never a broken row");
+        if listed.entries.is_empty() {
+            assert!(!dir.exists() && !twin.exists(), "gone from the list, and the twin with it");
+            assert_eq!(bytes_in(&moved), before, "what could not be removed is whole, under a name the list ignores");
+        } else {
+            assert_eq!(bytes_in(&dir), before, "or nothing changed");
+            assert_eq!(fs::read(&twin).unwrap(), twin_before, "the twin included");
+            assert!(f.load().is_ok(), "and the shared archive loads");
+        }
+        assert_eq!(fs::read(foreign.join("keep")).unwrap(), b"kept", "another delete's leftover is not this one's");
+    }
+
+    /// The same bundle, whose plain file of the same id cannot go (a folder has its name). The bundle comes back under
+    /// its own name: every byte as it was, the shared archive loads, it is listed once and nothing is left over.
+    fn a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back() {
+        let f = Fixture::new();
+        let dir = f.publish(&session());
+        let id = encode_file_id("native-id");
+        let archive = CaptureArchive::new(&f.0);
+        let before = bytes_in(&dir);
+        fs::create_dir(f.0.join(format!("{id}.tmrc"))).unwrap();
+        assert!(archive.delete(&id).is_err());
+        assert_eq!(bytes_in(&dir), before);
+        assert!(f.load().is_ok(), "the shared archive loads");
+        let listed = archive.list().unwrap();
+        assert!(listed.entries.len() == 1 && listed.skipped.is_empty());
+        assert!(!f.0.join(format!(".{id}.smd-0.del")).exists(), "nothing is left under the other name");
+    }
+
     /// tr-primary-2 14:51:40Z: a capture written for the Recordings list keeps each entry's fighter identity, from the
     /// live hook's events through the written archive to the editor cache the menu loads. One written without it has none.
     fn a_written_capture_keeps_each_entrys_fighter_identity() {
@@ -591,6 +682,29 @@ mod tests {
         for entry in entries {
             assert!(old.load(&entry.id).unwrap().session.tracks.iter().all(|track| track.fighter.is_none()));
         }
+    }
+
+    /// A capture written with its entry's fighter identity, deleted. A delete that cannot remove the plain file puts
+    /// the bundle back with every byte, the identity still read from it; the delete that finishes leaves nothing listed.
+    fn a_capture_with_its_fighter_identity_is_put_back_whole_and_deleted_whole() {
+        let fighter = crate::model::move_names::FighterId { chara: 0xb2, specials: [0, 2, 1, 0] };
+        let mut named = session();
+        named.tracks[0].fighter = Some(fighter);
+        let f = Fixture::new();
+        let dir = f.publish(&named);
+        let id = encode_file_id("native-id");
+        let archive = CaptureArchive::new(&f.0);
+        let before = bytes_in(&dir);
+        let blocker = f.0.join(format!("{id}.tmrc"));
+        fs::create_dir(&blocker).unwrap();
+        assert!(archive.delete(&id).is_err());
+        assert_eq!(bytes_in(&dir), before);
+        assert_eq!(f.load().unwrap().session.tracks[0].fighter, Some(fighter), "the shared archive keeps the identity");
+        assert!(!f.0.join(format!(".{id}.smd-0.del")).exists(), "nothing is left under the other name");
+        fs::remove_dir(&blocker).unwrap();
+        assert_eq!(archive.load(&id).unwrap().session.tracks[0].fighter, Some(fighter), "and so does the editor's file");
+        assert!(archive.delete(&id).unwrap(), "the same delete then finishes");
+        assert!(!dir.exists() && archive.list().unwrap().entries.is_empty());
     }
 
     /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with
@@ -676,7 +790,11 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_sudden_death_break_round_trips_with_its_gap_and_true_counters", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),
+            ("a_delete_that_cannot_start_changes_nothing_in_a_real_bundle", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),
+            ("a_delete_is_all_or_nothing_for_a_real_bundle", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),
+            ("a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back", a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back as fn()),
             ("a_written_capture_keeps_each_entrys_fighter_identity", a_written_capture_keeps_each_entrys_fighter_identity as fn()),
+            ("a_capture_with_its_fighter_identity_is_put_back_whole_and_deleted_whole", a_capture_with_its_fighter_identity_is_put_back_whole_and_deleted_whole as fn()),
             ("replay_miis_publish_with_the_canonical_timeline_and_cache", replay_miis_publish_with_the_canonical_timeline_and_cache as fn()),
             ("partial_capture_and_identity_transitions_survive_one_pass", partial_capture_and_identity_transitions_survive_one_pass as fn()),
         ]);
