@@ -3,7 +3,7 @@ use crate::model::bridge_events::Clip;
 use crate::model::combo::{self, Kind, STEPS};
 use crate::model::combo_record::{full_move_key, move_of};
 use crate::model::frame_strip::{self, Angle, Button, Move, Snap};
-use crate::model::move_names::{Namer, Normal};
+use crate::model::move_names::{FighterId, Namer, Normal};
 
 pub const SHOWN_MARKS: usize = 24;
 pub const WATCH_SPANS: usize = 32;
@@ -56,6 +56,17 @@ pub fn mark_name(namer: Namer<'_>, mv: Move, variant: u8, angle: Option<Angle>) 
 /// other fighter's is read, and only while its status is a named move.
 pub fn watched_motion(sampled: u64, named: bool, read: impl FnOnce() -> u64) -> u64 {
     if sampled != 0 || !named { sampled } else { read() }
+}
+
+/// The three Mii fighter kinds (`mii_setup`): a Mii's specials are its own selection, not its kind's.
+pub const MII_KINDS: core::ops::RangeInclusive<i32> = 0x48..=0x4a;
+
+/// The identity a saved take's specials are named by. A take stores its fighter's kind, not the key of the names
+/// table, so the live Player 1 serves when it is that kind. For a Mii that is the take's stored selection, and no
+/// identity (the common names) when the take stored none.
+pub fn take_identity(live: Option<(i32, FighterId)>, kind: i32, mii: Option<[u8; 4]>) -> Option<FighterId> {
+    let _ = mii;
+    live.filter(|(live, _)| *live == kind).map(|(_, id)| id)
 }
 
 fn angle_key(angle: Angle) -> &'static str {
@@ -1261,7 +1272,8 @@ mod tests {
     }
 
     fn an_angled_forward_tilt_is_named_with_its_angle() {
-        let cases: [(&[Part], u8, Option<Angle>, &str, &str); 4] = [
+        type Angled = (&'static [Part], u8, Option<Angle>, &'static str, &'static str);
+        let cases: [Angled; 4] = [
             (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_hi")], 7, Some(Angle::Up), "Forward tilt ↑", "Side tilt"),
             (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_s")], 7, None, "Forward tilt", "Side tilt"),
             (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_lw")], 7, Some(Angle::Down), "Forward tilt ↓", "Side tilt"),
@@ -1431,6 +1443,83 @@ mod tests {
         }
     }
 
+    /// rv-preview-vis 13:55:17Z and 14:04:42Z: the editor as it is reopened, with the published toggle, table and
+    /// Player 1 and no injected Namer. A special is named by the fighter the take was recorded on, or by the common
+    /// name: never by another fighter's, and never by another Mii's selection.
+    fn the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on() {
+        use crate::model::move_names::{FighterId, Names, PUBLISHED};
+        const CHILD: &str = "TR_MARK_NAMES_CHILD";
+        let name = "the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on";
+        if std::env::var_os(CHILD).is_none() {
+            // The published names are one per process: this case runs alone in a child.
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "engine::macro_ui::clip_marks::tests::case_table", "--nocapture"])
+                .env("TR_TABLE_CASE", name).env(CHILD, "1").output().unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(output.status.success() && stdout.contains("running 1 test"), "{stdout}\n{}", String::from_utf8_lossy(&output.stderr));
+            return;
+        }
+        let alpha = FighterId { chara: crate::model::hash40::hash40("ui_chara_alpha") & 0xff_ffff_ffff, specials: [0; 4] };
+        let saved = |kind: i32, action: ActionMark, press: bool| {
+            let mut frames = vec![InputFrame::default(); 60];
+            if press { frames[0].buttons = 1; }
+            let mut take = MacroRecording::new("Take", "13.0.5", StartState::neutral(kind, 0, 1.0), frames).unwrap();
+            take.actions = vec![action];
+            let root = scratch("reopen");
+            let library = Library::new(&root);
+            let id = library.save_new(&take).unwrap();
+            ClipEditor::macro_file(library.load(&id).unwrap(), true).unwrap().view().move_text
+        };
+        let mark = |mv: Option<Move>, variant: u8| ActionMark { start: 0, end: Some(20), mv: mv.map(|mv| full_move_key(mv).into()), variant, angle: None };
+        let special = |kind: i32| saved(kind, mark(Some(Move::NeutralSpecial), 0), false);
+        let rows = |special_name: &str, jab: &str, tilt: &str| {
+            assert_eq!(special(6), format!("Start of {special_name}"));
+            assert_eq!(saved(6, mark(Some(Move::Jab), 2), false), format!("Start of {jab}"));
+            // An old take's side tilt has no variant.
+            assert_eq!(saved(6, mark(Some(Move::SideTilt), 0), false), format!("Start of {tilt}"));
+            // A mark with no move keeps the name of the input that started it; none is inferred from the button.
+            assert_eq!(saved(6, mark(None, 0), true), "Start of Attack");
+        };
+        PUBLISHED.set_player(Some((6, alpha)));
+        rows("Neutral B", "Jab", "Side tilt");
+        PUBLISHED.set_on(true);
+        // On with no names table: the common names.
+        rows("Neutral special", "Jab 2", "Forward tilt");
+        PUBLISHED.publish(Box::new(Names::build(&crate::model::move_names::tests::shared_file()).unwrap()));
+        rows("Test Pulse", "Jab 2", "Forward tilt");
+        // Player 1 is now another fighter, or none: the take's special is not named by it.
+        PUBLISHED.set_player(Some((7, alpha)));
+        assert_eq!(special(6), "Start of Neutral special");
+        PUBLISHED.set_player(None);
+        assert_eq!(special(6), "Start of Neutral special");
+        // A Mii take that stored no selection, with a Mii of that kind as Player 1: its selection is not the take's.
+        PUBLISHED.set_player(Some((0x48, alpha)));
+        assert_eq!(special(0x48), "Start of Neutral special");
+        PUBLISHED.set_on(false);
+        rows("Neutral B", "Jab", "Side tilt");
+    }
+
+    fn a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names() {
+        use crate::model::move_names::FighterId;
+        let id = |specials| FighterId { chara: 0x12_3456_789a, specials };
+        let live = id([2, 0, 1, 2]);
+        // An ordinary fighter of the take's kind is the take's fighter.
+        assert_eq!(take_identity(Some((6, id([0; 4]))), 6, None), Some(id([0; 4])));
+        assert_eq!(take_identity(Some((7, id([0; 4]))), 6, None), None);
+        assert_eq!(take_identity(None, 6, None), None);
+        // Two Miis of one kind differ by their selection: the take's stored one names it, never the live one.
+        for kind in [0x48, 0x49, 0x4a] {
+            assert_eq!(take_identity(Some((kind, live)), kind, None), None);
+            assert_eq!(take_identity(Some((kind, live)), kind, Some([0, 1, 2, 0])), Some(id([0, 1, 2, 0])));
+            assert_eq!(take_identity(Some((kind - 3, live)), kind, Some([0, 1, 2, 0])), None);
+        }
+        assert_eq!(MII_KINDS, 0x48..=0x4a);
+        assert!(include_str!("../mii/mii_setup.rs").contains("if !(0x48..=0x4a).contains(&self.kind)"));
+        let panel = include_str!("clip_panel.rs").split("#[cfg(test)]").next().unwrap();
+        assert!(panel.contains("saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))"));
+        assert!(!panel.contains("recorded_identity("));
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
@@ -1476,6 +1565,8 @@ mod tests {
             ("a_throw_names_its_grab_mark", a_throw_names_its_grab_mark),
             ("a_variant_of_the_wrong_shape_reads_as_no_marks", a_variant_of_the_wrong_shape_reads_as_no_marks),
             ("a_crop_and_a_record_time_trim_keep_the_variants", a_crop_and_a_record_time_trim_keep_the_variants),
+            ("the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on", the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on),
+            ("a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names", a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names),
         ]);
     }
     }

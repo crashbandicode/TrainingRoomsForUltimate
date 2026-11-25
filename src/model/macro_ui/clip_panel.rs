@@ -327,16 +327,16 @@ fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
     (!session.tracks.is_empty()).then_some(session)
 }
 
-/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that
-/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.
-fn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {
-    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};
-    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))
+/// The move names of a saved take or capture: the toggle, and its own fighter's special names when they are known
+/// (`clip_marks::take_identity`); the common names otherwise.
+fn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {
+    use crate::model::move_names::{Namer, PUBLISHED};
+    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))
 }
 
 fn track_marks(track: &ReplayTrack) -> Marks {
     Marks::from_inputs(track.frames.iter().map(|frame| frame.input))
-        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind)))
+        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None))
 }
 
 impl ClipEditor {
@@ -380,7 +380,8 @@ impl ClipEditor {
 
     fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
         let marks = match &file {
-            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording.start.fighter_kind)),
+            FileSource::Macro { recording, .. } => Marks::from_recording(recording,
+                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))),
             FileSource::Combo(recording) => Marks::from_units(
                 crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()
                     .filter(|line| crate::model::recording_menu::link_head(line))),

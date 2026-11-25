@@ -1270,7 +1270,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "2b80d00a88ca60ba7213e333215d5c7d816c46201323cbbfd00b94e1c2e1178e",
+   "dest_sha256": "22eefed693a88ec0de032e4a24018ff6167252a8d6398b926a36ce2d74d2e817",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1716,6 +1716,21 @@
     {
      "old": "\nimpl ClipEditor {",
      "new": "\n/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that\n/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.\nfn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};\n    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))\n}\n\nfn track_marks(track: &ReplayTrack) -> Marks {\n    Marks::from_inputs(track.frames.iter().map(|frame| frame.input))\n        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind)))\n}\n\nimpl ClipEditor {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording.start.fighter_kind)),",
+     "new": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording,\n                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind)))",
+     "new": "        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None))",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that\n/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.\nfn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};\n    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))",
+     "new": "/// The move names of a saved take or capture: the toggle, and its own fighter's special names when they are known\n/// (`clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{Namer, PUBLISHED};\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
