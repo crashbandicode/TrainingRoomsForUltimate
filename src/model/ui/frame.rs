@@ -1068,7 +1068,7 @@ fn paint_sections(rec: &RecordingScreens, frame: &mut Frame, face: Face, group: 
                 hot_lo.get_or_insert(slot);
                 hot_hi = Some(slot);
             }
-            if view.hairline_after == Some(5) && offset + 1 == 5 {
+            if view.hairline_after == Some(offset + 1) {
                 frame.hairline = Some(slot as u8);
             }
             frame.row_count = (slot + 1) as u8;
@@ -1160,7 +1160,7 @@ mod tests {
             [LoopMark::Finite(1), LoopMark::Finite(1)],
             None,
         );
-        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 4);
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 5);
         let mut frame = Frame::new();
         page_frame(&menu, &mut frame);
         assert!(frame.white_cursor);
@@ -1197,7 +1197,7 @@ mod tests {
             hot_macros: vec!["m1".into()],
             ..Catalog::default()
         });
-        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 1);
         menu.press(Button::A);
         assert!(menu.recording().file_open(), "A opens the macro's own screen");
         let mut frame = Frame::new();
@@ -1368,7 +1368,7 @@ mod tests {
         use crate::model::recording_menu::{Face, ViewRole};
         let mut menu = recording_menu_with_files();
         menu.press(Button::ZR);
-        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 0);
+        menu.recording_mut().set_cursor(Face::Page, SAVES_MACROS, 1, 1);
         menu.press(Button::A);
         assert!(menu.recording().file_open());
         let mut f = Frame::new();

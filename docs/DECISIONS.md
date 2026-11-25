@@ -1,5 +1,9 @@
 # Decisions for the operator
 
+2026-11-24: the Recording page's MACROS list gets RECORDINGS > for capture side, playback role, playback, and
+making a macro, combo, or drill. Replays > Replay window stays. Decision provenance: inbox 2026-11-24 22:45:56Z,
+design accepted 23:02:29Z.
+
 2026-11-01. This page lists every operator decision of the menu proposal, one illustration per decision. In each
 picture the recommended option has a **green outline**. The images are in [`decisions/`](decisions) and are drawn
 by `tools/render_decisions.py` in the menu mockup's style. Sources: `MENU-DRAFT.md` §4 (the menu questions keep

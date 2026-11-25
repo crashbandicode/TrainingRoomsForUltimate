@@ -69,6 +69,10 @@ Sources for §1: the fork's menu definition as shipped in C116.1
 upstream rows' defaults. Origin: **upstream** = Training Modpack origin
 (clean-room reimplementation), **ours** = written for the fork (carried over).
 
+2026-11-24: the Recording page adds RECORDINGS > in MACROS for choosing a capture's input side and playback role,
+then playing it or making a macro, combo, or drill. Replays > Replay window stays. Decision provenance: inbox
+2026-11-24 22:45:56Z, design accepted 23:02:29Z.
+
 Control vocabulary used in both tables:
 
 | Control | Meaning |
@@ -80,6 +84,7 @@ Control vocabulary used in both tables:
 | `ordered` | today's ordered-list control (numbered order) |
 | `grid` | the fork's portrait / hat / item / stage grids |
 | `list` | the fork's scrolling lists (Mii lists, libraries, replay window) |
+
 | `action` | a row that opens a sub-screen or performs an operation |
 | `dropdown` | **new**: one value from a list; ◂/▸ cycles in place, A opens the popup list |
 | `number` | **new**: one numeric value with ◂/▸ step and a popup for direct pick |

@@ -112,7 +112,11 @@ pub const THREADS: [ThreadStack; 19] = [
     // fdd7994d). The stack's size is unchanged: the measured 57,648 B still decides what it needs.
     // With the replay editor on merge 3D (its strip, marks, the bridge line and the ZR tap), the ELF path is 55,376 B
     // (release) and 55,392 B (diag, gate dae6dfd6); the larger is recorded.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 55_392, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Vault recordings (2026-11-25): a Make drill pass saves through one more frame on the same path
+    // (`save_input` -> `save_drill_with_take_named` -> `save_combo` -> `Store<ComboRecord>::list` -> `decode`), and
+    // `ui::worker::run` and `service_at` grew: 55,200 B on both the release and the diag ELF of 9e7bfaf8. The 88 KiB
+    // stack covers it (required 90,112 B); the allocation is unchanged.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 55_904, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

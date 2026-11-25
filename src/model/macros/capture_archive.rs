@@ -5,7 +5,7 @@
 
 use std::{
     fs::{self, File, FileType, OpenOptions},
-    io::{self, BufReader, BufWriter, Read, Write},
+    io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -46,6 +46,7 @@ pub struct CaptureEntry {
     pub tracks: usize,
     pub frames: usize,
     pub truncated: bool,
+    pub sides: Vec<(i32, i32)>,
 }
 
 /// A fully decoded capture, including the original native replay identity.
@@ -87,7 +88,7 @@ impl CaptureArchive {
         Self { dir: dir.into() }
     }
 
-    /// Lists bounded metadata only; frame payloads are not read or validated.
+    /// Lists bounded metadata and the first record of each track.
     /// A missing directory is an empty archive and invalid files are reported
     /// in `skipped` without being changed or removed.
     pub fn list(&self) -> io::Result<CaptureListing> {
@@ -129,7 +130,14 @@ impl CaptureArchive {
                 if !shared && !item.file_type()?.is_file() {
                     return Err(invalid_data("capture path is not a regular file"));
                 }
-                let (_, header) = open_capture(&path, id)?;
+                let (mut capture, header) = open_capture(&path, id)?;
+                let mut sides = Vec::with_capacity(header.tracks.len());
+                for track in &header.tracks {
+                    let mut first = [0u8; CAPTURE_RECORD_BYTES];
+                    read_exact_capture(&mut capture, &mut first, "sample data")?;
+                    sides.push((track.entry, read_i32(&first, 8)));
+                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;
+                }
                 Ok(Some(CaptureEntry {
                     id: id.to_owned(),
                     replay_name: header.replay_name,
@@ -142,6 +150,7 @@ impl CaptureArchive {
                         .max()
                         .unwrap_or(0),
                     truncated: header.truncated,
+                    sides,
                 }))
             })();
 
@@ -1144,10 +1153,73 @@ mod tests {
         }
     }
 
+    fn two_sides() -> ReplaySession {
+        let frame = |buttons, kind| ReplayFrame {
+            input: InputFrame { buttons, ..InputFrame::default() },
+            start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,
+        };
+        ReplaySession { tracks: vec![
+            ReplayTrack { entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },
+            ReplayTrack { entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },
+        ], truncated: false, breaks: Vec::new() }
+    }
+
+    fn a_saved_capture_lists_each_side_with_its_fighter() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let id = archive.save("two-sides", "Match", "13.0.5", &two_sides()).unwrap();
+        let listing = archive.list().unwrap();
+        assert_eq!(listing.entries.len(), 1);
+        assert_eq!(listing.entries[0].id, id);
+        assert_eq!(listing.entries[0].sides, [(0, 7), (1, 8)]);
+    }
+
+    fn a_capture_file_with_no_new_key_reads_back_both_sides() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let id = encode_file_id("old-file");
+        let header = br#"{"schema_version":1,"replay_id":"old-file","replay_name":"Old","game_version":"13.0.5","truncated":false,"tracks":[{"entry":0,"frames":2,"quantized_analog":false},{"entry":1,"frames":2,"quantized_analog":false}]}"#;
+        let mut bytes = capture_file(header);
+        for (buttons, kind) in [(1u32, 7i32), (2, 7), (101, 8), (102, 8)] {
+            let mut record = [0u8; 44];
+            record[0..4].copy_from_slice(&buttons.to_le_bytes());
+            record[8..12].copy_from_slice(&kind.to_le_bytes());
+            record[16..20].copy_from_slice(&1.0f32.to_le_bytes());
+            bytes.extend_from_slice(&record);
+        }
+        fs::write(temp.0.join(format!("{id}.tmrc")), bytes).unwrap();
+        let saved = archive.load(&id).unwrap();
+        assert_eq!(saved.session.tracks[0].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [1, 2]);
+        assert_eq!(saved.session.tracks[1].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [101, 102]);
+        assert_eq!(archive.list().unwrap().entries[0].sides, [(0, 7), (1, 8)]);
+    }
+
+    fn a_capture_being_written_is_not_listed_until_it_is_committed() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let session = two_sides();
+        let id = encode_file_id("staged");
+        let header = CaptureHeader { schema_version: 1, replay_id: "staged".into(), replay_name: "Staged".into(),
+            game_version: "13.0.5".into(), miis: None, truncated: false, breaks: Vec::new(),
+            tracks: session.tracks.iter().map(|track| TrackHeader {
+                entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,
+            }).collect() };
+        let staged = write_capture_temp(&temp.0, &id, &serde_json::to_vec(&header).unwrap(), &session).unwrap();
+        assert!(archive.list().unwrap().entries.is_empty());
+        fs::rename(staged, temp.0.join(format!("{id}.tmrc"))).unwrap();
+        let listed = archive.list().unwrap().entries;
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, id);
+        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),
+            ("a_capture_file_with_no_new_key_reads_back_both_sides", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),
+            ("a_capture_being_written_is_not_listed_until_it_is_committed", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),
             ("mii_metadata_roundtrips_and_conflicting_duplicates_preserve_the_capture", mii_metadata_roundtrips_and_conflicting_duplicates_preserve_the_capture as fn()),
             ("saves_and_reopens_explicit_samples_and_truncation_metadata", saves_and_reopens_explicit_samples_and_truncation_metadata as fn()),
             ("ids_are_separate_from_duplicate_unicode_display_names", ids_are_separate_from_duplicate_unicode_display_names as fn()),

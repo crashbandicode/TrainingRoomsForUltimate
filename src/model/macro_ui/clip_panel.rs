@@ -427,6 +427,13 @@ impl ClipEditor {
         }
     }
 
+    pub fn select_entry(&mut self, entry: i32) -> bool {
+        if self.file.is_some() { return false; }
+        let Some(index) = self.session.tracks.iter().position(|track| track.entry == entry) else { return false };
+        self.set_track(index);
+        true
+    }
+
     /// Entry, recorded fighter kind and capture side (`true` = the previous
     /// capture) of the track `action` would select, without selecting it. Only a
     /// real change of track or capture answers; re-selecting the current track,

@@ -391,10 +391,47 @@ name").is_none());
     }
 
 
+    fn a_capture_keeps_one_track_per_entry_player_one_included() {
+        use super::{VaultArchive, VaultEvent};
+        use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
+        let mut archive = VaultArchive::new();
+        archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+        for (entry, buttons) in [(0, 1), (1, 101), (0, 2), (1, 102)] {
+            let sample = ReplayFrame { input: InputFrame { buttons, ..InputFrame::default() },
+                start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 };
+            archive.apply(VaultEvent::Sample { epoch: 1, entry, sample, quantized: false }, 0);
+        }
+        assert_eq!(archive.session.tracks.len(), 2);
+        for (entry, expected) in [(0, [1, 2]), (1, [101, 102])] {
+            let track = archive.session.tracks.iter().find(|track| track.entry == entry).unwrap();
+            assert_eq!(track.frames.iter().map(|frame| frame.input.buttons).collect::<Vec<_>>(), expected);
+        }
+    }
+
+    fn an_open_recording_is_a_copy_that_later_samples_do_not_change() {
+        use super::{VaultArchive, VaultEvent};
+        use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
+        let mut archive = VaultArchive::new();
+        let sample = |buttons| ReplayFrame { input: InputFrame { buttons, ..InputFrame::default() },
+            start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0 };
+        archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+        archive.apply(VaultEvent::Sample { epoch: 1, entry: 0, sample: sample(1), quantized: false }, 0);
+        let opened = archive.session.clone();
+        archive.apply(VaultEvent::Sample { epoch: 1, entry: 0, sample: sample(2), quantized: false }, 0);
+        archive.apply(VaultEvent::Begin { epoch: 2 }, 0);
+        archive.apply(VaultEvent::Sample { epoch: 2, entry: 0, sample: sample(101), quantized: false }, 0);
+        assert_eq!(opened.tracks.len(), 1);
+        assert_eq!(opened.tracks[0].frames.len(), 1);
+        assert_eq!(opened.tracks[0].frames[0].input.buttons, 1);
+        assert_eq!(archive.previous.as_ref().unwrap().tracks[0].frames.len(), 2);
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_capture_keeps_one_track_per_entry_player_one_included", a_capture_keeps_one_track_per_entry_player_one_included as fn()),
+            ("an_open_recording_is_a_copy_that_later_samples_do_not_change", an_open_recording_is_a_copy_that_later_samples_do_not_change as fn()),
             ("live_worker_handoff_preserves_bound_saves_across_reset_and_refuses_event_loss", live_worker_handoff_preserves_bound_saves_across_reset_and_refuses_event_loss as fn()),
             ("live_tokens_keep_bounded_incarnations_and_skip_duplicate_or_sealed_samples", live_tokens_keep_bounded_incarnations_and_skip_duplicate_or_sealed_samples as fn()),
             ("replay_identity_handoff_keeps_unicode_and_exact_mii_payload", replay_identity_handoff_keeps_unicode_and_exact_mii_payload as fn()),
