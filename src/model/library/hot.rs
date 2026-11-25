@@ -174,6 +174,8 @@ impl RecordingIndex {
         if index_path_absent(&path)? {
             return Ok(Self::fresh());
         }
+        #[cfg(test)]
+        crate::model::store::count_index_read();
         let bytes = match fs::read(&path) {
             Ok(bytes) => bytes,
             Err(err) if index_absent_error(&err) => return Ok(Self::fresh()),

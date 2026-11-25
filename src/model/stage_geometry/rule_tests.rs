@@ -11,7 +11,7 @@ use super::*;
 /// ax, ay, bx, by, normal x, normal y, pass-through.
 type Row = (f32, f32, f32, f32, f32, f32, bool);
 
-const TRAINING_BLAST: [f32; 4] = [-589.99982, 500.0, 360.00015, -137.85207];
+const TRAINING_BLAST: [f32; 4] = [-589.999_8, 500.0, 360.00015, -137.85207];
 const TRAINING: &[Row] = &[
     // The long floor (COL_curve1).
     (620.0, 0.0, -80.0, 0.0, 0.0, 1.0, false),
