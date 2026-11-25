@@ -5,6 +5,9 @@ use super::*;
 fn the_sample_mailbox_is_sized_to_one_poll_of_the_busiest_game() {
     // BTT with Ice Climbers: two fighter passes and one P1 input poll per frame, for the two frames between drains.
     assert_eq!(SAMPLE_SLOTS, (2 + 1) * 2);
+    // The merge-5 mailbox holds six inline samples. Extra padding in each sample is paid six times in BSS.
+    let bytes = core::mem::size_of::<Fields>();
+    assert!(bytes <= 224, "practice fields use {bytes} bytes per slot (merge 5: 224)");
 }
 
 #[test]
