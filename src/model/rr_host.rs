@@ -550,8 +550,8 @@ pub struct Tick {
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
-    /// Change placement: the save the placement picker opens on.
-    pub place: Option<PlaceOpen>,
+    /// The full save pair is needed only on a picker open, not on every recording tick's stack.
+    pub place: Option<Box<PlaceOpen>>,
 }
 
 /// The existing Fighter Mismatch screen, named for the wrapper that opens it.
@@ -1273,6 +1273,35 @@ pub fn today() -> String {
     }
 }
 
+/// A macro stop and an input-drill stop are alternatives. The drill's deep
+/// save path must not reserve the macro capture, spans and two saved fighters.
+#[inline(never)]
+fn save_stopped_macro(root: &Path, player: SavedState, cpu: SavedState, tick: &mut Tick) {
+    let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { "cpu" } else { "player" };
+    tick.diags.push(format!("screen=recording role={role_now} recording=0"));
+    let (spans, count) = take_capture_spans();
+    let (role, frames) = taken_frames();
+    let mut capture = Capture::idle();
+    toggle_record(&mut capture, role);
+    for frame in frames {
+        push_frame(&mut capture, role, frame);
+    }
+    capture.set_spans(&spans[..count]);
+    // The Record chord owns the start pose and speed. Host callers without
+    // a posted start use the two live poses, at rest.
+    let posted = take_record_start();
+    capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+    let (player, cpu, speeds) = match posted.map(|p| p.start) {
+        Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
+        None => (player, cpu, [(0.0, 0.0); 2]),
+    };
+    if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim()) {
+        if let Some(text) = stop.notice() {
+            tick.notices.push(text);
+        }
+    }
+}
+
 pub fn service_at(
     root: &Path,
     slots: &[Option<LegacySlot>; 5],
@@ -1335,36 +1364,7 @@ pub fn service_at(
         let (spans, count) = take_capture_spans();
         save_input(root, "", true, &spans[..count], &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
-        let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
-            "cpu"
-        } else {
-            "player"
-        };
-        tick.diags
-            .push(format!("screen=recording role={role_now} recording=0"));
-        let (spans, count) = take_capture_spans();
-        let (role, frames) = taken_frames();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, role);
-        for frame in frames {
-            push_frame(&mut capture, role, frame);
-        }
-        capture.set_spans(&spans[..count]);
-        // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
-        // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
-        // stands in, at rest, as before.
-        let posted = take_record_start();
-        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
-        let (player, cpu, speeds) = match posted.map(|p| p.start) {
-            Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
-            None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
-        };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim())
-        {
-            if let Some(text) = stop.notice() {
-                tick.notices.push(text);
-            }
-        }
+        save_stopped_macro(root, player, cpu, &mut tick);
     }
     // A drill question and a finished Make combo are work even when no chord is waiting.
     let busy = play_player
@@ -1667,10 +1667,10 @@ pub enum Placed {
 
 /// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
 #[inline(never)]
-fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<PlaceOpen> {
+fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<Box<PlaceOpen>> {
     let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save).ok()?;
     let shared = Shared { macros: macros_starting_from(root, &save), from_macro: relink.is_some() };
-    Some(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared })
+    Some(Box::new(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared }))
 }
 
 /// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
@@ -6329,13 +6329,13 @@ mod tests {
             edit: Role::Cpu,
             shared: Shared { macros: 2, from_macro: true },
         };
-        assert_eq!(tick.place, Some(open.clone()));
+        assert_eq!(tick.place.as_deref(), Some(&open));
         post_effect(Effect::ChangePlacement { save: save.clone(), relink: None });
         let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
-        assert_eq!(tick.place, Some(PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
         post_effect(Effect::ChangePlacement { save: save.clone(), relink: Some(macros[1].clone()) });
         let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
-        assert_eq!(tick.place, Some(PlaceOpen { relink: Some(macros[1].clone()), ..open }));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: Some(macros[1].clone()), ..open }));
         post_effect(Effect::ChangePlacement { save: "no-such-save".into(), relink: None });
         assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
     }

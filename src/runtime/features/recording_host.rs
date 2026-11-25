@@ -277,6 +277,8 @@ pub fn service() {
 /// Change placement: the picker confirmed a placement on a save, and the worker writes the file and answers the
 /// visit: the written pair, or that the write failed. The picker takes the answer only while that visit still waits;
 /// it then starts the pair's one load itself, or puts both fighters back and says so.
+/// Keep the pair's temporaries off the worker's separate `service_at` / `save_input` stack path.
+#[inline(never)]
 fn place_commit(root: &Path) {
     let Some((commit, save, relink)) = super::record_place::take_commit() else { return };
     match rr_host::commit_placement(root, &save, relink.as_deref(), commit) {
