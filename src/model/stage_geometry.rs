@@ -2,29 +2,103 @@
 use super::edge_juggle::perfect::{Outline, Point, Segment};
 use super::mashout::entry::PlacementFloor;
 use super::tech::discovery::{Ray, Rays};
-use super::tech::surface::{Line, Surfaces};
+use super::tech::surface::{Kind, Line, Surfaces, MAX_LINES};
 use super::tech::Vec2;
 
 /// Placement's floor rule.
-pub fn placement_floor(_: u32, _: f32, _: bool) -> bool { false }
+pub fn placement_floor(flags: u32, normal_y: f32, platforms: bool) -> bool {
+    if flags & 0x2000 != 0 {
+        platforms && flags & 0x0300 == 0 && normal_y > 0.0
+    } else {
+        flags & 0x0800 != 0
+    }
+}
 
 /// One ray of the column scan Tech's platform scan and eggs' floor read both step.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Scan { Done, Hit(Line), Miss, Broken }
 
-pub fn scan_step(_: &mut Rays, _: impl FnOnce(Ray) -> Result<Option<(Line, Vec2)>, ()>) -> Scan { Scan::Done }
+pub fn scan_step(rays: &mut Rays, ray: impl FnOnce(Ray) -> Result<Option<(Line, Vec2)>, ()>) -> Scan {
+    let Some(current) = rays.current() else {
+        return Scan::Done;
+    };
+    match ray(current) {
+        Ok(Some((line, hit))) if rays.hit(line, hit).is_ok() => Scan::Hit(line),
+        Ok(Some(_)) | Err(()) => Scan::Broken,
+        Ok(None) => {
+            rays.miss();
+            Scan::Miss
+        }
+    }
+}
 
 /// Endpoints of the current connected solid floor, including its slope.
-pub fn floor_ledges(_: impl IntoIterator<Item = Segment>) -> Option<[Point; 2]> { None }
+pub fn floor_ledges(floors: impl IntoIterator<Item = Segment>) -> Option<[Point; 2]> {
+    let mut points = floors.into_iter().flatten();
+    let first = points.next()?;
+    let [mut left, mut right] = [first; 2];
+    for point in std::iter::once(first).chain(points) {
+        if !point.into_iter().all(f32::is_finite) {
+            return None;
+        }
+        if point[0] < left[0] {
+            left = point;
+        }
+        if point[0] > right[0] {
+            right = point;
+        }
+    }
+    (left[0] < right[0]).then_some([left, right])
+}
 
 /// A closed walk as world geometry: its segments in walk order, and the ledges of its solid floors.
-pub fn outline_of(_: &Surfaces) -> (Outline, Option<[Point; 2]>) { (Outline::new(), None) }
+pub fn outline_of(walk: &Surfaces) -> (Outline, Option<[Point; 2]>) {
+    let mut outline = Outline::new();
+    let ends = |line: Line| {
+        line.ends.map(|point| [point.x, point.y])
+    };
+    for line in walk.lines() {
+        outline.add(ends(line));
+    }
+    let floor = walk.lines().filter(|line| line.kind() == Some(Kind::Floor) && !line.passable);
+    (outline, floor_ledges(floor.map(ends)))
+}
+
+fn ledge(
+    ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
+    mut floor: PlacementFloor,
+    right: bool,
+    limits: [f32; 2],
+) -> Option<Point> {
+    let dir = if right { 1.0 } else { -1.0 };
+    for _ in 0..MAX_LINES {
+        let [a, b] = floor.ends;
+        let end = if (a[0] < b[0]) == right { b } else { a };
+        let Some(next) = ray(end[0] + dir, limits, false) else {
+            return Some(end);
+        };
+        if !next.ends.contains(&end) || next.ends == floor.ends {
+            return Some(end);
+        }
+        floor = next;
+    }
+    None
+}
 
 /// The main floor under the camera's middle and its two ledges.
 pub fn main_floor(
-    _: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
-    _: [f32; 4],
-) -> Option<(Segment, Point)> { None }
+    mut ray: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
+    [left, right, top, bottom]: [f32; 4],
+) -> Option<(Segment, Point)> {
+    let x = left.midpoint(right);
+    let limits = [top, bottom];
+    let floor = ray(x, limits, false)?;
+    let ledges = [
+        ledge(&mut ray, floor, false, limits)?,
+        ledge(&mut ray, floor, true, limits)?,
+    ];
+    Some((ledges, [x, floor.height(x)?]))
+}
 
 #[cfg(test)]
 mod tests {
