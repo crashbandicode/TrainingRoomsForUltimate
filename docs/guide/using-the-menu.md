@@ -4,7 +4,9 @@ Open the menu, move around it and change a row. It works in Training and in the 
 on its page's own doc: [CPU](../menu/cpu.md), [Saves](../menu/saves.md), [Recording](../menu/recording.md),
 [Fighters & Stages](../menu/fighters-and-stages.md), [Display & Controls](../menu/display-and-controls.md).
 
-<!-- CLIP: tut-menu-change-option.mp4 | the CPU stands → the menu opens, Crouch flips On → the menu closes and the CPU crouches -->
+<video src="../media/tut-menu-change-option.mp4" autoplay muted loop playsinline controls></video>
+
+*The CPU stands. On the CPU page, D-pad Right flips Crouch On; B closes the menu and the CPU crouches. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](../media/tut-menu-change-option.mp4)
 
 ## Opening and closing
 
