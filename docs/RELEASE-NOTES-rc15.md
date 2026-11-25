@@ -112,8 +112,9 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
 
 ### The input display
 
-- **Scroll back.** Hold R3 and press D-pad Left or Right to look back through about ten seconds of inputs. Let go of
-  R3 to return to the present. [Frame strip](guide/frame-strip.md)
+- **Scroll back.** Hold R3 and press D-pad Left or Right to look through the last 600 displayed columns. That's about
+  ten seconds while the strip advances continuously; a quiet stretch can stay on screen much longer. Let go of R3
+  to return to the present. [Frame strip](guide/frame-strip.md)
 
 ### The menu
 
@@ -131,8 +132,9 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
   the playback indicator for Player 1; the pop-up's ZR switch; scroll-back; the clip editor; a capture played from
   RECORDINGS; Move names in the drill list. These ran on an earlier head, `a9131331`; two fixes separate it from the
   installed build. The reset chord, with Mario's and Kirby's drills as controls, ran on the installed build.
-- **Not run in Eden:** the waiting room and Quick Play, the airborne steered special, the deflection half of Match
-  angle and deflection, ledge attacks, the Trim setting's migration and the CPU's playback indicator.
+- **Not covered by the final Eden session:** the waiting-room editor, the Quick Play practice pick, new pick and
+  rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
+  setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **Hand-tested by the operator:** no report is on record.
 
 ## Install 3

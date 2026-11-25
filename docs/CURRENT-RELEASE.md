@@ -11,9 +11,9 @@ Status: **rc.15, whose newest build is install 4** (commit `a945b0c1`, installed
 2026-11-25).
 
 - **Installed:** the file on the card was read back and matches the build.
-- **Tested in Eden, in part:** the drill, Trim, clip editor and scroll-back rows passed in Training, on the head two
-  fixes before this build; the reset-chord fix passed on this build itself. The waiting room and Quick Play were not
-  run.
+- **Tested in Eden, in part:** the final session checked drill grading, Trim, the clip editor and scroll-back in
+  Training on `a9131331`. The reset-chord and Load-after retests passed on `a945b0c1`. The Quick Play match tested
+  Online Deluxe's fonts, not TrainingRooms' waiting-room or Quick Play changes.
 - **No recorded hardware test:** no report from play on the console is on record for install 4.
 
 What ran, on which build, and what did not: [Install evidence](EVIDENCE-rc15-installs.md). What each build changed:
@@ -74,9 +74,10 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 ## Known issues
 
 - **No recorded hardware test of install 4.** See the status above.
-- **Not yet run in Eden on install 4:** the waiting room and Quick Play, the airborne entry of a steered special, the
-  deflection half of Match angle and deflection, ledge attacks, the Trim setting's migration and the CPU's playback
-  indicator. [Install evidence](EVIDENCE-rc15-installs.md#install-4-a945b0c1)
+- **Not covered by the final Eden session:** the editor in the waiting room; the Quick Play practice pick, new pick
+  and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
+  attacks; the Trim setting's migration; and the CPU's playback indicator.
+  [Install evidence](EVIDENCE-rc15-installs.md#install-4-a945b0c1)
 - **L + R + A pressed one button at a time.** A button pressed before the chord and still held when it completes
   belongs to the reset, and its drill result is taken back, so a result can show for a moment first.
   [Input drills](guide/recording.md#input-drills)

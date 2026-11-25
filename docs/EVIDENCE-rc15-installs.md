@@ -102,17 +102,18 @@ each gate's own; they were not compared test by test here.
 | --- | --- | --- |
 | 1, Training (`i4-final-yoga-01`) | `a9131331`, two fixes before the installed build | Pass: the drill rows for Pikachu (two directions, a one-frame tap), a charged smash, Fox, Palutena, Mario steered against straight, Kirby's angled tilt; the angle half of Match angle and deflection; Move names in the drill list; the clip editor (open, layout, Y snap, both previews); Trim (198, 115, 88 and 5 frames for Off, Start, End and Both); the playback indicator for Player 1; the pop-up's ZR switch; scroll-back; a capture played on the CPU from RECORDINGS. |
 | 1, Training | `a9131331` | **Product failure:** the reset chord by itself added a failed result, and with Load after On a short chord loaded a state. Fixed in `a945b0c1`. |
-| 2, Quick Play (three boots) | `a9131331`, then `0d28433d` | Not run: the boots were lost to test set-up. No Quick Play feature of TrainingRooms was exercised. |
+| 2, Quick Play (three boots) | `0d28433d` | Both windows were staged with this build before boot 1 (final-session `HANDOFF.md`, 05:33:42Z and 05:48:08Z). Setup stopped all three attempts before a Quick Play feature was exercised. |
 | 2, Quick Play (boot 4) | `0d28433d` | Online Deluxe's font check only, pass. The match and its sudden death ended with no desync on both windows. |
 | 3, Training (`i4-final-yoga-p3`) | `a945b0c1`, the installed build | Pass: the reset chord by itself, held 4 and 40 frames, on Mario's and Kirby's drills, adds no result; Load after starts no load after the chord; the two control drills grade as in part 1. |
 
-- **Not exercised in Eden on any of these heads** (from the install record): the airborne entry of a steered special;
+- **Not exercised in the final Eden session** (from the install record): the airborne entry of a steered special;
   the deflection half of Match angle and deflection; in Quick Play the practice pick, a new pick and a rematch; ledge
   attacks beyond the host tests; Recordings beyond one played capture; step titles beyond the list; the clip editor in
   a waiting room; the Trim setting's migration; the CPU's playback indicator; the reset chord pressed one button at a
   time.
-- **Not re-run on the installed build:** every part 1 row except the two control drills. The two commits between
-  `a9131331` and `a945b0c1` change a saved take's move name and the reset chord.
+- **Repeated on the installed build:** the Mario and Kirby reset rows, Load after, and the Mario steering and Kirby
+  tilt controls. Two airborne rows were attempted again, but neither produced a jump. The other part 1 rows were
+  not repeated. The two fixes between `a9131331` and `a945b0c1` change a saved take's move name and the reset chord.
 - **Hand test:** none on record for this build.
 
 ## The build before install 1 (`17060a5e`)
