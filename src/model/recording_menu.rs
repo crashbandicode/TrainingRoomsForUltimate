@@ -3639,10 +3639,10 @@ mod tests {
     fn a_capture_with_no_player_one_track_offers_only_the_sides_it_has() {
         let mut screens = screens();
         open_vault_file(&mut screens, vec![RecordingSide { entry: 1, fighter: "Fox".into() }]);
-        assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+        assert_eq!(screens.file_rows()[0].value, "CPU · Fox");
         for button in [Button::Left, Button::Right, Button::A] {
             screens.handle_page(button, true, SAVES_MACROS);
-            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+            assert_eq!(screens.file_rows()[0].value, "CPU · Fox");
         }
         screens.set_file_cursor(2);
         screens.handle_page(Button::A, true, SAVES_MACROS);
@@ -3660,11 +3660,11 @@ mod tests {
             assert_eq!(rows[0].value, "P1 · Mario");
             assert_eq!(rows[1].value, role.label());
             screens.handle_page(Button::Left, true, SAVES_MACROS);
-            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+            assert_eq!(screens.file_rows()[0].value, "CPU · Fox");
             screens.handle_page(Button::Right, true, SAVES_MACROS);
             assert_eq!(screens.file_rows()[0].value, "P1 · Mario");
             screens.handle_page(Button::A, true, SAVES_MACROS);
-            assert_eq!(screens.file_rows()[0].value, "P2 · Fox");
+            assert_eq!(screens.file_rows()[0].value, "CPU · Fox");
             screens.set_file_cursor(1);
             for button in [Button::Left, Button::Right, Button::A] {
                 let before = screens.file_rows()[1].value.clone();
@@ -3704,7 +3704,7 @@ mod tests {
         screens.set_recordings(vec![vault_file(vault_sides()), partial]);
         let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
         assert_eq!(rows[0].name, "Replay");
-        assert_eq!(rows[0].sub, "P1 Mario · P2 Fox · 8299 frames");
+        assert_eq!(rows[0].sub, "P1 Mario · CPU Fox · 8299 frames");
         assert_eq!(rows[1].name, "Previous Vault capture (partial)");
         screens.set_recordings((0..6).map(|i| {
             let mut file = vault_file(vault_sides());

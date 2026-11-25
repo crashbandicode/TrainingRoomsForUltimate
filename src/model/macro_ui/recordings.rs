@@ -83,6 +83,12 @@ mod tests {
         assert_eq!(waiting.tick(true, true), clip_browser::Effect::Open("latest".into()));
     }
 
+    fn a_captured_side_is_named_independently_of_the_play_target() {
+        assert_eq!(editor_label(0, "Fox", false), "P1 Fox · plays on CPU");
+        assert_eq!(editor_label(1, "Fox", true), "CPU Fox · plays on Player 1");
+        assert_eq!(editor_label(2, "Fox", true), "P3 Fox · plays on Player 1");
+    }
+
     /// The waiting room: three seconds (180 layout ticks) with the CPU never idle end the opening; nothing opens later.
     fn a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds() {
         let (mut waiting, effect) = open_one("latest", true);
@@ -99,6 +105,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_captured_side_is_named_independently_of_the_play_target", a_captured_side_is_named_independently_of_the_play_target as fn()),
             ("an_empty_capture_is_not_listed_and_does_not_open", an_empty_capture_is_not_listed_and_does_not_open as fn()),
             ("the_recordings_rows_are_the_same_in_the_lobby_and_training", the_recordings_rows_are_the_same_in_the_lobby_and_training as fn()),
             ("a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds", a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds as fn()),
