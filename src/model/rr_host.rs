@@ -3408,30 +3408,45 @@ mod tests {
         }
     }
 
-    fn a_crop_preview_ends_when_the_library_cannot_be_read() {
+    fn an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return() {
         let _hold = hold();
         reset_host();
         let root = scratch("preview-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let id = one_macro(&root, "Real take", 7, 7, None);
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
-        request_preview("macro-1", Role::Cpu, 0, 3);
+        let reads = store::index_reads();
+        request_preview(&id, Role::Cpu, 0, 1);
         assert!(preview_running());
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(store::index_reads(), reads + 1);
         assert!(!preview_running() && lock(&PREVIEW_ASK).start.is_none());
+        assert!(take_cpu_frame().is_none());
 
         reset_host();
         let root = scratch("vault-preview-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
+        // Exclude mod writes from parallel library tests: the only change here is external.
+        let _no_mod_write = store::recording_write_guard(&root).unwrap();
         request_clip_preview(clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(preview_away());
         assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(land_pair([state(8), state(7)], false));
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
-        stop_preview();
+        let reads = store::index_reads();
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        assert!(!previewing());
+        assert!(take_cpu_frame().is_some() && !CPU_FRAMES.is_empty());
+        stop_preview();
+        let returning = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(returning.home, Some(HomeWarp::Return));
+        assert!(!preview_running() && preview_away() && CPU_FRAMES.is_empty());
+        assert!(take_cpu_frame().is_none());
+        assert!(land_pair([state(8), state(7)], false));
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!previewing() && !preview_away());
+        assert_eq!(store::index_reads(), reads);
     }
 
     fn a_session_end_drops_the_preview_home() {
@@ -5174,6 +5189,7 @@ mod tests {
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
             let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1, &[]).unwrap().unwrap();
+            let no_mod_write = store::recording_write_guard(&root).unwrap();
             assert!(request_drill_preview(&take, 80, Trim::Off));
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert_eq!(take_player_frame().unwrap().buttons, 1);
@@ -5186,9 +5202,26 @@ mod tests {
             let had_index = index.is_file();
             if had_index { std::fs::rename(&index, &held).unwrap(); }
             std::fs::create_dir(&index).unwrap();
-            if stop { stop_preview(); }
+            let reads = store::index_reads();
+            // Cross the prefilled queue boundary while the index remains unreadable.
+            for expected in 2..=65 {
+                service_at(&root, &none(), "2026-11-23", state(8), state(7));
+                assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(expected));
+            }
+            assert!(preview_running() && !PLAYER_FRAMES.is_empty());
+            assert_eq!(store::index_reads(), reads);
+            if stop {
+                stop_preview();
+            } else {
+                drop(no_mod_write);
+                let generation = catalog_generation();
+                one_macro(&root, "Changed library", 7, 8, None);
+                assert_ne!(catalog_generation(), generation);
+            }
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(store::index_reads(), reads + usize::from(!stop));
             assert!(!preview_running());
+            assert!(PLAYER_FRAMES.is_empty());
             assert!(take_player_frame().is_none());
             assert!(!RUN_PLAYER.load(Ordering::Acquire));
 
@@ -6837,7 +6870,7 @@ mod tests {
             ("a_cpu_crop_preview_holds_right_whatever_the_facing", a_cpu_crop_preview_holds_right_whatever_the_facing as fn()),
             ("a_named_load_is_taken_with_save_states_off", a_named_load_is_taken_with_save_states_off as fn()),
             ("a_linked_crop_preview_starts_with_save_states_off", a_linked_crop_preview_starts_with_save_states_off as fn()),
-            ("a_crop_preview_ends_when_the_library_cannot_be_read", a_crop_preview_ends_when_the_library_cannot_be_read as fn()),
+            ("an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return", an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return as fn()),
             ("a_session_end_drops_the_preview_home", a_session_end_drops_the_preview_home as fn()),
             ("a_refused_vault_preview_says_why_and_ends", a_refused_vault_preview_says_why_and_ends as fn()),
             ("a_crop_preview_plays_its_window_on_the_role_through_the_play_queue", a_crop_preview_plays_its_window_on_the_role_through_the_play_queue as fn()),
