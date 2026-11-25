@@ -174,12 +174,6 @@ impl Book {
         target.configuration().map(|_| target)
     }
 
-    /// How many macro files start from the save `id`. A chain starts from its macro 1's save and is not counted.
-    pub fn starts_from(&self, id: &str) -> u8 {
-        let count = self.recordings.values().filter(|recording| recording.start_save.as_deref() == Some(id)).count();
-        u8::try_from(count).unwrap_or(u8::MAX)
-    }
-
     /// The file's placement (Edit placement); the default for a missing file.
     pub fn placement(&self, id: &str) -> super::macros::Placement {
         self.recordings.get(id).map(|recording| recording.placement).unwrap_or_default()

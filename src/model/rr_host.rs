@@ -1710,10 +1710,27 @@ pub enum Placed {
 }
 
 /// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
-fn place_open(root: &Path, book: &Book, save: &str, relink: Option<String>) -> Option<PlaceOpen> {
+#[inline(never)]
+fn place_open(root: &Path, save: &str, relink: Option<String>) -> Option<PlaceOpen> {
     let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok()?;
-    let shared = Shared { macros: book.starts_from(save), from_macro: relink.is_some() };
+    let shared = Shared { macros: macros_starting_from(root, save), from_macro: relink.is_some() };
     Some(PlaceOpen { save: save.to_owned(), relink, name: file.name, pair: [file.player, file.cpu], edit: record_role(), shared })
+}
+
+/// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
+/// is asked for: the book it holds for Play has only the files that play. A chain is not a macro file (it starts
+/// from its macro 1's save), so it is not counted; a file that does not read as a macro is passed over.
+/// Kept out of line, as the held book's reader is: a loaded macro must not sit in `service_at`'s frame.
+#[inline(never)]
+fn macros_starting_from(root: &Path, save: &str) -> u8 {
+    let library = Library::new(root.join(MACROS_DIR));
+    let Ok(folder) = std::fs::read_dir(root.join(MACROS_DIR)) else { return 0 };
+    let count = folder
+        .flatten()
+        .filter_map(|item| item.file_name().to_str().and_then(|name| name.strip_suffix(".json")).map(str::to_owned))
+        .filter(|id| library.load(id).is_ok_and(|file| file.start_save.as_deref() == Some(save)))
+        .count();
+    u8::try_from(count).unwrap_or(u8::MAX)
 }
 
 /// The picker confirmed a placement on the save its visit opened: the worker writes it. Only what was edited is
@@ -2326,12 +2343,12 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
-        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, book, &save, relink),
+        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, &save, relink),
         // The Replays row: the start save of the pop-up role's active macro (a chain: its macro 1's).
         Effect::ChangeActivePlacement => match placement_target(root) {
             Ok(target) => {
                 tick.place = target.recording.start_save.as_deref()
-                    .and_then(|save| place_open(root, book, save, Some(target.id.clone())));
+                    .and_then(|save| place_open(root, save, Some(target.id.clone())));
             }
             Err(refusal) => tick.notices.push(refusal),
         },
