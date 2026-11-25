@@ -317,7 +317,8 @@ fn name_file(file: crate::engine::rr_runtime::ClipFile) {
             crate::model::combo_record::UnitKind::Step => "Name drill",
         }, recording.name.as_str()),
     };
-    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {
+    let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);
+    let title = match request {
         Some(request) if request.make == crate::model::recording_menu::Make::Drill => "Name drill",
         Some(_) => "Name macro",
         None => title,
@@ -996,14 +997,15 @@ fn apply_action(action: ClipAction) {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
     }
     // Drop the editor lock before opening the naming panel or notifying the game.
-    let (effect, configuration, file, source) = {
+    let (effect, configuration, file, source, requested) = {
         let mut editor = EDITOR.lock().unwrap();
         REVISION.fetch_add(1, Ordering::Relaxed);
         let configuration=editor.as_ref().and_then(|editor|editor.target().ok().flatten())
             .and_then(Target::configuration);
         let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
-        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source)
+        let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());
+        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source, requested)
     };
     // Only a saved file carries identity, and it is always the recorded one: the
     // original kind, plus the exact Mii for a Mii track. A preview is inputs only
@@ -1041,8 +1043,7 @@ fn apply_action(action: ClipAction) {
                 return;
             }
             match attach(recording) {
-                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>
-                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),
+                Ok(recording) if requested => name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),
                 Ok(recording)=>crate::runtime::macros::named_macros::offer_replay_recording(*recording),Err(error)=>notify(error),
             }
         }

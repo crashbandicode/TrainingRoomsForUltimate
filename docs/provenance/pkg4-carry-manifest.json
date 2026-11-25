@@ -3711,7 +3711,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "dd7d451e5e8b17257a10f92e45468569e65dfa3dfa64b9f53b2eac3d7244c6b9",
+   "dest_sha256": "8e08a71ac53ff5b644723955a64007d8ae096fbffa757f5b95e2e454b0b32c2e",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4462,6 +4462,26 @@
      "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
      "old": "                notify(\"CPU did not settle; capture opening cancelled\".into());\n",
      "new": "                if recording { RECORDING_TIMED_OUT.store(true, Ordering::Release); }\n                notify(CPU_NOT_SETTLED.into());\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n",
+     "new": "    let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);\n    let title = match request {\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "    let (effect, configuration, file, source) = {\n",
+     "new": "    let (effect, configuration, file, source, requested) = {\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source)\n",
+     "new": "        let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());\n        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source, requested)\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>\n                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n",
+     "new": "                Ok(recording) if requested => name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n"
     }
    ]
   },
