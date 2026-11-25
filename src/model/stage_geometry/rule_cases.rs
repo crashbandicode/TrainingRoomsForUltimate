@@ -257,6 +257,18 @@
     }
 
     #[test]
+    fn nearest_ledge_counts_the_near_end_when_entering_a_run() {
+        let mut lines = training();
+        lines.push((line([[-115., 25.], [-95., 25.]], true, true), true));
+        each(&lines, |stage| {
+            let at = [-100., 40.];
+            assert_eq!(classify(stage, TRAINING, at), Ok(Place::OverStage));
+            assert_eq!(nearest_ledge(stage, TRAINING, at), Ok(ledge([-80., 0.], -1.)));
+            assert_eq!(nearest_ledge(stage, TRAINING, [-160., 40.]), Ok(ledge([-170., 0.014], 1.)));
+        });
+    }
+
+    #[test]
     fn the_nearest_ledge_is_found_run_by_run() {
         let cases = [
             ([-30., 0.], ledge([-80., 0.], -1.)),
