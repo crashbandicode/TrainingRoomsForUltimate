@@ -603,7 +603,7 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
                 let _ = out.write_str(" - ");
                 let _ = spec.write(upper as u8, out);
                 let _ = out.write_str("  >");
-            } else if super::settings::def(r.id).is_some_and(|(_, d)| matches!(d.kind, super::settings::Kind::HalfSlider { .. })) {
+            } else if super::settings::is_half_slider(r.id) {
                 let _ = super::settings::write_half(lower, out);
                 let _ = out.write_str(" - ");
                 let _ = super::settings::write_half(upper, out);

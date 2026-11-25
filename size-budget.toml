@@ -2821,7 +2821,7 @@ approved_by = "tr-primary-2 2026-11-24 23:01:06Z (merge 4b, owner f15-lobby) and
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 199956
+ceiling = 199953
 date = "2026-11-25"
-reason = "Menu polish adds half-percent damage ranges, quickening slider controls, and Recording pop-up role keys: measured 199956 (tools/sloc.py tree), 128 above 199828."
+reason = "Menu polish adds half-percent damage ranges, quickening slider controls, and Recording pop-up role keys: measured 199953 (tools/sloc.py tree), 125 above 199828."
 approved_by = "tr-primary-2 2026-11-24 23:57:04Z (menu-polish order: the line ceiling is approved at the measured value), restated 2026-11-25 00:08:17Z"

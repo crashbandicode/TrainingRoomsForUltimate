@@ -9,8 +9,8 @@
 //!
 //! Every setting is an array of small integers, one element per option in the option set's
 //! declaration order (`0` not selected, `1` selected, `2..=5` a weight on a weighted row); a slider
-//! is `[lower, upper]`; damage sliders append two half-percent flags when needed. The shape and the ids are the fork's, checked against two real files from
-//! the fork (`tests/fixtures/fork-menu-*.json`).
+//! is `[lower, upper]`; damage sliders append two half-percent flags when needed. The shape and the
+//! ids are the fork's, checked against two real files from the fork (`tests/fixtures/fork-menu-*.json`).
 //!
 //! Reading is field by field (S2): a field that does not parse takes its factory value, the rest of
 //! the file still loads, and `Loaded::issues` lists what was wrong so the caller keeps a renamed
@@ -51,7 +51,8 @@ pub enum Kind {
     Weighted,
     /// `[lower, upper]`, `lower <= upper <= max` (Tech ranges: their declared scale).
     Slider { max: u8 },
-    /// Whole-percent ends with optional half-percent flags.
+    /// `[lower, upper]` in whole percents, `lower <= upper <= max`, with `lower half, upper half`
+    /// (0 or 1 each) appended when an end has a half percent.
     HalfSlider { max: u8 },
     /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
     /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
@@ -90,14 +91,19 @@ pub fn def(id: &str) -> Option<(usize, &'static Def)> {
     DEFS.iter().enumerate().find(|(_, def)| def.id == id)
 }
 
-/// A damage row's ends in half percents.
+/// Whether the row is a half-percent damage slider.
+pub fn is_half_slider(id: &str) -> bool {
+    def(id).is_some_and(|(_, def)| matches!(def.kind, Kind::HalfSlider { .. }))
+}
+
+/// A damage row's ends in half percents; missing elements read as zero.
 pub fn half_ends(row: &[u8]) -> (u16, u16) {
     let end = |index| u16::from(row.get(index).copied().unwrap_or(0)) * 2
         + u16::from(row.get(index + 2).copied().unwrap_or(0).min(1));
     (end(0), end(1))
 }
 
-/// The canonical damage row for ends in half percents.
+/// The canonical damage row for ends in half percents: length 2 when both are whole, 4 otherwise.
 pub fn half_row(lower: u16, upper: u16) -> ([u8; 4], usize) {
     let row = [(lower / 2) as u8, (upper / 2) as u8, (lower % 2) as u8, (upper % 2) as u8];
     let len = if row[2] == 0 && row[3] == 0 { 2 } else { 4 };

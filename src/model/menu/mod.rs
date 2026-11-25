@@ -463,7 +463,9 @@ pub struct Menu {
     practice_cpu_pop: Option<usize>,
     /// The last press reached an arm that does nothing (`press` returns false).
     ignored: bool,
+    /// Repeat bits for this poll: bit 0 Up, bit 1 Down.
     repeats: u8,
+    /// Last handle direction (true raises) and number of presses in that hold.
     slider_run: (bool, u8),
 }
 
@@ -479,6 +481,8 @@ pub struct MashoutPop {
     pub grab: usize,
 }
 
+/// Steps per hold: presses 1–2: 1, 3–6: 2, 7–12: 4, 13–22: 10, then 20.
+/// With the adapter's quickening repeats, 0–150% takes 168 polls, about 2.8 seconds.
 const fn slider_step(run: u8) -> u16 {
     match run {
         0..=2 => 1,
@@ -907,7 +911,7 @@ impl Menu {
                 })
             }
             Control::Slider => {
-                let (lower, upper) = if settings::def(row.id).is_some_and(|(_, d)| matches!(d.kind, settings::Kind::HalfSlider { .. })) {
+                let (lower, upper) = if settings::is_half_slider(row.id) {
                     settings::half_ends(array)
                 } else {
                     (u16::from(array.first().copied().unwrap_or(0)), u16::from(array.get(1).copied().unwrap_or(0)))

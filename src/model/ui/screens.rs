@@ -289,7 +289,7 @@ fn slider_frame(menu: &Menu, screen: &Screen, row: usize, state: SliderState, fr
         let mut label = String::new();
         if let Some(spec) = super::tech_settings::scale(ROWS[row].id) {
             let _ = spec.write(value, &mut label);
-        } else if super::settings::def(ROWS[row].id).is_some_and(|(_, d)| matches!(d.kind, super::settings::Kind::HalfSlider { .. })) {
+        } else if super::settings::is_half_slider(ROWS[row].id) {
             let ends = super::settings::half_ends(&values);
             let _ = super::settings::write_half(if i == 0 { ends.0 } else { ends.1 }, &mut label);
             let _ = label.write_char('%');

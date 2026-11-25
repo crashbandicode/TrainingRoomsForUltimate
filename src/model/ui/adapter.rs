@@ -148,7 +148,7 @@ pub struct Step {
     /// Release-only polls must reach an active physical chord capture too.
     pub changed: bool,
     pub presses: [Option<Button>; 14],
-    /// Up and Down presses that repeat a held direction.
+    /// Repeated held-direction presses: bit 0 Up, bit 1 Down.
     pub repeats: u8,
     pub hold_ends: [Option<HoldEnd>; 4],
 }
