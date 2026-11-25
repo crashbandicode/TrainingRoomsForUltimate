@@ -3073,3 +3073,11 @@ ceiling = 203529
 date = "2026-11-25"
 reason = "Trim, the macro playback indicator and the drill-ownership correction folded on install 4 f36ebe8f (Vault and Recordings, bare keys): measured 203529, 401 above 203128"
 approved_by = "tr-primary-2, inbox 2026-11-25 00:38:26Z (+369) and the +60 review-fix rule"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203532
+date = "2026-11-25"
+reason = "The replay editor stores a take mark's own move key, so a saved take keeps the name of a grab, a throw, a final smash and a ledge, get-up or trip attack: one helper in combo_record.rs. Measured 203532 on install 4 a9131331 (203529): +3."
+approved_by = "tr-primary-2 ruling 2026-11-25 05:04:41Z (the fix ordered; lines under the +60 review-fix rule of 2026-11-24 21:46:20Z)."
