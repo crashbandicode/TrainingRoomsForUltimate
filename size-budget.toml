@@ -3141,7 +3141,7 @@ approved_by = "tr-primary-2 ruling 2026-11-25 16:36:55Z (line ceiling for feat/p
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 205068
+ceiling = 205117
 date = "2026-11-25"
-reason = "The eggs Off stage zone on the off-stage rule, on main 2d140506 (204799): the stage read through the rule's probe, each ledge's open air, the stage's other lines copied in the zone's columns, a spot and a move asked off stage, and the Outer step's stop. Measured 205068 (tools/sloc.py tree), 269 above 204799."
+reason = "The eggs Off stage zone on the off-stage rule, on main 2d140506 (204799): the stage read through the rule's probe, each ledge's open air, the stage's other lines copied in the zone's columns, a spot and a move asked off stage, and the Outer step's stop. Measured 205117 (tools/sloc.py tree), 318 above 204799. Includes the editor's crop slot keeping its layout's full address (rv-hit-streak 241e9be9)."
 approved_by = "tr-primary-2 2026-11-25 19:21:22Z (one entry at the measured value of the final head, on top of stage geometry's)"
