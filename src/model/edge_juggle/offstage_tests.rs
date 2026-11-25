@@ -281,8 +281,14 @@ fn a_kept_start_under_the_stage_is_reused_only_while_the_option_is_on() {
     let place = classify(&mut Copied(&lines), TRAINING_BLAST, at);
     assert_eq!(place, Ok(Place::Under));
     assert!(long.off_stage(at).is_some(), "beside the run by its ends alone");
-    let mut wizard = fresh;
-    wizard.setup.cpu = at;
+    // The cursor was moved there: an unmoved start is the default, which is never kept as a point.
+    let moved = |to: [f32; 2]| {
+        let mut wizard = fresh;
+        wizard.steer(long, &crate::model::btt::Pad { stick: [1.0, 0.0], ..Default::default() });
+        wizard.setup.cpu = to;
+        wizard
+    };
+    let mut wizard = moved(at);
     assert_eq!(wizard.confirm_start(at, place, ON), Some(true));
     let kept = wizard.kept(long);
     assert!(kept.under);
@@ -293,16 +299,40 @@ fn a_kept_start_under_the_stage_is_reused_only_while_the_option_is_on() {
     assert!(near(Some(default.cpu), [-125.0, -68.426]));
     // A start confirmed in open air does not need the option, and a later confirm replaces the class.
     let open = [-125.0, -60.0];
-    let mut wizard = fresh;
-    wizard.setup.cpu = open;
+    let mut wizard = moved(open);
     assert_eq!(wizard.confirm_start(open, Ok(Place::Open), OFF), Some(true));
     assert!(!wizard.kept(long).under);
     assert_eq!(fresh.kept_setup(long, wizard.kept(long), OFF).map(|setup| setup.cpu), Some(open));
     // The defaults are never under the stage.
-    let mut reset = fresh;
-    reset.setup.cpu = at;
+    let mut reset = moved(at);
     assert_eq!(reset.confirm_start(at, place, ON), Some(true));
     reset.back_to_defaults(default);
     assert!(!reset.kept(long).under);
+}
+
+/// tr-primary-2 2026-11-25 (rv-preview-vis 19:21:39Z): the place A confirmed decides the reuse, not the older
+/// one-unit inset from the run's ends. Half a unit outside the long floor's left ledge is open air by the rule.
+#[test]
+fn a_kept_start_confirmed_in_open_air_is_reused_whatever_its_inset() {
+    let lines = training();
+    let (long, p1) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
+    let fresh = Wizard::new(Drill::GuardEdge, long, p1, 100, (308, 0), None).unwrap();
+    let at = [-80.5, -60.0];
+    let place = classify(&mut Copied(&lines), TRAINING_BLAST, at);
+    assert_eq!(place, Ok(Place::Open));
+    assert_eq!(long.off_stage(at), None, "inside the older inset");
+    let mut wizard = fresh;
+    wizard.steer(long, &crate::model::btt::Pad { stick: [1.0, 0.0], ..Default::default() });
+    wizard.setup.cpu = at;
+    assert_eq!(wizard.confirm_start(at, place, OFF), Some(true));
+    let kept = wizard.kept(long);
+    assert!(!kept.under && !kept.unmoved);
+    for options in [OFF, ON] {
+        assert_eq!(fresh.kept_setup(long, kept, options).map(|setup| setup.cpu), Some(at), "{options:?}");
+    }
+    // Still only on its own run.
+    let (island, island_p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let on_island = Wizard::new(Drill::GuardEdge, island, island_p1, 100, (308, 0), None).unwrap();
+    assert_eq!(on_island.kept_setup(island, kept, OFF), None);
 }
 }
