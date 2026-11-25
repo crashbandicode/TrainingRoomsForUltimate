@@ -615,7 +615,7 @@ fn playback_delay_row_lists_its_frames() {
     ]));
     assert_eq!(row.help.lines().count(), 2);
     assert!(row.help.contains("60 frames is one second"));
-    assert_eq!(ROWS.iter().filter(|other| other.group == options).last().unwrap().id, "playback_delay");
+    assert_eq!(ROWS.iter().rfind(|other| other.group == options).unwrap().id, "playback_delay");
     for (at, frames) in [0, 10, 20, 30, 45, 60, 90, 120].into_iter().enumerate() {
         let mut snapshot = Snapshot::factory();
         let mut selected = [0; 8];

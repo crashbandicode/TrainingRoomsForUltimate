@@ -545,8 +545,7 @@ pub(crate) fn count_index_read() {
 }
 
 #[cfg(test)]
-#[allow(dead_code)]
-pub(crate) fn index_reads() -> usize {
+pub fn index_reads() -> usize {
     INDEX_READS.with(core::cell::Cell::get)
 }
 
@@ -556,8 +555,7 @@ fn count_directory_read() {
 }
 
 #[cfg(test)]
-#[allow(dead_code)]
-pub(crate) fn directory_reads() -> usize {
+pub fn directory_reads() -> usize {
     DIRECTORY_READS.with(core::cell::Cell::get)
 }
 
