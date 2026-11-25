@@ -231,8 +231,13 @@ Where the recording code is (moved here from the Recording guide; named by funct
 - The start save keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`). Momentum is
   `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`).
 - Mash interrupts playback stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs`.
-- Edit placement: the target macro is `placement_target` (`rr_host.rs`), the screen is `open_placement` in
-  `src/model/macro_ui/macro_panel.rs`, and the warp plus offset is `warp_pair` (`rr_host.rs`).
+- Change placement (2026-11-25; it replaced Edit placement's offset editor): the picker is `Wizard` in
+  `src/model/record_place.rs`, the same wizard as Place fighters before Record, run from the fighter frame in
+  `src/runtime/features/record_place.rs`. On stage it steps between the floors of Tech practice's one traced outline
+  (`tech::floors`, `src/model/floor_hop.rs`). A fighter switched to Off stage is placed by `off_stage_spot`, on the
+  off-stage rule of `src/model/stage_geometry.rs`, read on that frame only. The worker writes the save in
+  `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's save and macro are
+  `active_placement_ids`, and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`).
 - Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
   `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
   `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is

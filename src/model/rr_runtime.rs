@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
+use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, MacroPlace, RecordingScreens, SaveFile, SequenceFile};
 use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
@@ -614,7 +614,8 @@ pub fn load_catalog(root: &Path) -> Result<CatalogBundle, Error> {
 }
 
 enum CatalogEntry {
-    Macro(MacroFile, crate::model::trim::Trim),
+    /// A macro or a chain, its trim, and what Play does at its start save's warp (a chain has none of its own).
+    Macro(MacroFile, crate::model::trim::Trim, MacroPlace),
     Save(SaveFile),
     Combo(ComboFile, crate::model::trim::Trim),
     Sequence(SequenceFile),
@@ -625,7 +626,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
     let entry = match folder {
         0 => {
             let Some(file) = Library::new(dir).load_with_sibling::<Chain>(&id)? else { return Ok(None) };
-            let (file, trim) = match file {
+            let (file, trim, place) = match file {
                 Ok(file) => (MacroFile {
                     id,
                     name: file.name,
@@ -635,7 +636,10 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: fighter_name(file.start.fighter_kind),
                     span: file.frames.len() as u32,
-                }, file.trim),
+                }, file.trim, MacroPlace {
+                    offset: [file.placement.delta_x.to_bits(), file.placement.delta_y.to_bits()],
+                    rest: file.placement.momentum == crate::engine::macros::MomentumMode::AtRest,
+                }),
                 Err(file) => (MacroFile {
                     id,
                     name: file.name,
@@ -645,9 +649,9 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: String::new(),
                     span: 0,
-                }, crate::model::trim::Trim::Off),
+                }, crate::model::trim::Trim::Off, MacroPlace::default()),
             };
-            CatalogEntry::Macro(file, trim)
+            CatalogEntry::Macro(file, trim, place)
         }
         1 => {
             let Some(save) = Store::<NamedSave>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
@@ -812,8 +816,11 @@ impl CatalogCache {
         let mut catalog = CatalogBundle::default();
         for file in self.files.values().filter_map(|file| file.entry.as_ref()) {
             match file {
-                CatalogEntry::Macro(file, trim) => {
+                CatalogEntry::Macro(file, trim, place) => {
                     catalog.macro_trims.insert(file.id.clone(), *trim);
+                    if !file.chain {
+                        catalog.macro_places.insert(file.id.clone(), *place);
+                    }
                     catalog.macros.push(file.clone());
                 }
                 CatalogEntry::Save(file) => catalog.saves.push(file.clone()),

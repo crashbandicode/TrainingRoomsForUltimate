@@ -1144,8 +1144,10 @@ fn the_drill_picker_holds_the_cpu_at_the_picked_point() {
     assert!(hold.contains("*held_cpu = Some(body);"));
     assert!(hold.contains("crosshair::cpu_view(preview.as_ref())"));
     let placement = src("src/runtime/features/placement.rs");
-    let preview = item(&placement, "pub(super) unsafe fn preview(");
-    assert!(preview.contains("crosshair::preview_step("));
+    // The drills' hold is the shared one, in the air; the placement picker holds both fighters through it.
+    assert!(item(&placement, "pub(super) unsafe fn preview(").contains("hold_at(slot, body, id, at, false)"));
+    let preview = item(&placement, "pub(super) unsafe fn hold_at(");
+    assert!(preview.contains("crosshair::hold_step("));
     assert!(preview.find("PreviewAct::Lift").unwrap() < preview.find("lift(body, at").unwrap());
     assert!(preview.find("PreviewAct::Hold").unwrap() < preview.find("hold(body, at)").unwrap());
     assert!(preview.contains("konst(C::WorkFlagIsLoupe)") && preview.contains("natives::is_flag(body,"));

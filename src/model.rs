@@ -163,6 +163,8 @@ pub mod spacing;
 pub mod btt;
 #[path = "model/crosshair.rs"]
 pub mod crosshair;
+#[path = "model/floor_hop.rs"]
+pub mod floor_hop;
 #[path = "model/lockon.rs"]
 pub mod lockon;
 #[path = "model/sites_lockon.rs"]

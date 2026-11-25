@@ -1,5 +1,5 @@
-//! The Recording page's panels on the menu (package 4's named-macro / replay layer): Named library, Save slot to library, Edit
-//! placement and the Replay window. The layer keeps its own panel state (`named_macros`, `replay_capture`); this module opens a panel
+//! The Recording page's panels on the menu (package 4's named-macro / replay layer): Named library, Save slot to library
+//! and the Replay window. The layer keeps its own panel state (`named_macros`, `replay_capture`); this module opens a panel
 //! when the menu's row is pressed, hands the player's buttons to it as the layer's pads, and says what is on screen so the worker can
 //! draw it (`model::screens::panel_frame`, the clip editor's `editors::clip_frame`).
 //!
@@ -17,7 +17,7 @@ use crate::runtime::macros::{named_macros, replay_capture};
 
 /// The editors this module drives.
 pub fn is_layer_panel(editor: Editor) -> bool {
-    matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary | Editor::EditPlacement | Editor::ReplayWindow)
+    matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary | Editor::ReplayWindow)
 }
 
 /// Open the panel of `editor`. `slot` is the Record Slot of the page (`recording_slot`), which the library and the export freeze.
@@ -25,7 +25,6 @@ pub fn is_layer_panel(editor: Editor) -> bool {
 pub fn open_panel(editor: Editor, slot: Option<usize>) -> bool {
     match editor {
         Editor::NamedLibrary => named_macros::open_library(slot),
-        Editor::EditPlacement => named_macros::open_editor(),
         Editor::ReplayWindow => replay_capture::open_editor(),
         _ => {}
     }
@@ -79,23 +78,29 @@ pub fn close_panel() {
     }
 }
 
+/// What the Recording page's panels and the placement picker wait for, in the layer's own words: both practice
+/// fighters there (`practice`: the practice scene is on), and no record, playback or load in progress. One check, so
+/// the Replays row's Change placement says what its key grid said.
+pub fn practice_wait(practice: bool) -> Option<&'static str> {
+    if !practice || !crate::runtime::ui::facts::fact_fighters_present() {
+        return Some("Wait for both practice fighters");
+    }
+    if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
+        return Some("Finish the current practice action first");
+    }
+    None
+}
+
 /// Why `editor`'s panel did not open, in the words of the layer's own refusals (its notice is hidden while the menu is open, so the
 /// menu says it on the row's help line). The predicates are the layer's: the published facts, the recorder and the save states.
 pub fn refusal_of(editor: Editor, slot: Option<usize>) -> &'static str {
     if matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary) && slot.is_none() {
         return "Choose a Record Slot first";
     }
-    if !crate::runtime::ui::facts::fact_fighters_present() {
-        return "Wait for both practice fighters";
-    }
-    if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
-        return "Finish the current practice action first";
+    if let Some(wait) = practice_wait(true) {
+        return wait;
     }
     match editor {
-        // The active macro's own refusal (primary 2026-11-08 #70 (a): it edits the file Play plays).
-        Editor::EditPlacement => crate::engine::rr_host::placement_target(std::path::Path::new(crate::model::storage::ROOT))
-            .err()
-            .unwrap_or("Placement is not usable"),
         Editor::ReplayWindow => "Open the replay window in idle practice, with a saved replay capture",
         Editor::SaveSlotToLibrary => "Record into the slot first",
         _ => "Not available right now",

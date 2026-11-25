@@ -324,40 +324,6 @@ def main():
     ln = line_after(m, "Saved evtest", 4)
     row("saved notice posted", ln is not None or ok, ln or "no notice line (the file is the evidence)")
 
-    # The placement panel uses the real loaded macro and the restore anchor from playback.
-    baseline = json.loads(read_file(f"{SD}/macros/evtest2.json"))
-    receipt(cmd("open_library 0"), "open_library slot=0")
-    at = move_to("evtest2")
-    row("placement source found", at is not None, f"cursor={at}")
-    receipt(cmd("pad confirm"), "pad confirm")
-    receipt(cmd("open_placement"), "open_placement")
-    placement_view = view()
-    row("placement editor opens with restored anchor",
-        'title="Placement"' in (placement_view or ""), placement_view or "no view")
-    selected, _ = parse_view(placement_view)
-    row("placement editor selects X +1", selected == 1, placement_view)
-    receipt(cmd("pad confirm"), "pad confirm")
-    changed_view = view()
-    (OUT / "placement-view.txt").write_text(changed_view or "")
-    at = move_to("Write")
-    row("placement overwrite action found", at is not None, f"cursor={at}")
-    receipt(cmd("pad confirm"), "pad confirm")
-    original_x = baseline.get("placement", {}).get("delta_x", 0)
-
-    def placement_written(value):
-        try:
-            return json.loads(value).get("placement", {}).get("delta_x") == original_x + 1
-        except (ValueError, TypeError):
-            return False
-
-    placed = wait_file(f"{SD}/macros/evtest2.json", placement_written)
-    (OUT / "placement-saved.json").write_text(placed)
-    result = json.loads(placed) if placed.strip() else {}
-    row("placement X +1 persists without changing recorded inputs",
-        placement_written(placed) and result.get("frames") == baseline["frames"],
-        f"before_x={original_x}; placement={result.get('placement')}")
-    shot("after-placement")
-
     # replay window over the seeded capture
     m = cmd("list_captures")
     ln = line_after(m, "[NamedMacroDiag] captures", 8)

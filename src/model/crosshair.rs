@@ -63,13 +63,15 @@ pub struct Origin {
     pub facing: f32,
 }
 
-/// What a picker does with the CPU's body on one frame.
+/// What a picker does with a fighter's body on one frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreviewAct {
     /// Place it in the air at the point and request Fall.
     Lift,
     /// Hold it asleep at the point.
     Hold,
+    /// Stand it awake on its floor point.
+    Stand,
 }
 
 /// A picker's hold on the CPU: the body itself waits at its start point. In view the game draws it under the
@@ -79,6 +81,8 @@ pub struct CpuPreview {
     body: u32,
     origin: Origin,
     frames: u8,
+    /// The hold put the body to sleep, as of this frame's write: whoever lets it go wakes it.
+    pub asleep: bool,
     /// The game's own `FLAG_IS_LOUPE` of the body, read back after this frame's write.
     pub magnified: bool,
 }
@@ -93,8 +97,11 @@ impl CpuPreview {
         self.origin
     }
 
-    fn act(&mut self) -> PreviewAct {
-        if self.frames < PREVIEW_SETTLE {
+    fn act(&mut self, grounded: bool) -> PreviewAct {
+        if grounded {
+            self.frames = 0;
+            PreviewAct::Stand
+        } else if self.frames < PREVIEW_SETTLE {
             self.frames += 1;
             PreviewAct::Lift
         } else {
@@ -106,10 +113,17 @@ impl CpuPreview {
 /// One frame of a picker's CPU preview: a preview starts for `body` when none runs for it (`origin` is read then),
 /// and the frame's act is returned.
 pub fn preview_step(slot: &mut Option<CpuPreview>, body: u32, origin: impl FnOnce() -> Origin) -> PreviewAct {
+    hold_step(slot, body, false, origin)
+}
+
+/// One frame of a picker's hold on either fighter (the placement picker holds both). In the air it is
+/// `preview_step`. `grounded`: the body stands on its floor point, awake, every frame; taken into the air after
+/// that it settles again before it is held.
+pub fn hold_step(slot: &mut Option<CpuPreview>, body: u32, grounded: bool, origin: impl FnOnce() -> Origin) -> PreviewAct {
     if slot.is_none_or(|preview| preview.body != body) {
-        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, magnified: false });
+        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, asleep: false, magnified: false });
     }
-    slot.as_mut().map_or(PreviewAct::Lift, CpuPreview::act)
+    slot.as_mut().map_or(PreviewAct::Lift, |preview| preview.act(grounded))
 }
 
 /// How the picker's CPU point is shown, for the practice state: the body is there in view, or the game shows its
@@ -221,6 +235,22 @@ mod tests {
         assert_eq!(preview_step(&mut slot, 9, || origin(-40.0)), PreviewAct::Lift);
         let preview = slot.unwrap();
         assert_eq!((preview.body(), preview.origin()), (9, origin(-40.0)));
+    }
+
+    #[test]
+    fn a_fighter_on_a_floor_stands_at_its_spot_and_one_in_the_air_is_held() {
+        let mut slot = None;
+        for _ in 0..PREVIEW_SETTLE + 3 {
+            assert_eq!(hold_step(&mut slot, 7, true, || origin(3.0)), PreviewAct::Stand);
+        }
+        let settle = usize::from(PREVIEW_SETTLE);
+        let air: Vec<_> = (0..settle + 2).map(|_| hold_step(&mut slot, 7, false, || panic!("the same body"))).collect();
+        assert!(air[..settle].iter().all(|act| *act == PreviewAct::Lift));
+        assert!(air[settle..].iter().all(|act| *act == PreviewAct::Hold));
+        // Back on a floor it stands again, and the next lift settles again before the hold.
+        assert_eq!(hold_step(&mut slot, 7, true, || panic!("the same body")), PreviewAct::Stand);
+        assert_eq!(hold_step(&mut slot, 7, false, || panic!("the same body")), PreviewAct::Lift);
+        assert_eq!(slot.unwrap().origin(), origin(3.0));
     }
 
     /// The operator's picture: the CPU start of Guard the Edge at (-199, -8), left of the Fixed camera's view.

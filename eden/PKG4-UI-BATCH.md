@@ -33,6 +33,6 @@ This proves the live preference and persistence ONLY. Full capture additionally 
 
 ## Remaining recording and final evidence
 
-rows_s44.py provides existing exact request/receipt pairs for named capture, library load, input0/playback completion, copy-to-slot frame equality, X+1 placement with unchanged frames, real keyboard text and frame_probe advancement, cross-fighter loading and actual cpu_kind change. These need compatible settings; opening panels is insufficient coverage.
+rows_s44.py provides existing exact request/receipt pairs for named capture, library load, input0/playback completion, copy-to-slot frame equality, real keyboard text and frame_probe advancement, cross-fighter loading and actual cpu_kind change. These need compatible settings; opening panels is insufficient coverage.
 
 Retain ALL hook_stats intervals, every total/delta zero; exercised required scopes live_replay, recorder_ai, recorder_poll, named_service, named_restore. Require zero handoff drops, zero TOTAL console Unmapped, source/NRO/settings/inputs binding, screenshots, raw run.json/memory.peak, profile restoration and claim release. Existing F6 fault invalidates clean runtime acceptance even when individual panel observations pass.

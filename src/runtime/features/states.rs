@@ -498,7 +498,21 @@ unsafe fn take_named_load() -> bool {
         NAMED_LOAD.take(take_pair)
     };
     let Some(pair) = named else { return false };
-    let accepted = begin_temporary(pair);
+    announce_load(begin_temporary(pair))
+}
+
+/// The placement picker's pair, started as a named save's is. The picker took it from its own hand-off on Player 1's
+/// frame while its visit still waited, so a pair posted for a visit that ended never comes here, and the named
+/// hand-off (a Play's warp) is never replaced by a placement. Whether the load was taken.
+///
+/// # Safety
+/// Player 1's frame on the game thread, as `take_named_load`.
+pub(super) unsafe fn begin_placed(pair: [SavedState; 2]) -> bool {
+    announce_load(begin_temporary(pair))
+}
+
+/// A temporary load that was taken is told to the recorder and the HUD.
+unsafe fn announce_load(accepted: bool) -> bool {
     if accepted {
         recorder::on_load_request();
         hud_load(Role::Player.index(), true);

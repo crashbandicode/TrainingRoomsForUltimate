@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 174] = [
+pub static ROWS: [Row; 175] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -384,8 +384,8 @@ pub static ROWS: [Row; 174] = [
     // Recording > Replays. The library groups above have no rows (revision 8.2).
     r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
       "On: a replay, macro, chain or combo drill on another fighter\nasks first. Off: the fighter you have stays, without asking."),
-    r(REPLAYS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
-      "Moves where the active macro starts after its warp,\nfor the side the Recording pop-up is set to."),
+    r(REPLAYS, "Change placement", "", Control::Editor(Editor::EditPlacement),
+      "Places both fighters of the active macro's start save\non the live game, for the side of the Recording pop-up."),
     r(REPLAYS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
       "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(REPLAYS, "Replay capture", "", Control::ReplayCapture,
@@ -403,6 +403,8 @@ pub static ROWS: [Row; 174] = [
       "How many times the active macro plays.\nX cycles this while the cursor is in MACROS."),
     Row { advanced: true, ..r(OPTIONS, "Settings override playback", "settings_override_playback", TOGGLE,
       "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
+    Row { advanced: true, ..r(OPTIONS, "Shared start save", "shared_start_save", Control::Dropdown(&o::SHARED_START),
+      "Change placement on a start save that macros share: ask,\nalways change it for all, or always copy it for one.") },
     r(OPTIONS, "Combo helper", "combo_helper", TOGGLE,
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
     r(OPTIONS, "Match sweet/sour spot", "spots_combo", TOGGLE,

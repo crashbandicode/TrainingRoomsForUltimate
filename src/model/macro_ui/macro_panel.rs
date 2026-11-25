@@ -140,10 +140,6 @@ pub enum Effect {
     None,
     Notify(String),
     Save(Box<MacroRecording>),
-    Overwrite {
-        id: String,
-        recording: Box<MacroRecording>,
-    },
     Choose(String),
     /// Y on the named CPU library. A remains [`Effect::Choose`].
     BindToSlot { id: String },
@@ -164,9 +160,6 @@ pub enum Effect {
     ComboFighter(Option<FighterChoice>),
     /// Result of a prompt opened for a recording, a combo drill, or a chain's macro 1. `None` is Cancel.
     RecordingFighter(Option<FighterChoice>),
-    /// Keep on Edit placement for a role's active macro: Play uses this offset until the game closes; the file is
-    /// unchanged.
-    KeepPlacement { id: String, placement: Placement },
 }
 
 /// Everything the runtime knows about the selection being loaded. The panel
@@ -221,13 +214,7 @@ enum Key {
     Prev,
     Save,
     Cancel,
-    Place,
     Momentum,
-    Nudge(i16, i16),
-    Keep,
-    Write,
-    SaveAs,
-    Back,
     Empty,
 }
 
@@ -244,15 +231,12 @@ enum Plays {
 }
 
 struct Loaded {
+    /// The selection's library id. No shipped code reads it since the placement grid went (operator 2026-11-25,
+    /// PC6 A); the tests tell by it which selection is loaded.
+    #[cfg(test)]
     id: Option<String>,
     recording: MacroRecording,
     plays: Plays,
-}
-
-/// The role's active macro on Edit placement, and where its start save puts that role.
-struct Editing {
-    id: String,
-    recording: MacroRecording,
 }
 
 /// A selection waiting for the user's fighter choice. Nothing is committed yet,
@@ -317,13 +301,6 @@ impl NameDraft {
     }
 }
 
-struct PlaceDraft {
-    working: Placement,
-    cursor: usize,
-    /// Return to the save dialog instead of closing.
-    from_save: bool,
-}
-
 struct LibraryPage {
     rows: Vec<LibraryRow>,
     skipped: usize,
@@ -338,27 +315,19 @@ struct LibraryPage {
 enum Screen {
     Closed,
     Save(NameDraft),
-    Place(Box<PlaceDraft>),
     Library(Box<LibraryPage>),
     Fighter(Box<FighterScreen>),
 }
 
-/// Menu, naming, placement, and the restore/character sequence for one macro.
+/// Menu, naming, and the restore/character sequence for one macro.
 pub struct MacroUi {
     screen: Screen,
     loaded: Option<Loaded>,
-    /// Edit placement's file while its page is open (primary 2026-11-08 #70 (a)); the named selection is not changed.
-    editing: Option<Editing>,
     /// Library page the last A choice came from, for a Cancelled fighter prompt.
     picked: Option<Box<LibraryPage>>,
     /// Id and name of a library load a fighter prompt just committed, until the
     /// runtime has remembered it.
     prompt_commit: Option<(String, String)>,
-    /// Name dialog parked while its placement page is open.
-    held_save: Option<NameDraft>,
-    /// CPU position from the latest save-state restore, before the offset.
-    anchor: Option<(f32, f32)>,
-    edit_anchor: Option<(f32, f32)>,
     pending_kind: Option<i32>,
     claimed: bool,
     character_ready: bool,
@@ -374,12 +343,8 @@ impl MacroUi {
         Self {
             screen: Screen::Closed,
             loaded: None,
-            editing: None,
             picked: None,
             prompt_commit: None,
-            held_save: None,
-            anchor: None,
-            edit_anchor: None,
             pending_kind: None,
             claimed: false,
             character_ready: false,
@@ -413,13 +378,6 @@ impl MacroUi {
     }
 
     #[cfg(test)]
-    pub fn loaded_facing(&self) -> Option<f32> {
-        self.loaded
-            .as_ref()
-            .map(|loaded| loaded.recording.start.facing)
-    }
-
-    #[cfg(test)]
     pub fn loaded_start(&self) -> Option<StartState> {
         self.loaded.as_ref().map(|loaded| loaded.recording.start)
     }
@@ -439,13 +397,6 @@ impl MacroUi {
         } else {
             self.loaded_target().map(|target| target.kind() as i32)
         };
-    }
-
-    #[cfg(test)]
-    pub fn loaded_placement(&self) -> Option<Placement> {
-        self.loaded
-            .as_ref()
-            .map(|loaded| loaded.recording.placement)
     }
 
     /// Native frontends supply their system keyboard instead of the terminal grid.
@@ -501,7 +452,7 @@ impl MacroUi {
         let Screen::Save(draft) = &self.screen else { return None };
         let footer = match &draft.body {
             NameBody::Macro(body) => format!(
-                "{} · {}f · {:.2}s\nA: system keyboard   Y: placement   B: return",
+                "{} · {}f · {:.2}s\nA: system keyboard   B: return",
                 shown_name(&draft.name), body.frames.len(), body.frames.len() as f32 / 60.0),
             NameBody::External { summary, .. } => format!(
                 "{} · {summary}\nA: system keyboard   B: return",
@@ -518,8 +469,6 @@ impl MacroUi {
         draft.name = name;
         self.finish_save()
     }
-
-    pub fn native_name_placement(&mut self) -> Effect { self.open_place_from_save() }
 
     pub fn view(&self) -> Option<View> {
         let mut labels = vec![String::new(); PAGE];
@@ -541,20 +490,6 @@ impl MacroUi {
                         "Name: {}    page {}/2\n{detail}",
                         shown_name(&draft.name),
                         draft.page + 1,
-                    ),
-                    draft.cursor,
-                )
-            }
-            Screen::Place(draft) => {
-                fill_keys(&mut labels, place_keys());
-                (
-                    "Placement".to_owned(),
-                    format!(
-                        "Offset X {:.2}  Y {:.2}  {}\nAnchor is {}. Inputs stay recorded.",
-                        draft.working.delta_x,
-                        draft.working.delta_y,
-                        momentum_label(draft.working.momentum),
-                        if self.editing.is_some() { "where the start save puts this role" } else { "the restored CPU position" }
                     ),
                     draft.cursor,
                 )
@@ -658,7 +593,6 @@ impl MacroUi {
 
     fn open_name(&mut self, draft: NameDraft) {
         self.playback_on = false;
-        self.held_save = None;
         self.screen = Screen::Save(draft);
     }
 
@@ -708,46 +642,6 @@ impl MacroUi {
             alternate,
             binds_slot,
         }));
-    }
-
-    /// The supplied reference must come from the Training restore, never live movement.
-    #[cfg(test)]
-    pub fn open_editor(&mut self, restored_reference: Option<(f32, f32)>) -> bool {
-        if self.loaded.is_none() {
-            return false;
-        }
-        let Some(anchor) = self.anchor.or(restored_reference) else {
-            return false;
-        };
-        let working = self.loaded.as_ref().unwrap().recording.placement;
-        self.edit_anchor = Some(anchor);
-        self.playback_on = false;
-        self.screen = Screen::Place(Box::new(PlaceDraft {
-            working,
-            cursor: 1,
-            from_save: false,
-        }));
-        true
-    }
-
-    /// Edit placement on a role's active macro, the file Play plays (primary 2026-11-08 #70 (a)). `anchor` is where the
-    /// macro's start save puts that role, the warp Play makes; the offset is added to it. The named selection and the
-    /// CPU are left alone.
-    pub fn open_placement(&mut self, id: String, recording: MacroRecording, anchor: (f32, f32)) -> bool {
-        if recording.validate().is_err() {
-            return false;
-        }
-        let working = recording.placement;
-        self.editing = Some(Editing { id, recording });
-        self.edit_anchor = Some(anchor);
-        self.playback_on = false;
-        self.held_save = None;
-        self.screen = Screen::Place(Box::new(PlaceDraft {
-            working,
-            cursor: 1,
-            from_save: false,
-        }));
-        true
     }
 
     pub fn on_pad(&mut self, pad: Pad) -> Effect {
@@ -838,13 +732,6 @@ impl MacroUi {
         }
     }
 
-    pub fn marker(&self) -> Option<(f32, f32)> {
-        let Screen::Place(draft) = &self.screen else {
-            return None;
-        };
-        let anchor = if self.editing.is_some() { self.edit_anchor } else { self.anchor.or(self.edit_anchor) }?;
-        Some(draft.working.apply(anchor))
-    }
 
     #[cfg(test)]
     pub fn arm_playback(&mut self) -> bool {
@@ -899,43 +786,43 @@ impl MacroUi {
 
     pub fn close_transient(&mut self) {
         self.screen = Screen::Closed;
-        self.editing = None;
         self.picked = None;
         self.prompt_commit = None;
-        self.held_save = None;
-        self.clear_anchor();
+        self.stop_playback();
     }
 
     /// Keep exact unfinished panels and draft values across a waiting match, but
-    /// invalidate the old stage anchor and all playback/character acknowledgments.
+    /// invalidate playback and character acknowledgments.
     /// A fighter prompt is about the old stage's CPU: it is retired, not parked.
     pub fn invalidate_practice_context(&mut self) {
-        self.clear_anchor();
+        self.stop_playback();
         self.drop_fighter_prompt();
         self.picked = None;
         self.character_ready = false;
         self.claimed = false;
     }
 
-    fn clear_anchor(&mut self) {
+    fn stop_playback(&mut self) {
         self.playback_on = false;
         self.emitted = None;
         self.emitted_tick = None;
-        self.anchor = None;
-        self.edit_anchor = None;
     }
 
     fn install(
         &mut self,
-        id: Option<String>,
+        _id: Option<String>,
         recording: MacroRecording,
         cpu_kind: Option<i32>,
     ) -> Result<Effect, MacroError> {
         let kind = recording.start.fighter_kind;
-        self.loaded = Some(Loaded { id, recording, plays: Plays::Recorded });
+        self.loaded = Some(Loaded {
+            #[cfg(test)]
+            id: _id,
+            recording,
+            plays: Plays::Recorded,
+        });
         self.screen = Screen::Closed;
         self.picked = None;
-        self.held_save = None;
         self.playback_on = false;
         self.playback_frame = 0;
         self.playback_len = 0;
@@ -982,7 +869,6 @@ impl MacroUi {
             FighterGate::Prompt => {
                 let prior = self.picked.take();
                 self.playback_on = false;
-                self.held_save = None;
                 self.screen = Screen::Fighter(Box::new(FighterScreen {
                     prompt: fighter::Prompt::new(
                         FighterOrigin::Named,
@@ -1064,14 +950,18 @@ impl MacroUi {
     /// and the file's recorded fighter and Mii are untouched.
     fn install_current(
         &mut self,
-        id: Option<String>,
+        _id: Option<String>,
         recording: MacroRecording,
         cpu_kind: Option<i32>,
     ) -> Effect {
-        self.loaded = Some(Loaded { id, recording, plays: Plays::Current });
+        self.loaded = Some(Loaded {
+            #[cfg(test)]
+            id: _id,
+            recording,
+            plays: Plays::Current,
+        });
         self.screen = Screen::Closed;
         self.picked = None;
-        self.held_save = None;
         self.playback_on = false;
         self.playback_frame = 0;
         self.playback_len = 0;
@@ -1143,7 +1033,6 @@ impl MacroUi {
     fn shift(&mut self, d_row: i32, d_col: i32) -> Effect {
         match &mut self.screen {
             Screen::Save(draft) => draft.cursor = nudge(draft.cursor, d_row, d_col),
-            Screen::Place(draft) => draft.cursor = nudge(draft.cursor, d_row, d_col),
             Screen::Library(page) => {
                 page.cursor = move_library(page.cursor, page.rows.len(), d_row, d_col);
             }
@@ -1157,10 +1046,6 @@ impl MacroUi {
             Screen::Save(draft) => {
                 let key = name_keys(draft.page)[draft.cursor];
                 self.activate_name(key)
-            }
-            Screen::Place(draft) => {
-                let key = place_keys()[draft.cursor];
-                self.activate_place(key)
             }
             Screen::Library(page) => {
                 let id = page.rows.get(page.cursor).map(|row| row.id.clone());
@@ -1218,35 +1103,11 @@ impl MacroUi {
             }
             Key::Save => self.finish_save(),
             Key::Cancel => self.discard(),
-            Key::Place => self.open_place_from_save(),
             Key::Momentum => {
                 self.toggle_draft_momentum();
                 Effect::None
             }
-            _ => Effect::None,
-        }
-    }
-
-    fn activate_place(&mut self, key: Key) -> Effect {
-        match key {
-            Key::Nudge(x, y) => {
-                if let Screen::Place(draft) = &mut self.screen {
-                    draft.working.delta_x += f32::from(x) / 4.0;
-                    draft.working.delta_y += f32::from(y) / 4.0;
-                }
-                Effect::None
-            }
-            Key::Momentum => {
-                if let Screen::Place(draft) = &mut self.screen {
-                    draft.working.momentum = flip(draft.working.momentum);
-                }
-                Effect::None
-            }
-            Key::Keep => self.keep_temporary(),
-            Key::Write => self.write_over(),
-            Key::SaveAs => self.save_as(),
-            Key::Back | Key::Cancel => self.back(),
-            _ => Effect::None,
+            Key::Empty => Effect::None,
         }
     }
 
@@ -1301,32 +1162,6 @@ impl MacroUi {
         }
     }
 
-    fn open_place_from_save(&mut self) -> Effect {
-        if matches!(&self.screen, Screen::Save(draft) if matches!(draft.body, NameBody::External { .. })) {
-            return Effect::None;
-        }
-        if self.anchor.is_none() {
-            return Effect::Notify("Restore a Training state before editing placement".into());
-        }
-        let screen = std::mem::replace(&mut self.screen, Screen::Closed);
-        let Screen::Save(draft) = screen else {
-            self.screen = screen;
-            return Effect::None;
-        };
-        let NameBody::Macro(body) = &draft.body else {
-            self.screen = Screen::Save(draft);
-            return Effect::None;
-        };
-        let working = body.placement;
-        self.held_save = Some(draft);
-        self.screen = Screen::Place(Box::new(PlaceDraft {
-            working,
-            cursor: 1,
-            from_save: true,
-        }));
-        Effect::None
-    }
-
     fn finish_save(&mut self) -> Effect {
         let external = match &self.screen {
             Screen::Save(draft) => match draft.body {
@@ -1377,99 +1212,14 @@ impl MacroUi {
         Effect::Save(Box::new(recording))
     }
 
-    fn keep_temporary(&mut self) -> Effect {
-        let (placement, from_save) = match &self.screen {
-            Screen::Place(draft) => (draft.working, draft.from_save),
-            _ => return Effect::None,
-        };
-        if from_save {
-            return self.restore_save_from_place(placement);
-        }
-        if let Some(editing) = self.editing.take() {
-            self.screen = Screen::Closed;
-            return Effect::KeepPlacement { id: editing.id, placement };
-        }
-        if let Some(loaded) = self.loaded.as_mut() {
-            if loaded.recording.set_placement(placement).is_err() {
-                return Effect::Notify("Placement is not usable".to_owned());
-            }
-        }
-        self.screen = Screen::Closed;
-        Effect::Notify("Placement kept for this session".to_owned())
-    }
-
-    fn write_over(&mut self) -> Effect {
-        let placement = match &self.screen {
-            Screen::Place(draft) => draft.working,
-            _ => return Effect::None,
-        };
-        if let Some(editing) = self.editing.as_mut() {
-            if editing.recording.set_placement(placement).is_err() {
-                return Effect::Notify("Placement is not usable".to_owned());
-            }
-            let Some(Editing { id, recording }) = self.editing.take() else { return Effect::None };
-            self.screen = Screen::Closed;
-            return Effect::Overwrite { id, recording: Box::new(recording) };
-        }
-        let Some(id) = self.loaded.as_ref().and_then(|loaded| loaded.id.clone()) else {
-            return Effect::Notify("Save the recording before overwriting a file".to_owned());
-        };
-        let Some(loaded) = self.loaded.as_mut() else {
-            return Effect::None;
-        };
-        if loaded.recording.set_placement(placement).is_err() {
-            return Effect::Notify("Placement is not usable".to_owned());
-        }
-        let recording = Box::new(loaded.recording.clone());
-        self.screen = Screen::Closed;
-        Effect::Overwrite { id, recording }
-    }
-
-    fn save_as(&mut self) -> Effect {
-        let placement = match &self.screen {
-            Screen::Place(draft) => draft.working,
-            _ => return Effect::None,
-        };
-        let editing = self.editing.take();
-        let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {
-            return Effect::Notify("Nothing to save".to_owned());
-        };
-        let draft = NameDraft::from_recording(source, placement);
-        self.held_save = None;
-        self.screen = Screen::Save(draft);
-        Effect::None
-    }
-
     fn back(&mut self) -> Effect {
-        let from_save = matches!(&self.screen, Screen::Place(draft) if draft.from_save);
-        if from_save {
-            let placement = match &self.screen {
-                Screen::Place(draft) => draft.working,
-                _ => Placement::default(),
-            };
-            return self.restore_save_from_place(placement);
-        }
         match &self.screen {
-            Screen::Place(_) | Screen::Save(_) | Screen::Library(_) => self.discard(),
+            Screen::Save(_) | Screen::Library(_) => self.discard(),
             Screen::Closed | Screen::Fighter(_) => Effect::None,
         }
     }
 
-    fn restore_save_from_place(&mut self, placement: Placement) -> Effect {
-        let Some(mut held) = self.held_save.take() else {
-            self.screen = Screen::Closed;
-            return Effect::None;
-        };
-        if let NameBody::Macro(body) = &mut held.body {
-            body.placement = placement;
-        }
-        self.screen = Screen::Save(held);
-        Effect::None
-    }
-
     fn discard(&mut self) -> Effect {
-        self.held_save = None;
-        self.editing = None;
         self.screen = Screen::Closed;
         Effect::None
     }
@@ -1555,28 +1305,8 @@ fn name_keys(page: usize) -> [Key; PAGE] {
         keys[14] = Key::Prev;
         keys[16] = Key::Save;
         keys[17] = Key::Cancel;
-        keys[18] = Key::Place;
         keys[19] = Key::Momentum;
     }
-    keys
-}
-
-fn place_keys() -> [Key; PAGE] {
-    let mut keys = [Key::Empty; PAGE];
-    // Whole units are stored as quarters so the cell value stays an integer.
-    keys[0] = Key::Nudge(-4, 0);
-    keys[1] = Key::Nudge(4, 0);
-    keys[2] = Key::Nudge(0, -4);
-    keys[3] = Key::Nudge(0, 4);
-    keys[4] = Key::Nudge(-1, 0);
-    keys[5] = Key::Nudge(1, 0);
-    keys[6] = Key::Nudge(0, -1);
-    keys[7] = Key::Nudge(0, 1);
-    keys[8] = Key::Momentum;
-    keys[9] = Key::Keep;
-    keys[10] = Key::Write;
-    keys[11] = Key::SaveAs;
-    keys[12] = Key::Back;
     keys
 }
 
@@ -1638,28 +1368,8 @@ fn key_label(key: Key) -> &'static str {
         Key::Prev => "Prev",
         Key::Save => "Save",
         Key::Cancel => "Cancel",
-        Key::Place => "Place",
         Key::Momentum => "Momentum",
-        Key::Nudge(-4, 0) => "X-",
-        Key::Nudge(4, 0) => "X+",
-        Key::Nudge(0, -4) => "Y-",
-        Key::Nudge(0, 4) => "Y+",
-        Key::Nudge(-1, 0) => "x-",
-        Key::Nudge(1, 0) => "x+",
-        Key::Nudge(0, -1) => "y-",
-        Key::Nudge(0, 1) => "y+",
-        Key::Keep => "Keep",
-        Key::Write => "Write",
-        Key::SaveAs => "New",
-        Key::Back => "Back",
-        Key::Empty | Key::Nudge(_, _) => "",
-    }
-}
-
-fn momentum_label(mode: MomentumMode) -> &'static str {
-    match mode {
-        MomentumMode::PreserveRecorded => "Keep recorded speed",
-        MomentumMode::AtRest => "Start at rest",
+        Key::Empty => "",
     }
 }
 
@@ -1868,73 +1578,6 @@ mod tests {
         assert_eq!(ui.loaded_id(), Some("kept"));
     }
 
-    fn placement_edit_keeps_inputs_and_can_stay_temporary() {
-        let mut ui = MacroUi::new();
-        let original = frames();
-        ui.commit_loaded("drill".to_owned(), sample(Placement::default()), Some(0x08))
-            .unwrap();
-        assert!(ui.open_editor(Some((4.0, 8.0))));
-        ui.on_pad(Pad::Confirm);
-        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
-        assert_eq!(ui.loaded_placement().unwrap().delta_x, 0.0);
-        assert_eq!(ui.loaded_frames(), Some(original.as_slice()));
-
-        assert!(ui.open_editor(Some((4.0, 8.0))));
-        ui.on_pad(Pad::Confirm);
-        goto(&mut ui, 9);
-        assert!(matches!(ui.on_pad(Pad::Confirm), Effect::Notify(_)));
-        let placement = ui.loaded_placement().unwrap();
-        assert_eq!(placement.delta_x, 1.0);
-        assert_eq!(placement.momentum, MomentumMode::PreserveRecorded);
-        assert_eq!(ui.loaded_facing(), Some(-1.0));
-        assert_eq!(ui.loaded_frames(), Some(original.as_slice()));
-        assert!(!ui.is_open());
-    }
-
-    fn placement_needs_restored_reference_and_save_keeps_it() {
-        let mut ui = MacroUi::new();
-        ui.commit_loaded("drill".into(), sample(Placement::default()), Some(0x08)).unwrap();
-        assert!(!ui.open_editor(None));
-        ui.commit_loaded("copy".into(), sample(Placement::default()), Some(0x08)).unwrap();
-        assert!(ui.open_editor(Some((5.0, 8.0))));
-        assert_eq!(ui.marker(), Some((5.0, 8.0)));
-        ui.close_transient();
-        assert!(!ui.open_editor(None));
-    }
-
-    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden
-    /// rc6-covrec-diag2 cov-edit-placement: with a macro active the row refused "Load a macro and restore a Training
-    /// state first", because it looked for the retired named layer's macro.
-    fn edit_placement_opens_on_the_active_macro_and_writes_that_file() {
-        let mut ui = MacroUi::new();
-        let original = sample(Placement::default());
-        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
-        assert!(ui.is_open());
-        assert_eq!(ui.marker(), Some((10.0, 0.0)), "the marker starts on the start save's position");
-        assert_eq!(ui.loaded_id(), None, "the named selection is not changed");
-        ui.on_pad(Pad::Confirm);
-        assert_eq!(ui.marker(), Some((11.0, 0.0)));
-        goto(&mut ui, 10);
-        let Effect::Overwrite { id, recording } = ui.on_pad(Pad::Confirm) else { panic!("Write over the active file") };
-        assert_eq!(id, "active-1");
-        assert_eq!(recording.placement.delta_x, 1.0);
-        assert_eq!(recording.frames, original.frames, "inputs stay recorded");
-        assert!(!ui.is_open());
-        assert_eq!(ui.loaded_id(), None);
-
-        assert!(ui.open_placement("active-1".into(), original.clone(), (10.0, 0.0)));
-        ui.on_pad(Pad::Confirm);
-        goto(&mut ui, 9);
-        let Effect::KeepPlacement { id, placement } = ui.on_pad(Pad::Confirm) else { panic!("Keep for this session") };
-        assert_eq!((id.as_str(), placement.delta_x), ("active-1", 1.0));
-        assert!(!ui.is_open());
-
-        assert!(ui.open_placement("active-1".into(), original, (10.0, 0.0)));
-        assert!(matches!(ui.on_pad(Pad::Back), Effect::None));
-        assert!(!ui.is_open());
-        assert_eq!(ui.marker(), None);
-    }
-
     fn native_checkpoint_survives_repeated_interruption_without_commit() {
         let mut ui = MacroUi::new();
         let mut original = sample(Placement { delta_x: 7.0, delta_y: -2.0, ..Placement::default() });
@@ -1963,23 +1606,18 @@ mod tests {
         assert_eq!(saved.mii, original.mii);
     }
 
-    fn save_dialog_placement_round_trip_and_momentum() {
+    fn saving_a_named_draft_keeps_its_selected_momentum() {
         let mut ui = MacroUi::new();
-        ui.anchor = Some((4.0, 8.0));
         ui.offer_save_with_mii(frames(), start(), false, "13.0.5", None);
         ui.on_pad(Pad::Left);
         ui.on_pad(Pad::Confirm);
-        goto(&mut ui, 18);
+        goto(&mut ui, 19);
         ui.on_pad(Pad::Confirm);
-        ui.on_pad(Pad::Confirm);
-        goto(&mut ui, 8);
-        ui.on_pad(Pad::Confirm);
-        ui.on_pad(Pad::Back);
         goto(&mut ui, 16);
         let Effect::Save(recording) = ui.on_pad(Pad::Confirm) else {
             panic!("expected save");
         };
-        assert_eq!(recording.placement.delta_x, 1.0);
+        assert_eq!(recording.placement.delta_x, 0.0);
         assert_eq!(recording.placement.momentum, MomentumMode::AtRest);
         assert_eq!(recording.frames, frames());
         assert_eq!(recording.start.status, 0x22);
@@ -2028,7 +1666,7 @@ mod tests {
         crate::engine::mii::lifetime::Configuration::from_saved(&saved).unwrap()
     }
 
-    fn exact_mii_naming_save_as_and_same_class_ack_keep_identity() {
+    fn exact_mii_naming_retry_and_same_class_ack_keep_identity() {
         let configuration = exact_mii();
         let mut original = MacroRecording::new("Captured", "13.0.5", StartState::neutral(0x48, 0, 1.0), frames()).unwrap();
         original.set_mii(configuration).unwrap();
@@ -2053,8 +1691,7 @@ mod tests {
         assert!(!ui.playback_allowed());
         ui.observe_exact_cpu(Some(0x48), Some(configuration), false);
         assert!(ui.playback_allowed());
-        assert!(ui.open_editor(Some((0.0, 0.0))));
-        ui.save_as();
+        ui.restore_draft(ui.loaded.as_ref().unwrap().recording.clone());
         let Effect::Save(copy) = ui.confirm_native_name("Copy Brawler".into()) else { panic!() };
         assert_eq!(copy.mii, Some(configuration));
         assert_eq!(copy.schema_version, 2);
@@ -2266,8 +1903,6 @@ mod tests {
         assert_eq!(ui.name_prompt(), Some("Slot draft"));
         assert_eq!(ui.native_name_title(), Some(SETUP_KEYBOARD_TITLE));
         assert_eq!(ui.native_name_cursor(), Some(4));
-        assert!(matches!(ui.native_name_placement(), Effect::None));
-        assert_eq!(ui.name_prompt(), Some("Slot draft"));
         assert!(matches!(ui.confirm_native_name("   ".into()), Effect::Notify(_)));
         assert_eq!(ui.name_prompt(), Some("   "));
         let Effect::NameConfirmed { context, name } = ui.confirm_native_name("  Morning setup  ".into()) else {
@@ -2338,13 +1973,10 @@ mod tests {
             ("empty_name_stays_on_the_dialog_and_typed_name_pages", empty_name_stays_on_the_dialog_and_typed_name_pages as fn()),
             ("crop_drops_only_the_neutral_tail", crop_drops_only_the_neutral_tail as fn()),
             ("library_pages_and_cancel_keeps_the_previous_choice", library_pages_and_cancel_keeps_the_previous_choice as fn()),
-            ("placement_edit_keeps_inputs_and_can_stay_temporary", placement_edit_keeps_inputs_and_can_stay_temporary as fn()),
-            ("placement_needs_restored_reference_and_save_keeps_it", placement_needs_restored_reference_and_save_keeps_it as fn()),
-            ("edit_placement_opens_on_the_active_macro_and_writes_that_file", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),
             ("native_checkpoint_survives_repeated_interruption_without_commit", native_checkpoint_survives_repeated_interruption_without_commit as fn()),
-            ("save_dialog_placement_round_trip_and_momentum", save_dialog_placement_round_trip_and_momentum as fn()),
+            ("saving_a_named_draft_keeps_its_selected_momentum", saving_a_named_draft_keeps_its_selected_momentum as fn()),
             ("character_request_is_once_and_playback_does_not_double_advance", character_request_is_once_and_playback_does_not_double_advance as fn()),
-            ("exact_mii_naming_save_as_and_same_class_ack_keep_identity", exact_mii_naming_save_as_and_same_class_ack_keep_identity as fn()),
+            ("exact_mii_naming_retry_and_same_class_ack_keep_identity", exact_mii_naming_retry_and_same_class_ack_keep_identity as fn()),
             ("numbered_slot_copy_rejects_over_limit_without_truncation", numbered_slot_copy_rejects_over_limit_without_truncation as fn()),
             ("slot_facing_parks_only_a_captured_slot", slot_facing_parks_only_a_captured_slot as fn()),
             ("library_y_binds_only_when_the_slot_label_is_set", library_y_binds_only_when_the_slot_label_is_set as fn()),

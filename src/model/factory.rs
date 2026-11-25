@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 182;
+pub const COUNT: usize = 183;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -151,6 +151,8 @@ pub static DEFS: [Def; COUNT] = [
     // Draft 9 (SPEC-core-04 §3.1): Off by default.
     row!("respawn_invincibility", Single, 2, [1]),
     row!("settings_override_playback", Single, 2, [1]),
+    // Change placement on a start save that macros share (operator 2026-11-25, PC5): Prompt by default.
+    row!("shared_start_save", Single, 3, [0]),
     row!("dev_reload_config", Single, 2, [1]),
     row!("dev_debug_hooks", Single, 2, [1]),
     // Preload Samples: the fork's id (SPEC-core-02 §2.8 proposed `preload_samples`; see CARRY-OVER.md).

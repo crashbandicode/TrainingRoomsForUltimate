@@ -18,7 +18,7 @@ use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
+    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, unused_name, Capture,
     KeyboardOffer, EMPTY_COMBO,
 };
 use crate::model::action::Late;
@@ -31,6 +31,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
+use crate::model::record_place::{Commit, Shared};
 use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -460,8 +461,6 @@ static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
 static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
 /// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
 static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
-/// Edit placement's Keep: a file id and the offset Play uses for it instead of the file's.
-static KEPT_PLACEMENT: Mutex<Option<(String, Placement)>> = Mutex::new(None);
 
 /// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
 #[derive(Clone, Debug, PartialEq)]
@@ -551,6 +550,8 @@ pub struct Tick {
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
+    /// The full save pair is needed only on a picker open, not on every recording tick's stack.
+    pub place: Option<Box<PlaceOpen>>,
 }
 
 /// The existing Fighter Mismatch screen, named for the wrapper that opens it.
@@ -1272,6 +1273,35 @@ pub fn today() -> String {
     }
 }
 
+/// A macro stop and an input-drill stop are alternatives. The drill's deep
+/// save path must not reserve the macro capture, spans and two saved fighters.
+#[inline(never)]
+fn save_stopped_macro(root: &Path, player: SavedState, cpu: SavedState, tick: &mut Tick) {
+    let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { "cpu" } else { "player" };
+    tick.diags.push(format!("screen=recording role={role_now} recording=0"));
+    let (spans, count) = take_capture_spans();
+    let (role, frames) = taken_frames();
+    let mut capture = Capture::idle();
+    toggle_record(&mut capture, role);
+    for frame in frames {
+        push_frame(&mut capture, role, frame);
+    }
+    capture.set_spans(&spans[..count]);
+    // The Record chord owns the start pose and speed. Host callers without
+    // a posted start use the two live poses, at rest.
+    let posted = take_record_start();
+    capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+    let (player, cpu, speeds) = match posted.map(|p| p.start) {
+        Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
+        None => (player, cpu, [(0.0, 0.0); 2]),
+    };
+    if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim()) {
+        if let Some(text) = stop.notice() {
+            tick.notices.push(text);
+        }
+    }
+}
+
 pub fn service_at(
     root: &Path,
     slots: &[Option<LegacySlot>; 5],
@@ -1334,36 +1364,7 @@ pub fn service_at(
         let (spans, count) = take_capture_spans();
         save_input(root, "", true, &spans[..count], &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
-        let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
-            "cpu"
-        } else {
-            "player"
-        };
-        tick.diags
-            .push(format!("screen=recording role={role_now} recording=0"));
-        let (spans, count) = take_capture_spans();
-        let (role, frames) = taken_frames();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, role);
-        for frame in frames {
-            push_frame(&mut capture, role, frame);
-        }
-        capture.set_spans(&spans[..count]);
-        // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
-        // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
-        // stands in, at rest, as before.
-        let posted = take_record_start();
-        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
-        let (player, cpu, speeds) = match posted.map(|p| p.start) {
-            Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
-            None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
-        };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim())
-        {
-            if let Some(text) = stop.notice() {
-                tick.notices.push(text);
-            }
-        }
+        save_stopped_macro(root, player, cpu, &mut tick);
     }
     // A drill question and a finished Make combo are work even when no chord is waiting.
     let busy = play_player
@@ -1595,25 +1596,14 @@ pub fn setup_bound(restore: bool) {
     }
 }
 
-/// What Edit placement edits (primary 2026-11-08 #70 (a)): the active macro of the Recording pop-up's role (`RECORD_ROLE`,
-/// not the page's ZR view), the file Play plays, and the position its start save gives that role. Play warps there and
-/// adds the offset (`warp_pair`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct PlacementTarget {
-    pub role: Role,
-    pub id: String,
-    pub recording: MacroRecording,
-    pub anchor: (f32, f32),
-}
-
 /// The game's `SITUATION_KIND_AIR` (ground 0, cliff 1).
 const SITUATION_AIR: i32 = 2;
 
 pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
 pub const PLACE_NO_START: &str = "Link a start save to the macro first";
 
-pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
-    let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
+/// The save to open and the macro to relink on Copy. Reading the save belongs to `place_open`.
+fn active_placement_ids(root: &Path, role: Role) -> Result<(String, String), &'static str> {
     let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
     let active = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
     // A chain warps to macro 1's start save and plays with macro 1's placement (`play_placement`), so it edits macro 1.
@@ -1623,45 +1613,14 @@ pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
     };
     let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
     let start_on = chain_on.unwrap_or(recording.start_save_on);
-    let save = recording
-        .start_save
-        .as_deref()
-        .filter(|_| start_on)
-        .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
-        .ok_or(PLACE_NO_START)?;
-    let at = match role {
-        Role::Player => &save.player,
-        Role::Cpu => &save.cpu,
-    };
-    let anchor = (at.x, at.y);
-    let mut recording = recording;
-    if let Some(placement) = kept_placement(&id) {
-        recording.placement = placement;
-    }
-    Ok(PlacementTarget { role, id, recording, anchor })
+    let save = recording.start_save.filter(|_| start_on).ok_or(PLACE_NO_START)?;
+    Ok((save, id))
 }
 
-/// Keep on Edit placement: Play uses this offset for that file until the game closes. The file is unchanged.
-pub fn keep_placement(id: &str, placement: Placement) {
-    *lock(&KEPT_PLACEMENT) = Some((id.to_owned(), placement));
-}
-
-/// Write over put an offset into the file: a kept one for that file no longer applies.
-pub fn placement_written(id: &str) {
-    let mut kept = lock(&KEPT_PLACEMENT);
-    if kept.as_ref().is_some_and(|(kept, _)| kept == id) {
-        *kept = None;
-    }
-}
-
-fn kept_placement(id: &str) -> Option<Placement> {
-    lock(&KEPT_PLACEMENT).as_ref().filter(|(kept, _)| kept == id).map(|(_, placement)| *placement)
-}
-
-/// The placement a Play of `id` warps with: a kept one, else the file's (a chain: macro 1's, whose start save it is).
+/// The placement a Play of `id` warps with: the file's own (a chain: macro 1's, whose start save it is).
 fn play_placement(book: &Book, id: &str) -> Placement {
     let first = book.first_recording(id).unwrap_or(id);
-    kept_placement(first).unwrap_or_else(|| book.placement(first))
+    book.placement(first)
 }
 
 /// The pair a Play warps to: the start save, with the file's placement added to the playing role's saved position
@@ -1680,6 +1639,110 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
         }
     }
     pair
+}
+
+/// Change placement: a save the placement picker is asked to open on, as the worker read it. `save` is its file,
+/// `relink` the macro a copy is linked to (the macro whose screen asked, a chain's macro 1); the picker hands both
+/// back with what it confirmed (`commit_placement`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlaceOpen {
+    pub save: String,
+    pub relink: Option<String>,
+    pub name: String,
+    pub pair: [SavedState; 2],
+    /// The fighter the picker edits first.
+    pub edit: Role,
+    pub shared: Shared,
+}
+
+/// What a confirmed placement did to its save, for the Switch wrapper.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Placed {
+    /// Nothing was written: the save, its copy or the macro's link could not be read or written. `name`: the
+    /// save's, when it could be read.
+    Refused { ticket: u32, name: String },
+    /// The save holds the placement (or nothing was edited): the pair to load once, and the notice.
+    Saved { ticket: u32, pair: Box<[SavedState; 2]>, notice: String },
+}
+
+/// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
+#[inline(never)]
+fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<Box<PlaceOpen>> {
+    let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save).ok()?;
+    let shared = Shared { macros: macros_starting_from(root, &save), from_macro: relink.is_some() };
+    Some(Box::new(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared }))
+}
+
+/// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
+/// is asked for: the book it holds for Play has only the files that play. A chain is not a macro file (it starts
+/// from its macro 1's save), so it is not counted; a file that does not read as a macro is passed over.
+/// Kept out of line, as the held book's reader is: a loaded macro must not sit in `service_at`'s frame.
+#[inline(never)]
+fn macros_starting_from(root: &Path, save: &str) -> u8 {
+    let library = Library::new(root.join(MACROS_DIR));
+    let Ok(folder) = std::fs::read_dir(root.join(MACROS_DIR)) else { return 0 };
+    let count = folder
+        .flatten()
+        .filter_map(|item| item.file_name().to_str().and_then(|name| name.strip_suffix(".json")).map(str::to_owned))
+        .filter(|id| library.load(id).is_ok_and(|file| file.start_save.as_deref() == Some(save)))
+        .count();
+    u8::try_from(count).unwrap_or(u8::MAX)
+}
+
+/// The picker confirmed a placement on the save its visit opened: the worker writes it. Only what was edited is
+/// written, field by field (`record_place::patch`); with nothing edited no file is written and none is copied. A
+/// copy is a new save, written before `relink` is linked to it; if that link cannot be written the copy is
+/// removed again, so the old link stands. No macro file is touched otherwise: a macro's offset stays its own.
+pub fn commit_placement(root: &Path, save: &str, relink: Option<&str>, commit: Commit) -> Placed {
+    let ticket = commit.ticket;
+    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let Ok(mut file) = saves.load(save) else { return Placed::Refused { ticket, name: String::new() } };
+    let name = file.name.clone();
+    if !commit.edits.iter().any(|edit| edit.any()) {
+        return Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice: format!("Nothing changed · {name}") };
+    }
+    crate::model::record_place::patch([&mut file.player, &mut file.cpu], &commit.setup, commit.edits, commit.stage);
+    let notice = if commit.copy {
+        match copy_placed(root, &saves, &file, relink) {
+            Some(copy) => format!("Saved a copy · {copy}"),
+            None => return Placed::Refused { ticket, name },
+        }
+    } else {
+        if saves.overwrite(save, &file).is_err() {
+            return Placed::Refused { ticket, name };
+        }
+        invalidate_bound();
+        match commit.macros {
+            0 => format!("Saved · {name}"),
+            1 => format!("Saved · {name} · 1 macro starts here"),
+            macros => format!("Saved · {name} · {macros} macros start here"),
+        }
+    };
+    Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice }
+}
+
+/// The placed pair as a new save, and `relink` linked to it; the copy's name. `None`: nothing is left behind.
+fn copy_placed(root: &Path, saves: &Store<NamedSave>, placed: &NamedSave, relink: Option<&str>) -> Option<String> {
+    let names = saves.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
+    let copy = NamedSave::new(unused_name("Save", &names), placed.player.clone(), placed.cpu.clone()).ok()?;
+    let id = saves.save_new(&copy).ok()?;
+    if let Some(recording) = relink {
+        let macros = Library::new(root.join(MACROS_DIR));
+        let linked = macros.load(recording).ok().and_then(|mut file| {
+            // Relink the store-issued id without enabling a standalone start the chain's first macro had disabled.
+            file.start_save = Some(id.clone());
+            macros.overwrite(recording, &file).ok()
+        });
+        if linked.is_none() {
+            let _ = saves.delete(&id);
+            return None;
+        }
+    }
+    let _ = RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &id, Use::Recorded, unix_now())?;
+        Ok(true)
+    });
+    Some(copy.name)
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
@@ -2236,6 +2299,18 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
+        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, save, relink, record_role()),
+        // The Replays row: the start save of the pop-up role's active macro (a chain: its macro 1's).
+        Effect::ChangeActivePlacement => {
+            let role = record_role();
+            match active_placement_ids(root, role) {
+                Ok((save, id)) => {
+                    tick.place = place_open(root, save, Some(id), role);
+                    if tick.place.is_none() { tick.notices.push(PLACE_NO_START); }
+                }
+                Err(refusal) => tick.notices.push(refusal),
+            }
+        },
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
@@ -2293,6 +2368,14 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             }
         }
         Effect::SetTrim { .. } => {}
+        // The macro's own screen (operator 2026-11-25, PC6 A): each row writes its one field into the macro's file.
+        Effect::SetMomentum { id, rest } => {
+            let momentum = if rest { MomentumMode::AtRest } else { MomentumMode::PreserveRecorded };
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| file.placement.momentum = momentum);
+        }
+        Effect::ClearOffset { id } => {
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| (file.placement.delta_x, file.placement.delta_y) = (0.0, 0.0));
+        }
     }
 }
 
@@ -2898,7 +2981,6 @@ pub(crate) fn reset_host() {
     *lock(&BOUND_APPLIED) = None;
     *lock(&SAVED_PAIR) = None;
     SLOT_RESYNC.store(false, Ordering::Release);
-    *lock(&KEPT_PLACEMENT) = None;
     for slot in ROLE_KIND.iter().chain(&LIVE_KIND) {
         slot.store(-1, Ordering::Release);
     }
@@ -5954,7 +6036,7 @@ mod tests {
         let root = scratch("placement");
         migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
         set_record_role(Role::Cpu);
-        assert_eq!(placement_target(&root), Err(PLACE_NO_MACRO));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_MACRO));
         let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
         let mut cpu = at_x(30.0);
         cpu.fighter_kind = 7;
@@ -5967,16 +6049,14 @@ mod tests {
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&loose), 1).unwrap();
         index.save(&root).unwrap();
-        assert_eq!(placement_target(&root), Err(PLACE_NO_START), "no warp, no anchor");
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_START));
         recording.set_start_save(Some(&start)).unwrap();
         recording.set_placement(Placement { delta_x: 1.5, delta_y: 0.0, ..Placement::default() }).unwrap();
         let id = macros.save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&id), 2).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("the CPU's active macro");
-        assert_eq!((target.role, target.id.as_str(), target.anchor), (Role::Cpu, id.as_str(), (30.0, 2.0)));
-        assert_eq!(target.recording.placement.delta_x, 1.5);
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start.clone(), id.clone())));
 
         on_chords(false, false, true);
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
@@ -5990,23 +6070,313 @@ mod tests {
         );
         assert_eq!((lifted[1].y, lifted[1].situation_kind), (5.0, SITUATION_AIR), "a raised start is in the air");
 
-        keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
-        warp_landed();
-        on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
-        assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
-
         // A chain warps to macro 1's start save and plays with macro 1's placement, so Edit placement edits macro 1.
         let chain = Chain::new("Pressure", vec![id.clone(), loose.clone()]).unwrap();
         let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&chain_id), 3).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("a chain edits its macro 1");
-        assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start, id)));
+    }
+
+    /// A save named Jab start (Player 1 at x 10, the CPU at x 50 with 6.3 %), and two macros that start from it;
+    /// the first has an offset of +5.
+    fn placement_library(root: &Path) -> (String, [String; 2]) {
+        let mut cpu = at_x(50.0);
+        (cpu.percent, cpu.fighter_kind) = (6.3, 7);
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Jab start", at_x(10.0), cpu).unwrap()).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let ids = ["Nair", "Fair"].map(|name| {
+            let mut recording = MacroRecording::new(name, "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+            recording.set_start_save(Some(&save)).unwrap();
+            if name == "Nair" {
+                recording.set_placement(Placement { delta_x: 5.0, delta_y: 0.0, ..Placement::default() }).unwrap();
+            }
+            macros.save_new(&recording).unwrap()
+        });
+        (save, ids)
+    }
+
+    #[test]
+    fn replays_opens_a_start_save_without_reading_it_twice() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("replays-open-reads");
+        let (save, macros) = placement_library(&root);
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR))
+            .save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        let book = Book::new(RecordingIndex::load(&root).unwrap());
+        let open = |effect| {
+            let mut tick = Tick::default();
+            let before = store::file_reads();
+            post_effect(effect);
+            apply_menu(&root, &mut Playback::new(), &book, &mut tick);
+            (tick, store::file_reads() - before)
+        };
+        let (direct, direct_reads) = open(Effect::ChangePlacement { save, relink: Some(macros[0].clone()) });
+        let (active, active_reads) = open(Effect::ChangeActivePlacement);
+        assert!(direct.place.is_some());
+        assert_eq!(active.place, direct.place, "same pair, editing role, shared count and relink target");
+        // Both paths read the save and count its links. Resolving an active chain
+        // additionally needs the chain and its first macro, not a second save read.
+        assert!(active_reads <= direct_reads + 2, "direct={direct_reads}; active chain={active_reads}");
+
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save(Some("missing")).unwrap();
+        library.overwrite(&macros[0], &first).unwrap();
+        let (missing, _) = open(Effect::ChangeActivePlacement);
+        assert!(missing.place.is_none());
+        assert_eq!(missing.notices, [PLACE_NO_START]);
+    }
+
+    /// What the picker confirms on `pair` after `edit`: the fields that differ, as the wizard reports them.
+    fn placed(pair: &[SavedState; 2], copy: bool, macros: u8, edit: impl FnOnce(&mut crate::model::record_place::Setup)) -> Commit {
+        use crate::model::record_place::{saved_fighter, Edits};
+        let was = [saved_fighter(&pair[0]).0, saved_fighter(&pair[1]).0];
+        let mut setup = was;
+        edit(&mut setup);
+        let edits = [0, 1].map(|i| Edits {
+            spot: setup[i].place != was[i].place || setup[i].at != was[i].at,
+            state: setup[i].state != was[i].state,
+            percent: setup[i].percent != was[i].percent,
+        });
+        Commit { ticket: 7, copy, setup, edits, stage: 31, macros }
+    }
+
+    fn saved_pair(root: &Path, id: &str) -> [SavedState; 2] {
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(id).unwrap();
+        [save.player, save.cpu]
+    }
+
+    fn file_bytes(root: &Path, dir: &str, id: &str) -> Vec<u8> {
+        std::fs::read(root.join(dir).join(format!("{id}.json"))).unwrap()
+    }
+
+    /// Operator 2026-11-25: Change placement "should also edit on the save state itself". Only the edited half is
+    /// written, field by field; no macro file is touched, so Play still adds a macro's offset to the new spot.
+    fn a_placement_save_rewrites_only_the_edited_half_of_the_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-change");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id));
+        let pair = saved_pair(&root, &save);
+        let commit = placed(&pair, false, 2, |setup| setup[1].at = [40.0, 0.0]);
+        let done = commit_placement(&root, &save, Some(&macros[0]), commit);
+        let Placed::Saved { ticket, pair: loads, notice } = done else { panic!("{done:?}") };
+        assert_eq!((ticket, notice.as_str()), (7, "Saved · Jab start · 2 macros start here"));
+        let written = saved_pair(&root, &save);
+        assert_eq!(written[0], pair[0], "the half that was not edited is as saved");
+        assert_eq!((written[1].x, written[1].saved_stage), (40.0, Some(31)));
+        // rv-edge-juggle-sol 15:54:53Z: a spot edit keeps the file's own damage, 6.3 and not 6.
+        assert_eq!(written[1].percent.to_bits(), pair[1].percent.to_bits());
+        assert_eq!(*loads, written, "the pair to load once is the file's");
+        assert_eq!(macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)), before, "no macro file is touched");
+        let nair = Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap();
+        let named = NamedSave::new("Jab start", written[0].clone(), written[1].clone()).unwrap();
+        assert_eq!(warp_pair(named, Some((Role::Player, nair.placement)))[0].x, 15.0, "Play still adds the offset");
+        // One macro reads in the singular; a save no macro starts from says nothing of macros.
+        let one = commit_placement(&root, &save, None, placed(&written, false, 1, |setup| setup[0].percent = 20));
+        assert!(matches!(&one, Placed::Saved { notice, .. } if notice == "Saved · Jab start · 1 macro starts here"), "{one:?}");
+        let none = commit_placement(&root, &save, None, placed(&written, false, 0, |setup| setup[0].percent = 30));
+        assert!(matches!(&none, Placed::Saved { notice, .. } if notice == "Saved · Jab start"), "{none:?}");
+        assert_eq!(saved_pair(&root, &save)[0].percent, 30.0);
+        // A save that is gone refuses, by its ticket.
+        assert_eq!(commit_placement(&root, "no-such-save", None, placed(&pair, false, 0, |setup| setup[0].percent = 1)),
+            Placed::Refused { ticket: 7, name: String::new() });
+    }
+
+    fn a_save_with_nothing_edited_writes_no_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-none");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = file_bytes(&root, SAVES_DIR, &save);
+        let pair = saved_pair(&root, &save);
+        // Also when the answer was "copy": with nothing to write there is nothing to copy.
+        for copy in [false, true] {
+            let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, copy, 2, |_| {}));
+            let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+            assert_eq!((notice.as_str(), *loads == pair), ("Nothing changed · Jab start", true));
+        }
+        assert_eq!(file_bytes(&root, SAVES_DIR, &save), before);
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1);
+        assert_eq!(Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap().start_save.as_deref(), Some(save.as_str()));
+    }
+
+    fn the_bound_copy_follows_a_changed_placement() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-bound");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, _) = placement_library(&root);
+        RecordingIndex::update(&root, |index| { index.bind_save(Some(&save), 1)?; Ok(true) }).unwrap();
+        invalidate_bound();
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 50.0);
+        assert!(bound_sync(&root).is_none());
+        let pair = saved_pair(&root, &save);
+        assert!(matches!(commit_placement(&root, &save, None, placed(&pair, false, 0, |setup| setup[1].at = [40.0, 0.0])), Placed::Saved { .. }));
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 40.0, "Load goes to the new spot");
+    }
+
+    /// Operator 2026-11-25, PC5: "copy it for this macro". The copy is a new save; it is written before the macro is
+    /// linked to it, and the save and the other macro are not touched.
+    fn a_copy_is_written_before_the_macro_is_relinked() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-copy");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1]));
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+        assert_eq!(notice, "Saved a copy · Save 1");
+        let library = Library::new(root.join(MACROS_DIR));
+        let copy = library.load(&macros[0]).unwrap().start_save.expect("linked");
+        assert_ne!(copy, save);
+        assert_eq!((saved_pair(&root, &copy)[1].x, loads[1].x), (40.0, 40.0));
+        assert_eq!(library.load(&macros[0]).unwrap().placement.delta_x, 5.0, "the macro keeps its offset");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1])), before);
+        // From the save's own screen a copy is a new save that no macro uses.
+        let own = commit_placement(&root, &save, None, placed(&pair, true, 2, |setup| setup[0].at = [0.0, 0.0]));
+        assert!(matches!(&own, Placed::Saved { notice, .. } if notice == "Saved a copy · Save 2"), "{own:?}");
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 3);
+        assert_eq!(library.load(&macros[1]).unwrap().start_save.as_deref(), Some(save.as_str()));
+        assert_eq!(library.load(&macros[0]).unwrap().start_save.as_deref(), Some(copy.as_str()));
+    }
+
+    fn a_chain_copy_keeps_the_first_macros_own_start_save_switch() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-chain-copy-switch");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save_on(false);
+        library.overwrite(&macros[0], &first).unwrap();
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let open = service_at(&root, &none(), "2026-11-25", state(8), state(7)).place.unwrap();
+        assert_eq!(open.relink.as_ref(), Some(&macros[0]), "the chain uses macro 1 even with its own switch Off");
+        assert_eq!(open.save, save);
+        let commit = placed(&open.pair, true, 2, |setup| setup[1].at = [40.0, 0.0]);
+        assert!(matches!(commit_placement(&root, &open.save, open.relink.as_deref(), commit), Placed::Saved { .. }));
+        let written = library.load(&macros[0]).unwrap();
+        let copy = written.start_save.clone().unwrap();
+        assert_ne!(copy, save);
+        assert_eq!(saved_pair(&root, &copy)[1].x, 40.0);
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((copy.clone(), macros[0].clone())));
+        first.start_save = Some(copy);
+        assert_eq!(written.start_save_on, first.start_save_on, "copy must not turn standalone warps On");
+        assert_eq!(written, first, "the new start-save id is the only macro edit");
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 2)?; Ok(true) }).unwrap();
+        assert_eq!(active_placement_ids(&root, Role::Cpu).unwrap_err(), PLACE_NO_START);
+    }
+
+    /// rv-edge-juggle-sol 16:38:12Z: the second write fails (a directory stands where the macro's temporary file
+    /// goes). The old link stays, the copy does not, and the picker is told the save was not written.
+    fn a_failed_relink_leaves_the_old_link_and_no_copy() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-relink");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)));
+        std::fs::create_dir(root.join(MACROS_DIR).join(format!("{}.json.tmp", macros[0]))).unwrap();
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        assert_eq!(done, Placed::Refused { ticket: 7, name: "Jab start".into() });
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1, "no copy is left");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id))), before);
+        let library = Library::new(root.join(MACROS_DIR));
+        for id in &macros {
+            assert_eq!(library.load(id).unwrap().start_save.as_deref(), Some(save.as_str()));
+        }
+    }
+
+    /// Operator 2026-11-25, PC2: the Replays row "opens the SAME picker", on the start save of the pop-up role's
+    /// active macro (a chain: its macro 1's). The save's own screen and the pop-up open it with no macro to relink.
+    fn the_replays_row_opens_the_active_macros_start_save() {
+        use crate::model::record_place::Shared;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-open");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!((tick.place, tick.notices), (None, vec![PLACE_NO_MACRO]));
+        let (save, macros) = placement_library(&root);
+        // The count is of macro files: a chain that uses one of them is not a third.
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let open = PlaceOpen {
+            save: save.clone(),
+            relink: Some(macros[0].clone()),
+            name: "Jab start".into(),
+            pair: saved_pair(&root, &save),
+            edit: Role::Cpu,
+            shared: Shared { macros: 2, from_macro: true },
+        };
+        assert_eq!(tick.place.as_deref(), Some(&open));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: None });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: Some(macros[1].clone()) });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: Some(macros[1].clone()), ..open }));
+        post_effect(Effect::ChangePlacement { save: "no-such-save".into(), relink: None });
+        assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
+    }
+
+    /// Operator 2026-11-25, PC6 A: "Momentum row; an Offset row shows an old offset, and A clears it". Each row
+    /// writes its one field into the macro's file; the menu's catalog carries both for the rows.
+    fn the_momentum_and_offset_rows_write_only_their_field() {
+        use crate::model::recording_menu::MacroPlace;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-rows");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let before = library.load(&macros[0]).unwrap();
+        let other = file_bytes(&root, MACROS_DIR, &macros[1]);
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [5.0f32.to_bits(), 0.0f32.to_bits()], rest: false }));
+        assert_eq!(places.get(&macros[1]), Some(&MacroPlace::default()));
+        post_effect(Effect::SetMomentum { id: macros[0].clone(), rest: true });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut rest = library.load(&macros[0]).unwrap();
+        assert_eq!(rest.placement, Placement { momentum: MomentumMode::AtRest, ..before.placement });
+        rest.placement = before.placement;
+        assert_eq!(rest, before, "nothing else of the file changes");
+        post_effect(Effect::ClearOffset { id: macros[0].clone() });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut cleared = library.load(&macros[0]).unwrap();
+        assert_eq!(cleared.placement, Placement { momentum: MomentumMode::AtRest, ..Placement::default() }, "Momentum stays");
+        cleared.placement = before.placement;
+        assert_eq!(cleared, before, "inputs, start save and name are as they were");
+        assert_eq!(file_bytes(&root, MACROS_DIR, &macros[1]), other, "the other macro's file is untouched");
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [0, 0], rest: true }));
+        // Play after the clear warps to the save's own spot, at rest.
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.warp.as_deref(), Some(save.as_str()));
+        assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x, place.momentum)), Some((Role::Cpu, 0.0, MomentumMode::AtRest)));
     }
 
     fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
@@ -6556,13 +6926,13 @@ mod tests {
         if start_save {
             recording.set_start_save(Some(&save)).unwrap();
         }
+        if let Some(placement) = placement {
+            recording.set_placement(placement).unwrap();
+        }
         let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Player, Some(&id), 1).unwrap();
         index.save(&root).unwrap();
-        if let Some(placement) = placement {
-            keep_placement(&id, placement);
-        }
         on_chords(false, true, false);
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(take_start_speed(Role::Player).is_none(), "{tag}: nothing before the run's first input");
@@ -7061,6 +7431,14 @@ mod tests {
             ("delete_and_edit_reach_the_card", delete_and_edit_reach_the_card as fn()),
             ("the_active_slot_follows_the_bound_save_and_save_writes_it", the_active_slot_follows_the_bound_save_and_save_writes_it as fn()),
             ("edit_placement_targets_the_active_macro_and_play_warps_with_its_offset", edit_placement_targets_the_active_macro_and_play_warps_with_its_offset as fn()),
+            ("a_placement_save_rewrites_only_the_edited_half_of_the_file", a_placement_save_rewrites_only_the_edited_half_of_the_file as fn()),
+            ("a_save_with_nothing_edited_writes_no_file", a_save_with_nothing_edited_writes_no_file as fn()),
+            ("the_bound_copy_follows_a_changed_placement", the_bound_copy_follows_a_changed_placement as fn()),
+            ("a_copy_is_written_before_the_macro_is_relinked", a_copy_is_written_before_the_macro_is_relinked as fn()),
+            ("a_chain_copy_keeps_the_first_macros_own_start_save_switch", a_chain_copy_keeps_the_first_macros_own_start_save_switch as fn()),
+            ("a_failed_relink_leaves_the_old_link_and_no_copy", a_failed_relink_leaves_the_old_link_and_no_copy as fn()),
+            ("the_replays_row_opens_the_active_macros_start_save", the_replays_row_opens_the_active_macros_start_save as fn()),
+            ("the_momentum_and_offset_rows_write_only_their_field", the_momentum_and_offset_rows_write_only_their_field as fn()),
             ("switch_on_an_exact_mii_macro_asks_for_that_mii", switch_on_an_exact_mii_macro_asks_for_that_mii as fn()),
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),

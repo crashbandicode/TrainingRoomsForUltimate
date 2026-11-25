@@ -5,7 +5,7 @@ use crate::model::guard::{guard_outcome, GuardOutcome, SeamKind};
 use crate::model::sites_mashout::FLOOR_RAY;
 use crate::model::sites_tech_surfaces::windows as guards;
 use crate::model::tech::discovery::{decode, far_end, Bootstrap, Rays};
-use crate::model::tech::surface::{damaging_material, Kind, Line, Source, Surfaces};
+use crate::model::tech::surface::{damaging_material, Kind, Line, Source, Surfaces, Walk};
 use crate::model::tech::Vec2;
 use crate::runtime::diag_log::diagnostic;
 use crate::runtime::game::{self, natives};
@@ -308,6 +308,66 @@ impl PlatformScan {
         } else {
             ScanState::More
         }
+    }
+}
+
+/// How far the surface walk is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Found {
+    More,
+    Done,
+    Failed,
+}
+
+/// The surface walk, one native step a frame: the seed search, the connected outline, then the platform scan.
+/// Tech practice and the placement picker step it, each into its own `Surfaces`.
+pub(super) struct Discovery {
+    scan: Option<PlatformScan>,
+    scan_done: bool,
+    bootstrap: Option<Bootstrap>,
+}
+
+impl Discovery {
+    pub(super) const NEW: Self = Self { scan: None, scan_done: false, bootstrap: None };
+
+    /// The outline is closed and the platform scan is done: `surfaces` holds every line.
+    pub(super) fn walked(&self, surfaces: &Surfaces) -> bool {
+        surfaces.state == Walk::Closed && self.scan_done
+    }
+
+    /// One frame of the walk inside the camera's `range`.
+    pub(super) fn walk_step(&mut self, source: &mut NativeSource, range: [f32; 4], surfaces: &mut Surfaces) -> Found {
+        if self.scan.is_none() {
+            self.scan = PlatformScan::new(range);
+        }
+        if self.bootstrap.is_none() {
+            self.bootstrap = Bootstrap::new(range, source.touched());
+        }
+        if !self.walked(surfaces) && !self.bootstrap.as_mut().is_some_and(Bootstrap::tick) {
+            return Found::Failed;
+        }
+        if surfaces.state == Walk::Broken && surfaces.lines().next().is_none() {
+            match self.bootstrap.as_mut().ok_or(()).and_then(|search| source.find_seed(search)) {
+                Ok(Some((seed, end))) => surfaces.begin(seed, end),
+                Ok(None) => {}
+                Err(()) => return Found::Failed,
+            }
+        }
+        if surfaces.state == Walk::More {
+            surfaces.step(source);
+        } else if surfaces.state == Walk::Closed && !self.scan_done {
+            if let Some(scan) = self.scan.as_mut() {
+                match scan.step(source, surfaces) {
+                    ScanState::More => {}
+                    ScanState::Done => self.scan_done = true,
+                    ScanState::Broken | ScanState::Full => return Found::Failed,
+                }
+            }
+        }
+        if surfaces.state == Walk::Full || (surfaces.state == Walk::Broken && surfaces.lines().next().is_some()) {
+            return Found::Failed;
+        }
+        if self.walked(surfaces) { Found::Done } else { Found::More }
     }
 }
 

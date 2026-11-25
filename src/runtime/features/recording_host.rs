@@ -266,11 +266,59 @@ pub fn service() {
     }
     sync_bound(root);
     sync_slots(root);
+    place_commit(root);
     if !rr_host::pending() {
         return;
     }
     let tick = rr_host::service_pending(root, player, cpu);
     apply(&tick);
+}
+
+/// Change placement: the picker confirmed a placement on a save, and the worker writes the file and answers the
+/// visit: the written pair, or that the write failed. The picker takes the answer only while that visit still waits;
+/// it then starts the pair's one load itself, or puts both fighters back and says so.
+/// Keep the pair's temporaries off the worker's separate `service_at` / `save_input` stack path.
+#[inline(never)]
+fn place_commit(root: &Path) {
+    let Some((commit, save, relink)) = super::record_place::take_commit() else { return };
+    match rr_host::commit_placement(root, &save, relink.as_deref(), commit) {
+        rr_host::Placed::Refused { ticket, name } => {
+            // A picker that could not be told still gets the refusal, from here.
+            if !super::record_place::post_placed(ticket, None) {
+                let mut text = String::new();
+                let _ = crate::model::record_place::write_not_saved(&name, &mut text);
+                super::notices::upsert(NOTICE_ID, "Input Recording", &text, 240, NOTICE_COLOR); // restriction: place-save-write
+            }
+        }
+        rr_host::Placed::Saved { ticket, pair, notice } => {
+            super::record_place::post_placed(ticket, Some(*pair));
+            super::notices::upsert(NOTICE_ID, "Change placement", &notice, 240, NOTICE_COLOR);
+        }
+    }
+}
+
+/// Change placement: hand the save the worker read to the placement picker, as the picker shows a save.
+fn place_open(open: &rr_host::PlaceOpen) {
+    use crate::model::record_place::{saved_fighter, Who};
+    // As the Recording panels, by their one check: both practice fighters are there, and no record, playback or load
+    // is in progress.
+    let practice = crate::runtime::ui::facts::fact_practice_enabled();
+    if let Some(text) = crate::runtime::ui::external::practice_wait(practice) {
+        super::notices::upsert(NOTICE_ID, "Change placement", text, 240, NOTICE_COLOR);
+        return;
+    }
+    let [p1, cpu] = [saved_fighter(&open.pair[0]), saved_fighter(&open.pair[1])];
+    super::record_place::open_save(super::record_place::SaveOpen {
+        ticket: 0,
+        save: open.save.clone(),
+        relink: open.relink.clone(),
+        name: open.name.clone(),
+        saved: [p1.0, cpu.0],
+        ledge: [p1.1, cpu.1],
+        edit: if open.edit == crate::engine::library::Role::Cpu { Who::Cpu } else { Who::P1 },
+        shared: open.shared,
+        rule: super::recorder::settings().shared,
+    });
 }
 
 /// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
@@ -390,6 +438,9 @@ fn apply(tick: &Tick) {
                 rr_host::warp_landed();
             }
         }
+    }
+    if let Some(open) = &tick.place {
+        place_open(open);
     }
     for text in &tick.notices {
         super::notices::upsert(NOTICE_ID, "Recording", text, 240, NOTICE_COLOR);
