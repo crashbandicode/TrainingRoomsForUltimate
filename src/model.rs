@@ -169,6 +169,8 @@ pub mod lockon;
 pub mod sites_lockon;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
+#[path = "model/stage_geometry.rs"]
+pub mod stage_geometry;
 /// rc.15 Parry practice: the attempt detector (artifacts/rc15-parry/DESIGN.md).
 #[path = "model/parry.rs"]
 pub mod parry;

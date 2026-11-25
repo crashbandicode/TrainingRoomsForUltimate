@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
 use hos_lock::{Mutex, Published};
 
-use super::{cpu::konst, mashout::FloorRay, notices, placement, practice, recorder, states};
+use super::{cpu::konst, stage_geometry::FloorRay, notices, placement, practice, recorder, states};
 use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::crosshair::{self, CpuPreview, Marks};
@@ -949,7 +949,7 @@ unsafe fn route_guide(
         let (midpoint, limits) =
             perfect::outline_probe(natives::camera_limit_range()?, run.stage.blast())?;
         let ray = FloorRay::new(p1)?;
-        super::tech_surfaces::training_outline(&ray, midpoint, limits)
+        super::stage_geometry::training_outline(&ray, midpoint, limits)
     };
     let Some((outline, live_ledges)) = read_outline() else {
         planner_unavailable(PlanInput::StageOutline);
@@ -1574,46 +1574,10 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     true
 }
 
-/// Borrowed only on the P1 frame. Wider or sloped main floors can have adjacent exact endpoints.
-unsafe fn ledge(
-    ray: &FloorRay,
-    mut floor: crate::model::mashout::entry::PlacementFloor,
-    right: bool,
-    limits: [f32; 2],
-) -> Option<[f32; 2]> {
-    let dir = if right { 1.0 } else { -1.0 };
-    for _ in 0..crate::model::tech::surface::MAX_LINES {
-        let [a, b] = floor.ends;
-        let end = if (a[0] < b[0]) == right { b } else { a };
-        let Some(next) = ray.floor(end[0] + dir, limits, false) else {
-            return Some(end);
-        };
-        if !next.ends.contains(&end) || next.ends == floor.ends {
-            return Some(end);
-        }
-        floor = next;
-    }
-    None
-}
-
-pub(super) unsafe fn stage_floor(
-    ray: &FloorRay,
-    [left, right, top, bottom]: [f32; 4],
-) -> Option<(perfect::Segment, perfect::Point)> {
-    let x = left.midpoint(right);
-    let limits = [top, bottom];
-    let floor = ray.floor(x, limits, false)?;
-    let ledges = [
-        ledge(ray, floor, false, limits)?,
-        ledge(ray, floor, true, limits)?,
-    ];
-    Some((ledges, [x, floor.height(x)?]))
-}
-
 unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
     let bounds = natives::camera_limit_range()?;
     let ray = FloorRay::new(p1)?;
-    let (ledges, start) = stage_floor(&ray, bounds)?;
+    let (ledges, start) = super::stage_geometry::stage_floor(&ray, bounds)?;
     let blast = super::tech_surfaces::training_blast_bounds()?;
     Some((Stage::new(blast, bounds, ledges)?, start))
 }
@@ -1622,7 +1586,7 @@ unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
 unsafe fn start_class(p1: usize, stage: Stage, point: [f32; 2]) -> StartClass {
     let outline = || {
         let (midpoint, limits) = perfect::outline_probe(natives::camera_limit_range()?, stage.blast())?;
-        super::tech_surfaces::training_outline(&FloorRay::new(p1)?, midpoint, limits)
+        super::stage_geometry::training_outline(&FloorRay::new(p1)?, midpoint, limits)
     };
     outline().map_or(StartClass::Over, |(outline, _)| stage.start_class(point, outline.segments()))
 }
