@@ -702,6 +702,94 @@ fn the_toggle_off_prints_the_action_models_text() {
     assert_eq!(written(ActionDesc::of(Move::SideTilt, up, Normal::ForwardTilt as u8), Namer::new(true, None, None)), "Forward tilt ↑");
 }
 
+fn a_strip_on_screen_takes_the_toggle_on_its_next_draw() {
+    isolated("a_strip_on_screen_takes_the_toggle_on_its_next_draw", || {
+    use crate::model::frame_strip::Sample;
+    use crate::model::frame_strip_plan::{at, Renderer, StripDraw};
+    use crate::model::input_delay::MappedInputs;
+    use crate::model::panes::strip_layout::C;
+    let _guard = published();
+    let stun = Sample { hitstun: true, reaction: Some(50.0), ..Sample::default() };
+    let hit = Sample { stop: true, ..stun };
+    let mut tracker = Tracker::new();
+    tracker.step(Sample { attack: Some(Move::DashAttack), status: 0x29, ..Sample::default() }, hit, MappedInputs::NEUTRAL);
+    tracker.step(Sample { actionable: true, ..Sample::default() }, stun, MappedInputs::NEUTRAL);
+    tracker.step(
+        Sample { attack: Some(Move::Jab), status: 0x27, motion_frame: 8.0, motion: hash40("attack_12"), ..Sample::default() },
+        stun, MappedInputs::NEUTRAL,
+    );
+    tracker.step(
+        Sample { attack: Some(Move::Jab), status: 0x28, motion: hash40("attack_100"), ..Sample::default() },
+        hit, MappedInputs::NEUTRAL,
+    );
+    let link = tracker.latest_link().expect("a dash attack into a rapid jab");
+    let on = strip_text(&link);
+    PUBLISHED.set_on(false);
+    let off = strip_text(&link);
+    assert!(on.ends_with("Rapid jab") && off.ends_with("Jab") && on != off, "{on} / {off}");
+    // The LAST row's newest moves (Link history On) and the folded LINK line (Off): each on one renderer, as on screen.
+    for (history_enabled, pane) in [(true, at::MOVE_TEXT), (false, at::READ_SUB + 1)] {
+        let mut renderer = Renderer::new();
+        let draw = |renderer: &mut Renderer| {
+            let mut wrote = None;
+            let (writes, _) = renderer.draw_with_spec(
+                &tracker, StripDraw { shown: true, back: None, spots: false, parry: None, history_enabled, cells: false, spec: &C },
+                |index, look, changed| if index == pane && changed.text { wrote = Some(String::from_utf16(look.text.units()).unwrap()) },
+            );
+            (writes, wrote)
+        };
+        let kept = |renderer: &Renderer| renderer.written(pane).map(|look| String::from_utf16(look.text.units()).unwrap());
+        PUBLISHED.set_on(false);
+        let (_, first) = draw(&mut renderer);
+        assert!(first.as_deref().is_some_and(|text| text.ends_with(off.as_str())), "pane {pane}: {first:?}");
+        assert_eq!(draw(&mut renderer), (0, None), "pane {pane}: an unchanged draw writes nothing");
+        PUBLISHED.set_on(true);
+        let (_, named) = draw(&mut renderer);
+        assert!(named.as_deref().is_some_and(|text| text.ends_with(on.as_str())), "pane {pane}: {named:?}");
+        assert_eq!(kept(&renderer), named, "pane {pane}: the cache holds the names");
+        assert_eq!(draw(&mut renderer), (0, None), "pane {pane}: the names stay on an unchanged draw");
+        PUBLISHED.set_on(false);
+        let (_, back) = draw(&mut renderer);
+        assert_eq!(back, first, "pane {pane}: Off writes the first text again");
+        assert_eq!(kept(&renderer), first);
+        assert_eq!(draw(&mut renderer), (0, None));
+    }
+    });
+}
+
+fn a_bar_on_screen_takes_the_toggle_on_its_next_draw() {
+    isolated("a_bar_on_screen_takes_the_toggle_on_its_next_draw", || {
+    use crate::model::combo_plan::{at, Renderer};
+    let _guard = published();
+    let mut rec = LinkRec::presses(Move::Jab, Move::Throw, Verdict::True(None), None, &[]);
+    rec.set_descriptions([
+        ActionDesc::of(Move::Jab, Shown::default(), Normal::Jab3 as u8),
+        ActionDesc::of(Move::Throw, Shown::default(), Normal::ForwardThrow as u8),
+    ]);
+    let mut helper = Helper::new();
+    helper.set_target(Some(Combo::from_links([rec]).unwrap()));
+    helper.step(&Tracker::new(), Settings::factory());
+    let mut renderer = Renderer::new();
+    let draw = |renderer: &mut Renderer| {
+        let mut wrote = None;
+        let (writes, _) = renderer.draw(
+            &helper, &Text::new("Test"), None, true, (&crate::model::panes::strip_layout::C, false),
+            |index, look, changed| if index == at::TITLE && changed.text { wrote = Some(String::from_utf16(look.text.units()).unwrap()) },
+        );
+        (writes, wrote)
+    };
+    PUBLISHED.set_on(false);
+    assert_eq!(draw(&mut renderer).1.as_deref(), Some("1 Jab>Throw"));
+    assert_eq!(draw(&mut renderer), (0, None), "an unchanged draw writes nothing");
+    PUBLISHED.set_on(true);
+    assert_eq!(draw(&mut renderer).1.as_deref(), Some("1 Jab 3>Forward throw"));
+    assert_eq!(draw(&mut renderer), (0, None), "the names stay on an unchanged draw");
+    PUBLISHED.set_on(false);
+    assert_eq!(draw(&mut renderer).1.as_deref(), Some("1 Jab>Throw"));
+    assert_eq!(draw(&mut renderer), (0, None));
+    });
+}
+
 #[test]
 fn case_table() {
     crate::test_table::run(&[
@@ -741,6 +829,8 @@ fn case_table() {
         ("a_saved_link_keeps_its_variant_for_the_bar_and_the_menu", a_saved_link_keeps_its_variant_for_the_bar_and_the_menu as fn()),
         ("the_final_smash_shows_the_games_name_for_the_fighter", the_final_smash_shows_the_games_name_for_the_fighter as fn()),
         ("the_toggle_off_prints_the_action_models_text", the_toggle_off_prints_the_action_models_text as fn()),
+        ("a_strip_on_screen_takes_the_toggle_on_its_next_draw", a_strip_on_screen_takes_the_toggle_on_its_next_draw as fn()),
+        ("a_bar_on_screen_takes_the_toggle_on_its_next_draw", a_bar_on_screen_takes_the_toggle_on_its_next_draw as fn()),
     ]);
 }
 }

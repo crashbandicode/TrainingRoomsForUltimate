@@ -71,6 +71,7 @@ ended is not a reaction. An ordinary `Release` stays recorded but contributes no
 directions. `write` names the move and writes the angle and parts through `action::arrow`; the strip's
 `append_moves`, combo-bar cell and recording menu use it. Diagonals are two cardinal arrows. The description holds
 kinds, never names; `variant` identifies engine-common motion variants and returns zero when none is known.
+The ledge, get-up and trip attack animations use `Normal` numbers 26, 27 and 28 respectively.
 
 `LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of`
 (0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five
@@ -79,8 +80,10 @@ and angle, not variant or parts; otherwise it compares legacy moves.
 
 `Action` stores the tracker action state. At opening its origin is the newest press at most `INPUT_LOOKBACK` (15)
 frames earlier; a hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to
-Grab, Throw to Throw and exactly Final to Final Smash. A throw changes a grab's move without opening a new action.
-`Move::legacy` maps those three kinds to `Other`.
+Grab, Throw to Throw and exactly Final to Final Smash. It maps `CLIFF_ATTACK`, `DOWN_STAND_ATTACK` and
+`SLIP_STAND_ATTACK` to Ledge attack, Getup attack and Trip attack. Each opens its own action from a wait, even one
+that is not actionable, when the tracked move is different. A throw changes a grab's move without opening a new
+action. `Move::legacy` maps these six kinds to `Other`; the lane's colours are unchanged.
 
 ## The outcome rule
 
@@ -211,9 +214,10 @@ This build records reactions using the selected On-time tolerance and writes `re
 `reacted`, an owned hold under eight frames stays ungraded,
 while a hold of eight or more is graded in its band. An unowned release remains ungraded. Re-recording a drill gives
 it the causal rule.
-Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (the three
-new kinds), `of` (a move key), `angle` (`up` or `down`) and `variant` (0–31). Both objects are needed for a described
-link; `{}` is valid. `from` and `to` write `other` for Grab, Throw and Final Smash for older readers.
+Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (`grab`,
+`throw`, `final_smash`, `ledge_attack`, `getup_attack` or `trip_attack`), `of` (a move key), `angle` (`up` or `down`)
+and `variant` (0–31). Both objects are needed for a described link; `{}` is valid. `from` and `to` write `other` for
+these six kinds for older readers.
 
 An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a
 stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs). On reading, an aim event with `path` gets
@@ -329,3 +333,8 @@ selected version and name.
 - The new reasons and marks of both are also drawn by
   `every_reason_the_grader_can_give_is_shown_in_full_at_the_cards_width` and
   `every_mark_under_a_step_is_shown_in_full`.
+- Edge attacks: `the_edge_attack_statuses_are_the_games`, `an_edge_attack_opens_its_own_action_at_its_press`,
+  `an_edge_attack_keeps_its_move_one_frame_past_its_end`, `an_edge_attack_links_on_both_sides_and_reads_alike`,
+  `the_grader_tells_an_edge_attack_from_another_move`, `edge_attacks_round_trip_in_files_and_in_the_packed_link`,
+  `an_old_file_grades_an_edge_attack_as_before`, `an_edge_attack_step_is_decided_when_its_action_opens`,
+  `an_edge_attack_takes_its_name_number_from_its_animation`.

@@ -2997,6 +2997,14 @@ approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceili
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 202279
+date = "2026-11-25"
+reason = "Ledge, get-up and trip attacks as actions with their own moves, with the review's correction that keeps their file keys out of a link's bare from and to (fix/rv-edge-file-keys be321a1b). Measured 202279 on the install 4 head with the replay editor and merge 6 (e333d865, 202248): +31. On merge 7 (45425cb0) the same change measured +34 (201039): merge 6 rewrote two of the lines it touches."
+approved_by = "tr-primary-2 ruling 2026-11-25 02:17:20Z (the edge attacks' line budget approved at the measured value, +30), its standing rule of 2026-11-24 21:46:20Z (a measured correction up to 60 lines, here +4) and its standing rule of 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 200197
 date = "2026-11-25"
 reason = "Trim windows and the macro playback indicator: measured 200197, 369 above install 4 merge 4b's 199828."
