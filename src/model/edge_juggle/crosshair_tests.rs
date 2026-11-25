@@ -353,7 +353,7 @@ fn the_start_options_read_no_scene() {
     assert_eq!(runtime.matches("StartOptions::read(snapshot)").count(), 1);
     assert_eq!(runtime.matches("drill.placed_jump_count(options.jumps_used, ").count(), 1);
     assert_eq!(runtime.matches("wizard.confirm_start(at, place, run.options)").count(), 1);
-    assert_eq!(runtime.matches("wizard.kept_setup(stage, run, setup, unmoved, config.options)").count(), 1);
+    assert_eq!(runtime.matches("wizard.kept_setup(stage, kept, config.options)").count(), 1);
     assert_eq!(runtime.matches("edge_juggle::start_stage(").count(), 1);
     let body = |name: &str| runtime.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
     for code in [body("unsafe fn try_place("), body("unsafe fn setup_stage(")] {

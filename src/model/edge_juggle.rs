@@ -985,12 +985,24 @@ pub enum WizardStep {
     Preview,
 }
 
+/// A setup kept for Start without the wizard: the ends of the floor run it was made on, whether its CPU start is
+/// still the default, and whether A confirmed that start under the stage.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kept {
+    pub run: perfect::Segment,
+    pub setup: Setup,
+    pub unmoved: bool,
+    pub under: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
     area_offset: Option<[f32; 2]>,
     left_start: Option<[f32; 2]>,
     moved: bool,
+    /// The CPU start A confirmed lies under the stage.
+    under: bool,
     cross: Crosshair,
     floor_at: [f32; 2],
     pub step: WizardStep,
@@ -1091,6 +1103,7 @@ impl Wizard {
             area_offset,
             left_start,
             moved: false,
+            under: false,
             cross: Crosshair::new(cpu),
             floor_at: cpu,
             step: WizardStep::Cpu,
@@ -1154,6 +1167,7 @@ impl Wizard {
     pub fn back_to_defaults(&mut self, defaults: Setup) {
         self.setup = defaults;
         self.moved = false;
+        self.under = false;
         self.step = WizardStep::Preview;
         self.jump_page();
     }
@@ -1167,15 +1181,17 @@ impl Wizard {
         setup
     }
 
-    /// The setup Start uses without the wizard: one kept on `run`, the ends of the floor run it was made on. It is
-    /// reused only on that same run (the saved ends are compared; nothing is read again), and a Guard the Edge CPU
-    /// point that is not beside the run was accepted as one under the stage, which needs that option. `None`: Start
-    /// opens the wizard at this run's defaults.
-    pub fn kept_setup(
-        &self, stage: Stage, run: perfect::Segment, setup: Setup, unmoved: bool, options: StartOptions,
-    ) -> Option<Setup> {
-        let beside = self.drill == Drill::Juggler || options.under || stage.off_stage(setup.cpu).is_some();
-        (run == stage.ledges && beside).then(|| self.remembered(stage, setup, unmoved))
+    /// What Start keeps of this wizard's setup.
+    pub fn kept(&self, stage: Stage) -> Kept {
+        Kept { run: stage.ledges, setup: self.setup, unmoved: self.unmoved(), under: self.under }
+    }
+
+    /// The setup Start uses without the wizard. A kept one is reused only on the floor run it was made on (the
+    /// saved ends are compared), and a CPU start that A confirmed under the stage only while that option is On.
+    /// Nothing is read again. `None`: Start opens the wizard at this run's defaults.
+    pub fn kept_setup(&self, stage: Stage, kept: Kept, options: StartOptions) -> Option<Setup> {
+        let beside = self.drill == Drill::Juggler || options.under || stage.off_stage(kept.setup.cpu).is_some();
+        (kept.run == stage.ledges && beside).then(|| self.remembered(stage, kept.setup, kept.unmoved))
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
@@ -1230,6 +1246,7 @@ impl Wizard {
         }
         let taken = place.is_ok_and(|place| self.takes(place, options));
         if taken {
+            self.under = place == Ok(geometry::Place::Under);
             self.advance();
         }
         Some(taken)

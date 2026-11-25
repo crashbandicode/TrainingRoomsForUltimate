@@ -25,7 +25,7 @@ use crate::model::edge_juggle::perfect::{
 };
 use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
 use crate::model::edge_juggle::{
-    CpuObject, Drill, Observation, Outcome, Phase, PlacedPlayer, Placement, PlacementAction, PlacementFrame,
+    CpuObject, Drill, Kept, Observation, Outcome, Phase, PlacedPlayer, Placement, PlacementAction, PlacementFrame,
     Reaction, Session, Setup, Stage, StartOptions, StartRefusal, Wizard, WizardStep,
 };
 use crate::model::stage_geometry as geometry;
@@ -100,9 +100,8 @@ static BACK: AtomicBool = AtomicBool::new(false);
 
 struct Engine {
     run: Option<Run>,
-    /// Per drill: the stage, the ends of the floor run the setup was made on, the setup, and whether its CPU
-    /// start is still the default.
-    kept: [Option<(StageKey, perfect::Segment, Setup, bool)>; 2],
+    /// Per drill: the stage and the setup kept on it (`edge_juggle::Kept`).
+    kept: [Option<(StageKey, Kept)>; 2],
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
@@ -1566,7 +1565,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         }
         if wizard.step == WizardStep::Preview {
             run.setup = wizard.setup;
-            kept[run.drill as usize] = Some((run.stage_key, run.stage.ledges, run.setup, wizard.unmoved()));
+            kept[run.drill as usize] = Some((run.stage_key, wizard.kept(run.stage)));
             run.wizard = None;
             published::WIZARDS.set_up(Kind::DrillStart, false);
         } else {
@@ -1991,7 +1990,7 @@ pub unsafe fn frame(fighter: usize) {
         };
         let last = engine.kept[drill as usize]
             .filter(|(stage, ..)| *stage == stage_key)
-            .and_then(|(_, run, setup, unmoved)| wizard.kept_setup(stage, run, setup, unmoved, config.options));
+            .and_then(|(_, kept)| wizard.kept_setup(stage, kept, config.options));
         let editing = start == 2 || last.is_none();
         let mut setup = last.unwrap_or(wizard.setup);
         if drill == Drill::GuardEdge {

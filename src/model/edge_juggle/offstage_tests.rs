@@ -243,12 +243,13 @@ fn a_kept_start_is_reused_only_on_its_own_floor_run() {
         };
         let made_on_long = Setup { cpu: long_cpu, p1: [0.0, 0.0], percent: 100 };
         let made_on_island = Setup { cpu: island_cpu, p1: [-250.0, 0.014], percent: 100 };
+        let kept = |run: Stage, setup| Kept { run: run.ledges, setup, unmoved: false, under: false };
         // The same run reuses it.
-        assert_eq!(on_long.kept_setup(long, long.ledges, made_on_long, false, OFF), Some(made_on_long), "{drill:?}");
-        assert_eq!(on_island.kept_setup(island, island.ledges, made_on_island, false, OFF), Some(made_on_island), "{drill:?}");
+        assert_eq!(on_long.kept_setup(long, kept(long, made_on_long), OFF), Some(made_on_long), "{drill:?}");
+        assert_eq!(on_island.kept_setup(island, kept(island, made_on_island), OFF), Some(made_on_island), "{drill:?}");
         // The other run does not: Start then opens the wizard, whose setup is that run's own default.
-        assert_eq!(on_long.kept_setup(long, island.ledges, made_on_island, false, OFF), None, "{drill:?}: kept on the island");
-        assert_eq!(on_island.kept_setup(island, long.ledges, made_on_long, false, OFF), None, "{drill:?}: kept on the long floor");
+        assert_eq!(on_long.kept_setup(long, kept(island, made_on_island), OFF), None, "{drill:?}: kept on the island");
+        assert_eq!(on_island.kept_setup(island, kept(long, made_on_long), OFF), None, "{drill:?}: kept on the long floor");
         assert!(long.on_run(on_long.setup.p1[0]) && island.on_run(on_island.setup.p1[0]), "{drill:?}");
         match drill {
             Drill::GuardEdge => {
@@ -261,15 +262,47 @@ fn a_kept_start_is_reused_only_on_its_own_floor_run() {
             }
         }
     }
-    // Guard the Edge: a start under the island, on its own run, still needs the option.
-    let (island, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
-    let wizard = Wizard::new(Drill::GuardEdge, island, p1, 100, key, None).unwrap();
-    let under = Setup { cpu: [-250.0, -80.0], p1: [-250.0, 0.014], percent: 100 };
-    assert_eq!(wizard.kept_setup(island, island.ledges, under, false, OFF), None);
-    assert_eq!(wizard.kept_setup(island, island.ledges, under, false, ON), Some(under));
     // The run's ends are kept with the setup and compared at Start; nothing is read again for it.
     let runtime = include_str!("../../runtime/features/edge_juggle.rs");
-    assert!(runtime.contains("kept[run.drill as usize] = Some((run.stage_key, run.stage.ledges, run.setup, wizard.unmoved()));"));
-    assert_eq!(runtime.matches("wizard.kept_setup(stage, run, setup, unmoved, config.options)").count(), 1);
+    assert!(runtime.contains("kept[run.drill as usize] = Some((run.stage_key, wizard.kept(run.stage)));"));
+    assert_eq!(runtime.matches("wizard.kept_setup(stage, kept, config.options)").count(), 1);
+}
+
+/// tr-primary-2 2026-11-25 (rv-preview-vis 18:44:40Z): a kept start remembers that A confirmed it under the stage.
+/// On the long floor the island's underside is beyond the run's left end, so the point alone reads as beside the run.
+#[test]
+fn a_kept_start_under_the_stage_is_reused_only_while_the_option_is_on() {
+    let lines = training();
+    let (long, p1) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
+    let fresh = Wizard::new(Drill::GuardEdge, long, p1, 100, (308, 0), None).unwrap();
+    let default = fresh.setup;
+    // Under the island, from the long floor, with Under the stage On.
+    let at = [-250.0, -80.0];
+    let place = classify(&mut Copied(&lines), TRAINING_BLAST, at);
+    assert_eq!(place, Ok(Place::Under));
+    assert!(long.off_stage(at).is_some(), "beside the run by its ends alone");
+    let mut wizard = fresh;
+    wizard.setup.cpu = at;
+    assert_eq!(wizard.confirm_start(at, place, ON), Some(true));
+    let kept = wizard.kept(long);
+    assert!(kept.under);
+    assert_eq!((kept.run, kept.setup.cpu), (long.ledges, at));
+    // Kept, then Start with the option still On: reused. With it Off: not reused, so Start uses the run's default.
+    assert_eq!(fresh.kept_setup(long, kept, ON).map(|setup| setup.cpu), Some(at));
+    assert_eq!(fresh.kept_setup(long, kept, OFF), None);
+    assert!(near(Some(default.cpu), [-125.0, -68.426]));
+    // A start confirmed in open air does not need the option, and a later confirm replaces the class.
+    let open = [-125.0, -60.0];
+    let mut wizard = fresh;
+    wizard.setup.cpu = open;
+    assert_eq!(wizard.confirm_start(open, Ok(Place::Open), OFF), Some(true));
+    assert!(!wizard.kept(long).under);
+    assert_eq!(fresh.kept_setup(long, wizard.kept(long), OFF).map(|setup| setup.cpu), Some(open));
+    // The defaults are never under the stage.
+    let mut reset = fresh;
+    reset.setup.cpu = at;
+    assert_eq!(reset.confirm_start(at, place, ON), Some(true));
+    reset.back_to_defaults(default);
+    assert!(!reset.kept(long).under);
 }
 }
