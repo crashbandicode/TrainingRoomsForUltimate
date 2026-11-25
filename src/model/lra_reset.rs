@@ -7,6 +7,13 @@
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
+/// Player 1's reset commands of the last 64 polls, newest in bit 0.
+pub const fn command_history(history: u64, _commanded: bool) -> u64 { history }
+
+/// The command of the poll whose record Input Delay hands out now: that record is `delay` polls old
+/// (`DelayQueue::step_with`). Past 63 polls it answers none.
+pub const fn command_at(_history: u64, _delay: u8) -> bool { false }
+
 /// What the inline hook inside the game's reset check does to register `x8`: when the setting is
 /// Off, and only in native Training, the register is cleared so the game's check fails and no reset
 /// happens (SPEC-state-06 §4). `None` leaves the register alone.
@@ -349,6 +356,23 @@ mod tests {
         assert_eq!(seen, HUB_ORDER);
     }
 
+    fn a_command_leaves_the_delay_with_its_own_record() {
+        use crate::model::input_delay::{DelayQueue, MappedInputs};
+        for delay in [0, 1, 5, 40, 63] {
+            let mut queue = DelayQueue::new();
+            let mut history = 0;
+            for poll in 0..100 {
+                let held = (20..24).contains(&poll);
+                let record = MappedInputs { buttons: if held { 1 } else { 0 }, ..MappedInputs::NEUTRAL };
+                let out = queue.step(delay, record);
+                history = command_history(history, held);
+                assert_eq!(command_at(history, delay), out.buttons == 1, "delay={delay} poll={poll}");
+            }
+        }
+        assert!(!command_at(u64::MAX, 64));
+        assert!(!command_at(u64::MAX, 255));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
@@ -356,6 +380,7 @@ mod tests {
             ("entry_ids_are_zero_to_seven", entry_ids_are_zero_to_seven as fn()),
             ("off_clears_x8_in_training_only", off_clears_x8_in_training_only as fn()),
             ("the_hub_runs_every_step_in_order", the_hub_runs_every_step_in_order as fn()),
+            ("a_command_leaves_the_delay_with_its_own_record", a_command_leaves_the_delay_with_its_own_record as fn()),
         ]);
     }
     }

@@ -286,6 +286,10 @@ pub const CSTICK_ON: u32 = 0x80;
 /// and, when the stick is high enough, a tap-jump flick.
 pub const FLICK_JUMP: u32 = 0x8000;
 
+/// Not a mapped bit: the runtime sets it in the buttons of a poll on which Player 1 commands the game's own
+/// Training reset (raw L+R+A in native Training with L+R+A Reset On). No press is read from it.
+pub const RESET_COMMAND: u32 = 1 << 31;
+
 /// Snaps kept for a link's events. The visible strip is 60 columns; a follow-up's inputs can start before that
 /// window, and 96 covers the exchange the helper grades.
 pub const SNAP_RING: usize = 96;

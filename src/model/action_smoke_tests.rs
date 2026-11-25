@@ -8,6 +8,7 @@ use crate::model::input_delay::MappedInputs;
 const A: u32 = 1;
 const B: u32 = 2;
 const RESET: u32 = 0x8 | A;
+const COMMAND: u32 = crate::model::frame_strip::RESET_COMMAND;
 
 fn standing() -> Sample {
     Sample { actionable: true, facing: 1, ..Sample::default() }
@@ -605,5 +606,218 @@ fn a_recording_uses_the_selected_tolerance() {
     let source = include_str!("../runtime/features/input_display.rs");
     assert!(source.contains("let tolerance = super::combo::settings().tolerance;"));
     assert!(source.contains("crate::engine::rr_host::observe_input(snap, tracker.late(), tolerance, tracker.contact_now())"));
+}
+
+fn command_step(tracker: &mut Tracker, helper: &mut Helper, sample: Sample, buttons: u32, settings: Settings) -> Out {
+    tracker.step(sample, standing(), MappedInputs { buttons, ..MappedInputs::NEUTRAL });
+    helper.step(tracker, settings)
+}
+
+#[test]
+fn a_reset_command_alone_leaves_no_result_on_any_frame() {
+    for tolerance in [0, 1, 2] {
+        for (button, x, y, hold) in [(A, 60, 60, 2), (B, 0, 60, 3)] {
+            for count in [0, 2, RESULTS] {
+                for held in [1, 4, 8, 40, 90] {
+                    let settings = Settings { load_after: true, tolerance, ..Settings::factory() };
+                    let mut tracker = Tracker::new();
+                    let mut helper = Helper::new();
+                    helper.set_target(Some(target(button, x, y, hold)));
+                    for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
+                    for _ in 0..count { clean_attempt(&mut tracker, &mut helper, button, x, y, hold); }
+                    let before = helper.results().copied().collect::<Vec<_>>();
+                    let stats = (helper.streak(), helper.best());
+                    for f in 0..held.max(8) + 30 {
+                        if f == 8 { tracker.clear(); }
+                        let buttons = if f < held { RESET | COMMAND } else { 0 };
+                        let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
+                        let out = command_step(&mut tracker, &mut helper, sample, buttons, settings);
+                        assert!(out.resolved.is_none() && out.link.is_none() && !out.load,
+                            "tolerance={tolerance} button={button} count={count} held={held} frame={f} out={out:?}");
+                        assert_eq!(helper.results().copied().collect::<Vec<_>>(), before,
+                            "tolerance={tolerance} button={button} count={count} held={held} frame={f}");
+                        assert_eq!((helper.streak(), helper.best()), stats,
+                            "tolerance={tolerance} button={button} count={count} held={held} frame={f}");
+                    }
+                    assert!(helper.attempt().is_none(), "tolerance={tolerance} button={button} count={count} held={held}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_reset_command_under_input_delay_leaves_no_result_on_any_frame() {
+    use crate::model::input_delay::{Clear, DelayQueue};
+    use crate::model::lra_reset::{command_at, command_history};
+    for delay in [0, 3, 5] {
+        for held in [4, 40] {
+            let settings = Settings { load_after: true, tolerance: 1, ..Settings::factory() };
+            let mut tracker = Tracker::new();
+            let mut helper = Helper::new();
+            helper.set_target(Some(target(B, 0, 60, 3)));
+            for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
+            for _ in 0..2 { clean_attempt(&mut tracker, &mut helper, B, 0, 60, 3); }
+            let before = helper.results().copied().collect::<Vec<_>>();
+            let stats = (helper.streak(), helper.best());
+            let mut queue = DelayQueue::new();
+            let mut history = 0;
+            for f in 0..held.max(8) + usize::from(delay) + 30 {
+                if f == 8 {
+                    tracker.clear();
+                    queue.clear(Clear::TrainingReset);
+                }
+                let raw_held = f < held;
+                let record = MappedInputs { buttons: if raw_held { RESET } else { 0 }, ..MappedInputs::NEUTRAL };
+                let mut delayed = queue.step(delay, record);
+                history = command_history(history, raw_held);
+                if command_at(history, delay) { delayed.buttons |= COMMAND; }
+                let sample = if f >= usize::from(delay) && f < 8 { active(Move::Jab, 0x27) } else { standing() };
+                let out = command_step(&mut tracker, &mut helper, sample, delayed.buttons, settings);
+                assert!(out.resolved.is_none() && out.link.is_none() && !out.load,
+                    "delay={delay} held={held} frame={f} out={out:?} buttons={:#x}", delayed.buttons);
+                assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "delay={delay} held={held} frame={f}");
+                assert_eq!((helper.streak(), helper.best()), stats, "delay={delay} held={held} frame={f}");
+            }
+            assert!(helper.attempt().is_none(), "delay={delay} held={held}");
+        }
+    }
+}
+
+#[test]
+fn a_reset_command_takes_back_what_is_held_with_it() {
+    let settings = Settings { load_after: true, ..Settings::factory() };
+    for staggered in [true, false] {
+        let mut tracker = Tracker::new();
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        for _ in 0..2 { clean_attempt(&mut tracker, &mut helper, B, 0, 60, 3); }
+        let before = helper.results().copied().collect::<Vec<_>>();
+        let stats = (helper.streak(), helper.best());
+        if staggered {
+            for _ in 0..30 { command_step(&mut tracker, &mut helper, standing(), 0x8, settings); }
+            assert_eq!(helper.results().count(), before.len() + 1);
+            assert!(!helper.results().next().unwrap().clean);
+            assert_eq!(helper.streak(), 0);
+        }
+        for f in 0..32 {
+            if f == 8 { tracker.clear(); }
+            let buttons = if f < 4 { RESET | COMMAND } else if !staggered && f < 12 { 0x8 } else { 0 };
+            let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
+            let out = command_step(&mut tracker, &mut helper, sample, buttons, settings);
+            assert!(out.resolved.is_none() && !out.load, "staggered={staggered} frame={f} out={out:?}");
+            assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "staggered={staggered} frame={f}");
+            assert_eq!((helper.streak(), helper.best()), stats, "staggered={staggered} frame={f}");
+        }
+    }
+}
+
+#[test]
+fn a_result_released_before_the_command_stays() {
+    let settings = Settings { load_after: true, ..Settings::factory() };
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(target(B, 0, 60, 3)));
+    for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0x8, settings); }
+    for _ in 0..6 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
+    let before = helper.results().copied().collect::<Vec<_>>();
+    assert_eq!(before.len(), 1);
+    assert!(!before[0].clean);
+    for f in 0..28 {
+        if f == 8 { tracker.clear(); }
+        let buttons = if f < 4 { RESET | COMMAND } else { 0 };
+        let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
+        command_step(&mut tracker, &mut helper, sample, buttons, settings);
+        assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "frame={f}");
+        assert_eq!(helper.streak(), 0, "frame={f}");
+    }
+}
+
+#[test]
+fn a_real_attempt_then_a_reset_command_records_as_today() {
+    let settings = Settings { load_after: true, ..Settings::factory() };
+    let mut capture = InputCapture::new();
+    for (frame, buttons) in [(0, A), (2, 0), (30, B), (32, 0)] {
+        capture.step(Snap { buttons, ..Snap::empty(frame) });
+    }
+    for event in capture.combo.links[0].as_mut().unwrap().events.iter_mut().flatten() {
+        if event.kind == Kind::Release(Button::Attack) { event.kind = Kind::LetGo(Button::Attack); }
+    }
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(capture.combo));
+    clean_attempt(&mut tracker, &mut helper, A, 0, 0, 2);
+    assert!(helper.attempt().is_some_and(|a| a.open() && a.len() == 1));
+    for f in 0..28 {
+        if f == 8 { tracker.clear(); }
+        let buttons = if f < 4 { RESET | COMMAND } else { 0 };
+        let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
+        let out = command_step(&mut tracker, &mut helper, sample, buttons, settings);
+        assert!(!out.load, "frame={f} out={out:?}");
+        assert_eq!(helper.results().map(|s| (s.outcome, s.clean)).collect::<Vec<_>>(),
+            vec![(Outcome::Cleared, false)], "frame={f}");
+    }
+
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(target(A, 0, 0, 2)));
+    clean_attempt(&mut tracker, &mut helper, A, 0, 0, 2);
+    for _ in 0..4 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
+    let before = helper.results().copied().collect::<Vec<_>>();
+    let stats = (helper.streak(), helper.best());
+    assert_eq!((before.len(), stats.0), (1, 1));
+    for f in 0..28 {
+        if f == 8 { tracker.clear(); }
+        let buttons = if f < 4 { RESET | COMMAND } else { 0 };
+        let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
+        let out = command_step(&mut tracker, &mut helper, sample, buttons, settings);
+        assert!(!out.load, "frame={f} out={out:?}");
+        assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "frame={f}");
+        assert_eq!((helper.streak(), helper.best()), stats, "frame={f}");
+    }
+}
+
+#[test]
+fn a_normal_attempt_still_grades_and_loads() {
+    let settings = Settings { load_after: true, ..Settings::factory() };
+    for (buttons, y, hold, clean) in [(B, 60, 3, true), (A, 0, 2, false), (RESET, 0, 4, false)] {
+        let mut tracker = Tracker::new();
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        let mut loads = 0;
+        for f in 0..hold + 30 {
+            let mapped = MappedInputs { buttons: if f < hold { buttons } else { 0 },
+                lstick_y: y, ..MappedInputs::NEUTRAL };
+            tracker.step(standing(), standing(), mapped);
+            if helper.step(&tracker, settings).load { loads += 1; }
+        }
+        let results = helper.results().copied().collect::<Vec<_>>();
+        assert_eq!(results.len(), 1, "buttons={buttons:#x}");
+        assert_eq!(results[0].clean, clean, "buttons={buttons:#x}");
+        assert_eq!(loads, 1, "buttons={buttons:#x}");
+    }
+}
+
+#[test]
+fn the_reset_command_is_no_button() {
+    use crate::model::frame_strip::{press_of, CSTICK_ON, FLICK_JUMP, PRESS_BITS};
+    assert!(PRESS_BITS.iter().all(|(mask, _)| mask & COMMAND == 0));
+    assert_eq!(COMMAND & (CSTICK_ON | FLICK_JUMP), 0);
+    assert_eq!(press_of(MappedInputs { buttons: COMMAND, ..MappedInputs::NEUTRAL }, 0, 0), None);
+    let mut input = InputCapture::new();
+    input.step(Snap { buttons: COMMAND, ..Snap::empty(0) });
+    input.step(Snap::empty(1));
+    assert!(input.combo.is_empty());
+}
+
+#[test]
+fn the_poll_stores_the_command_with_its_record() {
+    let source = include_str!("../runtime/features/input_display.rs");
+    let poll = source.split("pub unsafe fn on_p1_poll(").nth(1).unwrap().split("\n}").next().unwrap();
+    let store = poll.find("INPUTS.store(").unwrap();
+    assert!(poll.find("lra_reset::command_history(").is_some_and(|at| at < store));
+    assert!(poll.find("lra_reset::command_at(").is_some_and(|at| at < store));
+    let sample = source.split("pub unsafe fn sample_frame(").nth(1).unwrap().split("\n}").next().unwrap();
+    assert!(sample.contains("physical_inputs.buttons & RESET_COMMAND"));
 }
 }
