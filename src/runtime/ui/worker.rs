@@ -408,6 +408,13 @@ fn run() {
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        // A recording's opening waits for the CPU to be idle (the waiting room): its screen says so, and why it ended.
+        let waiting = replay_capture::recording_waiting();
+        let ended = replay_capture::take_recording_timeout();
+        if ended { session.refusal = Some(replay_capture::CPU_NOT_SETTLED); }
+        if session.menu.as_mut().is_some_and(|menu| menu.recording_mut().set_opening(waiting)) || ended {
+            publish_frame(&session);
+        }
         let shown = OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire);
         let naming = session.menu.as_ref().is_some_and(|m| m.recording().naming());
         if crate::runtime::features::recording_host::settle_name(shown && naming) || (naming && !shown) {
@@ -863,6 +870,11 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         notices::post_body("Record drill", crate::model::notify::Body::copied(&format!("{chord}: start; again: stop and save")), 240, DEFAULT_COLOR);
     }
     match effect {
+        Effect::ListRecordings => menu.recording_mut().set_recordings(crate::runtime::macros::replay_capture::recordings()),
+        Effect::CancelRecording => crate::runtime::macros::replay_capture::cancel_recording(),
+        Effect::OpenRecording { id, entry, player, make, play } => {
+            crate::runtime::macros::replay_capture::open_recording(&id, crate::engine::macro_ui::recordings::OpenRequest { entry, player, make, play });
+        }
         Effect::OpenCrop { source, combo, player } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
@@ -1429,7 +1441,7 @@ fn publish_frame(s: &Session) {
         let Some(view) = replay_capture::clip_view() else { return };
         let mut next = NEXT_FRAME.lock();
         next.reset();
-        clip_frame(&view, &named_macros::fighter_label(view.fighter_kind), replay_capture::scrub_pace(), &mut next);
+        clip_frame(&view, &replay_capture::clip_fighter_label(&view), replay_capture::scrub_pace(), &mut next);
         hand_over(&next);
         return;
     }

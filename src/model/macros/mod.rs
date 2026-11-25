@@ -43,9 +43,9 @@ mod replay;
 mod shared_capture;
 mod window;
 
-pub use capture_archive::{CaptureArchive, CaptureSaveOutcome, SavedCapture};
+pub use capture_archive::{CaptureArchive, CaptureEntry, CaptureSaveOutcome, SavedCapture};
 #[cfg(test)]
-pub use capture_archive::{CaptureEntry, CaptureListing};
+pub use capture_archive::CaptureListing;
 pub use crate::model::capture_settings::{recover_previous_ini, CaptureSettings, IniRecovery, DEFAULT_CAPTURE_INI};
 #[cfg(test)]
 pub use crate::model::capture_settings::{host_persistence_key, CAPTURE_CONFIG_KEY};

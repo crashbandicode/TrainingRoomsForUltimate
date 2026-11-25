@@ -43,6 +43,8 @@ static OWNER_ON: AtomicBool = AtomicBool::new(false);
 static LANES: Lanes = Lanes::new();
 static GRADER: Grader = Grader::new();
 static CLEAR_DUE: AtomicBool = AtomicBool::new(false);
+/// The acting side of the last sampled frame was the CPU (a Make pass on the CPU, `rr_host::make_actor_cpu`).
+static ACTOR_CPU: AtomicBool = AtomicBool::new(false);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -429,8 +431,13 @@ pub unsafe fn sample_frame(player: usize) {
     };
     let cpu_accessor = cpu;
     let spots = spots_wanted();
-    let p1 = sample(player, &ids, true, spots);
-    let cpu = sample(cpu, &ids, false, spots);
+    let cpu_pass = crate::engine::rr_host::make_actor_cpu();
+    if ACTOR_CPU.swap(cpu_pass, Ordering::Relaxed) != cpu_pass {
+        CLEAR_DUE.store(true, Ordering::Relaxed);
+    }
+    let order = crate::model::frame_strip::acting(cpu_pass);
+    let p1 = sample(player, &ids, order[0] == 0, spots);
+    let cpu = sample(cpu, &ids, order[0] == 1, spots);
     let watched = if take != 0 {
         let fed = rr_host::captured_frames();
         (fed > 0).then(|| (rr_host::CAPTURE_RUN, fed - 1, if take == 1 { &p1 } else { &cpu }))
@@ -483,9 +490,14 @@ pub unsafe fn sample_frame(player: usize) {
             }
         }
     }
-    let inputs = unpack(INPUTS.load(Ordering::Acquire));
+    let physical_inputs = unpack(INPUTS.load(Ordering::Acquire));
+    let inputs = if cpu_pass { crate::engine::rr_host::make_cpu_inputs() } else { physical_inputs };
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
-    let p1_kind = if shown || input_drill { p1_fighter(player) } else { None };
+    let p1_kind = if shown || input_drill { p1_fighter([player, cpu_accessor][order[0]]) } else { None };
+    let physical_kind = if cpu_pass {
+        let kind = crate::engine::rr_host::live_pose(0).fighter_kind;
+        (kind >= 0).then_some(kind)
+    } else { p1_kind };
     let Some(mut tracker) = TRACKER.try_lock() else {
         GRADER.finish(false);
         return;
@@ -497,7 +509,8 @@ pub unsafe fn sample_frame(player: usize) {
     }
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
-    tracker.step_graded(p1, cpu, inputs, taken);
+    let samples = [p1, cpu];
+    tracker.step_graded(samples[order[0]], samples[order[1]], inputs, taken);
     if let Some(mut back) = BACK.try_lock() {
         SCROLL.record(&mut back, &tracker);
     }
@@ -508,11 +521,11 @@ pub unsafe fn sample_frame(player: usize) {
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         // SAFETY: `player` is the live P1 accessor of this frame.
-        PUBLISHED.observe_player(p1_kind, |kind| unsafe { super::move_names::fighter_id(player, kind) });
+        PUBLISHED.observe_player(physical_kind, |kind| unsafe { super::move_names::fighter_id(player, kind) });
         crate::runtime::features::combo::after_strip(&tracker, p1_kind);
     }
     if super::parry::on() {
-        super::parry::step(parry_frame(player, &ids, &p1, inputs), p1_kind, tracker.newest().unwrap_or(0));
+        super::parry::step(parry_frame(player, &ids, &p1, physical_inputs), physical_kind, tracker.newest().unwrap_or(0));
     }
     GRADER.finish(true);
     #[cfg(feature = "diag")]

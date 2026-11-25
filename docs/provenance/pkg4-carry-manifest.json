@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "3f6bd716f03fbfb30df7da1249c7c76dbb4358e1f04a46336ad075cb98f91ddf",
+   "dest_sha256": "8ac01983b1297429c973cc0c2bd5e1e4c7edf746c0d0a11bbe80aa068f64ed96",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -132,6 +132,46 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "    pub truncated: bool,\n",
+     "new": "    pub truncated: bool,\n    pub sides: Vec<(i32, i32)>,\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "                    truncated: header.truncated,\n",
+     "new": "                    truncated: header.truncated,\n                    sides: Vec::new(),\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "            assert!(archive.load(&id).is_err());\n        }\n    }\n\n",
+     "new": "            assert!(archive.load(&id).is_err());\n        }\n    }\n\n    fn two_sides() -> ReplaySession {\n        let frame = |buttons, kind| ReplayFrame {\n            input: InputFrame { buttons, ..InputFrame::default() },\n            start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,\n        };\n        ReplaySession { tracks: vec![\n            ReplayTrack { entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },\n            ReplayTrack { entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },\n        ], truncated: false, breaks: Vec::new() }\n    }\n\n    fn a_saved_capture_lists_each_side_with_its_fighter() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let id = archive.save(\"two-sides\", \"Match\", \"13.0.5\", &two_sides()).unwrap();\n        let listing = archive.list().unwrap();\n        assert_eq!(listing.entries.len(), 1);\n        assert_eq!(listing.entries[0].id, id);\n        assert_eq!(listing.entries[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn a_capture_file_with_no_new_key_reads_back_both_sides() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let id = encode_file_id(\"old-file\");\n        let header = br#\"{\"schema_version\":1,\"replay_id\":\"old-file\",\"replay_name\":\"Old\",\"game_version\":\"13.0.5\",\"truncated\":false,\"tracks\":[{\"entry\":0,\"frames\":2,\"quantized_analog\":false},{\"entry\":1,\"frames\":2,\"quantized_analog\":false}]}\"#;\n        let mut bytes = capture_file(header);\n        for (buttons, kind) in [(1u32, 7i32), (2, 7), (101, 8), (102, 8)] {\n            let mut record = [0u8; 44];\n            record[0..4].copy_from_slice(&buttons.to_le_bytes());\n            record[8..12].copy_from_slice(&kind.to_le_bytes());\n            record[16..20].copy_from_slice(&1.0f32.to_le_bytes());\n            bytes.extend_from_slice(&record);\n        }\n        fs::write(temp.0.join(format!(\"{id}.tmrc\")), bytes).unwrap();\n        let saved = archive.load(&id).unwrap();\n        assert_eq!(saved.session.tracks[0].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [1, 2]);\n        assert_eq!(saved.session.tracks[1].frames.iter().map(|f| f.input.buttons).collect::<Vec<_>>(), [101, 102]);\n        assert_eq!(archive.list().unwrap().entries[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn a_capture_being_written_is_not_listed_until_it_is_committed() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let session = two_sides();\n        let id = encode_file_id(\"staged\");\n        let header = CaptureHeader { schema_version: 1, replay_id: \"staged\".into(), replay_name: \"Staged\".into(),\n            game_version: \"13.0.5\".into(), miis: None, truncated: false, breaks: Vec::new(),\n            tracks: session.tracks.iter().map(|track| TrackHeader {\n                entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,\n            }).collect() };\n        let staged = write_capture_temp(&temp.0, &id, &serde_json::to_vec(&header).unwrap(), &session).unwrap();\n        assert!(archive.list().unwrap().entries.is_empty());\n        fs::rename(staged, temp.0.join(format!(\"{id}.tmrc\"))).unwrap();\n        let listed = archive.list().unwrap().entries;\n        assert_eq!(listed.len(), 1);\n        assert_eq!(listed[0].id, id);\n        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"a_saved_capture_lists_each_side_with_its_fighter\", a_saved_capture_lists_each_side_with_its_fighter as fn()),\n            (\"a_capture_file_with_no_new_key_reads_back_both_sides\", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),\n            (\"a_capture_being_written_is_not_listed_until_it_is_committed\", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    io::{self, BufReader, BufWriter, Read, Write},\n",
+     "new": "    io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write},\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    /// Lists bounded metadata only; frame payloads are not read or validated.\n",
+     "new": "    /// Lists bounded metadata and the first record of each track.\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                let (_, header) = open_capture(&path, id)?;\n",
+     "new": "                let (mut capture, header) = open_capture(&path, id)?;\n                let mut sides = Vec::with_capacity(header.tracks.len());\n                for track in &header.tracks {\n                    let mut first = [0u8; CAPTURE_RECORD_BYTES];\n                    read_exact_capture(&mut capture, &mut first, \"sample data\")?;\n                    sides.push((track.entry, read_i32(&first, 8)));\n                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;\n                }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                    sides: Vec::new(),\n",
+     "new": "                    sides,\n"
     }
    ]
   },
@@ -1021,7 +1061,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "123c04de853753091dae61803f7acef18e80a58da4320b0bd4c3a31bda83448c",
+   "dest_sha256": "a229296067e12c6f052ba38c419817e64e389f420d1aa304313e7749f5076a89",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -1140,6 +1180,16 @@
      "reason": "F7: play saved crop previews on their selected Recording role."
     },
     {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "pub use capture_archive::{CaptureArchive, CaptureSaveOutcome, SavedCapture};\n",
+     "new": "pub use capture_archive::{CaptureArchive, CaptureEntry, CaptureSaveOutcome, SavedCapture};\n"
+    },
+    {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "pub use capture_archive::{CaptureEntry, CaptureListing};\n",
+     "new": "pub use capture_archive::CaptureListing;\n"
+    },
+    {
      "old": "pub use recording::{InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};",
      "new": "pub use recording::{ActionMark, InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
@@ -1210,7 +1260,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "3d1e1b3fa714457a62669faad9d558bb0200b3ed97aed3497f4d6d0fd07e705c",
+   "dest_sha256": "c54cc886d59c75dcb9165c1b618e915a10823b0b2b3926f5997eedb11a8ae876",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1454,6 +1504,16 @@
      "reason": "F7: play saved crop previews on their selected Recording role."
     },
     {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "            self.set_track(index);\n        }\n    }\n",
+     "new": "            self.set_track(index);\n        }\n    }\n\n    pub fn select_entry(&mut self, _entry: i32) -> bool { false }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    pub fn select_entry(&mut self, _entry: i32) -> bool { false }\n",
+     "new": "    pub fn select_entry(&mut self, entry: i32) -> bool {\n        if self.file.is_some() { return false; }\n        let Some(index) = self.session.tracks.iter().position(|track| track.entry == entry) else { return false };\n        self.set_track(index);\n        true\n    }\n"
+    },
+    {
      "old": "            (\"a_replay_preview_hides_the_page_too\", a_replay_preview_hides_the_page_too as fn()),",
      "new": "            (\"a_replay_preview_stays_playing\", a_replay_preview_stays_playing as fn()),",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
@@ -1494,18 +1554,13 @@
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "            ClipAction::Restart => { return self.start_preview(); }\n            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                let count = self.session.tracks.len();\n                let offset = if matches!(action, ClipAction::PreviousFighter) { count - 1 } else { 1 };",
-     "new": "            ClipAction::Restart => { return self.start_preview(); }\n            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                if matches!(self.file, Some(FileSource::Macro { .. })) {\n                    return self.apply_action(ClipAction::SwapTarget);\n                }\n                let count = self.session.tracks.len();\n                let offset = if matches!(action, ClipAction::PreviousFighter) { count - 1 } else { 1 };",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
      "old": "        match action {\n            ClipAction::SelectIn | ClipAction::SelectOut => {",
-     "new": "        match action {\n            ClipAction::Snap => {\n                let boundary = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In => self.marks.snap_in(self.window.start()),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),\n                };\n                let Some(boundary) = boundary else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                match self.handle {\n                    Handle::In => { self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start()); }\n                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }\n                    Handle::Playhead => {}\n                }\n            }\n            ClipAction::SwapTarget => {\n                if let Some(FileSource::Macro { player, .. }) = &mut self.file {\n                    *player = !*player;\n                    let playing = self.playing;\n                    self.pause();\n                    return if playing { ClipEffect::StopPreview } else { ClipEffect::None };\n                }\n                return ClipEffect::None;\n            }\n            ClipAction::SelectIn | ClipAction::SelectOut => {",
+     "new": "        match action {\n            ClipAction::Snap => {\n                let boundary = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In => self.marks.snap_in(self.window.start()),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),\n                };\n                let Some(boundary) = boundary else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                match self.handle {\n                    Handle::In => { self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start()); }\n                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }\n                    Handle::Playhead => {}\n                }\n            }\n            ClipAction::SwapTarget => {\n                let Some(on_player) = self.plays_on_player() else { return ClipEffect::None };\n                self.set_play_target(!on_player);\n                let playing = self.playing;\n                self.pause();\n                return if playing { ClipEffect::StopPreview } else { ClipEffect::None };\n            }\n            ClipAction::SelectIn | ClipAction::SelectOut => {",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "        if self.file.is_some() && matches!(action,\n            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {",
-     "new": "        if self.file.is_some() && matches!(action, ClipAction::ToggleCapture | ClipAction::UseLeadIn) {\n            return ClipEffect::None;\n        }\n        if matches!(self.file, Some(FileSource::Combo(_)))\n            && matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::SwapTarget) {",
+     "old": "            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {\n            return ClipEffect::None;",
+     "new": "            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {\n            return ClipEffect::None;\n        }\n        if matches!(self.file, Some(FileSource::Combo(_)))\n            && matches!(action, ClipAction::SwapTarget) {\n            return ClipEffect::None;",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
@@ -1535,7 +1590,7 @@
     },
     {
      "old": "            source_name: self.source_name.clone(), error: self.error.clone() }",
-     "new": "            source_name: self.source_name.clone(), error: self.error.clone(),\n            marks, mark_count, move_text: self.marks.text(at, out_handle) }",
+     "new": "            source_name: self.source_name.clone(), error: self.error.clone(),\n            marks, mark_count, move_text: self.marks.text(at, out_handle),\n            mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),\n            target: self.plays_on_player() }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
@@ -1545,17 +1600,17 @@
     },
     {
      "old": "            source_name, previous_name: String::new(), open_guard, error: None })",
-     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, watch_base: 0 })",
+     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })\n    }\n\n    /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.\n    pub fn plays_on_player(&self) -> Option<bool> {\n        match &self.file {\n            Some(FileSource::Macro { player, .. }) => Some(*player),\n            Some(FileSource::Combo(_)) => None,\n            None => Some(self.replay_player),\n        }\n    }\n\n    pub fn set_play_target(&mut self, on_player: bool) {\n        match &mut self.file {\n            Some(FileSource::Macro { player, .. }) => *player = on_player,\n            Some(FileSource::Combo(_)) => {}\n            None => self.replay_player = on_player,\n        }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
      "old": "    fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {\n        let mut open_guard = OpenInputGuard::new();",
-     "new": "    fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {\n        let marks = match &file {\n            FileSource::Macro { recording, .. } => Marks::from_recording(recording),\n            FileSource::Combo(recording) => Marks::from_units(\n                crate::model::recording_menu::combo_link_lines(&recording.combo).into_iter()\n                    .filter(|line| crate::model::recording_menu::link_head(line))),\n        };\n        let mut open_guard = OpenInputGuard::new();",
+     "new": "    fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {\n        let marks = match &file {\n            FileSource::Macro { recording, .. } => Marks::from_recording(recording),\n            FileSource::Combo(recording) => Marks::from_units(\n                crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()\n                    .filter(|line| crate::model::recording_menu::link_head(line))),\n        };\n        let mut open_guard = OpenInputGuard::new();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
      "old": "            open_guard, error: None })",
-     "new": "            open_guard, error: None, marks, watch_base: 0 })",
+     "new": "            open_guard, error: None, marks, replay_player: false, watch_base: 0 })",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
@@ -1565,17 +1620,22 @@
     },
     {
      "old": "    error: Option<String>,\n}",
-     "new": "    error: Option<String>,\n    marks: Marks,\n    watch_base: u32,\n}",
+     "new": "    error: Option<String>,\n    marks: Marks,\n    replay_player: bool,\n    watch_base: u32,\n}",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
      "old": "}\n\nimpl ClipView {\n    /// The page is hidden while a preview plays.\n    pub fn hides_page(&self) -> bool { self.playing }",
-     "new": "    pub marks: [(u16, u16); SHOWN_MARKS],\n    pub mark_count: u8,\n    pub move_text: String,",
+     "new": "    pub marks: [(u16, u16); SHOWN_MARKS],\n    pub mark_count: u8,\n    pub move_text: String,\n    /// Every mark of the take, not only the drawn ones, and the mark at or nearest the cursor.\n    pub mark_total: u32,\n    pub near: Option<(u32, Option<u32>)>,\n    /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.\n    pub target: Option<bool>,",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "\n/// The same editor changes units and offered actions with its source.",
+     "new": "\n/// ZR pressed and released with no other button or direction in between: the Player 1 / CPU toggle. ZR held with a\n/// direction is the coarse scrub and never a tap.\n#[derive(Default)]\npub struct TargetTap { down: bool, clean: bool }\n\nimpl TargetTap {\n    pub const fn new() -> Self { Self { down: false, clean: false } }\n\n    /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.\n    pub fn tapped(&mut self, zr: bool, other: bool) -> bool {\n        if zr {\n            self.clean = if self.down { self.clean && !other } else { !other };\n            self.down = true;\n            return false;\n        }\n        let tap = self.down && self.clean && !other;\n        self.down = false;\n        self.clean = false;\n        tap\n    }\n}\n\n/// The same editor changes units and offered actions with its source.",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
      "old": "    let controls = format!(\"{}{}A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" } else { \"\" },",
-     "new": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"D-pad Up/Down: plays on CPU or Player 1. \" }\n        else { \"\" },",
+     "new": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }\n        else { \"\" },",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
@@ -1599,73 +1659,23 @@
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "                crate::model::recording_menu::combo_link_lines(&recording.combo).into_iter()",
-     "new": "                crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()",
+     "old": "        tap\n    }",
+     "new": "        tap\n    }\n}\n\nimpl TargetTap {\n    /// The pad's own button set, once per Player 1 input (a GameCube pad's Z arrives as the ZR bit).\n    pub fn zr_tap(&mut self, held: crate::model::chords::Buttons) -> bool {\n        let _ = held;\n        false\n    }\n}\n\nimpl ClipView {\n    /// The role a preview plays on and is fed through.\n    pub fn play_role(&self) -> crate::engine::library::Role {\n        let _ = self.target;\n        crate::engine::library::Role::Cpu\n    }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "                if let Some(FileSource::Macro { player, .. }) = &mut self.file {\n                    *player = !*player;\n                    let playing = self.playing;\n                    self.pause();\n                    return if playing { ClipEffect::StopPreview } else { ClipEffect::None };\n                }\n                return ClipEffect::None;",
-     "new": "                let Some(on_player) = self.plays_on_player() else { return ClipEffect::None };\n                self.set_play_target(!on_player);\n                let playing = self.playing;\n                self.pause();\n                return if playing { ClipEffect::StopPreview } else { ClipEffect::None };",
+     "old": "        let _ = self.target;\n        crate::engine::library::Role::Cpu",
+     "new": "        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "            marks, mark_count, move_text: self.marks.text(at, out_handle) }",
-     "new": "            marks, mark_count, move_text: self.marks.text(at, out_handle),\n            mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),\n            target: self.plays_on_player() }",
+     "old": "        let _ = held;\n        false",
+     "new": "        self.tapped(held.zr(), held.other_than_zr())",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "            source_name, previous_name: String::new(), open_guard, error: None, marks, watch_base: 0 })",
-     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })\n    }\n\n    /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.\n    pub fn plays_on_player(&self) -> Option<bool> {\n        match &self.file {\n            Some(FileSource::Macro { player, .. }) => Some(*player),\n            Some(FileSource::Combo(_)) => None,\n            None => Some(self.replay_player),\n        }\n    }\n\n    pub fn set_play_target(&mut self, on_player: bool) {\n        match &mut self.file {\n            Some(FileSource::Macro { player, .. }) => *player = on_player,\n            Some(FileSource::Combo(_)) => {}\n            None => self.replay_player = on_player,\n        }",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "            open_guard, error: None, marks, watch_base: 0 })",
-     "new": "            open_guard, error: None, marks, replay_player: false, watch_base: 0 })",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "    marks: Marks,\n    watch_base: u32,",
-     "new": "    marks: Marks,\n    replay_player: bool,\n    watch_base: u32,",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "    pub move_text: String,\n}",
-     "new": "    pub move_text: String,\n    /// Every mark of the take, not only the drawn ones, and the mark at or nearest the cursor.\n    pub mark_total: u32,\n    pub near: Option<(u32, Option<u32>)>,\n    /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.\n    pub target: Option<bool>,\n}",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "        held && pressed && !released\n    }",
-     "new": "        held && pressed && !released\n    }\n}\n\n/// ZR pressed and released with no other button or direction in between: the Player 1 / CPU toggle. ZR held with a\n/// direction is the coarse scrub and never a tap.\n#[derive(Default)]\npub struct TargetTap { down: bool, clean: bool }\n\nimpl TargetTap {\n    pub const fn new() -> Self { Self { down: false, clean: false } }\n\n    /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.\n    pub fn poll(&mut self, zr: bool, other: bool) -> bool {\n        let _ = (zr, other);\n        false\n    }",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                if matches!(self.file, Some(FileSource::Macro { .. })) {\n                    return self.apply_action(ClipAction::SwapTarget);\n                }\n                let count = self.session.tracks.len();",
-     "new": "            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                let count = self.session.tracks.len();",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "            && matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::SwapTarget) {",
-     "new": "            && matches!(action, ClipAction::SwapTarget) {",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "        if self.file.is_some() && matches!(action, ClipAction::ToggleCapture | ClipAction::UseLeadIn) {",
-     "new": "        if self.file.is_some() && matches!(action,\n            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "        let _ = (zr, other);\n        false",
-     "new": "        if zr {\n            self.clean = if self.down { self.clean && !other } else { !other };\n            self.down = true;\n            return false;\n        }\n        let tap = self.down && self.clean && !other;\n        self.down = false;\n        self.clean = false;\n        tap",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"D-pad Up/Down: plays on CPU or Player 1. \" }",
-     "new": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }",
-     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
-    },
-    {
-     "old": "    pub fn poll(&mut self, zr: bool, other: bool) -> bool {",
-     "new": "    pub fn tapped(&mut self, zr: bool, other: bool) -> bool {",
+     "old": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }\n        else { \"\" },",
+     "new": "    let controls = format!(\"{}{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" } else { \"\" },\n        if view.target.is_some() { \"ZR Player/CPU. \" } else { \"\" },",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
@@ -3951,7 +3961,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "17c6ed893076570543cc46ad306d53655f6e0198ad803de83109b3a443ea2183",
+   "dest_sha256": "75334d4f4a97769f17b748dd32ef4ef741cb38fb93d7f660b03c8fe3f4ffeccb",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4564,13 +4574,173 @@
      "reason": "F10: the Recording menu worker reuses the Crop preview readiness gate for input drill previews."
     },
     {
+     "reason": "Vault Recordings: role and capture selection regression slice",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording);\n",
+     "new": "                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "struct Browser { ui: ClipBrowser, revision: u64 }\n",
+     "new": "struct Browser { ui: ClipBrowser, revision: u64, request: Option<crate::engine::macro_ui::recordings::OpenRequest> }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)> }\n",
+     "new": "struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1 });\n",
+     "new": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n",
+     "new": "            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n\npub fn recordings() -> Vec<crate::model::recording_menu::RecordingFile> {\n    use crate::engine::macro_ui::recordings::rows;\n    let mut result = {\n        let capture = CAPTURE.lock().unwrap();\n        rows(Some(&capture.session), capture.previous.as_ref(), &[], kind_label)\n    };\n    match crate::runtime::macros::replay_store::archive().list() {\n        Ok(listing) => result.extend(rows(None, None, &listing.entries, kind_label)),\n        Err(error) => notify(format!(\"Saved capture library: {error}\")),\n    }\n    result\n}\n\npub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    let (ui, effect) = crate::engine::macro_ui::recordings::open_one(id, crate::runtime::ui::facts::fact_waiting_scene());\n    let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;\n    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    install_capture_source(source, revision)\n",
+     "new": "    install_capture_source(source, revision, id)\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)) });\n",
+     "new": "        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)), request: None });\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        }, recording.name.as_str()),\n    };\n",
+     "new": "        }, recording.name.as_str()),\n    };\n    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n        Some(request) if request.make == crate::model::recording_menu::Make::Drill => \"Name drill\",\n        Some(_) => \"Name macro\",\n        None => title,\n    };\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        if let Some(file) = file {\n",
+     "new": "        if let Some(file) = file {\n            let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);\n            if let (Some(request), crate::engine::rr_runtime::ClipFile::Macro(recording)) = (request, &file) {\n                let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());\n                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };\n                match crate::engine::rr_runtime::generate(std::path::Path::new(crate::model::storage::ROOT), (**recording).clone(), &name, request.make, role, at) {\n                    Ok(crate::engine::rr_runtime::Generated::Macro(id)) => crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] saved_new={id}\")),\n                    Ok(crate::engine::rr_runtime::Generated::Pass(ask)) => { close_editor(); crate::engine::rr_host::request_make(ask); }\n                    Err(error) => notify(error.to_string()),\n                }\n                return;\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "fn install_capture_source(source: CaptureSource, revision: u64) -> Result<(), String> {\n",
+     "new": "fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Result<(), String> {\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            editor.select_kind(current);\n",
+     "new": "            let request = browser.as_ref().and_then(|b| b.request);\n            if let Some(request) = request {\n                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n            } else {\n                editor.select_kind(current);\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                association,resolved:[None;8],resolve_failed:0,switch:false,source:None});\n",
+     "new": "                association,resolved:[None;8],resolve_failed:0,switch:false,source:None,request});\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            gate_selection(None, Some(current));\n",
+     "new": "            gate_selection(None, Some(current));\n            if let Some(request) = request {\n                crate::runtime::diag_log::diagnostic(format_args!(\"[ClipEditor] recording id={id} entry={} plays_on={} make={} play={}\",\n                    request.entry, if request.player { \"player\" } else { \"cpu\" },\n                    match request.make { crate::model::recording_menu::Make::Macro => \"macro\", crate::model::recording_menu::Make::Combo => \"combo\", crate::model::recording_menu::Make::Drill => \"drill\" },\n                    u8::from(request.play)));\n            }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "        let Some(editor) = editor.as_ref() else { return false; };\n",
+     "new": "        let Some(editor) = editor.as_ref() else { return false; };\n        if editor.request.is_some_and(|request| request.player) { return false; }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())\n}\n\n",
+     "new": "    EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())\n}\n\npub fn clip_play_role() -> crate::engine::library::Role {\n    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {\n        crate::engine::library::Role::Player\n    } else { crate::engine::library::Role::Cpu }\n}\n\npub fn clip_fighter_label(view: &ClipView) -> String {\n    let fighter = kind_label(view.fighter_kind);\n    match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),\n        None => fighter,\n    }\n}\n\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "    service_file_name();\n",
+     "new": "    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n            let mut editor = EDITOR.lock().unwrap();\n            editor.as_mut().is_some_and(|editor| {\n                if editor.switch { return false; }\n                if let Some(request) = editor.request.as_mut().filter(|request| request.play) {\n                    request.play = false;\n                    true\n                } else { false }\n            })\n        };\n        if play { apply_action(ClipAction::TogglePlay); }\n    }\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording, crate::engine::library::Role::Cpu);\n",
+     "new": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n"
+    },
+    {
+     "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
+     "old": "            match attach(recording) {\n",
+     "new": "            match attach(recording) {\n                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>\n                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "    let (gate, recorded, unresolved) = {\n",
+     "new": "    let (gate, recorded, unresolved, player) = {\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "        if editor.request.is_some_and(|request| request.player) { return false; }\n",
+     "new": "        let player = editor.request.is_some_and(|request| request.player);\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved)\n",
+     "new": "        (editor.gate_for(entry, kind, previous, current), kind_label(kind), unresolved, player)\n"
+    },
+    {
+     "reason": "Vault Recordings: resolve exact Mii data without a Player 1 fighter question",
+     "old": "    if gate != FighterGate::Prompt { return false; }\n",
+     "new": "    if player || gate != FighterGate::Prompt { return false; }\n"
+    },
+    {
+     "reason": "Vault Recordings: a failed opening from the Recordings screen does not open the old capture list",
+     "old": "                open_browser(Some(revision));\n",
+     "new": "                let listed = BROWSER.lock().unwrap().as_ref().is_none_or(|b| b.request.is_none());\n                if listed { open_browser(Some(revision)); }\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);\n",
+     "new": "static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);\n/// A recording's opening waited three seconds for the CPU and was dropped (`take_recording_timeout`).\nstatic RECORDING_TIMED_OUT: AtomicBool = AtomicBool::new(false);\npub const CPU_NOT_SETTLED: &str = \"CPU did not settle; capture opening cancelled\";\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n",
+     "new": "pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    RECORDING_TIMED_OUT.store(false, Ordering::Release);\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n",
+     "new": "    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n\n/// A recording's opening from the Recordings screen waits for the CPU to be idle (the waiting room).\npub fn recording_waiting() -> bool {\n    BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.request.is_some() && b.ui.pending())\n}\n\n/// B on the waiting recording's screen: that opening is dropped.\npub fn cancel_recording() {\n    let revision = BROWSER.lock().unwrap().as_ref().filter(|b| b.request.is_some()).map(|b| b.revision);\n    if let Some(revision) = revision { close_editor_revision(false, Some(revision)); }\n}\n\n/// The wait ended after three seconds with the CPU still busy (read once).\npub fn take_recording_timeout() -> bool { RECORDING_TIMED_OUT.swap(false, Ordering::AcqRel) }\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "        BrowserEffect::TimedOut => {\n",
+     "new": "        BrowserEffect::TimedOut => {\n            let recording = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.revision == revision && b.request.is_some());\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "                notify(\"CPU did not settle; capture opening cancelled\".into());\n",
+     "new": "                if recording { RECORDING_TIMED_OUT.store(true, Ordering::Release); }\n                notify(CPU_NOT_SETTLED.into());\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "    let title = match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {\n",
+     "new": "    let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);\n    let title = match request {\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "    let (effect, configuration, file, source) = {\n",
+     "new": "    let (effect, configuration, file, source, requested) = {\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source)\n",
+     "new": "        let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());\n        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source, requested)\n"
+    },
+    {
+     "reason": "Vault Recordings: the editor lock is released before the name is asked (tests/lock_order.rs)",
+     "old": "                Ok(recording) if EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.request.is_some()) =>\n                    name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n",
+     "new": "                Ok(recording) if requested => name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n"
+    },
+    {
      "old": "        else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Restart }) }",
      "new": "        else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Snap }) }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }",
-     "new": "    if let Some(view) = clip_view().filter(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() {\n            on_action(ClipAction::TogglePlay);\n        } else if matches!(view.context, crate::engine::macro_ui::clip_panel::ClipContext::Macro { .. })\n            && (controller.just_down.dpad_up() || controller.just_down.dpad_down()) {\n            on_action(ClipAction::SwapTarget);\n        }",
+     "old": "    }\n    if clip_view().is_some_and(|v| v.playing) {",
+     "new": "    }\n    let held = controller.current_buttons;\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).\n    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())\n        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {\n        on_action(ClipAction::SwapTarget);\n        return;\n    }\n    if clip_view().is_some_and(|v| v.playing) {",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
@@ -4589,6 +4759,11 @@
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
+     "old": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
+     "new": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic TARGET_TAP: Mutex<crate::engine::macro_ui::clip_panel::TargetTap> = Mutex::new(crate::engine::macro_ui::clip_panel::TargetTap::new());\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
      "old": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};",
      "new": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
@@ -4599,28 +4774,38 @@
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "    if let Some(view) = clip_view().filter(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() {\n            on_action(ClipAction::TogglePlay);\n        } else if matches!(view.context, crate::engine::macro_ui::clip_panel::ClipContext::Macro { .. })\n            && (controller.just_down.dpad_up() || controller.just_down.dpad_down()) {\n            on_action(ClipAction::SwapTarget);\n        }",
-     "new": "    let held = controller.current_buttons;\n    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()\n        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()\n        || held.l_left() || held.l_right() || held.r_left() || held.r_right();\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).\n    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)\n        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {\n        on_action(ClipAction::SwapTarget);\n        return;\n    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }",
+     "old": "    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).\n    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())\n        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {",
+     "new": "    if TARGET_TAP.lock().unwrap().zr_tap(held)\n        && clip_view().is_some_and(|v| v.target.is_some()) {",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
-     "new": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic TARGET_TAP: Mutex<crate::engine::macro_ui::clip_panel::TargetTap> = Mutex::new(crate::engine::macro_ui::clip_panel::TargetTap::new());\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
+     "old": "            let role = match before.context {\n                ClipContext::Macro { player: true } => Role::Player,\n                _ => Role::Cpu,\n            };",
+     "new": "            let role = before.play_role();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)",
-     "new": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)",
+     "old": "        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),",
+     "new": "        Some(_) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter),",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)",
-     "new": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())",
+     "old": "pub fn clip_play_role() -> crate::engine::library::Role {\n    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {\n        crate::engine::library::Role::Player\n    } else { crate::engine::library::Role::Cpu }",
+     "new": "/// The fighter a preview plays on: the editor's play target (a ZR tap swaps it; a recording's Plays on seeds it).\npub fn clip_play_role() -> Role {\n    EDITOR.lock().unwrap().as_ref().map_or(Role::Cpu, |editor| editor.view().play_role())",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     },
     {
-     "old": "    let held = controller.current_buttons;\n    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()\n        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()\n        || held.l_left() || held.l_right() || held.r_left() || held.r_right();\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).",
-     "new": "    let held = controller.current_buttons;\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).",
+     "old": "        let player = editor.request.is_some_and(|request| request.player);",
+     "new": "        let player = editor.plays_on_player() == Some(true);",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n            } else {",
+     "new": "                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n                editor.set_play_target(request.player);\n            } else {",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };",
+     "new": "                let role = clip_play_role();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

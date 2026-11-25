@@ -136,6 +136,7 @@ move, not one fighter's moves, so a combo recorded on one fighter can be practis
 `aerial`; a newer file's event direction tells a forward air from a neutral air, relative to the facing. An older file's `aim` still uses `side` for both left and right.
 The writer puts `grab`, `throw`, `final_smash`, `ledge_attack`, `getup_attack` and `trip_attack` in a description's
 `move` and writes `other` in `from` or `to`, so earlier builds can read those fields.
+A file with one of these six straight in `from` or `to` is skipped; the move belongs in the description.
 
 ### Reading rules
 

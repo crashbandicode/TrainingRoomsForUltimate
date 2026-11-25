@@ -120,7 +120,15 @@ pub const THREADS: [ThreadStack; 19] = [
     // the path is 55,424 B (release) and 55,392 B (diag, scratch gate measure-batch-6abe940a); the larger is recorded.
     // Trim and replay editor fold: 55,600 B release and 55,616 B diag in ELFs cd774f00.
     // Trim and edge attacks fold: 55,600 B release and 55,616 B diag in ELFs 0a6c8bbb.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 55_616, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Vault recordings (2026-11-25): a Make drill pass saves through one more frame on the same path
+    // (`save_input` -> `save_drill_with_take_named` -> `save_combo` -> `Store<ComboRecord>::list` -> `decode`), and
+    // `ui::worker::run` and `service_at` grew: 55,200 B on both the release and the diag ELF of 9e7bfaf8. The 88 KiB
+    // stack covers it (required 90,112 B); the allocation is unchanged.
+    // The replay editor and the Vault recordings folded with the play-target seam: 56,688 B on both the release and the
+    // diag ELF (gate 178a48b2). Required and allocated stay 90,112 B.
+    // The same fold on the install 4 head with the editor and the drill-step moves (cdfbd917): 56,720 B (release) and
+    // 56,688 B (diag, gate 2c679acb); the larger is recorded.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_720, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

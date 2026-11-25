@@ -27,8 +27,10 @@ pub(super) fn clear() {
 
 pub(crate) fn request_home(home: HomeWarp) {
     let ask = match home {
-        HomeWarp::Start { air: false } => 1,
-        HomeWarp::Start { air: true } => 2,
+        HomeWarp::Start { air: false, player: false } => 1,
+        HomeWarp::Start { air: true, player: false } => 2,
+        HomeWarp::Start { air: false, player: true } => 4,
+        HomeWarp::Start { air: true, player: true } => 5,
         HomeWarp::Return => 3,
     };
     ASK.store(ask, Ordering::Release);
@@ -43,11 +45,11 @@ pub(super) unsafe fn take_home() -> bool {
         return false;
     }
     let result = if ask == 3 {
-        let result = request(false, false);
+        let result = request(false, false, false);
         CHECKPOINT.lock().clear();
         result
     } else {
-        request(true, ask == 2)
+        request(true, ask == 2 || ask == 5, ask >= 4)
     };
     match result {
         Ok(()) => true,
@@ -113,7 +115,7 @@ pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {
     Ok((identity, [player, cpu]))
 }
 
-pub(super) unsafe fn request(start: bool, air: bool) -> Result<(), &'static str> {
+pub(super) unsafe fn request(start: bool, air: bool, player: bool) -> Result<(), &'static str> {
     if !ACTIVE.load(Ordering::Acquire) || !CONSTS_READY.load(Ordering::Acquire) {
         return Err(NOT_READY);
     }
@@ -142,9 +144,10 @@ pub(super) unsafe fn request(start: bool, air: bool) -> Result<(), &'static str>
     }
     let mut pair = CHECKPOINT.lock().restore(&identity).map_err(message)?;
     if air {
+        let index = crate::model::state::preview::playing_index(player);
         super::with(|state| {
-            if state.ids.is(C::SituationGround, pair[1].situation_kind) {
-                pair[1].situation_kind = state.ids.get(C::SituationAir);
+            if state.ids.is(C::SituationGround, pair[index].situation_kind) {
+                pair[index].situation_kind = state.ids.get(C::SituationAir);
             }
         });
     }
