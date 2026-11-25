@@ -132,4 +132,15 @@ fn a_cleared_strip_has_no_past() {
     let mut fresh = tracker;
     assert_eq!(back.rewind(&mut fresh, 60), None);
 }
+
+#[test]
+fn scrollback_review_each_timeline_reset_invalidates_the_published_cursor() {
+    let native = include_str!("../runtime/features/input_display.rs");
+    for boundary in ["fn session_clear()", "fn fighter_initialised()", "fn sample_frame("] {
+        let body = native.split_once(boundary).unwrap().1.split_once("\n}").unwrap().0;
+        assert!(body.contains("clear_live_strip("), "{boundary} did not clear the tracking timeline");
+        assert!(body.contains("clear_scroll") || body.contains("clear_live_strip(&mut"),
+            "{boundary} can reuse a pre-reset anchor once new columns reach its old number");
+    }
+}
 }
