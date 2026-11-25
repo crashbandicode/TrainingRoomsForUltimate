@@ -6118,6 +6118,41 @@ mod tests {
         (save, ids)
     }
 
+    #[test]
+    fn replays_opens_a_start_save_without_reading_it_twice() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("replays-open-reads");
+        let (save, macros) = placement_library(&root);
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR))
+            .save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        let book = Book::new(RecordingIndex::load(&root).unwrap());
+        let open = |effect| {
+            let mut tick = Tick::default();
+            let before = store::file_reads();
+            post_effect(effect);
+            apply_menu(&root, &mut Playback::new(), &book, &mut tick);
+            (tick, store::file_reads() - before)
+        };
+        let (direct, direct_reads) = open(Effect::ChangePlacement { save, relink: Some(macros[0].clone()) });
+        let (active, active_reads) = open(Effect::ChangeActivePlacement);
+        assert!(direct.place.is_some());
+        assert_eq!(active.place, direct.place, "same pair, editing role, shared count and relink target");
+        // Both paths read the save and count its links. Resolving an active chain
+        // additionally needs the chain and its first macro, not a second save read.
+        assert!(active_reads <= direct_reads + 2, "direct={direct_reads}; active chain={active_reads}");
+
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save(Some("missing")).unwrap();
+        library.overwrite(&macros[0], &first).unwrap();
+        let (missing, _) = open(Effect::ChangeActivePlacement);
+        assert!(missing.place.is_none());
+        assert_eq!(missing.notices, [PLACE_NO_START]);
+    }
+
     /// What the picker confirms on `pair` after `edit`: the fields that differ, as the wizard reports them.
     fn placed(pair: &[SavedState; 2], copy: bool, macros: u8, edit: impl FnOnce(&mut crate::model::record_place::Setup)) -> Commit {
         use crate::model::record_place::{saved_fighter, Edits};
