@@ -380,6 +380,21 @@ pub fn write_shown(shown: &Shown, first: bool, popup: bool, role: Who, out: &mut
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome { Open, Start, Closed }
 
+/// Which parts of one fighter differ from what the wizard opened with.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Edits {
+    /// The place or the spot.
+    pub spot: bool,
+    pub state: bool,
+    pub percent: bool,
+}
+
+impl Edits {
+    pub fn any(self) -> bool {
+        self.spot || self.state || self.percent
+    }
+}
+
 pub struct Wizard {
     pub page: Page,
     pub edit: Who,
@@ -418,6 +433,21 @@ impl Wizard {
     /// brought back, or reset with X, is not edited.
     pub fn edited(&self) -> [bool; 2] {
         [0, 1].map(|i| self.setup[i].place != self.defaults[i].place || self.setup[i].at != self.defaults[i].at)
+    }
+
+    /// What differs, field by field: a save is rewritten only in these.
+    pub fn edits(&self) -> [Edits; 2] {
+        [Edits::default(); 2]
+    }
+
+    /// `step` with the traced floor lines of the stage (Tech practice's surface walk). With floors, an on-stage
+    /// fighter rides them: Left / Right along its floor, Up / Down to the floor above or below. Without (the walk is
+    /// not finished), the fighter stands on the floor under a free crosshair.
+    pub fn step_on(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
+        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, floors: &[super::floor_hop::Floor]) -> Outcome
+    {
+        let _ = floors;
+        self.step(pad, fit, floor)
     }
 
     /// A fighter saved hanging on a ledge reads so until it is edited.
@@ -1550,16 +1580,145 @@ mod tests {
         assert_eq!((w.page, w.mode(), w.edit, w.cursor()), (Page::Where, Mode::Save, Who::P1, [-30.0, 30.0]));
         let cpu = Wizard::for_save(saved(), [false, true], Who::Cpu);
         assert_eq!((cpu.page, cpu.edit, cpu.cursor()), (Page::Where, Who::Cpu, [-80.0, -11.0]));
-        // Two pages: A on Spot saves, B on Spot goes back, B on Where cancels, + saves from either page.
-        assert_eq!(wizard_press(&mut w, PLUS), Outcome::Start);
-        assert_eq!(wizard_press(&mut w, A), Outcome::Open);
-        assert_eq!(w.page, Page::Spot);
-        assert_eq!(wizard_press(&mut w, B), Outcome::Open);
-        assert_eq!(w.page, Page::Where);
+        // The operator's PC3: all five pages, and + saves from any of them with the values of the pages not visited.
         assert_eq!(wizard_press(&mut w, B), Outcome::Closed);
+        for page in [Page::Where, Page::Spot, Page::State, Page::Percent, Page::Preview] {
+            assert_eq!(w.page, page);
+            assert_eq!(wizard_press(&mut w, PLUS), Outcome::Start, "{page:?}");
+            assert_eq!((w.page, w.setup, w.edited()), (page, saved(), [false; 2]));
+            let next = wizard_press(&mut w, A);
+            assert_eq!(next, if page == Page::Preview { Outcome::Start } else { Outcome::Open });
+        }
+        for page in [Page::Percent, Page::State, Page::Spot, Page::Where] {
+            assert_eq!(wizard_press(&mut w, B), Outcome::Open);
+            assert_eq!(w.page, page);
+        }
+    }
+
+    #[test]
+    fn a_save_carries_the_state_and_percent_of_an_edited_fighter() {
+        use crate::model::chords::logical::{A, DPAD_RIGHT, DPAD_UP, L, X};
+        let none = Edits::default();
+        let mut w = save_wizard();
+        assert_eq!(w.edits(), [none; 2]);
+        for _ in 0..2 { wizard_press(&mut w, A); }
+        assert_eq!(w.page, Page::State);
+        wizard_press(&mut w, DPAD_RIGHT);
+        assert_eq!(w.setup[0].state, StartState::MissedTechUp);
+        assert_eq!(w.edits(), [Edits { state: true, ..none }, none]);
+        assert_eq!(w.edited(), [true, false]);
+        // A fighter that reads Ledge keeps its saved state: only its spot can take it off the ledge.
+        wizard_press(&mut w, L);
+        wizard_press(&mut w, DPAD_RIGHT);
+        assert_eq!((w.setup[1].state, w.edits()[1]), (StartState::Standard, none));
         wizard_press(&mut w, A);
-        assert_eq!(wizard_press(&mut w, A), Outcome::Start);
-        assert_eq!(w.page, Page::Spot);
+        wizard_press(&mut w, DPAD_UP);
+        assert_eq!(w.setup[1].percent, 50);
+        assert_eq!(w.edits(), [Edits { state: true, ..none }, Edits { percent: true, ..none }]);
+        assert_eq!(text(&w, "Jab start"), "Jab start · 4/5 Percent\n  P1   12%\n> CPU  50%\nL / R fighter · ← → 1 · ↑ ↓ 10 · A next · B back · X as saved · + save");
+        // X puts every page's values back, and nothing is edited.
+        wizard_press(&mut w, X);
+        assert_eq!((w.setup, w.edits()), (saved(), [none; 2]));
+    }
+
+    #[test]
+    fn a_saved_state_that_cannot_exist_at_the_new_place_becomes_standard() {
+        use crate::model::chords::logical::DPAD_RIGHT;
+        let mut setup = saved();
+        setup[0].state = StartState::Trip;
+        setup[1].state = StartState::Tumble;
+        let none = Edits::default();
+        let mut w = Wizard::for_save(setup, [false; 2], Who::P1);
+        w.set_home(Some([0.0, 0.0]));
+        // A trip moved into the air cannot be: it becomes Standard, and the save is written with that.
+        w.step(&button(DPAD_RIGHT), Some, floors);
+        assert_eq!((w.setup[0].place, w.setup[0].state), (Place::OffStage, StartState::Standard));
+        assert_eq!(w.edits()[0], Edits { spot: true, state: true, ..none });
+        // A tumble moved onto a floor cannot be either.
+        let mut w = Wizard::for_save(setup, [false; 2], Who::Cpu);
+        w.set_home(Some([0.0, 0.0]));
+        w.step(&button(DPAD_RIGHT), Some, floors);
+        assert_eq!((w.setup[1].place, w.setup[1].state), (Place::OnStage, StartState::Standard));
+        // A state that can exist at both places is kept: a save's Standard, and its damage.
+        let mut w = save_wizard();
+        w.step(&button(DPAD_RIGHT), Some, floors);
+        assert_eq!((w.setup[0].place, w.setup[0].state, w.setup[0].percent), (Place::OffStage, StartState::Standard, 12));
+        assert_eq!(w.edits()[0], Edits { spot: true, ..none });
+    }
+
+    /// Traced floors of the tests, as `floors` reads them: the ground and the platform, and one more above.
+    fn traced() -> Vec<crate::model::floor_hop::Floor> {
+        vec![[[-60.0, 0.0], [60.0, 0.0]], [[-60.0, 30.0], [60.0, 30.0]], [[-35.0, 55.0], [-20.0, 55.0]]]
+    }
+
+    fn hop_press(w: &mut Wizard, key: u8) -> Outcome {
+        w.step_on(&button(key), Some, floors, &traced())
+    }
+
+    #[test]
+    fn on_stage_up_and_down_step_between_the_traced_floors() {
+        use crate::model::btt::Pad;
+        use crate::model::chords::logical::{A, DPAD_DOWN, DPAD_UP};
+        for mut w in [spot_wizard(saved(), None), { let mut w = save_wizard(); wizard_press(&mut w, A); w }] {
+            assert_eq!((w.page, w.cursor()), (Page::Spot, [-30.0, 30.0]));
+            hop_press(&mut w, DPAD_UP);
+            assert_eq!((w.setup[0].place, w.setup[0].at, w.cursor()), (Place::OnStage, [-30.0, 55.0], [-30.0, 55.0]));
+            // No further floor: the fighter stays.
+            hop_press(&mut w, DPAD_UP);
+            assert_eq!(w.setup[0].at, [-30.0, 55.0]);
+            hop_press(&mut w, DPAD_DOWN);
+            hop_press(&mut w, DPAD_DOWN);
+            assert_eq!((w.setup[0].at, w.cursor()), ([-30.0, 0.0], [-30.0, 0.0]));
+            hop_press(&mut w, DPAD_DOWN);
+            assert_eq!(w.setup[0].at, [-30.0, 0.0]);
+            // One flick of the stick is one floor, however long it is held.
+            for _ in 0..30 { w.step_on(&Pad { stick: [0.0, 1.0], ..Pad::default() }, Some, floors, &traced()); }
+            assert_eq!(w.setup[0].at, [-30.0, 30.0]);
+        }
+    }
+
+    #[test]
+    fn on_stage_left_and_right_move_along_the_floor() {
+        use crate::model::btt::Pad;
+        use crate::model::chords::logical::{DPAD_LEFT, DPAD_UP};
+        let mut w = spot_wizard(saved(), None);
+        hop_press(&mut w, DPAD_UP);
+        // The stick: 2 units a frame, as Break the Targets; the D-pad: one unit a press.
+        for _ in 0..3 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, &traced()); }
+        assert_eq!((w.setup[0].at, w.cursor()), ([-24.0, 55.0], [-24.0, 55.0]));
+        hop_press(&mut w, DPAD_LEFT);
+        assert_eq!(w.setup[0].at, [-25.0, 55.0]);
+        // The cursor cannot leave a floor: it stops at the floor's end.
+        for _ in 0..20 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, &traced()); }
+        assert_eq!((w.setup[0].place, w.setup[0].at, w.cursor()), (Place::OnStage, [-20.0, 55.0], [-20.0, 55.0]));
+    }
+
+    #[test]
+    fn a_diagonal_stick_keeps_the_floor() {
+        use crate::model::btt::Pad;
+        let mut w = spot_wizard(saved(), None);
+        // Past the tilt, but more sideways than up: no hop, and the fighter slides 2 units a frame.
+        for _ in 0..5 { w.step_on(&Pad { stick: [1.0, 0.75], ..Pad::default() }, Some, floors, &traced()); }
+        assert_eq!((w.setup[0].at, w.cursor()), ([-20.0, 30.0], [-20.0, 30.0]));
+        // More down than sideways, but short of the tilt: no hop either.
+        for _ in 0..5 { w.step_on(&Pad { stick: [-0.5, -0.6875], ..Pad::default() }, Some, floors, &traced()); }
+        assert_eq!((w.setup[0].at, w.cursor()), ([-25.0, 30.0], [-25.0, 30.0]));
+    }
+
+    #[test]
+    fn off_stage_and_an_unfinished_walk_keep_the_free_crosshair() {
+        use crate::model::btt::Pad;
+        use crate::model::chords::logical::L;
+        let up = Pad { stick: [0.0, 1.0], ..Pad::default() };
+        // Off stage the traced floors change nothing: the crosshair is free, as Break the Targets.
+        let mut w = spot_wizard(saved(), None);
+        hop_press(&mut w, L);
+        for _ in 0..3 { w.step_on(&up, Some, floors, &traced()); }
+        assert_eq!((w.setup[1].place, w.setup[1].at), (Place::OffStage, [-80.0, -5.0]));
+        // Without traced floors the fighter stands on the floor under a free crosshair.
+        let mut w = spot_wizard(saved(), None);
+        for _ in 0..3 { w.step_on(&up, Some, floors, &[]); }
+        assert_eq!((w.cursor(), w.setup[0].at), ([-30.0, 36.0], [-30.0, 30.0]));
     }
 
     #[test]
@@ -1614,7 +1773,7 @@ mod tests {
         for _ in 0..3 { w.step(&up, Some, floors); }
         assert_eq!((w.setup[1].place, w.setup[1].at), (Place::OffStage, [-80.0, -5.0]));
         assert_eq!(w.edited(), [true, true]);
-        assert_eq!(w.step(&button(A), Some, floors), Outcome::Start);
+        assert_eq!(w.step(&button(crate::model::chords::logical::PLUS), Some, floors), Outcome::Start);
         assert_eq!(w.setup.map(|f| (f.place, f.at)), [(Place::OnStage, [-20.0, 30.0]), (Place::OffStage, [-80.0, -5.0])]);
     }
 
@@ -1676,7 +1835,8 @@ mod tests {
         for _ in 0..10 { w.step(&down, Some, floors); }
         assert_eq!((w.setup[0].place, w.setup[0].at), (Place::OnStage, [-30.0, 0.0]));
         assert_eq!(w.edited(), [true, false]);
-        assert_eq!(w.step(&button(A), Some, floors), Outcome::Start);
+        assert_eq!(w.edits()[0], Edits { spot: true, ..Edits::default() });
+        assert_eq!(w.step(&button(crate::model::chords::logical::PLUS), Some, floors), Outcome::Start);
     }
 
     #[test]
@@ -1729,7 +1889,7 @@ mod tests {
         use crate::model::chords::logical::{DPAD_RIGHT, L};
         let mut w = save_wizard();
         assert_eq!((w.setup, w.edited()), (saved(), [false; 2]));
-        assert_eq!(text(&w, "Jab start"), "Jab start · 1/2 Where\n> P1   On stage (-30, 30)\n  CPU  Ledge (-80, -11)\nL / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel");
+        assert_eq!(text(&w, "Jab start"), "Jab start · 1/5 Where\n> P1   On stage (-30, 30)\n  CPU  Ledge (-80, -11)\nL / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel");
         // A ledge reading ends when that fighter is changed, and comes back with its saved place.
         w.set_home(Some([0.0, 0.0]));
         w.step(&button(L), Some, floors);
@@ -1742,15 +1902,34 @@ mod tests {
     fn change_placement_texts_match_the_design() {
         use crate::model::chords::logical::{A, L};
         let mut w = Wizard::for_save(wizard_defaults(), [false; 2], Who::P1);
-        assert_eq!(text(&w, "Jab start"), "Jab start · 1/2 Where\n> P1   On stage (-40, 0)\n  CPU  Off stage (-118, 22)\nL / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel");
+        assert_eq!(text(&w, "Jab start"), "Jab start · 1/5 Where\n> P1   On stage (-40, 0)\n  CPU  Off stage (-118, 22)\nL / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel");
         wizard_press(&mut w, A);
         wizard_press(&mut w, L);
-        assert_eq!(text(&w, "Jab start"), "Jab start · 2/2 Spot\n  P1   On stage (-40, 0)\n> CPU  Off stage (-118, 22)\nStick or D-pad move · L / R fighter · A save\nX as saved · Y on / off stage · B back");
-        // The longest text fits the notice: a 40-byte name and four-digit spots.
-        w.setup = [Fighter { at: [-1234.0, -1234.0], ..w.setup[0] }, Fighter { at: [-1234.0, -1234.0], ..w.setup[1] }];
-        for _ in 0..2 {
-            assert!(text(&w, &"n".repeat(40)).len() <= 224, "{}", text(&w, &"n".repeat(40)).len());
+        assert_eq!(text(&w, "Jab start"), "Jab start · 2/5 Spot\n  P1   On stage (-40, 0)\n> CPU  Off stage (-118, 22)\nStick or D-pad move · L / R fighter · A next\nX as saved · Y on / off stage · + save · B back");
+        wizard_press(&mut w, A);
+        assert_eq!(text(&w, "Jab start"), "Jab start · 3/5 State\n  P1   Standard\n> CPU  Tumble\nL / R fighter · ← → change · X as saved · A next · B back · + save");
+        w.setup[1].state = StartState::MissedTechUp;
+        assert_eq!(text(&w, "Jab start"), "Jab start · 3/5 State\n  P1   Standard\n> CPU  Missed tech · face up\nL / R fighter · ← → change · X face up / down · A next · B back · + save");
+        w.setup[1].state = StartState::Tumble;
+        wizard_press(&mut w, A);
+        assert_eq!(text(&w, "Jab start"), "Jab start · 4/5 Percent\n  P1   0%\n> CPU  45%\nL / R fighter · ← → 1 · ↑ ↓ 10 · A next · B back · X as saved · + save");
+        wizard_press(&mut w, A);
+        assert_eq!(text(&w, "Jab start"), "Jab start · 5/5 Preview\nP1   On stage (-40, 0) · Standard · 0%\nCPU  Off stage (-118, 22) · Tumble · 45%\nA / + save · B back");
+        // Every page says + save, and the longest text fits the notice: a 40-byte name and four-digit spots.
+        w.setup = [Fighter { at: [-1234.0, -1234.0], state: StartState::MissedTechDown, percent: 300, ..w.setup[0] },
+            Fighter { at: [-1234.0, -1234.0], ..w.setup[1] }];
+        for _ in 0..5 {
+            let page = text(&w, &"n".repeat(40));
+            assert!(page.contains("+ save") && page.len() <= 224, "{} {page}", page.len());
             wizard_press(&mut w, crate::model::chords::logical::B);
+        }
+        // Record placement keeps + start.
+        let mut record = Wizard::new(wizard_defaults(), None);
+        for _ in 0..5 {
+            let mut page = String::new();
+            record.write_text(Who::P1, "", &mut page).unwrap();
+            assert!(page.contains("+ start") && !page.contains("save"), "{page}");
+            wizard_press(&mut record, A);
         }
     }
 
