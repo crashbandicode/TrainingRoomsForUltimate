@@ -346,6 +346,16 @@ mod tests {
         assert_eq!(next(Phase::Prompt, in_menu), (Phase::Menu, Step::HidePrompt));
     }
 
+    fn opening_a_recording_from_its_page_routes_the_cpu_question_before_the_clip() {
+        // Unlike Replay window, the Recordings file is a menu screen, not a layer panel.
+        let asking = Seen { prompt_visible: true, clip_foreground: false, ..seen(true, true, true) };
+        let (phase, _) = next(Phase::Menu, asking);
+        assert_eq!(phase, Phase::Panel, "draw the question and route its A/B to the layer");
+        assert_eq!(next(phase, asking), (Phase::Panel, Step::Nothing));
+        assert_eq!(next(phase, seen(true, true, true)), (Phase::Clip, Step::HandOverToClip)); // Keep
+        assert_eq!(next(phase, seen(true, false, false)), (Phase::Menu, Step::PopRow)); // Cancel
+    }
+
     fn clip_sync_outlives_menu_on_both_entry_routes() {
         for entry in [Phase::Menu, Phase::Panel] {
             let (phase, step) = next(entry, seen(true, true, true));
@@ -426,6 +436,7 @@ mod tests {
             ("the_hand_over_close_keeps_the_clip_editor_drawn", the_hand_over_close_keeps_the_clip_editor_drawn as fn()),
             ("clip_sync_outlives_menu_on_both_entry_routes", clip_sync_outlives_menu_on_both_entry_routes as fn()),
             ("a_fighter_question_inside_the_open_menu_stays_the_menu_panels", a_fighter_question_inside_the_open_menu_stays_the_menu_panels as fn()),
+            ("opening_a_recording_from_its_page_routes_the_cpu_question_before_the_clip", opening_a_recording_from_its_page_routes_the_cpu_question_before_the_clip as fn()),
             ("the_pop_ups_close_starts_the_close_window", the_pop_ups_close_starts_the_close_window as fn()),
             ("the_close_window_waits_for_the_buttons_held_when_it_began", the_close_window_waits_for_the_buttons_held_when_it_began as fn()),
             ("the_model_list_follows_the_press_owner", the_model_list_follows_the_press_owner as fn()),
