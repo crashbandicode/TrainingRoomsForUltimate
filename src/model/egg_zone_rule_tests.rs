@@ -147,7 +147,9 @@ fn plain_battlefield() -> Stage {
 }
 
 fn stage_three() -> Stage {
-    Stage::new(3, [-240.0, 240.0, 180.0, -140.0], [[-79.986, 0.0], [79.989, 0.0]],
+    // These ledges are the stage file's own values.
+    let ledges = [[-79.98560333251953, 0.0], [79.98930358886719, 0.0]];
+    Stage::new(3, [-240.0, 240.0, 180.0, -140.0], ledges,
         outline(&BATTLEFIELD_LINES, 10), [Some(-240.0), Some(240.0)], &[]).unwrap()
 }
 

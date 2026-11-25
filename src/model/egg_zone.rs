@@ -10,8 +10,11 @@ const EDGE_MARGIN: f32 = 8.0;
 const BOTTOM_MARGIN: f32 = 24.0;
 const DIAMETER: f32 = 2.0 * RADIUS;
 const DEFAULT: [u8; 4] = [128, 128, 255, 128];
+/// Other lines a stage keeps at most; a spot's test rebuilds them as `Met` on the stack.
 const LINES: usize = 16;
+/// The read's columns are this far apart, as the rule's own.
 const COLUMN: f32 = 10.0;
+/// How far past a line just met the next cast starts.
 const STEP: f32 = 0.1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,9 +32,13 @@ pub struct Stage {
     id: i32,
     blast: [f32; 4],
     ledges: [Point; 2],
+    /// The main solid's closed outline, then the stage's other lines in the zone's columns: solid lines (left end first when a fighter can stand on it, right end first when not), then platforms.
     outline: Outline,
+    /// Where each end's open air stops (`stage_geometry::open_air_end`); the ledge's own x for a side with no zone.
     air: [f32; 2],
+    /// Segments of the main outline.
     main: u8,
+    /// End of the other solid lines; the platforms follow.
     solid: u8,
     available: [bool; 2],
 }
@@ -99,6 +106,7 @@ pub fn blast_rect([left, right, top, bottom]: [f32; 4]) -> [Point; 2] {
     [[left, bottom], [right, top]]
 }
 
+/// The stage without the main solid's own lines: a line of the main outline is passed, and the cast goes on under it.
 struct Others<'a, P> {
     stage: &'a mut P,
     main: &'a Outline,
@@ -185,6 +193,7 @@ impl Stage {
         })
     }
 
+    /// The stage as the off-stage rule reads it: the floor run under the camera's middle, each ledge's open air, and the other lines in the zone's columns. `Ok(None)`: no usable zone. `Err`: the stage could not be read.
     pub fn read(id: i32, blast: [f32; 4], camera: [f32; 4], outline: Outline,
         stage: &mut impl Probe) -> Result<Option<Self>, Unread> {
         if !blast.into_iter().chain(camera).all(f32::is_finite) { return Ok(None); }
@@ -367,6 +376,7 @@ impl Stage {
             && self.outline.segments().iter().all(|&s| clear_of(s, at))
     }
 
+    /// Whether a target centred at `at` is off stage by the rule among the stage's other lines: its centre and its two side points.
     fn off_stage(&self, at: Point) -> bool {
         let empty = Met { ends: [[0.0; 2]; 2], stand: false, through: false };
         let mut lines = [empty; LINES];
