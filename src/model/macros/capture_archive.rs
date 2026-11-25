@@ -1272,7 +1272,7 @@ mod tests {
         assert!(!CaptureArchive::new(temp.0.join("absent")).delete(&kept).unwrap(), "no folder yet: nothing to delete");
     }
 
-    fn a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens() {
+    fn a_delete_that_fails_after_it_commits_never_lists_a_broken_capture() {
         let temp = TestDir::new();
         let archive = CaptureArchive::new(&temp.0);
         let id = encode_file_id("bundle");
@@ -1282,13 +1282,10 @@ mod tests {
         fs::copy(dir.join(format!("{id}.tmrc")), temp.0.join(format!("{id}.tmrc"))).unwrap();
         assert!(archive.delete(&id).is_err(), "a folder inside is not this module's to remove");
         let listed = archive.list().unwrap();
-        assert_eq!(listed.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [id.as_str()]);
-        assert!(listed.skipped.is_empty());
-        assert!(archive.load(&id).is_ok(), "it still opens");
-        // Once the obstacle is gone the same delete finishes.
-        fs::remove_dir(dir.join("not-a-file")).unwrap();
-        assert!(archive.delete(&id).unwrap());
-        assert!(archive.list().unwrap().entries.is_empty() && !dir.exists());
+        assert!(listed.entries.is_empty() && listed.skipped.is_empty(), "the capture left the list whole, not half");
+        assert!(!dir.exists() && !temp.0.join(format!("{id}.tmrc")).exists());
+        assert!(temp.0.join(format!(".{id}.smd-0.del")).join("not-a-file").is_dir(), "the rest waits under a name the list ignores");
+        assert!(!archive.delete(&id).unwrap(), "nothing of that id is listed any more");
     }
 
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
@@ -1296,7 +1293,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
-            ("a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),
+            ("a_delete_that_fails_after_it_commits_never_lists_a_broken_capture", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),
             ("a_capture_file_with_no_new_key_reads_back_both_sides", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),
             ("a_capture_being_written_is_not_listed_until_it_is_committed", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),

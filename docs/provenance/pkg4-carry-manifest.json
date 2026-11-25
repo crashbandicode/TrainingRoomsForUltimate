@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "d1854c1f7c52f4c15dfba3ced2ac3a58b147631ae2ecc97c28389c8843781991",
+   "dest_sha256": "c2e8ae172d0bfe861ae617acd9f6d34ff0f678571c41377012226fa6daa98e50",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -207,6 +207,21 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n",
      "new": "            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n            (\"a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens\", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    fn a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens() {\n",
+     "new": "    fn a_delete_that_fails_after_it_commits_never_lists_a_broken_capture() {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(listed.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [id.as_str()]);\n        assert!(listed.skipped.is_empty());\n        assert!(archive.load(&id).is_ok(), \"it still opens\");\n        // Once the obstacle is gone the same delete finishes.\n        fs::remove_dir(dir.join(\"not-a-file\")).unwrap();\n        assert!(archive.delete(&id).unwrap());\n        assert!(archive.list().unwrap().entries.is_empty() && !dir.exists());\n",
+     "new": "        assert!(listed.entries.is_empty() && listed.skipped.is_empty(), \"the capture left the list whole, not half\");\n        assert!(!dir.exists() && !temp.0.join(format!(\"{id}.tmrc\")).exists());\n        assert!(temp.0.join(format!(\".{id}.smd-0.del\")).join(\"not-a-file\").is_dir(), \"the rest waits under a name the list ignores\");\n        assert!(!archive.delete(&id).unwrap(), \"nothing of that id is listed any more\");\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens\", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),\n",
+     "new": "            (\"a_delete_that_fails_after_it_commits_never_lists_a_broken_capture\", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),\n"
     }
    ]
   },
@@ -707,7 +722,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "5ce6e7fce63a9f73f353189dabb6c63638adb1914994e48304301142ccc2a811",
+   "dest_sha256": "26a9ecc30c79d388840dd0d4bb6c5e4765046f33484acdc124e0d7a71b0f4778",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -829,6 +844,16 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n",
+     "new": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n    fn bytes_in(dir: &Path) -> BTreeMap<String, Vec<u8>> {\n        fs::read_dir(dir).unwrap().map(|item| {\n            let item = item.unwrap();\n            (item.file_name().to_string_lossy().into_owned(), fs::read(item.path()).unwrap())\n        }).collect()\n    }\n\n    /// A real saved bundle with an older plain file of the same id beside it. The folder that holds the captures\n    /// cannot be changed, so the delete cannot start: every byte stays and the shared archive still loads.\n    fn a_delete_that_cannot_start_changes_nothing_in_a_real_bundle() {\n        use std::os::unix::fs::PermissionsExt;\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let twin = f.0.join(format!(\"{id}.tmrc\"));\n        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        assert!(before.len() >= 3, \"the manifest, the timeline and the editor's file\");\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(f.0.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o755)).unwrap();\n        if !locked {\n            return; // a process that may write anywhere: nothing to show here\n        }\n        assert!(result.is_err());\n        assert_eq!(bytes_in(&dir), before);\n        assert_eq!(fs::read(&twin).unwrap(), twin_before);\n        assert!(f.load().is_ok(), \"the shared archive loads\");\n        assert_eq!(archive.list().unwrap().entries.len(), 1);\n        assert!(archive.delete(&id).unwrap(), \"the same delete then finishes\");\n        assert!(!dir.exists() && !twin.exists() && archive.list().unwrap().entries.is_empty());\n    }\n\n    /// The same bundle, whose own files cannot be removed. Either nothing changed, or the capture left the list in one\n    /// step with its twin and what could not be removed is whole under a name the list ignores. Another delete's\n    /// leftover is never touched.\n    fn a_delete_is_all_or_nothing_for_a_real_bundle() {\n        use std::os::unix::fs::PermissionsExt;\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let twin = f.0.join(format!(\"{id}.tmrc\"));\n        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let foreign = f.0.join(format!(\".{id}.smd-0.del\"));\n        fs::create_dir(&foreign).unwrap();\n        fs::write(foreign.join(\"keep\"), b\"kept\").unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(dir.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        let moved = f.0.join(format!(\".{id}.smd-1.del\"));\n        for path in [&dir, &moved] {\n            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));\n        }\n        if !locked {\n            return; // a process that may write anywhere: nothing to show here\n        }\n        assert!(result.is_err());\n        let listed = archive.list().unwrap();\n        assert!(listed.skipped.is_empty(), \"never a broken row\");\n        if listed.entries.is_empty() {\n            assert!(!dir.exists() && !twin.exists(), \"gone from the list, and the twin with it\");\n            assert_eq!(bytes_in(&moved), before, \"what could not be removed is whole, under a name the list ignores\");\n        } else {\n            assert_eq!(bytes_in(&dir), before, \"or nothing changed\");\n            assert_eq!(fs::read(&twin).unwrap(), twin_before, \"the twin included\");\n            assert!(f.load().is_ok(), \"and the shared archive loads\");\n        }\n        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n",
+     "new": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n            (\"a_delete_that_cannot_start_changes_nothing_in_a_real_bundle\", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),\n            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n"
     }
    ]
   },
