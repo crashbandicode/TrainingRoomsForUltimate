@@ -936,13 +936,6 @@ impl Stage {
     pub fn keeps_start(self, drill: Drill, cpu: [f32; 2], options: StartOptions) -> bool {
         drill == Drill::Juggler || options.under || self.off_stage(cpu).is_some()
     }
-
-    /// Whether a setup kept for this stage is still one Start may use without the wizard. Guard the Edge's belongs
-    /// to the floor run Player 1's point is on, and a CPU point that is not beside that run was accepted as one
-    /// under the stage, which needs that option. The point is not classed again.
-    pub fn keeps_setup(self, drill: Drill, setup: Setup, options: StartOptions) -> bool {
-        self.keeps_start(drill, setup.cpu, options)
-    }
 }
 
 /// Guard the Edge's two start options (the menu rows `edge_under` and `edge_jumps`).
@@ -1197,6 +1190,17 @@ impl Wizard {
             }
         }
         setup
+    }
+
+    /// The setup Start uses without the wizard: one kept on `run`, the ends of the floor run it was made on. It is
+    /// reused only on that same run (the saved ends are compared; nothing is read again), and a Guard the Edge CPU
+    /// point that is not beside the run was accepted as one under the stage, which needs that option. `None`: Start
+    /// opens the wizard at this run's defaults.
+    pub fn kept_setup(
+        &self, stage: Stage, run: perfect::Segment, setup: Setup, unmoved: bool, options: StartOptions,
+    ) -> Option<Setup> {
+        let _ = run;
+        stage.keeps_start(self.drill, setup.cpu, options).then(|| self.remembered(stage, setup, unmoved))
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {

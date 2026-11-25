@@ -229,23 +229,47 @@ fn a_moved_cursor_does_not_use_an_earlier_press() {
 
 #[test]
 fn a_kept_start_is_reused_only_on_its_own_floor_run() {
-    let (long, _) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
-    let (island, _) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
-    // Made on the long floor, beside its left ledge.
-    let kept = Setup { cpu: [-125.0, -68.0], p1: [0.0, 0.0], percent: 100 };
-    assert!(long.keeps_setup(Drill::GuardEdge, kept, OFF));
-    assert!(!island.keeps_setup(Drill::GuardEdge, kept, OFF), "Player 1's point is not on the island");
-    assert!(!island.keeps_setup(Drill::GuardEdge, kept, ON));
-    // A start under the island needs the option.
-    let under = Setup { cpu: [-250.0, -80.0], p1: [-250.0, 0.014], percent: 100 };
-    assert!(!island.keeps_setup(Drill::GuardEdge, under, OFF));
-    assert!(island.keeps_setup(Drill::GuardEdge, under, ON));
-    for setup in [kept, under] {
-        for stage in [long, island] {
-            assert!(stage.keeps_setup(Drill::Juggler, setup, OFF));
+    let key = (308, 0);
+    for drill in [Drill::Juggler, Drill::GuardEdge] {
+        let (long, long_p1) = on_training(drill, [-30.0, 0.01]).unwrap();
+        let (island, island_p1) = on_training(drill, [-250.0, 0.024]).unwrap();
+        let on_long = Wizard::new(drill, long, long_p1, 100, key, None).unwrap();
+        let on_island = Wizard::new(drill, island, island_p1, 100, key, None).unwrap();
+        // A start set up on each run, with the CPU moved off its default: beside the run's left ledge for Guard
+        // the Edge, over Player 1 for Juggler.
+        let (long_cpu, island_cpu) = match drill {
+            Drill::GuardEdge => ([-125.0, -60.0], [-375.0, -60.0]),
+            Drill::Juggler => ([0.0, 80.0], [-250.0, 80.0]),
+        };
+        let made_on_long = Setup { cpu: long_cpu, p1: [0.0, 0.0], percent: 100 };
+        let made_on_island = Setup { cpu: island_cpu, p1: [-250.0, 0.014], percent: 100 };
+        // The same run reuses it.
+        assert_eq!(on_long.kept_setup(long, long.ledges, made_on_long, false, OFF), Some(made_on_long), "{drill:?}");
+        assert_eq!(on_island.kept_setup(island, island.ledges, made_on_island, false, OFF), Some(made_on_island), "{drill:?}");
+        // The other run does not: Start then opens the wizard, whose setup is that run's own default.
+        assert_eq!(on_long.kept_setup(long, island.ledges, made_on_island, false, OFF), None, "{drill:?}: kept on the island");
+        assert_eq!(on_island.kept_setup(island, long.ledges, made_on_long, false, OFF), None, "{drill:?}: kept on the long floor");
+        assert!(long.on_run(on_long.setup.p1[0]) && island.on_run(on_island.setup.p1[0]), "{drill:?}");
+        match drill {
+            Drill::GuardEdge => {
+                assert!(near(Some(on_long.setup.cpu), [-125.0, -68.426]));
+                assert!(near(Some(on_island.setup.cpu), [-375.0, -68.419]));
+            }
+            Drill::Juggler => {
+                assert_eq!(on_long.setup.cpu, long.default_juggle(long_p1));
+                assert_eq!(on_island.setup.cpu, island.default_juggle(island_p1));
+            }
         }
     }
+    // Guard the Edge: a start under the island, on its own run, still needs the option.
+    let (island, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let wizard = Wizard::new(Drill::GuardEdge, island, p1, 100, key, None).unwrap();
+    let under = Setup { cpu: [-250.0, -80.0], p1: [-250.0, 0.014], percent: 100 };
+    assert_eq!(wizard.kept_setup(island, island.ledges, under, false, OFF), None);
+    assert_eq!(wizard.kept_setup(island, island.ledges, under, false, ON), Some(under));
+    // The run's ends are kept with the setup and compared at Start; nothing is read again for it.
     let runtime = include_str!("../../runtime/features/edge_juggle.rs");
-    assert_eq!(runtime.matches("stage.keeps_setup(drill, *setup, config.options)").count(), 1);
+    assert!(runtime.contains("kept[run.drill as usize] = Some((run.stage_key, run.stage.ledges, run.setup, wizard.unmoved()));"));
+    assert_eq!(runtime.matches("wizard.kept_setup(stage, run, setup, unmoved, config.options)").count(), 1);
 }
 }
