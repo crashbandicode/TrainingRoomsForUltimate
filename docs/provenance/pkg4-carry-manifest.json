@@ -302,7 +302,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "9882885f49519b35ca2866f31dae3af5f8c6e8616f3d9652c3bfa32f76cee1a5",
+   "dest_sha256": "11898fcf4d75f2fbb2fbafb45e90bafe6a3d00eb1a78542bd9025320e4261b46",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -484,6 +484,11 @@
     {
      "old": "                live.session.tracks.push(LiveTrack { entry, frames });",
      "new": "                live.session.tracks.push(LiveTrack { fighter: None, entry, frames });",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let _ = (key, entry, fighter);",
+     "new": "        if self.active != Some(key) { return; }\n        let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) else { return };\n        if let Some(track) = live.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
@@ -1390,7 +1395,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "82d19367452df75f2ea55170d489f1663ee39f7a4817ffe0b0f2997f61b83b8f",
+   "dest_sha256": "b5f3e750a2885c920a6ecdb24bb98a894645eeed5b3a05fdb7ac8641327a9fc8",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1881,6 +1886,11 @@
     {
      "old": "/// (`clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {",
      "new": "/// (the identity stored with it, else `clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    let _ = stored;\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
+     "new": "    Namer::recorded(stored.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii)))",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
@@ -4201,7 +4211,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "75334d4f4a97769f17b748dd32ef4ef741cb38fb93d7f660b03c8fe3f4ffeccb",
+   "dest_sha256": "56b09a720f111a6c6fc58ec8f83890338b9033e2c8ffe69c8a6ac6b3b94e0461",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5047,6 +5057,26 @@
      "old": "                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };",
      "new": "                let role = clip_play_role();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; }",
+     "new": "    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; return; }\n    // Once per entry and capture: the identity its specials are named by (`recorded_fighter`).\n    if !core::mem::replace(&mut hook.named[entry as usize], true) {\n        // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.\n        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };\n        if let Some(fighter) = fighter {\n            if !post_vault(hook.epoch, VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }) { hook.truncated = true; }\n        }\n    }",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        hook.counts = [0; 8];\n        hook.pending = [None; 8];",
+     "new": "        hook.counts = [0; 8];\n        hook.named = [false; 8];\n        hook.pending = [None; 8];",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],",
+     "new": "    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8], named: [false; 8],",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    pending: [Option<ReplayFrame>; 8],\n}",
+     "new": "    pending: [Option<ReplayFrame>; 8],\n    /// The entries whose fighter identity this capture has posted.\n    named: [bool; 8],\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -5282,7 +5312,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "23b56030db188ccc21ecafa595e151c5768ca6a56fb62559aa090ae2101db6e0",
+   "dest_sha256": "643dcd99cdad8acd73e8d6f101396556bdc7218da113ecf30356c1fe1c5001f1",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -5595,6 +5625,26 @@
      "old": "    if scratch.is_empty() { scratch.resize(4096, (0, 0)); }\n",
      "new": "    if scratch.is_empty() { scratch.resize(crate::engine::macros::handoff::REPLAY_EVENT_SLOTS, (0, 0)); }\n",
      "reason": "rc.8 R4 (TASK-rc8.md SCOPE REOPENED; the operator 2026-11-11 11:24Z): the replay mailbox has handoff::REPLAY_EVENT_SLOTS slots (1024, from 4096: the rc.8 pass peaked at 4; 2.1 s of 8 samples a frame, the stall watchdog's STALL_MS), and its drain scratch follows; a full mailbox drops and counts as before"
+    },
+    {
+     "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);\n    #[cfg(feature = \"named-input-trace\")]",
+     "new": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);\n    // Once per entry and record, after its first sample: the identity its specials are named by.\n    if accepted && capture.named[entry as usize] != Some(pending.key) {\n        capture.named[entry as usize] = Some(pending.key);\n        // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.\n        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };\n        if let Some(fighter) = fighter { capture.pool.name(pending.key, entry, fighter); }\n    }\n    #[cfg(feature = \"named-input-trace\")]",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        self.tokens.seal(key, entry); post(LiveEvent::Seal { key, entry });\n    }",
+     "new": "        self.tokens.seal(key, entry); post(LiveEvent::Seal { key, entry });\n    }\n    fn name(&mut self, key: NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId) {\n        post(LiveEvent::Fighter { key, entry, fighter });\n    }",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    pending: [Option<Pending>; 8],\n    saves: VecDeque<BoundSave>,",
+     "new": "    pending: [Option<Pending>; 8],\n    /// Per entry, the record whose fighter identity was posted.\n    named: [Option<NativeRecordKey>; 8],\n    saves: VecDeque<BoundSave>,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    pending: [None; 8], saves: VecDeque::new(),",
+     "new": "    pending: [None; 8], named: [None; 8], saves: VecDeque::new(),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },

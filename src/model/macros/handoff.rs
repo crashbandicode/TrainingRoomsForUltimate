@@ -56,7 +56,9 @@ impl VaultArchive {
         self.note_loss(last_lost_epoch);
         match event {
             VaultEvent::Begin { .. } => {},
-            VaultEvent::Fighter { .. } => {},
+            VaultEvent::Fighter { entry, fighter, .. } => {
+                if let Some(track) = self.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }
+            },
             VaultEvent::End { truncated, .. } => self.session.truncated |= truncated,
             VaultEvent::Sample { entry, sample, quantized, .. } => {
                 if !(0..8).contains(&entry) { self.session.truncated = true; return; }

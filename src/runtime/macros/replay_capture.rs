@@ -118,9 +118,11 @@ static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
 struct VaultHook {
     epoch: u64, recording: bool, truncated: bool, counts: [usize; 8],
     pending: [Option<ReplayFrame>; 8],
+    /// The entries whose fighter identity this capture has posted.
+    named: [bool; 8],
 }
 static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {
-    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
+    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8], named: [false; 8],
 });
 // rc.8 R4: the slots are sized in `handoff::REPLAY_EVENT_SLOTS`, which says what a full mailbox does.
 static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, { crate::engine::macros::handoff::REPLAY_EVENT_SLOTS }> = hos_lock::Mailbox::new();
@@ -1251,6 +1253,7 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
         hook.recording = true;
         hook.truncated = false;
         hook.counts = [0; 8];
+        hook.named = [false; 8];
         hook.pending = [None; 8];
         if !post_vault(hook.epoch, VaultEvent::Begin { epoch: hook.epoch }) { hook.truncated = true; }
     }
@@ -1276,7 +1279,15 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     let (input, quantized) = observed.unwrap().project();
     sample.input = input;
     hook.counts[entry as usize] += 1;
-    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; }
+    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; return; }
+    // Once per entry and capture: the identity its specials are named by (`recorded_fighter`).
+    if !core::mem::replace(&mut hook.named[entry as usize], true) {
+        // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.
+        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };
+        if let Some(fighter) = fighter {
+            if !post_vault(hook.epoch, VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }) { hook.truncated = true; }
+        }
+    }
 }
 
 pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> Option<LiveInput> {

@@ -232,6 +232,7 @@ pub fn finish_recording(
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = capture.fighter;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
@@ -262,6 +263,7 @@ pub fn save_drill_take_of(root: &Path, frames: Vec<InputFrame>, start: StartStat
     let name = drill_take_name(drill_take_key(&frames, at));
     let mut recording = MacroRecording::new(name, "13.0.5", start, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = fighter;
     macros.save_new(&recording).map_err(record).map(Some)
 }
 
@@ -375,7 +377,7 @@ pub enum Generated { Macro(String), Pass(super::rr_host::MakeAsk) }
 pub fn generate(root: &Path, recording: MacroRecording, typed: &str, make: crate::model::recording_menu::Make, role: Role, at: u64) -> Result<Generated, Error> {
     use crate::model::recording_menu::Make;
     if make == Make::Drill {
-        let source = save_drill_take(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[])?
+        let source = save_drill_take_of(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[], recording.recorded_fighter)?
             .ok_or_else(|| Error::Record(EMPTY_RECORDING.into()))?;
         return Ok(Generated::Pass(super::rr_host::MakeAsk { source, role, drill: Some(typed.trim().into()) }));
     }

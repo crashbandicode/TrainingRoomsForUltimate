@@ -224,7 +224,9 @@ impl LiveCapturePool {
 
     /// The identity of an entry's fighter, read once by the hook after the entry's first sample.
     pub fn name_entry(&mut self, key: NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId) {
-        let _ = (key, entry, fighter);
+        if self.active != Some(key) { return; }
+        let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) else { return };
+        if let Some(track) = live.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }
     }
 
     pub fn finish_record(&mut self) {

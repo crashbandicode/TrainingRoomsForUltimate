@@ -269,7 +269,7 @@ fn save_input(root: &Path, source: &str, activate: bool, spans: &[Span], tick: &
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
     let fighter = posted.and_then(|p| p.owner.fighter());
     // F10: a directly recorded drill owns the macro file holding its take.
-    let kept = if activate { keep_drill_take(root, start, spans) } else { None };
+    let kept = if activate { keep_drill_take(root, start, spans, fighter) } else { None };
     let saved = match kept {
         Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, fighter, kept, unix_now()),
         None => save_made_combo(root, &take.combo, source, recorded_on, fighter, unix_now()),
@@ -288,7 +288,7 @@ fn save_input(root: &Path, source: &str, activate: bool, spans: &[Span], tick: &
 
 /// The frames of a direct drill take as a macro (`save_drill_take`), with the start the Record chord posted. `None`
 /// when nothing could be kept: the drill is saved all the same, without a preview.
-fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span]) -> Option<String> {
+fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span], fighter: Option<crate::model::move_names::FighterId>) -> Option<String> {
     let (_, frames) = taken_frames();
     let state = start.map_or_else(StartState::default, |s| StartState {
         situation: s.poses[0].situation_kind,
@@ -296,7 +296,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span]) -> O
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, record_trim(), unix_now(), spans).ok().flatten()
+    super::rr_runtime::save_drill_take_of(root, frames, state, record_trim(), unix_now(), spans, fighter).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -1117,8 +1117,9 @@ fn read_fighter(role: Role) -> Option<crate::model::move_names::FighterId> {
 /// fighter identity is read here, so every take carries the one of the role that recorded it.
 pub fn post_record_start(start: RecordStart, fighter: Option<crate::model::move_names::FighterId>) {
     let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
+    let fighter = fighter.or_else(|| read_fighter(Role::Player));
     RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter),
-        cpu: CaptureOwner::UNKNOWN });
+        cpu: CaptureOwner::new(start.poses[1].fighter_kind, read_fighter(Role::Cpu)) });
 }
 
 fn take_record_start() -> Option<PostedStart> {
@@ -1329,7 +1330,9 @@ pub fn service_at(
         // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
         // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
         // stands in, at rest, as before.
-        let (player, cpu, speeds) = match take_record_start().map(|p| p.start) {
+        let posted = take_record_start();
+        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+        let (player, cpu, speeds) = match posted.map(|p| p.start) {
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };

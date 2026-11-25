@@ -331,8 +331,7 @@ fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
 /// (the identity stored with it, else `clip_marks::take_identity`); the common names otherwise.
 fn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {
     use crate::model::move_names::{Namer, PUBLISHED};
-    let _ = stored;
-    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))
+    Namer::recorded(stored.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii)))
 }
 
 fn track_marks(track: &ReplayTrack) -> Marks {

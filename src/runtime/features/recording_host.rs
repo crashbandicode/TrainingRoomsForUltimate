@@ -14,7 +14,19 @@ static NAME_ASKED: AtomicBool = AtomicBool::new(false);
 const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
+/// A role's live fighter identity, for the take it records (`rr_host::post_record_start`).
+fn role_fighter(role: crate::engine::library::Role) -> Option<crate::model::move_names::FighterId> {
+    // SAFETY: a take start is posted from the game thread only (the chord step, the placement poll), where the
+    // role's body is live this frame.
+    unsafe {
+        let body = super::recorder::body_of(if role == crate::engine::library::Role::Cpu { 1 } else { 0 })?;
+        let kind = ((body.fighter + super::recorder::FIGHTER_KIND_FIELD) as *const i32).read();
+        super::move_names::fighter_id(body.accessor, kind)
+    }
+}
+
 pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, play_cpu: bool) {
+    rr_host::set_fighter_reader(role_fighter);
     // A Record that starts keeps both fighters as they are now: the start save is where the macro starts
     // (RECORDING-REDESIGN, "Start save"), and the macro keeps the recorded role's speed (PLAY-MOMENTUM).
     if record && rr_host::capture_role() == 0 {

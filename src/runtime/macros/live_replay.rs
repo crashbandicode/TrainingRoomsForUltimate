@@ -24,7 +24,7 @@ static BASE: AtomicUsize = AtomicUsize::new(0);
 static CLOCK_TRACE_LEFT: AtomicUsize = AtomicUsize::new(0);
 static CAPTURE: hos_lock::Mutex<Capture> = hos_lock::Mutex::new(Capture {
     native_state: 0, epoch: 0, clock: None, pool: HookPool::new(), owner: RecordOwnership::new(),
-    pending: [None; 8], saves: VecDeque::new(),
+    pending: [None; 8], named: [None; 8], saves: VecDeque::new(),
     #[cfg(feature = "diag")]
     completion_trace: CompletionTrace::new(),
 });
@@ -37,6 +37,8 @@ struct Capture {
     /// Accepted native record, armed or not, independent of the pool (R1).
     owner: RecordOwnership,
     pending: [Option<Pending>; 8],
+    /// Per entry, the record whose fighter identity was posted.
+    named: [Option<NativeRecordKey>; 8],
     saves: VecDeque<BoundSave>,
     #[cfg(feature = "diag")]
     completion_trace: CompletionTrace,
@@ -150,6 +152,9 @@ impl HookPool {
     }
     fn seal_entry(&mut self, key: NativeRecordKey, entry: i32) {
         self.tokens.seal(key, entry); post(LiveEvent::Seal { key, entry });
+    }
+    fn name(&mut self, key: NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId) {
+        post(LiveEvent::Fighter { key, entry, fighter });
     }
     fn push(&mut self, key: NativeRecordKey, entry: i32, tick: u32, sample: LiveFrame) -> bool {
         if !self.tokens.wants_sample(key, entry, tick) { return false; }
@@ -733,6 +738,13 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     pending.sample.input = input;
     // Only a fixed observation crosses the callback; the worker grows frame storage.
     let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);
+    // Once per entry and record, after its first sample: the identity its specials are named by.
+    if accepted && capture.named[entry as usize] != Some(pending.key) {
+        capture.named[entry as usize] = Some(pending.key);
+        // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.
+        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };
+        if let Some(fighter) = fighter { capture.pool.name(pending.key, entry, fighter); }
+    }
     #[cfg(feature = "named-input-trace")]
     if entry == 1 && pending.tick < 600 {
         println!("[LiveCapture] sample generation={} index={} tick={} accepted={} buttons={:#x} lx={} ly={}",
