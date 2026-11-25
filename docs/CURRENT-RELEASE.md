@@ -16,8 +16,9 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
   had its off-stage zone, the recording picker's Off stage switch moved a fighter, a take played and the clip editor
   previewed. Neither drill was played through, no placement was saved, the waiting room was not run, and most of
   the build's other new items were not touched.
-- **On the console:** not played yet. Install 5 went on the card at 23:06 and no report is on record. The operator's
-  reports on the earlier builds are in the evidence page.
+- **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
+  with "In is mid-action" after a snap to the move start. The cause is being traced. It is a report of what they
+  saw, not a test of the build; the reports on the earlier builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -93,7 +94,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Install 5 has not been played on the console.** Its Eden check was one short smoke boot:
+- **Install 5 has had little play on the console:** one report is on record. Its Eden check was one short smoke boot:
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
   starts; the start has not been timed in a game.

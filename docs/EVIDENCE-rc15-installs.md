@@ -23,7 +23,7 @@ author. Times are UTC.
 | Card readback | match | match | match | match | match |
 | Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 |
 | Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks; the waiting room not run |
-| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | none yet |
+| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | one (2026-11-25) |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
 (`strings` on `artifacts/phase23/install4/gate-a945b0c1/nro/libtraining_rooms-a945b0c1-release.nro`). The install 5
@@ -126,7 +126,7 @@ each gate's own; they were not compared test by test here.
 ## The operator's reports from the console
 
 The operator's own reports from play on a Switch. Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z,
-tr-primary-2). Two were recorded by the coordinator at the time, in its handoff
+tr-primary-2; the report on install 5, inbox 23:33:51Z). Two were recorded by the coordinator at the time, in its handoff
 (`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry. Each report is placed on the build
 that was on the card at its time, by the install records' times above.
 They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose
@@ -148,6 +148,7 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
 | 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed. A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
+| 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Nothing yet. The cause is being traced on `58c9ccb5`, whose code is install 5's (inbox 23:33:51Z); it has not been reproduced off the console, and no fix is merged. The smoke boot's editor check opened the editor and previewed a take without moving a handle. |
 
 ## Install 5 (`b7a382e4`)
 
@@ -161,7 +162,7 @@ plugins are left out, except the first, which was made in Training and turned ou
   different SHA-256 (`0414f116…`); it was not installed. The card readback still matches `b7a382e4` (`0cb29525…`).
   Compare `artifacts/phase23/next-build/gate-f55dfbbe/SUMMARY.md` with the install gate above.
 - **Eden:** the smoke boot below, on this exact file.
-- **The operator's reports:** none yet.
+- **The operator's reports:** one, on 2026-11-25, [above](#the-operator-s-reports-from-the-console).
 
 The changes in this build were merged one by one after `a945b0c1` and are listed in the release notes. The Gate column names the receipt under
 `artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
