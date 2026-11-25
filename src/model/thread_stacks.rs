@@ -40,6 +40,7 @@ pub enum ThreadId {
     MiiCatalog,
     PracticeTrace,
     StallWatch,
+    MoveNames,
 }
 
 /// One row: what runs on the thread and the numbers its size is checked against.
@@ -68,7 +69,7 @@ const KIB: usize = 1024;
 // Menu catalog v2: max of exact release and diag c5a5740c (2026-11-19) for Menu, IniWriter, TraceWriter, Archive, MacroDiag.
 // Intermediate c7c17f3e (2026-11-23): SettingsLoad from diag, Menu from release.
 // Runtime paint marks and stack allocations retain their recorded provenance below.
-pub const THREADS: [ThreadStack; 18] = [
+pub const THREADS: [ThreadStack; 19] = [
     // Includes the registered TICK steps (indirect calls, outside the static walk): the drain closure's 2,928 B frame plus the
     // deeper step, `p1::service` 5,168 B (diag ELF of the rc.6 hook-allocation fix; report_late's path was 5696 in all); measured11184 dominates.
     // See docs/SH01-MEASURED-STACK-REVIEW.md (removed after v0.2.0-rc.1; see that tag); margin and SDK reserve are unchanged.
@@ -100,7 +101,18 @@ pub const THREADS: [ThreadStack; 18] = [
     // base (0x1101726000, size 0xe000), so it needed at least 57,344 + 0x130 = 57,648 B (its last paint mark was 54,960).
     // rc.7 svc clobbers (2026-11-11): with hos-lock's arbiter calls declaring clobber_abi("C"), values no longer ride in
     // x8-x17 across them, and the static path grew from 50,208 to 50,368 B (diag ELF of p23/rc7-svc-clobber).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_608, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Install 4 (2026-11-24): with the move names folded onto the travel parts the static path, now a combo save listing
+    // the combo folder (`save_combo` -> `Store<ComboRecord>::list` -> `decode`), reached 57,728 B (release) and 57,744 B
+    // (diag, gate 81324d41); 58,982 B is the most the 88 KiB stack covers with the margin and the SDK reserve. Boxing the
+    // record and a frame of its own for `ComboRecord::from_value` were measured and did not help (probes 1fa8e40c,
+    // 48f7b8ef). Reading the links straight into the record did: `decode::<ComboRecord>` went from 11,520 to 7,680 B and
+    // the path to 53,888 B (release) and 53,904 B (diag).
+    // Merge 3D (2026-11-25): a special's own travel keeps its entry velocity, so a combo's four-entry travel table grew
+    // from 96 to 120 B and the same path, which holds combos by value, to 54,144 B (release) and 54,176 B (diag, gate
+    // fdd7994d). The stack's size is unchanged: the measured 57,648 B still decides what it needs.
+    // Smoke fix 1 on merge 3D (2026-11-25): the release path is unchanged at 54,144 B; the diag build's
+    // `decode::<ComboRecord>` frame is 16 B larger (7,792 B), so the path reads 54,192 B there (gate 074fd9c3).
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_192, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
@@ -118,6 +130,10 @@ pub const THREADS: [ThreadStack; 18] = [
     // The static bound is the `diag,hang-trace` ELF's: `held_locks` puts 32 `owners::Held` (768 B) in the frame. At "z" it is
     // 4,016 B (plain diag 3,344; at "s" 3,776 and 3,104: B's rc.8 review, then the docs lane's), so 24 KiB.
     row(ThreadId::StallWatch, c"tr-stall-watch", 24 * KIB, 4_016, 2_608, "final-surface-cov-4e336da4", "stall_watch::start::{closure#0}"),
+    // The move names' one read of `arc:/ui/message/msg_name.msbt`, on a stack that exists only while it runs (`transient`).
+    // The external bound and the size are the Probe row's: the same ARCropolis read, measured there. Static: fdf49c31
+    // diag 2,768 B (release 1,520). Not measured in Eden.
+    row(ThreadId::MoveNames, c"tr-move-names", 204 * KIB, 2_768, 0, "", "move_names::load").with_external(143_376),
 ];
 
 const fn row(
@@ -171,6 +187,8 @@ pub const BOOT_STACK: [ThreadId; 4] = [ThreadId::Import, ThreadId::SettingsLoad,
 pub const fn joined(id: ThreadId) -> bool {
     matches!(id, ThreadId::Import | ThreadId::SettingsLoad | ThreadId::StateLoad)
 }
+
+pub const fn transient(id: ThreadId) -> bool { matches!(id, ThreadId::MoveNames) }
 
 /// The size of the static stack shared by `ids`: the largest of their rows.
 pub const fn slot_bytes(ids: &[ThreadId]) -> usize {

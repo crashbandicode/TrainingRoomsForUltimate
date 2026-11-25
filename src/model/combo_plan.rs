@@ -35,11 +35,11 @@ pub fn verdict_text(verdict: Verdict) -> Text {
 pub fn event_label(kind: Kind) -> &'static str {
     match kind {
         Kind::Press(button) => button_name(button),
-        Kind::Release(Button::Attack) => "Attack release",
-        Kind::Release(Button::Special) => "Special release",
-        Kind::Release(Button::Jump) => "Jump release",
-        Kind::Release(Button::Shield) => "Shield release",
-        Kind::Release(Button::Grab) => "Grab release",
+        Kind::Release(Button::Attack) | Kind::LetGo(Button::Attack) => "Attack release",
+        Kind::Release(Button::Special) | Kind::LetGo(Button::Special) => "Special release",
+        Kind::Release(Button::Jump) | Kind::LetGo(Button::Jump) => "Jump release",
+        Kind::Release(Button::Shield) | Kind::LetGo(Button::Shield) => "Shield release",
+        Kind::Release(Button::Grab) | Kind::LetGo(Button::Grab) => "Grab release",
         Kind::CStick => "C-stick",
         Kind::Flick(Flick::FastFall) => "fast-fall",
         Kind::Flick(Flick::Dash) => "dash",
@@ -47,6 +47,15 @@ pub fn event_label(kind: Kind) -> &'static str {
         Kind::Aim(1) => "1st direction",
         Kind::Aim(_) => "2nd direction",
     }
+}
+
+fn write_angle(text: &mut Text, ordinal: &str, tenths: i16) -> core::fmt::Result {
+    let magnitude = tenths.unsigned_abs();
+    write!(text, "{ordinal} angle {}", magnitude / 10)?;
+    if !magnitude.is_multiple_of(10) {
+        write!(text, ".{}", magnitude % 10)?;
+    }
+    text.write_str(" off")
 }
 
 /// A reference event's mark: "on time", "Jump 2f late", "Jump release missing", "C-stick wrong direction".
@@ -78,8 +87,34 @@ pub fn mark_text(mark: Mark, name: &str, tolerance: u8) -> (Text, [u8; 4]) {
             };
             BAD
         }
+        Mark::Path => {
+            let _ = write!(t, "{} path off", name.split_whitespace().next().unwrap_or(name));
+            BAD
+        }
+        Mark::Angle(delta) => {
+            let _ = write_angle(&mut t, name.split_whitespace().next().unwrap_or(name), delta);
+            BAD
+        }
+        Mark::Deflection(delta) => {
+            let _ = write!(t, "{} deflection {}% {}", name.split_whitespace().next().unwrap_or(name),
+                delta.unsigned_abs(), if delta < 0 { "low" } else { "high" });
+            BAD
+        }
+        Mark::Steer => {
+            let _ = write!(t, "{} steer wrong", name.split_whitespace().next().unwrap_or(name));
+            BAD
+        }
     };
     (t, color)
+}
+
+/// Whose travel a fault names: an aim part's, or as part 0 the special's own.
+const fn travel_name(part: u8) -> &'static str {
+    match part {
+        0 => "Special",
+        1 => "1st",
+        _ => "2nd",
+    }
 }
 
 /// Drift, shown and never graded. The font draws `>` and `<` for the two sideways holds.
@@ -167,6 +202,12 @@ fn reason_mode(s: &Summary, input: bool) -> Text {
         Reason::MissingAim(part) => write!(t, "{unit}{n} {} missing", event_label(Kind::Aim(part))),
         Reason::WrongAim(part) => write!(t, "{unit}{n} {} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => write!(t, "{unit}{n} extra {}", event_label(Kind::Aim(part))),
+        Reason::AimPath(part) => write!(t, "{unit}{n} {} path off", travel_name(part)),
+        Reason::AimAngle(part, delta) => write!(t, "{unit}{n} ")
+            .and_then(|()| write_angle(&mut t, travel_name(part), delta)),
+        Reason::AimDeflection(part, delta) => write!(t, "{unit}{n} {} deflection {}% {}",
+            travel_name(part), delta.unsigned_abs(), if delta < 0 { "low" } else { "high" }),
+        Reason::Steer => write!(t, "{unit}{n} {} steer wrong", travel_name(0)),
         Reason::WrongSpot(Some(got), saved) => write!(t, "{unit}{n} {}, saved {}", got.name(), saved.name()),
         Reason::WrongSpot(None, saved) => write!(t, "{unit}{n} no spot, saved {}", saved.name()),
     };
@@ -526,10 +567,13 @@ impl Plan<'_> {
                 if input {
                     let _ = write!(text, "Step {}", k + 1);
                 } else {
+                    let namer = super::move_names::Namer::target();
                     let _ = write!(text, "{} ", k + 1);
-                    let _ = reference.desc(0).write(&mut text, false);
+                    let [first, follow] = self.helper.target().and_then(|target| target.descs(k))
+                        .unwrap_or([reference.desc(0), reference.desc(1)]);
+                    let _ = first.write(&mut text, false, namer);
                     let _ = text.write_str(">");
-                    let _ = reference.desc(1).write(&mut text, false);
+                    let _ = follow.write(&mut text, false, namer);
                 }
                 Ink::text(text, MUTED)
             }

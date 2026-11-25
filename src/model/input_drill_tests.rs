@@ -70,7 +70,12 @@ fn input_idle_groups_and_continuations_share_combo_bounds() {
 }
 #[test]
 fn input_attempt_counts_steps_and_drops_late_or_missing_releases() {
-    let reference=capture(&[(0,1),(2,0),(23,2),(25,0)]);
+    let mut reference=capture(&[(0,1),(2,0),(23,2),(25,0)]);
+    for link in reference.links[..reference.len].iter_mut().flatten() {
+        for event in link.events.iter_mut().flatten() {
+            if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+        }
+    }
     assert_eq!(reference.len(),2);
     let mut helper=Helper::new(); helper.set_target(Some(reference));
     run(&mut helper,27,&[(0,1),(2,0),(22,2),(24,0)]);
@@ -123,7 +128,7 @@ fn input_bar_names_steps_and_has_no_hit_verdict_or_window() {
 #[test]
 fn capacity_layout_receipt() {
     use core::mem::size_of;
-    println!("CAPACITY_LAYOUT units={} LinkRec={} Combo={} Grade={} Attempt={} Helper={} InputCapture={} triple_combo={}", LINKS, size_of::<LinkRec>(), size_of::<Combo>(),size_of::<Grade>(),size_of::<Attempt>(),size_of::<Helper>(),size_of::<InputCapture>(),size_of::<hos_lock::TripleBuffer<Combo>>());
+    println!("CAPACITY_LAYOUT units={} LinkRec={} Combo={} Grade={} Attempt={} Helper={} InputCapture={} triple_combo={} Travel={} Rule={}", LINKS, size_of::<LinkRec>(), size_of::<Combo>(),size_of::<Grade>(),size_of::<Attempt>(),size_of::<Helper>(),size_of::<InputCapture>(),size_of::<hos_lock::TripleBuffer<Combo>>(),size_of::<crate::model::action::Travel>(),size_of::<crate::model::aim::Rule>());
     assert_eq!(STEPS,12);
 }
 

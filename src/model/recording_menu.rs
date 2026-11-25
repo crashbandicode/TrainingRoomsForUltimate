@@ -190,7 +190,7 @@ pub struct MacroFile {
     pub span: u32,
 }
 
-/// A combo file. `links` are the lines [`combo_link_lines`] produces: the move, then its events, then drift.
+/// A combo file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ComboFile {
     pub input_only: bool,
@@ -201,7 +201,8 @@ pub struct ComboFile {
     pub made_from: Option<String>,
     /// The macro file that holds this directly recorded drill's owned take.
     pub take: Option<String>,
-    pub links: Vec<String>,
+    pub combo: Box<Combo>,
+    pub fighter: Option<super::move_names::FighterId>,
     /// Real links in the combo file. The crop handles step this, not the display lines.
     pub span: u32,
 }
@@ -886,10 +887,11 @@ impl RecordingScreens {
                 }
                 let links = combo.span;
                 let units = if combo.input_only { "steps" } else { "links" };
-                if !combo.links.is_empty() {
+                let lines = combo_link_lines(&combo.combo, super::move_names::Namer::recorded(combo.fighter));
+                if !lines.is_empty() {
                     out.push(line(ConnKind::Heading, format!("Its {units} ({links})")));
-                    out.extend(combo.links.iter().map(|text| {
-                        line(if link_head(text) { ConnKind::Link } else { ConnKind::LinkSub }, text.clone())
+                    out.extend(lines.into_iter().map(|text| {
+                        line(if link_head(&text) { ConnKind::Link } else { ConnKind::LinkSub }, text)
                     }));
                 }
                 if !combo.recorded_on.is_empty() {
@@ -929,9 +931,9 @@ impl RecordingScreens {
     }
 
     #[cfg(test)]
-    pub fn set_links(&mut self, id: &str, links: Vec<String>) {
-        if let Some(combo) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
-            combo.links = links;
+    pub fn set_combo(&mut self, id: &str, combo: Combo) {
+        if let Some(file) = self.catalog.combos.iter_mut().find(|file| file.id == id) {
+            *file.combo = combo;
         }
     }
 
@@ -2029,8 +2031,8 @@ impl RecordingScreens {
         if let Some(source) = combo.made_from.as_ref().and_then(|id| self.macro_by_id(id).map(|file| file.name.clone())) {
             lines.push(line(format!("from {source}")));
         }
-        for link in &combo.links {
-            lines.push(line(link.clone()));
+        for link in combo_link_lines(&combo.combo, super::move_names::Namer::recorded(combo.fighter)) {
+            lines.push(line(link));
         }
         for sequence in &self.catalog.sequences {
             if sequence.combos.iter().any(|step| step == id) {
@@ -2272,23 +2274,24 @@ fn link_head(line: &str) -> bool {
 
 /// One link's move line, then its input events, then drift when the file recorded a hold.
 /// An older presses-only file shows its presses and no drift.
-pub fn combo_link_lines(combo: &Combo) -> Vec<String> {
+pub fn combo_link_lines(combo: &Combo, namer: super::move_names::Namer<'_>) -> Vec<String> {
     combo.links().enumerate().flat_map(|(index, link)| {
-        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(index, link) }
+        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(combo, index, link, namer) }
     }).collect()
 }
 
-fn link_panel_lines(index: usize, link: &super::combo::LinkRec) -> Vec<String> {
+fn link_panel_lines(combo: &Combo, index: usize, link: &super::combo::LinkRec, namer: super::move_names::Namer<'_>) -> Vec<String> {
     let word = if link.is_true() { "TRUE" } else { "FALSE" };
     let mut from = String::new();
     let mut to = String::new();
-    let _ = link.desc(0).write(&mut from, false);
-    let _ = link.desc(1).write(&mut to, false);
+    let [first, follow] = combo.descs(index).unwrap_or([link.desc(0), link.desc(1)]);
+    let _ = first.write(&mut from, false, namer);
+    let _ = follow.write(&mut to, false, namer);
     let mut lines = vec![format!(
         "L{} {} → {} {word}",
         index + 1,
-        from.to_ascii_lowercase(),
-        to.to_ascii_lowercase()
+        if namer.is_on() { from } else { from.to_ascii_lowercase() },
+        if namer.is_on() { to } else { to.to_ascii_lowercase() }
     )];
     if let Some(events) = event_line(link) {
         lines.push(events);
@@ -2313,7 +2316,7 @@ fn event_token(event: super::combo::Event) -> String {
         Kind::Press(Button::Special) => with_dir(event.dir, "B"),
         Kind::Press(Button::Shield) => "shield".to_string(),
         Kind::Press(Button::Grab) => "grab".to_string(),
-        Kind::Release(_) => "release".to_string(),
+        Kind::Release(_) | Kind::LetGo(_) => "release".to_string(),
         Kind::CStick => with_dir(event.dir, "c-stick"),
         Kind::Flick(Flick::FastFall) => with_dir(event.dir, "flick"),
         Kind::Flick(Flick::Dash) => with_dir(event.dir, "dash"),
@@ -2484,7 +2487,8 @@ mod tests {
                 name: "Nair loop combo".into(),
                 recorded_on: String::new(),
                 made_from: Some("nair".into()),
-                links: combo_link_lines(&Combo::from_links([link(Move::Aerial, Move::Aerial, true)]).unwrap()),
+                combo: Box::new(Combo::from_links([link(Move::Aerial, Move::Aerial, true)]).unwrap()),
+                fighter: None,
                 span: 1,
             }],
             sequences: vec![SequenceFile {
@@ -3178,7 +3182,7 @@ mod tests {
             link
         };
         let combo = Combo::from_links([nair(Some(Dir::Forward)), nair(Some(Dir::Back))]).unwrap();
-        let lines = combo_link_lines(&combo);
+        let lines = combo_link_lines(&combo, crate::model::move_names::Namer::OFF);
         assert_eq!(lines[0], "L1 aerial → aerial TRUE");
         assert_eq!(lines[1], "jump · release · ↓ flick · A");
         assert_eq!(lines[2], "drift →");
@@ -3186,7 +3190,7 @@ mod tests {
         assert_eq!(lines[4], "jump · release · ↓ flick · A");
         assert_eq!(lines[5], "drift ←");
         let mut screens = screens();
-        screens.set_links("nairc", lines);
+        screens.set_combo("nairc", combo);
         // Row 0 of COMBOS is + Save last combo…; the combo is row 1.
         screens.set_cursor(Face::Page, COMBOS_SEQ, 1, 1);
         let panel = screens.connections(Face::Page, COMBOS_SEQ);
@@ -3206,7 +3210,7 @@ mod tests {
             ],
         )])
         .unwrap();
-        let old_lines = combo_link_lines(&old);
+        let old_lines = combo_link_lines(&old, crate::model::move_names::Namer::OFF);
         assert_eq!(old_lines, vec!["L1 aerial → aerial TRUE".to_string(), "A · jump".to_string()]);
         assert!(old_lines.iter().all(|line| !line.contains("drift") && !line.contains("release") && !line.contains("flick")));
     }
@@ -3305,7 +3309,8 @@ mod tests {
                 name: "Ryu BnB".into(),
                 recorded_on: String::new(),
                 made_from: None,
-                links: combo_link_lines(&Combo::from_links([link(Move::Jab, Move::Aerial, true)]).unwrap()),
+                combo: Box::new(Combo::from_links([link(Move::Jab, Move::Aerial, true)]).unwrap()),
+                fighter: None,
                 span: 1,
             },
         );
@@ -3679,7 +3684,7 @@ mod tests {
         };
         let combo = |id: &str, input_only: bool, made_from: Option<&str>, take: Option<&str>| ComboFile {
             input_only, id: id.into(), name: id.into(), recorded_on: String::new(),
-            made_from: made_from.map(str::to_string), take: take.map(str::to_string), links: Vec::new(), span: 1,
+            made_from: made_from.map(str::to_string), take: take.map(str::to_string), combo: Box::new(Combo::EMPTY), fighter: None, span: 1,
         };
         for face in [Face::Page, Face::Popup] {
             let mut screens = RecordingScreens::new();
@@ -3791,7 +3796,7 @@ mod tests {
             macros: vec![MacroFile { id: "source".into(), name: "Source".into(), chain: false, steps: Vec::new(),
                 start_save: None, start_save_on: true, recorded_on: String::new(), span: 40 }],
             combos: vec![ComboFile { id: "crop".into(), name: crop.name, input_only: true, recorded_on: String::new(),
-                made_from: crop.made_from, take: crop.take, links: Vec::new(), span: 1 }],
+                made_from: crop.made_from, take: crop.take, combo: Box::new(Combo::EMPTY), fighter: None, span: 1 }],
             ..Catalog::default()
         });
         let place = screens.place_mut(Face::Page, COMBOS_SEQ);

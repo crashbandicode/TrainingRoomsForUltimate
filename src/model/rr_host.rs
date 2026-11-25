@@ -20,7 +20,7 @@ use super::rr_runtime::{
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::action::Late;
-use crate::model::combo::{Combo, InputCapture};
+use crate::model::combo::{CaptureOwner, Combo, InputCapture};
 use crate::model::frame_strip::Snap;
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
@@ -230,7 +230,7 @@ fn begin_input(mode: u8) {
     INPUT_MODE.fetch_and(!mode, Ordering::AcqRel); INPUT_POLLS[at].store(0, Ordering::Release);
     INPUT_EPOCH[at].fetch_add(1, Ordering::AcqRel); INPUT_MODE.fetch_or(mode, Ordering::Release);
 }
-pub fn observe_input(snap: Snap, late: Late, contact: bool) {
+pub fn observe_input(snap: Snap, late: Late, window: u8, contact: bool) {
     if !input_observation_wanted() { return; }
     let mut state = INPUT_STATE.lock();
     for (at, take) in state.iter_mut().enumerate() {
@@ -238,7 +238,7 @@ pub fn observe_input(snap: Snap, late: Late, contact: bool) {
         let epoch = INPUT_EPOCH[at].load(Ordering::Acquire); let polls = INPUT_POLLS[at].load(Ordering::Acquire);
         if polls == 0 { continue; }
         if take.epoch != epoch { *take = InputTake { epoch, ..InputTake::EMPTY }; }
-        if take.polls != polls { take.capture.step_late(snap, late); take.polls = polls; }
+        if take.polls != polls { take.capture.set_window(window); take.capture.step_late(snap, late); take.polls = polls; }
         take.contact |= contact; INPUT_RESULT[at].write(*take);
     }
 }
@@ -257,13 +257,15 @@ fn save_input(root: &Path, source: &str, activate: bool, tick: &mut Tick) {
     let take = converted_input(mode).expect("observed take").capture; INPUT_MODE.fetch_and(!mode, Ordering::AcqRel);
     if take.combo.overflow { tick.notices.push(DRILL_CAPACITY); return; }
     if take.combo.is_empty() { tick.notices.push(super::rr_runtime::EMPTY_RECORDING); return; }
-    let start = if activate { take_record_start() } else { None };
+    let posted = if activate { take_record_start() } else { None };
+    let start = posted.map(|p| p.start);
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
+    let fighter = posted.and_then(|p| p.owner.fighter());
     // F10: a directly recorded drill owns the macro file holding its take.
     let kept = if activate { keep_drill_take(root, start) } else { None };
     let saved = match kept {
-        Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, kept, unix_now()),
-        None => save_made_combo(root, &take.combo, source, recorded_on, unix_now()),
+        Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, fighter, kept, unix_now()),
+        None => save_made_combo(root, &take.combo, source, recorded_on, fighter, unix_now()),
     };
     if let Ok(id) = saved {
         if activate {
@@ -403,7 +405,7 @@ static PREVIEW: AtomicU8 = AtomicU8::new(0);
 static PREVIEW_ASK: Mutex<Option<PreviewAsk>> = Mutex::new(None);
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
-static STRIP: Mutex<(u32, Option<Combo>)> = Mutex::new((0, None));
+static STRIP: Mutex<(u32, Option<Combo>, CaptureOwner)> = Mutex::new((0, None, CaptureOwner::UNKNOWN));
 static MAKE: Mutex<Option<MakeJob>> = Mutex::new(None);
 static HELD: Mutex<Option<Role>> = Mutex::new(None);
 static ANSWER: Mutex<Option<MismatchChoice>> = Mutex::new(None);
@@ -422,11 +424,12 @@ static START_GATE: AtomicBool = AtomicBool::new(false);
 struct PostedStart {
     seq: u64,
     start: RecordStart,
+    owner: CaptureOwner,
 }
 
 /// One game-thread writer (chord or placement poll), one recording-worker reader.
 static RECORD_STARTS: hos_lock::TripleBuffer<PostedStart> =
-    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY });
+    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN });
 static START_SEQ: AtomicU64 = AtomicU64::new(0);
 static START_USED: AtomicU64 = AtomicU64::new(0);
 /// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
@@ -1025,13 +1028,18 @@ pub struct StartSpeed {
 /// The game thread, at a record chord that starts a recording (`capture_role() == 0`), before `on_chords`: both fighters'
 /// live pose and speeds. Values only; no allocation.
 pub fn note_record_start(start: RecordStart) {
-    let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
-    RECORD_STARTS.write(PostedStart { seq, start });
+    let fighter = crate::model::move_names::recorded_identity(crate::model::move_names::PUBLISHED.player(), start.poses[0].fighter_kind);
+    post_record_start(start, fighter);
 }
 
-fn take_record_start() -> Option<RecordStart> {
+pub fn post_record_start(start: RecordStart, fighter: Option<crate::model::move_names::FighterId>) {
+    let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
+    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter) });
+}
+
+fn take_record_start() -> Option<PostedStart> {
     let posted = RECORD_STARTS.read().0;
-    (START_USED.swap(posted.seq, Ordering::AcqRel) != posted.seq).then_some(posted.start)
+    (START_USED.swap(posted.seq, Ordering::AcqRel) != posted.seq).then_some(posted)
 }
 
 /// PLAY-MOMENTUM (primary 2026-11-08 23:03Z, reading (b)): what the role's run owes its first input, taken once by the
@@ -1221,7 +1229,7 @@ pub fn service_at(
         // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
         // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
         // stands in, at rest, as before.
-        let (player, cpu, speeds) = match take_record_start() {
+        let (player, cpu, speeds) = match take_record_start().map(|p| p.start) {
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
@@ -1320,8 +1328,8 @@ pub fn set_record_trim(on: bool) {
     RECORD_TRIM.store(on, Ordering::Release);
 }
 
-pub fn set_strip_sample((seen, combo): (u32, Option<Combo>)) {
-    *lock(&STRIP) = (seen, combo);
+pub fn set_strip_sample(sample: (u32, Option<Combo>, CaptureOwner)) {
+    *lock(&STRIP) = sample;
 }
 
 pub fn set_fighter_label(label: &str) {
@@ -1661,6 +1669,7 @@ pub struct SequenceStep {
     pub id: String,
     pub name: String,
     pub combo: Combo,
+    pub fighter: Option<crate::model::move_names::FighterId>,
 }
 
 /// What the frame hook drills for a sequence: its name, the combos that still open in file order, and the streak
@@ -1679,7 +1688,7 @@ impl SequencePlan {
     pub fn same_steps(&self, other: &SequencePlan) -> bool {
         self.id == other.id
             && self.steps.len() == other.steps.len()
-            && self.steps.iter().zip(&other.steps).all(|(a, b)| a.id == b.id && a.combo == b.combo)
+            && self.steps.iter().zip(&other.steps).all(|(a, b)| a.id == b.id && a.combo == b.combo && a.fighter == b.fighter)
     }
 }
 
@@ -1693,7 +1702,7 @@ pub fn sequence_plan(root: &Path, id: &str) -> Option<SequencePlan> {
         .filter_map(|combo_id| {
             let record = combos.load(combo_id).ok()?;
             if record.combo.input_only { return None; }
-            Some(SequenceStep { id: combo_id.clone(), name: record.name, combo: record.combo })
+            Some(SequenceStep { id: combo_id.clone(), name: record.name, combo: record.combo, fighter: record.fighter })
         })
         .collect();
     Some(SequencePlan { id: id.to_owned(), name: sequence.name, steps, streak: sequence.streak, best: sequence.best })
@@ -2149,15 +2158,16 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
 /// *+ Save last combo…* (operator 2026-11-08; rc.4 COMBO-HELPER): the strip's latest exchange becomes a combo file
 /// named `name` (empty: Combo N), recorded on Player 1's fighter, hot, and the drill (RECORDING.md).
 fn save_last_combo(root: &Path, name: &str, tick: &mut Tick) {
-    let Some(combo) = lock(&STRIP).1.filter(|combo| !combo.is_empty()) else {
+    let (_, combo, owner) = *lock(&STRIP);
+    let Some(combo) = combo.filter(|combo| !combo.is_empty()) else {
         tick.notices.push(EMPTY_COMBO);
         tick.diags.push("screen=notice kind=combo-empty".to_string());
         return;
     };
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
-    let label = lock(&PLAYER_LABEL).clone();
+    let label = super::rr_runtime::fighter_name(owner.kind());
     let recorded_on = (!label.is_empty()).then_some(label);
-    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, unix_now()) {
+    if let Ok(id) = super::rr_runtime::save_last_combo(root, &combo, name, recorded_on, owner.fighter(), unix_now()) {
         tick.diags.push(format!("screen=save-last-combo saved={id} links={}", combo.len()));
     }
 }
@@ -2371,7 +2381,7 @@ fn finish_make(root: &Path, tick: &mut Tick) {
     };
     INPUT_MODE.fetch_and(!1, Ordering::AcqRel);
     if combo.overflow { tick.notices.push(COMBO_CAPACITY); return; }
-    if save_made_combo(root, &combo, &job.source, None, unix_now()).is_ok() {
+    if save_made_combo(root, &combo, &job.source, None, None, unix_now()).is_ok() {
         tick.diags.push(format!("screen=make-combo source={} saved=1", job.source));
     }
 }
@@ -2584,7 +2594,7 @@ fn reset_host() {
     PREVIEW_AWAY.store(0, Ordering::Release);
     REFUSAL_SEEN.store(REFUSAL_SEQ.load(Ordering::Acquire), Ordering::Release);
     *lock(&PREVIEW_CLIP) = None;
-    *lock(&STRIP) = (0, None);
+    *lock(&STRIP) = (0, None, CaptureOwner::UNKNOWN);
     *lock(&MAKE) = None;
     *lock(&HELD) = None;
     *lock(&ANSWER) = None;
@@ -2633,6 +2643,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn the_recording_host_passes_its_selected_reaction_window() {
+        use crate::model::combo::Kind;
+        use crate::model::frame_strip::Button;
+        let _hold = hold();
+        for (delay, window, expected) in [
+            (1, 0, Kind::Release(Button::Attack)), (1, 1, Kind::LetGo(Button::Attack)),
+            (2, 1, Kind::Release(Button::Attack)), (2, 2, Kind::LetGo(Button::Attack)),
+        ] {
+            reset_host();
+            CAP_ROLE.store(ROLE_PLAYER, Ordering::Release);
+            begin_input(2);
+            for frame in 1..=6 {
+                let mut mapped = MappedInputs { buttons: if frame < 3 { 1 } else { 0 }, ..MappedInputs::NEUTRAL };
+                unsafe { on_player_poll(&mut mapped); }
+                let late = if frame == 3 + delay { Late { turned: Some(Some(1)), ..Late::NONE } }
+                    else { Late::NONE };
+                observe_input(Snap { buttons: mapped.buttons, ..Snap::empty(frame) }, late, window, false);
+            }
+            let take = converted_input(2).unwrap();
+            let release = take.capture.combo.links().flat_map(crate::model::combo::LinkRec::events)
+                .find(|event| matches!(event.kind, Kind::Release(_) | Kind::LetGo(_))).unwrap();
+            assert_eq!(release.kind, expected, "delay {delay}, window {window}");
+        }
+        reset_host();
     }
 
     fn state(kind: i32) -> SavedState {
@@ -4602,7 +4639,7 @@ mod tests {
         index.set_drill(Some(Drill { kind: DrillKind::Combo, id: "kept-drill".into() }), 2).unwrap();
         index.save(&root).unwrap();
         // An earlier exchange is on the strip; the source's own link arrives while it plays.
-        set_strip_sample((0, Some(sample_combo())));
+        set_strip_sample((0, Some(sample_combo()), CaptureOwner::UNKNOWN));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let playing = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(playing.warp.as_deref(), Some(save_id.as_str()));
@@ -4611,7 +4648,7 @@ mod tests {
         let fed = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(fed.diags.iter().all(|line| !line.contains("saved=1")), "the combo is made after the source has played");
         assert_eq!(take_player_frame().expect("source frame").buttons, 11);
-        set_strip_sample((1, Some(sample_combo())));
+        set_strip_sample((1, Some(sample_combo()), CaptureOwner::UNKNOWN));
         let saved = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(saved.diags.iter().any(|line| line.contains("screen=make-combo") && line.contains("saved=1")));
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
@@ -4632,7 +4669,7 @@ mod tests {
         reset_host();
         let root = scratch("make-fail");
         let source = one_macro(&root, "Bare", 3, 8, None);
-        set_strip_sample((0, Some(crate::model::combo::Combo::default())));
+        set_strip_sample((0, Some(crate::model::combo::Combo::default()), CaptureOwner::UNKNOWN));
         post_effect(Effect::MakeCombo { source: source.clone(), chain: false });
         let _ = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert_eq!(take_player_frame().expect("the source plays").buttons, 3);
@@ -4643,7 +4680,7 @@ mod tests {
 
         reset_host();
         let gone = one_macro(&root, "Gone", 4, 8, Some("deleted-save"));
-        set_strip_sample((0, Some(sample_combo())));
+        set_strip_sample((0, Some(sample_combo()), CaptureOwner::UNKNOWN));
         post_effect(Effect::MakeCombo { source: gone, chain: false });
         let missing = service_at(&root, &none(), "2026-11-06", state(8), state(7));
         assert!(missing.warp.is_none());
@@ -4673,15 +4710,15 @@ mod tests {
     fn make_combo_no_hit_saves_input_drill_not_previous_exchange() {
         let _hold = hold(); reset_host(); let root = scratch("make-no-hit");
         let source = one_macro(&root,"Whiff",3,8,None);
-        set_strip_sample((4,Some(sample_combo())));
+        set_strip_sample((4,Some(sample_combo()), CaptureOwner::UNKNOWN));
         post_effect(Effect::MakeCombo { source: source.clone(), chain:false });
         service_at(&root,&none(),"2026-11-15",state(8),state(7));
         let mut input=MappedInputs::NEUTRAL; assert!(unsafe { on_player_poll(&mut input) });
         assert_eq!(input.buttons,3);
         // A completed poll is acknowledged by the guarded fighter observation before the worker converts it.
         let pending=service_at(&root,&none(),"2026-11-15",state(8),state(7)); assert!(pending.diags.iter().all(|l| !l.contains("saved=")));
-        observe_input(Snap { buttons:input.buttons, facing:-1, ..Snap::empty(1) },Late::NONE,false);
-        set_strip_sample((4,Some(sample_combo())));
+        observe_input(Snap { buttons:input.buttons, facing:-1, ..Snap::empty(1) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
+        set_strip_sample((4,Some(sample_combo()), CaptureOwner::UNKNOWN));
         let done=service_at(&root,&none(),"2026-11-15",state(8),state(7));
         assert!(!done.notices.contains(&EMPTY_COMBO));
         let lib=ComboLibrary::new(root.join("combos")); let entries=lib.list().unwrap().entries;
@@ -4693,7 +4730,7 @@ mod tests {
     fn a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change() {
         let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu); set_record_trim(false);
         post_effect(Effect::RecordDrill); note_record_start(RecordStart { poses:[pose(0,0.0,1.0),pose(7,5.0,-1.0)], speeds:[(0.0,0.0);2] }); on_chords(true,false,false); assert_eq!(capture_role(),ROLE_PLAYER);
-        for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },Late::NONE,false); }
+        for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false); }
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7)); set_record_trim(true);
         let id=take_saved_drill().unwrap(); assert!(take_saved_drill().is_none());
         assert_eq!(RecordingIndex::load(&root).unwrap().drill().unwrap().id,id);
@@ -4719,17 +4756,21 @@ mod tests {
         set_record_role(Role::Cpu);
         set_record_trim(false);
         post_effect(Effect::RecordDrill);
-        note_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+        let first = crate::model::move_names::FighterId { chara: crate::model::hash40::hash40("ui_chara_miiswordsman"), specials: [0, 1, 2, 0] };
+        post_record_start(RecordStart { poses: [pose(0x49, 0.0, 1.0), pose(7, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] }, Some(first));
+        crate::model::move_names::PUBLISHED.set_player(Some((0x49, crate::model::move_names::FighterId { specials: [2, 0, 1, 2], ..first })));
         on_chords(true, false, false);
         for (f, b) in [1, 0].into_iter().enumerate() {
             let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
             unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, false);
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         set_record_trim(true);
         let drill = ComboLibrary::new(root.join("combos")).load(&take_saved_drill().unwrap()).unwrap();
+        assert_eq!(drill.fighter, Some(first), "even a later Mii of the same kind cannot replace the recorded loadout");
+        crate::model::move_names::PUBLISHED.set_player(None);
         let source = drill.take.unwrap();
         request_preview(&source, Role::Player, 0, 2);
         assert!(preview_running());
@@ -4898,7 +4939,7 @@ mod tests {
         for (f, b) in [1, 0].into_iter().enumerate() {
             let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
             unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, false);
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
@@ -4929,14 +4970,14 @@ mod tests {
         for b in [4,0] { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } }
         post_effect(Effect::MakeCombo { source:source.clone(),chain:false });
         service_at(&root,&none(),"2026-11-15",state(8),state(7));
-        let mut input=MappedInputs::NEUTRAL; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:input.buttons,facing:1,..Snap::empty(3) },Late::NONE,false);
+        let mut input=MappedInputs::NEUTRAL; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:input.buttons,facing:1,..Snap::empty(3) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7));
         let lib=Library::new(root.join(MACROS_DIR)); let saved=lib.list().unwrap().entries.into_iter().find(|e| e.id!=source).unwrap();
         assert_eq!(lib.load(&saved.id).unwrap().frames.iter().map(|f|f.buttons).collect::<Vec<_>>(),vec![4,0,3]);
         assert_eq!(ComboLibrary::new(root.join("combos")).list().unwrap().entries.len(),1);
         reset_host(); post_effect(Effect::RecordDrill); on_chords(true,false,false);
         let mut mapped=MappedInputs { buttons:crate::model::frame_strip::CSTICK_ON,lstick_x:127,rstick_x:127,..MappedInputs::NEUTRAL };
-        unsafe { on_player_poll(&mut mapped); } observe_input(Snap { buttons:mapped.buttons,rstick_x:127,facing:1,..Snap::empty(10) },Late::NONE,false);
+        unsafe { on_player_poll(&mut mapped); } observe_input(Snap { buttons:mapped.buttons,rstick_x:127,facing:1,..Snap::empty(10) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7));
         let drill=ComboLibrary::new(root.join("combos")).load(&take_saved_drill().unwrap()).unwrap();
         let events=drill.combo.get(0).unwrap().events().collect::<Vec<_>>(); assert_eq!(events.len(),1); assert_eq!(events[0].kind,crate::model::combo::Kind::CStick);
@@ -4949,12 +4990,12 @@ mod tests {
         post_effect(Effect::RecordDrill); on_chords(true,false,false);
         for f in 0..=crate::model::combo::LINKS*crate::model::combo::STEPS {
             let mut input=MappedInputs { buttons:if f%2==0 {1} else {0},..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons:input.buttons, facing:1,..Snap::empty(f as u32) },Late::NONE,false);
+            observe_input(Snap { buttons:input.buttons, facing:1,..Snap::empty(f as u32) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         }
         on_chords(true,false,false); let done=service_at(&root,&none(),"2026-11-15",state(8),state(7)); assert!(done.notices.contains(&DRILL_CAPACITY));
         assert!(ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty()); assert!(!input_observation_wanted());
         let mut overflow=sample_combo(); for _ in 0..crate::model::combo::LINKS { overflow.push(*overflow.get(0).unwrap()); }
-        set_strip_sample((100,Some(overflow))); post_effect(Effect::SaveLastCombo { name:String::new() });
+        set_strip_sample((100,Some(overflow), CaptureOwner::UNKNOWN)); post_effect(Effect::SaveLastCombo { name:String::new() });
         let tick=service_at(&root,&none(),"2026-11-15",state(8),state(7)); assert!(tick.notices.contains(&COMBO_CAPACITY));
         assert!(ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty());
 
@@ -4968,15 +5009,21 @@ mod tests {
         reset_host();
         let root = scratch("save-last");
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        set_fighter_label("Mario");
+        use crate::model::move_names::{FighterId, PUBLISHED};
+        let recorded = FighterId { chara: crate::model::hash40::hash40("ui_chara_pikachu"), specials: [0; 4] };
+        let later = FighterId { chara: crate::model::hash40::hash40("ui_chara_fox"), specials: [0; 4] };
+        set_fighter_label("Pikachu");
         let combos = crate::model::combo_record::ComboLibrary::new(root.join("combos"));
-        set_strip_sample((0, None));
+        set_strip_sample((0, None, CaptureOwner::UNKNOWN));
         post_effect(Effect::SaveLastCombo { name: String::new() });
         let empty = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(empty.diags.iter().any(|line| line == "screen=notice kind=combo-empty"), "{:?}", empty.diags);
         assert!(empty.notices.contains(&EMPTY_COMBO));
         assert!(combos.list().map(|listed| listed.entries.is_empty()).unwrap_or(true));
-        set_strip_sample((3, Some(sample_combo())));
+        PUBLISHED.set_player(Some((8, recorded)));
+        set_strip_sample((3, Some(sample_combo()), CaptureOwner::new(8, Some(recorded))));
+        PUBLISHED.set_player(Some((7, later)));
+        set_fighter_label("Fox");
         post_effect(Effect::SaveLastCombo { name: "Ryu BnB".into() });
         let saved = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(saved.diags.iter().any(|line| line.starts_with("screen=save-last-combo saved=")), "{:?}", saved.diags);
@@ -4984,7 +5031,9 @@ mod tests {
         assert_eq!(listed.entries.len(), 1);
         let id = listed.entries[0].id.clone();
         let file = combos.load(&id).unwrap();
-        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Mario")));
+        assert_eq!(file.fighter, Some(recorded), "a later P1 cannot rename the retained exchange");
+        assert_eq!((file.name.as_str(), file.combo, file.recorded_on.as_deref()), ("Ryu BnB", sample_combo(), Some("Pikachu")));
+        PUBLISHED.set_player(None);
         let index = RecordingIndex::load(&root).unwrap();
         assert_eq!(index.drill().map(|drill| (drill.kind, drill.id.as_str())), Some((DrillKind::Combo, id.as_str())));
         assert_eq!(index.hot(Kind::Combo).first(), Some(&id));
@@ -5240,9 +5289,15 @@ mod tests {
         let root = scratch("seq-plan");
         let ryu = one_combo(&root, "Ryu BnB", Move::Jab);
         let nair = one_combo(&root, "Nair loop combo", Move::Aerial);
+        let library = ComboLibrary::new(root.join("combos"));
+        let owner = crate::model::move_names::FighterId { chara: crate::model::hash40::hash40("ui_chara_ryu"), specials: [0; 4] };
+        let mut record = library.load(&ryu).unwrap();
+        record.fighter = Some(owner);
+        library.overwrite(&ryu, &record).unwrap();
         let id = one_sequence(&root, "Corner to kill", &[ryu.clone(), "deleted-combo".into(), nair.clone()]);
         let plan = sequence_plan(&root, &id).expect("the sequence file loads");
         assert_eq!(plan.name, "Corner to kill");
+        assert_eq!(plan.steps.iter().map(|s| s.fighter).collect::<Vec<_>>(), [Some(owner), None]);
         assert_eq!(plan.steps.iter().map(|s| (s.id.as_str(), s.name.as_str())).collect::<Vec<_>>(), [
             (ryu.as_str(), "Ryu BnB"),
             (nair.as_str(), "Nair loop combo")

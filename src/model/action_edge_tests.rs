@@ -87,7 +87,7 @@ fn check_link_text(tracker: &Tracker, link: Link, from: &str, to: &str, mv: Move
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), format!("{from} > {to}"), "{mv:?}");
     let rec = LinkRec::of(&link, tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo)[0],
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0],
         format!("L1 {} → {} TRUE", from.to_ascii_lowercase(), to.to_ascii_lowercase()), "{mv:?}");
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
@@ -291,6 +291,7 @@ fn an_old_file_grades_an_edge_attack_as_before() {
     assert!(value["links"][0].get("from_shown").is_none());
     assert!(value["links"][0].get("to_shown").is_none());
     let drill: ComboRecord = serde_json::from_str(r#"{"input_steps":[{"events":[{"button":"attack","dir":"neutral","kind":"press","offset":0},{"button":"attack","dir":"neutral","kind":"release","offset":2}]}],"kind":"input_drill","name":"Drill 1","schema_version":2}"#).unwrap();
+    assert_eq!(drill.combo.get(0).unwrap().events().last().unwrap().kind, Kind::Release(Button::Attack));
     for (mv, status, wait, _, key) in EDGE {
         let described = hit_record("jab", "other", Some(serde_json::json!({})),
             Some(serde_json::json!({"move": key})));
@@ -343,9 +344,70 @@ fn an_edge_attack_step_is_decided_when_its_action_opens() {
             };
             tracker.step(p1, idle(), inputs);
             helper.step(&tracker, ComboSettings::factory());
+            if frame < 8 {
+                assert!(helper.results().next().is_none(), "{mv:?}, frame {frame}");
+            }
+            if frame == 8 {
+                assert_eq!(tracker.action.mv, mv, "{mv:?}");
+                assert_eq!(tracker.action.start, 8, "{mv:?}");
+                assert_eq!(tracker.origin(), Some(6), "{mv:?}");
+                assert_eq!(tracker.late().open, Some((Some(6), None)), "{mv:?}");
+                assert!(helper.results().next().expect("edge direction decided on action opening").clean, "{mv:?}");
+            }
         }
         let result = helper.results().next().expect("edge direction resolved by frame 12");
         assert!(result.clean, "{mv:?}: {result:?}");
+    }
+}
+
+#[test]
+fn an_edge_attack_takes_its_name_number_from_its_animation() {
+    use crate::model::hash40::hash40;
+    use crate::model::move_names::{Namer, Normal};
+
+    for (mv, status, wait, name, key, motion, variant) in [
+        (Move::LedgeAttack, 0x78, 0x77, "Ledge attack", "ledge_attack", "cliff_attack_quick", 26),
+        (Move::GetupAttack, 0x59, 0x53, "Getup attack", "getup_attack", "down_attack_u", 27),
+        (Move::GetupAttack, 0x59, 0x53, "Getup attack", "getup_attack", "down_attack_d", 27),
+        (Move::TripAttack, 0x8a, 0x88, "Trip attack", "trip_attack", "slip_attack", 28),
+    ] {
+        let motion = hash40(motion);
+        assert_eq!(crate::model::action::variant(motion), variant, "{mv:?}");
+        for namer in [Namer::OFF, Namer::new(true, None, None)] {
+            assert_eq!(namer.name(mv, Normal::from_u8(variant)).as_str(), name, "{mv:?}");
+        }
+
+        let mut tracker = Tracker::new();
+        tracker.step(attack(Move::Jab, 0x27, 0.0), hit(), NONE);
+        for frame in 1..=4 {
+            tracker.step(waiting(wait), stun(), if frame == 3 { A } else { NONE });
+        }
+        let edge = Sample { motion, ..named(mv, status) };
+        tracker.step(edge, stun(), NONE);
+        assert_eq!(tracker.action.mv, mv, "{mv:?}");
+        assert_eq!(tracker.action.variant, variant, "{mv:?}");
+        tracker.step(Sample { active: true, ..edge }, hit(), NONE);
+        let incoming = tracker.latest_link().expect("jab to edge attack");
+        assert_eq!((incoming.from, incoming.to), (Move::Jab, mv), "{mv:?}");
+        assert_eq!(incoming.variants[1], variant, "{mv:?}");
+
+        tracker.step(idle(), stun(), NONE);
+        tracker.step(idle(), stun(), NONE);
+        tracker.step(attack(Move::Jab, 0x27, 0.0), hit(), NONE);
+        let outgoing = tracker.latest_link().expect("edge attack to jab");
+        assert_eq!((outgoing.from, outgoing.to), (mv, Move::Jab), "{mv:?}");
+        assert_eq!(outgoing.variants[0], variant, "{mv:?}");
+
+        for (link, side, shown) in [(incoming, 1, "to_shown"), (outgoing, 0, "from_shown")] {
+            let combo = Combo::from_links([LinkRec::of(&link, &tracker, tracker.exchange().1, true)]).unwrap();
+            let record = ComboRecord::new("Drill".into(), combo, None);
+            let value = serde_json::to_value(&record).unwrap();
+            assert_eq!(value["links"][0][shown], serde_json::json!({"move": key, "variant": variant}), "{mv:?}");
+            let read: ComboRecord = serde_json::from_value(value).unwrap();
+            let desc = read.combo.get(0).unwrap().desc(side);
+            assert_eq!((desc.mv, desc.normal), (mv, variant), "{mv:?}");
+            assert_eq!(read, record, "{mv:?}");
+        }
     }
 }
 }

@@ -134,7 +134,11 @@ fn probe_accounts_for_the_actual_external_read_path_even_when_paint_misses_it() 
     probe.external_bound += 4096;
     assert!(probe.required() > probe.bytes, "a growing external path must fail again");
     for row in &THREADS {
-        if row.id != ThreadId::Probe { assert_eq!(row.external_bound, 0); }
+        if row.id == ThreadId::MoveNames {
+            assert_eq!(row.external_bound, thread_stacks::of(ThreadId::Probe).external_bound);
+        } else if row.id != ThreadId::Probe {
+            assert_eq!(row.external_bound, 0);
+        }
     }
 }
 
@@ -185,7 +189,7 @@ fn the_runtime_starts_threads_only_through_the_table() {
             }
         }
         for row in &THREADS {
-            let call = if thread_stacks::joined(row.id) { "run_joined" } else { "spawn" };
+            let call = if thread_stacks::transient(row.id) { "run_transient" } else if thread_stacks::joined(row.id) { "run_joined" } else { "spawn" };
             if text.contains(&format!("threads::{call}(crate::model::thread_stacks::ThreadId::{:?},", row.id))
                 || text.contains(&format!("threads::{call}(ThreadId::{:?},", row.id))
             {
@@ -219,7 +223,7 @@ fn every_thread_has_one_static_stack_from_the_table() {
         }
     }
     for row in &THREADS {
-        assert_eq!(seen[row.id as usize], 1, "{}: {} static stacks", row.name, seen[row.id as usize]);
+        assert_eq!(seen[row.id as usize], usize::from(!thread_stacks::transient(row.id)), "{}: {} static stacks", row.name, seen[row.id as usize]);
     }
     // Only the boot stack is shared: the joined loaders, one after another, then its one detached last user.
     let boot: Vec<String> = thread_stacks::BOOT_STACK.iter().map(|id| format!("{id:?}")).collect();

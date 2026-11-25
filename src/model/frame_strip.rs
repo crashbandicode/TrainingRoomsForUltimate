@@ -4,6 +4,7 @@
 //! pane looks (`frame_strip_plan`). Fixed arrays only, so nothing here allocates.
 
 use super::input_delay::MappedInputs;
+use super::move_names::Normal;
 use super::spots::{self, Peak, Powers, Spot};
 use super::spacing::{Grade, Taken};
 
@@ -721,6 +722,11 @@ impl Tracker {
         *self = Self { buttons: self.buttons, stick: self.stick, ..Self::new() };
     }
 
+    pub fn clear_live_strip(&mut self, names: &super::move_names::Published) {
+        self.clear();
+        names.set_player(None);
+    }
+
     pub fn step_graded(&mut self, p1: Sample, cpu: Sample, inputs: MappedInputs, taken: Taken) {
         if let Some(grade) = taken.earlier {
             self.push_tag(0, grade);
@@ -775,6 +781,9 @@ impl Tracker {
                     && !p1.stop)
         });
         let opened = p1_busy && (self.p1_was_actionable || restarted);
+        // A status left while Player 1 could already act is no longer part of the action.
+        self.late.turned = (p1.status != self.p1_status)
+            .then_some(if self.p1_was_actionable { None } else { self.action.origin });
         if opened {
             if self.p1_was_actionable {
                 self.action.base = None;
@@ -803,6 +812,11 @@ impl Tracker {
                     self.action.variant = super::action::variant(p1.motion);
                     self.action.variant_known = true;
                 }
+            }
+        } else if self.action.mv == Move::Jab && p1.attack == Some(Move::Jab) {
+            // ATTACK -> ATTACK_100 can change the hit's name without opening a new action.
+            if let rapid @ (Normal::RapidJab | Normal::RapidJabFinisher) = Normal::of(p1.motion) {
+                self.action.variant = rapid as u8;
             }
         }
         if p1.named == Some(Move::Throw) && self.action.mv == Move::Grab {
@@ -841,6 +855,7 @@ impl Tracker {
             facing: p1.facing,
             grounded: !p1.airborne,
             press: self.action.origin.unwrap_or(frame),
+            stick: (inputs.lstick_x, inputs.lstick_y),
         }, |from, heading, ground| {
             (0..len)
                 .map(|i| snaps[(head + SNAP_RING - 1 - i) % SNAP_RING])
@@ -850,6 +865,10 @@ impl Tracker {
                     super::aim::follows(stick, heading, ground).then_some(stick)
                 })
         });
+        self.late.travel = self.rule.ended();
+        if let Some((0, _)) = self.late.travel {
+            self.late.press = self.rule.own_press();
+        }
         if let Some(dir) = seen.dir.filter(|_| seen.part != 0) {
             self.push_aim(frame.saturating_sub(u32::from(seen.age)), dir);
         }

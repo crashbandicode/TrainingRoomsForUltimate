@@ -9,7 +9,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
-use super::action::ActionDesc;
+use super::action::{self, ActionDesc, Entry, Travel};
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
 use super::frame_strip::{Angle, Button, Move, Verdict};
 use super::spots::Spot;
@@ -94,6 +94,7 @@ pub struct ComboRecord {
     pub combo: Combo,
     /// The name of P1's fighter when the combo was saved. Metadata only: the helper grades whatever fighter P1 is.
     pub recorded_on: Option<String>,
+    pub fighter: Option<super::move_names::FighterId>,
     /// The recording or chain this combo was made from. Absent on a combo saved by hand.
     pub made_from: Option<String>,
     /// The macro file that holds a directly recorded input drill's take (F10). The drill owns it: the menu lists it nowhere and deleting the drill deletes it.
@@ -106,11 +107,12 @@ pub struct ComboRecord {
 /// Two records are the same combo when their name, links and recorded fighter are (not how their files are laid out).
 impl PartialEq for ComboRecord {
     fn eq(&self, other: &Self) -> bool {
-        (&self.name, &self.combo, &self.recorded_on, &self.made_from, &self.take)
+        (&self.name, &self.combo, &self.recorded_on, &self.fighter, &self.made_from, &self.take)
             == (
                 &other.name,
                 &other.combo,
                 &other.recorded_on,
+                &other.fighter,
                 &other.made_from,
                 &other.take,
             )
@@ -186,7 +188,15 @@ impl ComboRecord {
             link
         })).unwrap();
         combo.input_only = self.combo.input_only;
+        for old in start as usize..end as usize {
+            for event in 0..STEPS {
+                if let Some(travel) = self.combo.travel(old, event) {
+                    combo.attach_travel(old - start as usize, event, travel);
+                }
+            }
+        }
         let mut record = Self::new(self.name.clone(), combo, self.recorded_on.clone());
+        record.fighter = self.fighter;
         record.made_from = self.made_from.clone();
         Ok(record)
     }
@@ -197,6 +207,7 @@ impl ComboRecord {
             name,
             combo,
             recorded_on,
+            fighter: None,
             made_from: None,
             take: None,
             source: None,
@@ -206,6 +217,11 @@ impl ComboRecord {
     /// Made from a recording or a chain. The combo file keeps that id.
     pub fn with_made_from(mut self, source: impl Into<String>) -> Self {
         self.made_from = Some(source.into());
+        self
+    }
+
+    pub fn with_fighter(mut self, fighter: Option<super::move_names::FighterId>) -> Self {
+        self.fighter = fighter;
         self
     }
 
@@ -227,6 +243,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
+        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -237,6 +254,11 @@ impl ComboRecord {
             let mut object = source.clone();
             object.insert("schema_version".into(), json!(version));
             object.insert("name".into(), json!(self.name));
+            if let Some(identity) = identity {
+                object.insert("recorded_fighter".into(), identity);
+            } else {
+                object.remove("recorded_fighter");
+            }
             return Value::Object(object);
         }
         let links: Vec<Value> = self
@@ -245,7 +267,9 @@ impl ComboRecord {
             .enumerate()
             .map(|(k, l)| {
                 let holds = if self.combo.input_only { self.combo.holds(k) } else { l.holds() };
-                if self.combo.input_only { return json!({"events": events_value(l, &holds)}); }
+                if self.combo.input_only {
+                    return json!({"events": events_value(l, &holds, Some(&self.combo.travels(k)))});
+                }
                 let mut link = json!({
                     "from": move_key(l.from),
                     "to": move_key(l.to),
@@ -271,7 +295,7 @@ impl ComboRecord {
                     link["to_shown"] = description_value(l.desc(1));
                 }
                 if !l.presses_only {
-                    link["events"] = Value::Array(events_value(l, &holds));
+                    link["events"] = Value::Array(events_value(l, &holds, None));
                     if let Some(dir) = l.drift {
                         link["drift"] = json!(dir_key(dir));
                     }
@@ -284,6 +308,9 @@ impl ComboRecord {
         if self.combo.input_only { value["kind"] = json!("input_drill"); }
         if let Some(fighter) = &self.recorded_on {
             value["recorded_on"] = json!(fighter);
+        }
+        if let Some(identity) = identity {
+            value["recorded_fighter"] = identity;
         }
         if let Some(source) = &self.made_from {
             value["made_from"] = json!(source);
@@ -321,32 +348,56 @@ impl ComboRecord {
         let key = if input { "input_steps" } else { "links" };
         let links = object.get(key).and_then(Value::as_array).ok_or(key)?;
         if links.is_empty() || links.len() > LINKS { return Err(key); }
-        let mut previous = 0;
-        let mut combo = Combo::from_links(links.iter().map(|value| {
-            if !input { return link_of(value, aims); }
-            let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
-            if events.is_empty() || events.len() > STEPS { return Err("events"); }
-            let mut link = LinkRec::INPUT;
-            for (slot, event) in link.events.iter_mut().zip(events) {
-                let event = parse_event(event.as_object().ok_or("event")?, aims)?;
-                if event.offset < previous { return Err("offset"); }
-                previous = event.offset;
-                *slot = Some(event);
-            }
-            Ok(link)
-        }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
-        combo.input_only = input;
-        if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
-        if input { combo.join_split_steps(); }
-        Ok(ComboRecord {
+        let mut record = ComboRecord {
             name,
-            combo,
+            combo: Combo::EMPTY,
             recorded_on,
+            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
             made_from,
             take,
-            source: Some(object.clone()),
-        })
+            source: None,
+        };
+        let combo = &mut record.combo;
+        let mut previous = 0;
+        for value in links {
+            let link = if input { input_step(value, aims, &mut previous)? } else { link_of(value, aims)? };
+            if !combo.push(link) { return Err(key); }
+        }
+        combo.input_only = input;
+        if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
+        if input {
+            mark_legacy_releases(combo, links);
+            for (link, value) in links.iter().enumerate() {
+                let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+                for (index, value) in events.iter().enumerate() {
+                    // An aim part's travel, or on the press that began a special that special's own.
+                    let kept = matches!(combo.get(link).and_then(|link| link.events[index]).map(|event| event.kind),
+                        Some(Kind::Aim(_) | Kind::Press(Button::Special) | Kind::CStick));
+                    if kept && value.get("path").is_some() {
+                        let travel = parse_travel(value.as_object().ok_or("event")?)?;
+                        combo.attach_travel(link, index, travel);
+                    }
+                }
+            }
+            combo.join_split_steps();
+        }
+        record.source = Some(object.clone());
+        Ok(record)
     }
+}
+
+fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
+    let chara = value.get("ui_chara")?.as_str()?;
+    if chara.is_empty() || chara.len() > 10 || !chara.bytes().all(|byte| byte.is_ascii_hexdigit()) { return None; }
+    let chara = u64::from_str_radix(chara, 16).ok()?;
+    if chara == 0 { return None; }
+    let values = value.get("specials")?.as_array()?;
+    if values.len() != 4 { return None; }
+    let mut specials = [0; 4];
+    for (out, value) in specials.iter_mut().zip(values) {
+        *out = u8::try_from(value.as_u64()?).ok().filter(|value| *value <= 2)?;
+    }
+    Some(super::move_names::FighterId { chara, specials })
 }
 
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
@@ -354,6 +405,36 @@ fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static s
         .get(key)
         .and_then(int_value)
         .ok_or(key)
+}
+
+/// One input drill step: its events in file order. `previous` carries the last offset across steps.
+fn input_step(value: &Value, aims: bool, previous: &mut i32) -> Result<LinkRec, &'static str> {
+    let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+    if events.is_empty() || events.len() > STEPS { return Err("events"); }
+    let mut link = LinkRec::INPUT;
+    for (slot, event) in link.events.iter_mut().zip(events) {
+        let event = parse_event(event.as_object().ok_or("event")?, aims, true)?;
+        if event.offset < *previous { return Err("offset"); }
+        *previous = event.offset;
+        *slot = Some(event);
+    }
+    Ok(link)
+}
+
+/// A drill file from before the `reacted` key: a release whose hold reaches the band is graded as before, a shorter
+/// one is a tap. Kept out of the decoder's own frame, which is on the menu worker's deepest stack path.
+#[inline(never)]
+fn mark_legacy_releases(combo: &mut Combo, steps: &[Value]) {
+    for (k, step) in steps.iter().enumerate() {
+        let Some(events) = step.get("events").and_then(Value::as_array) else { continue };
+        let holds = combo.holds(k);
+        let bits = events.iter().enumerate().take(STEPS).fold(0u16, |bits, (i, event)| {
+            if event.get("reacted").is_none() && holds[i].is_some_and(|hold| action::hold_band(hold) > 0) {
+                bits | (1u16 << i)
+            } else { bits }
+        });
+        combo.mark_legacy_holds(k, bits);
+    }
 }
 
 fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
@@ -401,7 +482,7 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
             }
             let mut events = [None; STEPS];
             for (slot, event) in events.iter_mut().zip(events_in) {
-                *slot = Some(parse_event(event.as_object().ok_or("event")?, aims)?);
+                *slot = Some(parse_event(event.as_object().ok_or("event")?, aims, false)?);
             }
             (events, false)
         }
@@ -501,14 +582,24 @@ fn parse_step(step: &Map<String, Value>) -> Result<(Button, Aim, i32), &'static 
     ))
 }
 
-fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static str> {
+fn parse_event(event: &Map<String, Value>, aims: bool, input: bool) -> Result<Event, &'static str> {
     if event.get("hold").is_some_and(|hold| hold.as_u64().is_none()) { return Err("hold"); }
     let name = |k: &'static str| event.get(k).and_then(Value::as_str).ok_or(k);
     let dir = dir_of(name("dir")?).ok_or("dir")?;
     let offset = int(event, "offset")?;
     let kind = match name("kind")? {
         "press" => Kind::Press(button_of(name("button")?).ok_or("button")?),
-        "release" => Kind::Release(button_of(name("button")?).ok_or("button")?),
+        "release" => {
+            let button = button_of(name("button")?).ok_or("button")?;
+            let reacted = if input {
+                match event.get("reacted") {
+                    None | Some(Value::Bool(false)) => false,
+                    Some(Value::Bool(true)) => true,
+                    Some(_) => return Err("reacted"),
+                }
+            } else { false };
+            if input && reacted { Kind::LetGo(button) } else { Kind::Release(button) }
+        }
         "cstick" => Kind::CStick,
         "flick" => Kind::Flick(value_of(&FLICKS, name("flick")?).ok_or("flick")?),
         "aim" if aims => match event.get("part").and_then(Value::as_u64) {
@@ -520,25 +611,80 @@ fn parse_event(event: &Map<String, Value>, aims: bool) -> Result<Event, &'static
     Ok(Event { kind, dir, offset })
 }
 
-fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS]) -> Vec<Value> {
+fn parse_travel(event: &Map<String, Value>) -> Result<Travel, &'static str> {
+    let raw = event.get("path").and_then(Value::as_array).filter(|path| path.len() == 8).ok_or("path")?;
+    let mut path = [(0_i8, 0_i8); 8];
+    for (slot, point) in path.iter_mut().zip(raw) {
+        let pair = point.as_array().filter(|pair| pair.len() == 2).ok_or("path")?;
+        let coordinate = |value: &Value| {
+            int_value(value).filter(|value| (-127..=127).contains(value)).map(|value| value as i8).ok_or("path")
+        };
+        *slot = (coordinate(&pair[0])?, coordinate(&pair[1])?);
+    }
+    let angle = |value: Option<&Value>, key: &'static str| -> Result<u16, &'static str> {
+        let value = value.and_then(Value::as_f64).filter(|value| *value >= 0.0 && *value < 360.0).ok_or(key)?;
+        Ok(((value * 10.0).round() as u16) % 3600)
+    };
+    let heading = angle(event.get("heading"), "heading")?;
+    let distance = event.get("distance").and_then(Value::as_f64).filter(|value| *value >= 0.0).ok_or("distance")?;
+    let distance = (distance * 10.0).round().clamp(0.0, f64::from(u16::MAX)) as u16;
+    let stick = match event.get("stick") {
+        None => None,
+        Some(value) => {
+            let stick = value.as_object().ok_or("stick")?;
+            let angle = angle(stick.get("angle"), "stick")?;
+            let deflection = stick.get("deflection").and_then(Value::as_f64)
+                .filter(|value| *value >= 0.0 && *value <= 100.0).ok_or("stick")?;
+            Some((angle, deflection.round() as u8))
+        }
+    };
+    let entry = match (event.get("entry_x"), event.get("entry_y")) {
+        (None, None) if !event.contains_key("entry_change") => Entry::UNKNOWN,
+        (Some(x), Some(y)) => {
+            let change = event.get("entry_change").map_or(Ok(0.0), |v| v.as_f64().ok_or("entry_change"))?;
+            Entry::of(x.as_f64().ok_or("entry_x")?, y.as_f64().ok_or("entry_y")?)
+                .and_then(|entry| entry.with_change(change)).ok_or("entry velocity")?
+        }
+        _ => return Err("entry velocity"),
+    };
+    Ok(Travel { entry, stick, heading, distance, path })
+}
+
+fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS], travels: Option<&[Option<Travel>; STEPS]>) -> Vec<Value> {
     link.events.iter().enumerate().filter_map(|(i, event)| {
-        event.map(|event| event_value(event, holds[i]))
+        event.map(|event| event_value(event, holds[i], travels.and_then(|travels| travels[i]), travels.is_some()))
     }).collect()
 }
 
-fn event_value(event: Event, hold: Option<u32>) -> Value {
+fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>, input: bool) -> Value {
     let mut value =
         json!({"kind": kind_key(event.kind), "dir": dir_key(event.dir), "offset": event.offset});
     match event.kind {
-        Kind::Press(button) | Kind::Release(button) => {
+        Kind::Press(button) | Kind::Release(button) | Kind::LetGo(button) => {
             value["button"] = json!(button_key(button));
-            if let (Kind::Release(_), Some(hold)) = (event.kind, hold) {
+            if input && matches!(event.kind, Kind::Release(_) | Kind::LetGo(_)) {
+                value["reacted"] = json!(matches!(event.kind, Kind::LetGo(_)));
+            }
+            if let (Kind::Release(_) | Kind::LetGo(_), Some(hold)) = (event.kind, hold) {
                 value["hold"] = json!(hold);
             }
         }
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
         Kind::Aim(part) => value["part"] = json!(part),
+    }
+    if let Some(travel) = travel {
+        if let Some((x, y)) = travel.entry.units() {
+            value["entry_x"] = json!(x);
+            value["entry_y"] = json!(y);
+            if travel.entry.change() != 0.0 { value["entry_change"] = json!(travel.entry.change()); }
+        }
+        if let Some((angle, deflection)) = travel.stick {
+            value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
+        }
+        value["heading"] = json!(f64::from(travel.heading) / 10.0);
+        value["distance"] = json!(f64::from(travel.distance) / 10.0);
+        value["path"] = json!(travel.path);
     }
     value
 }
@@ -629,7 +775,7 @@ fn dir_of(key: &str) -> Option<Dir> {
 fn kind_key(kind: Kind) -> &'static str {
     match kind {
         Kind::Press(_) => "press",
-        Kind::Release(_) => "release",
+        Kind::Release(_) | Kind::LetGo(_) => "release",
         Kind::CStick => "cstick",
         Kind::Flick(_) => "flick",
         Kind::Aim(_) => "aim",

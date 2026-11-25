@@ -29,6 +29,15 @@ fn recorded(script: &[(u32, u32)]) -> Combo {
     input.combo
 }
 
+fn reacted(mut combo: Combo) -> Combo {
+    for link in combo.links[..combo.len].iter_mut().flatten() {
+        for event in link.events.iter_mut().flatten() {
+            if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+        }
+    }
+    combo
+}
+
 fn standing() -> Sample {
     Sample { actionable: true, facing: 1, ..Sample::default() }
 }
@@ -53,7 +62,7 @@ fn a_cast_after_a_training_reset_is_graded() {
     assert_eq!(drill.len(), 1, "set-up: one step, A held 12 frames");
     let mut tracker = Tracker::new();
     let mut helper = Helper::new();
-    helper.set_target(Some(drill));
+    helper.set_target(Some(reacted(drill)));
     for _ in 0..10 {
         game_frame(&mut tracker, &mut helper, standing(), 0);
     }
@@ -112,7 +121,7 @@ fn a_specials_first_aim_stays_in_its_step_however_late() {
         vec![Kind::Press(Button::Special), Kind::Release(Button::Special), Kind::Aim(1)]
     );
     assert_eq!(step.events().last().map(|e| e.dir), Some(Dir::BackUp));
-    let lines = crate::model::recording_menu::combo_link_lines(&drill);
+    let lines = crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::OFF);
     assert_eq!(lines.len(), 2, "the list shows one step and its one event line: {lines:?}");
     assert_eq!(lines[0], "S1 Step 1");
 }
@@ -166,7 +175,7 @@ fn a_held_buttons_release_stays_in_the_step_of_its_press() {
         vec![(Kind::Press(Button::Attack), 0), (Kind::Release(Button::Attack), 30)]
     );
     let mut helper = Helper::new();
-    helper.set_target(Some(drill));
+    helper.set_target(Some(reacted(drill)));
     let mut buttons = 0;
     for frame in 0..=55 {
         if let Some(&(_, now)) = script.iter().find(|(at, _)| *at == frame) {
@@ -371,19 +380,19 @@ fn run_drill(reference: Combo, script: &[(u32, u32)], end: u32) -> Summary {
 
 #[test]
 fn a_hold_is_graded_on_its_length_within_a_band() {
-    let reference = recorded(&[(0, ATTACK), (64, 0)]);
+    let reference = reacted(recorded(&[(0, ATTACK), (64, 0)]));
     assert!(run_drill(reference, &[(0, ATTACK), (72, 0)], 110).clean);
     assert!(run_drill(reference, &[(0, ATTACK), (55, 0)], 110).clean);
     assert_eq!(run_drill(reference, &[(0, ATTACK), (74, 0)], 110).fault, Some((0, Reason::MissingRelease(Button::Attack))));
     assert_eq!(run_drill(reference, &[(0, ATTACK), (54, 0)], 110).fault, Some((0, Reason::ReleaseOff(Button::Attack, -10))));
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     assert!(run_drill(reference, &[(0, SPECIAL), (2, 0), (11, ATTACK), (83, 0)], 110).clean);
 }
 
 #[test]
 fn a_short_hold_keeps_the_on_time_tolerance() {
-    let reference = recorded(&[(0, ATTACK), (4, 0)]);
+    let reference = reacted(recorded(&[(0, ATTACK), (4, 0)]));
     assert!(run_drill(reference, &[(0, ATTACK), (5, 0)], 20).clean);
     assert_eq!(run_drill(reference, &[(0, ATTACK), (6, 0)], 20).fault, Some((0, Reason::MissingRelease(Button::Attack))));
     assert_eq!(run_drill(reference, &[(0, ATTACK), (2, 0)], 20).fault, Some((0, Reason::ReleaseOff(Button::Attack, -2))));
@@ -391,7 +400,7 @@ fn a_short_hold_keeps_the_on_time_tolerance() {
 
 #[test]
 fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     let attack = |press, release| run_drill(reference, &[(0, SPECIAL), (2, 0), (press, ATTACK), (release, 0)], 120);
     assert!(attack(10, 83).clean, "on time, the longest hold in band");
@@ -401,7 +410,7 @@ fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
     assert_eq!(attack(9, 83).fault, Some((0, Reason::MissingRelease(Button::Attack))));
 
     // The press in one step, its release in the next: Attack 10..124 (hold 114: band 14), Special tapped at 60..62.
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (124, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (10, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (124, 0)]));
     assert_eq!(reference.len(), 2);
     let across = |press, release| run_drill(reference,
         &[(0, SPECIAL), (2, 0), (press, ATTACK), (60, ATTACK | SPECIAL), (62, ATTACK), (release, 0)], 170);
@@ -413,7 +422,7 @@ fn a_press_inside_the_tolerance_keeps_its_whole_hold_band() {
 
 #[test]
 fn a_repeated_button_uses_its_matching_press_for_the_hold_deadline() {
-    let reference = recorded(&[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (10, ATTACK), (74, 0)]);
+    let reference = reacted(recorded(&[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (10, ATTACK), (74, 0)]));
     assert_eq!(reference.len(), 1);
     assert!(run_drill(reference, &[(0, SPECIAL), (2, 0), (5, ATTACK), (7, 0), (11, ATTACK), (84, 0)], 120).clean);
     assert_eq!(
@@ -432,6 +441,7 @@ fn a_reference_release_without_its_press_is_not_graded() {
         cropped.get(0).unwrap().events().map(|e| (e.kind, e.offset)).collect::<Vec<_>>(),
         vec![(Kind::Press(Button::Special), 0), (Kind::Release(Button::Attack), 10), (Kind::Release(Button::Special), 12)]
     );
+    let cropped = reacted(cropped);
     assert!(run_drill(cropped, &[(0, SPECIAL), (12, 0)], 25).clean);
 }
 
@@ -451,7 +461,7 @@ fn a_split_step_file_reads_as_the_new_recorder_saves_it() {
     assert_eq!(parsed.combo, input.combo);
     let parsed: ComboRecord = serde_json::from_str(SPLIT_HOLD).unwrap();
     assert_eq!(parsed.combo.len(), 1, "the release is joined to the step of its press");
-    assert_eq!(parsed.combo, recorded(&[(0, ATTACK), (30, 0)]));
+    assert_eq!(parsed.combo, reacted(recorded(&[(0, ATTACK), (30, 0)])));
     let parsed: ComboRecord = serde_json::from_str(TWO_ZIPS).unwrap();
     let mut input = InputCapture::new();
     for frame in 0..=42 {
@@ -473,7 +483,7 @@ fn a_joined_file_is_written_back_unchanged() {
 #[test]
 fn a_release_records_its_hold_in_the_file() {
     use crate::model::combo_record::ComboRecord;
-    let record = ComboRecord::new("Drill".into(), recorded(&[(0, ATTACK), (30, 0)]), None);
+    let record = ComboRecord::new("Drill".into(), reacted(recorded(&[(0, ATTACK), (30, 0)])), None);
     let mut value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["input_steps"][0]["events"][1]["hold"], 30);
     let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
@@ -515,7 +525,7 @@ fn the_bar_and_the_menu_name_a_link_as_the_strip_does() {
     assert_eq!(String::from_utf16(link_moves(&link, TEXT_UNITS).units()).unwrap(), "Jab > Side tilt ↑");
     let rec = LinkRec::of(&link, &tracker, tracker.exchange().1, true);
     let combo = Combo::from_links([rec]).unwrap();
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo)[0], "L1 jab → side tilt ↑ TRUE");
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF)[0], "L1 jab → side tilt ↑ TRUE");
     let mut helper = Helper::new();
     helper.set_target(Some(combo));
     let mut texts = Vec::new();
@@ -581,7 +591,8 @@ fn a_link_record_keeps_its_size() {
 #[test]
 fn the_description_holds_no_names() {
     let source = include_str!("action.rs");
-    assert_eq!(source.matches(".name()").count(), 1);
+    assert_eq!(source.matches(".name()").count(), 0);
+    assert_eq!(source.matches("namer.name(").count(), 1, "the one name call goes through the move names");
     for name in [r#""Jab""#, r#""Up B""#, r#""Side tilt""#] {
         assert!(!source.contains(name));
     }
@@ -652,7 +663,7 @@ fn a_side_tilts_drill_direction_comes_from_its_animation() {
     let mut capture = InputCapture::new();
     capture.step_late(Snap { buttons: ATTACK | CSTICK_ON, lstick_x: 60, lstick_y: 20,
         rstick_x: 60, rstick_y: 20, facing: 1, ..Snap::empty(1) },
-        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) });
+        action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE });
     let events = capture.combo.get(0).unwrap().events().map(|e| (e.kind, e.dir)).collect::<Vec<_>>();
     assert_eq!(events, vec![(Kind::CStick, Dir::ForwardUp), (Kind::Press(Button::Attack), Dir::Forward)]);
 }
@@ -727,7 +738,7 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     helper.set_target(Some(target));
     for frame in 1..=4 {
         let late = if frame == 2 {
-            action::Late { open: Some((Some(1), Some(None))) }
+            action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }
         } else { action::Late::NONE };
         helper.step_inputs_late(Snap { buttons: if frame < 3 { ATTACK } else { 0 }, lstick_x: 60, lstick_y: 20,
             facing: 1, ..Snap::empty(frame) }, Some(late), &mut Out::default());
@@ -735,10 +746,10 @@ fn a_buffered_tilt_waits_for_its_animation_before_it_is_graded() {
     assert_eq!(helper.attempt().unwrap().len(), 1);
     let mut out = Out::default();
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(5) },
-        Some(action::Late { open: Some((Some(1), Some(None))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(None))), ..action::Late::NONE }), &mut out);
     assert!(out.link.is_none() && out.resolved.is_none());
     helper.step_inputs_late(Snap { lstick_x: 60, lstick_y: 20, facing: 1, ..Snap::empty(6) },
-        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))) }), &mut out);
+        Some(action::Late { open: Some((Some(1), Some(Some(Angle::Up)))), ..action::Late::NONE }), &mut out);
     assert_eq!(out.link.unwrap().0, 0);
     assert_eq!(out.resolved.unwrap().fault, Some((0, Reason::WrongDir(Kind::Press(Button::Attack)))));
 
@@ -759,7 +770,681 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
     let value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["schema_version"], 2);
     assert_eq!(value["kind"], "input_drill");
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo), vec!["S1 Step 1", "↑→ A · release"]);
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF), vec!["S1 Step 1", "↑→ A · release"]);
+}
+
+fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
+    let (x, y) = (f32::from(end.0), f32::from(end.1));
+    action::Travel {
+        entry: action::Entry::UNKNOWN,
+        stick: Some(stick),
+        heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
+        distance: (x.hypot(y) * 10.0).round() as u16,
+        path: core::array::from_fn(|i| {
+            let t = (i + 1) as f32 / 8.0;
+            ((x * t).round() as i8, (y * t).round() as i8)
+        }),
+    }
+}
+
+fn steering_snap(frame: u32, second: bool) -> Snap {
+    Snap {
+        buttons: if frame < 2 { SPECIAL } else if second && frame == 43 { ATTACK } else { 0 },
+        facing: 1,
+        aim: Seen { inside: frame <= 3, part: if frame == 3 { 1 } else { 0 },
+            dir: (frame == 3).then_some(4), facing: 1, age: 0 },
+        ..Snap::empty(frame)
+    }
+}
+
+fn steering_capture(detail: action::Travel, second: bool) -> Combo {
+    let mut capture = InputCapture::new();
+    for frame in 0..=(if second { 43 } else { 4 }) {
+        capture.step_late(steering_snap(frame, second), action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        });
+    }
+    capture.combo
+}
+
+fn steering_attempt(reference: action::Travel, actual: action::Travel, match_stick: bool) -> Summary {
+    let mut helper = Helper::new();
+    helper.set_target(Some(steering_capture(reference, false)));
+    for frame in 0..=4 {
+        helper.settings = Settings { match_stick, ..Settings::factory() };
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, actual)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    let result = *helper.results().next().unwrap();
+    result
+}
+
+#[test]
+fn a_steered_part_is_graded_on_its_path_within_the_tolerance() {
+    let reference = travel((-40, 0), (1800, 100));
+    assert!(steering_attempt(reference, travel((-40, 8), (1800, 100)), false).clean);
+    let result = steering_attempt(reference, travel((-38, 14), (1800, 100)), false);
+    assert_eq!(result.fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(crate::model::combo_plan::reason_text(&result), crate::model::frame_strip_plan::Text::new("L1 1st path off"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Path, "1st direction", 1),
+        (crate::model::frame_strip_plan::Text::new("1st path off"), crate::model::frame_strip_plan::BAD));
+}
+
+#[test]
+fn a_short_warp_fails_a_long_warp_drill() {
+    let long = travel((-42, 42), (1350, 100));
+    let short = travel((-14, 14), (1350, 100));
+    assert_eq!(steering_attempt(long, short, false).fault, Some((0, Reason::AimPath(1))));
+    assert_eq!(steering_attempt(short, long, false).fault, Some((0, Reason::AimPath(1))));
+}
+
+#[test]
+fn the_angle_and_deflection_toggle_grades_the_stick() {
+    let reference = travel((-40, 40), (1350, 100));
+    for stick in [(1150, 100), (1350, 50)] {
+        assert!(steering_attempt(reference, travel((-40, 40), stick), false).clean);
+    }
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1150, 100)), true).fault,
+        Some((0, Reason::AimAngle(1, -200))));
+    assert_eq!(steering_attempt(reference, travel((-40, 40), (1350, 50)), true).fault,
+        Some((0, Reason::AimDeflection(1, -50))));
+    assert!(steering_attempt(reference, travel((-40, 40), (1270, 90)), true).clean);
+    let around_zero = travel((40, 0), (3590, 50));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (90, 65))), None);
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (100, 50))), Some(Mark::Angle(110)));
+    assert_eq!(action::stick_off(&around_zero, &travel((40, 0), (3590, 34))), Some(Mark::Deflection(-16)));
+    assert_eq!(action::stick_of((0, 0), -1), (0, 0));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Angle(-200), "1st direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("1st angle 20 off"));
+    // DESIGN section 4 words the fault "deflection", as the menu row does.
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(-50), "2nd direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("2nd deflection 50% low"));
+    assert_eq!(crate::model::combo_plan::mark_text(Mark::Deflection(30), "1st direction", 1).0,
+        crate::model::frame_strip_plan::Text::new("1st deflection 30% high"));
+    let low = steering_attempt(reference, travel((-40, 40), (1350, 50)), true);
+    assert_eq!(crate::model::combo_plan::reason_text(&low),
+        crate::model::frame_strip_plan::Text::new("L1 1st deflection 50% low"));
+}
+
+#[test]
+fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
+    use crate::model::combo_plan::{mark_text, reason_text};
+    let reference = travel((-40, 0), (1800, 83));
+    for angle in [1700, 1900] {
+        assert!(steering_attempt(reference, travel((-40, 0), (angle, 83)), true).clean);
+    }
+    for (angle, degrees) in [(1698, "10.2"), (1902, "10.2"), (1600, "20")] {
+        let actual = travel((-40, 0), (angle, 83));
+        let result = steering_attempt(reference, actual, true);
+        let why = reason_text(&result);
+        assert_eq!(String::from_utf16(why.units()).unwrap(), format!("L1 1st angle {degrees} off"));
+        let mark = action::stick_off(&reference, &actual).unwrap();
+        let label = mark_text(mark, "1st direction", 1).0;
+        assert_eq!(String::from_utf16(label.units()).unwrap(), format!("1st angle {degrees} off"));
+    }
+}
+
+/// The travel table's static cost: an entry is packed into 30 bytes, so the table adds 120 bytes to a combo, which
+/// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
+/// more code than the data it saved (`833913b3`), so every combo carries the table.
+#[test]
+fn the_travel_table_is_packed_into_120_bytes_a_combo() {
+    use core::mem::size_of;
+    let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
+    println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
+        size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
+    assert_eq!((entry, DETAILS * entry), (30, 120), "a travel detail and a combo's table");
+    assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
+}
+
+#[test]
+fn the_toggle_row_reads_its_setting_and_is_off_by_default() {
+    assert!(!Settings::factory().match_stick);
+    let mut snapshot = crate::model::settings::Snapshot::factory();
+    snapshot.set("combo_stick", &[1, 0]).unwrap();
+    assert!(Settings::from_snapshot(&snapshot).match_stick);
+    let rows = &crate::model::menu::table::ROWS;
+    let spot = rows.iter().position(|row| row.id == "spots_combo").unwrap();
+    assert_eq!(rows[spot + 1].id, "combo_stick");
+}
+
+#[test]
+fn a_travel_that_ends_after_its_step_was_graded_amends_the_grade() {
+    let reference = travel((-40, 0), (1800, 100));
+    let target = steering_capture(reference, true);
+    assert_eq!(target.len(), 2);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false),
+        (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 9).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1);
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 9 {
+                if clean { assert!(helper.results().next().is_none()); }
+                else {
+                    let result = helper.results().next().unwrap();
+                    assert_eq!((result.outcome, result.clean, result.fault),
+                        (Outcome::Completed, false, Some((0, Reason::AimPath(1)))));
+                }
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+#[test]
+fn aim_details_round_trip_in_optional_keys() {
+    let detail = travel((-40, 40), (1350, 100));
+    let combo = steering_capture(detail, false);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let value = serde_json::to_value(&record).unwrap();
+    let event = &value["input_steps"][0]["events"][2];
+    assert_eq!(event["stick"], serde_json::json!({"angle": 135.0, "deflection": 100}));
+    assert_eq!(event["heading"], 135.0);
+    assert_eq!(event["distance"], 56.6);
+    assert_eq!(event["path"].as_array().unwrap().len(), 8);
+    assert_eq!((event["kind"].as_str(), event["part"].as_u64(), event["dir"].as_str(), event["offset"].as_i64()),
+        (Some("aim"), Some(1), Some("back"), Some(3)));
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(read, record);
+    let mut helper = Helper::new();
+    helper.set_target(Some(read.combo));
+    for frame in 0..=4 {
+        helper.settings = Settings::factory();
+        helper.step_inputs_late(steering_snap(frame, false), Some(action::Late {
+            travel: (frame == 4).then_some((1, detail)), ..action::Late::NONE
+        }), &mut Out::default());
+    }
+    assert!(helper.results().next().unwrap().clean);
+
+    let mut split = value.clone();
+    let events = value["input_steps"][0]["events"].as_array().unwrap();
+    split["input_steps"] = serde_json::json!([
+        {"events": [events[0].clone(), events[1].clone()]},
+        {"events": [events[2].clone()]}
+    ]);
+    let joined: crate::model::combo_record::ComboRecord = serde_json::from_value(split).unwrap();
+    assert_eq!(joined.combo.len(), 1);
+    assert_eq!(joined.combo.travel(0, 2), Some(detail));
+
+    let mut five = value.clone();
+    let events = five["input_steps"][0]["events"].as_array_mut().unwrap();
+    let aim = events[2].clone();
+    for offset in 4..=7 {
+        let mut event = aim.clone();
+        event["offset"] = serde_json::json!(offset);
+        events.push(event);
+    }
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(five).unwrap();
+    for index in 2..6 { assert_eq!(read.combo.travel(0, index), Some(detail)); }
+    assert_eq!(read.combo.travel(0, 6), None);
+    for (key, invalid) in [
+        ("path", serde_json::json!([1, 2])),
+        ("path", serde_json::json!([[128, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]])),
+        ("heading", serde_json::json!(360)),
+        ("distance", serde_json::json!(-1)),
+        ("stick", serde_json::json!({"angle": 0, "deflection": 101})),
+    ] {
+        let mut bad = value.clone();
+        bad["input_steps"][0]["events"][2][key] = invalid;
+        assert!(serde_json::from_value::<crate::model::combo_record::ComboRecord>(bad).unwrap_err().to_string().contains(key));
+    }
+    let mut old = value;
+    old["input_steps"][0]["events"][2].as_object_mut().unwrap().remove("path");
+    old["input_steps"][0]["events"][2]["heading"] = serde_json::json!("ignored");
+    old["input_steps"][0]["events"][2]["stick"] = serde_json::json!("ignored");
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(old).unwrap();
+    assert_eq!(read.combo.travel(0, 2), None);
+}
+
+#[test]
+fn a_drill_keeps_details_for_its_first_four_aims() {
+    let mut combo = Combo::EMPTY;
+    combo.input_only = true;
+    for i in 0..5 {
+        let link = LinkRec { events: retain([Event { kind: Kind::Aim(1), dir: Dir::Back, offset: i * 10 }]),
+            ..LinkRec::INPUT };
+        assert!(combo.push(link));
+    }
+    let detail = travel((-40, 0), (1800, 100));
+    for i in 0..4 { assert!(combo.attach_travel(i, 0, detail)); }
+    assert!(!combo.attach_travel(4, 0, detail));
+    let replacement = travel((-30, 0), (1800, 100));
+    assert!(combo.attach_travel(0, 0, replacement));
+    assert_eq!(combo.travel(0, 0), Some(replacement));
+    assert!(combo.attach_travel(0, 0, detail));
+    for i in 0..4 { assert_eq!(combo.travel(i, 0), Some(detail)); }
+    assert_eq!(combo.travel(4, 0), None);
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), combo, None);
+    let crop = record.crop_units(1, 4).unwrap();
+    for i in 0..3 { assert_eq!(crop.combo.travel(i, 0), Some(detail)); }
+
+    let mut split = Combo::EMPTY;
+    split.input_only = true;
+    for event in [Event { kind: Kind::Press(Button::Special), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 1 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 2 }] {
+        assert!(split.push(LinkRec { events: retain([event]), ..LinkRec::INPUT }));
+    }
+    assert!(split.attach_travel(1, 0, detail));
+    assert!(split.attach_travel(2, 0, replacement));
+    split.join_split_steps();
+    assert_eq!(split.len(), 2);
+    assert_eq!(split.travel(0, 1), Some(detail));
+    assert_eq!(split.travel(1, 0), Some(replacement));
+
+    let mut unordered = Combo::from_links([LinkRec { events: retain([
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 0 },
+        Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 1 },
+    ]), ..LinkRec::INPUT }]).unwrap();
+    unordered.input_only = true;
+    assert!(unordered.attach_travel(0, 1, replacement));
+    assert!(unordered.attach_travel(0, 0, detail));
+    let record = crate::model::combo_record::ComboRecord::new("Drill".into(), unordered, None);
+    let read: crate::model::combo_record::ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
+}
+
+/// A saved link keeps no inputs before its first hit, so its first move's travel arrows are not in it. That move is
+/// the follow-up of the link before, which has them: a later link shows them, the combo's first link shows none, and
+/// a crop that makes a link the first one stops borrowing. Nothing is stored for it.
+#[test]
+fn a_later_links_first_move_borrows_its_travel_arrows() {
+    use crate::model::combo_plan::Renderer;
+    use crate::model::combo_record::ComboRecord;
+    use crate::model::frame_strip_plan::Text;
+    use crate::model::panes::strip_layout::C;
+    let empty = || Some(serde_json::json!({}));
+    let first = LinkRec { events: retain([
+        Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 1 },
+        Event { kind: Kind::Aim(1), dir: Dir::Back, offset: 10 },
+        Event { kind: Kind::Aim(2), dir: Dir::Forward, offset: 20 },
+    ]), ..*hit_record("jab", "up_special", empty(), empty()).combo.get(0).unwrap() };
+    let second = *hit_record("up_special", "side_tilt", empty(), Some(serde_json::json!({"angle":"up"}))).combo.get(0).unwrap();
+    let combo = Combo::from_links([first, second]).unwrap();
+    let heads = |combo: &Combo| -> Vec<String> {
+        crate::model::recording_menu::combo_link_lines(combo, crate::model::move_names::Namer::OFF).into_iter()
+            .filter(|line| line.starts_with('L') && line.contains(" → ")).collect()
+    };
+    assert_eq!(heads(&combo), vec!["L1 jab → up b ← → TRUE", "L2 up b ← → → side tilt ↑ TRUE"]);
+    let mut helper = Helper::new();
+    helper.set_target(Some(combo));
+    let mut texts = Vec::new();
+    Renderer::new().draw(&helper, &Text::EMPTY, None, true, (&C, false), |_, look, _| {
+        if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); }
+    });
+    assert!(texts.iter().any(|text| text == "1 Jab>Up B ← →"), "{texts:?}");
+    assert!(texts.iter().any(|text| text == "2 Up B ← →>Side tilt ↑"), "{texts:?}");
+    // The crop's first link has no link before it.
+    let record = ComboRecord::new("Drill".into(), combo, None);
+    assert_eq!(heads(&record.crop_units(1, 2).unwrap().combo), vec!["L1 up b → side tilt ↑ TRUE"]);
+    // Nothing new is stored: the link keeps its size and the file reads back equal.
+    assert_eq!(core::mem::size_of::<LinkRec>(), 124);
+    let read: ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
+    assert_eq!(read, record);
+}
+
+/// Mario's up special as the early install-4 smoke sampled it on a game (`i4-early-yoga-01`): the frame of the rise
+/// and his offset from where he stood, facing right, with the stick held up-left and with no direction. The whole
+/// rise is the special's start status. Between the samples the positions here are straight lines; the game's are not.
+const STEERED: [(f32, f32, f32); 5] =
+    [(0.0, 0.0, 0.0), (4.0, 0.40, 8.50), (13.0, 9.70, 44.89), (24.0, 15.37, 50.64), (34.0, 18.11, 47.30)];
+const STRAIGHT: [(f32, f32, f32); 5] =
+    [(0.0, 0.0, 0.0), (4.0, 1.23, 8.42), (13.0, 14.03, 43.73), (22.0, 19.46, 49.20), (33.0, 22.45, 45.78)];
+/// Frames of the special's start status.
+const RISE: u32 = 35;
+
+fn rise(samples: &[(f32, f32, f32); 5], frame: u32) -> (f32, f32) {
+    let f = frame as f32;
+    let k = samples.windows(2).position(|pair| f <= pair[1].0).unwrap_or(3);
+    let (a, b) = (samples[k], samples[k + 1]);
+    let t = ((f - a.0) / (b.0 - a.0)).min(1.0);
+    (a.1 + (b.1 - a.1) * t, a.2 + (b.2 - a.2) * t)
+}
+
+/// One cast of the special: where Mario is on each frame of the rise, and the stick held from the B release on.
+#[derive(Clone, Copy)]
+struct Cast {
+    path: fn(u32) -> (f32, f32),
+    stick: (i8, i8),
+}
+
+const UP_LEFT: (i8, i8) = (-90, 90);
+const STEERED_CAST: Cast = Cast { path: |frame| rise(&STEERED, frame), stick: UP_LEFT };
+const STRAIGHT_CAST: Cast = Cast { path: |frame| rise(&STRAIGHT, frame), stick: (0, 0) };
+
+/// One game frame of a cast, counted from the B press: B with the stick up for three frames, then the cast's stick.
+/// The start status begins on the frame after the press and lasts `RISE` frames; a fall and a landing follow.
+fn cast_frame(cast: Cast, frame: u32) -> (Sample, MappedInputs) {
+    let (lstick_x, lstick_y) = if frame < 3 { (0, 127) } else { cast.stick };
+    let inputs = MappedInputs { buttons: if frame < 3 { SPECIAL } else { 0 }, lstick_x, lstick_y, ..MappedInputs::NEUTRAL };
+    let top = (cast.path)(RISE - 1);
+    let sample = if frame == 0 {
+        Sample { pos: Some((0.0, 0.0)), ..standing() }
+    } else if frame <= RISE {
+        Sample { attack: Some(Move::UpSpecial), status: 0x1de, pos: Some((cast.path)(frame - 1)), facing: 1,
+            airborne: true, ..Sample::default() }
+    } else if frame <= RISE + 20 {
+        Sample { status: 16, pos: Some((top.0, top.1 - (frame - RISE) as f32 * 2.0)), facing: 1, airborne: true,
+            ..Sample::default() }
+    } else {
+        Sample { pos: Some((top.0, 0.0)), ..standing() }
+    };
+    (sample, inputs)
+}
+
+/// A cast recorded as a drill: the strip's tracker steps, and the take's capture reads its snap and its late
+/// decisions, as `rr_host::observe_input` does.
+fn recorded_cast(cast: Cast) -> Combo {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    for _ in 0..5 {
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..standing() }, standing(), MappedInputs::NEUTRAL);
+    }
+    for frame in 0..RISE + 40 {
+        let (sample, inputs) = cast_frame(cast, frame);
+        tracker.step(sample, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+    }
+    capture.combo
+}
+
+/// A cast flown as an attempt at a drill, through the tracker and the helper as `combo::after_strip` does.
+fn attempted_cast(reference: Combo, cast: Cast, match_stick: bool) -> Summary {
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(reference));
+    let settings = Settings { match_stick, ..Settings::factory() };
+    for _ in 0..5 {
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..standing() }, standing(), MappedInputs::NEUTRAL);
+        let _out = helper.step(&tracker, settings);
+    }
+    for frame in 0..RISE + 40 {
+        let (sample, inputs) = cast_frame(cast, frame);
+        tracker.step(sample, standing(), inputs);
+        let _out = helper.step(&tracker, settings);
+    }
+    let result = *helper.results().next().expect("the drill resolved");
+    result
+}
+
+fn why(result: &Summary) -> String {
+    String::from_utf16(crate::model::combo_plan::reason_text(result).units()).unwrap()
+}
+
+/// EXPECTED RED. Flown on the early install-4 smoke: Mario's up special recorded with the stick up-left saved no
+/// direction, and a replay with no direction graded clean. The special's own travel belongs to its press: the stick
+/// most held while it travelled is compared 8-way, when the two paths also differ by more than the floor.
+#[test]
+fn a_steered_special_must_be_steered() {
+    let steered = recorded_cast(STEERED_CAST);
+    assert_eq!(steered.len(), 1, "set-up: one step, B and its release");
+    assert!(!steered.has_aim(), "rule D: a special going its own way has no aim event");
+    let straight = attempted_cast(steered, STRAIGHT_CAST, false);
+    assert!(!straight.clean, "a drill recorded steering up-left does not pass with no steering");
+    assert_eq!(why(&straight), "L1 Special steer wrong");
+    assert!(attempted_cast(steered, STEERED_CAST, false).clean, "the same steer is clean");
+    let reverse = attempted_cast(recorded_cast(STRAIGHT_CAST), STEERED_CAST, false);
+    assert_eq!(why(&reverse), "L1 Special steer wrong", "a straight drill does not pass with a steer either");
+}
+
+/// GUARD, green today. A special whose travel ignores the stick cannot fault on the stick: the paths are equal.
+#[test]
+fn a_special_that_ignores_the_stick_cannot_fault() {
+    let ignoring = Cast { stick: UP_LEFT, ..STRAIGHT_CAST };
+    let drill = recorded_cast(ignoring);
+    for match_stick in [false, true] {
+        assert!(attempted_cast(drill, STRAIGHT_CAST, match_stick).clean);
+        assert!(attempted_cast(drill, Cast { stick: (45, 45), ..STRAIGHT_CAST }, match_stick).clean);
+    }
+}
+
+/// EXPECTED RED. A steer far from the saved one fails on its path, as an aimed part does, whatever the stick was.
+#[test]
+fn a_wide_steer_fails_on_its_path() {
+    let wide = Cast { path: |frame| { let (x, y) = rise(&STRAIGHT, frame); (-x, y) }, stick: UP_LEFT };
+    let result = attempted_cast(recorded_cast(wide), Cast { stick: UP_LEFT, ..STRAIGHT_CAST }, false);
+    assert!(!result.clean);
+    assert_eq!(why(&result), "L1 Special path off");
+}
+
+/// GUARD, green today. Momentum carried into the special moves the path a little; inside the floor the stick held
+/// is not compared, so it is no fault.
+#[test]
+fn carried_momentum_inside_the_floor_is_not_a_steer_fault() {
+    let carried = Cast {
+        path: |frame| { let (x, y) = rise(&STRAIGHT, frame); (x + 0.6 * frame as f32 / 34.0, y) },
+        stick: UP_LEFT,
+    };
+    assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, false).clean);
+    assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, true).clean);
+}
+
+/// Use five airborne approach frames, so entry velocity is observed before the move and is not inferred from
+/// its kick or rise. The fixed diagonal trajectory models Wizard's Foot; the rise uses the Mario fixture above.
+fn airborne_cast(target: Option<Combo>, kick: bool, cast: Cast, speed: (f32, f32), toggle: bool) -> (Combo, Option<Summary>) {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    let mut helper = Helper::new();
+    helper.set_target(target);
+    let mut result = None;
+    for f in -5..75 {
+        let (mut p, mut inputs) = if f < 0 { (standing(), MappedInputs::NEUTRAL) } else { cast_frame(cast, f as u32) };
+        if kick {
+            if p.attack.is_some() { p.attack = Some(Move::DownSpecial); p.status = 0x1df; }
+            if (0..3).contains(&f) { inputs.lstick_y = -60; } // Down B, short of a separate fast-fall edge.
+        }
+        let (x, y) = if kick { let n = (f - 1).clamp(0, 34) as f32; (n, -n) } else { p.pos.unwrap_or_default() };
+        p.pos = Some((x + f as f32 * speed.0, 100.0 + y + f as f32 * speed.1));
+        p.airborne = true;
+        tracker.step(p, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        if target.is_some() {
+            let out = helper.step(&tracker, Settings { match_stick: toggle, ..Settings::factory() });
+            if out.resolved.is_some() { result = out.resolved; }
+        }
+    }
+    (capture.combo, result)
+}
+
+#[test]
+fn entry_motion_does_not_turn_an_airborne_fixed_kick_into_a_steer() {
+    let saved = airborne_cast(None, true, STRAIGHT_CAST, (0.25, 0.0), false).0;
+    let held = Cast { stick: UP_LEFT, ..STRAIGHT_CAST };
+    for speed in [(0.375, 0.0), (0.25, -0.125)] {
+        for toggle in [false, true] {
+            let (actual, result) = airborne_cast(Some(saved), true, held, speed, toggle);
+            let endpoint = |combo: Combo| combo.travel(0, 0).unwrap().path[7];
+            let ((x, y), (a, b)) = (endpoint(saved), endpoint(actual));
+            assert!(f32::from(x - a).hypot(f32::from(y - b)) > 2.0);
+            assert!(result.unwrap().clean, "fixed kick: {speed:?}, {toggle}, {result:?}");
+        }
+    }
+}
+
+#[test]
+fn entry_motion_on_a_steer_must_match_to_judge_the_stick() {
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, 0.0), false).0;
+    for toggle in [false, true] {
+        let run = |vx| airborne_cast(Some(saved), false, STRAIGHT_CAST, (vx, 0.0), toggle).1.unwrap();
+        assert_eq!(run(0.25).fault, Some((0, Reason::Steer)), "matching entry still grades the steer");
+        assert_eq!(run(0.3125).fault, Some((0, Reason::Steer)), "at the inclusive velocity tolerance");
+        assert!(run(0.31640625).clean, "one recorded velocity unit past the tolerance");
+        assert!(run(0.375).clean, "different entry cannot establish a steering error");
+    }
+}
+
+#[test]
+fn entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick() {
+    use crate::model::combo_record::ComboRecord;
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, -0.125), false).0;
+    let record = ComboRecord::new("Air".into(), saved, None);
+    let mut value = serde_json::to_value(&record).unwrap();
+    let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    let run = |target| airborne_cast(Some(target), false, STRAIGHT_CAST, (0.25, -0.125), true).1.unwrap();
+    assert_eq!(run(read.combo).fault, Some((0, Reason::Steer)));
+    let mut falling = value.clone();
+    let press = &mut falling["input_steps"][0]["events"][0];
+    press["entry_y"] = serde_json::json!(-0.25);
+    assert!(run(serde_json::from_value::<ComboRecord>(falling.clone()).unwrap().combo).clean);
+    falling["input_steps"][0]["events"][0]["entry_change"] = serde_json::json!(0.125);
+    let accelerated: ComboRecord = serde_json::from_value(falling).unwrap();
+    assert_eq!(accelerated.combo.travel(0, 0).unwrap().entry.change(), 0.125);
+    assert_eq!(run(accelerated.combo).fault, Some((0, Reason::Steer)));
+    let press = value["input_steps"][0]["events"][0].as_object_mut().unwrap();
+    assert_eq!(press.remove("entry_x"), Some(serde_json::json!(0.25)));
+    assert_eq!(press.remove("entry_y"), Some(serde_json::json!(-0.125)));
+    for (x, y) in [(serde_json::json!(0), None), (serde_json::json!(false), Some(0)), (serde_json::json!(128), Some(0))] {
+        let mut bad = value.clone();
+        let press = &mut bad["input_steps"][0]["events"][0];
+        press["entry_x"] = x;
+        if let Some(y) = y { press["entry_y"] = serde_json::json!(y); }
+        assert!(serde_json::from_value::<ComboRecord>(bad).is_err());
+    }
+    let legacy: ComboRecord = serde_json::from_value(value).unwrap();
+    assert!(legacy.combo.travel(0, 0).is_some());
+    assert!(run(legacy.combo).clean);
+}
+
+/// EXPECTED RED. What the press keeps: the path of the special's own travel and the stick most held during it. A
+/// special that does not move keeps nothing.
+#[test]
+fn a_specials_own_travel_is_kept_on_its_press() {
+    let steered = recorded_cast(STEERED_CAST);
+    let kept = steered.travel(0, 0).expect("the travel is on the B press");
+    assert_eq!(kept.stick, Some((1350, 100)), "up-left was held for all but the first three frames");
+    assert_eq!(kept.path[7], (18, 47), "where the rise ended, forward and up");
+    assert!((680..=700).contains(&kept.heading) && (500..=512).contains(&kept.distance), "{kept:?}");
+    assert_eq!(recorded_cast(STRAIGHT_CAST).travel(0, 0).and_then(|kept| kept.stick), Some((0, 0)), "no direction held");
+    let still = Cast { path: |_| (0.0, 0.0), stick: UP_LEFT };
+    assert_eq!(recorded_cast(still).travel(0, 0), None, "a special that does not move has no path");
+}
+
+/// EXPECTED RED. With *Match angle and deflection* On the press's stick is graded as an aim's is, when the paths
+/// differ by more than the floor: half a tilt in the same direction reads the deflection.
+#[test]
+fn the_stick_toggle_also_grades_a_steered_specials_stick() {
+    let drill = recorded_cast(STEERED_CAST);
+    let half = Cast { stick: (-45, 45), ..STRAIGHT_CAST };
+    assert!(attempted_cast(drill, half, false).clean, "the same 8-way direction, toggle Off");
+    let result = attempted_cast(drill, half, true);
+    assert!(!result.clean);
+    assert_eq!(why(&result), "L1 Special deflection 47% low");
+}
+
+/// EXPECTED RED. The press's travel is written in the same optional keys as an aim's, and the drill stays version 2.
+#[test]
+fn a_press_keeps_its_own_travel_in_optional_keys() {
+    use crate::model::combo_record::ComboRecord;
+    let record = ComboRecord::new("Drill".into(), recorded_cast(STEERED_CAST), None);
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["schema_version"], 2);
+    let press = &value["input_steps"][0]["events"][0];
+    assert_eq!((press["kind"].as_str(), press["button"].as_str()), (Some("press"), Some("special")));
+    assert_eq!(press["path"].as_array().map(Vec::len), Some(8), "{press}");
+    assert_eq!(press["stick"], serde_json::json!({"angle": 135.0, "deflection": 100}));
+    assert!(press["heading"].is_number() && press["distance"].is_number());
+    let read: ComboRecord = serde_json::from_value(value).unwrap();
+    assert_eq!(read, record);
+    assert_eq!(read.combo.travel(0, 0), record.combo.travel(0, 0));
+}
+
+/// EXPECTED RED. The four details of a drill are shared. An aim's detail takes the place of a press's path when the
+/// table is full; a press's path never takes an aim's.
+#[test]
+fn an_aims_detail_is_not_displaced_by_a_press_path() {
+    let path = travel((-40, 0), (1800, 100));
+    let detail = travel((-30, 0), (1800, 100));
+    let mut combo = Combo::EMPTY;
+    combo.input_only = true;
+    for i in 0..5 {
+        assert!(combo.push(LinkRec { events: retain([
+            Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: i * 40 },
+            Event { kind: Kind::Aim(1), dir: Dir::Back, offset: i * 40 + 10 },
+        ]), ..LinkRec::INPUT }));
+    }
+    for i in 0..4 { assert!(combo.attach_travel(i, 0, path)); }
+    assert!(!combo.attach_travel(4, 0, path), "a fifth press path is dropped");
+    assert!(combo.attach_travel(0, 1, detail), "an aim's detail takes the place of the last press path");
+    assert_eq!((combo.travel(0, 1), combo.travel(3, 0), combo.travel(2, 0)), (Some(detail), None, Some(path)));
+    for i in 1..4 { assert!(combo.attach_travel(i, 1, detail)); }
+    for i in 0..4 { assert_eq!((combo.travel(i, 1), combo.travel(i, 0)), (Some(detail), None)); }
+    assert!(!combo.attach_travel(4, 1, detail), "a fifth aim detail is dropped");
+    assert!(!combo.attach_travel(4, 0, path), "a press path does not displace an aim's detail");
+}
+
+/// Edge: the travel ends on the very next frame after its step was graded. The grade is amended on that frame.
+#[test]
+fn a_travel_that_ends_the_frame_after_its_step_was_graded_amends_the_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false), (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 5).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1, "step 1 is graded before its travel ends");
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 5 {
+                let result = helper.results().next().map(|r| (r.outcome, r.clean, r.fault));
+                assert_eq!(result, (!clean).then_some((Outcome::Completed, false, Some((0, Reason::AimPath(1))))));
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+/// Edge: *Match angle and deflection* flipped while a drill is being attempted. A step keeps the grade it got under
+/// the setting in force when it was graded; a travel that ends later is graded under the setting in force then.
+#[test]
+fn the_stick_toggle_flipped_mid_drill_applies_from_the_next_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    let off_angle = travel((-40, 0), (1600, 100));
+    // The frame the travel is handed over, the frame the toggle flips, whether it is On before the flip, the result.
+    for (handed, flips, first, clean) in [
+        (4, 5, false, true),
+        (4, 5, true, false),
+        (9, 6, false, false),
+        (9, 6, true, true),
+    ] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        let mut resolved = None;
+        for frame in 0..=44 {
+            helper.settings = Settings { match_stick: first != (frame >= flips), ..Settings::factory() };
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == handed).then_some((1, off_angle)), ..action::Late::NONE
+            }), &mut Out::default());
+            if resolved.is_none() {
+                resolved = helper.results().next().copied();
+            }
+        }
+        let result = resolved.expect("the drill resolved");
+        assert_eq!(result.clean, clean, "handed {handed}, flips {flips}, On first {first}");
+        if !clean {
+            assert_eq!(result.fault, Some((0, Reason::AimAngle(1, -200))));
+        }
+    }
 }
 
 }

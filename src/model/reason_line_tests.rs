@@ -23,6 +23,7 @@ const DELTAS: [i32; 6] = [1, -1, 96, -96, i32::MAX, -i32::MAX];
 fn reasons() -> Vec<Reason> {
     let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
         .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(BUTTONS.iter().map(|&b| Kind::LetGo(b)))
         .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
         .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
     let mut all = vec![Reason::Drop(1), Reason::Drop(96), Reason::MissingCStick];
@@ -44,7 +45,20 @@ fn reasons() -> Vec<Reason> {
     for part in [1, 2] {
         all.extend([Reason::MissingAim(part), Reason::WrongAim(part), Reason::ExtraAim(part)]);
     }
+    // Part 0 is the special's own travel, kept on its press.
+    for part in [0, 1, 2] {
+        all.push(Reason::AimPath(part));
+        // Include the smallest rejected angle and the widest fractional label.
+        all.extend([101, -101, 1799, -1799, -1800].map(|d| Reason::AimAngle(part, d)));
+        all.extend([16, -16, 100, -100].map(|d| Reason::AimDeflection(part, d)));
+    }
+    all.push(Reason::Steer);
     all
+}
+
+/// A travel as its faults name it: an aim part's, or as part 0 the special's own.
+fn ordinal(part: u8) -> &'static str {
+    match part { 0 => "Special", 1 => "1st", _ => "2nd" }
 }
 
 /// The sentence the card owes for a fault, written out here a second time.
@@ -67,6 +81,12 @@ fn sentence(unit: &str, link: u8, reason: Reason) -> String {
         Reason::MissingAim(part) => format!("{} missing", event_label(Kind::Aim(part))),
         Reason::WrongAim(part) => format!("{} wrong", event_label(Kind::Aim(part))),
         Reason::ExtraAim(part) => format!("extra {}", event_label(Kind::Aim(part))),
+        Reason::AimPath(part) => format!("{} path off", ordinal(part)),
+        Reason::AimAngle(part, d) => format!("{} angle {} off", ordinal(part), f32::from(d.unsigned_abs()) / 10.0),
+        Reason::AimDeflection(part, d) => {
+            format!("{} deflection {}% {}", ordinal(part), d.unsigned_abs(), if d < 0 { "low" } else { "high" })
+        }
+        Reason::Steer => "Special steer wrong".to_owned(),
     };
     format!("{unit}{} {fault}", u32::from(link) + 1)
 }
@@ -177,6 +197,7 @@ fn dropped_reason_fits_beside_the_actual_previous_caption() {
 fn every_mark_under_a_step_is_shown_in_full() {
     let kinds = BUTTONS.iter().map(|&b| Kind::Press(b))
         .chain(BUTTONS.iter().map(|&b| Kind::Release(b)))
+        .chain(BUTTONS.iter().map(|&b| Kind::LetGo(b)))
         .chain(FLICKS.iter().map(|&f| Kind::Flick(f)))
         .chain([Kind::CStick, Kind::Aim(1), Kind::Aim(2)]);
     for kind in kinds {
@@ -186,10 +207,78 @@ fn every_mark_under_a_step_is_shown_in_full() {
         marks.extend(DELTAS.iter().map(|&d| {
             (Mark::At(d), format!("{name} {}f {}", d.abs(), if d > 0 { "late" } else { "early" }))
         }));
+        // A travel's own marks: its path, and with the stick toggle its angle and deflection. An aim part keeps one;
+        // so does the press that began a special, which can also be steered wrong.
+        let travel = match kind {
+            Kind::Aim(part) => Some(ordinal(part)),
+            Kind::Press(Button::Special) => Some("Special"),
+            Kind::CStick => Some("C-stick"),
+            _ => None,
+        };
+        if let Some(part) = travel {
+            if !matches!(kind, Kind::Aim(_)) {
+                marks.push((Mark::Steer, format!("{part} steer wrong")));
+            }
+            marks.push((Mark::Path, format!("{part} path off")));
+            marks.extend([(101, "10.1"), (-1799, "179.9"), (-1800, "180")]
+                .map(|(d, deg)| (Mark::Angle(d), format!("{part} angle {deg} off"))));
+            marks.extend([16, -100].map(|d: i8| {
+                (Mark::Deflection(d), format!("{part} deflection {}% {}", d.unsigned_abs(), if d < 0 { "low" } else { "high" }))
+            }));
+        }
         for (mark, want) in marks {
             let (text, _) = crate::model::combo_plan::mark_text(mark, name, 0);
             assert_eq!(String::from_utf16(text.units()).unwrap(), want);
         }
+    }
+}
+
+#[test]
+fn the_widest_fractional_angle_reaches_both_card_panes() {
+    let reference = LinkRec {
+        events: retain([Event { kind: Kind::Aim(2), dir: Dir::Back, offset: 0 }]),
+        ..LinkRec::INPUT
+    };
+    let mut h = Helper::new();
+    h.set_target(Some(Combo { input_only: true, ..Combo::from_links([reference; LINKS]).unwrap() }));
+    let mut g = grade(&reference, &reference);
+    g.marks[0] = Some(Mark::Angle(-1799));
+    h.attempt = Some(Attempt { grades: [Some(g); LINKS], len: LINKS,
+        summary: Some(faulted(15, Reason::AimAngle(2, -1799))), ..Attempt::new(0, false) });
+    let (card, _) = drawn(&h, None);
+    let why = card[at::REASON];
+    check(&String::from_utf16(why.text.units()).unwrap(), why, "S16 2nd angle 179.9 off");
+    let mark = card[at::RULER - 1];
+    assert!(mark.visible);
+    assert_eq!(String::from_utf16(mark.text.units()).unwrap(), "2nd angle 179.9 off");
+}
+
+/// The input-drill card for a special's own travel, kept on its press: the steer fault and the widest of its texts
+/// are drawn whole on the reason pane and on the mark pane, with the step's prefix.
+#[test]
+fn a_steered_specials_faults_reach_both_card_panes() {
+    let reference = LinkRec {
+        events: retain([Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: 0 }]),
+        ..LinkRec::INPUT
+    };
+    for (mark, reason, text) in [
+        (Mark::Steer, Reason::Steer, "Special steer wrong"),
+        (Mark::Path, Reason::AimPath(0), "Special path off"),
+        (Mark::Angle(-1799), Reason::AimAngle(0, -1799), "Special angle 179.9 off"),
+        (Mark::Deflection(100), Reason::AimDeflection(0, 100), "Special deflection 100% high"),
+    ] {
+        let mut h = Helper::new();
+        h.set_target(Some(Combo { input_only: true, ..Combo::from_links([reference; LINKS]).unwrap() }));
+        let mut g = grade(&reference, &reference);
+        g.marks[0] = Some(mark);
+        h.attempt = Some(Attempt { grades: [Some(g); LINKS], len: LINKS,
+            summary: Some(faulted(15, reason)), ..Attempt::new(0, false) });
+        let (card, _) = drawn(&h, None);
+        let why = card[at::REASON];
+        check(&String::from_utf16(why.text.units()).unwrap(), why, &format!("S16 {text}"));
+        let under = card[at::RULER - 1];
+        assert!(under.visible);
+        assert_eq!(String::from_utf16(under.text.units()).unwrap(), text);
     }
 }
 

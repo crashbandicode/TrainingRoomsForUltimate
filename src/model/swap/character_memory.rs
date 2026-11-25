@@ -54,16 +54,23 @@ impl<T: Copy> WaitingChoice<T> {
 /// A waiting player's entry can be destroyed before either a match or a room exit.
 /// Defer that distinction: a match changes the scene; recreating an LDN room can
 /// create new entries with the exact same scene tuple (13.0.5 runtime trace).
+/// The scene tuple cannot show a CSS visit (the melee byte keeps its previous value), but a new room's native body can.
 pub struct WaitingSession<T> {
     choices: [WaitingChoice<T>; 2],
+    /// The native body each role's lobby started from.
+    origins: [Option<T>; 2],
+    /// The next observation is the role's first in a new waiting room of the same lobby.
+    returning: [bool; 2],
     scene: Option<(bool, u8, u32)>,
     player_departed: bool,
 }
 
-impl<T: Copy> WaitingSession<T> {
+impl<T: Copy + PartialEq> WaitingSession<T> {
     pub const fn empty() -> Self {
         Self {
             choices: [WaitingChoice::empty(); 2],
+            origins: [None; 2],
+            returning: [false; 2],
             scene: None,
             player_departed: false,
         }
@@ -78,11 +85,14 @@ impl<T: Copy> WaitingSession<T> {
         let current = lobby(initialized, melee, mode);
         let same_lobby = current.is_some() && self.scene
             .and_then(|(initialized, melee, mode)| lobby(initialized, melee, mode)) == current;
-        for choice in &mut self.choices {
+        for role in 0..self.choices.len() {
             if same_lobby {
-                choice.scene_changed();
+                self.choices[role].scene_changed();
+                self.returning[role] = self.origins[role].is_some();
             } else {
-                choice.clear();
+                self.choices[role].clear();
+                self.origins[role] = None;
+                self.returning[role] = false;
             }
         }
         self.scene = Some((initialized, melee, mode));
@@ -96,18 +106,35 @@ impl<T: Copy> WaitingSession<T> {
         self.player_departed = true;
     }
 
-    /// Called for a newly observed, ready waiting body. Returns whether this is a
-    /// fresh entry lifetime without a match excursion, which forgets BOTH roles.
-    pub fn observe(&mut self, role: usize, fighter: T) -> bool {
-        let fresh = self.player_departed;
-        if fresh {
-            for choice in &mut self.choices {
-                choice.clear();
-            }
-            self.player_departed = false;
+    fn forget(&mut self) {
+        for choice in &mut self.choices {
+            choice.clear();
         }
+        self.origins = [None; 2];
+        self.returning = [false; 2];
+        self.player_departed = false;
+    }
+
+    /// Returns whether this is a fresh lobby: a departed waiting entry or a returning
+    /// native body different from the lobby's origin, which only a new CSS pick makes.
+    /// Either case forgets BOTH roles.
+    pub fn observe(&mut self, role: usize, fighter: T) -> bool {
+        let returned = core::mem::take(&mut self.returning[role]);
+        let fresh = self.player_departed || (returned && self.origins[role] != Some(fighter));
+        if fresh { self.forget(); }
+        if self.origins[role].is_none() { self.origins[role] = Some(fighter); }
         self.choices[role].observe(fighter);
         fresh
+    }
+
+    /// Check a returning body before its exact value is known; a mismatch forgets both roles.
+    /// A match leaves the return pending for the later exact observation and never sets an origin.
+    pub fn arrived(&mut self, role: usize, same: impl FnOnce(&T) -> bool) -> bool {
+        if !self.returning[role] { return false; }
+        let Some(origin) = self.origins[role].as_ref() else { return false; };
+        if same(origin) { return false; }
+        self.forget();
+        true
     }
 
     pub fn commit(&mut self, role: usize, fighter: T) {
@@ -150,11 +177,179 @@ mod tests {
         assert!(!session.restoration_pending([true, true]));
     }
 
+    fn qp_waiting(session: &mut WaitingSession<i32>) {
+        session.scene_changed(true, 0x0d, 0x07010101);
+    }
+
+    fn qp_match_and_return(session: &mut WaitingSession<i32>) {
+        session.scene_changed(true, 0x0e, 0x07010101);
+        qp_waiting(session);
+    }
+
+    fn a_new_pick_after_a_match_forgets_both_roles() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        qp_match_and_return(&mut session);
+        assert!(session.observe(0, 30));
+        assert_eq!(session.restore_target(0), None);
+        assert_eq!(session.restore_target(1), None);
+        assert!(!session.observe(1, 30));
+        assert!(!session.restoration_pending([true, true]));
+
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.commit(1, 6);
+        qp_match_and_return(&mut session);
+        assert_eq!(session.restore_target(0), Some(20));
+        assert!(session.observe(0, 30));
+        assert_eq!(session.restore_target(0), None);
+        assert_eq!(session.restore_target(1), None);
+    }
+
+    fn the_cpu_seen_first_with_the_new_pick_forgets_the_player_too() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.commit(1, 6);
+        qp_match_and_return(&mut session);
+        assert!(session.observe(1, 30));
+        assert_eq!(session.restore_target(0), None);
+        assert!(!session.observe(0, 30));
+    }
+
+    fn the_new_pick_is_the_lobbys_fighter_from_then_on() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        qp_match_and_return(&mut session);
+        assert!(session.observe(0, 30));
+        assert!(!session.observe(1, 30));
+        session.commit(0, 40);
+        qp_match_and_return(&mut session);
+        assert!(!session.observe(0, 30));
+        assert_eq!(session.restore_target(0), Some(40));
+        assert!(!session.observe(1, 30));
+        qp_match_and_return(&mut session);
+        assert!(session.observe(0, 10));
+        assert_eq!(session.restore_target(0), None);
+        assert_eq!(session.restore_target(1), None);
+    }
+
+    fn a_rematch_still_brings_back_both_practice_choices() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.commit(1, 6);
+        for _ in 0..2 {
+            qp_match_and_return(&mut session);
+            assert!(!session.observe(0, 10));
+            assert!(!session.observe(1, 10));
+            assert_eq!(session.restore_target(0), Some(20));
+            assert_eq!(session.restore_target(1), Some(6));
+            session.commit(0, 20);
+            session.commit(1, 6);
+        }
+    }
+
+    fn a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry() {
+        let mut session = WaitingSession::empty();
+        session.scene_changed(true, 0x0d, 0x02010000);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.player_departed();
+        assert!(session.observe(0, 10));
+        assert_eq!(session.restore_target(0), None);
+        assert!(!session.observe(1, 10));
+        session.commit(1, 6);
+        session.scene_changed(true, 0x01, 0x02010000);
+        session.scene_changed(true, 0x0d, 0x02010000);
+        assert!(!session.observe(1, 10));
+        assert_eq!(session.restore_target(1), Some(6));
+    }
+
+    fn a_body_not_yet_known_exactly_decides_on_its_fighter() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.arrived(0, |origin| *origin == 30));
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        qp_match_and_return(&mut session);
+        assert!(!session.arrived(0, |origin| *origin == 10));
+        assert_eq!(session.restore_target(0), Some(20));
+        assert!(!session.observe(0, 10));
+        assert_eq!(session.restore_target(0), Some(20));
+
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        qp_match_and_return(&mut session);
+        assert!(session.arrived(0, |origin| *origin == 30));
+        assert_eq!(session.restore_target(0), None);
+        assert_eq!(session.restore_target(1), None);
+        assert!(!session.observe(0, 31));
+
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        qp_match_and_return(&mut session);
+        assert!(!session.arrived(1, |origin| *origin == 30));
+    }
+
+    fn a_change_of_body_inside_one_waiting_room_is_not_a_new_pick() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(0, 20));
+        session.commit(0, 20);
+        qp_match_and_return(&mut session);
+        assert!(!session.observe(0, 10));
+        assert_eq!(session.restore_target(0), Some(20));
+    }
+
+    /// Parity: Training is outside every waiting lobby, so its scene ends what the memory holds and starts no restore.
+    fn a_training_scene_keeps_nothing_of_the_waiting_memory() {
+        let mut session = WaitingSession::empty();
+        qp_waiting(&mut session);
+        assert!(!session.observe(0, 10));
+        assert!(!session.observe(1, 10));
+        session.commit(0, 20);
+        session.commit(1, 6);
+        assert!(!session.scene_changed(true, 0x20, 0x04040000));
+        assert!(!session.restoration_pending([true, true]));
+        assert!(!session.arrived(0, |origin| *origin == 30));
+        assert!(!session.scene_changed(true, 0x0d, 0x07010101));
+        assert!(!session.observe(0, 30));
+        assert!(!session.observe(1, 30));
+        assert!(!session.restoration_pending([true, true]));
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("disabled_player_restore_does_not_block_cpu_hat_continuation", disabled_player_restore_does_not_block_cpu_hat_continuation as fn()),
+            ("a_new_pick_after_a_match_forgets_both_roles", a_new_pick_after_a_match_forgets_both_roles as fn()),
+            ("the_cpu_seen_first_with_the_new_pick_forgets_the_player_too", the_cpu_seen_first_with_the_new_pick_forgets_the_player_too as fn()),
+            ("the_new_pick_is_the_lobbys_fighter_from_then_on", the_new_pick_is_the_lobbys_fighter_from_then_on as fn()),
+            ("a_rematch_still_brings_back_both_practice_choices", a_rematch_still_brings_back_both_practice_choices as fn()),
+            ("a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry", a_room_recreated_on_the_same_scene_still_forgets_through_its_departed_entry as fn()),
+            ("a_body_not_yet_known_exactly_decides_on_its_fighter", a_body_not_yet_known_exactly_decides_on_its_fighter as fn()),
+            ("a_change_of_body_inside_one_waiting_room_is_not_a_new_pick", a_change_of_body_inside_one_waiting_room_is_not_a_new_pick as fn()),
+            ("a_training_scene_keeps_nothing_of_the_waiting_memory", a_training_scene_keeps_nothing_of_the_waiting_memory as fn()),
         ]);
     }
     }
