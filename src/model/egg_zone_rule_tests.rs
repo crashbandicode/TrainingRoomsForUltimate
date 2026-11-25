@@ -422,4 +422,27 @@ fn the_stage_grows_by_its_two_open_air_ends_only() {
     assert_eq!(std::mem::size_of::<Stage>(), 1080);
     assert_eq!(std::mem::size_of::<Option<Stage>>(), 1080);
 }
+
+#[test]
+fn a_long_move_does_not_pass_through_another_solid() {
+    let mut lines = BATTLEFIELD_LINES.to_vec();
+    lines.extend([
+        ([[55.0, -70.0], [75.0, -70.0]], true, false),
+        ([[75.0, -70.0], [75.0, -90.0]], false, false),
+        ([[75.0, -90.0], [55.0, -90.0]], false, false),
+        ([[55.0, -90.0], [55.0, -70.0]], false, false),
+    ]);
+    let stage = battlefield(&lines);
+    let plain = battlefield(&BATTLEFIELD_LINES);
+    let zone = stage.resolve(Some([128, 0, 0, 255]));
+    assert!(stage.contains(&zone, Side::Right, [82.0, -80.0]));
+    assert!(stage.contains(&zone, Side::Right, [46.0, -80.0]));
+    assert!(!stage.allows_move(&zone, Side::Right, [82.0, -80.0], [46.0, -80.0]));
+    assert!(plain.allows_move(&zone, Side::Right, [82.0, -80.0], [46.0, -80.0]));
+    assert!(stage.allows_move(&zone, Side::Right, [82.0, -80.0], [80.5, -80.0]));
+    for spot in stage.samples(&zone)[5..].iter().flatten()
+        .filter(|spot| (-88.0..=-72.0).contains(&spot[1])) {
+        assert!(spot[0] > 75.0, "{spot:?}");
+    }
+}
 }
