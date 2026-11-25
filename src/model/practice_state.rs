@@ -26,10 +26,9 @@ pub struct Fields {
     /// How a picker's CPU point is shown (`crosshair::cpu_view`): `in_view` or `magnifier`; empty when the CPU's
     /// body is not held there.
     pub wizard_cpu: &'static str,
-    /// Guard the Edge's start options (`edge_juggle::StartOptions`): `on` or `off`, and `kept` or `used`; empty
-    /// for every other game.
-    pub under: &'static str,
-    pub jumps: &'static str,
+    /// Guard the Edge's start options as the running drill took them at Start (`edge_juggle::StartOptions`): under
+    /// the stage allowed, midair jumps used. The settings, not what the game did with them; none for every other game.
+    pub start_options: Option<[bool; 2]>,
     pub wizard_player_point: Option<[f32; 2]>,
     pub wizard_value: Option<u32>,
     pub score: Option<u32>,
@@ -70,13 +69,14 @@ pub fn snapshot(game: Option<Game>, fields: Fields, thinks: [u64; CPU_ENTRIES], 
             ("wizard.step", fields.wizard_step),
             ("wizard.selection", fields.wizard_selection),
             ("wizard.cpu", fields.wizard_cpu),
-            ("under", fields.under),
-            ("jumps", fields.jumps),
             ("last.outcome", fields.last_outcome),
         ] {
             if !value.is_empty() {
                 let _ = writeln!(out, "{key}={value}");
             }
+        }
+        if let Some([under, used]) = fields.start_options {
+            let _ = writeln!(out, "under={}\njumps={}", if under { "on" } else { "off" }, if used { "used" } else { "kept" });
         }
         if let Some([x, y]) = fields.wizard_point {
             let _ = writeln!(out, "wizard.x={x}\nwizard.y={y}");

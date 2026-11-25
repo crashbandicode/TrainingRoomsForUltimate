@@ -400,7 +400,7 @@ fn juggler_ignores_the_two_start_options() {
             }
             let mut fields = Fields::default();
             options.describe(Drill::Juggler, &mut fields);
-            assert_eq!((fields.under, fields.jumps), ("", ""));
+            assert_eq!(fields.start_options, None);
         }
     }
 }
@@ -421,6 +421,10 @@ fn the_drill_state_names_the_two_start_options() {
     assert!(has(&set, "under=on") && has(&set, "jumps=used"), "{set}");
     let default = wire(StartOptions::default());
     assert!(has(&default, "under=off") && has(&default, "jumps=kept"), "{default}");
+    // Every other game, and Juggler, has neither line.
+    let mut none = String::new();
+    snapshot(Some(Game::Juggler), Fields { phase: "live", ..Fields::default() }, [0; CPU_ENTRIES], &mut none);
+    assert!(!none.contains("under=") && !none.contains("jumps="), "{none}");
 }
 
 #[test]

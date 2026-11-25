@@ -907,8 +907,7 @@ impl StartOptions {
     /// Names the options in the drill's bridge state (`under=`, `jumps=`); Juggler has neither.
     pub fn describe(self, drill: Drill, fields: &mut Fields) {
         if drill == Drill::GuardEdge {
-            fields.under = if self.under { "on" } else { "off" };
-            fields.jumps = if self.jumps_used { "used" } else { "kept" };
+            fields.start_options = Some([self.under, self.jumps_used]);
         }
     }
 }
