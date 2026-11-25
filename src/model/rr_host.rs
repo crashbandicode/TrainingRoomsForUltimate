@@ -30,7 +30,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
-use crate::model::record_place::{Commit, Shared, SharedStart};
+use crate::model::record_place::{Commit, Shared};
 use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -1629,14 +1629,14 @@ pub struct PlaceOpen {
     /// The fighter the picker edits first.
     pub edit: Role,
     pub shared: Shared,
-    pub rule: SharedStart,
 }
 
 /// What a confirmed placement did to its save, for the Switch wrapper.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Placed {
-    /// Nothing was written: the save, its copy or the macro's link could not be written, or no visit has this ticket.
-    Refused { ticket: u32 },
+    /// Nothing was written: the save, its copy or the macro's link could not be read or written. `name`: the
+    /// save's, when it could be read.
+    Refused { ticket: u32, name: String },
     /// The save holds the placement (or nothing was edited): the pair to load once, and the notice.
     Saved { ticket: u32, pair: Box<[SavedState; 2]>, notice: String },
 }
@@ -1644,7 +1644,7 @@ pub enum Placed {
 /// The picker confirmed a placement on the save its visit opened: the worker writes it.
 pub fn commit_placement(root: &Path, save: &str, relink: Option<&str>, commit: Commit) -> Placed {
     let _ = (root, save, relink);
-    Placed::Refused { ticket: commit.ticket }
+    Placed::Refused { ticket: commit.ticket, name: String::new() }
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
@@ -2245,6 +2245,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
+        Effect::ChangePlacement { .. } | Effect::ChangeActivePlacement => {}
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
@@ -5814,6 +5815,201 @@ mod tests {
         assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
     }
 
+    /// A save named Jab start (Player 1 at x 10, the CPU at x 50 with 6.3 %), and two macros that start from it;
+    /// the first has an offset of +5.
+    fn placement_library(root: &Path) -> (String, [String; 2]) {
+        let mut cpu = at_x(50.0);
+        (cpu.percent, cpu.fighter_kind) = (6.3, 7);
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Jab start", at_x(10.0), cpu).unwrap()).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let ids = ["Nair", "Fair"].map(|name| {
+            let mut recording = MacroRecording::new(name, "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+            recording.set_start_save(Some(&save)).unwrap();
+            if name == "Nair" {
+                recording.set_placement(Placement { delta_x: 5.0, delta_y: 0.0, ..Placement::default() }).unwrap();
+            }
+            macros.save_new(&recording).unwrap()
+        });
+        (save, ids)
+    }
+
+    /// What the picker confirms on `pair` after `edit`: the fields that differ, as the wizard reports them.
+    fn placed(pair: &[SavedState; 2], copy: bool, macros: u8, edit: impl FnOnce(&mut crate::model::record_place::Setup)) -> Commit {
+        use crate::model::record_place::{saved_fighter, Edits};
+        let was = [saved_fighter(&pair[0]).0, saved_fighter(&pair[1]).0];
+        let mut setup = was;
+        edit(&mut setup);
+        let edits = [0, 1].map(|i| Edits {
+            spot: setup[i].place != was[i].place || setup[i].at != was[i].at,
+            state: setup[i].state != was[i].state,
+            percent: setup[i].percent != was[i].percent,
+        });
+        Commit { ticket: 7, copy, setup, edits, stage: 31, macros }
+    }
+
+    fn saved_pair(root: &Path, id: &str) -> [SavedState; 2] {
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(id).unwrap();
+        [save.player, save.cpu]
+    }
+
+    fn file_bytes(root: &Path, dir: &str, id: &str) -> Vec<u8> {
+        std::fs::read(root.join(dir).join(format!("{id}.json"))).unwrap()
+    }
+
+    /// Operator 2026-11-25: Change placement "should also edit on the save state itself". Only the edited half is
+    /// written, field by field; no macro file is touched, so Play still adds a macro's offset to the new spot.
+    fn a_placement_save_rewrites_only_the_edited_half_of_the_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-change");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id));
+        let pair = saved_pair(&root, &save);
+        let commit = placed(&pair, false, 2, |setup| setup[1].at = [40.0, 0.0]);
+        let done = commit_placement(&root, &save, Some(&macros[0]), commit);
+        let Placed::Saved { ticket, pair: loads, notice } = done else { panic!("{done:?}") };
+        assert_eq!((ticket, notice.as_str()), (7, "Saved · Jab start · 2 macros start here"));
+        let written = saved_pair(&root, &save);
+        assert_eq!(written[0], pair[0], "the half that was not edited is as saved");
+        assert_eq!((written[1].x, written[1].saved_stage), (40.0, Some(31)));
+        // rv-edge-juggle-sol 15:54:53Z: a spot edit keeps the file's own damage, 6.3 and not 6.
+        assert_eq!(written[1].percent.to_bits(), pair[1].percent.to_bits());
+        assert_eq!(*loads, written, "the pair to load once is the file's");
+        assert_eq!(macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)), before, "no macro file is touched");
+        let nair = Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap();
+        let named = NamedSave::new("Jab start", written[0].clone(), written[1].clone()).unwrap();
+        assert_eq!(warp_pair(named, Some((Role::Player, nair.placement)))[0].x, 15.0, "Play still adds the offset");
+        // One macro reads in the singular; a save no macro starts from says nothing of macros.
+        let one = commit_placement(&root, &save, None, placed(&written, false, 1, |setup| setup[0].percent = 20));
+        assert!(matches!(&one, Placed::Saved { notice, .. } if notice == "Saved · Jab start · 1 macro starts here"), "{one:?}");
+        let none = commit_placement(&root, &save, None, placed(&written, false, 0, |setup| setup[0].percent = 30));
+        assert!(matches!(&none, Placed::Saved { notice, .. } if notice == "Saved · Jab start"), "{none:?}");
+        assert_eq!(saved_pair(&root, &save)[0].percent, 30.0);
+        // A save that is gone refuses, by its ticket.
+        assert_eq!(commit_placement(&root, "no-such-save", None, placed(&pair, false, 0, |setup| setup[0].percent = 1)),
+            Placed::Refused { ticket: 7, name: String::new() });
+    }
+
+    fn a_save_with_nothing_edited_writes_no_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-none");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = file_bytes(&root, SAVES_DIR, &save);
+        let pair = saved_pair(&root, &save);
+        // Also when the answer was "copy": with nothing to write there is nothing to copy.
+        for copy in [false, true] {
+            let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, copy, 2, |_| {}));
+            let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+            assert_eq!((notice.as_str(), *loads == pair), ("Nothing changed · Jab start", true));
+        }
+        assert_eq!(file_bytes(&root, SAVES_DIR, &save), before);
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1);
+        assert_eq!(Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap().start_save.as_deref(), Some(save.as_str()));
+    }
+
+    fn the_bound_copy_follows_a_changed_placement() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-bound");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, _) = placement_library(&root);
+        RecordingIndex::update(&root, |index| { index.bind_save(Some(&save), 1)?; Ok(true) }).unwrap();
+        invalidate_bound();
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 50.0);
+        assert!(bound_sync(&root).is_none());
+        let pair = saved_pair(&root, &save);
+        assert!(matches!(commit_placement(&root, &save, None, placed(&pair, false, 0, |setup| setup[1].at = [40.0, 0.0])), Placed::Saved { .. }));
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 40.0, "Load goes to the new spot");
+    }
+
+    /// Operator 2026-11-25, PC5: "copy it for this macro". The copy is a new save; it is written before the macro is
+    /// linked to it, and the save and the other macro are not touched.
+    fn a_copy_is_written_before_the_macro_is_relinked() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-copy");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1]));
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+        assert_eq!(notice, "Saved a copy · Save 1");
+        let library = Library::new(root.join(MACROS_DIR));
+        let copy = library.load(&macros[0]).unwrap().start_save.expect("linked");
+        assert_ne!(copy, save);
+        assert_eq!((saved_pair(&root, &copy)[1].x, loads[1].x), (40.0, 40.0));
+        assert_eq!(library.load(&macros[0]).unwrap().placement.delta_x, 5.0, "the macro keeps its offset");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1])), before);
+        // From the save's own screen a copy is a new save that no macro uses.
+        let own = commit_placement(&root, &save, None, placed(&pair, true, 2, |setup| setup[0].at = [0.0, 0.0]));
+        assert!(matches!(&own, Placed::Saved { notice, .. } if notice == "Saved a copy · Save 2"), "{own:?}");
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 3);
+        assert_eq!(library.load(&macros[1]).unwrap().start_save.as_deref(), Some(save.as_str()));
+        assert_eq!(library.load(&macros[0]).unwrap().start_save.as_deref(), Some(copy.as_str()));
+    }
+
+    /// rv-edge-juggle-sol 16:38:12Z: the second write fails (a directory stands where the macro's temporary file
+    /// goes). The old link stays, the copy does not, and the picker is told the save was not written.
+    fn a_failed_relink_leaves_the_old_link_and_no_copy() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-relink");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)));
+        std::fs::create_dir(root.join(MACROS_DIR).join(format!("{}.json.tmp", macros[0]))).unwrap();
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        assert_eq!(done, Placed::Refused { ticket: 7, name: "Jab start".into() });
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1, "no copy is left");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id))), before);
+        let library = Library::new(root.join(MACROS_DIR));
+        for id in &macros {
+            assert_eq!(library.load(id).unwrap().start_save.as_deref(), Some(save.as_str()));
+        }
+    }
+
+    /// Operator 2026-11-25, PC2: the Replays row "opens the SAME picker", on the start save of the pop-up role's
+    /// active macro (a chain: its macro 1's). The save's own screen and the pop-up open it with no macro to relink.
+    fn the_replays_row_opens_the_active_macros_start_save() {
+        use crate::model::record_place::Shared;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-open");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!((tick.place, tick.notices), (None, vec![PLACE_NO_MACRO]));
+        let (save, macros) = placement_library(&root);
+        // The count is of macro files: a chain that uses one of them is not a third.
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let open = PlaceOpen {
+            save: save.clone(),
+            relink: Some(macros[0].clone()),
+            name: "Jab start".into(),
+            pair: saved_pair(&root, &save),
+            edit: Role::Cpu,
+            shared: Shared { macros: 2, from_macro: true },
+        };
+        assert_eq!(tick.place, Some(open.clone()));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: None });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place, Some(PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: Some(macros[1].clone()) });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place, Some(PlaceOpen { relink: Some(macros[1].clone()), ..open }));
+        post_effect(Effect::ChangePlacement { save: "no-such-save".into(), relink: None });
+        assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
+    }
+
     fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
         use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
         let saved = classify(&RawSlot {
@@ -6738,6 +6934,12 @@ mod tests {
             ("delete_and_edit_reach_the_card", delete_and_edit_reach_the_card as fn()),
             ("the_active_slot_follows_the_bound_save_and_save_writes_it", the_active_slot_follows_the_bound_save_and_save_writes_it as fn()),
             ("edit_placement_targets_the_active_macro_and_play_warps_with_its_offset", edit_placement_targets_the_active_macro_and_play_warps_with_its_offset as fn()),
+            ("a_placement_save_rewrites_only_the_edited_half_of_the_file", a_placement_save_rewrites_only_the_edited_half_of_the_file as fn()),
+            ("a_save_with_nothing_edited_writes_no_file", a_save_with_nothing_edited_writes_no_file as fn()),
+            ("the_bound_copy_follows_a_changed_placement", the_bound_copy_follows_a_changed_placement as fn()),
+            ("a_copy_is_written_before_the_macro_is_relinked", a_copy_is_written_before_the_macro_is_relinked as fn()),
+            ("a_failed_relink_leaves_the_old_link_and_no_copy", a_failed_relink_leaves_the_old_link_and_no_copy as fn()),
+            ("the_replays_row_opens_the_active_macros_start_save", the_replays_row_opens_the_active_macros_start_save as fn()),
             ("switch_on_an_exact_mii_macro_asks_for_that_mii", switch_on_an_exact_mii_macro_asks_for_that_mii as fn()),
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),

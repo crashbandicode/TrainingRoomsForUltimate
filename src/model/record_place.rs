@@ -515,6 +515,8 @@ pub struct Commit {
     pub setup: Setup,
     pub edits: [Edits; 2],
     pub stage: i32,
+    /// The macros that start from the save, as the picker was told: the Saved notice says how many.
+    pub macros: u8,
 }
 
 pub struct Wizard {
@@ -563,7 +565,7 @@ impl Wizard {
 
     /// What a save of this visit writes.
     pub fn commit(&self, ticket: u32, stage: i32) -> Commit {
-        Commit { ticket, copy: self.copy, setup: self.setup, edits: self.edits(), stage }
+        Commit { ticket, copy: self.copy, setup: self.setup, edits: self.edits(), stage, macros: self.shared.map_or(0, |shared| shared.macros) }
     }
 
     /// The main floor's point under the middle of the stage, where a fighter with no floor under it goes on stage.
@@ -2206,7 +2208,9 @@ mod tests {
         assert!(failed.contains("// restriction: place-save-write"));
         let host = include_str!("../runtime/features/recording_host.rs");
         let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(commit.contains("Placed::Refused { ticket } => super::record_place::post_placed(ticket, None)"));
+        // A picker the worker could not reach still hears it: the worker posts the same text itself.
+        assert!(commit.contains("Placed::Refused { ticket, name }") && commit.contains("if !super::record_place::post_placed(ticket, None)"));
+        assert!(commit.contains("record_place::write_not_saved(") && commit.contains("// restriction: place-save-write"));
     }
 
     /// tr-primary-2 2026-11-25 16:48:42Z and 17:50Z: flat BSS, and "on stage reuses the tracing stage". The picker
@@ -2512,7 +2516,7 @@ mod tests {
         wizard_press(&mut w, A);
         wizard_press(&mut w, DPAD_RIGHT);
         let commit = w.commit(9, 31);
-        assert_eq!(commit, Commit { ticket: 9, copy: true, setup: w.setup, edits: w.edits(), stage: 31 });
+        assert_eq!(commit, Commit { ticket: 9, copy: true, setup: w.setup, edits: w.edits(), stage: 31, macros: 2 });
         assert_eq!(commit.edits[0], Edits { spot: true, ..Edits::default() });
     }
 

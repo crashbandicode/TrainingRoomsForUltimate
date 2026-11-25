@@ -142,6 +142,11 @@ pub enum Effect {
     /// X on a drill that kept its take (F10): the host previews frames `0..frames` of macro `source` on Player 1.
     PreviewDrill { source: String, frames: u32, trim: super::trim::Trim },
     DuplicateSave { source: String },
+    /// Change placement on a save (operator 2026-11-25): the host opens the placement picker on it. `relink`: the
+    /// macro whose screen asked (a chain: its macro 1), which a copy of the save is linked to.
+    ChangePlacement { save: String, relink: Option<String> },
+    /// The Replays row: the same picker, on the start save of the pop-up role's active macro.
+    ChangeActivePlacement,
     DeleteSave { source: String },
     /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
     WriteChain { name: String, steps: Vec<String> },

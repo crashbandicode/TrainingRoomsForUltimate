@@ -263,7 +263,14 @@ pub fn service() {
 fn place_commit(root: &Path) {
     let Some((commit, save, relink)) = super::record_place::take_commit() else { return };
     match rr_host::commit_placement(root, &save, relink.as_deref(), commit) {
-        rr_host::Placed::Refused { ticket } => super::record_place::post_placed(ticket, None),
+        rr_host::Placed::Refused { ticket, name } => {
+            // A picker that could not be told still gets the refusal, from here.
+            if !super::record_place::post_placed(ticket, None) {
+                let mut text = String::new();
+                let _ = crate::model::record_place::write_not_saved(&name, &mut text);
+                super::notices::upsert(NOTICE_ID, "Input Recording", &text, 240, NOTICE_COLOR); // restriction: place-save-write
+            }
+        }
         rr_host::Placed::Saved { ticket, pair, notice } => {
             super::record_place::post_placed(ticket, Some(*pair));
             super::notices::upsert(NOTICE_ID, "Change placement", &notice, 240, NOTICE_COLOR);
@@ -284,7 +291,7 @@ fn place_open(open: &rr_host::PlaceOpen) {
         ledge: [p1.1, cpu.1],
         edit: if open.edit == crate::engine::library::Role::Cpu { Who::Cpu } else { Who::P1 },
         shared: open.shared,
-        rule: open.rule,
+        rule: crate::model::record_place::SharedStart::Prompt,
     });
 }
 

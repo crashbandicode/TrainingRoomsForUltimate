@@ -103,9 +103,14 @@ struct Visit {
 /// The engine for the recording worker: tried a few times, never waited for. A fighter frame only ever tries
 /// this lock too, so the worker holding it for a moment costs that frame its step at most.
 fn worker_engine() -> Option<hos_lock::MutexGuard<'static, Engine>> {
-    (0..64).find_map(|_| {
+    (0..96).find_map(|tries| {
         ENGINE.try_lock().or_else(|| {
-            std::thread::yield_now();
+            // A frame holds the engine for a part of its step: first yield, then sleep a millisecond a try.
+            if tries < 64 {
+                std::thread::yield_now();
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
             None
         })
     })
@@ -315,13 +320,14 @@ pub(crate) fn take_commit() -> Option<(Commit, String, Option<String>)> {
 
 /// The worker's answer for the visit `ticket`: the pair it wrote, to load once, or `None` when the save could not
 /// be written. The picker takes it only while that visit still waits. The answer before it is dropped here.
-/// Worker thread.
-pub(crate) fn post_placed(ticket: u32, pair: Option<[SavedState; 2]>) {
+/// False when the engine could not be had: the visit then ends by its own wait. Worker thread.
+pub(crate) fn post_placed(ticket: u32, pair: Option<[SavedState; 2]>) -> bool {
     let answer = Some(Box::new(Answer { ticket, pair }));
-    let Some(mut engine) = worker_engine() else { return };
+    let Some(mut engine) = worker_engine() else { return false };
     let old = core::mem::replace(&mut engine.answer, answer);
     drop(engine);
     drop(old);
+    true
 }
 
 pub fn wizard_active() -> bool {
