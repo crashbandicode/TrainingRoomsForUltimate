@@ -483,6 +483,8 @@ class GateStage(unittest.TestCase):
         if ignore:
             pathlib.Path(root, ".gitignore").write_text(ignore)
         git(root, "add", "-A")
+        git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "-qm", "fixture")
         return root
 
     def test_a_clip_that_git_holds_but_the_work_tree_lacks_passes(self):
@@ -515,8 +517,6 @@ class GateStage(unittest.TestCase):
                 if case in ("modified", "staged"):
                     files[path] = "committed version"
                 root = self.stage(files, ignore=path if case == "ignored" else "")
-                git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-                    "commit", "-qm", "fixture")
                 pathlib.Path(root, path).write_bytes(b"fixture mp4")
                 if case == "staged":
                     git(root, "add", path)
