@@ -294,6 +294,32 @@ fn a_library_write_while_a_macro_plays_is_read_on_the_next_pass() {
 }
 
 #[test]
+fn changing_the_active_selection_does_not_truncate_the_running_macro() {
+    let _guard = HostGuard::new();
+    let f = fixture(false, LoopCount::Finite(1), &[96, 2]);
+    let role = Role::Player;
+    tick(&f.root);
+    chord(role);
+    tick(&f.root);
+    assert_eq!(poll(role).map(|frame| frame.buttons), Some(1));
+    let mut index = RecordingIndex::load(&f.root).unwrap();
+    index.set_active(role, Some(&f.ids[1]), 4).unwrap();
+    index.save(&f.root).unwrap();
+    // The worker holds only 64 frames ahead: exercise the refill, not just that buffered prefix.
+    for i in 1..96 {
+        tick(&f.root);
+        assert_eq!(poll(role).map(|frame| frame.buttons), Some((i % 7 + 1) as u32), "old run at frame {i}");
+    }
+    tick(&f.root);
+    assert_eq!(poll(role), None);
+    chord(role);
+    tick(&f.root);
+    assert_eq!(poll(role).map(|frame| frame.buttons), Some(1));
+    assert_eq!(poll(role).map(|frame| frame.buttons), Some(2));
+    assert_eq!(poll(role), None, "the next chord uses the newly selected two-frame macro");
+}
+
+#[test]
 fn a_same_size_rewrite_outside_the_mod_is_played_by_the_next_start() {
     let _guard = HostGuard::new();
     let f = small(true);
