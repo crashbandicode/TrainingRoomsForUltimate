@@ -76,12 +76,12 @@ pub fn ledge_raise(kind: i32) -> f32 {
 /// The damage a load writes, or `None` to leave the respawn damage (0%). `Random` is uniform between
 /// the lower and upper end of the role's range, in whatever order they are stored (SPEC-state-01 open
 /// question 6: the CPU's ends were passed swapped upstream).
-pub fn load_damage(mode: DamageMode, saved: f32, limits: (u8, u8), rng: &mut Rng) -> Option<f32> {
+pub fn load_damage(mode: DamageMode, saved: f32, limits: (u16, u16), rng: &mut Rng) -> Option<f32> {
     match mode {
         DamageMode::Default => None,
         DamageMode::SaveState => Some(saved),
         DamageMode::Random => {
-            let (low, high) = (f32::from(limits.0.min(limits.1)), f32::from(limits.0.max(limits.1)));
+            let (low, high) = (f32::from(limits.0.min(limits.1)) / 2.0, f32::from(limits.0.max(limits.1)) / 2.0);
             let unit = rng.next_u32() as f32 / (u32::MAX as f32 + 1.0);
             Some(low + (high - low) * unit)
         }

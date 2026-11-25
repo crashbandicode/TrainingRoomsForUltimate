@@ -497,17 +497,17 @@ fn state01_damage_modes() {
     assert_eq!(place::load_damage(DamageMode::Default, 42.0, (0, 150), &mut rng), None);
     assert_eq!(place::load_damage(DamageMode::SaveState, 42.0, (0, 150), &mut rng), Some(42.0));
     for _ in 0..200 {
-        let value = place::load_damage(DamageMode::Random, 42.0, (30, 60), &mut rng).unwrap();
+        let value = place::load_damage(DamageMode::Random, 42.0, (60, 120), &mut rng).unwrap();
         assert!((30.0..=60.0).contains(&value), "{value}");
         // Either order of the stored ends gives the same range (OQ 6).
-        let swapped = place::load_damage(DamageMode::Random, 42.0, (60, 30), &mut rng).unwrap();
+        let swapped = place::load_damage(DamageMode::Random, 42.0, (120, 60), &mut rng).unwrap();
         assert!((30.0..=60.0).contains(&swapped));
     }
     // Per role: the player's mode and range for entry 0, the CPU's for entry 1.
     let s = StateSettings {
         damage_player: DamageMode::SaveState,
         damage_cpu: DamageMode::Random,
-        limits_cpu: (100, 100),
+        limits_cpu: (200, 200),
         ..settings()
     };
     let mut machine = machine_with(saved(0.0, 0.0, 1.0, GROUND, 7), saved(0.0, 0.0, 1.0, GROUND, 7), 0);
@@ -791,6 +791,26 @@ fn state01_suppression_predicates() {
 }
 
 #[test]
+fn damage_range_half_percent_is_applied_on_load() {
+    use model::settings::parse;
+    use serde_json::json;
+
+    let loaded_settings = parse(&json!({
+        "menu": {
+            "save_damage_player": [0, 0, 1],
+            "save_damage_limits_player": [12, 12, 1, 1],
+            "save_damage_cpu": [0, 0, 1],
+            "save_damage_limits_cpu": [12, 12, 1, 1],
+        },
+    }).to_string());
+    assert!(loaded_settings.issues.is_empty(), "{:?}", loaded_settings.issues);
+    let settings = StateSettings::from_snapshot(&loaded_settings.settings.menu);
+    let (player, cpu) = run_ground_load(&mut loaded(), &settings, &mut rng());
+    assert_eq!(player.done.unwrap().damage, Some(12.5));
+    assert_eq!(cpu.done.unwrap().damage, Some(12.5));
+}
+
+#[test]
 fn ice114_damage_cap_state_load() {
     use model::settings::parse;
     use serde_json::json;
@@ -816,6 +836,7 @@ fn state01_settings_default_and_from_the_factory_snapshot() {
     use model::settings::Snapshot;
     let factory = StateSettings::from_snapshot(&Snapshot::factory());
     assert_eq!(factory, StateSettings::default());
+    assert_eq!((u32::from(factory.limits_player.1), u32::from(factory.limits_cpu.1)), (300, 300));
     assert!(!factory.respawn_invincibility, "a missing key loads Off");
     let mut snapshot = Snapshot::factory();
     snapshot.set("save_state_enable", &[0, 1]).unwrap();
@@ -828,7 +849,8 @@ fn state01_settings_default_and_from_the_factory_snapshot() {
     snapshot.set("randomize_slots", &[1, 0, 0, 0, 3]).unwrap();
     let read = StateSettings::from_snapshot(&snapshot);
     assert!(!read.enable && read.autoload && read.respawn_invincibility);
-    assert_eq!((read.slot, read.mirroring, read.damage_cpu, read.limits_cpu), (2, Mirroring::Alternate, DamageMode::Random, (10, 20)));
+    assert_eq!((read.slot, read.mirroring, read.damage_cpu), (2, Mirroring::Alternate, DamageMode::Random));
+    assert_eq!((u32::from(read.limits_cpu.0), u32::from(read.limits_cpu.1)), (20, 40));
     assert_eq!(read.randomize, Weights([1, 0, 0, 0, 3]));
 }
 

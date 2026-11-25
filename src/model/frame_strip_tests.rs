@@ -881,6 +881,31 @@ fn the_tracker_hands_over_a_travel_when_its_part_ends() {
     assert_eq!(tracker.late().travel, None);
 }
 
+/// A special that travels inside its start status has no aim part (rule D); its own travel is handed over as part 0
+/// with the press that began it, on the frame the special ends.
+fn the_tracker_hands_over_a_specials_own_travel_with_its_press() {
+    let mut tracker = Tracker::new();
+    let stood = |y: f32| Sample { pos: Some((0.0, y)), facing: 1, ..idle() };
+    for _ in 0..3 {
+        tracker.step(stood(0.0), idle(), NONE);
+    }
+    tracker.step(stood(0.0), idle(), MappedInputs { buttons: 0x2, lstick_y: 100, ..NONE });
+    let press = tracker.frame();
+    let stick = MappedInputs { lstick_x: -100, lstick_y: 100, ..NONE };
+    for motion in 0..10 {
+        tracker.step(Sample { pos: Some((0.0, 3.0 * (motion + 1) as f32)), facing: 1, airborne: true,
+            ..attack(Move::UpSpecial, 0x1de, motion as f32) }, idle(), stick);
+        assert_eq!(tracker.late().travel, None);
+    }
+    tracker.step(stood(30.0), idle(), stick);
+    let (part, travel) = tracker.late().travel.unwrap();
+    assert_eq!((part, tracker.late().press), (0, press));
+    assert_eq!((travel.heading, travel.stick, travel.path[7]), (900, Some((1350, 100)), (0, 30)));
+    assert!(tracker.snaps().all(|snap| snap.aim.part == 0), "no aim event");
+    tracker.step(stood(30.0), idle(), stick);
+    assert_eq!(tracker.late().travel, None);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -927,6 +952,7 @@ fn case_table() {
         ("no_fighter_table_is_left", no_fighter_table_is_left as fn()),
         ("the_tracker_reports_an_action_when_it_opens", the_tracker_reports_an_action_when_it_opens as fn()),
         ("the_tracker_hands_over_a_travel_when_its_part_ends", the_tracker_hands_over_a_travel_when_its_part_ends as fn()),
+        ("the_tracker_hands_over_a_specials_own_travel_with_its_press", the_tracker_hands_over_a_specials_own_travel_with_its_press as fn()),
         ("the_runtime_reads_the_angle_and_the_travel_behind_their_gates", the_runtime_reads_the_angle_and_the_travel_behind_their_gates as fn()),
     ]);
 }

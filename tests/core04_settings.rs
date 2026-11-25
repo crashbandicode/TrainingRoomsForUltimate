@@ -308,6 +308,80 @@ fn core04_slider_rows() {
 }
 
 #[test]
+fn damage_half_slider_codec() {
+    assert_eq!(settings::half_ends(&[12, 150, 1, 0]), (25, 300));
+    assert_eq!(settings::half_ends(&[20, 140]), (40, 280));
+    assert_eq!(settings::half_ends(&[12]), (24, 0));
+    assert_eq!(settings::half_ends(&[12, 150, 5, 0]), (25, 300));
+    assert_eq!(settings::half_row(25, 300), ([12, 150, 1, 0], 4));
+    let (row, len) = settings::half_row(40, 280);
+    assert_eq!(len, 2);
+    assert_eq!(&row[..len], &[20, 140]);
+    let mut text = String::new();
+    settings::write_half(25, &mut text).unwrap();
+    assert_eq!(text, "12.5");
+    text.clear();
+    settings::write_half(24, &mut text).unwrap();
+    assert_eq!(text, "12");
+}
+
+#[test]
+fn old_whole_percent_file_loads_and_saves_without_doubling() {
+    use model::state::settings::StateSettings;
+
+    let cpu = "save_damage_limits_cpu";
+    let player = "save_damage_limits_player";
+    let input = json!({
+        "menu": {cpu: [20, 140], player: [0, 255]},
+        "defaults_menu": {cpu: [20, 140], player: [0, 255]},
+    });
+    let loaded = parse(&input.to_string());
+    assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+    let typed = StateSettings::from_snapshot(&loaded.settings.menu);
+    assert_eq!((u32::from(typed.limits_cpu.0), u32::from(typed.limits_cpu.1)), (40, 280));
+    assert_eq!((u32::from(typed.limits_player.0), u32::from(typed.limits_player.1)), (0, 510));
+    let text = loaded.settings.to_json();
+    let written: Value = serde_json::from_str(&text).unwrap();
+    for snapshot in ["menu", "defaults_menu"] {
+        assert_eq!(written[snapshot][cpu], input[snapshot][cpu]);
+        assert_eq!(written[snapshot][player], input[snapshot][player]);
+    }
+    let again = parse(&text);
+    assert_eq!(again, loaded);
+    assert_eq!(again.settings.to_json(), text);
+
+    for (source, canonical) in [
+        (json!([12, 150, 1, 0]), json!([12, 150, 1, 0])),
+        (json!([12, 150, 0, 0]), json!([12, 150])),
+    ] {
+        let loaded = parse(&json!({"menu": {cpu: source}, "defaults_menu": {cpu: source}}).to_string());
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+        let written: Value = serde_json::from_str(&loaded.settings.to_json()).unwrap();
+        assert_eq!(written["menu"][cpu], canonical);
+        assert_eq!(written["defaults_menu"][cpu], canonical);
+    }
+    for (id, value, reason) in [
+        (cpu, json!([0, 150, 2, 0]), Reason::ElementAboveMax),
+        (cpu, json!([0, 150, 0, 1]), Reason::ElementAboveMax),
+        (player, json!([0, 255, 0, 1]), Reason::ElementAboveMax),
+        (cpu, json!([12, 12, 1, 0]), Reason::BadSliderRange),
+        (cpu, json!([1, 2, 3]), Reason::BadDamageRangeLength),
+        (cpu, json!([5]), Reason::BadDamageRangeLength),
+    ] {
+        let (_, def) = settings::def(id).unwrap();
+        assert_eq!(settings::parse_row(def, &value), Err(reason.clone()), "{id} {value}");
+        let loaded = parse(&json!({"menu": {id: value}, "defaults_menu": {id: value}}).to_string());
+        assert_eq!(loaded.issues.len(), 2, "{id} {value}");
+        for (issue, snapshot) in loaded.issues.iter().zip(["menu", "defaults_menu"]) {
+            assert_eq!(issue.at, format!("{snapshot}.{id}"));
+            assert_eq!(issue.reason, reason);
+        }
+        assert_eq!(loaded.settings.menu.get(id), Some(def.default));
+        assert_eq!(loaded.settings.defaults.get(id), Some(def.default));
+    }
+}
+
+#[test]
 fn ice114_damage_cap_settings_roundtrip() {
     let player = "save_damage_limits_player";
     let cpu = "save_damage_limits_cpu";

@@ -1013,15 +1013,15 @@ impl RecordingScreens {
             let group = if self.tab() == 0 { SAVES_MACROS } else { COMBOS_SEQ };
             let cpu = self.popup_role == ViewRole::Cpu;
             match (group, self.current_section(face, group), cpu) {
-                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
-                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   ZR role   ZL+Up/Down page   B close",
                 (SAVES_MACROS, _, false) => {
-                    "A set active   X loop   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
+                    "A set active   X loop   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close"
                 }
-                (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   ZR role   ZL+Up/Down page   B close",
                 _ if self.drill_take(face, group).is_some() =>
-                    "A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
-                _ => "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
+                    "A drill   X preview   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
+                _ => "A drill   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
             }
         } else if page_group.is_some_and(|group| self.drill_take(Face::Page, group).is_some()) {
             "A open   X preview   ZR role   L/R page   B close"
@@ -1114,9 +1114,8 @@ impl RecordingScreens {
             Button::B if self.place(Face::Popup, group).drills => self.toggle_drills(Face::Popup, group),
             Button::B => self.popup_open = false,
             Button::Y => return false,
-            Button::L => self.set_popup_role(ViewRole::Player),
-            Button::R => self.set_popup_role(ViewRole::Cpu),
-            Button::ZL | Button::ZR => self.toggle_tab(),
+            Button::ZR => self.set_popup_role(self.popup_role.other()),
+            Button::ZL | Button::L | Button::R => self.toggle_tab(),
             Button::X => {
                 if self.in_macros(Face::Popup, group) {
                     self.cycle_x(self.popup_role);
@@ -2381,7 +2380,7 @@ fn event_token(event: super::combo::Event) -> String {
         Kind::Press(Button::Special) => with_dir(event.dir, "B"),
         Kind::Press(Button::Shield) => "shield".to_string(),
         Kind::Press(Button::Grab) => "grab".to_string(),
-        Kind::Release(_) => "release".to_string(),
+        Kind::Release(_) | Kind::LetGo(_) => "release".to_string(),
         Kind::CStick => with_dir(event.dir, "c-stick"),
         Kind::Flick(Flick::FastFall) => with_dir(event.dir, "flick"),
         Kind::Flick(Flick::Dash) => with_dir(event.dir, "dash"),
@@ -2628,12 +2627,91 @@ mod tests {
         assert_eq!(screens.tab(), 0, "Up does not enter the tab row");
         screens.press_popup(Button::ZL);
         assert_eq!(screens.tab(), 1);
-        screens.press_popup(Button::ZR);
-        assert_eq!(screens.tab(), 0);
         screens.press_popup(Button::L);
+        assert_eq!(screens.tab(), 0);
+        screens.press_popup(Button::ZR);
+        assert_eq!(screens.role(Face::Popup), ViewRole::Cpu);
+        screens.press_popup(Button::ZR);
         assert_eq!(screens.role(Face::Popup), ViewRole::Player);
         screens.press_popup(Button::B);
         assert!(!screens.popup_open());
+    }
+
+    fn popup_zr_toggles_the_role_like_the_page() {
+        for waiting_room in [false, true] {
+            for presses in [0, 1, 2, 3] {
+                let env = Env { waiting_room, ..Env::default() };
+                let mut page = Menu::new(Settings::factory(), env);
+                let mut popup = Menu::new(Settings::factory(), env);
+                to_recording(&mut page);
+                popup.on_request(Request::RecordingPopup);
+                let page_popup = page.recording().role(Face::Popup);
+                let popup_page = popup.recording().role(Face::Page);
+                for _ in 0..presses {
+                    page.press(Button::ZR);
+                    popup.press(Button::ZR);
+                }
+                assert_eq!(page.recording().role(Face::Page), popup.recording().role(Face::Popup));
+                assert_eq!(page.recording().role(Face::Popup), page_popup);
+                assert_eq!(popup.recording().role(Face::Page), popup_page);
+            }
+        }
+    }
+
+    fn popup_l_r_zl_switch_tabs_and_never_set_the_role() {
+        for waiting_room in [false, true] {
+            let mut menu = Menu::new(Settings::factory(), Env { waiting_room, ..Env::default() });
+            menu.on_request(Request::RecordingPopup);
+            for button in [Button::L, Button::R, Button::ZL] {
+                menu.press(button);
+                assert_eq!((menu.recording().tab(), menu.recording().role(Face::Popup)), (1, ViewRole::Player));
+                menu.press(button);
+                assert_eq!((menu.recording().tab(), menu.recording().role(Face::Popup)), (0, ViewRole::Player));
+            }
+            menu.press(Button::ZR);
+            assert_eq!((menu.recording().tab(), menu.recording().role(Face::Popup)), (0, ViewRole::Cpu));
+            for button in [Button::L, Button::R, Button::ZL] {
+                menu.press(button);
+                assert_eq!((menu.recording().tab(), menu.recording().role(Face::Popup)), (0, ViewRole::Cpu));
+            }
+            menu.press(Button::ZR);
+            assert_eq!((menu.recording().tab(), menu.recording().role(Face::Popup)), (0, ViewRole::Player));
+        }
+    }
+
+    fn popup_footer_names_zr_role_and_tab_keys() {
+        let mut s = screens();
+        open_popup(&mut s);
+        let mut drill = s.catalog.combos[0].clone();
+        drill.id = "preview-drill".into();
+        drill.input_only = true;
+        drill.take = Some("preview-take".into());
+        s.catalog.combos.push(drill);
+        s.takes.push(("preview-take".into(), 25));
+        for (tab, section, preview) in [(0, 0, false), (0, 1, false), (1, 0, false),
+            (1, 1, false), (1, 1, true)] {
+            s.popup_tab = tab;
+            let group = if tab == 0 { SAVES_MACROS } else { COMBOS_SEQ };
+            s.set_cursor(Face::Popup, group, section, 0);
+            if preview {
+                s.place_mut(Face::Popup, group).drills = true;
+                let at = s.items(Face::Popup, group, section).iter()
+                    .position(|item| item.id == "preview-drill").unwrap();
+                s.set_cursor(Face::Popup, group, section, at);
+            }
+            let hint = s.hint(Face::Popup);
+            assert!(hint.contains("ZL/L/R tab   ZR role"), "{hint}");
+            assert!(!hint.contains("L/R role"), "{hint}");
+            if preview { assert!(hint.contains("X preview"), "{hint}"); }
+        }
+        s.set_popup_role(ViewRole::Cpu);
+        for section in [0, 1] {
+            s.set_cursor(Face::Popup, SAVES_MACROS, section, 0);
+            let hint = s.hint(Face::Popup);
+            assert!(hint.contains("ZR role"), "{hint}");
+            assert!(!hint.contains("tab"), "{hint}");
+            assert!(!hint.contains("L/R role"), "{hint}");
+        }
     }
 
     fn paging_moves_one_section_by_twelve() {
@@ -3566,7 +3644,7 @@ mod tests {
         m.recording_mut().set_catalog(catalog);
         if face == Face::Popup {
             m.on_request(Request::RecordingPopup);
-            m.press(Button::ZR);
+            m.press(Button::ZL);
             let rows = m.recording().section(face, COMBOS_SEQ, 1).rows;
             let at = rows.iter().position(|row| row.name == "DRILLS >").unwrap();
             m.recording_mut().set_cursor(face, COMBOS_SEQ, 1, at);
@@ -3792,7 +3870,7 @@ mod tests {
             assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)), if face == Face::Page {
                 "A open   X preview   ZR role   L/R page   B close"
             } else {
-                "A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
+                "A drill   X preview   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close"
             });
             assert!(!screens.combo_lines("d-own").iter().any(|line| line.text == "Re-record to preview"));
             if face == Face::Page {
@@ -3811,7 +3889,7 @@ mod tests {
                         assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)), screens.hint(Face::Page));
                     } else {
                         assert_eq!(screens.hint_at(face, Some(COMBOS_SEQ)),
-                            "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close");
+                            "A drill   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close");
                     }
                 }
                 if face == Face::Page {
@@ -3898,6 +3976,9 @@ mod tests {
             ("the_lists_say_loading_until_the_catalog_arrives", the_lists_say_loading_until_the_catalog_arrives as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
+            ("popup_zr_toggles_the_role_like_the_page", popup_zr_toggles_the_role_like_the_page as fn()),
+            ("popup_l_r_zl_switch_tabs_and_never_set_the_role", popup_l_r_zl_switch_tabs_and_never_set_the_role as fn()),
+            ("popup_footer_names_zr_role_and_tab_keys", popup_footer_names_zr_role_and_tab_keys as fn()),
             ("paging_moves_one_section_by_twelve", paging_moves_one_section_by_twelve as fn()),
             ("library_lists_wrap_at_their_edges", library_lists_wrap_at_their_edges as fn()),
             ("holding_down_on_the_recording_lists_quickens", holding_down_on_the_recording_lists_quickens as fn()),

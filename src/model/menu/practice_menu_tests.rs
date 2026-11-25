@@ -735,7 +735,7 @@ fn recording_popup_over_a_kept_game_screen_is_the_popup_alone() {
     assert_eq!(actual.rows, expected.rows);
     assert!(actual.rows.iter().all(|r| !matches!(r.label.string_lossy().as_str(), "Start" | "Stop")));
     assert_eq!(actual, expected);
-    for button in [Button::Down, Button::R] {
+    for button in [Button::Down, Button::ZR] {
         m.press(button);
         plain.press(button);
     }
@@ -823,7 +823,7 @@ fn recording_popup_reopens_on_the_role_picked_last() {
     let mut held = None;
     let m = keeper.open(&mut held, live.clone(), Env::default());
     m.on_request(crate::model::chords::Request::RecordingPopup);
-    m.press(Button::R);
+    m.press(Button::ZR);
     assert!(m.save_roles(&mut live));
     assert!(!m.save_roles(&mut live));
     m.press(Button::B);
@@ -844,7 +844,7 @@ fn recording_popup_reopens_on_the_role_picked_last() {
     assert_eq!(m.recording().selection().record_role, ViewRole::Cpu);
     assert_eq!(frame(m).role_tab, Some(1));
     assert_eq!(m.recording().tab_names().len(), 1);
-    m.press(Button::L);
+    m.press(Button::ZR);
     assert!(m.save_roles(&mut live));
     drop(held);
     let live = crate::model::settings::parse(&live.to_json()).settings;
@@ -862,7 +862,7 @@ fn a_role_change_is_saved_without_a_menu_close() {
     let mut held = None;
     let m = keeper.open(&mut held, live.clone(), Env::default());
     m.on_request(crate::model::chords::Request::RecordingPopup);
-    m.press(Button::R);
+    m.press(Button::ZR);
     assert!(m.save_roles(&mut live));
     keeper.drop_model(&mut held);
     let m = keeper.open(&mut held, live, Env::default());
@@ -878,7 +878,7 @@ fn a_held_model_keeps_its_roles_at_a_menu_opening() {
     let mut held = None;
     let m = keeper.open(&mut held, live.clone(), Env::default());
     m.on_request(crate::model::chords::Request::RecordingPopup);
-    m.press(Button::R);
+    m.press(Button::ZR);
     assert!(m.save_roles(&mut live));
     m.press(Button::B);
     let m = keeper.open(&mut held, live, Env::default());
@@ -926,7 +926,7 @@ fn popup_and_page_roles_are_saved_separately() {
         let mut held = None;
         let m = keeper.open(&mut held, live.clone(), Env::default());
         m.on_request(crate::model::chords::Request::RecordingPopup);
-        if popup == ViewRole::Cpu { m.press(Button::R); }
+        if popup == ViewRole::Cpu { m.press(Button::ZR); }
         assert_eq!(m.recording().page_role(), ViewRole::Player);
         m.save_roles(&mut live);
         m.press(Button::B);

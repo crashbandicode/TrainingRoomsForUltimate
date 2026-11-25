@@ -696,8 +696,9 @@ Chooses a new random spot each attempt on **Any**, **Floor**, **Wall** or **Ceil
 attempt; **Auto (approximate)** works out the angle or start position for your spot.
 
 Use **Left / Right** on a setting to choose its mode, or **A** to open its list.
-**A** on its range row opens the slider, **Left / Right**
-chooses a handle, **A** picks it up, the **D-pad** changes it, and **A** puts it down.
+**A** on its range row opens the slider on Min. **Up / Down** choose Min or Max and **A** edits it. While editing,
+**Up** raises and **Down** lowers it by the range's own step; holding speeds up. **A** or **B** puts the handle down;
+**B** again goes back. **Left / Right** do nothing, and Min stays at or below Max.
 Auto is available for **Angle** and **Start position**; the other ranges use Set or Random.
 Auto lands on your spot on floors and platform tops; on walls it can land off your spot or find no solution, and under the stage it can miss by a lot, so use Set or Random there.
 If the chosen values cannot make a launch, the message asks for a different setup.

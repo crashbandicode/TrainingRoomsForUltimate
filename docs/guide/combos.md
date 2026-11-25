@@ -123,6 +123,7 @@ Each event, when `events` is present:
 | `flick` | For a flick: `fast_fall`, `dash` or `tap_jump`. |
 | `part` | For an aim: 1 or 2. |
 | `hold` | For a release whose press is in the same link or drill: how many frames the button was held. Optional; a whole number of 0 or more. The offsets decide the grade, not this value. |
+| `reacted` | This build writes `true` or `false` on each input-drill release: `true` grades its hold; `false` does not. When absent in an older file, an owned hold under eight frames is not graded and a hold of eight or more is graded in its band. Re-record the drill to grade releases by the game's reaction. |
 | `dir` | Facing-relative: `neutral`, `forward`, `forward_up`, `up`, `back_up`, `back`, `back_down`, `down` or `forward_down`. The same combo facing the other way is the same direction. |
 | `offset` | The frame of the event, counted from A₁ the same way a press is. |
 
@@ -144,7 +145,7 @@ so earlier builds can read those fields.
   reason, for example `typo.json skipped: malformed file: bad combo field: to` (a misspelt follow-up move), and adds
   "(+N more)" when there are several. Reasons:
   - a misspelt move, button, aim, event or direction;
-  - a `hold`, `from_shown` or `to_shown` with the wrong shape or invalid members;
+  - a `hold`, `reacted`, `from_shown` or `to_shown` with the wrong shape or invalid members;
   - a missing or empty `links`;
   - more than 16 links, more than 4 presses in `steps`, or more than 12 events;
   - broken JSON;
@@ -165,7 +166,7 @@ Input drills share this folder and the combo id namespace, with default names Dr
 COMBOS > DRILLS. A drill has an explicit kind and input steps: version 2 without aim events, or version 4 with them.
 
 ```json
-{"schema_version":2,"kind":"input_drill","name":"Drill 1","input_steps":[{"events":[{"kind":"press","button":"jump","dir":"neutral","offset":0},{"kind":"release","button":"jump","dir":"neutral","offset":2}]}]}
+{"schema_version":2,"kind":"input_drill","name":"Drill 1","input_steps":[{"events":[{"kind":"press","button":"jump","dir":"neutral","offset":0},{"kind":"release","button":"jump","dir":"neutral","offset":2,"reacted":false}]}]}
 ```
 
 Each step has 1–12 events. There are at most 16 steps, sharing the combo capacity. Event fields use the same kinds and
@@ -174,6 +175,6 @@ facing-relative directions as link events. Offsets are nonnegative frames from t
 a release or first aim does not split on that gap. A second aim starts a step, and a full 12-event step continues in
 another. On load, a step beginning with a release or first aim joins its predecessor if both fit in 12 events; the
 file is not changed by loading. A whole-step crop rebases the retained events from the new first event. No hit, move,
-spot, window or TRUE verdict is stored or graded. A release is required when its press is in the drill. Optional
+spot, window or TRUE verdict is stored or graded. A reacted release is required when its press is in the drill. Optional
 `recorded_on` and `made_from` have the same meaning as on hit combos; direct recordings have no `made_from`.
 Renaming preserves the kind and unknown metadata. Schema-1 files remain readable.
