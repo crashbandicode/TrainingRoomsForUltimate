@@ -547,8 +547,8 @@ doing what the CPU page says; hitting it doesn't count, unless the CPU is the ta
 
 ### Breaks on
 
-Which of Player 1's hits break a target. Projectiles (lasers, arrows, thrown items) never do. Ice Climbers' Nana counts
-as Player 1.
+Which of Player 1's hits break a target. **Breaks on** also applies to Player 1's projectiles and thrown items.
+For Hits of 12%+, use the projectile hit's damage. Ice Climbers' Nana counts as Player 1.
 
 - **Values:** Any attack, Aerials, Hits of 12%+
 - **Default:** Any attack
