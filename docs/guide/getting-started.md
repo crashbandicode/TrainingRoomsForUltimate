@@ -3,7 +3,9 @@
 Install TrainingRooms and start practising. It works in Training and in the waiting rooms of online and local play.
 Which release is current and what is new: [Current release](../CURRENT-RELEASE.md).
 
-<!-- CLIP: tut-menu-tour.mp4 | Training without the menu → B + D-pad Up opens it, R turns through the five pages → B closes it and Mario walks on -->
+<video src="../media/tut-menu-tour.mp4" autoplay muted loop playsinline controls></video>
+
+*B + D-pad Up opens the menu, R turns through the five pages, B closes it and practice goes on. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](../media/tut-menu-tour.mp4)
 
 ## Installing
 

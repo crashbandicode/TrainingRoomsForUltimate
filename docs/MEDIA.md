@@ -4,6 +4,20 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## Tutorial clips (2026-11-25)
+
+MP4 clips named `media/tut-*.mp4`: H.264, 1280×720, 60 fps, no audio, 10 s at most, cut at the ends only. Each was
+filmed whole-screen at 1920×1080 in Eden on the release build `c51f4d81` with the full plugin set of the card, run
+`tut-c51f4d81-yoga-1`. The capture tool draws a small yellow `BRIDGE LIVE` mark at the top of the screen, which a
+player never sees. It is cropped out: the picture is the 1842×1036 region at (39, 44) of the 1080p frame, scaled to
+720p. Where a clip opens or ends in Training with the input display on, that crop also cuts the display's top lane.
+
+| Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
+| --- | --- | --- | ---: | --- | --- |
+| `tut-menu-tour.mp4` | B + D-pad Up opens the menu, R turns through the five pages, B closes it, Mario walks | `t01-menu-tour`, 0.3–9.8 s | 1,301,566 | `866d3984b6c2c2cc` | [Getting started](guide/getting-started.md) |
+| `tut-menu-change-option.mp4` | CPU › Crouch flips On with D-pad Right, the menu closes, the CPU crouches | `t02-menu-change-option`, 1.6–8.6 s | 1,514,380 | `9ef6bc2ccd65da7c` | [Using the menu](guide/using-the-menu.md) |
+| `tut-controls-change-chord.mp4` | Button chords: Save State Save is changed to ZL + D-pad Left, which then saves | `t04-controls-change-chord`, 0.2–7.8 s | 1,867,343 | `4b49a4cb454bea75` | [Controls](guide/controls.md) |
+
 ## rc.15 Stage tech practice (2026-11-17)
 
 `media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,
