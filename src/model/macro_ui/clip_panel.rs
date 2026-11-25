@@ -547,7 +547,7 @@ impl ClipEditor {
     fn start_preview(&mut self) -> ClipEffect {
         self.pause();
         self.window.seek(self.window.start());
-        self.handle = Handle::Playhead;
+        let handle = std::mem::replace(&mut self.handle, Handle::Playhead);
         self.watch_base = self.window.start();
         self.marks.forget_watched(self.window.start(), self.window.end());
         if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {
@@ -561,8 +561,25 @@ impl ClipEditor {
                 self.playing = true;
                 ClipEffect::Preview(Box::new(recording))
             }
-            Err(error) => ClipEffect::Error(error),
+            Err(error) => { self.handle = handle; ClipEffect::Error(error) }
         }
+    }
+
+    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A
+    /// then restart that move from neutral (`export_move`). `None` without rules.
+    fn move_at(&mut self, at: u32) -> Option<Result<(), String>> {
+        let rules = self.move_rules.as_ref()?;
+        Some(match rules.snap(self.track(), at) {
+            Ok(start) if start.action_frame < self.window.end() => {
+                self.window.set_in(start.frame);
+                self.window.seek(start.frame);
+                self.handle = Handle::In;
+                self.move_start = Some(start);
+                Ok(())
+            }
+            Ok(_) => Err("Move is outside the crop; move Out later".into()),
+            Err(error) => Err(error),
+        })
     }
 
     fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {
@@ -626,13 +643,20 @@ impl ClipEditor {
             ClipAction::Snap => {
                 let boundary = match self.handle {
                     Handle::Playhead => return ClipEffect::Error("Press L for the start or R for the end, then Y to snap".into()),
-                    Handle::In => self.marks.snap_in(self.window.start()),
+                    Handle::In => self.marks.snap_in(self.move_start.map_or(self.window.start(), |start| start.action_frame)),
                     Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),
                 };
                 let Some(boundary) = boundary else { return ClipEffect::Error("No move marks yet: X previews and marks them".into()) };
                 self.pause();
                 match self.handle {
-                    Handle::In => { self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start()); }
+                    Handle::In => {
+                        self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start());
+                        // A mark is where a button was pressed, seldom an idle frame: take the move there, as the lead-in does.
+                        if self.file.is_none() && self.track().frames.get(boundary as usize)
+                            .is_some_and(|frame| !self.clean_statuses.contains(&frame.start.status)) {
+                            if let Some(Err(error)) = self.move_at(boundary) { return ClipEffect::Error(error); }
+                        }
+                    }
                     Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }
                     Handle::Playhead => {}
                 }
@@ -699,25 +723,18 @@ impl ClipEditor {
             }
             ClipAction::UseLeadIn => {
                 self.pause();
-                if let Some(rules) = &self.move_rules {
-                    // Repeated presses keep the same move, rather than treating
-                    // its included setup as a request for the preceding move.
-                    let requested = self.move_start.map_or(self.window.start(), |s| s.action_frame);
-                    match rules.snap(self.track(), requested) {
-                        Ok(start) if start.action_frame < self.window.end() => {
-                            self.window.set_in(start.frame);
-                            self.window.seek(start.frame);
-                            self.handle = Handle::In;
-                            self.move_start = Some(start);
-                        }
-                        Ok(_) => return ClipEffect::Error("Move is outside the crop; move Out later".into()),
-                        Err(error) => return ClipEffect::Error(error),
-                    }
-                } else if let Some(start) = self.track().previous_clean_start(self.window.start(), &self.clean_statuses) {
-                    self.window.set_in(start);
-                    self.window.seek(start);
-                    self.handle = Handle::In;
-                } else { return ClipEffect::Error("No earlier idle/fall start in this capture".into()); }
+                // Repeated presses keep the same move, rather than treating
+                // its included setup as a request for the preceding move.
+                let requested = self.move_start.map_or(self.window.start(), |s| s.action_frame);
+                match self.move_at(requested) {
+                    Some(Ok(())) => {}
+                    Some(Err(error)) => return ClipEffect::Error(error),
+                    None => if let Some(start) = self.track().previous_clean_start(self.window.start(), &self.clean_statuses) {
+                        self.window.set_in(start);
+                        self.window.seek(start);
+                        self.handle = Handle::In;
+                    } else { return ClipEffect::Error("No earlier idle/fall start in this capture".into()); }
+                }
             }
             ClipAction::Confirm => {
                 self.pause();
