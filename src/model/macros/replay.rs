@@ -18,6 +18,9 @@ pub struct ReplayTrack {
     pub frames: Vec<ReplayFrame>,
     /// Some observed analog values needed rounding to controller resolution.
     pub quantized_analog: bool,
+    /// The identity of the entry's fighter, read once with the capture (its first frame's fighter); none in a
+    /// capture taken before it was read.
+    pub fighter: Option<crate::model::move_names::FighterId>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -101,8 +104,11 @@ impl ReplayTrack {
             return Err("Window crosses a fighter transformation; select one fighter form.".into());
         }
         let inputs: Vec<InputFrame> = selected.iter().map(|f| f.input).collect();
-        MacroRecording::new(name, game_version, start, inputs)
-            .map_err(|e| e.to_string())
+        let mut recording = MacroRecording::new(name, game_version, start, inputs).map_err(|e| e.to_string())?;
+        // The identity is the first frame's fighter: a later form of the entry has none.
+        recording.recorded_fighter = self.fighter.filter(|_|
+            self.frames.first().is_some_and(|first| first.start.fighter_kind == start.fighter_kind));
+        Ok(recording)
     }
 }
 
@@ -112,7 +118,7 @@ mod tests {
     use super::*;
 
     fn track() -> ReplayTrack {
-        ReplayTrack { entry: 1, quantized_analog: false,
+        ReplayTrack { fighter: None, entry: 1, quantized_analog: false,
             frames: (0..12).map(|i| ReplayFrame {
                 input: InputFrame { buttons: if i == 3 { 513 } else { 0 }, ..InputFrame::default() },
                 start: StartState { status: if (4..9).contains(&i) { 44 } else { 14 },

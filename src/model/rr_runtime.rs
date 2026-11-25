@@ -114,6 +114,8 @@ pub struct Capture {
     frames: Vec<InputFrame>,
     /// The action spans the watch logged while this take was open (Marks::capture).
     spans: Vec<Span>,
+    /// The recorded role's fighter, as its take start read it (`MacroRecording::recorded_fighter`).
+    fighter: Option<crate::model::move_names::FighterId>,
 }
 
 impl Capture {
@@ -123,11 +125,16 @@ impl Capture {
             role: Role::Player,
             frames: Vec::new(),
             spans: Vec::new(),
+            fighter: None,
         }
     }
 
     pub fn set_spans(&mut self, spans: &[Span]) {
         self.spans = spans.to_vec();
+    }
+
+    pub fn set_fighter(&mut self, fighter: Option<crate::model::move_names::FighterId>) {
+        self.fighter = fighter;
     }
 
     pub fn role(&self) -> Role {
@@ -225,6 +232,7 @@ pub fn finish_recording(
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = capture.fighter;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
@@ -242,6 +250,11 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. `None` when no frame is left.
 pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: crate::model::trim::Trim, at: u64, spans: &[Span]) -> Result<Option<String>, Error> {
+    save_drill_take_of(root, frames, start, trim, at, spans, None)
+}
+
+/// The same, for a take whose recorded fighter is known (`MacroRecording::recorded_fighter`).
+pub fn save_drill_take_of(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: crate::model::trim::Trim, at: u64, spans: &[Span], fighter: Option<crate::model::move_names::FighterId>) -> Result<Option<String>, Error> {
     let (frames, marks) = finish_take(frames, spans, trim);
     if frames.is_empty() {
         return Ok(None);
@@ -250,6 +263,7 @@ pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, 
     let name = drill_take_name(drill_take_key(&frames, at));
     let mut recording = MacroRecording::new(name, "13.0.5", start, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = fighter;
     macros.save_new(&recording).map_err(record).map(Some)
 }
 
@@ -363,7 +377,7 @@ pub enum Generated { Macro(String), Pass(super::rr_host::MakeAsk) }
 pub fn generate(root: &Path, recording: MacroRecording, typed: &str, make: crate::model::recording_menu::Make, role: Role, at: u64) -> Result<Generated, Error> {
     use crate::model::recording_menu::Make;
     if make == Make::Drill {
-        let source = save_drill_take(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[])?
+        let source = save_drill_take_of(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[], recording.recorded_fighter)?
             .ok_or_else(|| Error::Record(EMPTY_RECORDING.into()))?;
         return Ok(Generated::Pass(super::rr_host::MakeAsk { source, role, drill: Some(typed.trim().into()) }));
     }
@@ -2030,6 +2044,7 @@ mod tests {
                 index.set_active(opposite, Some(&other), 1).unwrap();
                 index.save(&root).unwrap();
                 let track = |entry: i32, base: u32| ReplayTrack {
+                    fighter: None,
                     entry, quantized_analog: false,
                     frames: (0..3).map(|i| ReplayFrame { input: frame(base + i),
                         start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),

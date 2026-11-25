@@ -80,10 +80,16 @@ the number of files, such as "Save states & Macros (7)".
 
 2026-11-24. **RECORDINGS >** is the first row of MACROS on the Recording page, in either view. It opens the latest and
 previous Vault captures and saved captures, with their fighter sides and length; B returns to MACROS. A capture's
-screen has **Inputs from**, **Plays on**, **Play back**, **Make macro…**, **Make combo…**, and **Make drill…**.
+screen has **Inputs from**, **Plays on**, **Play back**, **Make macro…**, **Make combo…**, **Make drill…**, and
+**Delete**.
 Choose the recorded side and whether the inputs play on Player 1 or the CPU. Play back opens the clip editor and
 starts its preview. Make macro saves the selected clip as that role's active macro. Make combo plays it on that role
 to capture a combo, or an input drill when no hit is made. Make drill always saves an input drill and its take.
+
+2026-11-25. **Delete** removes the capture at once, without asking, as it does for a macro. A saved capture's files go
+from the card; a Vault capture is dropped for this boot. Macros, combos and drills you already made from it stay, and
+the game's own replay in the Vault is untouched. If the delete cannot start, the capture stays in the list as it was;
+it is never left there half-deleted. Not yet seen in a game.
 
 In the waiting room an opening first lets the CPU finish what it is doing. Until then the row reads
 **Waiting for the CPU…** and only B acts: it cancels the opening and leaves the screen up. If the CPU is still busy
@@ -102,7 +108,7 @@ don't turn the page while a file's screen is open.
 | --- | --- |
 | Save state | Bind to Save / Load, Duplicate, Rename, Delete |
 | Macro | Start save (only if it has one), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
-| Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill… |
+| Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill…, Delete |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
 | Input drill | Drill, Made from (only if made from a macro or chain), Rename, Trim, Crop, Delete |
@@ -268,6 +274,9 @@ Turns part of a saved match into a macro. It lists the captures you have: "Lates
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
 its name and its length in frames ("(partial)" if it ended early).
 
+2026-11-25. Y deletes the capture under the cursor, at once and without asking; the list stays open and the cursor
+returns to its first row. Deleting the last one closes the window. Not yet seen in a game.
+
 Pick one with A. If the CPU isn't the fighter it was recorded on, Fighter Mismatch may ask first
 ([Ask before switching fighter](#ask-before-switching-fighter)). Then the menu closes and the clip editor takes the
 controller. The editor is a strip over the bottom of the screen: the game keeps running above it, so you see both
@@ -294,8 +303,12 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 **Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
 
 - A macro recorded on this build keeps its moves in its file (the optional `actions` key: each move's start frame, the first frame the fighter could act again, and the move), so the marks are there when the editor opens.
+- 2026-11-25: a mark also keeps which form of the move it was, as a combo link does. `variant` is the first, second or third jab, the rapid jab or its finisher, or which aerial, grab or throw. `angle` is a side tilt or side smash aimed up or down. A take saved before that has neither and still loads.
 - If automatic trim cuts off a move's known end, its band ends at the end of the saved take. A move whose end was never observed still has no end mark.
 - An older macro and a Replay window capture show a tick for every press, C-stick input or flick that starts a move. Their ends and names appear as a preview plays past them.
+- With [Move names](#move-names) On, a mark reads as the combo and drill lists do: "Jab 1", "Jab 2", "Forward tilt ↑", "Forward air", "Dash grab", and a special by the fighter's own name. A grab that throws reads as the throw. A jab that runs into a rapid jab without restarting reads "Rapid jab". An older take has no forms, so its jab reads "Jab" and its side tilt "Forward tilt".
+- With Move names Off, every mark keeps its short name: "Jab", "Side tilt", "Neutral B".
+- 2026-11-25: a take, and each fighter of a replay capture, stores the fighter it was recorded on (`recorded_fighter`, the key a combo file uses), so its specials read that fighter's own names whoever Player 1 is. A take or capture saved before that has none: its specials take the fighter's own names only while Player 1 is that fighter; otherwise they read "Neutral special", "Side special" and so on. A Mii's specials are named by the selection saved with the take, and by those common names when the take saved none. If you delete the latest Vault capture while its replay is still playing, the rest of the replay becomes a partial capture. Fighters already seen use the same rule as an old capture for their special names.
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
 
@@ -471,7 +484,7 @@ Off: the path is compared without matching the stick. Older drills without trave
 
 On: moves use their common names; specials and Final Smashes use the names in the game's message file when available.
 Saved combos use the recorded fighter's names. Older files without that identity, or an unavailable message file, use
-common names. Off: the short names.
+common names. The Crop editor's move marks use the same names. Off: the short names.
 Pyra and Mythra currently use common special names.
 
 - **Values:** On, Off

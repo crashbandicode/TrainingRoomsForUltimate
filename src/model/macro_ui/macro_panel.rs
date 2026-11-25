@@ -276,6 +276,7 @@ struct MacroNameBody {
     version: String,
     mii: Option<crate::engine::mii::lifetime::Configuration>,
     actions: Vec<crate::engine::macros::ActionMark>,
+    recorded_fighter: Option<crate::model::move_names::FighterId>,
 }
 
 enum NameBody {
@@ -309,6 +310,7 @@ impl NameDraft {
                 version: recording.game_version.clone(),
                 mii: recording.mii,
                 actions: recording.actions.clone(),
+                recorded_fighter: recording.recorded_fighter,
             })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         }
@@ -624,6 +626,7 @@ impl MacroUi {
                 version: clip_version(version),
                 mii,
                 actions: Vec::new(),
+                recorded_fighter: None,
             })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         });
@@ -1341,7 +1344,7 @@ impl MacroUi {
             self.screen = Screen::Closed;
             return Effect::NameConfirmed { context: NameContext { token, title }, name };
         }
-        let (name, version, start, frames, placement, mii, actions) = match &self.screen {
+        let (name, version, start, frames, placement, mii, actions, recorded_fighter) = match &self.screen {
             Screen::Save(draft) => match &draft.body {
                 NameBody::Macro(body) => (
                     draft.name.clone(),
@@ -1351,6 +1354,7 @@ impl MacroUi {
                     body.placement,
                     body.mii,
                     body.actions.clone(),
+                    body.recorded_fighter,
                 ),
                 NameBody::External { .. } => return Effect::None,
             },
@@ -1362,6 +1366,7 @@ impl MacroUi {
             Err(err) => return Effect::Notify(err.to_string()),
         };
         recording.actions = actions;
+        recording.recorded_fighter = recorded_fighter;
         if let Some(configuration) = mii {
             if let Err(err) = recording.set_mii(configuration) { return Effect::Notify(err.to_string()); }
         }

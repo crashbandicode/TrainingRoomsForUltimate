@@ -2,7 +2,8 @@ use crate::engine::macros::{ActionMark, InputFrame, MacroRecording};
 use crate::model::bridge_events::Clip;
 use crate::model::combo::{self, Kind, STEPS};
 use crate::model::combo_record::{full_move_key, move_of};
-use crate::model::frame_strip::{self, Button, Move, Snap};
+use crate::model::frame_strip::{self, Angle, Button, Move, Snap};
+use crate::model::move_names::{FighterId, Namer, Normal};
 
 pub const SHOWN_MARKS: usize = 24;
 pub const WATCH_SPANS: usize = 32;
@@ -20,15 +21,61 @@ pub struct Span {
     pub start: u32,
     pub end: Option<u32>,
     pub mv: Option<Move>,
+    /// The move's variant as the tracker keeps it for a combo link (`Normal`); 0 when the animation is none of them.
+    pub variant: u8,
+    pub angle: Option<Angle>,
 }
 
-#[derive(Default)]
 pub struct Marks {
     list: Vec<Mark>,
     origins: Vec<Option<String>>,
     bindings: Vec<Option<u32>>,
     keys: Vec<Option<String>>,
+    /// Each mark's move, variant and angle, when its move is known.
+    descs: Vec<Option<(Move, u8, Option<Angle>)>>,
+    namer: Namer<'static>,
     recorded: bool,
+}
+impl Default for Marks {
+    fn default() -> Self {
+        Self { list: Vec::new(), origins: Vec::new(), bindings: Vec::new(), keys: Vec::new(), descs: Vec::new(),
+            namer: Namer::OFF, recorded: false }
+    }
+}
+
+/// A mark's name: today's short name with the move-name toggle Off; with it On, what the combo and drill views write
+/// for the same move, variant and angle.
+pub fn mark_name(namer: Namer<'_>, mv: Move, variant: u8, angle: Option<Angle>) -> String {
+    if !namer.is_on() { return mv.name().into(); }
+    let mut name = String::new();
+    let _ = crate::model::action::ActionDesc { mv, of: None, angle, normal: variant, parts: [None; 2] }.write(&mut name, false, namer);
+    name
+}
+
+/// The animation the watch reads for the fighter it follows. A sample carries one only for the acting side, so the
+/// other fighter's is read, and only while its status is a named move.
+pub fn watched_motion(sampled: u64, named: bool, read: impl FnOnce() -> u64) -> u64 {
+    if sampled != 0 || !named { sampled } else { read() }
+}
+
+/// The three Mii fighter kinds (`mii_setup`): a Mii's specials are its own selection, not its kind's.
+pub const MII_KINDS: core::ops::RangeInclusive<i32> = 0x48..=0x4a;
+
+/// The identity a saved take's specials are named by. A take stores its fighter's kind, not the key of the names
+/// table, so the live Player 1 serves when it is that kind. For a Mii that is the take's stored selection, and no
+/// identity (the common names) when the take stored none.
+pub fn take_identity(live: Option<(i32, FighterId)>, kind: i32, mii: Option<[u8; 4]>) -> Option<FighterId> {
+    let (_, id) = live.filter(|(live, _)| *live == kind)?;
+    if !MII_KINDS.contains(&kind) { return Some(id); }
+    mii.map(|specials| FighterId { specials, ..id })
+}
+
+fn angle_key(angle: Angle) -> &'static str {
+    match angle { Angle::Up => "up", Angle::Down => "down" }
+}
+
+fn angle_of_key(key: &str) -> Option<Angle> {
+    match key { "up" => Some(Angle::Up), "down" => Some(Angle::Down), _ => None }
 }
 
 /// One frame of the watched fighter, as the frame strip sampled it.
@@ -41,6 +88,8 @@ pub struct Seen {
     pub motion_frame: f32,
     /// In hitstop: its animation does not advance.
     pub stop: bool,
+    /// The animation's hash40; 0 when it was not read.
+    pub motion: u64,
 }
 
 pub struct Watch {
@@ -51,6 +100,8 @@ pub struct Watch {
     last: Option<u32>,
     status: i32,
     motion_frame: f32,
+    /// The open span has had its variant read.
+    told: bool,
 }
 impl Default for Watch {
     fn default() -> Self {
@@ -59,8 +110,8 @@ impl Default for Watch {
 }
 impl Watch {
     pub const fn new() -> Self {
-        Self { run: 0, spans: [Span { start: 0, end: None, mv: None }; WATCH_SPANS],
-            len: 0, open: false, last: None, status: 0, motion_frame: 0.0 }
+        Self { run: 0, spans: [Span { start: 0, end: None, mv: None, variant: 0, angle: None }; WATCH_SPANS],
+            len: 0, open: false, last: None, status: 0, motion_frame: 0.0, told: false }
     }
     /// A move that starts while the fighter is still busy is its own span, as the tracker counts it: another move, or
     /// the same status with its animation back at an earlier frame. A throw continues its grab.
@@ -82,18 +133,40 @@ impl Watch {
         }
         if seen.busy {
             if !self.open && self.len < WATCH_SPANS {
-                self.spans[self.len] = Span { start: index, end: None, mv: seen.mv };
+                self.spans[self.len] = Span { start: index, end: None, mv: seen.mv, variant: 0, angle: None };
                 self.len += 1;
                 self.open = true;
+                self.told = false;
             } else if self.open && self.spans[self.len - 1].mv.is_none() {
                 self.spans[self.len - 1].mv = seen.mv;
             }
+            if self.open { self.describe(seen); }
         } else if self.open {
             self.spans[self.len - 1].end = Some(index);
             self.open = false;
         }
         self.status = seen.status;
         self.motion_frame = seen.motion_frame;
+    }
+    /// The open span's variant and angle, by the tracker's rules for an action (`frame_strip::Tracker::step`): the
+    /// animation on the first frame the span has its move; a Jab that becomes the rapid jab or its finisher; a grab's
+    /// throw. A side attack keeps the last angle its animation named.
+    fn describe(&mut self, seen: Seen) {
+        let span = &mut self.spans[self.len - 1];
+        let (Some(mv), Some(now)) = (span.mv, seen.mv) else { return };
+        let normal = Normal::of(seen.motion);
+        if !self.told {
+            span.variant = normal as u8;
+            self.told = true;
+        } else if (mv == Move::Jab && now == Move::Jab && matches!(normal, Normal::RapidJab | Normal::RapidJabFinisher))
+            || (mv == Move::Grab && now == Move::Throw
+                && matches!(normal, Normal::ForwardThrow | Normal::BackThrow | Normal::UpThrow | Normal::DownThrow))
+        {
+            span.variant = normal as u8;
+        }
+        if matches!(now, Move::SideTilt | Move::SideSmash) {
+            if let Some(angle) = frame_strip::angle_of(seen.motion) { span.angle = Some(angle); }
+        }
     }
     pub fn run(&self) -> u32 { self.run }
     pub fn spans(&self) -> &[Span] { &self.spans[..self.len] }
@@ -109,7 +182,16 @@ impl Marks {
         self.origins.insert(at, origin);
         self.bindings.insert(at, binding);
         self.keys.insert(at, key);
+        self.descs.insert(at, None);
     }
+
+    /// Names the moves a preview finds as `namer` gives them.
+    pub fn named(mut self, namer: Namer<'static>) -> Self {
+        self.set_namer(namer);
+        self
+    }
+
+    pub(super) fn set_namer(&mut self, namer: Namer<'static>) { self.namer = namer; }
 
     pub fn from_inputs(frames: impl Iterator<Item = InputFrame>) -> Self {
         let mut marks = Self::new();
@@ -153,8 +235,8 @@ impl Marks {
         marks
     }
 
-    pub fn from_recording(recording: &MacroRecording) -> Self {
-        let fallback = Self::from_inputs(recording.frames.iter().copied());
+    pub fn from_recording(recording: &MacroRecording, namer: Namer<'static>) -> Self {
+        let fallback = Self::from_inputs(recording.frames.iter().copied()).named(namer);
         let mut last = None;
         let valid = !recording.actions.is_empty() && recording.actions.iter().all(|action| {
             let ok = (action.start as usize) < recording.frames.len()
@@ -164,14 +246,17 @@ impl Marks {
             ok
         });
         if !valid { return fallback; }
-        let mut marks = Self::new();
+        let mut marks = Self::new().named(namer);
         marks.recorded = true;
         for action in &recording.actions {
-            let name = action.mv.as_deref().and_then(move_of).filter(|mv| *mv != Move::Other)
-                .map(|mv| mv.name().to_owned())
+            let desc = action.mv.as_deref().and_then(move_of).filter(|mv| *mv != Move::Other)
+                .map(|mv| (mv, action.variant, action.angle.as_deref().and_then(angle_of_key)));
+            let name = desc.map(|(mv, variant, angle)| mark_name(namer, mv, variant, angle))
                 .or_else(|| fallback.list.iter().find(|mark| mark.start == action.start).map(|mark| mark.name.clone()))
                 .unwrap_or_else(|| "Move".into());
-            marks.insert(marks.list.len(), Mark { start: action.start, end: action.end, name }, None, None, action.mv.clone());
+            let at = marks.list.len();
+            marks.insert(at, Mark { start: action.start, end: action.end, name }, None, None, action.mv.clone());
+            marks.descs[at] = desc;
         }
         marks
     }
@@ -181,10 +266,12 @@ impl Marks {
     pub fn capture(frames: &[InputFrame], spans: &[Span]) -> Vec<ActionMark> {
         let mut marks = Self::from_inputs(frames.iter().copied());
         marks.watch(0, spans);
-        marks.list.iter().zip(&marks.keys).map(|(mark, key)| ActionMark {
+        marks.list.iter().zip(&marks.keys).zip(&marks.descs).map(|((mark, key), desc)| ActionMark {
             start: mark.start,
             end: mark.end.filter(|&end| end > mark.start && end <= frames.len() as u32),
             mv: key.clone(),
+            variant: desc.map_or(0, |(_, variant, _)| variant),
+            angle: desc.and_then(|(_, _, angle)| angle).map(|angle| angle_key(angle).to_owned()),
         }).collect()
     }
 
@@ -192,7 +279,7 @@ impl Marks {
         actions.iter().filter(|action| action.start >= from && action.start < to).map(|action| ActionMark {
             start: action.start - from,
             end: action.end.filter(|&end| end <= to).map(|end| end - from),
-            mv: action.mv.clone(),
+            ..action.clone()
         }).collect()
     }
     pub fn list(&self) -> &[Mark] { &self.list }
@@ -216,11 +303,13 @@ impl Marks {
                 self.list[i].end = None;
                 self.bindings[i] = None;
                 self.keys[i] = None;
+                self.descs[i] = None;
             } else {
                 self.list.remove(i);
                 self.origins.remove(i);
                 self.bindings.remove(i);
                 self.keys.remove(i);
+                self.descs.remove(i);
             }
         }
     }
@@ -245,8 +334,9 @@ impl Marks {
             self.bindings[index] = Some(start);
             self.list[index].end = span.end.map(|end| base.saturating_add(end));
             if let Some(mv) = span.mv.filter(|mv| *mv != Move::Other) {
-                self.list[index].name = mv.name().into();
+                self.list[index].name = mark_name(self.namer, mv, span.variant, span.angle);
                 self.keys[index] = Some(full_move_key(mv).into());
+                self.descs[index] = Some((mv, span.variant, span.angle));
             }
         }
     }
@@ -355,15 +445,15 @@ mod tests {
     fn recorded() -> MacroRecording {
         let mut recording = recording();
         recording.actions = vec![
-            ActionMark { start: 10, end: Some(40), mv: Some(move_key(Move::Jab).into()) },
-            ActionMark { start: 90, end: None, mv: None },
+            ActionMark { start: 10, end: Some(40), mv: Some(move_key(Move::Jab).into()), ..ActionMark::default() },
+            ActionMark { start: 90, end: None, mv: None, ..ActionMark::default() },
         ];
         recording
     }
 
     fn spans() -> [Span; 2] {
-        [Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
-         Span { start: 92, end: None, mv: None }]
+        [Span { start: 12, end: Some(40), mv: Some(Move::Jab), ..Span::default() },
+         Span { start: 92, end: None, mv: None, ..Span::default() }]
     }
 
     fn scratch(tag: &str) -> std::path::PathBuf {
@@ -534,7 +624,7 @@ mod tests {
         let mut other = recording();
         mario.start.fighter_kind = 0;
         other.start.fighter_kind = 8;
-        assert_eq!(Marks::from_recording(&mario).list(), Marks::from_recording(&other).list());
+        assert_eq!(Marks::from_recording(&mario, Namer::OFF).list(), Marks::from_recording(&other, Namer::OFF).list());
     }
 
     fn a_watched_action_gives_its_start_end_and_name() {
@@ -560,7 +650,7 @@ mod tests {
     /// rv-preview-vis 23:49:00Z: a second Jab that starts while the fighter is still busy (the same status, its animation
     /// back at frame 0) is its own move; one continuous Jab is one.
     fn a_move_restarted_while_busy_is_its_own_recorded_mark() {
-        let jab = |motion_frame: f32| Seen { busy: true, mv: Some(Move::Jab), status: 0x27, motion_frame, stop: false };
+        let jab = |motion_frame: f32| Seen { busy: true, mv: Some(Move::Jab), status: 0x27, motion_frame, ..Seen::default() };
         let take = |restart: bool| {
             let mut watch = Watch::new();
             for index in 12..55u32 {
@@ -586,11 +676,11 @@ mod tests {
         assert!(bridge_clip(&editor.view(), None, false).text().contains(" cursor=30 "));
         assert!(bridge_clip(&editor.view(), None, false).text().contains(" marks=3 mark=30-55 "));
         editor.on_action(ClipAction::TogglePlay);
-        let open = [ActionMark { start: 10, end: Some(30), mv: None }, ActionMark { start: 30, end: None, mv: None }];
+        let open = [ActionMark { start: 10, end: Some(30), mv: None, ..ActionMark::default() }, ActionMark { start: 30, end: None, mv: None, ..ActionMark::default() }];
         let mut touching = recording();
         touching.frames[30].buttons = 1;
         touching.actions = open.to_vec();
-        let touching = Marks::from_recording(&touching);
+        let touching = Marks::from_recording(&touching, Namer::OFF);
         assert!(touching.recorded());
         assert_eq!((touching.nearest(29), touching.nearest(30)), (Some((10, Some(30))), Some((30, None))));
         set_out(&mut editor, 35);
@@ -620,7 +710,7 @@ mod tests {
         frames[0].buttons = 1;
         frames[199].buttons = 2;
         let root = scratch("edges");
-        let spans = [Span { start: 0, end: Some(30), mv: Some(Move::Jab) }, Span { start: 199, end: None, mv: None }];
+        let spans = [Span { start: 0, end: Some(30), mv: Some(Move::Jab), ..Span::default() }, Span { start: 199, end: None, mv: None, ..Span::default() }];
         let id = save_capture(&root, &frames, &spans, crate::model::trim::Trim::Off);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
         assert_eq!(loaded.actions.iter().map(|mark| (mark.start, mark.end)).collect::<Vec<_>>(), vec![(0, Some(30)), (199, None)]);
@@ -637,9 +727,9 @@ mod tests {
         assert_eq!(editor.view().end, 200);
         let mut ended = loaded;
         ended.actions[1].end = Some(200);
-        assert_eq!(Marks::from_recording(&ended).list()[1].end, Some(200));
+        assert_eq!(Marks::from_recording(&ended, Namer::OFF).list()[1].end, Some(200));
         ended.actions[1].end = Some(201);
-        assert!(!Marks::from_recording(&ended).recorded());
+        assert!(!Marks::from_recording(&ended, Namer::OFF).recorded());
     }
 
     /// tr-primary-2's edge: In or Out cutting through a move, and a snap whose target lies across the other handle.
@@ -651,17 +741,17 @@ mod tests {
         };
         let mut out_cuts = ClipEditor::macro_file(recorded(), true).unwrap();
         set_out(&mut out_cuts, 30);
-        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: None, mv: jab.clone() }]);
+        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: None, mv: jab.clone(), ..ActionMark::default() }]);
         out_cuts.on_action(ClipAction::Snap);
         assert_eq!(out_cuts.view().end, 40);
-        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: Some(40), mv: jab.clone() }]);
+        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: Some(40), mv: jab.clone(), ..ActionMark::default() }]);
         let mut in_cuts = ClipEditor::macro_file(recorded(), true).unwrap();
         in_cuts.on_action(ClipAction::SelectIn);
         in_cuts.on_action(ClipAction::Nudge(20));
-        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 70, end: None, mv: None }]);
+        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 70, end: None, mv: None, ..ActionMark::default() }]);
         in_cuts.on_action(ClipAction::Snap);
         assert_eq!(in_cuts.view().start, 10);
-        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 0, end: Some(30), mv: jab }, ActionMark { start: 80, end: None, mv: None }]);
+        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 0, end: Some(30), mv: jab, ..ActionMark::default() }, ActionMark { start: 80, end: None, mv: None, ..ActionMark::default() }]);
         let mut crossing = ClipEditor::macro_file(recorded(), true).unwrap();
         crossing.on_action(ClipAction::SelectIn);
         crossing.on_action(ClipAction::Nudge(95));
@@ -681,7 +771,7 @@ mod tests {
         frames[10].buttons = 1;
         frames[90].buttons = 2;
         let mut recording = MacroRecording::new("Crop", "13.0.5", StartState::neutral(0, 0, 1.0), frames).unwrap();
-        recording.actions = vec![ActionMark { start: 10, end: Some(40), mv: None }, ActionMark { start: 90, end: None, mv: None }];
+        recording.actions = vec![ActionMark { start: 10, end: Some(40), mv: None, ..ActionMark::default() }, ActionMark { start: 90, end: None, mv: None, ..ActionMark::default() }];
         let mut editor = ClipEditor::macro_file(recording, false).unwrap();
         let line = bridge_clip(&editor.view(), None, false).text();
         assert!(line.starts_with("clip ctx=macro.cpu total=200 in=0 out=200 cursor=0 playing=0 handle=playhead running=0 "), "{line}");
@@ -692,7 +782,7 @@ mod tests {
         assert!(line.contains("ctx=macro.p1") && line.contains("cursor=199") && line.contains("handle=out"), "{line}");
         assert!(line.ends_with("target=p1 marks=2 mark=90-none move=\"110 frames into Special\""), "{line}");
         assert!(bridge_clip(&editor.view(), Some("drill"), true).text().starts_with("clip ctx=drill total=200 "));
-        let capture = ReplaySession { tracks: vec![ReplayTrack { entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
+        let capture = ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
             input: InputFrame::default(), start: StartState::neutral(74, 0, 1.0), x: 0.0, y: 0.0 }).collect() }],
             truncated: false, breaks: Vec::new() };
         let mut vault = ClipEditor::new(capture, vec![0]).unwrap();
@@ -708,7 +798,7 @@ mod tests {
         use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
         use crate::model::chords::{bit, logical, logical_set, Buttons, STYLE_GAMECUBE};
         use clip_panel::TargetTap;
-        let track = |entry: i32| ReplayTrack { entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
+        let track = |entry: i32| ReplayTrack { fighter: None, entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
             input: InputFrame { buttons: i + 1, ..InputFrame::default() }, start: StartState::neutral(entry + 7, 0, 1.0),
             x: 0.0, y: 0.0 }).collect() };
         let capture = || ReplaySession { tracks: vec![track(0), track(1)], truncated: false, breaks: Vec::new() };
@@ -816,7 +906,7 @@ mod tests {
         editor.on_action(ClipAction::Snap);
         assert_eq!(editor.view().end, 40);
         editor.on_action(ClipAction::TogglePlay);
-        editor.watch(&[Span { start: 12, end: Some(80), mv: Some(Move::UpTilt) }]);
+        editor.watch(&[Span { start: 12, end: Some(80), mv: Some(Move::UpTilt), ..Span::default() }]);
         editor.on_action(ClipAction::TogglePlay);
         set_out(&mut editor, 50);
         editor.on_action(ClipAction::Snap);
@@ -824,7 +914,7 @@ mod tests {
     }
 
     fn snapping_at_the_first_and_last_frame_stays_inside_the_take() {
-        let marks = Marks::from_recording(&recorded());
+        let marks = Marks::from_recording(&recorded(), Namer::OFF);
         assert_eq!(marks.snap_in(0), Some(0));
         assert_eq!(marks.snap_out(200, 200), Some(200));
     }
@@ -868,14 +958,23 @@ mod tests {
     }
 
     fn the_editor_reads_no_scene_so_lobby_and_training_match() {
-        for text in [include_str!("clip_marks.rs"), include_str!("clip_panel.rs"), include_str!("../../editors/clip.rs")] {
+        // The names of the marks come from the same two files as the combo views' (`move_names.rs`, `action.rs`).
+        for text in [include_str!("clip_marks.rs"), include_str!("clip_panel.rs"), include_str!("../../editors/clip.rs"),
+            include_str!("../move_names.rs"), include_str!("../action.rs")] {
             let code = text.split("#[cfg(test)]").next().unwrap();
             assert!(!code.contains("is_in_training") && !code.contains("is_in_lobby") && !code.contains("current_scene"));
         }
         let sample = include_str!("../../runtime/features/input_display.rs");
         let callback = include_str!("../../runtime/features/cpu.rs");
         assert!(sample.contains("rr_host::watch_feed("));
+        // The one feed, in either scene, gives the watch the animation the variant is read from.
+        assert!(sample.contains("clip_marks::watched_motion(s.motion, mv.is_some(), "));
         assert!(callback.contains("input_display::sample_frame("));
+        // The capture's identity must follow the same body as its start pose (Training entry 1, lobby entry 4).
+        let host = include_str!("../../runtime/features/recording_host.rs");
+        let reader = host.split_once("fn role_fighter(").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(reader.contains("Role::Cpu => super::recorder::cpu_body()"), "CPU take identity bypasses the scene's practice CPU");
+        assert!(reader.contains("Role::Player => super::recorder::body_of(0)"), "Player take identity must read entry 0");
     }
 
     /// A drill's crop names each step as the Recording list does (`combo_link_lines`, the recorded fighter): since the
@@ -934,14 +1033,14 @@ mod tests {
         let spans: Vec<_> = moves.iter().enumerate().map(|(i, &mv)| {
             let start = (i * 30) as u32;
             frames[start as usize].buttons = 1;
-            Span { start, end: Some(start + 10), mv: Some(mv) }
+            Span { start, end: Some(start + 10), mv: Some(mv), ..Span::default() }
         }).collect();
         let id = save_capture(&root, &frames, &spans, crate::model::trim::Trim::Off);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
 
         assert_eq!(loaded.actions.iter().map(|mark| mark.mv.as_deref()).collect::<Vec<_>>(),
             keys.into_iter().map(Some).collect::<Vec<_>>());
-        let marks = Marks::from_recording(&loaded);
+        let marks = Marks::from_recording(&loaded, Namer::OFF);
         assert_eq!(marks.list().iter().map(|mark| mark.name.as_str()).collect::<Vec<_>>(),
             moves.iter().map(|mv| mv.name()).collect::<Vec<_>>());
         let editor = ClipEditor::macro_file(loaded, true).unwrap();
@@ -986,15 +1085,15 @@ mod tests {
         editor.on_action(ClipAction::Nudge(5));
         set_out(&mut editor, 90);
         let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("crop") };
-        assert_eq!(saved.actions, vec![ActionMark { start: 5, end: Some(35), mv: Some(move_key(Move::Jab).into()) }]);
-        assert!(Marks::from_recording(&saved).recorded());
+        assert_eq!(saved.actions, vec![ActionMark { start: 5, end: Some(35), mv: Some(move_key(Move::Jab).into()), ..ActionMark::default() }]);
+        assert!(Marks::from_recording(&saved, Namer::OFF).recorded());
         assert_eq!(Marks::window(&recorded().actions, 5, 120).len(), 2);
     }
 
     fn a_record_time_trim_keeps_the_marks_inside_the_kept_frames() {
         let root = scratch("trim");
-        let spans = [Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
-            Span { start: 92, end: Some(150), mv: Some(Move::SideTilt) }];
+        let spans = [Span { start: 12, end: Some(40), mv: Some(Move::Jab), ..Span::default() },
+            Span { start: 92, end: Some(150), mv: Some(Move::SideTilt), ..Span::default() }];
         let id = save_capture(&root, &inputs(), &spans, crate::model::trim::Trim::End);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
         let drill = rr_runtime::save_drill_take(&root, inputs(), StartState::neutral(0, 0, 1.0), crate::model::trim::Trim::End, 2, &spans).unwrap().unwrap();
@@ -1008,7 +1107,7 @@ mod tests {
             assert_eq!(editor.view().end, 91);
             assert!(editor.view().move_text.starts_with("End of "));
         }
-        let open = [ActionMark { start: 90, end: None, mv: None }];
+        let open = [ActionMark { start: 90, end: None, mv: None, ..ActionMark::default() }];
         assert_eq!(Marks::window(&open, 5, 91)[0].end, None);
     }
 
@@ -1016,9 +1115,9 @@ mod tests {
         let root = scratch("bad-marks");
         let library = Library::new(&root);
         let invalid = [
-            vec![ActionMark { start: 200, end: None, mv: None }],
-            vec![ActionMark { start: 10, end: Some(10), mv: None }],
-            vec![ActionMark { start: 90, end: None, mv: None }, ActionMark { start: 10, end: None, mv: None }],
+            vec![ActionMark { start: 200, end: None, mv: None, ..ActionMark::default() }],
+            vec![ActionMark { start: 10, end: Some(10), mv: None, ..ActionMark::default() }],
+            vec![ActionMark { start: 90, end: None, mv: None, ..ActionMark::default() }, ActionMark { start: 10, end: None, mv: None, ..ActionMark::default() }],
         ];
         for actions in invalid {
             let mut rec = recording();
@@ -1026,7 +1125,7 @@ mod tests {
             let id = library.save_new(&rec).unwrap();
             let loaded = library.load(&id).unwrap();
             assert!(loaded.validate().is_ok());
-            let marks = Marks::from_recording(&loaded);
+            let marks = Marks::from_recording(&loaded, Namer::OFF);
             assert!(!marks.recorded());
             assert_eq!(marks.list().iter().map(|m| m.start).collect::<Vec<_>>(), vec![10, 90]);
         }
@@ -1037,7 +1136,7 @@ mod tests {
         std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
         let loaded = library.load(&id);
         assert!(loaded.is_ok());
-        assert!(!Marks::from_recording(&loaded.unwrap()).recorded());
+        assert!(!Marks::from_recording(&loaded.unwrap(), Namer::OFF).recorded());
     }
 
     fn the_capture_watch_follows_the_recorded_fighter_while_a_take_is_open() {
@@ -1048,6 +1147,481 @@ mod tests {
         assert!(input.contains("CAPTURE_RUN"));
         assert!(input.contains("rr_host::watch_feed("));
         assert!(host.contains("watch_clear()"));
+    }
+
+    type Part = (u32, u32, Move, i32, &'static str);
+
+    fn on() -> Namer<'static> { Namer::new(true, None, None) }
+
+    /// Each part is frames `from..to` of one animation of a move, counted from its start, in one status; at `end` the
+    /// fighter can act again.
+    fn watched(parts: &[Part], end: u32) -> Watch {
+        let mut watch = Watch::new();
+        for &(from, to, mv, status, motion) in parts {
+            for index in from..to {
+                watch.feed(CAPTURE_RUN, index, Seen { busy: true, mv: Some(mv), status, motion_frame: (index - from) as f32,
+                    stop: false, motion: crate::model::hash40::hash40(motion) });
+            }
+        }
+        watch.feed(CAPTURE_RUN, end, Seen::default());
+        watch
+    }
+
+    fn take(frames: usize, actions: Vec<ActionMark>) -> MacroRecording {
+        let mut take = MacroRecording::new("Take", "13.0.5", StartState::neutral(6, 0, 1.0), vec![InputFrame::default(); frames]).unwrap();
+        take.actions = actions;
+        take
+    }
+
+    fn names(take: &MacroRecording, namer: Namer<'static>) -> Vec<String> {
+        Marks::from_recording(take, namer).list().iter().map(|mark| mark.name.clone()).collect()
+    }
+
+    /// What the combo and drill views write for a move (`ActionDesc::write`).
+    fn written(namer: Namer<'_>, mv: Move, variant: u8, angle: Option<Angle>) -> String {
+        let mut text = String::new();
+        crate::model::action::ActionDesc { mv, of: None, angle, normal: variant, parts: [None; 2] }.write(&mut text, false, namer).unwrap();
+        text
+    }
+
+    /// The final install-4 session's take (`i4-final-yoga-01`, `macro-9`): Kirby, Attack held on frames 37 to 41, busy until
+    /// 56, restarted on 42. Here the second animation is the second jab's; whether the game's is, the Eden row decides.
+    fn a_held_attack_on_kirby_is_recorded_as_jab_1_then_jab_2() {
+        let mut frames = vec![InputFrame::default(); 138];
+        for frame in &mut frames[37..42] { frame.buttons = 1; }
+        let watch = watched(&[(37, 42, Move::Jab, 0x27, "attack_11"), (42, 56, Move::Jab, 0x27, "attack_12")], 56);
+        let root = scratch("kirby-jabs");
+        let id = save_capture(&root, &frames, watch.spans(), crate::model::trim::Trim::Off);
+        let json: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join("macros").join(format!("{id}.json"))).unwrap()).unwrap();
+        assert_eq!(json["actions"], serde_json::json!([
+            {"start": 37, "end": 42, "move": "jab", "variant": 1}, {"start": 42, "end": 56, "move": "jab", "variant": 2}]));
+        let loaded = Library::new(root.join("macros")).load(&id).unwrap();
+        assert_eq!(names(&loaded, on()), ["Jab 1", "Jab 2"]);
+        assert_eq!(names(&loaded, Namer::OFF), ["Jab", "Jab"]);
+        let mut editor = ClipEditor::macro_file(loaded, true).unwrap().with_namer(on());
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(40));
+        editor.on_action(ClipAction::Snap);
+        assert_eq!((editor.view().start, editor.view().move_text.as_str()), (42, "Start of Jab 2"));
+        assert!(bridge_clip(&editor.view(), None, false).text().ends_with("move=\"Start of Jab 2\""));
+        editor.on_action(ClipAction::Nudge(-4));
+        editor.on_action(ClipAction::Snap);
+        assert_eq!((editor.view().start, editor.view().move_text.as_str()), (37, "Start of Jab 1"));
+    }
+
+    fn a_three_hit_jab_is_jab_1_jab_2_and_jab_3() {
+        let watch = watched(&[(10, 16, Move::Jab, 0x27, "attack_11"), (16, 24, Move::Jab, 0x27, "attack_12"),
+            (24, 40, Move::Jab, 0x27, "attack_13")], 40);
+        let marks = Marks::capture(&[InputFrame::default(); 60], watch.spans());
+        assert_eq!(marks.iter().map(|mark| (mark.start, mark.end, mark.variant)).collect::<Vec<_>>(),
+            [(10, Some(16), 1), (16, Some(24), 2), (24, Some(40), 3)]);
+        assert_eq!(names(&take(60, marks), on()), ["Jab 1", "Jab 2", "Jab 3"]);
+    }
+
+    fn a_rapid_jab_and_its_finisher_are_named() {
+        let watch = watched(&[(10, 16, Move::Jab, 0x27, "attack_11"), (16, 20, Move::Jab, 0x2a, "attack_100_start"),
+            (20, 26, Move::Jab, 0x2a, "attack_100"), (26, 32, Move::Jab, 0x2a, "attack_100"),
+            (32, 50, Move::Jab, 0x2a, "attack_100_end")], 50);
+        let marks = Marks::capture(&[InputFrame::default(); 60], watch.spans());
+        // The first jab flows into the rapid jab in another status, with no restart: one mark, renamed in place as the
+        // combo link is (tr-primary-2 13:54:02Z, choice 3). Each loop and the finisher restart, so each is its own mark.
+        assert_eq!(marks.iter().map(|mark| (mark.start, mark.variant)).collect::<Vec<_>>(), [(10, 4), (20, 4), (26, 4), (32, 5)]);
+        assert_eq!(names(&take(60, marks), on()), ["Rapid jab", "Rapid jab", "Rapid jab", "Rapid jab finisher"]);
+        // Only a Jab is renamed in place: another move keeps the variant it started with.
+        let tilt = watched(&[(10, 16, Move::UpTilt, 0x29, "attack_hi3"), (16, 20, Move::UpTilt, 0x2b, "attack_100")], 20);
+        assert_eq!((tilt.spans().len(), tilt.spans()[0].variant), (1, Normal::UpTilt as u8));
+    }
+
+    /// tr-primary-2 13:54:02Z, choice 2: a take saved before the variant existed has none. Off, it reads as it did. On,
+    /// the Namer names it with no variant, and a special by the fighter's own name. Loading and saving do not change it.
+    fn an_old_take_with_no_variant_reads_as_before_off_and_through_the_namer_on() {
+        let moves = [Move::Jab, Move::SideTilt, Move::NeutralSpecial, Move::UpSpecial, Move::Aerial, Move::FinalSmash];
+        let old = serde_json::Value::Array(moves.iter().enumerate().map(|(i, &mv)|
+            serde_json::json!({"start": i * 20, "end": i * 20 + 10, "move": full_move_key(mv)})).collect());
+        let root = scratch("old-take");
+        let library = Library::new(&root);
+        let id = library.save_new(&take(200, Vec::new())).unwrap();
+        let path = root.join(format!("{id}.json"));
+        let mut json: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        json["actions"] = old.clone();
+        std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+        let loaded = library.load(&id).unwrap();
+        assert!(Marks::from_recording(&loaded, on()).recorded());
+        assert_eq!(names(&loaded, Namer::OFF), moves.map(|mv| mv.name()));
+        // A legacy Jab alone cannot tell the two paths apart; the side tilt and the specials can.
+        assert_eq!(names(&loaded, on()), ["Jab", "Forward tilt", "Neutral special", "Up special", "Aerial", "Final Smash"]);
+        let table: &'static crate::model::move_names::Names =
+            Box::leak(Box::new(crate::model::move_names::Names::build(&crate::model::move_names::tests::shared_file()).unwrap()));
+        let alpha = crate::model::move_names::FighterId { chara: crate::model::hash40::hash40("ui_chara_alpha") & 0xff_ffff_ffff, specials: [0; 4] };
+        let own = Namer::new(true, Some(table), Some(alpha));
+        assert_eq!(names(&loaded, own), ["Jab", "Forward tilt", "Test Pulse", "Test Rising Kick", "Aerial", "Test Grand Finish"]);
+        for namer in [on(), own] {
+            assert_eq!(names(&loaded, namer), moves.map(|mv| written(namer, mv, 0, None)));
+        }
+        let again = library.save_new(&loaded).unwrap();
+        let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join(format!("{again}.json"))).unwrap()).unwrap();
+        assert_eq!(saved["actions"], old);
+    }
+
+    fn with_move_names_off_a_mark_reads_as_before() {
+        let marks = vec![
+            ActionMark { start: 0, end: Some(10), mv: Some(full_move_key(Move::Jab).into()), variant: 2, angle: None },
+            ActionMark { start: 20, end: Some(30), mv: Some(full_move_key(Move::SideTilt).into()), variant: 7, angle: Some("up".into()) },
+            ActionMark { start: 40, end: Some(50), mv: Some(full_move_key(Move::Aerial).into()), variant: 14, angle: None },
+            ActionMark { start: 60, end: Some(70), mv: Some(full_move_key(Move::Grab).into()), variant: 22, angle: None },
+            ActionMark { start: 80, end: Some(90), mv: Some(full_move_key(Move::NeutralSpecial).into()), variant: 0, angle: None },
+        ];
+        let stripped: Vec<_> = marks.iter().map(|mark| ActionMark { variant: 0, angle: None, ..mark.clone() }).collect();
+        assert_eq!(names(&take(100, marks.clone()), Namer::OFF), ["Jab", "Side tilt", "Aerial", "Grab", "Neutral B"]);
+        assert_eq!(names(&take(100, marks), Namer::OFF), names(&take(100, stripped), Namer::OFF));
+        for mv in [Move::Jab, Move::SideSmash, Move::Throw, Move::LedgeAttack, Move::FinalSmash] {
+            assert_eq!(mark_name(Namer::OFF, mv, 5, Some(Angle::Down)), mv.name());
+        }
+    }
+
+    fn an_angled_forward_tilt_is_named_with_its_angle() {
+        type Angled = (&'static [Part], u8, Option<Angle>, &'static str, &'static str);
+        let cases: [Angled; 4] = [
+            (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_hi")], 7, Some(Angle::Up), "Forward tilt ↑", "Side tilt"),
+            (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_s")], 7, None, "Forward tilt", "Side tilt"),
+            (&[(10, 30, Move::SideTilt, 0x28, "attack_s3_lw")], 7, Some(Angle::Down), "Forward tilt ↓", "Side tilt"),
+            (&[(10, 20, Move::SideSmash, 0x2c, "attack_s4_hold"), (20, 40, Move::SideSmash, 0x2d, "attack_s4_lw")],
+                10, Some(Angle::Down), "Forward smash ↓", "Side smash"),
+        ];
+        for (parts, variant, angle, shown, short) in cases {
+            let watch = watched(parts, parts.last().unwrap().1);
+            assert_eq!(watch.spans().len(), 1);
+            let marks = Marks::capture(&[InputFrame::default(); 60], watch.spans());
+            let key = angle.map(|angle| match angle { Angle::Up => "up", Angle::Down => "down" });
+            assert_eq!((marks[0].variant, marks[0].angle.as_deref()), (variant, key), "{shown}");
+            assert_eq!(serde_json::to_value(&marks[0]).unwrap().get("angle").and_then(|angle| angle.as_str()), key);
+            let saved = take(60, marks);
+            assert_eq!(names(&saved, on()), [shown]);
+            assert_eq!(shown, written(on(), parts[0].2, variant, angle));
+            assert_eq!(names(&saved, Namer::OFF), [short]);
+        }
+    }
+
+    /// A take saved without marks learns its moves from a preview, on either fighter. rv-preview-vis 13:45:17Z: the
+    /// fighter the watch follows need not be the acting side, whose sample alone carries the animation.
+    fn a_preview_on_the_cpu_or_player_1_names_the_moves_of_a_take_without_marks() {
+        let found = [Span { start: 12, end: Some(40), mv: Some(Move::Jab), variant: 2, angle: None }];
+        for player in [true, false] {
+            for (namer, name) in [(on(), "Jab 2"), (Namer::OFF, "Jab")] {
+                let mut editor = ClipEditor::macro_file(recording(), player).unwrap().with_namer(namer);
+                assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { player: target, .. } if target == player));
+                editor.watch(&found);
+                editor.preview_cursor(11);
+                assert_eq!(editor.view().move_text, format!("Start of {name}"), "player {player}");
+            }
+        }
+        let reads = std::cell::Cell::new(0);
+        let read = || { reads.set(reads.get() + 1); 9 };
+        // The acting side's sample has its animation: nothing more is read.
+        assert_eq!((watched_motion(7, true, read), reads.get()), (7, 0));
+        // The other side, in a named move: its animation is read once.
+        assert_eq!((watched_motion(0, true, read), reads.get()), (9, 1));
+        // Not in a named move: no read.
+        assert_eq!((watched_motion(0, false, read), reads.get()), (0, 1));
+        let feed = include_str!("../../runtime/features/input_display.rs");
+        for wanted in [
+            "motion: crate::engine::macro_ui::clip_marks::watched_motion(s.motion, mv.is_some(), || unsafe { p1_motion(accessor) }),",
+            "if take == 1 { (&p1, player) } else { (&cpu, cpu_accessor) }",
+            "if role == Role::Player { (&p1, player) } else { (&cpu, cpu_accessor) }",
+            // Which side is graded, and the guard on the animation read, are as they were.
+            "let p1 = sample(player, &ids, order[0] == 0, spots);",
+            "let cpu = sample(cpu, &ids, order[0] == 1, spots);",
+            "if !ANGLE_ON.load(Ordering::Acquire) {\n        return 0;\n    }\n    natives::motion_kind(accessor)",
+        ] {
+            assert!(feed.contains(wanted), "missing {wanted}");
+        }
+    }
+
+    fn every_variant_names_a_mark_as_the_combo_views_do() {
+        use Normal as N;
+        let table: [(&str, Move, Normal); 28] = [
+            ("attack_11", Move::Jab, N::Jab1), ("attack_12", Move::Jab, N::Jab2), ("attack_13", Move::Jab, N::Jab3),
+            ("attack_100_start", Move::Jab, N::RapidJab), ("attack_100_end", Move::Jab, N::RapidJabFinisher),
+            ("attack_dash", Move::DashAttack, N::DashAttack), ("attack_s3_s", Move::SideTilt, N::ForwardTilt),
+            ("attack_hi3", Move::UpTilt, N::UpTilt), ("attack_lw3", Move::DownTilt, N::DownTilt),
+            ("attack_s4_s", Move::SideSmash, N::ForwardSmash), ("attack_hi4", Move::UpSmash, N::UpSmash),
+            ("attack_lw4", Move::DownSmash, N::DownSmash), ("attack_air_n", Move::Aerial, N::NeutralAir),
+            ("attack_air_f", Move::Aerial, N::ForwardAir), ("attack_air_b", Move::Aerial, N::BackAir),
+            ("attack_air_hi", Move::Aerial, N::UpAir), ("attack_air_lw", Move::Aerial, N::DownAir),
+            ("catch", Move::Grab, N::Grab), ("catch_dash", Move::Grab, N::DashGrab), ("catch_turn", Move::Grab, N::PivotGrab),
+            ("catch_attack", Move::Grab, N::Pummel), ("throw_f", Move::Throw, N::ForwardThrow),
+            ("throw_b", Move::Throw, N::BackThrow), ("throw_hi", Move::Throw, N::UpThrow), ("throw_lw", Move::Throw, N::DownThrow),
+            ("cliff_attack_quick", Move::LedgeAttack, N::LedgeAttack), ("down_attack_u", Move::GetupAttack, N::GetupAttack),
+            ("slip_attack", Move::TripAttack, N::TripAttack),
+        ];
+        let mut covered = [false; 29];
+        for (motion, mv, normal) in table {
+            let watch = watched(&[(10, 30, mv, 0x30, motion)], 30);
+            let marks = Marks::capture(&[InputFrame::default(); 40], watch.spans());
+            assert_eq!((marks[0].variant, marks[0].mv.as_deref()), (normal as u8, Some(full_move_key(mv))), "{motion}");
+            // The tracker's own reading of the same animation, which a combo link stores.
+            assert_eq!(marks[0].variant, crate::model::action::variant(crate::model::hash40::hash40(motion)));
+            let name = names(&take(40, marks), on()).remove(0);
+            assert_eq!(name, normal.name().unwrap(), "{motion}");
+            assert_eq!(name, written(on(), mv, normal as u8, None));
+            covered[normal as usize] = true;
+        }
+        assert!(covered[1..].iter().all(|row| *row), "a variant of the move names has no row here");
+        assert_eq!(Normal::from_u8(29), Normal::Unknown);
+        // An animation that is none of them: no variant and no key, and the Namer's name without one.
+        let special = watched(&[(10, 30, Move::NeutralSpecial, 0x1de, "special_n")], 30);
+        let marks = Marks::capture(&[InputFrame::default(); 40], special.spans());
+        assert_eq!(serde_json::to_value(&marks[0]).unwrap(),
+            serde_json::json!({"start": 10, "end": 30, "move": full_move_key(Move::NeutralSpecial)}));
+        assert_eq!(names(&take(40, marks), on()), ["Neutral special"]);
+    }
+
+    /// tr-primary-2 13:54:02Z, choice 4: a throw continues its grab's mark, whose move and saved key stay the grab's;
+    /// its variant is the throw's, as the tracker's is.
+    fn a_throw_names_its_grab_mark() {
+        let watch = watched(&[(10, 20, Move::Grab, 0x3a, "catch_dash"), (20, 40, Move::Throw, 0x40, "throw_f"),
+            (40, 44, Move::Throw, 0x41, "wait")], 44);
+        assert_eq!(watch.spans().len(), 1);
+        let marks = Marks::capture(&[InputFrame::default(); 60], watch.spans());
+        assert_eq!((marks[0].mv.as_deref(), marks[0].variant, marks[0].end),
+            (Some(full_move_key(Move::Grab)), Normal::ForwardThrow as u8, Some(44)));
+        let thrown = take(60, marks);
+        assert_eq!(names(&thrown, on()), ["Forward throw"]);
+        assert_eq!(names(&thrown, Namer::OFF), ["Grab"]);
+        let whiff = watched(&[(10, 40, Move::Grab, 0x3a, "catch_dash")], 40);
+        let marks = Marks::capture(&[InputFrame::default(); 60], whiff.spans());
+        assert_eq!(names(&take(60, marks), on()), ["Dash grab"]);
+    }
+
+    fn a_variant_of_the_wrong_shape_reads_as_no_marks() {
+        let root = scratch("bad-variant");
+        let library = Library::new(&root);
+        let load = |actions: serde_json::Value| {
+            let id = library.save_new(&recording()).unwrap();
+            let path = root.join(format!("{id}.json"));
+            let mut json: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            json["actions"] = actions;
+            std::fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+            library.load(&id).unwrap()
+        };
+        let tilt = full_move_key(Move::SideTilt);
+        for bad in [serde_json::json!({"variant": "two"}), serde_json::json!({"variant": 300}), serde_json::json!({"variant": -1}),
+            serde_json::json!({"angle": 3})] {
+            let mut action = serde_json::json!({"start": 10, "end": 40, "move": "jab"});
+            action.as_object_mut().unwrap().extend(bad.as_object().unwrap().clone());
+            let loaded = load(serde_json::json!([action]));
+            assert!(loaded.validate().is_ok());
+            let marks = Marks::from_recording(&loaded, on());
+            assert!(!marks.recorded(), "{bad}");
+            assert_eq!(marks.list().iter().map(|mark| mark.start).collect::<Vec<_>>(), [10, 90]);
+        }
+        // A number the move names do not know, an angle that is no angle and a key of a later build: the marks stay.
+        let odd = load(serde_json::json!([
+            {"start": 10, "end": 40, "move": "jab", "variant": 99},
+            {"start": 90, "end": 120, "move": tilt, "variant": 7, "angle": "sideways", "later": true}]));
+        assert!(Marks::from_recording(&odd, on()).recorded());
+        assert_eq!(names(&odd, on()), ["Jab", "Forward tilt"]);
+        assert_eq!(names(&odd, Namer::OFF), ["Jab", "Side tilt"]);
+    }
+
+    fn a_crop_and_a_record_time_trim_keep_the_variants() {
+        let tilt = full_move_key(Move::SideTilt);
+        let mut source = recording();
+        source.actions = vec![
+            ActionMark { start: 10, end: Some(40), mv: Some("jab".into()), variant: 1, angle: None },
+            ActionMark { start: 90, end: Some(150), mv: Some(tilt.into()), variant: 7, angle: Some("up".into()) }];
+        let mut editor = ClipEditor::macro_file(source, true).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(5));
+        let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("crop") };
+        assert_eq!(saved.actions, vec![
+            ActionMark { start: 5, end: Some(35), mv: Some("jab".into()), variant: 1, angle: None },
+            ActionMark { start: 85, end: Some(145), mv: Some(tilt.into()), variant: 7, angle: Some("up".into()) }]);
+        assert_eq!(names(&saved, on()), ["Jab 1", "Forward tilt ↑"]);
+        let root = scratch("trim-variants");
+        let spans = [Span { start: 12, end: Some(40), mv: Some(Move::Jab), variant: 1, angle: None },
+            Span { start: 92, end: Some(150), mv: Some(Move::SideTilt), variant: 7, angle: Some(Angle::Down) }];
+        let id = save_capture(&root, &inputs(), &spans, crate::model::trim::Trim::End);
+        let drill = rr_runtime::save_drill_take(&root, inputs(), StartState::neutral(0, 0, 1.0), crate::model::trim::Trim::End, 2, &spans).unwrap().unwrap();
+        for id in [id, drill] {
+            let loaded = Library::new(root.join("macros")).load(&id).unwrap();
+            assert_eq!(loaded.actions.iter().map(|mark| (mark.start, mark.variant, mark.angle.as_deref())).collect::<Vec<_>>(),
+                [(10, 1, None), (90, 7, Some("down"))]);
+            assert_eq!(names(&loaded, on()), ["Jab 1", "Forward tilt ↓"]);
+        }
+    }
+
+    /// rv-preview-vis 13:55:17Z and 14:04:42Z: the editor as it is reopened, with the published toggle, table and
+    /// Player 1 and no injected Namer. A special is named by the fighter the take was recorded on, or by the common
+    /// name: never by another fighter's, and never by another Mii's selection.
+    fn the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on() {
+        use crate::model::move_names::{FighterId, Names, PUBLISHED};
+        const CHILD: &str = "TR_MARK_NAMES_CHILD";
+        let name = "the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on";
+        if std::env::var_os(CHILD).is_none() {
+            // The published names are one per process: this case runs alone in a child.
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "engine::macro_ui::clip_marks::tests::case_table", "--nocapture"])
+                .env("TR_TABLE_CASE", name).env(CHILD, "1").output().unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(output.status.success() && stdout.contains("running 1 test"), "{stdout}\n{}", String::from_utf8_lossy(&output.stderr));
+            return;
+        }
+        let alpha = FighterId { chara: crate::model::hash40::hash40("ui_chara_alpha") & 0xff_ffff_ffff, specials: [0; 4] };
+        let saved = |kind: i32, action: ActionMark, press: bool| {
+            let mut frames = vec![InputFrame::default(); 60];
+            if press { frames[0].buttons = 1; }
+            let mut take = MacroRecording::new("Take", "13.0.5", StartState::neutral(kind, 0, 1.0), frames).unwrap();
+            take.actions = vec![action];
+            let root = scratch("reopen");
+            let library = Library::new(&root);
+            let id = library.save_new(&take).unwrap();
+            ClipEditor::macro_file(library.load(&id).unwrap(), true).unwrap().view().move_text
+        };
+        let mark = |mv: Option<Move>, variant: u8| ActionMark { start: 0, end: Some(20), mv: mv.map(|mv| full_move_key(mv).into()), variant, angle: None };
+        let special = |kind: i32| saved(kind, mark(Some(Move::NeutralSpecial), 0), false);
+        let rows = |special_name: &str, jab: &str, tilt: &str| {
+            assert_eq!(special(6), format!("Start of {special_name}"));
+            assert_eq!(saved(6, mark(Some(Move::Jab), 2), false), format!("Start of {jab}"));
+            // An old take's side tilt has no variant.
+            assert_eq!(saved(6, mark(Some(Move::SideTilt), 0), false), format!("Start of {tilt}"));
+            // A mark with no move keeps the name of the input that started it; none is inferred from the button.
+            assert_eq!(saved(6, mark(None, 0), true), "Start of Attack");
+        };
+        PUBLISHED.set_player(Some((6, alpha)));
+        rows("Neutral B", "Jab", "Side tilt");
+        PUBLISHED.set_on(true);
+        // On with no names table: the common names.
+        rows("Neutral special", "Jab 2", "Forward tilt");
+        PUBLISHED.publish(Box::new(Names::build(&crate::model::move_names::tests::shared_file()).unwrap()));
+        rows("Test Pulse", "Jab 2", "Forward tilt");
+        // Player 1 is now another fighter, or none: the take's special is not named by it.
+        PUBLISHED.set_player(Some((7, alpha)));
+        assert_eq!(special(6), "Start of Neutral special");
+        PUBLISHED.set_player(None);
+        assert_eq!(special(6), "Start of Neutral special");
+        // A Mii take that stored no selection, with a Mii of that kind as Player 1: its selection is not the take's.
+        PUBLISHED.set_player(Some((0x48, alpha)));
+        assert_eq!(special(0x48), "Start of Neutral special");
+        PUBLISHED.set_on(false);
+        rows("Neutral B", "Jab", "Side tilt");
+    }
+
+    fn a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names() {
+        use crate::model::move_names::FighterId;
+        let id = |specials| FighterId { chara: 0x12_3456_789a, specials };
+        let live = id([2, 0, 1, 2]);
+        // An ordinary fighter of the take's kind is the take's fighter.
+        assert_eq!(take_identity(Some((6, id([0; 4]))), 6, None), Some(id([0; 4])));
+        assert_eq!(take_identity(Some((7, id([0; 4]))), 6, None), None);
+        assert_eq!(take_identity(None, 6, None), None);
+        // Two Miis of one kind differ by their selection: the take's stored one names it, never the live one.
+        for kind in [0x48, 0x49, 0x4a] {
+            assert_eq!(take_identity(Some((kind, live)), kind, None), None);
+            assert_eq!(take_identity(Some((kind, live)), kind, Some([0, 1, 2, 0])), Some(id([0, 1, 2, 0])));
+            assert_eq!(take_identity(Some((kind - 3, live)), kind, Some([0, 1, 2, 0])), None);
+        }
+        assert_eq!(MII_KINDS, 0x48..=0x4a);
+        assert!(include_str!("../mii/mii_setup.rs").contains("if !(0x48..=0x4a).contains(&self.kind)"));
+        let panel = include_str!("clip_panel.rs").split("#[cfg(test)]").next().unwrap();
+        assert!(panel.contains("Namer::recorded(recording.recorded_fighter.or_else("));
+        assert!(panel.contains("PUBLISHED.player(), recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials)"));
+        assert!(!panel.contains("recorded_identity("));
+    }
+
+    /// tr-primary-2 14:33:53Z and 14:41:51Z: a take that stored its fighter, and a Vault capture's side, name their
+    /// specials by that fighter whoever Player 1 is. The capture is built by the hook's own events (`VaultArchive`).
+    fn a_take_and_a_vault_side_name_their_specials_by_their_own_fighter() {
+        use crate::engine::macros::handoff::{VaultArchive, VaultEvent};
+        use crate::engine::macros::ReplayFrame;
+        use crate::model::move_names::{FighterId, Names, PUBLISHED};
+        const CHILD: &str = "TR_MARK_NAMES_CHILD";
+        let name = "a_take_and_a_vault_side_name_their_specials_by_their_own_fighter";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "engine::macro_ui::clip_marks::tests::case_table", "--nocapture"])
+                .env("TR_TABLE_CASE", name).env(CHILD, "1").output().unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(output.status.success() && stdout.contains("running 1 test"), "{stdout}\n{}", String::from_utf8_lossy(&output.stderr));
+            return;
+        }
+        let id = |suffix: &str| FighterId { chara: crate::model::hash40::hash40(&format!("ui_chara_{suffix}")) & 0xff_ffff_ffff, specials: [0; 4] };
+        let (alpha, beta) = (id("alpha"), id("beta"));
+        PUBLISHED.publish(Box::new(Names::build(&crate::model::move_names::tests::shared_file()).unwrap()));
+        PUBLISHED.set_on(true);
+        // Player 1 is another fighter than the one recorded.
+        PUBLISHED.set_player(Some((6, alpha)));
+        let root = scratch("own-fighter");
+        let library = Library::new(root.join("macros"));
+        let reopened = |fighter: Option<FighterId>| {
+            let mut take = MacroRecording::new("Take", "13.0.5", StartState::neutral(8, 0, 1.0), vec![InputFrame::default(); 60]).unwrap();
+            take.actions = vec![ActionMark { start: 0, end: Some(20), mv: Some(full_move_key(Move::UpSpecial).into()), ..ActionMark::default() }];
+            take.recorded_fighter = fighter;
+            let id = library.save_new(&take).unwrap();
+            ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap().view().move_text
+        };
+        assert_eq!(reopened(Some(beta)), "Start of Test Lunar Lift");
+        assert_eq!(reopened(None), "Start of Up special");
+        // The Vault playback hook's events: both entries sampled, the CPU side's identity posted once after its first sample.
+        let mut archive = VaultArchive::new();
+        archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+        for frame in 0..40u32 {
+            for (entry, kind) in [(0, 6), (1, 8)] {
+                let sample = ReplayFrame { input: InputFrame { buttons: if frame == 5 { 2 } else { 0 }, ..InputFrame::default() },
+                    start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+                archive.apply(VaultEvent::Sample { epoch: 1, entry, sample, quantized: false }, 0);
+                if frame == 0 && entry == 1 { archive.apply(VaultEvent::Fighter { epoch: 1, entry, fighter: beta }, 0); }
+            }
+        }
+        archive.apply(VaultEvent::End { epoch: 1, truncated: false }, 0);
+        let mut editor = ClipEditor::new(archive.session.clone(), vec![0]).unwrap();
+        assert!(editor.select_entry(1));
+        let ClipEffect::Export(exported) = editor.on_action(ClipAction::Confirm) else { panic!("export") };
+        assert_eq!((exported.start.fighter_kind, exported.recorded_fighter), (8, Some(beta)));
+        for make in [crate::model::recording_menu::Make::Macro, crate::model::recording_menu::Make::Drill] {
+            let source = match rr_runtime::generate(&root, (*exported).clone(), "Made", make, Role::Cpu, 1).unwrap() {
+                rr_runtime::Generated::Macro(id) => id,
+                rr_runtime::Generated::Pass(ask) => ask.source,
+            };
+            assert_eq!(library.load(&source).unwrap().recorded_fighter, Some(beta), "{make:?}");
+        }
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::Preview(preview) if preview.recorded_fighter == Some(beta)));
+        editor.watch(&[Span { start: 6, end: Some(30), mv: Some(Move::UpSpecial), ..Span::default() }]);
+        editor.preview_cursor(6);
+        assert_eq!(editor.view().move_text, "Start of Test Lunar Lift");
+        // The capture's Player 1 side had no identity posted: its export has no key.
+        let mut other = ClipEditor::new(archive.session.clone(), vec![0]).unwrap();
+        assert!(other.select_entry(0));
+        let ClipEffect::Export(plain) = other.on_action(ClipAction::Confirm) else { panic!("export") };
+        assert_eq!(plain.recorded_fighter, None);
+        // A crop wholly after a transformation is valid; the first form cannot name the later one's special.
+        archive.apply(VaultEvent::Begin { epoch: 2 }, 0);
+        for frame in 0..40 {
+            let sample = ReplayFrame { input: InputFrame::default(), x: 0.0, y: 0.0,
+                start: StartState::neutral(if frame < 20 { 8 } else { 9 }, 0, 1.0) };
+            archive.apply(VaultEvent::Sample { epoch: 2, entry: 1, sample, quantized: false }, 0);
+            if frame == 0 { archive.apply(VaultEvent::Fighter { epoch: 2, entry: 1, fighter: beta }, 0); }
+        }
+        archive.apply(VaultEvent::End { epoch: 2, truncated: false }, 0);
+        let mut later = ClipEditor::new(archive.session, vec![0]).unwrap();
+        later.on_action(ClipAction::SelectIn);
+        later.on_action(ClipAction::Nudge(20));
+        let ClipEffect::Preview(preview) = later.on_action(ClipAction::TogglePlay) else { panic!("later form preview") };
+        assert_eq!((preview.start.fighter_kind, preview.recorded_fighter), (9, None));
+        later.watch(&[Span { start: 2, end: Some(8), mv: Some(Move::UpSpecial), ..Span::default() }]);
+        later.preview_cursor(3);
+        assert_eq!(later.view().cursor, 22);
+        assert_eq!(later.view().move_text, "Start of Up special");
+        // The three producers: each reads the identity once, on the game's own thread.
+        for (text, wanted) in [
+            (include_str!("../../runtime/features/recording_host.rs"), "rr_host::set_fighter_reader(role_fighter);"),
+            (include_str!("../../runtime/features/recording_host.rs"), "super::move_names::fighter_id(body.accessor, kind)"),
+            (include_str!("../../runtime/macros/replay_capture.rs"), "VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }"),
+            (include_str!("../../runtime/macros/live_replay.rs"), "capture.pool.name(pending.key, entry, fighter)"),
+            (include_str!("../rr_host.rs"), "cpu: CaptureOwner::new(start.poses[1].fighter_kind, read_fighter(Role::Cpu))"),
+        ] {
+            assert!(text.contains(wanted), "missing {wanted}");
+        }
     }
 
     #[test]
@@ -1084,6 +1658,20 @@ mod tests {
             ("a_record_time_trim_keeps_the_marks_inside_the_kept_frames", a_record_time_trim_keeps_the_marks_inside_the_kept_frames),
             ("damaged_marks_in_a_file_are_ignored_not_fatal", damaged_marks_in_a_file_are_ignored_not_fatal),
             ("the_capture_watch_follows_the_recorded_fighter_while_a_take_is_open", the_capture_watch_follows_the_recorded_fighter_while_a_take_is_open),
+            ("a_held_attack_on_kirby_is_recorded_as_jab_1_then_jab_2", a_held_attack_on_kirby_is_recorded_as_jab_1_then_jab_2),
+            ("a_three_hit_jab_is_jab_1_jab_2_and_jab_3", a_three_hit_jab_is_jab_1_jab_2_and_jab_3),
+            ("a_rapid_jab_and_its_finisher_are_named", a_rapid_jab_and_its_finisher_are_named),
+            ("an_old_take_with_no_variant_reads_as_before_off_and_through_the_namer_on", an_old_take_with_no_variant_reads_as_before_off_and_through_the_namer_on),
+            ("with_move_names_off_a_mark_reads_as_before", with_move_names_off_a_mark_reads_as_before),
+            ("an_angled_forward_tilt_is_named_with_its_angle", an_angled_forward_tilt_is_named_with_its_angle),
+            ("a_preview_on_the_cpu_or_player_1_names_the_moves_of_a_take_without_marks", a_preview_on_the_cpu_or_player_1_names_the_moves_of_a_take_without_marks),
+            ("every_variant_names_a_mark_as_the_combo_views_do", every_variant_names_a_mark_as_the_combo_views_do),
+            ("a_throw_names_its_grab_mark", a_throw_names_its_grab_mark),
+            ("a_variant_of_the_wrong_shape_reads_as_no_marks", a_variant_of_the_wrong_shape_reads_as_no_marks),
+            ("a_crop_and_a_record_time_trim_keep_the_variants", a_crop_and_a_record_time_trim_keep_the_variants),
+            ("the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on", the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on),
+            ("a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names", a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names),
+            ("a_take_and_a_vault_side_name_their_specials_by_their_own_fighter", a_take_and_a_vault_side_name_their_specials_by_their_own_fighter),
         ]);
     }
     }
