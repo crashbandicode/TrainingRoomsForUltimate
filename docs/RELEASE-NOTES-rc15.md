@@ -159,6 +159,109 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
 
 - **Quick Play.** Picking a different fighter at the character select starts the waiting-room practice fresh.
 
+### Clips
+
+Recorded in Eden on the installed build, not on the console. Where a clip is a close-up, the effect sits on a
+small panel that cannot be read at full-screen size. The yellow BRIDGE LIVE banner in some frames is the test
+tool's, not TrainingRooms'.
+
+**The clip editor over the game**
+
+<video src="media/i4-replay-editor-timeline.mp4" autoplay muted loop playsinline controls></video><br>
+*Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-timeline.mp4)
+
+**Preview on Player 1, then on the CPU**
+
+<video src="media/i4-replay-editor-preview.mp4" autoplay muted loop playsinline controls></video><br>
+*X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-preview.mp4)
+
+**Recordings**
+
+<video src="media/i4-vault-recordings-menu.mp4" autoplay muted loop playsinline controls></video><br>
+*RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-recordings-menu.mp4)
+
+**Playing a capture back**
+
+<video src="media/i4-vault-playback.mp4" autoplay muted loop playsinline controls></video><br>
+*Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-playback.mp4)
+
+**Trim: Off, Start, End and Both**
+
+<video src="media/i4-trim-modes.mp4" autoplay muted loop playsinline controls></video><br>
+*The same take played with each Trim setting, side by side. With Start and Both the attack comes at once; with Off and End the idle lead-in plays first. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-trim-modes.mp4)
+
+**The playback indicator**
+
+<video src="media/i4-playback-indicator-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the top left of the screen: the PLAY CPU mark shows while the CPU plays a take and goes when it ends. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-playback-indicator-zoom.mp4)
+
+**Drill steps are listed by move**
+
+<video src="media/i4-drill-step-names.mp4" autoplay muted loop playsinline controls></video><br>
+*DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-drill-step-names.mp4)
+
+**Move names Off and On**
+
+<video src="media/i4-move-names-toggle.mp4" autoplay muted loop playsinline controls></video><br>
+*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-move-names-toggle.mp4)
+
+**Match angle and deflection, Off**
+
+<video src="media/i4-action-off-147-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A warp recorded at 135° is cast at 147° with the option Off: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-off-147-zoom.mp4)
+
+**Match angle and deflection, On, another angle**
+
+<video src="media/i4-action-on-147-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. The same cast at 147° with the option On: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-147-zoom.mp4)
+
+**Match angle and deflection, On, the recorded angle**
+
+<video src="media/i4-action-on-135-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A cast at the recorded 135° with the option On: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-135-zoom.mp4)
+
+**A steered special, steered**
+
+<video src="media/i4-steer-steered-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A drill recorded with an up special steered up-left: the steered cast is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-steered-zoom.mp4)
+
+**A steered special, not steered**
+
+<video src="media/i4-steer-straight-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. The same drill with the up special cast straight: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-straight-zoom.mp4)
+
+**A get-up attack, recorded**
+
+<video src="media/i4-edge-getup-record.mp4" autoplay muted loop playsinline controls></video><br>
+*Place fighters starts Kirby lying down, and his get-up attack is recorded. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-record.mp4)
+
+**A get-up attack, played back**
+
+<video src="media/i4-edge-getup-play.mp4" autoplay muted loop playsinline controls></video><br>
+*Playing the take puts Kirby down again and repeats the get-up attack. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-play.mp4)
+
+**L + R + A by itself**
+
+<video src="media/i4-reset-chord-alone-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. After one green attempt, L + R + A alone, short and long, adds no square: the streak stays at 1. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-chord-alone-zoom.mp4)
+
+**L + R + A after a failed attempt**
+
+<video src="media/i4-reset-after-fail-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
+
+**Scrolling the input display back**
+
+<video src="media/i4-scrollback-zoom.mp4" autoplay muted loop playsinline controls></video><br>
+*Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-scrollback-zoom.mp4)
+
+**Damage range sliders**
+
+<video src="media/i4-cpu-damage-range.mp4" autoplay muted loop playsinline controls></video><br>
+*CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-cpu-damage-range.mp4)
+
+**A ledge attack:** Clip coming. The trip attack is filmed like the get-up attack and kept with the test records.
+
 ### Tested
 
 - **Installed:** yes, and read back.
