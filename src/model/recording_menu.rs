@@ -1574,8 +1574,11 @@ impl RecordingScreens {
                 let Some(side) = self.recording_by_id(&id).and_then(|recording| recording.sides.get(file.capture_side)) else { return };
                 self.last_effect = Effect::OpenRecording { id, entry: side.entry, player: file.capture_player, make, play };
             }
+            Act::Placement if kind == ItemKind::Save => {
+                self.last_effect = Effect::ChangePlacement { save: id, relink: None };
+            }
             Act::Placement => {
-                // The save itself; a macro's start save; a chain's macro 1's, with macro 1 the one a copy is linked to.
+                // A macro's start save; a chain uses macro 1, including for relinking a copy.
                 let target = match self.macro_by_id(&id) {
                     Some(file) if file.chain => self.chain_start_id(file).map(str::to_owned).zip(file.steps.first().cloned()),
                     Some(file) => file.start_save.clone().map(|save| (save, id.clone())),
@@ -1583,7 +1586,6 @@ impl RecordingScreens {
                 };
                 self.last_effect = match target {
                     Some((save, relink)) => Effect::ChangePlacement { save, relink: Some(relink) },
-                    None if kind == ItemKind::Save => Effect::ChangePlacement { save: id, relink: None },
                     None => Effect::None,
                 };
             }
