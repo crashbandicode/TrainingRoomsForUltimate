@@ -1612,8 +1612,11 @@ impl RecordingScreens {
                 let Some(side) = self.recording_by_id(&id).and_then(|recording| recording.sides.get(file.capture_side)) else { return };
                 self.last_effect = Effect::OpenRecording { id, entry: side.entry, player: file.capture_player, make, play };
             }
+            Act::Placement if kind == ItemKind::Save => {
+                self.last_effect = Effect::ChangePlacement { save: id, relink: None };
+            }
             Act::Placement => {
-                // The save itself; a macro's start save; a chain's macro 1's, with macro 1 the one a copy is linked to.
+                // A macro's start save; a chain uses macro 1, including for relinking a copy.
                 let target = match self.macro_by_id(&id) {
                     Some(file) if file.chain => self.chain_start_id(file).map(str::to_owned).zip(file.steps.first().cloned()),
                     Some(file) => file.start_save.clone().map(|save| (save, id.clone())),
@@ -1621,7 +1624,6 @@ impl RecordingScreens {
                 };
                 self.last_effect = match target {
                     Some((save, relink)) => Effect::ChangePlacement { save, relink: Some(relink) },
-                    None if kind == ItemKind::Save => Effect::ChangePlacement { save: id, relink: None },
                     None => Effect::None,
                 };
             }
@@ -2934,6 +2936,23 @@ mod tests {
             screens.file = None;
             screens.open_file(id.into(), ItemKind::Recording);
             assert!(!shown(&screens).iter().any(|row| row.0 == "Momentum" || row.0 == "Offset"), "{id}");
+        }
+    }
+
+    fn placement_uses_the_open_file_kind_when_ids_collide() {
+        let mut catalog = example();
+        catalog.saves[0].id = "nair".into();
+        let mut screens = RecordingScreens::new();
+        screens.set_catalog(catalog);
+        for (kind, save, relink) in [
+            (ItemKind::Recording, "nair-start", Some("nair")),
+            (ItemKind::Save, "nair", None),
+        ] {
+            screens.open_file("nair".into(), kind);
+            let row = screens.file_rows().iter().position(|row| row.title == "Change placement").unwrap();
+            screens.set_file_cursor(row);
+            assert!(matches!(screens.handle_page(Button::A, true, SAVES_MACROS), PageHit::Close));
+            assert_eq!(screens.take_effect(), Effect::ChangePlacement { save: save.into(), relink: relink.map(str::to_owned) });
         }
     }
 
@@ -4597,6 +4616,7 @@ mod tests {
             ("a_macro_and_a_chain_open_their_start_save", a_macro_and_a_chain_open_their_start_save as fn()),
             ("the_pop_up_opens_change_placement_with_x_on_a_save", the_pop_up_opens_change_placement_with_x_on_a_save as fn()),
             ("a_macro_shows_its_momentum_and_an_old_offset_and_a_clears_it", a_macro_shows_its_momentum_and_an_old_offset_and_a_clears_it as fn()),
+            ("placement_uses_the_open_file_kind_when_ids_collide", placement_uses_the_open_file_kind_when_ids_collide as fn()),
             ("popup_zr_toggles_the_role_like_the_page", popup_zr_toggles_the_role_like_the_page as fn()),
             ("popup_l_r_zl_switch_tabs_and_never_set_the_role", popup_l_r_zl_switch_tabs_and_never_set_the_role as fn()),
             ("popup_footer_names_zr_role_and_tab_keys", popup_footer_names_zr_role_and_tab_keys as fn()),
