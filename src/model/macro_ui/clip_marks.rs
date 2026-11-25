@@ -810,15 +810,23 @@ mod tests {
 
     fn a_record_time_trim_keeps_the_marks_inside_the_kept_frames() {
         let root = scratch("trim");
-        let spans = [Span { start: 12, end: Some(150), mv: Some(Move::Jab) }];
+        let spans = [Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
+            Span { start: 92, end: Some(150), mv: Some(Move::SideTilt) }];
         let id = save_capture(&root, &inputs(), &spans, true);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
-        assert_eq!(loaded.frames.len(), 91);
-        assert_eq!(loaded.actions.first().map(|mark| (mark.start, mark.end)), Some((10, None)));
         let drill = rr_runtime::save_drill_take(&root, inputs(), StartState::neutral(0, 0, 1.0), true, 2, &spans).unwrap().unwrap();
         let drill = Library::new(root.join("macros")).load(&drill).unwrap();
-        assert_eq!(drill.frames.len(), 91);
-        assert_eq!(drill.actions.first().map(|mark| (mark.start, mark.end)), Some((10, None)));
+        for take in [loaded, drill] {
+            assert_eq!(take.frames.len(), 91);
+            assert_eq!(take.actions.iter().map(|m| (m.start, m.end)).collect::<Vec<_>>(), [(10, Some(40)), (90, Some(91))]);
+            let mut editor = ClipEditor::macro_file(take, true).unwrap();
+            set_out(&mut editor, 80);
+            editor.on_action(ClipAction::Snap);
+            assert_eq!(editor.view().end, 91);
+            assert!(editor.view().move_text.starts_with("End of "));
+        }
+        let open = [ActionMark { start: 90, end: None, mv: None }];
+        assert_eq!(Marks::window(&open, 5, 91)[0].end, None);
     }
 
     fn damaged_marks_in_a_file_are_ignored_not_fatal() {

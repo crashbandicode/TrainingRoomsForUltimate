@@ -107,7 +107,8 @@ pub const THREADS: [ThreadStack; 19] = [
     // record and a frame of its own for `ComboRecord::from_value` were measured and did not help (probes 1fa8e40c,
     // 48f7b8ef). Reading the links straight into the record did: `decode::<ComboRecord>` went from 11,520 to 7,680 B and
     // the path to 53,888 B (release) and 53,904 B (diag).
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 53_904, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // With the replay editor and automatic trim, the ELF path is 54,864 B (release) and 54,880 B (diag).
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_880, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

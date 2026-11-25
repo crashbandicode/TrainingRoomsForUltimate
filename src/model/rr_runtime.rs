@@ -196,10 +196,7 @@ pub fn finish_recording(
     at: u64,
     trim: bool,
 ) -> Result<RecordStop, Error> {
-    let mut frames = capture.frames.clone();
-    if trim {
-        super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
-    }
+    let (frames, marks) = finish_take(capture.frames.clone(), &capture.spans, trim);
     if frames.is_empty() {
         return Ok(RecordStop::Empty);
     }
@@ -227,7 +224,7 @@ pub fn finish_recording(
     let start = NamedSave::new(start_name, player, cpu)?;
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
-    recording.actions = kept_marks(&capture.frames, &capture.spans, recording.frames.len());
+    recording.actions = marks;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
@@ -245,28 +242,30 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
 /// `None` when no frame is left.
-pub fn save_drill_take(root: &Path, mut frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64, spans: &[Span]) -> Result<Option<String>, Error> {
-    let marks = kept_marks(&frames, spans, frames.len());
-    if trim {
-        super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
-    }
+pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: bool, at: u64, spans: &[Span]) -> Result<Option<String>, Error> {
+    let (frames, marks) = finish_take(frames, spans, trim);
     if frames.is_empty() {
         return Ok(None);
     }
     let macros = Library::new(root.join(MACROS_DIR));
     let name = drill_take_name(drill_take_key(&frames, at));
     let mut recording = MacroRecording::new(name, "13.0.5", start, frames).map_err(record)?;
-    recording.actions = Marks::window(&marks, 0, recording.frames.len() as u32);
+    recording.actions = marks;
     macros.save_new(&recording).map_err(record).map(Some)
 }
 
-/// A take's marks for its file: read over every captured frame, then the window of the `kept` frames. A take the
-/// watch never followed gets none, so its file falls back to the input starts.
-fn kept_marks(captured: &[InputFrame], spans: &[Span], kept: usize) -> Vec<ActionMark> {
-    if spans.is_empty() {
-        return Vec::new();
+/// Measure before trimming. Only a known end can be clamped to the retained take's exclusive end.
+fn finish_take(mut frames: Vec<InputFrame>, spans: &[Span], trim: bool) -> (Vec<InputFrame>, Vec<ActionMark>) {
+    let mut marks = if spans.is_empty() { Vec::new() } else { Marks::capture(&frames, spans) };
+    if trim {
+        super::macro_ui::macro_panel::crop_neutral_tail(&mut frames);
+        let end = frames.len() as u32;
+        marks.retain_mut(|mark| {
+            mark.end = mark.end.map(|at| at.min(end));
+            mark.start < end
+        });
     }
-    Marks::window(&Marks::capture(captured, spans), 0, kept as u32)
+    (frames, marks)
 }
 
 /// The key in a take's name: FNV-1a 64 over the take's frames (per frame the buttons little-endian, then the four
