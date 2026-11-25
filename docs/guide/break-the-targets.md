@@ -1,10 +1,11 @@
 # Break the Targets
 
+<!-- CLIP: tut-break-the-targets.mp4 | Break the Targets starts → targets appear → Mario breaks them and the score counts -->
+*Clip coming.*
+
 Works in Training and in the [waiting room](waiting-rooms.md). Place up to ten targets, then break them as fast as you can. Choose **Start** in [Practice games](../menu/practice-games.md#break-the-targets): if this stage has no targets, the placement view opens first. The clock starts on your first gameplay input and stops when the last target breaks.
 
 Use **Saved layouts** to load, rename, duplicate or delete a layout for the current stage. Editing a loaded layout does not overwrite it: save a new one to keep your changes. **Projectiles break targets** and **Hit streak** are optional.
-
-<!-- CLIP targets-place-and-break: Place targets with the crosshair, start the course and break the last target to show the time. -->
 
 | Button | What it does |
 | --- | --- |

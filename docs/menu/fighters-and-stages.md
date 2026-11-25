@@ -424,6 +424,8 @@ list doesn't grey them for that.
 
 ## Practice games
 
+Tutorials: [Practice games](practice-games.md), [Parry practice](../guide/parry-practice.md), [Mash out](../guide/mash-out.md), [Break the Targets](../guide/break-the-targets.md), [Tech practice](../guide/tech-practice.md) and [Eggs-ercise](../guide/eggs-ercise.md).
+
 **Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets**, **Tech practice**, **Mash out**
 (its screen: Start, then State, Attacker move and Grab type; it runs until Stop) and **Parry practice** (Start, then
 10 attempts or Free practice, Saved parry practices and Save this parry practice; using a saved practice starts it when
@@ -657,6 +659,8 @@ positions belong to their stage.
 *Fighters & Stages > Practice games > Saved layouts, A: Battlefield's layouts, the five used last in the green outline and a thin line under the fifth (Layout 7 to Layout 3, then Layout 1 and 2). A on Layout 7 opens its own screen; A on Load turns Break the Targets On and the menu closes onto the zoomed-out stage with the three targets: "Loaded Layout 7 · Battlefield: close the menu to start". Eden, rc.14 (untested on hardware).*
 
 ## Stage tech practice
+
+Tutorials: [Practice games](practice-games.md) and [Tech practice](../guide/tech-practice.md).
 
 Practice your techs by being launched at a spot on the stage, then try to tech when you touch it.
 Open **Fighters & Stages > Practice games > Tech practice**: its screen holds **Start**, the session, the wizard, the

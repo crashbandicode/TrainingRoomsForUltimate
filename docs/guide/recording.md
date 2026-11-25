@@ -38,6 +38,15 @@ gives the game's revival.*
 Press Record (ZR + D-pad Down) to start and again to stop. The inputs are kept as a named macro (Macro 1, Macro 2, …;
 rename it on its own screen). The Record presses themselves are not in the recording.
 
+<!-- CLIP: tut-record-macro.mp4 | ZR + D-pad Down starts Record: the REC mark, Mario tinted → jab, jab, smash → the chord stops it and the notice names the macro -->
+*Clip coming.*
+
+1. Choose who records in the pop-up (ZR + D-pad Right): Player 1 at first, or the CPU.
+2. Press ZR + D-pad Down. While the take records, the HUD shows **REC P1** in red or **REC CPU** in blue, and the
+   recorded fighter is tinted the same way: Player 1 red, the CPU blue. Before a CPU take starts, the CPU is tinted
+   yellow, then magenta, while it waits.
+3. Do your moves, then press ZR + D-pad Down again. The take is listed under MACROS.
+
 ![Record writes the inputs as a macro and the spot as its start save; the macro becomes the active macro of the side that recorded](../diagrams/recording-record-flow.png)
 
 - **Who records:** the side the pop-up is set to (Player 1 until you pick CPU there). A recording made for the CPU
@@ -136,6 +145,9 @@ because the picker lists recordings only.
 
 ### Getting a combo
 
+<!-- CLIP: tut-combo-save-drill.mp4 | Kirby lands jab into side tilt → Recording › Combos & Sequences › + Save last combo… → the next try is graded on the link cells -->
+*Clip coming.*
+
 - **+ Save last combo…** is the first row of COMBOS, on the Recording page and in the pop-up's Combos & Sequences tab.
   It keeps the last combo the frame strip saw and makes it the drill. A opens the keyboard for a name. An empty name,
   or a room where no keyboard can open, gives it the next Combo N. With no link on the strip yet it says so and saves
@@ -191,6 +203,9 @@ recorded one.
 *Cropped to the top of the screen.*
 
 ### Input drills
+
+<!-- CLIP: tut-input-drill-record.mp4 | DRILLS › + Record drill… → Record chord, the moves, stop → the drill's steps listed → one graded try -->
+*Clip coming.*
 
 **DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Trim, Crop and Delete, plus Made from when a macro or chain made it. Macro and drill Trim skips neutral frames during playback without removing them; hit combos have no Trim row because they have no idle input frames.
 

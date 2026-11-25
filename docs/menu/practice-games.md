@@ -8,6 +8,10 @@ For choices, use **Left/Right** or **A** to open the list, **Up/Down** to choose
 
 Starting or stopping a game does not flash the game's pause screen, except that Guard the Edge and Juggler may briefly open it when changing or restoring CPU Behavior involving **Control** or a non-CPU-controlled fighter.
 
+**Hit streak** is available separately in Eggs-ercise and Break the Targets. When On, it shows the current streak and
+session best; a whiff resets the current streak. It applies at the next Start. In Eggs-ercise, an expired target also
+resets the streak.
+
 ## [Eggs-ercise](../guide/eggs-ercise.md)
 
 | Option | What it does | Values; default |
@@ -15,14 +19,14 @@ Starting or stopping a game does not flash the game's pause screen, except that 
 | Start / Stop | Starts or stops Eggs-ercise. | Action; **A** |
 | Eggs-ercise | Sets the goal or time limit. | 1 minute, 10 targets, 20 targets, Free practice; **1 minute** |
 | Breaks on | Chooses which attacks, including projectiles, break targets. | Any attack, Aerials, Hits of 12%+; **Any attack** |
-| Target | Chooses a disc or the CPU as the target. | Disc, CPU; **Disc** |
+| Target | Chooses a disc or the CPU as the target; CPU page Hide CPU On uses a disc instead. | Disc, CPU; **Disc** |
 | Target speed | Changes target flight speed. | Normal, Slow, Fast; **Normal** |
 | Spawn area | Chooses where targets appear; an empty list uses In view. | In view, Whole stage, Off stage; **In view** |
 | Off-stage zone… | Opens the editor for this stage's off-stage target area. | Stage-specific area; **A** opens |
 | Moving paths | Chooses target flight paths; an empty list uses Pop up. | Richter's Axe, Pac-Man's Galaxian, Link's Boomerang, Samus's Homing Missile, Pop up; **Pop up** |
 | Target expiry | Replaces an unhit target after the chosen time. | Off, 1–10 seconds; **Off** |
-| Hit streak | Shows the current and best hit streak. | Off, On; **Off** |
-| CPU during a game | Hides or shows the CPU during the game. | Hide, Show; **Hide** |
+| Hit streak | See Hit streak above. | Off, On; **Off** |
+| CPU during a game | Hides or shows the CPU; a CPU target stays visible. | Hide, Show; **Hide** |
 
 ## [Break the Targets](../guide/break-the-targets.md)
 
@@ -32,7 +36,7 @@ Starting or stopping a game does not flash the game's pause screen, except that 
 | Projectiles break targets | Allows projectiles to break targets. | Off, On; **On** |
 | Place targets | Opens the target placement view. | Action; **A** opens |
 | Saved layouts | Opens saved layouts for the current stage. | Saved layouts; **A** opens |
-| Hit streak | Shows the current and best hit streak. | Off, On; **Off** |
+| Hit streak | See Hit streak above. | Off, On; **Off** |
 | CPU during a game | Hides or shows the CPU during the game; this is the same setting as in Eggs-ercise. | Hide, Show; **Hide** |
 
 ## [Tech practice](../guide/tech-practice.md)
