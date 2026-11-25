@@ -464,8 +464,8 @@ fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
         }
         _ => return Err("window"),
     };
-    let from = move_of(key("from")?).ok_or("from")?;
-    let to = move_of(key("to")?).ok_or("to")?;
+    let from = endpoint_move(key("from")?).ok_or("from")?;
+    let to = endpoint_move(key("to")?).ok_or("to")?;
     let (events, presses_only) = match o.get("events") {
         Some(Value::Array(events_in)) => {
             if events_in.len() > STEPS {
@@ -741,6 +741,10 @@ pub fn move_key(m: Move) -> &'static str {
 }
 fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
+}
+fn endpoint_move(key: &str) -> Option<Move> {
+    // Preserve the three bare aliases accepted before descriptions gained the edge attacks.
+    move_of(key).filter(|m| m.legacy() == *m || matches!(m, Move::Grab | Move::Throw | Move::FinalSmash))
 }
 fn button_key(b: Button) -> &'static str {
     key_of(&BUTTONS, b)

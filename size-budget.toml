@@ -2889,3 +2889,11 @@ ceiling = 200501
 date = "2026-11-25"
 reason = "Ledge, get-up and trip attacks as actions with their own moves: three move kinds with their names, the three engine-common statuses in the strip's table, their keys in the two file tables, and the tracker opening such an attack's own action from a wait that is not actionable. Measured 200501 on the install 4 head with smoke fix 1 (9eeb1164, 200471): +30, as measured on the smoke fix's own pin (200374 against 200344)."
 approved_by = "tr-primary-2 ruling 2026-11-25 02:17:20Z (the edge attacks' line budget approved at the measured value, +30 on smoke fix 1) and its standing rule of 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200505
+date = "2026-11-25"
+reason = "Edge review: keep description-only move keys out of the bare link endpoints while retaining earlier accepted aliases. Measured 200505, four above the submitted 1d1c8dc0."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z (measured fixes through +60, disclosed to primary)."
