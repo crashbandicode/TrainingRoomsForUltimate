@@ -2817,3 +2817,11 @@ ceiling = 199828
 date = "2026-11-24"
 reason = "Merge 4b: a combo file's links are read straight into the record, which takes the menu worker's deepest stack path from 57,728 to 53,888 B. Measured 199828 (tools/sloc.py tree), 4 above merge 4's 199824."
 approved_by = "tr-primary-2 2026-11-24 23:01:06Z (merge 4b, owner f15-lobby) and its standing rule of 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200581
+date = "2026-11-24"
+reason = "Replay editor (install 4, inbox 22:10:39Z item 2): the crop strip over the game, move marks and the watch, Y snap, the CPU / Player 1 play target, the recorded actions key and the drill preview strip. Measured 200581 on the branch with merge 4b folded (remote-gate size step, 07de4957): 753 above merge 4b 199828; about 350 of them are its 26 tests."
+approved_by = "tr-primary-2 2026-11-24 23:45:23Z (+718 approved; the measured value at READY counts, up to +900)."
