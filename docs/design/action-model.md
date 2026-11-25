@@ -147,7 +147,8 @@ path points in game units from where the part began. Everything is facing-relati
 - **Late travel.** A part can end after its step was graded; `Helper::regrade` grades that step again, as for a late
   angle.
 - **The toggle.** Recording › Options, *Match angle and deflection* (`combo_stick`, Off by default), read into
-  `combo::Settings::match_stick`.
+  `combo::Settings::match_stick`. A step keeps the grade of the setting in force when it was graded or graded again;
+  flipping the toggle during a drill does not grade its earlier steps again.
 
 ## A special's own travel
 
@@ -235,6 +236,8 @@ selected version and name.
   floor and what counts as steered were set from one fighter's sampled casts (Mario's up special) and not flown.
 - A different approach can move the path outside the wide-path tolerance even when the stick is not comparable.
   The result then reports the path, not wrong steering.
+- The entry tolerance was checked against one fighter's traced fall (Pikachu, 44 samples) and not flown. An attempt
+  whose entry does not compare has its stick left ungraded, so it can pass without the recorded steer.
 - Every stored combo carries the 120-byte travel table, also where no travel can occur (four 30-byte details).
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
@@ -275,7 +278,9 @@ selected version and name.
   `the_angle_and_deflection_toggle_grades_the_stick`, `the_toggle_row_reads_its_setting_and_is_off_by_default`,
   `a_travel_that_ends_after_its_step_was_graded_amends_the_grade`, `aim_details_round_trip_in_optional_keys`,
   `a_drill_keeps_details_for_its_first_four_aims`, `the_travel_table_is_packed_into_120_bytes_a_combo`,
-  `a_later_links_first_move_borrows_its_travel_arrows`, `a_failed_stick_angle_shows_the_difference_that_was_graded`.
+  `a_later_links_first_move_borrows_its_travel_arrows`, `a_failed_stick_angle_shows_the_difference_that_was_graded`,
+  `a_travel_that_ends_the_frame_after_its_step_was_graded_amends_the_grade`,
+  `the_stick_toggle_flipped_mid_drill_applies_from_the_next_grade`.
 - A special's own travel: `a_specials_own_travel_is_measured_from_its_start_to_its_end`,
   `a_special_that_does_not_move_has_no_own_travel`, `the_own_travel_ends_where_the_first_aim_part_begins`,
   `the_stick_most_held_is_kept_with_the_own_travel`, `the_tracker_hands_over_a_specials_own_travel_with_its_press`,
@@ -284,6 +289,10 @@ selected version and name.
   `a_specials_own_travel_is_kept_on_its_press`, `the_stick_toggle_also_grades_a_steered_specials_stick`,
   `a_press_keeps_its_own_travel_in_optional_keys`, `an_aims_detail_is_not_displaced_by_a_press_path`,
   `a_steered_specials_faults_reach_both_card_panes`.
+- Entry velocity: `entry_motion_does_not_turn_an_airborne_fixed_kick_into_a_steer`,
+  `entry_motion_on_a_steer_must_match_to_judge_the_stick`,
+  `entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick`,
+  `entry_motion_one_frame_apart_compares_on_all_44_pikachu_fall_samples`.
 - The new reasons and marks of both are also drawn by
   `every_reason_the_grader_can_give_is_shown_in_full_at_the_cards_width` and
   `every_mark_under_a_step_is_shown_in_full`.
