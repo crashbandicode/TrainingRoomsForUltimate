@@ -113,13 +113,23 @@ impl Placement {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ActionMark {
     pub start: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<u32>,
     #[serde(rename = "move", default, skip_serializing_if = "Option::is_none")]
     pub mv: Option<String>,
+    /// The move's variant as a combo link's description stores it (`move_names::Normal`); 0 is none and is not written.
+    #[serde(default, skip_serializing_if = "is_no_variant")]
+    pub variant: u8,
+    /// A side tilt's or side smash's angle, `up` or `down`, as a combo link's description stores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angle: Option<String>,
+}
+
+fn is_no_variant(variant: &u8) -> bool {
+    *variant == 0
 }
 
 /// A named, versioned, portable CPU macro.

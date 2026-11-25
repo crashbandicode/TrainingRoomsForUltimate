@@ -327,11 +327,33 @@ fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
     (!session.tracks.is_empty()).then_some(session)
 }
 
+/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that
+/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.
+fn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {
+    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};
+    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))
+}
+
+fn track_marks(track: &ReplayTrack) -> Marks {
+    Marks::from_inputs(track.frames.iter().map(|frame| frame.input))
+        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind)))
+}
+
 impl ClipEditor {
+    /// The same take or capture with its marks named by `namer` instead of the published toggle and fighter.
+    pub fn with_namer(mut self, namer: crate::model::move_names::Namer<'static>) -> Self {
+        if let Some(FileSource::Macro { recording, .. }) = &self.file {
+            self.marks = Marks::from_recording(recording, namer);
+        } else if self.file.is_none() {
+            self.marks = Marks::from_inputs(self.session.tracks[self.track].frames.iter().map(|frame| frame.input)).named(namer);
+        }
+        self
+    }
+
     pub fn new(session: ReplaySession, clean_statuses: Vec<i32>) -> Result<Self, String> {
         let session = prepare(session).ok_or("Play a saved replay in Vault first")?;
         let window = session.tracks[0].window()?;
-        let marks = Marks::from_inputs(session.tracks[0].frames.iter().map(|frame| frame.input));
+        let marks = track_marks(&session.tracks[0]);
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
@@ -358,7 +380,7 @@ impl ClipEditor {
 
     fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
         let marks = match &file {
-            FileSource::Macro { recording, .. } => Marks::from_recording(recording),
+            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording.start.fighter_kind)),
             FileSource::Combo(recording) => Marks::from_units(
                 crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()
                     .filter(|line| crate::model::recording_menu::link_head(line))),
@@ -574,7 +596,7 @@ impl ClipEditor {
         window.seek(self.window.cursor().min(window.total() - 1));
         self.track = index;
         self.window = window;
-        self.marks = Marks::from_inputs(self.session.tracks[index].frames.iter().map(|frame| frame.input));
+        self.marks = track_marks(&self.session.tracks[index]);
         self.playing = false;
         self.move_start = None;
     }
@@ -667,7 +689,7 @@ impl ClipEditor {
                     self.previous_selected = !self.previous_selected;
                     self.track = 0;
                     self.window = self.session.tracks[0].window().expect("nonempty capture");
-                    self.marks = Marks::from_inputs(self.session.tracks[0].frames.iter().map(|frame| frame.input));
+                    self.marks = track_marks(&self.session.tracks[0]);
                     self.handle = Handle::Playhead;
                     self.move_start = None;
                     self.pause();
