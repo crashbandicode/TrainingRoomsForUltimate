@@ -679,7 +679,7 @@ pub fn hud_tick(
 ) -> (bool, [Option<u8>; 2]) {
     let tracker = *TRACKER.lock();
     let (_, history) = RENDERER.lock().draw_with_spec(
-        &tracker, StripDraw { shown, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
+        &tracker, StripDraw { shown, back: None, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {
             #[cfg(feature = "diag")]
             if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {

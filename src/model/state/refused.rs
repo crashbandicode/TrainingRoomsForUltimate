@@ -29,6 +29,7 @@ pub enum Refused {
     Owner,
     /// The game speed pop-up is open: the press steered it.
     SpeedHold,
+    StripScroll,
     /// Online Deluxe's open page acts on this chord's D-pad (a chord rebound onto a button Deluxe uses).
     DeluxeRows,
     /// Both GameCube triggers are held: that is Online Deluxe's L + R.
@@ -53,6 +54,7 @@ impl Refused {
         match self {
             Refused::Owner => "owner",
             Refused::SpeedHold => "speed_hold",
+            Refused::StripScroll => "strip_scroll",
             Refused::DeluxeRows => "deluxe_rows",
             Refused::GameCubeTriggers => "gamecube_triggers",
             Refused::Off => "off",
@@ -68,7 +70,7 @@ impl Refused {
     pub const fn notice(self, action: Action) -> Option<&'static str> {
         let save = matches!(action, Action::Save);
         match self {
-            Refused::Owner | Refused::SpeedHold => None,
+            Refused::Owner | Refused::SpeedHold | Refused::StripScroll => None,
             // restriction: save-load-deluxe-page
             Refused::DeluxeRows => Some(if save { "Online Deluxe's open page uses this button: close it to save" } else { "Online Deluxe's open page uses this button: close it to load" }),
             // restriction: save-load-gamecube-triggers

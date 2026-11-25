@@ -738,6 +738,7 @@ impl<const N: usize, const L: usize> Panes<N, L> {
 #[derive(Clone, Copy)]
 pub struct StripDraw<'a> {
     pub shown: bool,
+    pub back: Option<u32>,
     pub spots: bool,
     pub parry: Option<&'a super::parry::View>,
     pub history_enabled: bool,
@@ -765,7 +766,7 @@ impl Renderer {
     /// `draw_spots`, with Parry practice's readouts, window and pills when `parry` (rc.15).
     #[cfg(test)]
     pub fn draw_parry(&mut self, tracker: &Tracker, shown: bool, spots: bool, parry: Option<&super::parry::View>, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-        self.draw_with_spec(tracker, StripDraw { shown, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
+        self.draw_with_spec(tracker, StripDraw { shown, back: None, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
     }
 
     /// All text, including the folded link, travels through the pane cache.
@@ -782,6 +783,10 @@ impl Renderer {
         let content = Content::new(tracker, draw, history);
         (self.show(super::panes::iv::units, |i| content.look(i), apply), history)
     }
+}
+
+pub fn back_text(_: u32) -> Text {
+    Text::new("now")
 }
 
 #[cfg(test)]
