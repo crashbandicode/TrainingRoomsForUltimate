@@ -14,9 +14,12 @@ Status: **rc.15, whose newest build is install 4** (commit `a945b0c1`, installed
 - **Tested in Eden, in part:** the final session checked drill grading, Trim, the clip editor and scroll-back in
   Training on `a9131331`. The reset-chord and Load-after retests passed on `a945b0c1`. The Quick Play match tested
   Online Deluxe's fonts, not TrainingRooms' waiting-room or Quick Play changes.
-- **No recorded hardware test:** no report from play on the console is on record for install 4.
+- **On the console:** the operator reported on install 4 twice on 2026-11-25: the move names Jab 1 and Jab 2 are
+  fine, and playback took a second or more to start. These are reports of what they saw, not a list of
+  passes.
 
-What ran, on which build, and what did not: [Install evidence](EVIDENCE-rc15-installs.md). What each build changed:
+What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
+What each build changed:
 [rc.15 release notes](RELEASE-NOTES-rc15.md). This page says which release is current. The [README](../README.md) and
 the [technical notes](TECHNICAL.md#status) follow it.
 
@@ -73,7 +76,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **No recorded hardware test of install 4.** See the status above.
+- **Playback is slow to start.** Playback took a second or more to start (the operator's report on install 4). A fix is in work for the next build.
 - **Not covered by the final Eden session:** the editor in the waiting room; the Quick Play practice pick, new pick
   and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
   attacks; the Trim setting's migration; and the CPU's playback indicator.

@@ -19,24 +19,29 @@ What "tested" means in these notes:
 
 - **Installed:** the file on the card was read back and matched the build. That shows the build is there, not how it plays.
 - **Tested in Eden:** a named run in the Eden emulator gave a verdict for that item, on the build named beside it.
-- **Hand-tested by the operator:** the project's operator played it on the console and reported what they saw.
-  Written only where such a report is on record.
+- **The operator reported:** the project's operator played that build on the console and said what they saw. These
+  are reports, not a list of passes, and only reports that are on record are written.
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
 
 ## Next build (not installed yet)
 
-These changes are merged for the build after install 4. Its name is expected to be rc.16. None of them has been seen
-in a game: each merge passed the host tests and builds only.
+The build after install 4. Its name is expected to be rc.16. The first part below is merged; the second is still in
+work. None of it has been seen in a game: each merge passed the host tests and builds only.
 
-### Record works while an AI plays Player 1 (merged 2026-11-25)
+**How this build is tested:** one short Eden smoke boot on the finished build (each new item started once, no crash
+and the expected log lines), then the operator's full test on the console.
+
+### Merged
+
+#### Record works while an AI plays Player 1 (merged 2026-11-25)
 
 - With the CPU pilot plugin, or TrainingRooms' own Player 1 control, playing Player 1, Record now starts. The take
   holds Player 1's inputs as the game receives them, the AI's included.
 - Before, Record was refused. Play on Player 1 and L + R + A are still refused while an AI plays Player 1.
 - More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1).
 
-### Grabs, throws and edge attacks are named in combo files (merged 2026-11-25)
+#### Grabs, throws and edge attacks are named in combo files (merged 2026-11-25)
 
 - A combo file now writes `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack` by name in a link's
   `from` and `to`.
@@ -44,7 +49,7 @@ in a game: each merge passed the host tests and builds only.
   are not affected, and this build still reads older files.
 - More: [Combo files › The format](guide/combos.md#the-format).
 
-### B stops a preview, and the pop-up shows its chords (merged 2026-11-25)
+#### B stops a preview, and the pop-up shows its chords (merged 2026-11-25)
 
 - While any preview plays, the key line reads `B stop preview`. B or X stops it and drops the rest of its frames.
 - After the last frame the result stays for about a second and the key line reads `B back`.
@@ -53,14 +58,14 @@ in a game: each merge passed the host tests and builds only.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and
   [The Recording pop-up](menu/recording.md#the-recording-pop-up).
 
-### Delete for replay captures (merged 2026-11-25)
+#### Delete for replay captures (merged 2026-11-25)
 
 - A capture's screen under RECORDINGS has a **Delete** row, and Y deletes the capture under the cursor in the Replay
   window. It is removed at once, without asking, as a macro is.
 - Macros, combos and drills already made from it stay. The game's own replay in the Vault is untouched.
 - More: [Recording › Recordings](menu/recording.md#recordings).
 
-### The clip editor's marks name the form of a move (merged 2026-11-25)
+#### The clip editor's marks name the form of a move (merged 2026-11-25)
 
 - A move mark on the editor's timeline keeps which form of the move it was: the first, second or third jab, the
   rapid jab or its finisher, which aerial, grab or throw, and a side tilt or smash aimed up or down.
@@ -69,6 +74,24 @@ in a game: each merge passed the host tests and builds only.
 - A take, and each fighter of a replay capture, stores the fighter it was recorded on, so its specials keep that
   fighter's own names whoever Player 1 is.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
+
+### In work
+
+Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
+
+- **In work: Guard the Edge and Juggler start on the Training stage.** Both drills start from the floor you stand
+  on, at its ledges that have open air beside them. A floor with no such ledge shows a message instead of doing
+  nothing.
+- **In work: two Guard the Edge options.** One starts the CPU under the stage. The other starts the CPU with its
+  midair jumps already used. Both are Off by default, which is how the drill works today.
+- **In work: Eggs-ercise's Off stage zone stays out of solid ground.** Spots that are not off stage are dropped, and
+  the zone stops at the next solid.
+- **In work: placement's Off stage switch.** A fighter switched to Off stage whose spot is not off stage goes beside
+  the nearest ledge that has open air. The crosshair then moves freely.
+- **In work: playback starts at once.** The wait before a recording starts to play is removed, and a playback delay
+  setting is added, with no delay by default. The operator reported the wait on install 4.
+- **In work: placement on the crosshair.** Changing where a save state puts the fighters uses the crosshair, on the
+  save state itself.
 
 ## Install 4
 
@@ -135,7 +158,9 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
 - **Not covered by the final Eden session:** the waiting-room editor, the Quick Play practice pick, new pick and
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
-- **Hand-tested by the operator:** no report is on record.
+- **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
+  took a second or more to start. A fix for the wait is in work for the next build. They also asked for
+  placement changes and a Delete for replay captures; the Delete is merged for the next build.
 
 ## Install 3
 
@@ -154,7 +179,12 @@ Installed 2026-11-24 (03:07). Build `e7667f26`.
   partner's Stop passed. In Training, a run of the input changes passed for the frame strip's direction marks and for
   six fighters' drills, and found two defects that install 4 fixes: four fighters' special directions were saved as a
   step of their own, and nothing was graded after a Training reset.
-- **Hand-tested by the operator:** no report is on record.
+- **The operator reported** (2026-11-24, on this build):
+  - In Quick Play, after a match the loser declined the rematch, picked a different fighter and came back to the
+    room: the earlier fighter was put back as both the CPU and Player 1. Install 4 changes this (a different fighter
+    picked at the character select starts the practice fresh). That fix has not been run in Eden.
+  - The recording crop and preview showed a black screen, without the fighters and the timeline. In install 4 the clip
+    editor is a strip over the game; its layout passed in Eden on `a9131331`.
 
 ## Install 2
 
@@ -193,7 +223,7 @@ Installed 2026-11-24 (00:43). Build `71158421`.
   wrapping, the recording indicators, Record and Play on the CPU, the Playback Slot timing, the frame strip's marks
   and the Guard the Edge start points. One defect was confirmed and is fixed in install 3 (Lobby Practice Off during a
   drill). The runs were stopped for the install, so the remaining rows did not run.
-- **Hand-tested by the operator:** no report is on record.
+- **The operator reported:** nothing is on record for this build. It was on the card for about two and a half hours.
 
 ## Install 1
 
@@ -218,8 +248,8 @@ build before it.
   Edge start point, reworked in install 2); 1 failed in its setup, 2 did not run and 1 was left to a hand check. In
   the waiting room, Record and Play on the CPU and Crop's save passed; the preview's timing rows did not run there.
   The review cleared it as a limited release on that basis.
-- **Hand-tested by the operator:** no report is on record for this build. The defects it fixes were reported by the
-  operator from the console on 2026-11-23.
+- **The operator reported:** nothing is on record for this build. The defects it fixes were reported from the
+  console on 2026-11-23, on the build before it.
 
 ## Before install 1
 
@@ -236,10 +266,20 @@ own. By theme, with the page that describes each:
 - **The menu.** A held Up or Down repeats and speeds up, and L and R turn the page from inside a game's screen, a
   fighter grid or an editor. [Moving around](guide/using-the-menu.md#moving-around)
 
-The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was hand-tested by the
-operator that day. They reported that lists did not wrap, that nothing on screen showed a recording was running, that
-a CPU recording's left and right shuddered, that Crop's preview kept the menu up and stopped early, that cropping a
-Player 1 macro did not work, and that the 1 Frame label left out its button. Install 1 answers these.
+The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was played by the operator
+that day. The operator reported:
+
+- lists did not wrap, nothing on screen showed that a recording was running, and a CPU recording's left and right
+  shuddered. Install 1 changes all three;
+- Crop's preview kept the menu up and stopped early, cropping a Player 1 macro did not work, and the 1 Frame label
+  left out its button. Install 1 changes these too;
+- starting a new chain and going back before saving opened the keyboard, froze the menu for a moment and left both
+  fighters frozen after the menu closed. Install 2 changes the chain picker: B backs out and saves nothing;
+- in Guard the Edge, picking the CPU in the fighter picker and backing out left a black box over Hitbox Visualization. Install 2
+  puts back the part of the menu the pop-up had borrowed;
+- the Guard the Edge rule that a KO counts once Player 1 is back worked on the build they were playing.
+
+Each report with its time and the build it was made on: [Install evidence](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
 
 Earlier releases: [rc.9](RELEASE-NOTES-rc9.md), and rc.12 to rc.14 on their
 [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases).
