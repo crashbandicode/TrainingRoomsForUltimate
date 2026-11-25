@@ -2841,3 +2841,11 @@ ceiling = 200089
 date = "2026-11-24"
 reason = "Time-aware steering entry: one locally measured velocity change per allowed timing frame, +38 lines from dff82087."
 approved_by = "tr-primary-2 23:31:00Z (final measured ceiling) and 23:44:37Z (timing-aware entry and measured cost)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200093
+date = "2026-11-25"
+reason = "Merge 3D integrated on the install 4 head 4905ec89 (merge 4b): the steering line 19d26f8e with the entry-velocity fix 2d4d6e39 (200089), the wider stick counters 8d7fcd2d and the two 3C edge controls cef3e7aa. Measured 200093 (tools/sloc.py tree): 200089 plus the 4 lines of merge 4b."
+approved_by = "tr-primary-2 ruling 2026-11-24 23:31:00Z (the 3D line ceiling is approved at the final measured value) and its standing rule of 17:59:40Z (the merged ceiling is written at the measured merged value)."
