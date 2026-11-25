@@ -37,10 +37,10 @@ fn the_history_keeps_ten_seconds_of_columns_and_no_more() {
     assert_eq!(back.span(), (700, 600));
     let mut oldest = tracker;
     let mut boundary = tracker;
-    assert_eq!(back.view(&mut oldest, 100), Some(540));
+    assert_eq!(back.rewind(&mut oldest, 100), Some(540));
     assert_eq!(oldest.columns().next().unwrap().frame, 101);
     assert_eq!(oldest.columns().last().unwrap().frame, 160);
-    assert_eq!(back.view(&mut boundary, 160), Some(540));
+    assert_eq!(back.rewind(&mut boundary, 160), Some(540));
     assert_eq!(oldest.columns().collect::<Vec<_>>(), boundary.columns().collect::<Vec<_>>());
     assert!(core::mem::size_of::<Back>() <= 12 * 1024);
 }
@@ -56,7 +56,7 @@ fn a_missed_frame_is_caught_up() {
     back.record(&tracker);
     assert_eq!(back.span(), (8, 8));
     let mut view = tracker;
-    assert_eq!(back.view(&mut view, 8), Some(0));
+    assert_eq!(back.rewind(&mut view, 8), Some(0));
     assert_eq!(view.columns().map(|column| column.frame).collect::<Vec<_>>(), (1..=8).collect::<Vec<_>>());
     assert_eq!(view.presses().map(|press| (press.frame, press.button)).collect::<Vec<_>>(),
                [(8, Button::Special), (6, Button::Attack)]);
@@ -93,7 +93,7 @@ fn a_view_of_the_past_draws_what_was_live_then() {
     let then = tracker;
     let anchor = back.span().0;
     busy(&mut tracker, &mut back, 200);
-    assert_eq!(back.view(&mut tracker, anchor), Some(200));
+    assert_eq!(back.rewind(&mut tracker, anchor), Some(200));
     let (expected, actual) = (looks(&then), looks(&tracker));
     for index in (at::RUN..at::WINDOW_BAR)
         .chain(at::READ_VALUE + 1..at::READ_VALUE + 3)
@@ -111,11 +111,11 @@ fn the_view_stands_still_while_frames_arrive() {
     busy(&mut tracker, &mut back, 150);
     let anchor = 100;
     let mut first = tracker;
-    assert_eq!(back.view(&mut first, anchor), Some(50));
+    assert_eq!(back.rewind(&mut first, anchor), Some(50));
     let columns: Vec<_> = first.columns().collect();
     busy(&mut tracker, &mut back, 30);
     let mut second = tracker;
-    assert_eq!(back.view(&mut second, anchor), Some(80));
+    assert_eq!(back.rewind(&mut second, anchor), Some(80));
     assert_eq!(second.columns().collect::<Vec<_>>(), columns);
 }
 
@@ -126,10 +126,10 @@ fn a_cleared_strip_has_no_past() {
     busy(&mut tracker, &mut back, 100);
     tracker.clear();
     let mut cleared = tracker;
-    assert_eq!(back.view(&mut cleared, 60), None);
+    assert_eq!(back.rewind(&mut cleared, 60), None);
     busy(&mut tracker, &mut back, 1);
     assert_eq!(back.span(), (1, 1));
     let mut fresh = tracker;
-    assert_eq!(back.view(&mut fresh, 60), None);
+    assert_eq!(back.rewind(&mut fresh, 60), None);
 }
 }

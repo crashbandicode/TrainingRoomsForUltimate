@@ -702,7 +702,7 @@ pub fn hud_tick(
 ) -> (bool, [Option<u8>; 2]) {
     let mut tracker = *TRACKER.lock();
     let anchor = SCROLL.load(Ordering::Acquire);
-    let back = if anchor != 0 { BACK.lock().view(&mut tracker, anchor) } else { None };
+    let back = if anchor != 0 { BACK.lock().rewind(&mut tracker, anchor) } else { None };
     let (_, history) = RENDERER.lock().draw_with_spec(
         &tracker, StripDraw { shown, back, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {

@@ -140,7 +140,7 @@ impl Back {
 
     /// Turn a tracker copy into the strip at `anchor`, clamped to the oldest full window. Returns frames behind live,
     /// or leaves the tracker untouched when no view is available.
-    pub fn view(&self, tracker: &mut Tracker, anchor: u32) -> Option<u32> {
+    pub fn rewind(&self, tracker: &mut Tracker, anchor: u32) -> Option<u32> {
         if self.count == 0 || anchor == 0 || anchor > self.count || tracker.frame() < self.frame { return None; }
         let live_newest = tracker.newest()?;
         let first_kept = self.count.saturating_sub(self.kept as u32) + 1;
