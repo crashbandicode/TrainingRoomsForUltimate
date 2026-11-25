@@ -389,7 +389,7 @@ mod tests {
         files
     }
 
-    fn save_capture(root: &std::path::Path, frames: &[InputFrame], spans: &[Span], trim: bool) -> String {
+    fn save_capture(root: &std::path::Path, frames: &[InputFrame], spans: &[Span], trim: crate::model::trim::Trim) -> String {
         let mut capture = Capture::idle();
         rr_runtime::toggle_record(&mut capture, Role::Player);
         for &frame in frames { rr_runtime::push_frame(&mut capture, Role::Player, frame); }
@@ -569,7 +569,7 @@ mod tests {
             }
             watch.feed(CAPTURE_RUN, 55, Seen::default());
             let root = scratch(if restart { "restart" } else { "continuous" });
-            let id = save_capture(&root, &inputs(), watch.spans(), false);
+            let id = save_capture(&root, &inputs(), watch.spans(), crate::model::trim::Trim::Off);
             Library::new(root.join("macros")).load(&id).unwrap()
         };
         let twice = take(true);
@@ -621,7 +621,7 @@ mod tests {
         frames[199].buttons = 2;
         let root = scratch("edges");
         let spans = [Span { start: 0, end: Some(30), mv: Some(Move::Jab) }, Span { start: 199, end: None, mv: None }];
-        let id = save_capture(&root, &frames, &spans, false);
+        let id = save_capture(&root, &frames, &spans, crate::model::trim::Trim::Off);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
         assert_eq!(loaded.actions.iter().map(|mark| (mark.start, mark.end)).collect::<Vec<_>>(), vec![(0, Some(30)), (199, None)]);
         let mut editor = ClipEditor::macro_file(loaded.clone(), true).unwrap();
@@ -836,7 +836,7 @@ mod tests {
 
     fn a_recorded_take_keeps_its_move_ends_and_out_snaps_to_one_before_any_preview() {
         let root = scratch("first-open");
-        let id = save_capture(&root, &inputs(), &spans(), false);
+        let id = save_capture(&root, &inputs(), &spans(), crate::model::trim::Trim::Off);
         let library = Library::new(root.join("macros"));
         let loaded = library.load(&id).unwrap();
         assert_eq!(loaded.actions.first().and_then(|mark| mark.end), Some(40));
@@ -880,9 +880,9 @@ mod tests {
         let root = scratch("trim");
         let spans = [Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
             Span { start: 92, end: Some(150), mv: Some(Move::SideTilt) }];
-        let id = save_capture(&root, &inputs(), &spans, true);
+        let id = save_capture(&root, &inputs(), &spans, crate::model::trim::Trim::End);
         let loaded = Library::new(root.join("macros")).load(&id).unwrap();
-        let drill = rr_runtime::save_drill_take(&root, inputs(), StartState::neutral(0, 0, 1.0), true, 2, &spans).unwrap().unwrap();
+        let drill = rr_runtime::save_drill_take(&root, inputs(), StartState::neutral(0, 0, 1.0), crate::model::trim::Trim::End, 2, &spans).unwrap().unwrap();
         let drill = Library::new(root.join("macros")).load(&drill).unwrap();
         for take in [loaded, drill] {
             assert_eq!(take.frames.len(), 91);

@@ -3,6 +3,8 @@ use crate::model::combo::{Aim, Combo, Event, LinkRec};
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::frame_strip::{Button as InputButton, Move, Verdict};
 use crate::model::hud_row::{self, Take};
+use crate::model::macro_ui::clip_marks::Span;
+use crate::model::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
 use crate::model::menu::input::Button;
 use crate::model::menu::table::{Control, COMBOS_SEQ, ROWS, SAVES_MACROS};
 use crate::model::recording_menu::{Effect, Face, FileKind, RecordingScreens};
@@ -236,6 +238,7 @@ fn record_trims_by_the_setting() {
             StartState::neutral(8, 0, 1.0),
             trim,
             1,
+            &[],
         ).unwrap().unwrap();
         let saved = Library::new(root.0.join(MACROS_DIR)).load(&take).unwrap();
         assert_eq!(saved.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), expected);
@@ -497,6 +500,96 @@ fn crop_preview_addresses_the_whole_file() {
     let mut machine = Playback::new();
     assert!(machine.play_range(Role::Player, &book, "m", 0..4).started);
     assert_eq!(buttons(&mut machine, Role::Player, &book), [0, 1, 2, 0]);
+}
+
+fn saved_marked_capture(root: &Path, frames: &[InputFrame], spans: &[Span], trim: Trim) -> MacroRecording {
+    let mut capture = rr_runtime::Capture::idle();
+    rr_runtime::toggle_record(&mut capture, Role::Player);
+    for &input in frames { rr_runtime::push_frame(&mut capture, Role::Player, input); }
+    capture.set_spans(spans);
+    let stop = rr_runtime::finish_recording(root, &capture, state(8), state(7), (0.0, 0.0), 1, trim).unwrap();
+    Library::new(root.join(MACROS_DIR)).load(stop.cursor().unwrap()).unwrap()
+}
+
+fn marked_frames(include_open: bool) -> (Vec<InputFrame>, [Span; 2]) {
+    let mut frames = vec![frame(0); 200];
+    frames[10] = frame(1);
+    if include_open { frames[50] = frame(1); }
+    frames[90] = frame(2);
+    let spans = [
+        Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
+        Span { start: 92, end: Some(150), mv: Some(Move::SideTilt) },
+    ];
+    (frames, spans)
+}
+
+#[test]
+fn record_time_trim_moves_the_marks_with_the_kept_frames() {
+    let root = Scratch::new();
+    let (frames, spans) = marked_frames(true);
+    for (trim, range, marks) in [
+        (Trim::Start, 10..200, vec![(0, Some(30)), (40, None), (80, Some(140))]),
+        (Trim::End, 0..91, vec![(10, Some(40)), (50, None), (90, Some(91))]),
+        (Trim::Both, 10..91, vec![(0, Some(30)), (40, None), (80, Some(81))]),
+        (Trim::Off, 0..200, vec![(10, Some(40)), (50, None), (90, Some(150))]),
+    ] {
+        let saved = saved_marked_capture(&root.0, &frames, &spans, trim);
+        assert_eq!(saved.frames, frames[range]);
+        assert_eq!(saved.actions.iter().map(|mark| (mark.start, mark.end)).collect::<Vec<_>>(), marks);
+    }
+}
+
+#[test]
+fn end_trim_gives_the_marks_the_editor_already_had() {
+    let root = Scratch::new();
+    let (frames, spans) = marked_frames(false);
+    for (trim, range, marks) in [
+        (Trim::End, 0..91, vec![(10, Some(40)), (90, Some(91))]),
+        (Trim::Off, 0..200, vec![(10, Some(40)), (90, Some(150))]),
+        (Trim::Start, 10..200, vec![(0, Some(30)), (80, Some(140))]),
+    ] {
+        let saved = saved_marked_capture(&root.0, &frames, &spans, trim);
+        assert_eq!(saved.frames, frames[range]);
+        assert_eq!(saved.actions.iter().map(|mark| (mark.start, mark.end)).collect::<Vec<_>>(), marks);
+    }
+}
+
+#[test]
+fn a_crop_preview_shows_the_playback_indicator_for_its_role() {
+    let _host = HostGuard::new();
+    let root = Scratch::new();
+    let (frames, spans) = marked_frames(false);
+    let saved = saved_marked_capture(&root.0, &frames, &spans, Trim::Start);
+    assert_eq!(saved.actions[0].start, 0);
+    assert_eq!(saved.actions[0].end, Some(30));
+    let id = Library::new(root.0.join(MACROS_DIR))
+        .save_new(&recording("Crop", &[0, 1, 2, 0], Trim::Both)).unwrap();
+    for (role, expected) in [(Role::Player, [true, false]), (Role::Cpu, [false, true])] {
+        host::request_preview(&id, role, 0, 4);
+        tick(&root.0);
+        assert_eq!(host::playback_roles(), expected);
+        for _ in 0..8 {
+            if role == Role::Player { host::take_player_frame(); } else { host::take_cpu_frame(); }
+            tick(&root.0);
+        }
+        assert!(!host::preview_running());
+        assert_eq!(host::playback_roles(), [false, false]);
+    }
+}
+
+#[test]
+fn a_crop_saved_as_a_new_macro_has_trim_off() {
+    let root = Scratch::new();
+    let library = Library::new(root.0.join(MACROS_DIR));
+    let original = recording("Original", &[0, 1, 2, 0], Trim::Both);
+    let original_id = library.save_new(&original).unwrap();
+    let mut editor = ClipEditor::macro_file(library.load(&original_id).unwrap(), true).unwrap();
+    let ClipEffect::Export(crop) = editor.on_action(ClipAction::Confirm) else { panic!("crop export") };
+    let id = rr_runtime::save_clip_file(&root.0, rr_runtime::ClipFile::Macro(crop), "Crop", None).unwrap();
+    let saved = library.load(&id).unwrap();
+    assert_eq!(saved.trim, Trim::Off);
+    assert_eq!(saved.frames, original.frames);
+    assert_eq!(library.load(&original_id).unwrap().trim, Trim::Both);
 }
 
 #[test]

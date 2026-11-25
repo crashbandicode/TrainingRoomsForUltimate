@@ -240,8 +240,7 @@ pub fn finish_recording(
 }
 
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
-/// removes it with the drill. No start save, active role or recent-use mark. With `trim` the idle tail goes first;
-/// `None` when no frame is left.
+/// removes it with the drill. No start save, active role or recent-use mark. `None` when no frame is left.
 pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: crate::model::trim::Trim, at: u64, spans: &[Span]) -> Result<Option<String>, Error> {
     let (frames, marks) = finish_take(frames, spans, trim);
     if frames.is_empty() {
@@ -367,6 +366,7 @@ pub fn save_clip_file(root: &Path, file: ClipFile, typed: &str, follow: Option<(
             let library = Library::new(root.join(MACROS_DIR));
             let names: Vec<_> = library.list().map_err(record)?.entries.into_iter().map(|entry| entry.name).collect();
             recording.name = if typed.trim().is_empty() { unused_name("Macro", &names) } else { typed.trim().to_owned() };
+            recording.trim = crate::model::trim::Trim::Off;
             library.save_new(&recording).map_err(record)
         }
         ClipFile::Combo(mut recording) => {
