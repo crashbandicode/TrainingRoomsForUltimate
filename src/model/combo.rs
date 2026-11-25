@@ -181,11 +181,11 @@ pub struct LinkRec {
     pub(crate) shown: [u8; 3],
 }
 
-const DESC_MOVES: [Move; 17] = [
+const DESC_MOVES: [Move; 20] = [
     Move::Jab, Move::DashAttack, Move::SideTilt, Move::UpTilt, Move::DownTilt,
     Move::SideSmash, Move::UpSmash, Move::DownSmash, Move::Aerial, Move::NeutralSpecial,
     Move::SideSpecial, Move::UpSpecial, Move::DownSpecial, Move::Other,
-    Move::Grab, Move::Throw, Move::FinalSmash,
+    Move::Grab, Move::Throw, Move::FinalSmash, Move::LedgeAttack, Move::GetupAttack, Move::TripAttack,
 ];
 
 impl LinkRec {
