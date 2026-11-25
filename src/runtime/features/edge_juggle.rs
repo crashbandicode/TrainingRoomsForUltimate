@@ -35,6 +35,7 @@ mod zoom;
 pub(in crate::runtime) mod practice_cpu;
 use crate::model::notify::DEFAULT_COLOR;
 use crate::model::practice_games::best_time;
+use crate::model::practice_state::CpuView;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::wizard::Kind;
@@ -133,7 +134,7 @@ struct Run {
     /// A was pressed on a CPU point that is not beside the stage; the next fighter frame classes it.
     confirm_cpu: bool,
     /// How the picker shows the CPU point this frame (`crosshair::cpu_view`).
-    cpu_view: &'static str,
+    cpu_view: CpuView,
     setup: Setup,
     rounds: Session,
     body: CpuBody,
@@ -1860,13 +1861,13 @@ impl Engine {
     }
 }
 
-/// The picker’s hold on the CPU at its picked start, and the word the practice state shows for it.
+/// The picker's hold on the CPU at its picked start, as reported in the practice state.
 unsafe fn hold_preview(
     preview: &mut Option<CpuPreview>,
     held_cpu: &mut Option<CpuBody>,
     body: CpuBody,
     at: [f32; 2],
-) -> &'static str {
+) -> CpuView {
     if placement::preview(preview, body.accessor, body.object_id, at) == Some(true) {
         *held_cpu = Some(body);
     }
@@ -2040,7 +2041,7 @@ pub unsafe fn frame(fighter: usize) {
             confirm_player: false,
             options: config.options,
             confirm_cpu: false,
-            cpu_view: "",
+            cpu_view: CpuView::NotHeld,
             rounds: Session::new(drill, limit),
             body,
             previous_damage: None,

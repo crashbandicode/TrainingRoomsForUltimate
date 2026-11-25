@@ -16,6 +16,25 @@ pub fn published_activation(scene: &str, activation: impl FnOnce() -> (u64, Opti
     if matches!(scene, "training" | "lobby") { activation() } else { (0, None) }
 }
 
+/// Keep the picker's three states inline in the sample, not a pointer and length for their wire text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CpuView {
+    #[default]
+    NotHeld,
+    InView,
+    Magnifier,
+}
+
+impl CpuView {
+    fn wire(self) -> &'static str {
+        match self {
+            Self::NotHeld => "",
+            Self::InView => "in_view",
+            Self::Magnifier => "magnifier",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Fields {
     pub phase: &'static str,
@@ -25,7 +44,7 @@ pub struct Fields {
     pub wizard_point: Option<[f32; 2]>,
     /// How a picker's CPU point is shown (`crosshair::cpu_view`): `in_view` or `magnifier`; empty when the CPU's
     /// body is not held there.
-    pub wizard_cpu: &'static str,
+    pub wizard_cpu: CpuView,
     /// Guard the Edge's start options as the running drill took them at Start (`edge_juggle::StartOptions`): under
     /// the stage allowed, midair jumps used. The settings, not what the game did with them; none for every other game.
     pub start_options: Option<[bool; 2]>,
@@ -68,7 +87,7 @@ pub fn snapshot(game: Option<Game>, fields: Fields, thinks: [u64; CPU_ENTRIES], 
             ("step", fields.step),
             ("wizard.step", fields.wizard_step),
             ("wizard.selection", fields.wizard_selection),
-            ("wizard.cpu", fields.wizard_cpu),
+            ("wizard.cpu", fields.wizard_cpu.wire()),
             ("last.outcome", fields.last_outcome),
         ] {
             if !value.is_empty() {
