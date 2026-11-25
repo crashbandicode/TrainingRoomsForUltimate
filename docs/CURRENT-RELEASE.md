@@ -14,8 +14,9 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
 - **Tested in Eden, in part:** a short smoke boot on this exact build ran with no crash. Guard the Edge and Juggler
   opened their set-up on the Training stage, and Guard the Edge also from the island and on Battlefield. Eggs-ercise
   had its off-stage zone, the recording picker's Off stage switch moved a fighter, a take played and the clip editor
-  previewed. Neither drill was played through, no placement was saved, the waiting room was not run, and most of
-  the build's other new items were not touched.
+  previewed. A second boot opened the menu, and Guard the Edge's set-up, in a one-player waiting room. Neither
+  drill was played through, no placement was saved, no second player joined a room, and most of the build's other
+  new items were not touched.
 - **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
   with "In is mid-action" after a snap to the move start. The cause is being traced. It is a report of what they
   saw, not a test of the build; the reports on the earlier builds are in the evidence page.

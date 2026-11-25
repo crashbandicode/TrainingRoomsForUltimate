@@ -22,7 +22,7 @@ author. Times are UTC.
 | On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 | 2026-11-25 23:06 |
 | Card readback | match | match | match | match | match |
 | Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 |
-| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks; the waiting room not run |
+| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room |
 | The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | one (2026-11-25) |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
@@ -211,13 +211,13 @@ through**: no CPU was launched and no attempt was scored.
 | Play on Player 1 (`s6-playback`) | pass | a 64-frame take was played: 64 of 64 frames delivered. The time to start was not measured |
 | The clip editor (`s7-marks-preview`) | pass | the editor opened with four marks; X played the preview to its end |
 | Guard the Edge, Battlefield (`s8-guard-battlefield`) | pass | the set-up opened with CPU midair jumps set to Used; the setting was put back |
-| The waiting room (`s9-lobby`) | **not run** | the test's route stopped at the main menu before its first input, twice; the boot used an older build of the test bridge (dup-audit, inbox 23:07:47Z), so the cause is not shown to be in TrainingRooms. Nothing about the waiting room was tested in this boot. The operator then asked for the check (about 23:04); a second boot is under way and its result is not in yet |
+| The waiting room (`s9-lobby`) | **not run** | the test's route stopped at the main menu before its first input, twice; the boot used an older build of the test bridge (dup-audit, inbox 23:07:47Z), so the cause is not shown to be in TrainingRooms. Nothing about the waiting room was tested in this boot. The operator then asked for the check (about 23:04); see the second boot below |
 | Settings after the rows (`z-audit`) | pass | none of the toggles compared differed from its factory value; 21 keys, including rosters and ranges, were not checked |
 
 Not covered by the smoke boot:
 
 - playing any drill through, and what the two Guard the Edge options do once the CPU is launched;
-- the waiting room: a second boot was ordered for it, and its result is not in yet;
+- the waiting room, which the second boot below covers in part;
 - Record while an AI plays Player 1, the named grab, throw and edge-attack keys, B stopping a preview, Delete for
   replay captures, the form names on the editor's marks, the Playback delay option, and Change placement's save with
   its shared start save question.
@@ -225,6 +225,25 @@ Not covered by the smoke boot:
 The table uses the row files for verdicts and values. The first Guard the Edge frame was also checked for this page.
 On Battlefield the frame shows a fighter-preload notice, not the set-up card; the bridge recorded the wizard and its
 jump setting. The closing settings verdict comes from the audit, not its screenshot.
+
+### The waiting-room boot
+
+On 2026-11-25, after the install, Eden run `nb-lobby-yoga-01` (23:28 to 23:39) ran the same release file with the
+card's 20 other plugins and the current test bridge. The game did not crash. Receipts:
+`artifacts/phase23/next-build-smoke/20261125-1745Z/lobby/evidence/out/s9-lobby/` (the row file and one frame).
+Reported by dup-audit (inbox 23:39:37Z).
+
+| Row | Verdict | What was read |
+| --- | --- | --- |
+| The waiting room (`s9-lobby`) | pass | a Local Wireless room was created and its waiting room reached, as host and alone; TrainingRooms' menu opened there on Fighters & Stages, and its footer reads `rc15 b7a382e4` |
+| Guard the Edge in the waiting room (extra, in the same row) | read from the logged lines only | Start opened the set-up on its CPU page at (−160, −69) with no refusal. No frame was taken of it, and the drill was not played |
+| Settings after the row (`z-audit`) | **receipt failed** | the settings compare found no difference among the toggles it compares (21 keys not checked), but an extra read of the fighters got no answer in the waiting room, and the row is marked failed for that |
+
+Not shown by this boot: a second player in the room, Lobby practice with a partner, any drill played through, and
+leaving the room (the test's leave step stopped, and the boot's shutdown ended the room).
+
+For this page the row file's `pass` field, the room, the set-up's values and both audit files were read, and the
+frame was looked at.
 
 | Merge | Head | Gate |
 | --- | --- | --- |

@@ -146,8 +146,10 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
 - **It was a short check, not a play test.** Neither drill was played through, no placement was saved or loaded,
   and most of the other new items were not touched. What ran and what did not:
   [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build).
-- **The waiting room** was not run in that boot, because the test's own route failed. A second boot for it was
-  ordered and is under way; its result is not in yet.
+- **The waiting room** was not run in that boot, because the test's own route failed. A second boot the same
+  evening reached a Local Wireless waiting room with one player: TrainingRooms' menu opened there, and Guard the
+  Edge opened its set-up. No second player joined, and nothing was played.
+  [Install evidence](EVIDENCE-rc15-installs.md#the-waiting-room-boot)
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
   showing after a snap to the move start, so the clip could not be previewed or saved. The cause is being traced;
   no fix is merged. No other report on this build is on record.
