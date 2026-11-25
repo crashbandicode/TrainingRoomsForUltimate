@@ -30,6 +30,9 @@ static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
 static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));
 static RELOAD: Mutex<Option<Reload>> = Mutex::new(None);
 static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);
+/// A recording's opening waited three seconds for the CPU and was dropped (`take_recording_timeout`).
+static RECORDING_TIMED_OUT: AtomicBool = AtomicBool::new(false);
+pub const CPU_NOT_SETTLED: &str = "CPU did not settle; capture opening cancelled";
 static CLOSE_ARM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 static CLOSE_INPUT: hos_lock::Mutex<CloseInputGuard> = hos_lock::Mutex::new(CloseInputGuard::new());
 #[cfg(feature = "named-input-trace")]
@@ -248,12 +251,27 @@ pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::Op
         notify("Open the replay window in idle practice".into());
         return;
     }
+    RECORDING_TIMED_OUT.store(false, Ordering::Release);
     let (ui, effect) = crate::engine::macro_ui::recordings::open_one(id, crate::runtime::ui::facts::fact_waiting_scene());
     let revision = REVISION.fetch_add(1, Ordering::Relaxed) + 1;
     *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });
     browser_effect(effect, revision);
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
+
+/// A recording's opening from the Recordings screen waits for the CPU to be idle (the waiting room).
+pub fn recording_waiting() -> bool {
+    BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.request.is_some() && b.ui.pending())
+}
+
+/// B on the waiting recording's screen: that opening is dropped.
+pub fn cancel_recording() {
+    let revision = BROWSER.lock().unwrap().as_ref().filter(|b| b.request.is_some()).map(|b| b.revision);
+    if let Some(revision) = revision { close_editor_revision(false, Some(revision)); }
+}
+
+/// The wait ended after three seconds with the CPU still busy (read once).
+pub fn take_recording_timeout() -> bool { RECORDING_TIMED_OUT.swap(false, Ordering::AcqRel) }
 
 /// The decoded source is small ownership metadata; its buffers remain worker-owned.
 struct CaptureSource {
@@ -554,8 +572,10 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
         }
         BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }
         BrowserEffect::TimedOut => {
+            let recording = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.revision == revision && b.request.is_some());
             if close_editor_revision(false, Some(revision)) {
-                notify("CPU did not settle; capture opening cancelled".into());
+                if recording { RECORDING_TIMED_OUT.store(true, Ordering::Release); }
+                notify(CPU_NOT_SETTLED.into());
             }
         }
         BrowserEffect::Notify(error) => notify(error),

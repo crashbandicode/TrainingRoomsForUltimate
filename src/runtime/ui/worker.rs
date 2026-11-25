@@ -405,6 +405,13 @@ fn run() {
         }
         // The named-macro layer's model is this thread's (design C): its worker tick runs before the panels are looked at.
         crate::runtime::macros::port::worker_tick();
+        // A recording's opening waits for the CPU to be idle (the waiting room): its screen says so, and why it ended.
+        let waiting = replay_capture::recording_waiting();
+        let ended = replay_capture::take_recording_timeout();
+        if ended { session.refusal = Some(replay_capture::CPU_NOT_SETTLED); }
+        if session.menu.as_mut().is_some_and(|menu| menu.recording_mut().set_opening(waiting)) || ended {
+            publish_frame(&session);
+        }
         let shown = OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire);
         let naming = session.menu.as_ref().is_some_and(|m| m.recording().naming());
         if crate::runtime::features::recording_host::settle_name(shown && naming) || (naming && !shown) {
@@ -857,6 +864,7 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
     }
     match effect {
         Effect::ListRecordings => menu.recording_mut().set_recordings(crate::runtime::macros::replay_capture::recordings()),
+        Effect::CancelRecording => crate::runtime::macros::replay_capture::cancel_recording(),
         Effect::OpenRecording { id, entry, player, make, play } => {
             crate::runtime::macros::replay_capture::open_recording(&id, crate::engine::macro_ui::recordings::OpenRequest { entry, player, make, play });
         }

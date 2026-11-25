@@ -522,8 +522,8 @@ impl RecordingScreens {
     /// The host's opening of the recording on screen waits for the CPU to be idle (the waiting room), or no longer
     /// does. True when what the screen shows changed.
     pub fn set_opening(&mut self, waiting: bool) -> bool {
-        let _ = (waiting, self.opening);
-        false
+        let waiting = waiting && self.file.as_ref().is_some_and(|file| file.kind == ItemKind::Captured);
+        core::mem::replace(&mut self.opening, waiting) != waiting
     }
 
     /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
@@ -812,9 +812,12 @@ impl RecordingScreens {
             return vec![FileRow { floppy: None, title: "Loading…".to_owned(), value: String::new() }];
         }
         let floppy = self.file.as_ref().and_then(|file| self.row_floppy(&Item { kind: file.kind, id: file.id.clone() }));
+        let waiting = self.opening.then(|| self.file_cursor());
         self.built_file_rows()
             .into_iter()
-            .map(|row| FileRow { floppy: floppy.filter(|_| row.act == Act::StartSave), title: row.title, value: row.value })
+            .enumerate()
+            .map(|(index, row)| FileRow { floppy: floppy.filter(|_| row.act == Act::StartSave), title: row.title,
+                value: if waiting == Some(index) { "Waiting for the CPU…".to_owned() } else { row.value } })
             .collect()
     }
 
@@ -1024,6 +1027,9 @@ impl RecordingScreens {
             return "A add number   R remove   X done   B back";
         }
         if self.file.is_some() && face == Face::Page {
+            if self.opening {
+                return "Waiting for the CPU to be idle   B cancel";
+            }
             return "Up/Down move   Left/Right change   A do it   B back";
         }
         if face == Face::Popup {
@@ -1426,6 +1432,14 @@ impl RecordingScreens {
     }
 
     fn press_file(&mut self, button: Button) -> bool {
+        if self.opening {
+            // The opening owns the screen until the CPU is idle: only B acts, and it drops the opening.
+            if button == Button::B {
+                self.opening = false;
+                self.last_effect = Effect::CancelRecording;
+            }
+            return true;
+        }
         let len = self.built_file_rows().len();
         match button {
             Button::B => self.file = None,

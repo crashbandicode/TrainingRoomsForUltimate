@@ -3711,7 +3711,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "fc1c43c7f61f7fab79475eb1aec3c52ecc76e0c7ff1f8f59b87c75d1b0ad28d1",
+   "dest_sha256": "dd7d451e5e8b17257a10f92e45468569e65dfa3dfa64b9f53b2eac3d7244c6b9",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4437,6 +4437,31 @@
      "reason": "Vault Recordings: a failed opening from the Recordings screen does not open the old capture list",
      "old": "                open_browser(Some(revision));\n",
      "new": "                let listed = BROWSER.lock().unwrap().as_ref().is_none_or(|b| b.request.is_none());\n                if listed { open_browser(Some(revision)); }\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);\n",
+     "new": "static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);\n/// A recording's opening waited three seconds for the CPU and was dropped (`take_recording_timeout`).\nstatic RECORDING_TIMED_OUT: AtomicBool = AtomicBool::new(false);\npub const CPU_NOT_SETTLED: &str = \"CPU did not settle; capture opening cancelled\";\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n",
+     "new": "pub fn open_recording(id: &str, request: crate::engine::macro_ui::recordings::OpenRequest) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    RECORDING_TIMED_OUT.store(false, Ordering::Release);\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n",
+     "new": "    *BROWSER.lock().unwrap() = Some(Browser { ui, revision, request: Some(request) });\n    browser_effect(effect, revision);\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n\n/// A recording's opening from the Recordings screen waits for the CPU to be idle (the waiting room).\npub fn recording_waiting() -> bool {\n    BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.request.is_some() && b.ui.pending())\n}\n\n/// B on the waiting recording's screen: that opening is dropped.\npub fn cancel_recording() {\n    let revision = BROWSER.lock().unwrap().as_ref().filter(|b| b.request.is_some()).map(|b| b.revision);\n    if let Some(revision) = revision { close_editor_revision(false, Some(revision)); }\n}\n\n/// The wait ended after three seconds with the CPU still busy (read once).\npub fn take_recording_timeout() -> bool { RECORDING_TIMED_OUT.swap(false, Ordering::AcqRel) }\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "        BrowserEffect::TimedOut => {\n",
+     "new": "        BrowserEffect::TimedOut => {\n            let recording = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.revision == revision && b.request.is_some());\n"
+    },
+    {
+     "reason": "Vault Recordings: a waiting-room opening reports that it waits, can be cancelled, and says when it timed out",
+     "old": "                notify(\"CPU did not settle; capture opening cancelled\".into());\n",
+     "new": "                if recording { RECORDING_TIMED_OUT.store(true, Ordering::Release); }\n                notify(CPU_NOT_SETTLED.into());\n"
     }
    ]
   },

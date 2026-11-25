@@ -85,6 +85,11 @@ Choose the recorded side and whether the inputs play on Player 1 or the CPU. Pla
 starts its preview. Make macro saves the selected clip as that role's active macro. Make combo plays it on that role
 to capture a combo, or an input drill when no hit is made. Make drill always saves an input drill and its take.
 
+In the waiting room an opening first lets the CPU finish what it is doing. Until then the row reads
+**Waiting for the CPU…** and only B acts: it cancels the opening and leaves the screen up. If the CPU is still busy
+after 3 seconds the opening is dropped and the help line reads "CPU did not settle; capture opening cancelled".
+In Training the opening is immediate.
+
 More: [Recording a macro](../guide/recording.md#recording-a-macro-and-its-start-save),
 [Chains](../guide/recording.md#chains), [Save states](../guide/save-states.md)
 
