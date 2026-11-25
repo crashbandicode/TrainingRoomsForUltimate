@@ -35,11 +35,11 @@ pub fn verdict_text(verdict: Verdict) -> Text {
 pub fn event_label(kind: Kind) -> &'static str {
     match kind {
         Kind::Press(button) => button_name(button),
-        Kind::Release(Button::Attack) => "Attack release",
-        Kind::Release(Button::Special) => "Special release",
-        Kind::Release(Button::Jump) => "Jump release",
-        Kind::Release(Button::Shield) => "Shield release",
-        Kind::Release(Button::Grab) => "Grab release",
+        Kind::Release(Button::Attack) | Kind::LetGo(Button::Attack) => "Attack release",
+        Kind::Release(Button::Special) | Kind::LetGo(Button::Special) => "Special release",
+        Kind::Release(Button::Jump) | Kind::LetGo(Button::Jump) => "Jump release",
+        Kind::Release(Button::Shield) | Kind::LetGo(Button::Shield) => "Shield release",
+        Kind::Release(Button::Grab) | Kind::LetGo(Button::Grab) => "Grab release",
         Kind::CStick => "C-stick",
         Kind::Flick(Flick::FastFall) => "fast-fall",
         Kind::Flick(Flick::Dash) => "dash",
@@ -565,7 +565,13 @@ impl Plan<'_> {
             1 => {
                 let mut text = Text::EMPTY;
                 if input {
-                    let _ = write!(text, "Step {}", k + 1);
+                    let namer = super::move_names::Namer::target();
+                    let mut count = super::frame_strip_plan::Tally(0);
+                    let _ = write!(count, "{} ", k + 1);
+                    let _ = reference.write_title(&mut count, false, " > ", namer);
+                    let tight = count.0 > usize::from(super::panes::cb::units(TITLE + c));
+                    let _ = write!(text, "{} ", k + 1);
+                    let _ = reference.write_title(&mut text, tight, if tight { ">" } else { " > " }, namer);
                 } else {
                     let namer = super::move_names::Namer::target();
                     let _ = write!(text, "{} ", k + 1);

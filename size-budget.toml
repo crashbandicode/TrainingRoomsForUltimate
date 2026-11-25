@@ -2853,6 +2853,86 @@ approved_by = "tr-primary-2 ruling 2026-11-24 23:31:00Z (the 3D line ceiling is 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 200218
+date = "2026-11-25"
+reason = "Menu polish on the install 4 head 74f9f21e (merge 3D): half-percent damage ranges, quickening slider controls and the Recording pop-up's ZR role key. Measured 200218 (tools/sloc.py tree), 125 above merge 3D's 200093."
+approved_by = "tr-primary-2 2026-11-24 23:57:04Z (menu-polish order: the line ceiling is approved at the measured value), restated 2026-11-25 00:08:17Z and its standing rule of 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200220
+date = "2026-11-25"
+reason = "Menu polish review: distinguish damage-range recovery advice from the two-element slider error. Measured 200220, two implementation lines above f3480a2f."
+approved_by = "tr-primary-2 2026-11-24 23:57:04Z and 2026-11-25 00:08:17Z (menu-polish ceiling at the measured value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200344
+date = "2026-11-25"
+reason = "Smoke fix 1 on the install 4 head 74f9f21e (merge 3D): a drill grades a release's hold only when the game reacted to that release, for the press that owns the changed action, within the selected On-time tolerance, with a compatibility rule for files without the reacted key; and a reset chord alone leaves no result, however long it is held, through results that stay provisional while their presses are held, with Load after waiting for them. Measured 200344 on the merged tree, 251 above merge 3D's 200093 (the fix measured 200079 on merge 4b, 251 above its 199828)."
+approved_by = "tr-primary-2 ruling 2026-11-24 23:01:06Z (the smoke fix's line ceiling is approved at the final measured value) and its standing rule of 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200471
+date = "2026-11-25"
+reason = "Install 4 integration, smoke fix 1: a release is graded only when the game reacted to it, and a reset chord alone leaves no result (fix/action-smoke-1 fd465242) on top of the menu-polish merge. Measured 200471 on the merged tree: the menu-polish head measures 200220 and the fix adds 251 (its own entry: 200344 on merge 3D, which measures 200093)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for smoke fix 1 (200344) and for the menu-polish merge (200220)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200254
+date = "2026-11-25"
+reason = "Merge 7: the frame strip's scrollback (hold R3, D-pad Left or Right): the hold, the ten seconds of history, the view the HUD draws from it. Measured 200254 (tools/sloc.py tree), 426 above install 4 merge 4b 4905ec89 (199828)."
+approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the line ceiling is approved at the measured value), on the operator's request relayed at 23:23:39Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200293
+date = "2026-11-25"
+reason = "Merge 7 review: an editable menu shortcut takes precedence, past brackets stop at the view edge, and the cursor and its published column count reset together. Measured 200293, 39 above 47b52049."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200312
+date = "2026-11-25"
+reason = "Merge 7: the bridge publishes the frame strip's scroll state (strip.scroll, strip.back_ms) from the HUD pass that drew it. Measured 200312 (tools/sloc.py tree), 58 above the scrollback's 200254."
+approved_by = "tr-primary-2 2026-11-25 00:45:38Z (the scroll state as a bridge field on feat/strip-scrollback; lines approved at the measured value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200351
+date = "2026-11-25"
+reason = "Merge 7 with the reviewer's correction (fix/rv-scroll-shortcut 237a9661) and the bridge fields in one tree: measured 200351 (tools/sloc.py tree), which is the scrollback's 200254 plus the correction's 39 and the bridge's 58, with no lines from the merge."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its 21:46:20Z rule (the correction) and 2026-11-25 00:45:38Z (the bridge fields)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200362
+date = "2026-11-25"
+reason = "Scrollback bridge time retains the full elapsed frame count from the HUD pass, including long idle stretches. Measured 200362, 11 above 6f88b5df."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201005
+date = "2026-11-25"
+reason = "Install 4 integration, merge 7: the input-display scrollback chord (feat/strip-scrollback 1836edcf) on top of smoke fix 1. Measured 201005 on the merged tree: the smoke fix 1 head measures 200471 and merge 7 adds 534 (its own entry: 200362 on merge 4b, which measures 199828)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for merge 7 (200362) and for smoke fix 1 (200471)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 200581
 date = "2026-11-25"
 reason = "Replay editor (install 4, inbox 22:10:39Z item 2): the crop strip over the game, move marks and the watch, Y snap, the CPU / Player 1 play target, the recorded actions key and the drill preview strip. Measured 200581 on the branch with merge 4b folded (remote-gate size step, 07de4957): 753 above merge 4b 199828; about 350 of them are its 26 tests."
@@ -2877,6 +2957,46 @@ approved_by = "tr-primary-2 2026-11-24 23:45:23Z (the editor, measured, up to +9
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 201909
+date = "2026-11-25"
+reason = "Install 4 integration, the replay editor: the crop editor as a strip over the live game, with move starts and ends, Y snap and a CPU or Player 1 preview (feat/replay-editor 42be97a3) on top of merge 7. Measured 201909 on the merged tree: the merge 7 head measures 201005 and the editor adds 904 (its own entry allows 201006 on merge 3D, which measures 200093; the pin measures 200997)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for the replay editor (201006, approved 2026-11-25 01:35:06Z) and for merge 7 (201005)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200403
+date = "2026-11-25"
+reason = "Install 4 merge 6: a drill step stores the move its press became in its own link record (no added bytes) and the bar and the menu show it instead of a step number. Measured 200403, 310 above the measured install-4 head 74f9f21e (200093)."
+approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY, re-measured after the fold)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200432
+date = "2026-11-25"
+reason = "Merge 6 review: name an aim continuation from the tracked cast even when its press is a middle title input. Measured 200432, 29 above ff1d46e2."
+approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200810
+date = "2026-11-25"
+reason = "Install 4 merge 6 folded on smoke fix 1: drill steps store and show their move (310) with the review correction for a later aim part (29). Measured 200810 on the folded tree, 339 above the measured install-4 head bdfe4213 (200471)."
+approved_by = "tr-primary-2 rulings 2026-11-24 22:47:32Z and 2026-11-25 02:07:42Z (the merge-6 ceiling at the measured value, +310) and the standing rule of 2026-11-24 21:46:20Z (a reviewer fix up to +60 lines: +29)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 202248
+date = "2026-11-25"
+reason = "Install 4 integration, merge 6: drill steps store and show their move, never Step N (feat/drill-step-moves add4ea62) on top of the replay editor merge. Measured 202248 on the merged tree: the editor merge measures 201909 and merge 6 adds 339 (its own entry: 200810 on smoke fix 1, which measures 200471)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for merge 6 (200810) and for the replay editor merge (201909)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 200659
 date = "2026-11-25"
 reason = "Vault recordings on merge 4b (4905ec89): the RECORDINGS list and a recording's screen (Inputs from, Plays on, Play back, Make macro, combo, drill), a Make pass on either role, the Vault clip preview on either role, and the waiting-room opening's status. Measured 200659 (tools/sloc.py tree), 831 above merge 4b's 199828."
@@ -2889,11 +3009,3 @@ ceiling = 200672
 date = "2026-11-25"
 reason = "Vault review: label the second input source CPU and route the opening fighter question through its panel. Measured 200672, 15 above the submitted 962ad694 and 844 above merge 4b."
 approved_by = "tr-primary-2 2026-11-25 00:48:43Z (final measured value through +900), 02:16:35Z (review correction)."
-
-[[budget]]
-scope = "total"
-basis = "rustfmt-sloc4"
-ceiling = 201835
-date = "2026-11-25"
-reason = "Trial fold of the replay editor pin 42be97a3 (201006 approved, on merge 3D) and the Vault recordings line aaecc259 (200672 approved, on merge 4b), with the Vault play-target seam. Measured 201835 on 178a48b2 (remote-gate size step). The integrator writes the merged number on the install 4 head."
-approved_by = "tr-primary-2 2026-11-25 01:35:06Z (editor at 201006), 2026-11-25 02:44:33Z (Vault merge ordered) and 02:31:21Z (the seam, about 15 lines, ordered); the folded value is flagged in the seam post for f9-fix."

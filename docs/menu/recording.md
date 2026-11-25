@@ -193,6 +193,9 @@ More: [Combos](../guide/recording.md#combos),
 
 Practise movement without hitting the opponent: **A** on **COMBOS → DRILLS > → + Record drill…** arms a Player 1 take, then **ZR + D-pad Down** starts and stops it with the default Record chord.
 
+Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
+as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
+
 The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
 
 ![Drill 1 in the clip editor: four steps, then three selected whole steps](../media/rc15-input-drill.gif)<br>
@@ -503,17 +506,19 @@ renaming, cropping and deleting are done on the page.
 
 ### Player and CPU
 
-The title reads Recording, with two tabs beside it: L Player and CPU R. L picks Player 1 and R the CPU; the lit tab is
-the side you're working on. That side is the one Record (ZR + D-pad Down) records and [Edit placement](#edit-placement)
-edits. It stays until you change it, and starts on Player.
+The title reads Recording, with Player and CPU role tabs and a ZR cap beside them. ZR switches between Player 1 and
+the CPU, as it does on the Recording page; the lit tab is the side you're working on. That side is the one Record
+(ZR + D-pad Down) records and [Edit placement](#edit-placement) edits. It stays until you change it, and starts on Player.
 
 Under the title are the pop-up's own tabs:
 
-- **Player:** Save states & Macros, and Combos & Sequences. ZL or ZR switches between them.
-- **CPU:** Save states & Macros only. ZL and ZR do nothing.
+- **Player:** Save states & Macros, and Combos & Sequences. ZL, L or R switches between them. The footer says
+  `ZL/L/R tab   ZR role`.
+- **CPU:** Save states & Macros only. ZL, L and R do nothing; the footer says `ZR role`.
 
 ![ZR + Right opens the Recording pop-up on Player; R lights the CPU tab; B closes it](../media/rc11-popup-player-cpu.gif)<br>
 *ZR + Right opens the pop-up over the match on the Player tab; R switches to the CPU tab and its list; B closes it.*
+This clip was recorded before the keys changed; ZR now switches to the CPU.
 
 ### The lists and the hot five
 

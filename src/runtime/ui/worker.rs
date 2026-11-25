@@ -515,6 +515,7 @@ fn publish_bridge_state(s: &mut Session) {
         };
         let mut extra = String::new();
         crate::model::record_place::write_shown(&crate::runtime::features::record_place::shown(), first, popup, role, &mut extra);
+        let (strip_scroll, strip_back_ms) = crate::runtime::bridge_state::strip_scroll(now);
         let view = crate::model::bridge_state::View {
             open: open && m.is_some(),
             page: m.map_or("", |m| m.page().id()),
@@ -543,6 +544,8 @@ fn publish_bridge_state(s: &mut Session) {
             recording_capture_role: crate::engine::rr_host::capture_role_key(),
             recording_indicator: crate::runtime::bridge_state::recording_indicator(now),
             strip_aims: crate::runtime::bridge_state::strip_aims(now),
+            strip_scroll,
+            strip_back_ms,
             list: &list.id,
             list_count: list.count,
             list_index: list.index,

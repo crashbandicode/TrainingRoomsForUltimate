@@ -194,6 +194,9 @@ recorded one.
 
 **DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Crop and Delete, plus Made from when a macro or chain made it.
 
+Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
+as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
+
 - **Record directly:** choose **+ Record drill…**. The library closes and shows the configured Record chord. Press that chord to start recording Player 1, then press it again to stop and save the take straight as a drill. It becomes the current grading target. This one take uses Player 1 even if the pop-up's Record role is CPU; later ordinary recordings keep their selected role. Opening the library before starting cancels the armed take. The menu press and the Record chords are excluded. The take's inputs are kept with the drill in a file of its own; it is not listed under MACROS and is deleted with the drill.
 - **From a macro or chain:** Make combo saves an input drill when the pass touches no opponent. A pass with hit links keeps making a hit combo. The source and current grading target stay selected as before.
 - **Steps:** a press, C-stick input or stick flick starts a new step when it comes more than 20 frames after the last
@@ -201,19 +204,24 @@ recorded one.
   its own step. A step with 12 events continues in another step. The shared combo capacity is 16 steps of up to 12
   events; an overfull take saves nothing.
 - **Grading:** the same event kind, facing-relative direction, order and On-time tolerance apply. The first event
-  starts the clock; later steps keep their recorded offsets, including idle gaps. A release is graded on the hold
-  length, not its frame or stick: the hold may differ by the On-time tolerance plus one frame per eight frames of the
-  saved hold, at most 15 extra frames. A missing release, or a button held longer or shorter than that, drops the
-  step. A special with saved directions is graded on them, not its press's stick direction. A side tilt or smash uses
+  starts the clock; later steps keep their recorded offsets, including idle gaps. In a new recording, a release is
+  graded on its hold only when the status of the action started by its press changes on release or within the selected
+  On-time tolerance afterwards. The hold may differ by the On-time tolerance plus one frame per
+  eight frames of the saved hold, at most 15 extra frames. A missing graded release, or a button held longer or shorter than that, drops
+  the step; a release marked as unreacted is not graded. A special with saved directions is graded on them, not
+  its press's stick direction. A side tilt or smash uses
   the angle the game chose, not the stick position. There is no move, hit, spot or TRUE requirement; the TRUE field
   stays blank.
 - **Directions of a special:** for any fighter, a special records a direction when the fighter starts to move a way
   that is not the special's own and the stick pointed that way since the press (up to two per special, each graded on
   its direction). A special that only goes its own way, such as a straight-up up special, records none.
-- **After a Training reset:** buttons held through the reset are not new presses, and the next input starts a fresh
-  attempt.
-- **Older drill files:** a step beginning with a release or first special direction joins the preceding step on load
-  if both fit in 12 events. Loading does not change the file.
+- **After a Training reset:** the reset's own presses held at clear leave no result, however long they are held.
+  Buttons held through the reset are not new presses, and the next input starts a fresh attempt. With Load after on,
+  an attempt whose opening buttons are still held loads when one is released; a reset withdraws it without loading.
+- **Older drill files:** they did not record whether the game reacted. A saved hold under eight frames is a tap and is
+  not graded; a hold of eight or more is graded in its band. Re-recording the drill grades releases by the game's
+  reaction instead. A step beginning with a release or first special direction joins the preceding step on load if
+  both fit in 12 events. Loading does not change the file.
 - **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
 - **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
 - **Preview:** on a drill's row, X plays the drill's recorded inputs once on Player 1 through Recording's playback. The menu hides while it plays and a strip at the bottom shows the take's timeline, its moves and the playhead; X or B stops it, and the page returns about a second after the last input. X does nothing while a macro is already playing on Player 1. Only a drill recorded directly in this build has its inputs: one recorded earlier, a crop, or one Make combo made shows "Re-record to preview" (a made drill's source macro can be played as a macro).
@@ -286,7 +294,8 @@ on the [Recording page's pop-up section](../menu/recording.md#the-recording-pop-
 
 - While it is open it takes your buttons. B closes it and leaves the bound save, the active macros and the cursor as
   they were. That B never reaches your fighter, tapped or held; your buttons stay with the pop-up until you let go.
-- L Player and CPU R choose the side you are working on. That side is the one Record records and Edit placement edits.
+- ZR switches between Player 1 and CPU, as on the Recording page. The ZR cap sits beside the role tabs; the lit side
+  is the one Record records and Edit placement edits. ZL, L and R switch the pop-up's tabs; on CPU there is only one.
 - A acts at once: no file screens. Renaming, cropping and deleting are on the page.
 
 The pop-up role and the Recording page's ZR view are remembered separately across menu closes, leaving Training and a

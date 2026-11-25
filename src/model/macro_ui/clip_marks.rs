@@ -878,16 +878,31 @@ mod tests {
         assert!(callback.contains("input_display::sample_frame("));
     }
 
+    /// A drill's crop names each step as the Recording list does (`combo_link_lines`, the recorded fighter): since the
+    /// drill-step moves that is the step's move or input, not "Step N". The fixture's steps hold a real press each; a
+    /// step with no event has no title and cannot come from a drill file.
     fn a_drill_crop_marks_every_step_and_names_it() {
-        let editor = combo_editor(true);
+        use crate::model::combo::{Aim, Event};
+        let step = |button| {
+            let mut step = LinkRec::INPUT;
+            step.events[0] = Some(Event::press(button, Aim::Neutral, 0));
+            step
+        };
+        let mut drill = Combo::from_links([step(Button::Attack), step(Button::Special)]).unwrap();
+        drill.input_only = true;
+        let heads: Vec<String> = crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::recorded(None))
+            .into_iter().filter(|line| crate::model::recording_menu::link_head(line)).collect();
+        assert_eq!(heads.len(), 2);
+        assert!(heads[0].eq_ignore_ascii_case("S1 attack") && heads[1].eq_ignore_ascii_case("S2 special"), "{heads:?}");
+        let mut editor = ClipEditor::combo_file(ComboRecord::new("Drill".into(), drill, None)).unwrap();
         let view = editor.view();
         assert_eq!(view.mark_count, 2);
-        assert!(view.move_text.contains("Step 1"));
-        let mut editor = editor;
+        assert_eq!(view.move_text, format!("Start of {}", heads[0]));
         editor.on_action(ClipAction::SelectIn);
         editor.on_action(ClipAction::Nudge(1));
         editor.on_action(ClipAction::Snap);
         assert_eq!(editor.view().start, 1);
+        assert_eq!(editor.view().move_text, format!("Start of {}", heads[1]));
     }
 
     fn a_combo_crop_marks_every_link_and_names_it() {

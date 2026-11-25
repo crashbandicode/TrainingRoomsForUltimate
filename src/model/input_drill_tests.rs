@@ -70,7 +70,12 @@ fn input_idle_groups_and_continuations_share_combo_bounds() {
 }
 #[test]
 fn input_attempt_counts_steps_and_drops_late_or_missing_releases() {
-    let reference=capture(&[(0,1),(2,0),(23,2),(25,0)]);
+    let mut reference=capture(&[(0,1),(2,0),(23,2),(25,0)]);
+    for link in reference.links[..reference.len].iter_mut().flatten() {
+        for event in link.events.iter_mut().flatten() {
+            if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+        }
+    }
     assert_eq!(reference.len(),2);
     let mut helper=Helper::new(); helper.set_target(Some(reference));
     run(&mut helper,27,&[(0,1),(2,0),(22,2),(24,0)]);
@@ -116,7 +121,7 @@ fn input_bar_names_steps_and_has_no_hit_verdict_or_window() {
     use crate::model::panes::strip_layout::C;
     let mut h=Helper::new(); h.set_target(Some(capture(&[(0,1),(2,0)]))); run(&mut h,4,&[(0,1),(2,0)]);
     let mut texts=Vec::new(); Renderer::new().draw(&h,&Text::EMPTY,None,true,(&C,false),|_,look,_| { if look.visible { texts.push(String::from_utf16_lossy(look.text.units())); } });
-    assert!(texts.iter().any(|t| t=="Step 1")); assert!(texts.iter().any(|t| t=="Drill"));
+    assert!(texts.iter().any(|t| t=="1 Attack")); assert!(texts.iter().any(|t| t=="Drill"));
     assert!(texts.iter().all(|t| !t.contains("TRUE") && !t.contains("DROP") && !t.contains("other>other")));
 }
 

@@ -91,6 +91,7 @@ pub enum Flick {
 pub enum Kind {
     Press(Button),
     Release(Button),
+    LetGo(Button),
     CStick,
     Flick(Flick),
     /// A part of a directional special took its direction; the part number.
@@ -250,13 +251,17 @@ impl LinkRec {
         (bits >> (side * 12)) & 0xfff
     }
 
+    fn pack_description(desc: ActionDesc) -> u32 {
+        let of = desc.of.and_then(|mv| DESC_MOVES.iter().position(|&candidate| candidate == mv))
+            .map_or(1, |index| index as u32 + 2);
+        let angle = match desc.angle { None => 0, Some(Angle::Up) => 1, Some(Angle::Down) => 2 };
+        of | (angle << 5) | (u32::from(desc.normal.min(31)) << 7)
+    }
+
     pub(crate) fn set_descriptions(&mut self, desc: [ActionDesc; 2]) {
         let mut bits = 0u32;
         for (side, desc) in desc.into_iter().enumerate() {
-            let of = desc.of.and_then(|mv| DESC_MOVES.iter().position(|&candidate| candidate == mv))
-                .map_or(1, |index| index as u32 + 2);
-            let angle = match desc.angle { None => 0, Some(Angle::Up) => 1, Some(Angle::Down) => 2 };
-            bits |= (of | (angle << 5) | (u32::from(desc.normal.min(31)) << 7)) << (side * 12);
+            bits |= Self::pack_description(desc) << (side * 12);
         }
         self.shown = [bits as u8, (bits >> 8) as u8, (bits >> 16) as u8];
     }
@@ -264,6 +269,128 @@ impl LinkRec {
     /// Whether both moves have descriptions.
     pub fn described(&self) -> bool {
         self.description_bits(0) & 31 != 0 && self.description_bits(1) & 31 != 0
+    }
+
+    fn is_special(desc: ActionDesc) -> bool {
+        desc.of.is_some() || matches!(desc.mv,
+            Move::NeutralSpecial | Move::SideSpecial | Move::UpSpecial | Move::DownSpecial)
+    }
+
+    pub fn step_side(&self, side: usize) -> Option<ActionDesc> {
+        if self.description_bits(side) & 31 == 0 { return None; }
+        let mut desc = self.desc(side);
+        desc.parts = [None; 2];
+        let owner = [1, 0].into_iter().find(|&i| {
+            self.description_bits(i) & 31 != 0 && Self::is_special(self.desc(i))
+        });
+        if owner == Some(side) {
+            for event in self.events() {
+                if let Kind::Aim(part @ 1..=2) = event.kind {
+                    desc.parts[usize::from(part - 1)] = Some(event.dir);
+                }
+            }
+        }
+        Some(desc)
+    }
+
+    pub fn set_step_side(&mut self, side: usize, desc: Option<ActionDesc>) {
+        let shift = side * 12;
+        let mut bits = u32::from(self.shown[0]) | (u32::from(self.shown[1]) << 8) | (u32::from(self.shown[2]) << 16);
+        bits = (bits & !(0xfff << shift)) | (desc.map_or(0, Self::pack_description) << shift);
+        self.shown = [bits as u8, (bits >> 8) as u8, (bits >> 16) as u8];
+        let mv = desc.map_or(Move::Other, |desc| desc.mv);
+        if side == 0 { self.from = mv; } else { self.to = mv; }
+    }
+
+    fn title_buttons(&self) -> bool {
+        self.events().any(|event| matches!(event.kind, Kind::Press(_) | Kind::CStick))
+    }
+
+    fn aim_led(&self) -> bool {
+        matches!(self.events().next().map(|event| event.kind), Some(Kind::Aim(2..)))
+    }
+
+    fn title_ends(&self) -> (Option<Event>, Option<Event>) {
+        let buttons = self.title_buttons();
+        let mut first = None;
+        let mut last: Option<Event> = None;
+        for event in self.events().filter(|event| {
+            if buttons { matches!(event.kind, Kind::Press(_) | Kind::CStick) }
+            else { matches!(event.kind, Kind::Flick(_)) }
+        }) {
+            if let Some(previous) = last {
+                if previous.offset != event.offset {
+                    if first.is_none() { first = Some(previous); }
+                    last = Some(event);
+                } else if event.kind == Kind::CStick {
+                    last = Some(event);
+                }
+            } else {
+                last = Some(event);
+            }
+        }
+        if first.is_some() { (first, last) } else { (last, None) }
+    }
+
+    fn title_side(&self, offset: i32) -> Option<usize> {
+        let (first, last) = self.title_ends();
+        if self.aim_led() {
+            return last.or(first).filter(|event| event.offset == offset).map(|_| 1);
+        }
+        match (first, last) {
+            (Some(first), Some(_)) if first.offset == offset => Some(0),
+            (_, Some(last)) if last.offset == offset => Some(1),
+            (Some(first), None) if first.offset == offset => Some(1),
+            _ => None,
+        }
+    }
+
+    pub fn write_title(&self, out: &mut impl core::fmt::Write, tight: bool, separator: &str, namer: super::move_names::Namer<'_>) -> core::fmt::Result {
+        let (first, last) = self.title_ends();
+        if self.aim_led() {
+            if let Some(desc) = self.step_side(0) {
+                desc.write(out, tight, namer)?;
+                if let Some(event) = last.or(first) {
+                    out.write_str(separator)?;
+                    return Self::write_step_input(out, self.step_side(1), event, tight, namer);
+                }
+                return Ok(());
+            }
+            if let Some(event) = last.or(first) {
+                return Self::write_step_input(out, self.step_side(1), event, tight, namer);
+            }
+        }
+        match (first, last) {
+            (Some(first), Some(last)) => {
+                Self::write_step_input(out, self.step_side(0), first, tight, namer)?;
+                out.write_str(separator)?;
+                Self::write_step_input(out, self.step_side(1), last, tight, namer)
+            }
+            (Some(first), None) => Self::write_step_input(out, self.step_side(1), first, tight, namer),
+            (None, _) => {
+                if let Some(desc) = self.step_side(1).or_else(|| self.step_side(0)) { return desc.write(out, tight, namer); }
+                if let Some(event) = self.events().next() { return Self::write_step_input(out, None, event, tight, namer); }
+                Ok(())
+            }
+        }
+    }
+
+    /// Title flick names are capitalised; `event_label` uses mid-sentence fault words.
+    fn write_step_input(out: &mut impl core::fmt::Write, desc: Option<ActionDesc>, event: Event, tight: bool, namer: super::move_names::Namer<'_>) -> core::fmt::Result {
+        if let Some(desc) = desc { return desc.write(out, tight, namer); }
+        let label = match event.kind {
+            Kind::Flick(Flick::Dash) => "Dash",
+            Kind::Flick(Flick::FastFall) => "Fast-fall",
+            Kind::Flick(Flick::TapJump) => "Tap-jump",
+            kind => super::combo_plan::event_label(kind),
+        };
+        out.write_str(label)?;
+        let arrow = action::arrow(event.dir);
+        if !arrow.is_empty() {
+            if !tight { out.write_str(" ")?; }
+            out.write_str(arrow)?;
+        }
+        Ok(())
     }
 
     /// A move's saved description, with the follow-up's aim events.
@@ -290,9 +417,9 @@ impl LinkRec {
     fn holds_from(&self, before: impl Iterator<Item = Event> + Clone) -> [Option<u32>; STEPS] {
         let mut holds = [None; STEPS];
         for (i, event) in self.events.iter().enumerate() {
-            let Some(Event { kind: Kind::Release(button), offset, .. }) = event else { continue };
+            let Some(Event { kind: Kind::Release(button) | Kind::LetGo(button), offset, .. }) = event else { continue };
             let owner = self.events[..i].iter().rev().flatten().copied().chain(before.clone())
-                .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == *button));
+                .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) | Kind::LetGo(b) if b == *button));
             if let Some(Event { kind: Kind::Press(_), offset: press, .. }) = owner {
                 holds[i] = u32::try_from(i64::from(*offset) - i64::from(press)).ok();
             }
@@ -435,6 +562,16 @@ impl Combo {
         self.links.get(index).and_then(Option::as_ref)
     }
 
+    pub(crate) fn mark_legacy_holds(&mut self, k: usize, bits: u16) {
+        let Some(link) = self.links.get_mut(k).and_then(Option::as_mut) else { return };
+        for (i, slot) in link.events.iter_mut().enumerate() {
+            if bits & (1u16 << i) == 0 { continue; }
+            if let Some(event) = slot {
+                if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+            }
+        }
+    }
+
     pub fn links(&self) -> impl Iterator<Item = &LinkRec> {
         self.links[..self.len].iter().flatten()
     }
@@ -512,7 +649,7 @@ impl Combo {
     pub fn unreleased(&self, button: Button) -> bool {
         self.links[..self.len].iter().rev().flatten()
             .flat_map(|link| link.events.iter().rev().flatten())
-            .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) if b == button))
+            .find(|event| matches!(event.kind, Kind::Press(b) | Kind::Release(b) | Kind::LetGo(b) if b == button))
             .is_some_and(|event| matches!(event.kind, Kind::Press(_)))
     }
 
@@ -526,7 +663,7 @@ impl Combo {
 
     /// The button, ordinal and offset of the press that owns this release.
     fn owner_press(&self, k: usize, i: usize) -> Option<(Button, usize, i32)> {
-        let Kind::Release(button) = self.get(k)?.events.get(i)?.as_ref()?.kind else { return None };
+        let (Kind::Release(button) | Kind::LetGo(button)) = self.get(k)?.events.get(i)?.as_ref()?.kind else { return None };
         let mut count = 0;
         let mut open = None;
         for (step, link) in self.links().enumerate().take(k + 1) {
@@ -537,7 +674,7 @@ impl Combo {
                         open = Some((count, event.offset));
                         count += 1;
                     }
-                    Kind::Release(b) if b == button => open = None,
+                    Kind::Release(b) | Kind::LetGo(b) if b == button => open = None,
                     _ => {}
                 }
             }
@@ -567,13 +704,30 @@ impl Combo {
             let previous = self.links[k - 1].unwrap();
             let current = self.links[k].unwrap();
             let count = previous.events().count();
-            if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::Aim(1)))
+            if matches!(current.events().next().map(|event| event.kind), Some(Kind::Release(_) | Kind::LetGo(_) | Kind::Aim(1)))
                 && count + current.events().count() <= STEPS
             {
-                let previous = self.links[k - 1].as_mut().unwrap();
-                for (slot, event) in previous.events[count..].iter_mut().zip(current.events()) {
+                let merged = self.links[k - 1].as_mut().unwrap();
+                for (slot, event) in merged.events[count..].iter_mut().zip(current.events()) {
                     *slot = Some(event);
                 }
+                let buttons = merged.title_buttons();
+                let description = |event: Option<Event>| event.and_then(|event| {
+                    [current, previous].into_iter().find_map(|link| {
+                        if buttons && !link.title_buttons() { return None; }
+                        link.title_side(event.offset).and_then(|side| link.step_side(side))
+                    })
+                });
+                let (first, last) = merged.title_ends();
+                let (from, to) = if merged.aim_led() {
+                    (previous.step_side(0), description(last.or(first)))
+                } else if last.is_some() {
+                    (description(first), description(last))
+                } else {
+                    (None, description(first))
+                };
+                merged.set_step_side(0, from);
+                merged.set_step_side(1, to);
                 for detail in self.details.iter_mut().filter(|detail| detail.at != Detail::FREE) {
                     let (link, event) = (usize::from(detail.at >> 4), usize::from(detail.at & 0xF));
                     if link == k {
@@ -717,17 +871,20 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
     let mut from = 0;
     for (index, (mark, want)) in marks.iter_mut().zip(reference.events.iter()).enumerate() {
         let Some(want) = want else { continue };
-        if input_only && matches!(want.kind, Kind::Release(_)) && context.ref_holds[index].is_none() {
+        if input_only && (matches!(want.kind, Kind::Release(_))
+            || (matches!(want.kind, Kind::LetGo(_)) && context.ref_holds[index].is_none())) {
             continue;
         }
         let found = (from..STEPS).find(|&i| {
             !used[i]
                 && attempt.events[i]
-                    .is_some_and(|got| event_matches(*want, got, reference.presses_only))
+                    .is_some_and(|got| event_matches(*want, got, reference.presses_only)
+                        || (input_only && matches!((want.kind, got.kind),
+                            (Kind::LetGo(a), Kind::Release(b)) if a == b)))
         });
         // rc.12: the follow-up's events end at its hit, so a button still held when the hit lands has no release here.
         // Holding it longer does not change the move that came out: a release with no counterpart is not graded.
-        if !input_only && found.is_none() && matches!(want.kind, Kind::Release(_)) {
+        if !input_only && found.is_none() && matches!(want.kind, Kind::Release(_) | Kind::LetGo(_)) {
             continue;
         }
         *mark = Some(match found {
@@ -735,10 +892,10 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
                 used[i] = true;
                 from = i + 1;
                 let got = attempt.events[i].unwrap();
-                if reference.presses_only || got.dir == want.dir || matches!(want.kind, Kind::Release(_))
+                if reference.presses_only || got.dir == want.dir || matches!(want.kind, Kind::Release(_) | Kind::LetGo(_))
                     || (matches!(want.kind, Kind::Press(Button::Special)) && context.owns_aim[index])
                 {
-                    let delta = if let (Kind::Release(_), Some(saved), Some(actual)) =
+                    let delta = if let (Kind::Release(_) | Kind::LetGo(_), Some(saved), Some(actual)) =
                         (want.kind, context.ref_holds[index], context.att_holds[i])
                     {
                         band[index] = action::hold_band(saved);
@@ -989,6 +1146,15 @@ struct Capture {
 
 pub use crate::model::move_names::CaptureOwner;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Provisional {
+    buttons: u8,
+    streak: u16,
+    best: u8,
+    displaced: Option<Summary>,
+    load: bool,
+}
+
 /// The helper: game-owned capture, target and attempts. The HUD borrows its static storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Helper {
@@ -1001,6 +1167,7 @@ pub struct Helper {
     results: [Option<Summary>; RESULTS],
     streak: u16,
     best: u8,
+    provisional: [Option<Provisional>; PRESS_BITS.len()],
     pending_load: bool,
     settings: Settings,
     input: InputCapture,
@@ -1026,6 +1193,7 @@ impl Helper {
             results: [None; RESULTS],
             streak: 0,
             best: 0,
+            provisional: [None; PRESS_BITS.len()],
             pending_load: false,
             settings: Settings::factory(),
             input: InputCapture::new(),
@@ -1040,6 +1208,7 @@ impl Helper {
         self.results = [None; RESULTS];
         self.streak = 0;
         self.best = 0;
+        self.provisional = [None; PRESS_BITS.len()];
         self.pending_load = false;
     }
 
@@ -1057,6 +1226,7 @@ impl Helper {
     pub fn restart_with(&mut self, target: Option<Combo>) {
         self.target = target;
         self.attempt = None;
+        self.provisional = [None; PRESS_BITS.len()];
     }
 
     pub fn target(&self) -> Option<&Combo> {
@@ -1204,18 +1374,26 @@ impl Helper {
             self.attempt = None;
         }
         let aims = self.target.as_ref().is_some_and(Combo::has_aim);
+        self.input.window = self.settings.tolerance;
         let amended = self.input.step_with(snap, late.unwrap_or(Late::NONE), false, aims);
+        let buttons = self.input.prev.map_or(0, |prev| prev.buttons);
+        if let Some(i) = self.provisional.iter().position(|entry| entry.is_some_and(|entry| {
+            PRESS_BITS.iter().enumerate().any(|(n, (mask, _))| {
+                entry.buttons & (1u8 << n) != 0 && !held(buttons, *mask)
+            })
+        })) {
+            for entry in &mut self.provisional[i..] {
+                if entry.take().is_some_and(|entry| entry.load) { self.pending_load = true; }
+            }
+        }
         let Some(start) = self.input.first else {
             return;
         };
         if self.attempt.is_none() {
             self.attempt = Some(Attempt::new(start, false));
         }
-        if let Some(j) = amended[0] {
-            self.regrade(j, out);
-        }
-        if let Some(j) = amended[1].filter(|j| Some(*j) != amended[0]) {
-            self.regrade(j, out);
+        for j in 0..LINKS {
+            if amended & (1u16 << j) != 0 { self.regrade(j, out); }
         }
         while let Some(attempt) = self.attempt.as_ref().filter(|a| a.open()) {
             let target = self.target.as_ref().unwrap();
@@ -1231,7 +1409,7 @@ impl Helper {
             }
             let holds = target.holds(attempt.len);
             let deadline = reference.events.iter().enumerate().filter_map(|(i, event)| {
-                event.map(|event| {
+                event.filter(|event| !matches!(event.kind, Kind::Release(_))).map(|event| {
                     let Some(hold) = holds[i] else { return event.offset };
                     let shift = target.owner_press(attempt.len, i)
                         .and_then(|(button, n, saved)| self.input.combo.nth_press(button, n).map(|pressed| pressed - saved))
@@ -1290,8 +1468,35 @@ impl Helper {
 
     fn on_clear(&mut self, out: &mut Out) {
         let input_only = self.target.as_ref().is_some_and(|target| target.input_only);
-        if !input_only || self.attempt.as_ref().is_none_or(|attempt| !attempt.open() || !attempt.is_empty()) {
-            self.resolve_open(Outcome::Cleared, out);
+        if input_only {
+            let n = self.provisional.iter().take_while(|entry| entry.is_some()).count();
+            if n > 0 {
+                self.results.copy_within(n..RESULTS, 0);
+                for (j, entry) in self.provisional[..n].iter().enumerate() {
+                    self.results[RESULTS - n + j] = entry.unwrap().displaced;
+                }
+                let oldest = self.provisional[n - 1].unwrap();
+                self.streak = oldest.streak;
+                self.best = oldest.best;
+                self.provisional = [None; PRESS_BITS.len()];
+            }
+        }
+        let gesture_only = input_only && self.attempt.as_ref().is_some_and(Attempt::open)
+            && self.input.held_only().is_some();
+        if !gesture_only {
+            if input_only {
+                if let Some(k) = self.input.combo.len().checked_sub(1) {
+                    if self.attempt.as_ref().is_some_and(|attempt| attempt.open() && k >= attempt.len)
+                        && self.input.gesture_step(k)
+                    {
+                        self.input.combo.links[k] = None;
+                        self.input.combo.len -= 1;
+                    }
+                }
+            }
+            if !input_only || self.attempt.as_ref().is_none_or(|attempt| !attempt.open() || !attempt.is_empty()) {
+                self.resolve_open(Outcome::Cleared, out);
+            }
         }
         if input_only {
             self.attempt = None;
@@ -1379,11 +1584,27 @@ impl Helper {
     /// Closes the open attempt with `summary`: the history, the streak, best and the load after it.
     fn record(&mut self, summary: Summary, out: &mut Out) {
         let outcome = summary.outcome;
+        let before = (self.streak, self.best, self.results[RESULTS - 1]);
+        let held = if outcome != Outcome::Cleared && self.target.as_ref().is_some_and(|target| target.input_only) {
+            self.input.held_only()
+        } else {
+            None
+        };
         if let Some(attempt) = self.attempt.as_mut() {
             attempt.summary = Some(summary);
         }
         self.results.copy_within(0..RESULTS - 1, 1);
         self.results[0] = Some(summary);
+        if let Some(buttons) = held {
+            if self.provisional[PRESS_BITS.len() - 1].is_some_and(|entry| entry.load) { self.pending_load = true; }
+            self.provisional.copy_within(0..PRESS_BITS.len() - 1, 1);
+            self.provisional[0] = Some(Provisional { buttons, streak: before.0, best: before.1,
+                displaced: before.2, load: self.settings.load_after });
+        } else {
+            if self.provisional.iter().flatten().any(|entry| entry.load) { self.pending_load = true; }
+            self.provisional = [None; PRESS_BITS.len()];
+            if outcome != Outcome::Cleared && self.settings.load_after { self.pending_load = true; }
+        }
         // Streak follows `clean`, so a non-true link still counts. Best stays the most true links in one
         // attempt (operator 2026-11-06, question 2: a single combo's best stays as today).
         self.streak = if summary.clean {
@@ -1392,9 +1613,6 @@ impl Helper {
             0
         };
         self.best = self.best.max(summary.true_links);
-        if outcome != Outcome::Cleared && self.settings.load_after {
-            self.pending_load = true;
-        }
         out.resolved = Some(summary);
     }
 }
@@ -1402,7 +1620,7 @@ impl Helper {
 fn missing_reason(event: Event) -> Reason {
     match event.kind {
         Kind::Press(button) => Reason::Missing(button),
-        Kind::Release(button) => Reason::MissingRelease(button),
+        Kind::Release(button) | Kind::LetGo(button) => Reason::MissingRelease(button),
         Kind::CStick => Reason::MissingCStick,
         Kind::Flick(flick) => Reason::MissingFlick(flick),
         Kind::Aim(part) => Reason::MissingAim(part),
@@ -1412,7 +1630,7 @@ fn missing_reason(event: Event) -> Reason {
 fn off_reason(event: Event, delta: i32) -> Reason {
     match event.kind {
         Kind::Press(button) => Reason::Off(button, delta),
-        Kind::Release(button) => Reason::ReleaseOff(button, delta),
+        Kind::Release(button) | Kind::LetGo(button) => Reason::ReleaseOff(button, delta),
         Kind::CStick => Reason::CStickOff(delta),
         Kind::Flick(flick) => Reason::FlickOff(flick, delta),
         Kind::Aim(part) => Reason::WrongAim(part),
@@ -1715,6 +1933,7 @@ pub struct InputCapture {
     first: Option<u32>,
     last: Option<u32>,
     decided: Option<u32>,
+    window: u8,
 }
 impl InputCapture {
     pub const fn new() -> Self {
@@ -1727,6 +1946,7 @@ impl InputCapture {
             first: None,
             last: None,
             decided: None,
+            window: Settings::factory().tolerance,
         }
     }
     fn restart(&mut self) {
@@ -1738,18 +1958,34 @@ impl InputCapture {
     pub fn step(&mut self, snap: Snap) {
         self.step_late(snap, Late::NONE);
     }
+    pub fn set_window(&mut self, window: u8) {
+        self.window = window;
+    }
     pub fn step_late(&mut self, snap: Snap, late: Late) {
         self.step_with(snap, late, true, true);
+    }
+    fn continuation(&self, press: u32, mv: Move) -> Option<ActionDesc> {
+        let offset = i32::try_from(press.checked_sub(self.first?)?).ok()?;
+        let link = self.combo.links().find(|link| link.events().any(|e|
+            e.offset == offset && matches!(e.kind, Kind::Press(_) | Kind::CStick)))?;
+        // The cast can be the unprinted middle input. Use its exact variant when the step still has it.
+        let saved = link.title_side(offset).and_then(|side| link.step_side(side));
+        Some(saved.filter(|d| d.of.unwrap_or(d.mv) == mv)
+            .unwrap_or(ActionDesc { mv, of: None, angle: None, normal: 0, parts: [None; 2] }))
     }
     #[cfg(test)]
     fn step_mode(&mut self, snap: Snap, group_idle: bool, aims: bool) {
         self.step_with(snap, Late::NONE, group_idle, aims);
     }
-    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> [Option<usize>; 2] {
+    fn step_with(&mut self, mut snap: Snap, late: Late, group_idle: bool, aims: bool) -> u16 {
+        let mut amended = 0u16;
         if stick_axis(snap.lstick_y) < JUMP_STICK_Y {
             snap.buttons &= !FLICK_JUMP;
         }
-        if self.combo.overflow { return [None; 2]; }
+        if self.combo.overflow {
+            self.prev = Some(snap);
+            return amended;
+        }
         let mut edges = [None; STEPS];
         let mut count = 0;
         push_edges(&mut edges, &mut count, self.prev, snap, aims);
@@ -1766,26 +2002,62 @@ impl InputCapture {
                 .is_none_or(|l| l.events().count() == STEPS);
             let next_part = matches!(event.kind, Kind::Aim(2..))
                 && self.combo.links().last().is_some_and(|link| link.events().next().is_some());
-            if (full
+            if full
                 || next_part
                 || (group_idle
                     && action::originates(event.kind)
                     && self
                         .last
-                        .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX)))
-                && !self.combo.push(LinkRec::INPUT)
+                        .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX))
             {
-                return [None; 2];
+                let cast = late.continuation.filter(|_| next_part).and_then(|mv| self.continuation(late.press, mv));
+                if !self.combo.push(LinkRec::INPUT) { return amended; }
+                if let Some(desc) = cast {
+                    self.combo.links[self.combo.len - 1].as_mut().unwrap().set_step_side(0, Some(desc));
+                }
             }
             let link = self.combo.links[self.combo.len - 1].as_mut().unwrap();
+            let offset = (event.frame - start) as i32;
+            let buttons = link.title_buttons();
+            let button = matches!(event.kind, Kind::Press(_) | Kind::CStick);
+            if button || (!buttons && matches!(event.kind, Kind::Flick(_))) {
+                let (first, last) = link.title_ends();
+                let old_last = last.or(first);
+                if button && !buttons && first.is_some() {
+                    if !link.aim_led() { link.set_step_side(0, None); }
+                    link.set_step_side(1, None);
+                } else if old_last.is_none_or(|old| old.offset != offset) {
+                    if !link.aim_led() {
+                        if first.is_some() && last.is_none() {
+                            link.set_step_side(0, link.step_side(1));
+                        } else if first.is_none() {
+                            link.set_step_side(0, None);
+                        }
+                    }
+                    link.set_step_side(1, None);
+                }
+            }
             *link.events.iter_mut().find(|e| e.is_none()).unwrap() = Some(Event {
                 kind: event.kind,
                 dir: event.dir,
-                offset: (event.frame - start) as i32,
+                offset,
             });
             self.last = Some(event.frame);
         }
-        let mut amended = [None; 2];
+        if let Some((Some(press), mv, of, normal)) = late.named {
+            if let Some(first) = self.first.filter(|&first| press >= first) {
+                let offset = (press - first) as i32;
+                let found = self.combo.links().enumerate().find_map(|(step, link)| {
+                    link.title_side(offset).map(|side| (step, side))
+                });
+                if let Some((step, side)) = found {
+                    let link = self.combo.links[step].as_mut().unwrap();
+                    let angle = link.step_side(side).filter(|desc| desc.mv == mv).and_then(|desc| desc.angle);
+                    link.set_step_side(side, Some(ActionDesc { mv, of: if mv == Move::Other { of } else { None },
+                        angle, normal, parts: [None; 2] }));
+                }
+            }
+        }
         if let Some((Some(press), side)) = late.open {
             self.decided = Some(press);
             if let (Some(angle), Some(first)) = (side, self.first.filter(|&first| press >= first)) {
@@ -1798,11 +2070,18 @@ impl InputCapture {
                     })
                 });
                 if let Some((step, index)) = chosen {
-                    let event = self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap();
+                    let link = self.combo.links[step].as_mut().unwrap();
+                    if let Some(side) = link.title_side(offset) {
+                        if let Some(mut desc) = link.step_side(side) {
+                            desc.angle = angle;
+                            link.set_step_side(side, Some(desc));
+                        }
+                    }
+                    let event = link.events[index].as_mut().unwrap();
                     let direction = action::angled(event.dir, angle);
                     if direction != event.dir {
                         event.dir = direction;
-                        amended[0] = Some(step);
+                        amended |= 1u16 << step;
                     }
                 }
             }
@@ -1821,11 +2100,52 @@ impl InputCapture {
             });
             if let Some((step, index)) = chosen {
                 if self.combo.attach_travel(step, index, travel) {
-                    amended[1] = Some(step);
+                    amended |= 1u16 << step;
                 }
             }
         }
+        if let (Some(Some(origin)), Some(first)) = (late.turned, self.first) {
+            for (_, button) in PRESS_BITS {
+                let latest = self.combo.links[..self.combo.len].iter().enumerate().rev().find_map(|(step, link)| {
+                    link.as_ref()?.events.iter().enumerate().rev().find_map(|(index, event)| {
+                        let event = (*event)?;
+                        matches!(event.kind, Kind::Release(b) | Kind::LetGo(b) if b == button)
+                            .then_some((step, index, event))
+                    })
+                });
+                let Some((step, index, event)) = latest else { continue };
+                if !matches!(event.kind, Kind::Release(_)) { continue; }
+                let Ok(released) = u32::try_from(i64::from(first) + i64::from(event.offset)) else { continue };
+                if snap.frame.checked_sub(released).is_none_or(|age| age > u32::from(self.window)) { continue; }
+                let Some((_, _, offset)) = self.combo.owner_press(step, index) else { continue };
+                let Ok(press) = u32::try_from(i64::from(first) + i64::from(offset)) else { continue };
+                if origin != press { continue; }
+                self.combo.links[step].as_mut().unwrap().events[index].as_mut().unwrap().kind = Kind::LetGo(button);
+                amended |= 1u16 << step;
+            }
+        }
         amended
+    }
+    fn held_only(&self) -> Option<u8> {
+        let mut bits = 0u8;
+        for (k, link) in self.combo.links().enumerate() {
+            let Some(event) = link.events().next() else { continue };
+            if !self.gesture_step(k) { return None; }
+            let Kind::Press(button) = event.kind else { return None };
+            let n = PRESS_BITS.iter().position(|(_, b)| *b == button)?;
+            bits |= 1u8 << n;
+        }
+        (bits != 0).then_some(bits)
+    }
+    fn gesture_step(&self, k: usize) -> bool {
+        let Some(Kind::Press(button)) = self.combo.get(k).and_then(|link| link.events().next()).map(|event| event.kind)
+            else { return false };
+        let down = PRESS_BITS.iter().find(|(_, b)| *b == button)
+            .is_some_and(|(mask, _)| self.prev.is_some_and(|snap| held(snap.buttons, *mask)));
+        down && !self.combo.links().skip(k).enumerate().any(|(index, link)| {
+            link.events().skip(if index == 0 { 1 } else { 0 })
+                .any(|event| matches!(event.kind, Kind::Release(b) | Kind::LetGo(b) if b == button))
+        })
     }
     fn undecided(&self, k: usize, now: u32) -> bool {
         let Some(first) = self.first else { return false };
@@ -1859,3 +2179,11 @@ mod action_model_tests;
 #[cfg(test)]
 #[path = "reason_line_tests.rs"]
 mod reason_line_tests;
+
+#[cfg(test)]
+#[path = "drill_step_moves_tests.rs"]
+mod drill_step_moves_tests;
+
+#[cfg(test)]
+#[path = "action_smoke_tests.rs"]
+mod action_smoke_tests;

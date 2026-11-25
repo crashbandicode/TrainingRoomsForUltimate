@@ -51,6 +51,8 @@ static INPUTS: AtomicU64 = AtomicU64::new(0);
 static IDS_READY: AtomicBool = AtomicBool::new(false);
 static IDS: Mutex<Option<Table>> = Mutex::new(None);
 static TRACKER: Mutex<Tracker> = Mutex::new(Tracker::new());
+static BACK: Mutex<crate::model::frame_strip::back::Back> = Mutex::new(crate::model::frame_strip::back::Back::new());
+static SCROLL: crate::model::strip_scroll::Cursor = crate::model::strip_scroll::Cursor::new();
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 
 /// Boot: the display's closure passed its guards.
@@ -502,16 +504,20 @@ pub unsafe fn sample_frame(player: usize) {
     };
     let cleared = CLEAR_DUE.swap(false, Ordering::Relaxed);
     if cleared {
-        tracker.clear_live_strip(&PUBLISHED);
+        clear_live_strip(&mut tracker);
         super::parry::reset();
     }
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     let samples = [p1, cpu];
     tracker.step_graded(samples[order[0]], samples[order[1]], inputs, taken);
+    if let Some(mut back) = BACK.try_lock() {
+        SCROLL.record(&mut back, &tracker);
+    }
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
-            crate::engine::rr_host::observe_input(snap, tracker.late(), tracker.contact_now());
+            let tolerance = super::combo::settings().tolerance;
+            crate::engine::rr_host::observe_input(snap, tracker.late(), tolerance, tracker.contact_now());
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         // SAFETY: `player` is the live P1 accessor of this frame.
@@ -688,8 +694,17 @@ pub fn session_clear() {
     LANES.set(1, None);
     CLEAR_DUE.store(false, Ordering::Relaxed);
     GRADER.skip();
-    TRACKER.lock().clear_live_strip(&PUBLISHED);
+    clear_live_strip(&mut TRACKER.lock());
     crate::runtime::features::combo::session_clear();
+}
+
+pub fn on_scroll(event: crate::model::strip_scroll::ScrollEvent, open: bool) {
+    SCROLL.publish_selection(event, open);
+}
+
+fn clear_live_strip(tracker: &mut Tracker) {
+    SCROLL.clear();
+    tracker.clear_live_strip(&PUBLISHED);
 }
 
 /// The game initialised a fighter object again (`reset_hub::on_init`): a Training reset, a CPU replaced, a respawn.
@@ -698,7 +713,7 @@ pub fn session_clear() {
 #[inline(never)]
 pub fn fighter_initialised() {
     if ENABLED.load(Ordering::Acquire) {
-        TRACKER.lock().clear_live_strip(&PUBLISHED);
+        clear_live_strip(&mut TRACKER.lock());
     }
 }
 
@@ -716,10 +731,16 @@ pub fn hud_tick(
     cells: bool,
     labels: [bool; 2],
     mut apply: impl FnMut(usize, &Look, Changed),
-) -> (bool, [Option<u8>; 2]) {
-    let tracker = *TRACKER.lock();
+) -> (bool, [Option<u8>; 2], (u32, u32)) {
+    let mut tracker = *TRACKER.lock();
+    let anchor = SCROLL.anchor();
+    let (back, columns) = if anchor != 0 {
+        let kept = BACK.lock();
+        let back = kept.rewind(&mut tracker, anchor);
+        (back, if back.is_some() { kept.columns_back(anchor) } else { 0 })
+    } else { (None, 0) };
     let (_, history) = RENDERER.lock().draw_with_spec(
-        &tracker, StripDraw { shown, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
+        &tracker, StripDraw { shown, back, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {
             #[cfg(feature = "diag")]
             if local == crate::model::frame_strip_plan::at::CONTAINER && changed.visible {
@@ -731,5 +752,5 @@ pub fn hud_tick(
         },
     );
     let aims = if shown { crate::model::frame_strip_plan::aims_drawn(&tracker, labels) } else { [None; 2] };
-    (history, aims)
+    (history, aims, if shown { (columns, back.unwrap_or(0)) } else { (0, 0) })
 }

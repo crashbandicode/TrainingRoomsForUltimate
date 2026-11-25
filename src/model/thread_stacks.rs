@@ -110,15 +110,19 @@ pub const THREADS: [ThreadStack; 19] = [
     // Merge 3D (2026-11-25): a special's own travel keeps its entry velocity, so a combo's four-entry travel table grew
     // from 96 to 120 B and the same path, which holds combos by value, to 54,144 B (release) and 54,176 B (diag, gate
     // fdd7994d). The stack's size is unchanged: the measured 57,648 B still decides what it needs.
+    // Smoke fix 1 on merge 3D (2026-11-25): the release path is unchanged at 54,144 B; the diag build's
+    // `decode::<ComboRecord>` frame is 16 B larger (7,792 B), so the path reads 54,192 B there (gate 074fd9c3).
     // With the replay editor on merge 3D (its strip, marks, the bridge line and the ZR tap), the ELF path is 55,376 B
     // (release) and 55,392 B (diag, gate dae6dfd6); the larger is recorded.
+    // Install 4 integration (2026-11-25): with the replay editor and the drill-step moves both on the merge 7 head,
+    // the path is 55,424 B (release) and 55,392 B (diag, scratch gate measure-batch-6abe940a); the larger is recorded.
     // Vault recordings (2026-11-25): a Make drill pass saves through one more frame on the same path
     // (`save_input` -> `save_drill_with_take_named` -> `save_combo` -> `Store<ComboRecord>::list` -> `decode`), and
     // `ui::worker::run` and `service_at` grew: 55,200 B on both the release and the diag ELF of 9e7bfaf8. The 88 KiB
     // stack covers it (required 90,112 B); the allocation is unchanged.
     // The replay editor and the Vault recordings folded with the play-target seam: 56,688 B on both the release and the
     // diag ELF (gate 178a48b2). Required and allocated stay 90,112 B.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_688, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 57_200, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified

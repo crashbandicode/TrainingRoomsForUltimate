@@ -1971,3 +1971,18 @@ Decided by the operator on 2026-11-24 for the next build (relayed by tr-primary-
 - The Final Smash needs no handling of its own (19:48:35Z).
 
 Design: [design/action-model.md](design/action-model.md).
+
+## Range sliders and the Recording pop-up (2026-11-24)
+
+Decided by the operator on 2026-11-24 (relayed by tr-primary-2, inbox 23:57:04Z): Up / Down choose the slider handle
+and, while editing, raise or lower it; Left / Right do nothing. A edits or puts a handle down, and B puts it down or
+leaves. Damage ranges step by 0.5%; Tech ranges keep their own steps. ZR toggles the Recording pop-up's Player 1 / CPU
+role, and ZL, L and R switch its tabs.
+
+The storage form and hold curve were accepted by tr-primary-2 on 2026-11-25 00:08:17Z. Damage rows store
+`[lower, upper]` in whole percents, or `[lower, upper, lower half, upper half]` with 0 or 1 flags for half-percent
+ends. Held damage presses 1–2 move 0.5%, 3–6 move 1%, 7–12 move 2%, 13–22 move 5%, then each moves 10%; the
+adapter reaches 150% from 0 at poll 168.
+
+This reverses SPEC-core-02's slider keys and increments (Left / Right handles, ±1 and ±10) and the r8 pop-up's L and R
+role keys (primary 2026-11-08 15:55Z).
