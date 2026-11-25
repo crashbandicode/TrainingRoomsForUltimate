@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
-use crate::model::store::{catalog_changes, try_recording_read, CatalogFingerprint, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
+use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
     migrate, Chain, Error, Kind, LegacySlot, LoopCount, NamedSave, RecordingIndex, Role, Sequence,
@@ -759,7 +759,7 @@ fn accepts_macro_backup(id: &str) -> bool {
 }
 
 struct CatalogFile {
-    fingerprint: CatalogFingerprint,
+    size: u64,
     entry: Option<CatalogEntry>,
     retry: bool,
 }
@@ -831,15 +831,15 @@ impl CatalogCache {
     }
 
     fn apply_changes(&mut self, changes: CatalogSignatures) {
-        for (key, fingerprint) in changes {
-            if let Some(fingerprint) = fingerprint {
+        for (key, size) in changes {
+            if let Some(size) = size {
                 if let Some(file) = self.files.get_mut(&key) {
-                    file.fingerprint = fingerprint;
+                    file.size = size;
                     if !self.pending.contains(&key) {
                         self.revised.insert(key);
                     }
                 } else {
-                    self.files.insert(key.clone(), CatalogFile { fingerprint, entry: None, retry: false });
+                    self.files.insert(key.clone(), CatalogFile { size, entry: None, retry: false });
                     self.pending.insert(key);
                 }
             } else {
@@ -920,24 +920,23 @@ impl CatalogCache {
         }
         drop(guard);
         let listing = check.listing.take().unwrap();
-        self.finish_listing(check, listing, cold);
+        self.finish_listing(check, listing);
         check.at += 1;
         check.at < CATALOG_DIRS.len()
     }
 
     #[inline(never)]
-    fn finish_listing(&self, check: &mut FolderCheck, listing: CatalogListing, cold: bool) {
+    fn finish_listing(&self, check: &mut FolderCheck, listing: CatalogListing) {
         let Some(files) = listing.finish() else { return };
         for key in self.files.keys().filter(|key| key.0 == check.at) {
             if !files.contains_key(&key.1) {
                 check.changes.insert(key.clone(), None);
             }
         }
-        for (id, fingerprint) in files {
+        for (id, size) in files {
             let key = (check.at, id);
-            if self.files.get(&key).is_none_or(|file|
-                file.fingerprint != fingerprint || file.retry || (!cold && fingerprint.modified.is_none())) {
-                check.changes.insert(key, Some(fingerprint));
+            if self.files.get(&key).is_none_or(|file| file.size != size || file.retry) {
+                check.changes.insert(key, Some(size));
             }
         }
     }
@@ -972,31 +971,19 @@ impl CatalogCache {
 pub struct MenuIndex {
     seen: Option<(u64, u64)>,
     index: Option<RecordingIndex>,
-    check: bool,
 }
 
 impl MenuIndex {
-    pub fn check(&mut self) {
-        self.check = true;
-    }
-
     /// Returns true when this pass took the index read slot, even if a writer held the card.
     // Keep JSON decoding in its own frame for the menu worker's stack bound.
     #[inline(never)]
     pub fn step(&mut self, root: &Path, version: (u64, u64)) -> bool {
-        if self.ready(version).is_some() && !self.check {
+        if self.ready(version).is_some() {
             return false;
         }
         let Some(_guard) = crate::model::store::try_recording_read() else { return true };
-        let checking = core::mem::take(&mut self.check);
-        let index = RecordingIndex::load(root).ok();
-        if checking && self.seen == Some(version) && self.index != index {
-            crate::model::store::note_index_write(root);
-            self.seen = Some((version.0, crate::model::store::index_generation()));
-        } else {
-            self.seen = Some(version);
-        }
-        self.index = index;
+        self.seen = Some(version);
+        self.index = RecordingIndex::load(root).ok();
         true
     }
 

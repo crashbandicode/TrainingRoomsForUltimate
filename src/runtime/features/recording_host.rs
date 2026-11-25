@@ -249,7 +249,6 @@ pub fn service() {
     }
     sync_bound(root);
     sync_slots(root);
-    rr_host::warm_book(root);
     if !rr_host::pending() {
         return;
     }
@@ -363,9 +362,9 @@ fn apply(tick: &Tick) {
         let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
             root.join(crate::engine::library::SAVES_DIR),
         );
-        if let Some(pair) = tick.warp_pair.clone().or_else(|| saves.load(id).ok().map(|save| rr_host::warp_pair(save, tick.warp_place))) {
+        if let Ok(save) = saves.load(id) {
             // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
-            super::states::request_named_load(pair);
+            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
         } else {
             // No restore was asked for, so none will land.
             rr_host::warp_landed();

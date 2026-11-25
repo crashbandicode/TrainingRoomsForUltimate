@@ -428,9 +428,7 @@ impl<R: Record> Store<R> {
         for id in orphans {
             let target = self.file(&id, "json");
             if matches!(target.try_exists(), Ok(false)) {
-                if fs::rename(self.file(&id, "json.bak"), &target).is_ok() {
-                    note_catalog_write(&self.dir, &id, fs::metadata(&target).ok().map(|meta| meta.len()));
-                }
+                let _ = fs::rename(self.file(&id, "json.bak"), &target);
             }
             if target.is_file() {
                 names.push(format!("{id}.json"));
@@ -443,7 +441,7 @@ impl<R: Record> Store<R> {
 /// budget as visible records, so a folder of non-records also yields to input.
 pub struct CatalogListing {
     entries: Option<fs::ReadDir>,
-    files: Option<BTreeMap<String, CatalogFingerprint>>,
+    files: Option<BTreeMap<String, u64>>,
 }
 
 impl CatalogListing {
@@ -483,10 +481,7 @@ impl CatalogListing {
             let backup = entry.path();
             let target = backup.with_extension("");
             if !target.try_exists()? {
-                fs::rename(&backup, &target)?;
-                if let Some(dir) = target.parent() {
-                    note_catalog_write(dir, id, fs::metadata(&target).ok().map(|meta| meta.len()));
-                }
+                fs::rename(backup, &target)?;
             }
             (id, target)
         } else {
@@ -496,10 +491,7 @@ impl CatalogListing {
         count_catalog_metadata();
         match fs::metadata(path) {
             Ok(meta) if meta.is_file() => {
-                self.files.as_mut().unwrap().insert(id.to_owned(), CatalogFingerprint {
-                    size: meta.len(),
-                    modified: meta.modified().ok(),
-                });
+                self.files.as_mut().unwrap().insert(id.to_owned(), meta.len());
             }
             Ok(_) => {}
             Err(err) if err.kind() == io::ErrorKind::NotFound => {}
@@ -508,7 +500,7 @@ impl CatalogListing {
         Ok(())
     }
 
-    pub fn finish(self) -> Option<BTreeMap<String, CatalogFingerprint>> {
+    pub fn finish(self) -> Option<BTreeMap<String, u64>> {
         self.files
     }
 }
@@ -721,12 +713,7 @@ fn slug(name: &str) -> String {
 // Recording catalog invalidation happens at the committed Store operation,
 // including the standalone macro and combo editors. Other stores are independent.
 pub const CATALOG_DIRS: [&str; 4] = ["macros", "saves", "combos", "sequences"];
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CatalogFingerprint {
-    pub size: u64,
-    pub modified: Option<std::time::SystemTime>,
-}
-pub type CatalogSignatures = BTreeMap<(usize, String), Option<CatalogFingerprint>>;
+pub type CatalogSignatures = BTreeMap<(usize, String), Option<u64>>;
 static CATALOG_WRITES: Mutex<BTreeMap<PathBuf, CatalogSignatures>> = Mutex::new(BTreeMap::new());
 static RECORDING_WRITE: Mutex<()> = Mutex::new(());
 static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
@@ -760,12 +747,8 @@ pub fn try_recording_read() -> Option<MutexGuard<'static, ()>> {
 
 fn note_catalog_write(dir: &Path, id: &str, size: Option<u64>) {
     let Some((root, folder)) = catalog_folder(dir) else { return };
-    let fingerprint = size.map(|size| CatalogFingerprint {
-        size,
-        modified: fs::metadata(dir.join(format!("{id}.json"))).ok().and_then(|meta| meta.modified().ok()),
-    });
     let mut writes = CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner());
-    writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), fingerprint);
+    writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), size);
     CATALOG_GEN.fetch_add(1, Ordering::Release);
     drop(writes);
     #[cfg(target_os = "switch")]

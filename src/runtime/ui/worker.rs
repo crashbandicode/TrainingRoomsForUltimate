@@ -621,7 +621,6 @@ fn handle(event: Event, s: &mut Session) {
         refresh_recording(s);
         // Then the folders are listed in the worker's passes, to see files copied onto the card outside TR.
         s.catalog.check();
-        s.recording_index.check();
         publish_frame(s);
         publish_jumps(s);
         if crate::runtime::export::wanted() {
