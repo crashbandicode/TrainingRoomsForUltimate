@@ -119,6 +119,7 @@ pub const THREADS: [ThreadStack; 19] = [
     // Install 4 integration (2026-11-25): with the replay editor and the drill-step moves both on the merge 7 head,
     // the path is 55,424 B (release) and 55,392 B (diag, scratch gate measure-batch-6abe940a); the larger is recorded.
     // Trim and replay editor fold: 55,600 B release and 55,616 B diag in ELFs cd774f00.
+    // Trim and edge attacks fold: 55,600 B release and 55,616 B diag in ELFs 0a6c8bbb.
     row(ThreadId::Menu, c"tr-menu", 88 * KIB, 55_616, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),

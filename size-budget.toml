@@ -3033,3 +3033,11 @@ ceiling = 202641
 date = "2026-11-25"
 reason = "Trim, the macro playback indicator and the drill-ownership correction folded on install 4 e333d865 (replay editor, merge 6): measured 202641, 393 above 202248"
 approved_by = "tr-primary-2, inbox 2026-11-25 00:38:26Z (+369) and the +60 review-fix rule"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 202672
+date = "2026-11-25"
+reason = "Trim, the macro playback indicator and the drill-ownership correction folded on install 4 c41ad700 (replay editor, merge 6, edge attacks): measured 202672, 393 above 202279"
+approved_by = "tr-primary-2, inbox 2026-11-25 00:38:26Z (+369) and the +60 review-fix rule"
