@@ -835,6 +835,12 @@ impl Grade {
     }
 }
 
+/// A link without descriptions is compared by its endpoint: `other` stands for every move older files call other,
+/// any other endpoint for that move only.
+fn endpoint_matches(reference: Move, actual: Move) -> bool {
+    if reference == Move::Other { actual.legacy() == Move::Other } else { reference == actual }
+}
+
 /// Grade `attempt` against `reference`. A presses-only reference matches the next unused press with the same button
 /// and the old aim. Any other reference matches the next event of the same kind; a different direction is
 /// [`Mark::WrongDir`] and is not skipped. A reference release the attempt has no match for is not graded (rc.12).
@@ -935,7 +941,7 @@ fn grade_with(reference: &LinkRec, attempt: &LinkRec, input_only: bool, aims: bo
         wrong_move: !input_only && if reference.described() && attempt.described() {
             !reference.desc(1).same_move(&attempt.desc(1))
         } else {
-            attempt.to.legacy() != reference.to.legacy()
+            !endpoint_matches(reference.to, attempt.to)
         },
         marks,
         band,
@@ -1531,7 +1537,7 @@ impl Helper {
             .is_some_and(|a| a.open() && a.exchange == exchange);
         if !open {
             if !first || target.get(0).is_none_or(|r| {
-                if r.described() { r.from != rec.from } else { r.from.legacy() != rec.from.legacy() }
+                if r.described() { r.from != rec.from } else { !endpoint_matches(r.from, rec.from) }
             }) {
                 return;
             }
@@ -1543,7 +1549,7 @@ impl Helper {
         if attempt.junction {
             attempt.junction = false;
             let matches = target.get(0).is_some_and(|r| {
-                if r.described() { r.from == rec.to } else { r.from.legacy() == rec.to.legacy() }
+                if r.described() { r.from == rec.to } else { endpoint_matches(r.from, rec.to) }
             });
             if !matches {
                 let summary = Summary {
