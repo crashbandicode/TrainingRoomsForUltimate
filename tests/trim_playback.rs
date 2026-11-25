@@ -526,12 +526,13 @@ fn marked_frames(include_open: bool) -> (Vec<InputFrame>, [Span; 2]) {
 #[test]
 fn record_time_trim_moves_the_marks_with_the_kept_frames() {
     let root = Scratch::new();
-    let (frames, spans) = marked_frames(true);
+    let (frames, later_spans) = marked_frames(true);
+    let spans = [Span { start: 2, end: Some(15), mv: Some(Move::UpTilt) }, later_spans[0], later_spans[1]];
     for (trim, range, marks) in [
         (Trim::Start, 10..200, vec![(0, Some(30)), (40, None), (80, Some(140))]),
-        (Trim::End, 0..91, vec![(10, Some(40)), (50, None), (90, Some(91))]),
+        (Trim::End, 0..91, vec![(2, Some(15)), (10, Some(40)), (50, None), (90, Some(91))]),
         (Trim::Both, 10..91, vec![(0, Some(30)), (40, None), (80, Some(81))]),
-        (Trim::Off, 0..200, vec![(10, Some(40)), (50, None), (90, Some(150))]),
+        (Trim::Off, 0..200, vec![(2, Some(15)), (10, Some(40)), (50, None), (90, Some(150))]),
     ] {
         let saved = saved_marked_capture(&root.0, &frames, &spans, trim);
         assert_eq!(saved.frames, frames[range]);
