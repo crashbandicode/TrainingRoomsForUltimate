@@ -1688,7 +1688,8 @@ fn copy_placed(root: &Path, saves: &Store<NamedSave>, placed: &NamedSave, relink
     if let Some(recording) = relink {
         let macros = Library::new(root.join(MACROS_DIR));
         let linked = macros.load(recording).ok().and_then(|mut file| {
-            file.set_start_save(Some(&id)).ok()?;
+            // Relink the store-issued id without enabling a standalone start the chain's first macro had disabled.
+            file.start_save = Some(id.clone());
             macros.overwrite(recording, &file).ok()
         });
         if linked.is_none() {
@@ -6016,6 +6017,37 @@ mod tests {
         assert_eq!(library.load(&macros[0]).unwrap().start_save.as_deref(), Some(copy.as_str()));
     }
 
+    fn a_chain_copy_keeps_the_first_macros_own_start_save_switch() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-chain-copy-switch");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save_on(false);
+        library.overwrite(&macros[0], &first).unwrap();
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let open = service_at(&root, &none(), "2026-11-25", state(8), state(7)).place.unwrap();
+        assert_eq!(open.relink.as_ref(), Some(&macros[0]), "the chain uses macro 1 even with its own switch Off");
+        assert_eq!(open.save, save);
+        let commit = placed(&open.pair, true, 2, |setup| setup[1].at = [40.0, 0.0]);
+        assert!(matches!(commit_placement(&root, &open.save, open.relink.as_deref(), commit), Placed::Saved { .. }));
+        let written = library.load(&macros[0]).unwrap();
+        let copy = written.start_save.clone().unwrap();
+        assert_ne!(copy, save);
+        assert_eq!(saved_pair(&root, &copy)[1].x, 40.0);
+        assert_eq!(placement_target(&root).unwrap().recording.start_save.as_ref(), Some(&copy));
+        first.start_save = Some(copy);
+        assert_eq!(written.start_save_on, first.start_save_on, "copy must not turn standalone warps On");
+        assert_eq!(written, first, "the new start-save id is the only macro edit");
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 2)?; Ok(true) }).unwrap();
+        assert_eq!(placement_target(&root).unwrap_err(), PLACE_NO_START);
+    }
+
     /// rv-edge-juggle-sol 16:38:12Z: the second write fails (a directory stands where the macro's temporary file
     /// goes). The old link stays, the copy does not, and the picker is told the save was not written.
     fn a_failed_relink_leaves_the_old_link_and_no_copy() {
@@ -7002,6 +7034,7 @@ mod tests {
             ("a_save_with_nothing_edited_writes_no_file", a_save_with_nothing_edited_writes_no_file as fn()),
             ("the_bound_copy_follows_a_changed_placement", the_bound_copy_follows_a_changed_placement as fn()),
             ("a_copy_is_written_before_the_macro_is_relinked", a_copy_is_written_before_the_macro_is_relinked as fn()),
+            ("a_chain_copy_keeps_the_first_macros_own_start_save_switch", a_chain_copy_keeps_the_first_macros_own_start_save_switch as fn()),
             ("a_failed_relink_leaves_the_old_link_and_no_copy", a_failed_relink_leaves_the_old_link_and_no_copy as fn()),
             ("the_replays_row_opens_the_active_macros_start_save", the_replays_row_opens_the_active_macros_start_save as fn()),
             ("switch_on_an_exact_mii_macro_asks_for_that_mii", switch_on_an_exact_mii_macro_asks_for_that_mii as fn()),
