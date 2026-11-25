@@ -3,8 +3,8 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 4 (`a945b0c1`, 2026-11-25), is
-tested in Eden in part, and the operator's reports from the console are on record. What's new, how to install it and what is known not to work
+**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 5 (`b7a382e4`, 2026-11-25), is
+installed and tested in Eden in part; it has not been played on the console yet. What's new, how to install it and what is known not to work
 are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
@@ -177,7 +177,7 @@ endorsed by Nintendo.
 ## More
 
 [The docs](docs/README.md): every menu page and guide. The current release is [rc.15](docs/CURRENT-RELEASE.md),
-**tested in Eden in part, with the operator's reports from the console on record** (see [Status](docs/TECHNICAL.md#status)): what's new, how
+**installed and tested in Eden in part, not yet played on the console** (see [Status](docs/TECHNICAL.md#status)): what's new, how
 to install it and its known issues.
 The rc.15 builds are in [their release notes](docs/RELEASE-NOTES-rc15.md). Release notes for rc.12, rc.13 and rc.14
 are on their

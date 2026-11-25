@@ -9,7 +9,7 @@ below, with every option on it; the guides explain a topic across pages.
 | --- | --- |
 | [Getting started](guide/getting-started.md) | What you need, installing, the first start, opening the menu, a first look around, and how to read the build tag. |
 | [Current release](CURRENT-RELEASE.md) | Which release is current, which build is the newest, what is tested, what's new, how to install it and its known issues. |
-| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 4, and the build after them as it grows. |
+| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 5. |
 | [Troubleshooting](guide/troubleshooting.md) | What you may see, why, and what to do: the plugin or the menu not loading, greyed rows, the notices that say no, slow fighter loading, waiting rooms, settings, and where the logs are. |
 
 ## The menu, page by page

@@ -1,4 +1,4 @@
-# rc.15 installs 1 to 4: what was installed and what was tested
+# rc.15 installs 1 to 5: what was installed and what was tested
 
 2026-11-25. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
@@ -14,19 +14,20 @@ author. Times are UTC.
 
 ## Summary
 
-| | Install 1 | Install 2 | Install 3 | Install 4 |
-| --- | --- | --- | --- | --- |
-| Commit | `152629cd` | `71158421` | `e7667f26` | `a945b0c1` |
-| Release NRO (sha256, first 8) | `3d6836da` | `1b5608ed` | `eff66d92` | `99e00e92` |
-| Size | 5,226,496 B | 5,210,112 B | 5,210,112 B | 5,337,088 B |
-| On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 |
-| Card readback | match | match | match | match |
-| Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 |
-| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play |
-| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) |
+| | Install 1 | Install 2 | Install 3 | Install 4 | Install 5 |
+| --- | --- | --- | --- | --- | --- |
+| Commit | `152629cd` | `71158421` | `e7667f26` | `a945b0c1` | `b7a382e4` |
+| Release NRO (sha256, first 8) | `3d6836da` | `1b5608ed` | `eff66d92` | `99e00e92` | `0cb29525` |
+| Size | 5,226,496 B | 5,210,112 B | 5,210,112 B | 5,337,088 B | 5,373,952 B |
+| On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 | 2026-11-25 23:06 |
+| Card readback | match | match | match | match | match |
+| Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 |
+| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks; the waiting room not run |
+| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | none yet |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
-(`strings` on `artifacts/phase23/install4/gate-a945b0c1/nro/libtraining_rooms-a945b0c1-release.nro`).
+(`strings` on `artifacts/phase23/install4/gate-a945b0c1/nro/libtraining_rooms-a945b0c1-release.nro`). The install 5
+file holds `rc15 b7a382e4` and `0.2.0-rc.15` (the copy kept with its install record): its version was not raised.
 
 The host-test count falls between install 1 and install 2 because three test binaries stopped repeating the same
 184 tests each (`artifacts/phase23/test-speed/HANDOFF.md`, the entry that counts 2,911 against 2,359). The counts are
@@ -146,11 +147,23 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 19:35 | install 3 | Quick Play: after a match the loser declined the rematch, picked a different fighter and came back to the room; the earlier fighter was put back as both the CPU and Player 1. | Install 4 (`6146f8e9`). Not run in Eden: the final session exercised no Quick Play feature of TrainingRooms. |
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
-| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is merged for the next build (`445d1100`), host-tested only and not timed in a game. A change to placement is merged for the next build (`6dcf5c40`), host-tested only. The Delete is merged for the next build (`3fd708bc`), host-tested only. |
+| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed. A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
 
-## The next build
+## Install 5 (`b7a382e4`)
 
-Merges after `a945b0c1` are listed in the release notes. The Gate column names the receipt under
+- **Card:** `artifacts/phase23/card-install/20261125-2306Z-card-b7a382e4/deployment.json`. Over DBI's USB file
+  transfer, at 23:06. Before `99e00e92`, after `0cb29525`, read back. 21 plugins before and after; the other 20 are
+  byte-identical. The old file is kept on the card as `ultimate/TrainingRooms/backups/pre-0cb29525506021e3.nro`, and
+  its readback matches `99e00e92`.
+- **Gate:** `artifacts/phase23/next-build/gate-b7a382e4/status.json`: all six steps exit 0; 3,048 tests passed, 0
+  failed, 4 ignored. The installed file is that gate's release file.
+- **Later docs build:** `f55dfbbe` changed only documentation. Its release NRO embeds the later commit tag and has a
+  different SHA-256 (`0414f116…`); it was not installed. The card readback still matches `b7a382e4` (`0cb29525…`).
+  Compare `artifacts/phase23/next-build/gate-f55dfbbe/SUMMARY.md` with the install gate above.
+- **Eden:** the smoke boot below, on this exact file.
+- **The operator's reports:** none yet.
+
+The changes in this build were merged one by one after `a945b0c1` and are listed in the release notes. The Gate column names the receipt under
 `artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
 documentation merges that followed it. These receipts are host tests and builds, not gameplay tests.
 
@@ -158,7 +171,7 @@ On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd7
 **before** the off-stage changes. Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running"
 (`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png`
 for Juggler in the run's folder). This was not a test of the fix,
-which merged later as `7e6ff810` and is host-tested only, or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
+which merged later as `7e6ff810` (the smoke boot below opened both set-ups on that stage), or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
 17:39:04Z report from training-offstage.
 
 A later Eden probe (`sg-probe-yoga-01`, diagnostic `0f39ec04`) read the Training stage's long floor and Battlefield.
@@ -167,8 +180,50 @@ merged head `afd4ce01` or of any placement or playback feature. Receipts:
 `artifacts/phase23/next-build-smoke/20261125-1745Z/probe/evidence/sdlog/previous-184632.log` (lines 270-274)
 and `current-184745.log` in the same directory (lines 375-379).
 
-The plan remains one short Eden smoke run on the finished build, then the
-operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is claimed here.
+The plan was one short Eden smoke run on the finished build, then the operator's full test on the console (inbox
+17:06:54Z, tr-primary-2). The smoke run is below; the build was installed nine minutes after it ended. The operator's
+test has not happened.
+
+### The Eden smoke boot of the finished build
+
+On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10,
+with the card's 20 other plugins. Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate
+(`artifacts/phase23/next-build/gate-b7a382e4/status.json`). The game did not crash. Receipts:
+`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its
+JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
+
+Two rows, the eggs zone and placement, passed on a later try in the same boot, after the test's own steps were
+corrected (it looked for a row named Stop, and expected the placement card to open on Spot). The build did not change
+between tries.
+
+For Guard the Edge and Juggler, Start opened the set-up on its CPU page with no refusal. **Neither drill was played
+through**: no CPU was launched and no attempt was scored.
+
+| Row | Verdict | What was read |
+| --- | --- | --- |
+| Guard the Edge, Training stage (`s1-guard-training`) | pass | Start opened the set-up on the CPU page at (−125, −68), beside the long floor's left ledge |
+| Under the stage On (`s2-guard-under`) | pass | the set-up reported the option On; the setting was put back |
+| Guard the Edge from the island (`s2b-guard-island`) | pass | with Player 1 on the island's floor the set-up opened beside its left ledge, and Y moved it to the right one |
+| Juggler, Training stage (`s3-juggler-training`) | pass | Start opened the set-up on the CPU page at (−45, 140) |
+| Eggs-ercise's off-stage zone (`s4-eggs-offstage`) | pass | one zone, in the gap between the island and the long floor; the game started with Off stage only and no "No usable Off stage zone" |
+| Recording picker's Off stage switch (`s5-place-offstage`) | pass | Player 1's spot went from on stage at (−30, 0) to off stage at (−125, −68); D-pad Right then moved it to (−124, −68). No placement was saved or loaded |
+| Play on Player 1 (`s6-playback`) | pass | a 64-frame take was played: 64 of 64 frames delivered. The time to start was not measured |
+| The clip editor (`s7-marks-preview`) | pass | the editor opened with four marks; X played the preview to its end |
+| Guard the Edge, Battlefield (`s8-guard-battlefield`) | pass | the set-up opened with CPU midair jumps set to Used; the setting was put back |
+| The waiting room (`s9-lobby`) | **not run** | the test's route stopped at the main menu before its first input, twice; the boot used an older build of the test bridge (dup-audit, inbox 23:07:47Z), so the cause is not shown to be in TrainingRooms. Nothing about the waiting room was tested in this boot. The operator then asked for the check (about 23:04); a second boot is under way and its result is not in yet |
+| Settings after the rows (`z-audit`) | pass | none of the toggles compared differed from its factory value; 21 keys, including rosters and ranges, were not checked |
+
+Not covered by the smoke boot:
+
+- playing any drill through, and what the two Guard the Edge options do once the CPU is launched;
+- the waiting room: a second boot was ordered for it, and its result is not in yet;
+- Record while an AI plays Player 1, the named grab, throw and edge-attack keys, B stopping a preview, Delete for
+  replay captures, the form names on the editor's marks, the Playback delay option, and Change placement's save with
+  its shared start save question.
+
+The table uses the row files for verdicts and values. The first Guard the Edge frame was also checked for this page.
+On Battlefield the frame shows a fighter-preload notice, not the set-up card; the bridge recorded the wizard and its
+jump setting. The closing settings verdict comes from the audit, not its screenshot.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
