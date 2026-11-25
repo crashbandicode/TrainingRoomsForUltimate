@@ -2849,3 +2849,11 @@ ceiling = 200351
 date = "2026-11-25"
 reason = "Merge 7 with the reviewer's correction (fix/rv-scroll-shortcut 237a9661) and the bridge fields in one tree: measured 200351 (tools/sloc.py tree), which is the scrollback's 200254 plus the correction's 39 and the bridge's 58, with no lines from the merge."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its 21:46:20Z rule (the correction) and 2026-11-25 00:45:38Z (the bridge fields)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200362
+date = "2026-11-25"
+reason = "Scrollback bridge time retains the full elapsed frame count from the HUD pass, including long idle stretches. Measured 200362, 11 above 6f88b5df."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."

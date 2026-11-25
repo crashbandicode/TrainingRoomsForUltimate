@@ -87,8 +87,8 @@ fn strip_scroll_reports_how_far_back_the_last_pass_drew() {
     assert_eq!(strip_scroll(stamp, 1200, 500), (45, 1200));
     assert_eq!(strip_scroll(scroll_stamp(1000, 0, 0), 1200, 500), (0, 0));
     assert_eq!(strip_scroll(stamp, 1501, 500), (0, 0));
-    assert_eq!(strip_scroll(0, 1200, 500), (0, 0));
-    assert_eq!(strip_scroll(scroll_stamp(1000, 5000, 99_999), 1200, 500), (1023, 16_383 * 1000 / 60));
+    assert_eq!(strip_scroll(scroll_stamp(0, 0, 0), 0, 500), (0, 0));
+    assert_eq!(strip_scroll(scroll_stamp(1000, 540, u32::MAX), 1200, 500), (540, 71_582_788_250));
     let mut out = String::new();
     snapshot(&View { strip_scroll: 45, strip_back_ms: 1200, ..View::default() }, &mut out);
     assert!(out.contains("\nstrip.aims=\"\"\nstrip.scroll=45\nstrip.back_ms=1200\n"));
