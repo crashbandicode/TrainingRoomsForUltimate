@@ -76,7 +76,8 @@ fn fixture(with_save: bool, loops: LoopCount, frame_counts: &[usize]) -> Fixture
         if i == 0 && with_save { rec.set_start_save(Some(&save)).unwrap(); }
         ids.push(library.save_new(&rec).unwrap());
     }
-    let mut index = RecordingIndex::fresh();
+    crate::engine::rr_runtime::migrate_at_boot(&root, &[None, None, None, None, None], "2026-11-25").unwrap();
+    let mut index = RecordingIndex::load(&root).unwrap();
     index.set_active(Role::Player, Some(&ids[0]), 1).unwrap();
     index.set_active(Role::Cpu, Some(&ids[0]), 1).unwrap();
     index.set_loop(Role::Player, loops);
