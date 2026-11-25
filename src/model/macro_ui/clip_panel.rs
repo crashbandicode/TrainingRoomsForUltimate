@@ -878,6 +878,22 @@ mod tests {
         assert_eq!(e.view().error, Some(text));
     }
 
+    /// The workaround given for install 5: ZL/ZR + Y, then X, then A. It passes before the fix too.
+    fn the_lead_in_key_then_x_and_a_work_on_the_same_take() {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));
+        assert!(!matches!(e.on_action(ClipAction::UseLeadIn), ClipEffect::Error(_)));
+        let want = snap_rules().snap(e.track(), 30).unwrap();
+        assert_eq!((want.frame, want.action_frame), (19, 25));
+        assert_eq!(e.view().move_start, Some(want));
+        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!("preview refused") };
+        e.preview_progress(60 - want.frame);
+        let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        assert_eq!(saved.frames, preview.frames);
+    }
+
     fn y_snap_on_a_saved_macro_is_unchanged() {
         let mut e = saved_macro(false);
         assert!(!e.marks.list().is_empty());
@@ -1259,6 +1275,7 @@ mod tests {
             ("a_second_y_keeps_the_same_move", a_second_y_keeps_the_same_move as fn()),
             ("y_snap_to_an_idle_mark_stays_a_plain_start", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),
             ("y_snap_where_no_move_can_start_says_why", y_snap_where_no_move_can_start_says_why as fn()),
+            ("the_lead_in_key_then_x_and_a_work_on_the_same_take", the_lead_in_key_then_x_and_a_work_on_the_same_take as fn()),
             ("y_snap_on_a_saved_macro_is_unchanged", y_snap_on_a_saved_macro_is_unchanged as fn()),
             ("normalized_pad_cannot_bypass_or_clear_opening_press_ownership", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),
             ("invalid_start_requires_explicit_lead_in_and_keeps_selection", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),
