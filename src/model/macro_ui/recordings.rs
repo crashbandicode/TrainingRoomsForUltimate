@@ -83,11 +83,25 @@ mod tests {
         assert_eq!(waiting.tick(true, true), clip_browser::Effect::Open("latest".into()));
     }
 
+    /// The waiting room: three seconds (180 layout ticks) with the CPU never idle end the opening; nothing opens later.
+    fn a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds() {
+        let (mut waiting, effect) = open_one("latest", true);
+        assert_eq!(effect, clip_browser::Effect::None);
+        for _ in 0..179 {
+            assert_eq!(waiting.tick(true, false), clip_browser::Effect::None);
+            assert!(waiting.pending());
+        }
+        assert_eq!(waiting.tick(true, false), clip_browser::Effect::TimedOut);
+        assert!(!waiting.pending());
+        assert_eq!(waiting.tick(true, true), clip_browser::Effect::None);
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("an_empty_capture_is_not_listed_and_does_not_open", an_empty_capture_is_not_listed_and_does_not_open as fn()),
             ("the_recordings_rows_are_the_same_in_the_lobby_and_training", the_recordings_rows_are_the_same_in_the_lobby_and_training as fn()),
+            ("a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds", a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds as fn()),
         ]);
     }
     }

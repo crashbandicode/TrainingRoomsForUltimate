@@ -2137,7 +2137,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
         return;
     }
     match effect {
-        Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::OpenRecording { .. } => {}
+        Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });

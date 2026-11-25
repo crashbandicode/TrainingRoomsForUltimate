@@ -131,6 +131,8 @@ impl Floppy {
 pub enum Effect {
     None,
     ListRecordings,
+    /// B while a recording's opening waits for the CPU to be idle (the waiting room): the host drops that opening.
+    CancelRecording,
     OpenRecording { id: String, entry: u8, player: bool, make: Make, play: bool },
     RecordDrill,
     Keyboard { header: &'static str, draft: String },
@@ -493,6 +495,7 @@ pub struct RecordingScreens {
     overlay_face: Face,
     catalog: Catalog,
     recordings: Option<Vec<RecordingFile>>,
+    opening: bool,
     /// Macros that drills own as their takes (F10), named with the take prefix and key, with their frame counts: taken out of the catalog's macros in
     /// `set_catalog`, so no list, picker, name or count shows them.
     takes: Vec<(String, u32)>,
@@ -514,6 +517,13 @@ impl RecordingScreens {
         for file in &mut files { file.sides.sort_by_key(|side| side.entry); }
         files.retain(|file| !file.sides.is_empty());
         self.recordings = Some(files);
+    }
+
+    /// The host's opening of the recording on screen waits for the CPU to be idle (the waiting room), or no longer
+    /// does. True when what the screen shows changed.
+    pub fn set_opening(&mut self, waiting: bool) -> bool {
+        let _ = (waiting, self.opening);
+        false
     }
 
     /// Screens open above this face's own list, one B each (the bridge snapshot's depth).
@@ -579,6 +589,7 @@ impl RecordingScreens {
             overlay_face: Face::Page,
             catalog: Catalog::default(),
             recordings: None,
+            opening: false,
             takes: Vec::new(),
             bound: None,
             active: [None, None],
@@ -3704,6 +3715,35 @@ mod tests {
         }
     }
 
+    fn a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vault_sides());
+        screens.set_file_cursor(4);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(matches!(screens.take_effect(), Effect::OpenRecording { make: Make::Combo, .. }));
+        assert!(screens.set_opening(true));
+        assert!(!screens.set_opening(true));
+        assert_eq!(screens.file_rows()[4].value, "Waiting for the CPU…");
+        assert_eq!(screens.hint(Face::Page), "Waiting for the CPU to be idle   B cancel");
+        for button in [Button::A, Button::Left, Button::Right, Button::Up, Button::Down] {
+            screens.handle_page(button, true, SAVES_MACROS);
+            assert_eq!(screens.take_effect(), Effect::None);
+            assert_eq!(screens.file_cursor(), 4);
+            assert_eq!(screens.file_rows()[4].value, "Waiting for the CPU…");
+        }
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::CancelRecording);
+        assert!(screens.file_open());
+        assert_eq!(screens.file_rows()[4].value, "");
+        // Three seconds pass with the CPU still busy: the host drops the opening and the rows come back.
+        assert!(screens.set_opening(true));
+        assert!(screens.set_opening(false));
+        assert_eq!(screens.file_rows()[4].value, "");
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert!(!screens.file_open());
+        assert!(!screens.set_opening(true), "no recording's screen is up");
+    }
+
     fn play_back_opens_the_recording_playing_on_the_target() {
         let mut screens = screens();
         open_vault_file(&mut screens, vault_sides());
@@ -4065,6 +4105,7 @@ mod tests {
             ("the_recordings_list_names_each_recording_with_its_sides_and_length", the_recordings_list_names_each_recording_with_its_sides_and_length as fn()),
             ("a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill", a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill as fn()),
             ("play_back_opens_the_recording_playing_on_the_target", play_back_opens_the_recording_playing_on_the_target as fn()),
+            ("a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it", a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it as fn()),
             ("f9_b_backs_out_of_a_new_picker", f9_b_backs_out_of_a_new_picker as fn()),
             ("f9_x_is_done_and_asks_the_name", f9_x_is_done_and_asks_the_name as fn()),
             ("f9_b_keeps_the_old_chain_on_edit", f9_b_keeps_the_old_chain_on_edit as fn()),
