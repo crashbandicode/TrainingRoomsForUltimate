@@ -49,6 +49,7 @@ Read the help line below the row. It tells you what must change.
 ## A notice says no
 
 <!-- CLIP: tut-notice-save-states-off.mp4 | Save States Off → the save chord shows the refusal → Save States On → the chord saves -->
+*Clip coming.*
 
 | Notice | Why | What to do |
 | --- | --- | --- |

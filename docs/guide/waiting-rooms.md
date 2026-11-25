@@ -3,6 +3,7 @@
 Practise while you wait for a match in a local wireless or Quickplay waiting room.
 
 <!-- CLIP: tut-lobby-practice-menu.mp4 | A Local Wireless waiting room (one member): B + D-pad Up opens the room menu, Hurtboxes ticked, both practice fighters drawn as pills -->
+*Clip coming.*
 
 ## Lobby Practice is On by default
 

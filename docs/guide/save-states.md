@@ -49,6 +49,7 @@ Set [Player damage on load](../menu/saves.md#player-damage-on-load) and
 | Random Value | A new random value within that fighter's damage range. |
 
 <!-- CLIP: tut-save-damage-range.mp4 | CPU damage range: Min and Max edited with taps and a hold -->
+*Clip coming.*
 
 To practise against a CPU at 90–110%:
 

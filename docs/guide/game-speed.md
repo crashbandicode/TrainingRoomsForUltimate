@@ -3,6 +3,7 @@
 Slow down or speed up practice without opening a menu. The same controls work in Training and waiting rooms.
 
 <!-- CLIP: tut-game-speed.mp4 | A smash at x1 → hold R + D-pad Up, Left steps to 1/4, the stopwatch shows it → the same smash, slow -->
+*Clip coming.*
 
 ## Changing the speed
 
@@ -23,6 +24,7 @@ On a GameCube controller use Z + D-pad Up. You can change the chord at Display &
 ## 1 Frame
 
 <!-- CLIP: tut-one-frame.mp4 | Speed stepped to 1 Frame: the label names its button → ZL steps frame by frame through a jab -->
+*Clip coming.*
 
 1. Hold R + D-pad Up and tap Left until the pop-up reads 1 Frame.
 2. Let go of the chord. Press ZL once to advance one frame, or hold it to keep advancing after the initial delay.

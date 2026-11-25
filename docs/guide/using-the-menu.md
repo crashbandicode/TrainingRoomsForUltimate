@@ -38,6 +38,7 @@ Two help lines describe the row you are on, and the footer lists the keys. A gre
 row it depends on changes. The Loading section on Fighters & Stages is collapsed; A on its header opens it.
 
 <!-- CLIP: tut-menu-list-scroll.mp4 | held Down and Up move through the CPU page, quickening → ZL + Down jumps a screenful on a long Recording list -->
+*Clip coming.*
 
 ## Changing a row
 
