@@ -6348,7 +6348,7 @@ mod tests {
             };
             if let Some(input) = got {
                 received.push(input.buttons);
-                observe_input(Snap { buttons: input.buttons, facing: 1, ..Snap::empty(frame) }, Late::NONE, hit);
+                observe_input(Snap { buttons: input.buttons, facing: 1, ..Snap::empty(frame) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, hit);
                 if hit { set_strip_sample((1, Some(sample_combo()), CaptureOwner::UNKNOWN)); }
             }
         }
@@ -6422,7 +6422,7 @@ mod tests {
         assert_eq!(crate::model::frame_strip::acting(true), [1, 0]);
         let frame = take_cpu_frame().unwrap();
         assert_eq!(make_cpu_inputs(), to_mapped(frame));
-        observe_input(Snap { buttons: frame.buttons, facing: 1, ..Snap::empty(1) }, Late::NONE, false);
+        observe_input(Snap { buttons: frame.buttons, facing: 1, ..Snap::empty(1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
         consume_make(&root, Role::Cpu, false);
         assert!(!make_actor_cpu());
         assert_eq!(crate::model::frame_strip::acting(false), [0, 1]);
