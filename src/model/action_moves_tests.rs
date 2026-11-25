@@ -232,8 +232,10 @@ fn the_three_moves_round_trip_in_files_and_in_the_packed_link() {
         assert_eq!(parsed.combo.get(0).unwrap().to, mv);
         let record = ComboRecord::new("Drill".into(), parsed.combo, None);
         let value = serde_json::to_value(&record).unwrap();
-        assert_eq!(value["links"][0]["to"], "other");
-        assert_eq!(value["links"][0]["to_shown"], serde_json::json!({"move": key}));
+        assert_eq!(value["links"][0]["to"], if mv == Move::FinalSmash { "other" } else { key });
+        assert_eq!(value["links"][0]["to_shown"], if mv == Move::FinalSmash {
+            serde_json::json!({"move": key})
+        } else { serde_json::json!({}) });
         assert_eq!(serde_json::from_value::<ComboRecord>(value).unwrap(), record);
 
         let parsed = hit_record("jab", "other", Some(serde_json::json!({})),
@@ -269,32 +271,6 @@ fn the_three_moves_round_trip_in_files_and_in_the_packed_link() {
                 Move::Throw => "Move::Throw", Move::FinalSmash => "Move::FinalSmash", _ => unreachable!(),
             }).unwrap());
         assert!(positions.windows(2).all(|pair| pair[0] < pair[1]));
-    }
-}
-
-#[test]
-fn a_grab_a_throw_and_a_final_smash_belong_to_descriptions_not_bare_link_endpoints() {
-    for (mv, key) in [(Move::Grab, "grab"), (Move::Throw, "throw"), (Move::FinalSmash, "final_smash")] {
-        for (field, shown, side) in [("from", "from_shown", 0), ("to", "to_shown", 1)] {
-            let mut file = serde_json::json!({"name":"Shared", "schema_version":1, "links":[{
-                "from":"jab", "to":"jab", "events":[], "verdict":{"kind":"true","link":null}
-            }]});
-            file["links"][0][field] = serde_json::json!(key);
-            let err = serde_json::from_value::<ComboRecord>(file.clone()).unwrap_err();
-            assert!(err.to_string().contains(field), "{field}={key}: {err}");
-
-            file["links"][0][field] = serde_json::json!("other");
-            file["links"][0]["from_shown"] = serde_json::json!({});
-            file["links"][0]["to_shown"] = serde_json::json!({});
-            file["links"][0][shown] = serde_json::json!({"move": key});
-            let crop = serde_json::from_value::<ComboRecord>(file).unwrap().crop_units(0, 1).unwrap();
-            let saved = serde_json::to_value(&crop).unwrap();
-            assert_eq!(saved["links"][0][field], "other");
-            assert_eq!(saved["links"][0][shown], serde_json::json!({"move": key}));
-            let reopened: ComboRecord = serde_json::from_value(saved).unwrap();
-            assert_eq!(reopened.combo.get(0).unwrap().desc(side).mv, mv);
-            assert_eq!(reopened, crop);
-        }
     }
 }
 

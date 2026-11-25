@@ -84,7 +84,8 @@ The ledge, get-up and trip attack animations use `Normal` numbers 26, 27 and 28 
 `LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of`
 (0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five
 for variant. Follow-up parts come from its aim events. If both links are described, wrong-move compares move, `of`
-and angle, not variant or parts; otherwise it compares legacy moves.
+and angle, not variant or parts. Otherwise it compares the follow-up endpoints: a reference `other` matches any
+move older files called `other`; a named reference matches only that move.
 
 `Action` stores the tracker action state. At opening its origin is the newest press at most `INPUT_LOOKBACK` (15)
 frames earlier; a hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to
@@ -222,10 +223,17 @@ This build records reactions using the selected On-time tolerance and writes `re
 `reacted`, an owned hold under eight frames stays ungraded,
 while a hold of eight or more is graded in its band. An unowned release remains ungraded. Re-recording a drill gives
 it the causal rule.
-Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (`grab`,
-`throw`, `final_smash`, `ledge_attack`, `getup_attack` or `trip_attack`), `of` (a move key), `angle` (`up` or `down`)
-and `variant` (0–31). Both objects are needed for a described link; `{}` is valid. `from` and `to` write `other` for
-these six kinds for older readers. The reader refuses any of the six straight in `from` or `to`.
+Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `of` (a
+move key), `angle` (`up` or `down`) and `variant` (0–31), and `move` for a Final Smash only. Both objects are
+needed for a described link; `{}` is valid. `from` and `to` write `grab`, `throw`, `ledge_attack`,
+`getup_attack` and `trip_attack` by name (the operator's order of 2026-11-25, which reverses that day's rule
+that the six kinds belong in the description, for these five). It is not backward compatible: install 4
+(`a945b0c1`) and earlier shipped installs refuse a file with one of the five in `from` or `to`. A Final Smash still
+writes `other` with `move`, and the reader refuses `final_smash` straight in `from` or `to`. The reader still
+takes the older form of the five (`other` with `move`) and reads it to the same link; a file read from disk
+keeps its own JSON, and a crop or a new record writes the names. A named `from` or `to` with a `move` member is
+refused. Without both objects a link is compared by its endpoints: `other` stands for any move older files
+call other, a named endpoint for that move only.
 
 An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a
 stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs). On reading, an aim event with `path` gets
@@ -346,4 +354,8 @@ selected version and name.
   `the_grader_tells_an_edge_attack_from_another_move`, `edge_attacks_round_trip_in_files_and_in_the_packed_link`,
   `an_old_file_grades_an_edge_attack_as_before`, `an_edge_attack_step_is_decided_when_its_action_opens`,
   `an_edge_attack_takes_its_name_number_from_its_animation`,
-  `a_grab_a_throw_and_a_final_smash_belong_to_descriptions_not_bare_link_endpoints`.
+  `a_new_link_names_a_grab_a_throw_and_the_edge_attacks_and_round_trips`,
+  `an_old_file_with_other_and_a_description_reads_as_before`, `a_file_mixing_old_and_new_links_reads_both`,
+  `the_combo_and_drill_views_name_them_the_same`, `a_final_smash_is_still_refused_straight_in_from_or_to`,
+  `a_named_endpoint_takes_no_move_in_its_description`, `a_named_endpoint_without_descriptions_grades_by_its_name`,
+  `a_crop_of_an_old_file_writes_the_names`, `the_format_docs_say_which_builds_read_a_named_link`.
