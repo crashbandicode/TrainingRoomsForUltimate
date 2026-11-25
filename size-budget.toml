@@ -3145,3 +3145,11 @@ ceiling = 205039
 date = "2026-11-25"
 reason = "Guard the Edge start options (Under the stage, CPU midair jumps) and both drills on the off-stage rule: the stage is the floor run the player stands on, a start that cannot happen says why, and a kept start remembers its run and the place A confirmed. Measured 205039 with the reviewer correction of the other-side key (fix/rv-edge-one-side-y c7d7155f), over main 2d140506 (204799): +240."
 approved_by = "tr-primary-2 2026-11-25 17:47:41Z (one entry for the whole item at the measured value of its final head, parts (a) and (b) together)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 205854
+date = "2026-11-25"
+reason = "Change placement on the save itself: one picker on the live game for Record and Change placement (five pages; On stage on the traced floors with the floor hop; Off stage on the shared crosshair, with the Off-stage switch T1 A), four entry points, the shared start save question and its Advanced setting, the save edit on the recording worker, and the Momentum and Offset rows of a macro. The Replays key grid, its kept offset and the Place page of macro naming are removed. Measured 205854 on the joined head, which contains Guard the Edge (205039): +815 (src/model +706, src/runtime/features +462, src/model/macro_ui -277, src/runtime/macros -77, the rest +1)."
+approved_by = "tr-primary-2 2026-11-25 15:23:38Z and 15:53:07Z (line budget for feat/placement-crosshair approved at the measured value; flag it over +600). +815 is over that line and is flagged in the READY post."
