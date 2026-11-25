@@ -52,7 +52,7 @@ mod tests {
     use crate::engine::macros::{InputFrame, ReplayFrame, ReplayTrack, StartState};
 
     fn capture(buttons: u32) -> ReplaySession {
-        ReplaySession { tracks: vec![ReplayTrack { entry: 0, frames: vec![ReplayFrame {
+        ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 0, frames: vec![ReplayFrame {
             input: InputFrame { buttons, ..InputFrame::default() },
             start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0,
         }], quantized_analog: false }], truncated: false, breaks: Vec::new() }
@@ -88,7 +88,7 @@ mod tests {
         assert_eq!(editor_label(0, "Fox"), "P1 Fox");
         assert_eq!(editor_label(1, "Fox"), "CPU Fox");
         assert_eq!(editor_label(2, "Fox"), "P3 Fox");
-        let session = |entry: i32| ReplaySession { tracks: vec![ReplayTrack { entry, frames: vec![ReplayFrame {
+        let session = |entry: i32| ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry, frames: vec![ReplayFrame {
             input: InputFrame::default(), start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0 }], quantized_analog: false }],
             truncated: false, breaks: Vec::new() };
         let mut editor = ClipEditor::new(session(1), vec![0]).unwrap();

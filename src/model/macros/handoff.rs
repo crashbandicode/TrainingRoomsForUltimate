@@ -6,6 +6,8 @@
 pub enum VaultEvent {
     Begin { epoch: u64 },
     Sample { epoch: u64, entry: i32, sample: crate::engine::macros::ReplayFrame, quantized: bool },
+    /// The identity of an entry's fighter, once per capture after the entry's first sample.
+    Fighter { epoch: u64, entry: i32, fighter: crate::model::move_names::FighterId },
     End { epoch: u64, truncated: bool },
 }
 
@@ -48,7 +50,8 @@ impl VaultArchive {
     pub fn apply(&mut self, event: VaultEvent, last_lost_epoch: u64) {
         use crate::engine::macros::{ReplayTrack, MAX_FRAMES};
         let epoch = match event {
-            VaultEvent::Begin { epoch } | VaultEvent::Sample { epoch, .. } | VaultEvent::End { epoch, .. } => epoch,
+            VaultEvent::Begin { epoch } | VaultEvent::Sample { epoch, .. } | VaultEvent::Fighter { epoch, .. }
+            | VaultEvent::End { epoch, .. } => epoch,
         };
         if epoch == 0 || epoch < self.epoch { return; }
         if epoch != self.epoch {
@@ -62,6 +65,9 @@ impl VaultArchive {
         self.note_loss(last_lost_epoch);
         match event {
             VaultEvent::Begin { .. } => {},
+            VaultEvent::Fighter { entry, fighter, .. } => {
+                if let Some(track) = self.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }
+            },
             VaultEvent::End { truncated, .. } => self.session.truncated |= truncated,
             VaultEvent::Sample { entry, sample, quantized, .. } => {
                 if !(0..8).contains(&entry) { self.session.truncated = true; return; }
@@ -69,7 +75,7 @@ impl VaultArchive {
                 let index = match tracks.iter().position(|track| track.entry == entry) {
                     Some(index) => index,
                     None => {
-                        tracks.push(ReplayTrack { entry, frames: Vec::new(), quantized_analog: false });
+                        tracks.push(ReplayTrack { fighter: None, entry, frames: Vec::new(), quantized_analog: false });
                         tracks.len() - 1
                     },
                 };
@@ -205,6 +211,7 @@ pub enum LiveEvent {
     Finish { partial: bool },
     Seal { key: crate::engine::macros::NativeRecordKey, entry: i32 },
     Sample { key: crate::engine::macros::NativeRecordKey, entry: i32, tick: u32, sample: crate::engine::macros::LiveFrame },
+    Fighter { key: crate::engine::macros::NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId },
     Bind { save: u64, key: crate::engine::macros::NativeRecordKey },
     Forget { save: u64 },
     Commit { save: u64, id: FixedReplayId, title: FixedReplayTitle, miis: bool },
@@ -246,6 +253,7 @@ impl LiveArchive {
             LiveEvent::Finish { partial } => if partial { self.pool.finish_partial(); } else { self.pool.finish_record(); },
             LiveEvent::Seal { key, entry } => self.pool.seal_entry(key, entry),
             LiveEvent::Sample { key, entry, tick, sample } => { self.pool.push(key, entry, tick, sample); },
+            LiveEvent::Fighter { key, entry, fighter } => self.pool.name_entry(key, entry, fighter),
             LiveEvent::Bind { save, key } => {
                 self.bindings.retain(|(id, _)| *id != save);
                 if let Some(session) = self.pool.snapshot(key) {

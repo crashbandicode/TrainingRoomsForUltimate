@@ -303,8 +303,12 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 **Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
 
 - A macro recorded on this build keeps its moves in its file (the optional `actions` key: each move's start frame, the first frame the fighter could act again, and the move), so the marks are there when the editor opens.
+- 2026-11-25: a mark also keeps which form of the move it was, as a combo link does. `variant` is the first, second or third jab, the rapid jab or its finisher, or which aerial, grab or throw. `angle` is a side tilt or side smash aimed up or down. A take saved before that has neither and still loads.
 - If automatic trim cuts off a move's known end, its band ends at the end of the saved take. A move whose end was never observed still has no end mark.
 - An older macro and a Replay window capture show a tick for every press, C-stick input or flick that starts a move. Their ends and names appear as a preview plays past them.
+- With [Move names](#move-names) On, a mark reads as the combo and drill lists do: "Jab 1", "Jab 2", "Forward tilt ↑", "Forward air", "Dash grab", and a special by the fighter's own name. A grab that throws reads as the throw. A jab that runs into a rapid jab without restarting reads "Rapid jab". An older take has no forms, so its jab reads "Jab" and its side tilt "Forward tilt".
+- With Move names Off, every mark keeps its short name: "Jab", "Side tilt", "Neutral B".
+- 2026-11-25: a take, and each fighter of a replay capture, stores the fighter it was recorded on (`recorded_fighter`, the key a combo file uses), so its specials read that fighter's own names whoever Player 1 is. A take or capture saved before that has none: its specials take the fighter's own names only while Player 1 is that fighter; otherwise they read "Neutral special", "Side special" and so on. A Mii's specials are named by the selection saved with the take, and by those common names when the take saved none. If you delete the latest Vault capture while its replay is still playing, the rest of the replay becomes a partial capture. Fighters already seen use the same rule as an old capture for their special names.
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
 
@@ -490,7 +494,7 @@ Off: the path is compared without matching the stick. Older drills without trave
 
 On: moves use their common names; specials and Final Smashes use the names in the game's message file when available.
 Saved combos use the recorded fighter's names. Older files without that identity, or an unavailable message file, use
-common names. Off: the short names.
+common names. The Crop editor's move marks use the same names. Off: the short names.
 Pyra and Mythra currently use common special names.
 
 - **Values:** On, Off
