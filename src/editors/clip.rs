@@ -52,10 +52,11 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
     let target = match view.context {
         ClipContext::Macro { player: true } => "Plays on Player 1".into(),
         ClipContext::Macro { player: false } => "Plays on CPU".into(),
-        ClipContext::Replay { .. } => format!("Fighter: {fighter}{}{}{}",
+        ClipContext::Replay { .. } => format!("Fighter: {fighter}{}{}{} · plays on {}",
             if view.previous_selected { " (previous capture)" } else { "" },
             if view.truncated { " (partial)" } else { "" },
-            if view.quantized { " (quantized)" } else { "" }),
+            if view.quantized { " (quantized)" } else { "" },
+            if view.target == Some(true) { "Player 1" } else { "CPU" }),
         ClipContext::Combo { .. } => String::new(),
     };
     push(frame, &target, &view.move_text, Tone::Normal);
@@ -95,6 +96,9 @@ mod tests {
             marks: [(0, 0); crate::engine::macro_ui::clip_marks::SHOWN_MARKS],
             mark_count: 0,
             move_text: String::new(),
+            mark_total: 0,
+            near: None,
+            target: Some(false),
         }
     }
 

@@ -897,13 +897,14 @@ fn step_drill_clip(s: &mut Session) {
     if let Some(source) = DRILL_TAKE.lock().take() {
         s.drill_clip = drill_clip(&source);
     }
-    let Some(clip) = s.drill_clip.as_mut() else { return };
-    clip.preview_cursor(rr_host::fed_frames(Role::Player));
+    let Some(editor) = s.drill_clip.as_mut() else { return };
+    editor.preview_cursor(rr_host::fed_frames(Role::Player));
     let mut spans = [Span::default(); WATCH_SPANS];
     let (run, count) = rr_host::watch_copy(&mut spans);
     if rr_host::fed_run(Role::Player).is_some_and(|(current, _)| current == run) {
-        clip.watch(&spans[..count]);
+        editor.watch(&spans[..count]);
     }
+    s.bridge.set_drill(Some(crate::model::bridge_events::Clip::of(&editor.view(), Some("drill"), rr_host::preview_running())));
     publish_frame(s);
 }
 
@@ -928,6 +929,7 @@ fn end_drill_preview(s: &mut Session, stop: bool) {
     }
     s.drill_preview = DrillPreview::new();
     s.drill_clip = None;
+    s.bridge.set_drill(None);
     DRILL_TAKE.lock().take();
     crate::runtime::ui::state::PREVIEW_STRIP.store(false, Ordering::Release);
     if stop {

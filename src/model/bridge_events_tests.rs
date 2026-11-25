@@ -5,7 +5,8 @@ fn hold(polls: u32) -> Event {
 }
 
 fn clip() -> Clip {
-    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true }
+    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true,
+        target: "cpu", marks: 2, mark: Some((90, None)), text: MoveText::new("66 frames into Special") }
 }
 
 fn fed(p1: u32, cpu: u32, preview: bool, hides: bool) -> Fed { Fed { p1, cpu, run: [0, 0], preview, hides } }
@@ -101,7 +102,42 @@ fn the_fed_sample_is_first_in_player_ones_poll_and_the_worker_never_sends_it() {
 #[test]
 fn clip_text_names_the_window_and_the_editor_cursor() {
     let c = clip();
-    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1");
+    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
+        target=cpu marks=2 mark=90-none move=\"66 frames into Special\"");
+}
+
+/// tr-primary-2 00:31:58Z: the line carries the play target, the mark count, the mark at or nearest the cursor and the
+/// strip's move text, quoted and bounded; the drill take preview's strip sends the same line as `ctx=drill`.
+#[test]
+fn a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text() {
+    use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor};
+    use crate::engine::macros::{ActionMark, InputFrame, MacroRecording, ReplayFrame, ReplaySession, ReplayTrack, StartState};
+    let mut frames = vec![InputFrame::default(); 200];
+    frames[10].buttons = 1;
+    frames[90].buttons = 2;
+    let mut recording = MacroRecording::new("Crop", "13.0.5", StartState::neutral(0, 0, 1.0), frames).unwrap();
+    recording.actions = vec![ActionMark { start: 10, end: Some(40), mv: None }, ActionMark { start: 90, end: None, mv: None }];
+    let mut editor = ClipEditor::macro_file(recording, false).unwrap();
+    let line = Clip::of(&editor.view(), None, false).text();
+    assert!(line.starts_with("clip ctx=macro.cpu total=200 in=0 out=200 cursor=0 playing=0 handle=playhead running=0 "), "{line}");
+    assert!(line.ends_with("target=cpu marks=2 mark=10-40 move=\"No move here\""), "{line}");
+    editor.on_action(ClipAction::SwapTarget);
+    editor.on_action(ClipAction::SelectOut);
+    let line = Clip::of(&editor.view(), None, false).text();
+    assert!(line.contains("ctx=macro.p1") && line.contains("cursor=199") && line.contains("handle=out"), "{line}");
+    assert!(line.ends_with("target=p1 marks=2 mark=90-none move=\"110 frames into Special\""), "{line}");
+    assert!(Clip::of(&editor.view(), Some("drill"), true).text().starts_with("clip ctx=drill total=200 "));
+    let capture = ReplaySession { tracks: vec![ReplayTrack { entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
+        input: InputFrame::default(), start: StartState::neutral(74, 0, 1.0), x: 0.0, y: 0.0 }).collect() }],
+        truncated: false, breaks: Vec::new() };
+    let mut vault = ClipEditor::new(capture, vec![0]).unwrap();
+    assert!(Clip::of(&vault.view(), None, false).text().contains("ctx=replay"));
+    assert!(Clip::of(&vault.view(), None, false).text().contains(" target=cpu marks=0 mark=none move="));
+    vault.on_action(ClipAction::SwapTarget);
+    assert!(Clip::of(&vault.view(), None, false).text().contains(" target=p1 "));
+    let quoted = MoveText::new(&"a\"b\\".repeat(30));
+    assert!(quoted.as_str().len() == 48 && !quoted.as_str().contains(['"', '\\']), "{}", quoted.as_str());
+    assert_eq!(MoveText::new(&"→".repeat(40)).as_str().chars().count(), 16);
 }
 
 #[test]

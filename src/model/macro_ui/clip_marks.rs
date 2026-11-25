@@ -196,6 +196,15 @@ impl Marks {
     }
     pub fn list(&self) -> &[Mark] { &self.list }
 
+    /// The mark `at` lies in, else the one whose start or known end is nearest.
+    pub fn nearest(&self, at: u32) -> Option<(u32, Option<u32>)> {
+        self.list.iter().min_by_key(|mark| {
+            let inside = mark.start <= at && mark.end.is_some_and(|end| at < end);
+            let away = mark.end.map_or(u32::MAX, |end| end.abs_diff(at)).min(mark.start.abs_diff(at));
+            (if inside { 0 } else { away }, mark.start)
+        }).map(|mark| (mark.start, mark.end))
+    }
+
     pub fn forget_watched(&mut self, from: u32, to: u32) {
         if self.recorded { return; }
         for i in (0..self.list.len()).rev() {

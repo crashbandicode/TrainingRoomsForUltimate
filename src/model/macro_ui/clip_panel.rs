@@ -258,6 +258,11 @@ pub struct ClipView {
     pub marks: [(u16, u16); SHOWN_MARKS],
     pub mark_count: u8,
     pub move_text: String,
+    /// Every mark of the take, not only the drawn ones, and the mark at or nearest the cursor.
+    pub mark_total: u32,
+    pub near: Option<(u32, Option<u32>)>,
+    /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.
+    pub target: Option<bool>,
 }
 
 pub struct ClipEditor {
@@ -277,6 +282,7 @@ pub struct ClipEditor {
     open_guard: OpenInputGuard,
     error: Option<String>,
     marks: Marks,
+    replay_player: bool,
     watch_base: u32,
 }
 
@@ -296,7 +302,7 @@ impl ClipEditor {
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
-            open_guard, error: None, marks, watch_base: 0 })
+            open_guard, error: None, marks, replay_player: false, watch_base: 0 })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -328,7 +334,24 @@ impl ClipEditor {
             file: Some(file), previous: None, previous_selected: false, track: 0,
             window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
-            source_name, previous_name: String::new(), open_guard, error: None, marks, watch_base: 0 })
+            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })
+    }
+
+    /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.
+    pub fn plays_on_player(&self) -> Option<bool> {
+        match &self.file {
+            Some(FileSource::Macro { player, .. }) => Some(*player),
+            Some(FileSource::Combo(_)) => None,
+            None => Some(self.replay_player),
+        }
+    }
+
+    pub fn set_play_target(&mut self, on_player: bool) {
+        match &mut self.file {
+            Some(FileSource::Macro { player, .. }) => *player = on_player,
+            Some(FileSource::Combo(_)) => {}
+            None => self.replay_player = on_player,
+        }
     }
 
     pub fn context(&self) -> ClipContext {
@@ -433,7 +456,9 @@ impl ClipEditor {
             entry, fighter_kind, previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
             clean_start, move_start: self.move_start, quantized, truncated: self.session.truncated,
             source_name: self.source_name.clone(), error: self.error.clone(),
-            marks, mark_count, move_text: self.marks.text(at, out_handle) }
+            marks, mark_count, move_text: self.marks.text(at, out_handle),
+            mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
+            target: self.plays_on_player() }
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing
@@ -546,13 +571,11 @@ impl ClipEditor {
                 }
             }
             ClipAction::SwapTarget => {
-                if let Some(FileSource::Macro { player, .. }) = &mut self.file {
-                    *player = !*player;
-                    let playing = self.playing;
-                    self.pause();
-                    return if playing { ClipEffect::StopPreview } else { ClipEffect::None };
-                }
-                return ClipEffect::None;
+                let Some(on_player) = self.plays_on_player() else { return ClipEffect::None };
+                self.set_play_target(!on_player);
+                let playing = self.playing;
+                self.pause();
+                return if playing { ClipEffect::StopPreview } else { ClipEffect::None };
             }
             ClipAction::SelectIn | ClipAction::SelectOut => {
                 self.pause();

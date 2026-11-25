@@ -38,9 +38,57 @@ pub struct Clip {
     pub playing: bool,
     pub handle: &'static str,
     pub running: bool,
+    /// Where a preview plays: `p1`, `cpu`, or `none` for a source with no preview.
+    pub target: &'static str,
+    /// Every mark of the take, and the mark at or nearest the cursor.
+    pub marks: u32,
+    pub mark: Option<(u32, Option<u32>)>,
+    pub text: MoveText,
+}
+
+/// The strip's move text on a `clip` line: at most 48 bytes, cut at a character; a quote, a backslash or a control
+/// character is written as an apostrophe, so the quoted value never needs an escape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MoveText { bytes: [u8; 48], len: u8 }
+
+impl MoveText {
+    pub fn new(text: &str) -> Self {
+        let mut out = Self { bytes: [0; 48], len: 0 };
+        for c in text.chars() {
+            let c = if c == '"' || c == '\\' || c.is_control() { '\'' } else { c };
+            let mut buffer = [0u8; 4];
+            let unit = c.encode_utf8(&mut buffer).as_bytes();
+            let at = usize::from(out.len);
+            if at + unit.len() > out.bytes.len() { break; }
+            out.bytes[at..at + unit.len()].copy_from_slice(unit);
+            out.len += unit.len() as u8;
+        }
+        out
+    }
+
+    pub fn as_str(&self) -> &str { core::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("") }
 }
 
 impl Clip {
+    /// The editor's view as the bridge line carries it; `ctx` names a strip that is not the editor's own (`drill`).
+    pub fn of(view: &crate::engine::macro_ui::clip_panel::ClipView, ctx: Option<&'static str>, running: bool) -> Self {
+        use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
+        Clip {
+            ctx: ctx.unwrap_or(match view.context {
+                ClipContext::Replay { .. } => "replay",
+                ClipContext::Macro { player: true } => "macro.p1",
+                ClipContext::Macro { player: false } => "macro.cpu",
+                ClipContext::Combo { .. } => "combo",
+            }),
+            total: view.total, start: view.start, end: view.end, cursor: view.cursor,
+            playing: view.playing,
+            handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
+            running,
+            target: match view.target { Some(true) => "p1", Some(false) => "cpu", None => "none" },
+            marks: view.mark_total, mark: view.near, text: MoveText::new(&view.move_text),
+        }
+    }
+
     pub fn text(self) -> String {
         format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={}",
             self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running))
