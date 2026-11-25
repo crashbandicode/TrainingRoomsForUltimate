@@ -30,7 +30,7 @@ Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosp
 Use chords in Training and waiting-room practice. Open **Display & Controls › Button chords**, press A on a chord,
 then X. Hold and release the new chord; A keeps it.
 
-<video src="docs/media/tut-controls-change-chord.mp4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
 
 *Button chords: Save State Save reads ZL + D-pad Down; X, then holding ZL + D-pad Left sets the new chord, and that chord saves. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-controls-change-chord.mp4)
 
@@ -67,7 +67,7 @@ Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to ke
 Open with B + D-pad Up. L / R turn pages, Up / Down choose a row, A opens or changes it, and B goes back or closes the
 menu. Changes apply when it closes; see [Using the menu](docs/guide/using-the-menu.md).
 
-<video src="docs/media/tut-menu-tour.mp4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
 
 *B + D-pad Up opens the menu, R turns through the five pages, B closes it and practice goes on. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-menu-tour.mp4)
 
@@ -84,7 +84,7 @@ when it fires in **Mash Triggers**.
 With Save States On, save both fighters' positions with ZL + D-pad Down; ZL + D-pad Up loads them again.
 [Save states](docs/guide/save-states.md) also covers damage, mirroring and buffs on load.
 
-<video src="docs/media/tut-save-load.mp4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2f0394ea36fb533c09e157925c016b4e369ab2a6" autoplay muted loop playsinline controls></video>
 
 *ZL + D-pad Down saves beside the CPU; two jabs take it to 4.9%; ZL + D-pad Up puts both fighters back at 0%. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-save-load.mp4)
 

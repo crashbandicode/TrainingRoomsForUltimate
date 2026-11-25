@@ -2,7 +2,7 @@
 
 Use and change the button chords for practice. They work in Training and in the waiting rooms.
 
-<video src="../media/tut-controls-change-chord.mp4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
 
 *Button chords: Save State Save reads ZL + D-pad Down; X, then holding ZL + D-pad Left sets the new chord, and that chord saves. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](../media/tut-controls-change-chord.mp4)
 
