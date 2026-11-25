@@ -69,6 +69,8 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.indicator=\"\"",
         "playback.indicator=\"\"",
         "strip.aims=\"\"",
+        "strip.scroll=0",
+        "strip.back_ms=0",
         "list=\"rows/22\"",
         "list.count=2",
         "list.index=0",
@@ -78,6 +80,21 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "rows.complete=1",
         "rows=\"Start\",\"Eggs mode\"",
     ]);
+}
+
+#[test]
+fn strip_scroll_reports_how_far_back_the_last_pass_drew() {
+    let stamp = scroll_stamp(1000, 45, 72);
+    assert_eq!(strip_scroll(stamp, 1200, 500), (45, 1200));
+    assert_eq!(strip_scroll(scroll_stamp(1000, 0, 0), 1200, 500), (0, 0));
+    assert_eq!(strip_scroll(stamp, 1501, 500), (0, 0));
+    assert_eq!(strip_scroll(scroll_stamp(0, 0, 0), 0, 500), (0, 0));
+    assert_eq!(strip_scroll(scroll_stamp(1000, 540, u32::MAX), 1200, 500), (540, 71_582_788_250));
+    let mut out = String::new();
+    snapshot(&View { strip_scroll: 45, strip_back_ms: 1200, ..View::default() }, &mut out);
+    assert!(out.contains("\nstrip.aims=\"\"\nstrip.scroll=45\nstrip.back_ms=1200\n"));
+    snapshot(&View::default(), &mut out);
+    assert!(out.contains("\nstrip.scroll=0\nstrip.back_ms=0\n"));
 }
 
 #[test]

@@ -1,0 +1,1 @@
+{"input_steps":[{"events":[{"button":"attack","dir":"forward_up","kind":"press","offset":0},{"button":"attack","dir":"neutral","hold":4,"kind":"release","offset":4}]}],"kind":"input_drill","name":"Drill 5","recorded_on":"Kirby","schema_version":2,"take":"drill-take-d0a49bb137dcab8e"}

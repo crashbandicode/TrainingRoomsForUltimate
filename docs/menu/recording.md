@@ -101,7 +101,7 @@ don't turn the page while a file's screen is open.
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
 | Trim | Start, End, Both or Off: skip neutral frames at those sides during playback, without changing the saved frames. A, Left or Right cycles. |
-| Crop | Opens the [clip editor](#replay-window). L picks In, R picks Out; Left/Right move it. Macros use frames and X previews through Play on the role of the view; combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays, and a crop of the role's active macro becomes active. B leaves. |
+| Crop | Opens the [clip editor](#replay-window). It is a strip over the bottom of the screen, so both fighters stay visible. L picks In, R picks Out; Left/Right move it and Y snaps it to the nearest move. Macros use frames and X previews on the CPU or Player 1 (a ZR tap swaps); combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays, and a crop of the role's active macro becomes active. B leaves. |
 | Make combo | Plays the file once on Player 1 from its start save: hits make a combo; a pass with no hits makes an input drill. |
 | Drill, Drill sequence | Makes this the one combo or sequence the combo helper grades. |
 | Edit chain, Edit combos | Opens the numbered picker. |
@@ -180,6 +180,9 @@ More: [Combos](../guide/recording.md#combos),
 
 Practise movement without hitting the opponent: **A** on **COMBOS → DRILLS > → + Record drill…** arms a Player 1 take, then **ZR + D-pad Down** starts and stops it with the default Record chord.
 
+Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
+as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
+
 The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
 
 ![Drill 1 in the clip editor: four steps, then three selected whole steps](../media/rc15-input-drill.gif)<br>
@@ -246,18 +249,31 @@ its name and its length in frames ("(partial)" if it ended early).
 
 Pick one with A. If the CPU isn't the fighter it was recorded on, Fighter Mismatch may ask first
 ([Ask before switching fighter](#ask-before-switching-fighter)). Then the menu closes and the clip editor takes the
-controller:
+controller. The editor is a strip over the bottom of the screen: the game keeps running above it, so you see both
+fighters while you crop and while a preview plays. The strip shows the kept range, where the preview plays, the move
+at the selected handle, and one timeline with the In and Out handles, the playhead and a tick for every move:
 
 | Key | What it does |
 | --- | --- |
-| Up/Down | Pick whose inputs to take when the capture has two sides. A file has one side, so this does nothing. |
+| Up/Down | On a capture with two sides, pick whose inputs to take. Nothing for a saved file. |
+| ZR | A tap (pressed and released with nothing else) swaps where a macro's preview plays: the CPU or Player 1, as ZR does on the Recording page. The strip reads "Plays on CPU" or "Plays on Player 1". During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
 | L / R | L picks the start and R the end. After a preview or save, pick a handle again before moving it. |
-| Left/Right | Move it (hold to go faster): frames for replays and macros, whole links for combos, whole steps for drills. |
-| X | Previews the kept part: a Replay window capture on the CPU, or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. The page hides during preview; X or B stops it early. A macro preview returns the page about a second after its last input. Not offered for combos or drills. |
+| Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. |
+| Y | Snaps the selected handle to the nearest move: In to a move's start, Out to a move's end. A move whose end is not known offers the next move's start, or the end of the take. Pick a handle with L or R first. |
+| ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
+| X | Previews the kept part: a Replay window capture on the CPU, or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview, or leaves when not previewing. |
 
-Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save.
+Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a Replay window capture the strip also names where the preview plays (CPU).
+
+**Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
+
+- A macro recorded on this build keeps its moves in its file (the optional `actions` key: each move's start frame, the first frame the fighter could act again, and the move), so the marks are there when the editor opens.
+- If automatic trim cuts off a move's known end, its band ends at the end of the saved take. A move whose end was never observed still has no end mark.
+- An older macro and a Replay window capture show a tick for every press, C-stick input or flick that starts a move. Their ends and names appear as a preview plays past them.
+- A combo has one mark per link and a drill one per step, with the name the list shows.
+- The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
 
 ![Moving a macro's start handle from frame 0 to 180 keeps the final 134 frames](../media/rc15-crop-editor.gif)<br>
 *Macro Crop, Eden, 2026-11-15, rc.15 d520d325 (untested on hardware). L selects the start handle; Left/Right moves it. This clip shows range selection.*

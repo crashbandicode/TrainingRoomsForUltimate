@@ -275,6 +275,7 @@ struct MacroNameBody {
     placement: Placement,
     version: String,
     mii: Option<crate::engine::mii::lifetime::Configuration>,
+    actions: Vec<crate::engine::macros::ActionMark>,
 }
 
 enum NameBody {
@@ -307,6 +308,7 @@ impl NameDraft {
                 placement,
                 version: recording.game_version.clone(),
                 mii: recording.mii,
+                actions: recording.actions.clone(),
             })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         }
@@ -621,6 +623,7 @@ impl MacroUi {
                 placement: Placement::default(),
                 version: clip_version(version),
                 mii,
+                actions: Vec::new(),
             })),
             keyboard_title: MACRO_KEYBOARD_TITLE,
         });
@@ -1338,7 +1341,7 @@ impl MacroUi {
             self.screen = Screen::Closed;
             return Effect::NameConfirmed { context: NameContext { token, title }, name };
         }
-        let (name, version, start, frames, placement, mii) = match &self.screen {
+        let (name, version, start, frames, placement, mii, actions) = match &self.screen {
             Screen::Save(draft) => match &draft.body {
                 NameBody::Macro(body) => (
                     draft.name.clone(),
@@ -1347,6 +1350,7 @@ impl MacroUi {
                     body.frames.clone(),
                     body.placement,
                     body.mii,
+                    body.actions.clone(),
                 ),
                 NameBody::External { .. } => return Effect::None,
             },
@@ -1357,6 +1361,7 @@ impl MacroUi {
             Ok(recording) => recording,
             Err(err) => return Effect::Notify(err.to_string()),
         };
+        recording.actions = actions;
         if let Some(configuration) = mii {
             if let Err(err) = recording.set_mii(configuration) { return Effect::Notify(err.to_string()); }
         }

@@ -2332,7 +2332,7 @@ pub(crate) fn unused_n(prefix: &str, names: &[String]) -> u32 {
 }
 
 /// A link's move line ("L1 jab → jab TRUE"), not the events or drift line under it.
-fn link_head(line: &str) -> bool {
+pub(crate) fn link_head(line: &str) -> bool {
     line.strip_prefix(['L','S']).and_then(|rest| rest.split_once(' ')).is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
@@ -2340,7 +2340,13 @@ fn link_head(line: &str) -> bool {
 /// An older presses-only file shows its presses and no drift.
 pub fn combo_link_lines(combo: &Combo, namer: super::move_names::Namer<'_>) -> Vec<String> {
     combo.links().enumerate().flat_map(|(index, link)| {
-        if combo.input_only { let mut lines = vec![format!("S{} Step {}", index + 1, index + 1)]; if let Some(events) = event_line(link) { lines.push(events); } lines } else { link_panel_lines(combo, index, link, namer) }
+        if combo.input_only {
+            let mut title = String::new();
+            let _ = link.write_title(&mut title, false, " → ", namer);
+            let mut lines = vec![format!("S{} {}", index + 1, if namer.is_on() { title } else { title.to_ascii_lowercase() })];
+            if let Some(events) = event_line(link) { lines.push(events); }
+            lines
+        } else { link_panel_lines(combo, index, link, namer) }
     }).collect()
 }
 

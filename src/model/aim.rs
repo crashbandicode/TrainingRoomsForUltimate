@@ -233,6 +233,9 @@ impl Rule {
     /// Player 1 is inside a special as of the last step.
     pub fn inside(&self) -> bool { self.family.is_some() }
 
+    /// The cast this rule is measuring, independent of later button presses or status changes.
+    pub fn cast(&self) -> Option<(u32, Family)> { self.family.map(|family| (self.press, family)) }
+
     /// The entry of a status whose movement may still show.
     pub fn pending(&self) -> Option<u32> { self.candidate.map(|candidate| candidate.entry) }
 

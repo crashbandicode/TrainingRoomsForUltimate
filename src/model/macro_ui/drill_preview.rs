@@ -115,7 +115,8 @@ mod tests {
         assert!(handle.find("end_drill_preview(s, true);").unwrap() < handle.find("s.keeper.open(").unwrap());
         let reset = body(worker, "fn sync_input_generation(");
         assert!(reset.find("end_drill_preview(s, true);").unwrap() < reset.find("s.keeper.drop_model(").unwrap());
-        assert!(tick.contains("&& !state::PREVIEW_HIDES.load(Ordering::Acquire)"));
+        assert!(tick.contains("let hidden = state::PREVIEW_HIDES.load(Ordering::Acquire) && !state::PREVIEW_STRIP.load(Ordering::Acquire);"));
+        assert!(tick.contains("&& !hidden;"));
         assert!(state.contains("pub static PREVIEW_HIDES: AtomicBool"));
         assert!(!body(state, "pub fn release_menu()").contains("PREVIEW_HIDES"),
             "only the worker clears the preview flag");

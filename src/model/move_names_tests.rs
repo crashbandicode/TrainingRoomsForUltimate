@@ -61,7 +61,7 @@ fn texts(entries: &[(&str, &str)]) -> Vec<u8> {
     message(&entries.iter().map(|(label, text)| ((*label).to_owned(), text.encode_utf16().collect())).collect::<Vec<_>>())
 }
 
-fn shared_file() -> Vec<u8> {
+pub(crate) fn shared_file() -> Vec<u8> {
     texts(&[
         ("nam_special_upper_00_alpha", "Test Rising Kick"),
         ("nam_special_upper_00_beta", "Test Lunar Lift"),

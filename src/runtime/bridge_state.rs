@@ -282,6 +282,8 @@ static RECORDING_INDICATOR: AtomicU64 = AtomicU64::new(0);
 static PLAYBACK_INDICATOR: AtomicU64 = AtomicU64::new(0);
 /// The direction marks drawn by the strip's last pass (`m::aims_stamp`).
 static STRIP_AIMS: AtomicU64 = AtomicU64::new(0);
+/// The serialized HUD tick publishes; only the menu worker reads. Neither waits.
+static STRIP_SCROLL: hos_lock::TripleBuffer<m::ScrollStamp> = hos_lock::TripleBuffer::new(m::scroll_stamp(0, 0, 0));
 
 /// The current notice, written by the game thread, read by the worker; whoever finds it busy skips (never waits).
 struct Notice {
@@ -362,6 +364,18 @@ pub fn strip_aims(now_ms: u64) -> [Option<u8>; 2] {
     m::strip_aims(STRIP_AIMS.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)
 }
 
+/// The scroll distance drawn by the strip on this pass.
+pub fn note_strip_scroll(drawn: (u32, u32)) {
+    if FOUND.load(Ordering::Relaxed) {
+        STRIP_SCROLL.write(m::scroll_stamp(crate::runtime::clock::uptime_ms(), drawn.0, drawn.1));
+    }
+}
+
+/// The strip's scroll distance on its last fresh pass.
+pub fn strip_scroll(now_ms: u64) -> (u32, u64) {
+    m::strip_scroll(STRIP_SCROLL.read().0, now_ms, SCENE_FRESH_MS)
+}
+
 /// The notice the HUD draws (game thread). Skipped when the worker is reading it or no bridge was found.
 pub fn note_notice(header: &str, body: &str) {
     if !FOUND.load(Ordering::Relaxed) || NOTICE_BUSY.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
@@ -420,10 +434,16 @@ pub struct Provider {
     notice: (String, String),
     events: Outbox,
     clip: ClipSeen,
+    /// The drill take preview's strip, while it is up (the worker sets it).
+    drill: Option<Clip>,
 }
 
 impl Provider {
     /// One worker pass. `view` builds the snapshot; it is called only once the bridge was found.
+    pub fn set_drill(&mut self, strip: Option<Clip>) {
+        self.drill = strip;
+    }
+
     pub fn tick(&mut self, now_ms: u64, view: impl FnOnce(&(String, String), u64, &mut String)) {
         if !enabled() {
             return;
@@ -462,21 +482,8 @@ impl Provider {
         self.events.lost(EVENTS.take_dropped());
         let send = |text: &str| event(handle, text.as_ptr(), text.len() as u32);
         self.events.flush(now_ms, send);
-        let clip = crate::runtime::macros::replay_capture::clip_view().map(|view| {
-            use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
-            Clip {
-                ctx: match view.context {
-                    ClipContext::Replay { .. } => "replay",
-                    ClipContext::Macro { player: true } => "macro.p1",
-                    ClipContext::Macro { player: false } => "macro.cpu",
-                    ClipContext::Combo { .. } => "combo",
-                },
-                total: view.total, start: view.start, end: view.end, cursor: view.cursor,
-                playing: view.playing,
-                handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
-                running: crate::engine::rr_host::preview_running(),
-            }
-        });
+        let running = crate::engine::rr_host::preview_running();
+        let clip = self.drill.or_else(|| crate::runtime::macros::replay_capture::clip_view().map(|shown| crate::engine::macro_ui::clip_marks::bridge_clip(&shown, None, running)));
         self.clip.send(clip, send);
     }
 

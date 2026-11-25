@@ -53,6 +53,9 @@ pub struct View<'a> {
     pub playback_indicator: &'a str,
     /// The strip's last drawn direction marks, oldest first.
     pub strip_aims: [Option<u8>; 2],
+    /// How far the strip's last pass was scrolled back: columns, and the marker's time in milliseconds. 0 when live.
+    pub strip_scroll: u32,
+    pub strip_back_ms: u64,
     pub list: &'a str,
     pub list_count: usize,
     pub list_index: Option<usize>,
@@ -222,6 +225,8 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
         }
     }
     out.push_str("\"\n");
+    let _ = writeln!(out, "strip.scroll={}", view.strip_scroll);
+    let _ = writeln!(out, "strip.back_ms={}", view.strip_back_ms);
     push_str(out, "list", view.list);
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
@@ -372,6 +377,24 @@ pub fn strip_aims(stamp: u64, now_ms: u64, fresh_ms: u64) -> [Option<u8>; 2] {
     }
     let dir = |nibble: u64| (1..=8).contains(&nibble).then(|| (nibble - 1) as u8);
     [dir(stamp & 15), dir((stamp >> 4) & 15)]
+}
+
+/// Quiet frames advance the clock without consuming history columns.
+#[derive(Clone, Copy)]
+pub struct ScrollStamp {
+    at_ms: u64,
+    columns: u32,
+    frames: u32,
+}
+
+pub const fn scroll_stamp(at_ms: u64, columns: u32, frames: u32) -> ScrollStamp {
+    ScrollStamp { at_ms, columns, frames }
+}
+
+/// `(strip.scroll, strip.back_ms)` on a fresh HUD pass; zeros when live, never drawn or stale.
+pub fn strip_scroll(stamp: ScrollStamp, now_ms: u64, fresh_ms: u64) -> (u32, u64) {
+    if now_ms.saturating_sub(stamp.at_ms) > fresh_ms { return (0, 0); }
+    (stamp.columns, u64::from(stamp.frames) * 1000 / 60)
 }
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {
