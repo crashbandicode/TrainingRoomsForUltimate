@@ -39,7 +39,7 @@ static BACK: AtomicU32 = AtomicU32::new(0);
 
 /// The crop window `draw` computed in this pass and the layout it was drawn for, taken by that layout's menu tick
 /// (`ui::tick`) right after the draw. The tick reads no camera itself: the projection stays behind the hitbox unit's draw.
-static CROP: Mutex<Option<(usize, [Option<CropRect>; CROP_RECTS])>> = Mutex::new(None);
+static CROP: Mutex<Option<(u8, [Option<CropRect>; CROP_RECTS])>> = Mutex::new(None);
 
 pub fn request() {
     REQUEST.store(epoch(), Ordering::Release);
@@ -55,6 +55,7 @@ pub fn wizard_active() -> bool {
 
 /// This pass's crop window for `layout`, once; `None` when the editor's guide was not drawn for it in this pass.
 pub fn crop(layout: usize) -> Option<[Option<CropRect>; CROP_RECTS]> {
+    let layout = u8::try_from(layout).ok()?;
     let mut slot = CROP.try_lock()?;
     let (owner, rects) = (*slot)?;
     (owner == layout).then(|| {
@@ -165,9 +166,9 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     let range = [left, right, top, bottom];
     let (mid, limits) = perfect::outline_probe(camera, range)?;
     let ray = FloorRay::new(p1)?;
-    let (ledges, _) = stage_geometry::stage_floor(&ray, camera)?;
     let (outline, _) = stage_geometry::training_outline(&ray, mid, limits)?;
-    Stage::new(id, range, ledges, outline, [Some(range[0]), Some(range[1])], &[])
+    let mut probe = stage_geometry::RayProbe::new(p1)?;
+    Stage::read(id, range, camera, outline, &mut probe).ok().flatten()
 }
 
 /// The editor's state for the optional test bridge (`zone.*`). Call it before `LIVE` changes.
@@ -377,7 +378,7 @@ pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4
         }
         crop_view(&overview)
     });
-    if let Some(mut crop) = CROP.try_lock() {
+    if let (Ok(layout), Some(mut crop)) = (u8::try_from(layout), CROP.try_lock()) {
         *crop = Some((layout, crop_window(crop_view(&map), inset, display.step)));
     }
     display.samples

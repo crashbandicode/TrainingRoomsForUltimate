@@ -503,12 +503,21 @@ Check **In view**, **Whole stage**, **Off stage**, or a combination. Each new ta
 checked area. In view is the default and takes over when the checklist is empty. Whole stage uses the stage's world
 bounds, so a target can appear outside the current camera. Changes apply at the next Start.
 
-Open **Off-stage zone…** to edit the two mirrored zones. Use the left stick up/down for the blue **Top** and **Bottom**
-lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges** in or out. Yellow
-limit lines mark how far inward each side can reach under the stage. The active edge has a handle, sample targets show
-places targets can appear, and the rest of the screen is dimmed. The solid stage is excluded. **A** advances,
-**B** goes back or cancels from Top, and **X** previews the factory zone. In **Preview**, press **A** or **+** to apply.
-Training Rooms saves the zone for the current stage and form.
+Open **Off-stage zone…** to edit the zones: two mirrored ones on most stages. Use the left stick up/down for the blue
+**Top** and **Bottom** lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges**
+in or out. Yellow limit lines mark how far inward each side can reach under the stage. The active edge has a handle,
+sample targets show places targets can appear, and the rest of the screen is dimmed. The solid stage is excluded.
+**A** advances, **B** goes back or cancels from Top, and **X** previews the factory zone. In **Preview**, press **A**
+or **+** to apply. Training Rooms saves the zone for the current stage and form.
+
+Each zone lies beside a ledge of the stage's main floor, the floor under the middle of the camera's range. A side
+has a zone only when its ledge has open air next to it, so a stage can have one zone or none. The outer edge
+stops where that open air ends: at the next part of the stage, or short of the blast line. On the Training stage
+the one zone is the gap between the long floor and the island.
+
+A target appears only in the air off stage: never inside another part of the stage, and never above a floor or a
+platform. The stage is read when the zone is first needed on it. A platform that moves afterwards is not
+followed, and a piece of the stage narrower than 10 units can be missed.
 
 A break on an Off stage target shows **Recover!**. Get offstage and then grab a ledge or land on the main stage floor
 to add it to the score. A KO cancels the hit. With **Hit streak** on, a cancellation clears the current streak and
