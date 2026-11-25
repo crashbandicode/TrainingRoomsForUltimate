@@ -359,22 +359,14 @@ impl ComboRecord {
         };
         let combo = &mut record.combo;
         let mut previous = 0;
-        let mut legacy = [0u16; LINKS];
-        for (k, value) in links.iter().enumerate() {
-            let link = if input { input_step(value, aims, &mut previous, &mut legacy[k])? } else { link_of(value, aims)? };
+        for value in links {
+            let link = if input { input_step(value, aims, &mut previous)? } else { link_of(value, aims)? };
             if !combo.push(link) { return Err(key); }
         }
         combo.input_only = input;
         if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
         if input {
-            for (k, bits) in legacy.iter().copied().enumerate().take(combo.len()) {
-                let eligible = combo.holds(k).into_iter().enumerate().fold(0u16, |selected, (i, hold)| {
-                    if bits & (1u16 << i) != 0 && hold.is_some_and(|hold| action::hold_band(hold) > 0) {
-                        selected | (1u16 << i)
-                    } else { selected }
-                });
-                combo.mark_legacy_holds(k, eligible);
-            }
+            mark_legacy_releases(combo, links);
             for (link, value) in links.iter().enumerate() {
                 let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
                 for (index, value) in events.iter().enumerate() {
@@ -415,19 +407,33 @@ fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static s
 }
 
 /// One input drill step: its events in file order. `previous` carries the last offset across steps.
-fn input_step(value: &Value, aims: bool, previous: &mut i32, legacy: &mut u16) -> Result<LinkRec, &'static str> {
+fn input_step(value: &Value, aims: bool, previous: &mut i32) -> Result<LinkRec, &'static str> {
     let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
     if events.is_empty() || events.len() > STEPS { return Err("events"); }
     let mut link = LinkRec::INPUT;
-    for (i, (slot, value)) in link.events.iter_mut().zip(events).enumerate() {
-        let object = value.as_object().ok_or("event")?;
-        let event = parse_event(object, aims, true)?;
-        if matches!(event.kind, Kind::Release(_)) && object.get("reacted").is_none() { *legacy |= 1u16 << i; }
+    for (slot, event) in link.events.iter_mut().zip(events) {
+        let event = parse_event(event.as_object().ok_or("event")?, aims, true)?;
         if event.offset < *previous { return Err("offset"); }
         *previous = event.offset;
         *slot = Some(event);
     }
     Ok(link)
+}
+
+/// A drill file from before the `reacted` key: a release whose hold reaches the band is graded as before, a shorter
+/// one is a tap. Kept out of the decoder's own frame, which is on the menu worker's deepest stack path.
+#[inline(never)]
+fn mark_legacy_releases(combo: &mut Combo, steps: &[Value]) {
+    for (k, step) in steps.iter().enumerate() {
+        let Some(events) = step.get("events").and_then(Value::as_array) else { continue };
+        let holds = combo.holds(k);
+        let bits = events.iter().enumerate().take(STEPS).fold(0u16, |bits, (i, event)| {
+            if event.get("reacted").is_none() && holds[i].is_some_and(|hold| action::hold_band(hold) > 0) {
+                bits | (1u16 << i)
+            } else { bits }
+        });
+        combo.mark_legacy_holds(k, bits);
+    }
 }
 
 fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
