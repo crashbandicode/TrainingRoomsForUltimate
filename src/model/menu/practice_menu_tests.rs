@@ -379,6 +379,36 @@ fn running_shows_in_green_on_the_list_and_stop_on_the_sub_screen() {
     assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy(), f.rows[0].value_tone), ("Start".into(), ">".into(), Tone::Normal));
 }
 
+/// The Ally rows of 2026-11-25 (run `tso-3fd708bc-ally-1`): on the Training stage Start did nothing, and the menu then
+/// read "Running" for a drill that never started.
+#[test]
+fn a_refused_start_ends_the_game_so_the_menu_reads_start() {
+    // The row follows the running game: Stop and Running while it runs, Start once it has ended.
+    for game in [Game::GuardEdge, Game::Juggler] {
+        let mut m = running(game);
+        on_list(&mut m, game);
+        m.press(Button::A);
+        let f = frame(&m);
+        assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy()), ("Stop".into(), "Running  >".into()));
+        assert_eq!(f.help[0].string_lossy(), format!("{} is running. A stops it, and the row reads Start.", game.title()));
+        let f = frame(&opened(game));
+        assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy(), f.rows[0].value_tone), ("Start".into(), ">".into(), Tone::Normal));
+    }
+    // A start the drill's frame refuses ends the game before the frame returns, so nothing is left running.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    let drill_frame = runtime.split_once("pub unsafe fn frame(").unwrap().1;
+    let refused = drill_frame.split_once("Err(refusal) => {").expect("the refused start").1.split_once("return;").unwrap().0;
+    assert!(refused.contains("START.store(0, Ordering::Release);"));
+    assert!(refused.contains("practice::finish(drill.game());"));
+    assert!(refused.contains("published::WIZARDS.set_up(Kind::DrillStart, false);"));
+    assert!(!runtime.contains("let Some((stage, p1_start)) = setup_stage(p1) else"), "a failed start is no longer silent");
+    // The menu's "running" is the game the worker reports, and an ended game reports none.
+    let practice = include_str!("../../runtime/features/practice.rs");
+    let finish = practice.split_once("pub fn finish(game: Game)").unwrap().1.split_once("\n}").unwrap().0;
+    assert!(finish.contains("word & !GAME_MASK"));
+    assert!(include_str!("../../runtime/ui/worker.rs").contains("running: crate::runtime::features::practice::running(),"));
+}
+
 #[test]
 fn mode_rows_have_no_off_and_a_stored_off_reads_as_the_first_mode() {
     let eggs = row("Eggs-ercise", table::game_group(Game::Eggs));

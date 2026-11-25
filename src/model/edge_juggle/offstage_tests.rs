@@ -1,0 +1,251 @@
+//! Guard the Edge and Juggler on the off-stage rule (`stage_geometry::rule`): the stage is the floor run Player 1
+//! stands on, a start that cannot happen has a reason, and a CPU start is taken by the place the rule gives it.
+//! The stage lines are the Training stage's and Battlefield's, as the rule's own tests hold them.
+lib_unit_tests! {
+use super::*;
+use crate::model::stage_geometry::{classify, Copied, Met, Place, Point, Probe, Unread};
+
+const TRAINING_BLAST: [f32; 4] = [-590.0, 500.0, 360.0, -137.852];
+const TRAINING_CAMERA: [f32; 4] = [-510.0, 420.0, 280.0, -39.864];
+const BATTLEFIELD_BLAST: [f32; 4] = [-240.0, 240.0, 192.0, -140.0];
+const BATTLEFIELD_CAMERA: [f32; 4] = [-170.0, 170.0, 130.0, -80.0];
+const ON: StartOptions = StartOptions { under: true, jumps_used: false };
+const OFF: StartOptions = StartOptions { under: false, jumps_used: false };
+
+fn line(ends: [Point; 2], stand: bool, through: bool) -> Met {
+    Met { ends, stand, through }
+}
+
+/// The left block (its top and its low floor), the island with its platforms, and the long floor.
+fn training() -> Vec<Met> {
+    vec![
+        line([[-635., 47.391], [-490., 47.391]], true, false),
+        line([[-490., 0.], [-420., 0.]], true, false),
+        line([[-635., -165.], [-420., -165.]], false, false),
+        line([[-330., 0.014], [-170., 0.014]], true, false),
+        line([[-330., 0.014], [-250., -40.]], false, false),
+        line([[-250., -40.], [-170., 0.014]], false, false),
+        line([[-309.4, 24.119], [-274.8, 24.119]], true, true),
+        line([[-267.3, 47.189], [-232.7, 47.189]], true, true),
+        line([[-225.2, 24.119], [-190.6, 24.119]], true, true),
+        line([[-80., 0.], [620., 0.]], true, false),
+        line([[-80., -340.], [620., -340.]], false, false),
+    ]
+}
+
+fn battlefield() -> Vec<Met> {
+    vec![
+        line([[-79.986, 0.], [79.989, 0.]], true, false),
+        line([[-79.986, 0.], [0., -40.1]], false, false),
+        line([[0., -40.1], [79.989, 0.]], false, false),
+        line([[-57.6, 27.2], [-20., 27.2]], true, true),
+        line([[20., 27.2], [57.6, 27.2]], true, true),
+        line([[-18.8, 54.4], [18.8, 54.4]], true, true),
+    ]
+}
+
+/// A stage that cannot be read.
+struct Gone;
+impl Probe for Gone {
+    fn first(&mut self, _: Point, _: f32, _: bool) -> Result<Option<Met>, Unread> {
+        Err(Unread)
+    }
+}
+
+fn near(a: Option<Point>, b: Point) -> bool {
+    a.is_some_and(|a| (a[0] - b[0]).abs() < 0.01 && (a[1] - b[1]).abs() < 0.01)
+}
+
+fn on_training(drill: Drill, p1: Point) -> Result<(Stage, Point), StartRefusal> {
+    start_stage(&mut Copied(&training()), drill, TRAINING_BLAST, TRAINING_CAMERA, p1)
+}
+
+#[test]
+fn the_stage_is_the_floor_run_the_player_stands_on() {
+    // Player 1 at the Training stage's start: the long floor. Its left end is a ledge; its right end is past the
+    // blast line.
+    let (long, start) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
+    assert_eq!(long.ledges, [[-80.0, 0.0], [620.0, 0.0]]);
+    assert!(near(long.spot(0), [-125.0, -68.426]), "{:?}", long.spot(0));
+    assert_eq!(long.spot(1), None);
+    assert_eq!(start, [-45.0, 0.0], "the camera's middle is on this run");
+    // Player 1 on the island, also on one of its platforms: both ends are ledges with open air.
+    for p1 in [[-250.0, 0.024], [-250.0, 47.2]] {
+        let (island, start) = on_training(Drill::GuardEdge, p1).unwrap();
+        assert_eq!(island.ledges, [[-330.0, 0.014], [-170.0, 0.014]]);
+        assert!(near(island.spot(0), [-375.0, -68.419]), "{:?}", island.spot(0));
+        assert!(near(island.spot(1), [-125.0, -68.419]), "{:?}", island.spot(1));
+        assert_eq!(start, [-250.0, 0.014], "the run's own middle");
+    }
+    // A stage of one solid is the stage as it was read before.
+    let (found, start) = start_stage(&mut Copied(&battlefield()), Drill::GuardEdge, BATTLEFIELD_BLAST, BATTLEFIELD_CAMERA, [40.0, 27.21]).unwrap();
+    let before = Stage::new(BATTLEFIELD_BLAST, BATTLEFIELD_CAMERA, [[-79.986, 0.0], [79.989, 0.0]]).unwrap();
+    assert_eq!(found.ledges, before.ledges);
+    for side in 0..2 {
+        assert!(near(found.spot(side), before.spot(side).unwrap()), "{side}");
+    }
+    assert_eq!(start, [0.0, 0.0]);
+    assert!(long.on_run(-80.0) && long.on_run(499.0) && !long.on_run(-80.5));
+}
+
+#[test]
+fn on_the_training_stage_guard_the_edge_starts_from_the_long_floor_and_the_island() {
+    let key = (308, 0);
+    // The long floor: the left side only.
+    let (long, p1) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
+    let mut wizard = Wizard::new(Drill::GuardEdge, long, p1, 100, key, None).unwrap();
+    assert!(near(Some(wizard.setup.cpu), [-125.0, -68.426]), "{:?}", wizard.setup.cpu);
+    let left = wizard.setup.cpu;
+    wizard.set_side_default(long, true);
+    assert_eq!(wizard.setup.cpu, left, "there is no other side");
+    wizard.setup.cpu = [400.0, 50.0];
+    wizard.set_side_default(long, false);
+    assert_eq!(wizard.setup.cpu, left, "the default of the one side there is");
+    // The island: both sides.
+    let (island, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let mut wizard = Wizard::new(Drill::GuardEdge, island, p1, 100, key, None).unwrap();
+    assert!(near(Some(wizard.setup.cpu), [-375.0, -68.419]));
+    wizard.set_side_default(island, true);
+    assert!(near(Some(wizard.setup.cpu), [-125.0, -68.419]));
+    wizard.set_side_default(island, true);
+    assert!(near(Some(wizard.setup.cpu), [-375.0, -68.419]));
+    // The left block's low floor: its right end only (its left end is against the wall).
+    let (block, p1) = on_training(Drill::GuardEdge, [-450.0, 0.01]).unwrap();
+    assert_eq!((block.ledges, block.spot(0)), ([[-490.0, 0.0], [-420.0, 0.0]], None));
+    let wizard = Wizard::new(Drill::GuardEdge, block, p1, 100, key, None).unwrap();
+    assert!(near(Some(wizard.setup.cpu), [-375.0, -68.426]), "{:?}", wizard.setup.cpu);
+    // Juggler starts on each of them, with the CPU over Player 1.
+    for at in [[-30.0, 0.01], [-250.0, 0.024], [-450.0, 0.01]] {
+        let (stage, p1) = on_training(Drill::Juggler, at).unwrap();
+        let wizard = Wizard::new(Drill::Juggler, stage, p1, 60, key, None).unwrap();
+        assert_eq!(classify(&mut Copied(&training()), TRAINING_BLAST, wizard.setup.cpu), Ok(Place::OverStage), "{at:?}");
+    }
+}
+
+#[test]
+fn a_start_that_cannot_happen_names_its_reason() {
+    for drill in [Drill::GuardEdge, Drill::Juggler] {
+        // Over a gap there is no floor to start from.
+        assert_eq!(on_training(drill, [-375.0, 20.0]), Err(StartRefusal::NoFloor), "{drill:?}");
+        assert_eq!(start_stage(&mut Gone, drill, TRAINING_BLAST, TRAINING_CAMERA, [-30.0, 0.01]), Err(StartRefusal::Unread), "{drill:?}");
+    }
+    // The left block's top: one end is past the blast line, the other steps down onto a floor. No ledge to guard;
+    // Juggler needs none.
+    assert_eq!(on_training(Drill::GuardEdge, [-520.0, 47.4]), Err(StartRefusal::NoLedge));
+    let (top, _) = on_training(Drill::Juggler, [-520.0, 47.4]).unwrap();
+    assert_eq!((top.spot(0), top.spot(1)), (None, None));
+    // Each reason has its own approved text, shown where the start is refused.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    let frame = runtime.split_once("pub unsafe fn frame(").unwrap().1;
+    for refusal in [
+        "StartRefusal::Unread => notices::refuse(\"The stage could not be read\"), // restriction: edge-juggle-stage-unread",
+        "StartRefusal::NoFloor => notices::refuse(\"Stand on the stage to start this drill\"), // restriction: edge-juggle-start-no-floor",
+        "StartRefusal::NoLedge => notices::refuse(\"This floor has no ledge to guard\"), // restriction: edge-juggle-no-open-ledge",
+    ] {
+        assert!(frame.contains(refusal), "{refusal}");
+    }
+    let restrictions = include_str!("../../../docs/RESTRICTIONS.md");
+    for id in ["edge-juggle-stage-unread", "edge-juggle-start-no-floor", "edge-juggle-no-open-ledge", "edge-juggle-juggler-start"] {
+        assert!(restrictions.contains(&format!("| `{id}` |")), "{id}");
+    }
+}
+
+#[test]
+fn guard_the_edge_takes_open_air_and_under_only_with_the_option() {
+    let lines = training();
+    let (stage, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let wizard = Wizard::new(Drill::GuardEdge, stage, p1, 100, (308, 0), None).unwrap();
+    for (point, place, off, on) in [
+        ([-375.0, -50.0], Place::Open, true, true),
+        ([-125.0, 30.0], Place::Open, true, true),
+        ([-250.0, -80.0], Place::Under, false, true),
+        ([-250.0, -10.0], Place::Solid, false, false),
+        ([100.0, 30.0], Place::OverStage, false, false),
+        ([-250.0, 60.0], Place::OverStage, false, false),
+        ([0.0, 400.0], Place::Outside, false, false),
+    ] {
+        assert_eq!(classify(&mut Copied(&lines), TRAINING_BLAST, point), Ok(place), "{point:?}");
+        assert_eq!((wizard.takes(place, OFF), wizard.takes(place, ON)), (off, on), "{point:?}");
+    }
+    // A taken start goes on to the next page; a refused one, or an unread stage, stays on this one.
+    let at = wizard.setup.cpu;
+    for (place, options, taken) in [
+        (Ok(Place::Open), OFF, true), (Ok(Place::Under), ON, true), (Ok(Place::Under), OFF, false),
+        (Ok(Place::Solid), ON, false), (Err(Unread), ON, false),
+    ] {
+        let mut wizard = wizard;
+        assert_eq!(wizard.confirm_start(at, place, options), Some(taken), "{place:?}");
+        assert_eq!(wizard.step, if taken { WizardStep::Player } else { WizardStep::Cpu }, "{place:?}");
+    }
+}
+
+#[test]
+fn juggler_takes_a_spot_over_the_stage_or_in_open_air() {
+    let (stage, p1) = on_training(Drill::Juggler, [-30.0, 0.01]).unwrap();
+    let wizard = Wizard::new(Drill::Juggler, stage, p1, 60, (308, 0), None).unwrap();
+    for options in [OFF, ON] {
+        for (place, taken) in [
+            (Place::OverStage, true), (Place::Open, true), (Place::Under, false), (Place::Solid, false), (Place::Outside, false),
+        ] {
+            assert_eq!(wizard.takes(place, options), taken, "{place:?}");
+        }
+    }
+    let mut refused = wizard;
+    assert_eq!(refused.confirm_start(wizard.setup.cpu, Ok(Place::Under), ON), Some(false));
+    assert_eq!(refused.step, WizardStep::Cpu);
+    let mut taken = wizard;
+    assert_eq!(taken.confirm_start(wizard.setup.cpu, Ok(Place::OverStage), OFF), Some(true));
+    assert_eq!(taken.step, WizardStep::Percent);
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    assert!(runtime.contains("Drill::Juggler => notices::refuse(\"Pick a point over the stage or beside it\"), // restriction: edge-juggle-juggler-start"));
+    assert!(runtime.contains("Drill::GuardEdge => notices::refuse(\"Pick a point off the stage\"), // restriction: edge-juggle-start-over-stage"));
+}
+
+#[test]
+fn a_moved_cursor_does_not_use_an_earlier_press() {
+    use crate::model::btt::Pad;
+    let (stage, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let mut wizard = Wizard::new(Drill::GuardEdge, stage, p1, 100, (308, 0), None).unwrap();
+    let pressed = wizard.setup.cpu;
+    wizard.steer(stage, &Pad { stick: [1.0, 0.0], ..Pad::default() });
+    assert_ne!(wizard.setup.cpu, pressed);
+    assert_eq!(wizard.confirm_start(pressed, Ok(Place::Open), OFF), None);
+    assert_eq!(wizard.step, WizardStep::Cpu);
+    // The press on the point the cursor is on now is the one that counts.
+    let now = wizard.setup.cpu;
+    assert_eq!(wizard.confirm_start(now, Ok(Place::Open), OFF), Some(true));
+    assert_eq!(wizard.step, WizardStep::Player);
+    // On another page the press is not a CPU start at all.
+    assert_eq!(wizard.confirm_start(now, Ok(Place::Open), OFF), None);
+    assert_eq!(wizard.step, WizardStep::Player);
+    // The poll only records the press; the frame classes that point with the rule.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    let poll = runtime.split_once("pub unsafe fn poll(").unwrap().1.split_once("\n}").unwrap().0;
+    assert!(poll.contains("run.confirm_cpu = Some(wizard.setup.cpu);"));
+    assert!(!poll.contains("notices::refuse("));
+    assert_eq!(runtime.matches("wizard.confirm_start(at, place, run.options)").count(), 1);
+    assert_eq!(runtime.matches("geometry::classify(&mut stage, run.stage.blast(), at)").count(), 1);
+}
+
+#[test]
+fn a_kept_start_is_reused_only_on_its_own_floor_run() {
+    let (long, _) = on_training(Drill::GuardEdge, [-30.0, 0.01]).unwrap();
+    let (island, _) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    // Made on the long floor, beside its left ledge.
+    let kept = Setup { cpu: [-125.0, -68.0], p1: [0.0, 0.0], percent: 100 };
+    assert!(long.keeps_setup(Drill::GuardEdge, kept, OFF));
+    assert!(!island.keeps_setup(Drill::GuardEdge, kept, OFF), "Player 1's point is not on the island");
+    assert!(!island.keeps_setup(Drill::GuardEdge, kept, ON));
+    // A start under the island needs the option.
+    let under = Setup { cpu: [-250.0, -80.0], p1: [-250.0, 0.014], percent: 100 };
+    assert!(!island.keeps_setup(Drill::GuardEdge, under, OFF));
+    assert!(island.keeps_setup(Drill::GuardEdge, under, ON));
+    for setup in [kept, under] {
+        for stage in [long, island] {
+            assert!(stage.keeps_setup(Drill::Juggler, setup, OFF));
+        }
+    }
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    assert_eq!(runtime.matches("stage.keeps_setup(drill, *setup, config.options)").count(), 1);
+}
+}

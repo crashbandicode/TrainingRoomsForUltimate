@@ -3,6 +3,7 @@ use super::btt;
 use super::crosshair::{Crosshair, Marks};
 use super::panes::EGG_WHOLE;
 use crate::model::practice_state::Fields;
+use crate::model::stage_geometry as geometry;
 use super::practice_games::{record_max, record_time, result_tick, Game};
 
 #[path = "edge_juggle/perfect.rs"]
@@ -14,6 +15,9 @@ pub mod zoom;
 #[cfg(test)]
 #[path = "edge_juggle/crosshair_tests.rs"]
 mod crosshair_tests;
+#[cfg(test)]
+#[path = "edge_juggle/offstage_tests.rs"]
+mod offstage_tests;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
@@ -776,11 +780,55 @@ pub struct Stage {
     blast: [f32; 4],
     camera: [f32; 4],
     pub ledges: [[f32; 2]; 2],
+    /// For the left and the right end: the default CPU start in the open air beside it; none where that end is
+    /// not a ledge with open air.
+    spots: [Option<[f32; 2]>; 2],
+}
+
+/// Why a drill cannot start where Player 1 stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartRefusal {
+    /// The stage could not be read.
+    Unread,
+    /// No solid floor under Player 1.
+    NoFloor,
+    /// Guard the Edge: the floor run has no ledge with open air beside it.
+    NoLedge,
+}
+
+/// The stage a drill starts on: the floor run Player 1 stands on, by the off-stage rule, with the default CPU start
+/// beside each of its ledges with open air, and Player 1's default start on it.
+pub fn start_stage(
+    stage: &mut impl geometry::Probe, drill: Drill, blast: [f32; 4], camera: [f32; 4], p1: [f32; 2],
+) -> Result<(Stage, [f32; 2]), StartRefusal> {
+    let _ = (stage, drill);
+    Stage::of_run(blast, camera, [[p1[0] - 1.0, p1[1]], [p1[0] + 1.0, p1[1]]], [None; 2]).map(|stage| (stage, p1)).ok_or(StartRefusal::Unread)
 }
 
 impl Stage {
     pub const fn blast(self) -> [f32; 4] {
         self.blast
+    }
+
+    /// A floor run and the default spots beside its ends. Unlike `new`, an end may lie outside the blast lines:
+    /// it then has no spot.
+    pub fn of_run(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2], spots: [Option<[f32; 2]>; 2]) -> Option<Self> {
+        let [_, _, top, bottom] = blast;
+        let [[lx, ly], [rx, ry]] = ledges;
+        (blast.into_iter().chain(camera).chain(ledges.into_iter().flatten()).all(f32::is_finite)
+            && lx < rx
+            && [ly, ry].into_iter().all(|y| bottom < y && y < top))
+        .then_some(Self { blast, camera, ledges, spots })
+    }
+
+    /// The default CPU start beside an end; none where the end has no open air.
+    pub fn spot(self, side: usize) -> Option<[f32; 2]> {
+        self.spots[side]
+    }
+
+    /// Whether `x` lies on the floor run.
+    pub fn on_run(self, x: f32) -> bool {
+        self.ledges[0][0] <= x && x <= self.ledges[1][0]
     }
 
     pub fn new(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2]) -> Option<Self> {
@@ -795,10 +843,9 @@ impl Stage {
             && lx < rx
             && rx < right
             && [ly, ry].into_iter().all(|y| bottom < y && y < top))
-        .then_some(Self {
-            blast,
-            camera,
-            ledges,
+        .then(|| {
+            let stage = Self { blast, camera, ledges, spots: [None; 2] };
+            Self { spots: [stage.lower_middle(0), stage.lower_middle(1)], ..stage }
         })
     }
 
@@ -888,6 +935,13 @@ impl Stage {
     /// that is not beside the stage was accepted as one under it, and needs that option.
     pub fn keeps_start(self, drill: Drill, cpu: [f32; 2], options: StartOptions) -> bool {
         drill == Drill::Juggler || options.under || self.off_stage(cpu).is_some()
+    }
+
+    /// Whether a setup kept for this stage is still one Start may use without the wizard. Guard the Edge's belongs
+    /// to the floor run Player 1's point is on, and a CPU point that is not beside that run was accepted as one
+    /// under the stage, which needs that option. The point is not classed again.
+    pub fn keeps_setup(self, drill: Drill, setup: Setup, options: StartOptions) -> bool {
+        self.keeps_start(drill, setup.cpu, options)
     }
 }
 
@@ -1079,14 +1133,16 @@ impl Wizard {
             },
         };
         if drill == Drill::GuardEdge {
-            wizard.setup.cpu = wizard.default_cpu(stage, 0)?;
+            wizard.setup.cpu = wizard.default_cpu(stage, 0).or_else(|| wizard.default_cpu(stage, 1))?;
             wizard.cross.jump(wizard.setup.cpu);
         }
         wizard.floor_at = wizard.cross.at;
         Some(wizard)
     }
 
+    /// The default CPU start on a side; none where that end of the floor run has no open air.
     pub fn default_cpu(&self, stage: Stage, side: usize) -> Option<[f32; 2]> {
+        let spot = stage.spot(side)?;
         let offset = if side == 0 { self.left_start.or(self.area_offset) } else { self.area_offset };
         if let Some([outside, height]) = offset {
             let ledge = stage.ledges[side];
@@ -1096,7 +1152,7 @@ impl Wizard {
                 return Some(point);
             }
         }
-        stage.lower_middle(side)
+        Some(spot)
     }
 
     pub fn unmoved(&self) -> bool {
@@ -1148,7 +1204,9 @@ impl Wizard {
             return;
         }
         let side = stage.side(self.setup.cpu[0]) ^ usize::from(other);
-        if let Some(cpu) = self.default_cpu(stage, side) {
+        // The point's own side may have no ledge with open air: its default is then the other side's.
+        let own = || self.default_cpu(stage, side).or_else(|| self.default_cpu(stage, side ^ 1));
+        if let Some(cpu) = if other { self.default_cpu(stage, side) } else { own() } {
             self.setup.cpu = cpu;
             self.moved = false;
             self.cross.jump(cpu);
@@ -1190,6 +1248,26 @@ impl Wizard {
             self.advance();
         }
         accepted
+    }
+
+    /// Whether the drill takes a CPU start at this place: Guard the Edge in open air, or under the stage with
+    /// that option; Juggler over the stage or in open air.
+    pub fn takes(&self, place: geometry::Place, options: StartOptions) -> bool {
+        let _ = options;
+        self.drill == Drill::Juggler || place == geometry::Place::Open
+    }
+
+    /// A on the CPU page, once the rule has classed the point A was pressed on. `None`: the press is stale, the
+    /// page or the point has changed since. An unread stage refuses the point.
+    pub fn confirm_start(
+        &mut self, at: [f32; 2], place: Result<geometry::Place, geometry::Unread>, options: StartOptions,
+    ) -> Option<bool> {
+        let _ = at;
+        let taken = place.is_ok_and(|place| self.takes(place, options));
+        if taken {
+            self.advance();
+        }
+        Some(taken)
     }
 
     /// The Player page keeps its cursor over a floor: a move with none under it is undone.
