@@ -2012,3 +2012,15 @@ block record while ai plays player 1". The design was accepted by tr-primary-2 o
 
 This reverses the Record half of B4 (2026-11-01: "Record is refused with a notice"). Vault and match captures never
 had that refusal. Host tests only; not yet seen in a game.
+
+## Preview stop and Recording chord hints (2026-11-25)
+
+Decided by the operator on 2026-11-25 (relayed by tr-primary-2, inbox 14:29:24Z): the five preview entry points share
+B as the stop key and `B stop preview` as their hint. B stops and drops the remaining frames without closing the
+editor; a second B closes it. X also stops, and an editor ZR tap switches target and stops a preview.
+
+The Recording pop-up's first help line shows the configured Record and Play chords. It uses the full names when they
+fit the pane's UTF-16 capacity and width, then P1 and CPU, then a pointer to the chords screen. The hint shows only
+while the preview is running; the key line reads `B back` during the approximately one-second tail (tr-primary-2's
+ruling, 2026-11-25 15:11:54Z). The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended
+after review by rv-hit-streak at 14:36:00Z.
