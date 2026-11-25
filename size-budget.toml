@@ -2829,7 +2829,23 @@ approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the l
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
+ceiling = 200293
+date = "2026-11-25"
+reason = "Merge 7 review: an editable menu shortcut takes precedence, past brackets stop at the view edge, and the cursor and its published column count reset together. Measured 200293, 39 above 47b52049."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 200312
 date = "2026-11-25"
 reason = "Merge 7: the bridge publishes the frame strip's scroll state (strip.scroll, strip.back_ms) from the HUD pass that drew it. Measured 200312 (tools/sloc.py tree), 58 above the scrollback's 200254."
 approved_by = "tr-primary-2 2026-11-25 00:45:38Z (the scroll state as a bridge field on feat/strip-scrollback; lines approved at the measured value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200351
+date = "2026-11-25"
+reason = "Merge 7 with the reviewer's correction (fix/rv-scroll-shortcut 237a9661) and the bridge fields in one tree: measured 200351 (tools/sloc.py tree), which is the scrollback's 200254 plus the correction's 39 and the bridge's 58, with no lines from the merge."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its 21:46:20Z rule (the correction) and 2026-11-25 00:45:38Z (the bridge fields)."

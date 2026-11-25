@@ -5,6 +5,7 @@ use crate::model::frame_strip_plan::{at, Look, Renderer, StripDraw, COUNT};
 use crate::model::input_delay::MappedInputs;
 use crate::model::panes::strip_layout::C;
 use crate::model::spacing::{Grade, Taken};
+use crate::model::strip_scroll::{Cursor, Dir, ScrollEvent};
 
 fn idle() -> Sample {
     Sample { actionable: true, ..Sample::default() }
@@ -144,5 +145,39 @@ fn a_cleared_strip_has_no_past() {
     assert_eq!(back.span(), (1, 1));
     let mut fresh = tracker;
     assert_eq!(back.rewind(&mut fresh, 60), None);
+}
+
+#[test]
+fn scrollback_review_each_timeline_reset_invalidates_the_published_cursor() {
+    let native = include_str!("../runtime/features/input_display.rs");
+    for boundary in ["fn session_clear()", "fn fighter_initialised()", "fn sample_frame("] {
+        let body = native.split_once(boundary).unwrap().1.split_once("\n}").unwrap().0;
+        assert!(body.contains("clear_live_strip(&mut"), "{boundary} must invalidate the shared cursor");
+    }
+    let clear = native.split_once("fn clear_live_strip(").unwrap().1.split_once("\n}").unwrap().0;
+    assert!(clear.contains("SCROLL.clear()") && clear.contains("tracker.clear_live_strip("));
+    let cursor = Cursor::new();
+    let mut tracker = Tracker::new();
+    let mut back = Back::new();
+    for _ in 0..100 {
+        tracker.step(Sample::default(), Sample::default(), MappedInputs::NEUTRAL);
+        cursor.record(&mut back, &tracker);
+    }
+    cursor.publish_selection(ScrollEvent::Opened(Dir::Back), true);
+    assert_eq!(cursor.anchor(), 85);
+    tracker.clear();
+    cursor.clear();
+    // Miss enough records to overtake the old timeline's last frame: frame numbers alone cannot detect the reset.
+    for _ in 0..105 { tracker.step(Sample::default(), Sample::default(), MappedInputs::NEUTRAL); }
+    cursor.record(&mut back, &tracker);
+    assert_eq!(back.span(), (60, 60));
+    for _ in 0..30 {
+        tracker.step(Sample::default(), Sample::default(), MappedInputs::NEUTRAL);
+        cursor.record(&mut back, &tracker);
+    }
+    cursor.publish_selection(ScrollEvent::Held, true);
+    assert_eq!(cursor.anchor(), 0, "the former column 85 exists again, but the view stays live");
+    cursor.publish_selection(ScrollEvent::Step(Dir::Back), true);
+    assert_eq!(cursor.anchor(), 75);
 }
 }

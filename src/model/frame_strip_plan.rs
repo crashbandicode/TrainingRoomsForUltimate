@@ -346,7 +346,7 @@ impl<'a> Content<'a> {
     fn slot(&self, frame: u32) -> Option<f32> {
         let newest = self.tracker.newest()?;
         if frame > newest {
-            return Some((WINDOW - 1) as f32 + (frame - newest) as f32);
+            return self.back.is_none().then(|| (WINDOW - 1) as f32 + (frame - newest) as f32);
         }
         (self.first_slot..WINDOW).find(|s| self.frames[*s] == frame).map(|s| s as f32)
     }

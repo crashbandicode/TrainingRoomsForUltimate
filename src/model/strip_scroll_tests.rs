@@ -1,6 +1,8 @@
 lib_unit_tests! {
 use super::*;
 use crate::model::chords::{logical, ChordSet, Detector, Sample};
+use crate::model::chords::Request;
+use crate::model::menu_shortcuts::MenuShortcuts;
 use logical::{DPAD_LEFT as LEFT, DPAD_RIGHT as RIGHT, STICK_R as R3};
 
 fn bits(buttons: &[u8]) -> u16 {
@@ -23,6 +25,22 @@ fn r3_alone_hides_nothing_and_opens_nothing() {
     assert_eq!(detector.hidden(), 0);
     assert_eq!(detector.scroll_event(), ScrollEvent::Idle);
     assert_eq!(scroll.poll(sample(&[R3, LEFT], &[LEFT]), false, true), ScrollEvent::Opened(Dir::Back));
+}
+
+#[test]
+fn an_editable_menu_shortcut_owns_the_scroll_opening_poll() {
+    for dir in [LEFT, RIGHT] {
+        let mut set = ChordSet::factory();
+        set.shortcuts = MenuShortcuts::new(Chord(bits(&[R3, dir])), Chord::NONE);
+        let input = sample(&[R3, dir], &[dir]).with_strip(true);
+        let mut detector = Detector::new();
+        detector.poll(&set, input, false);
+        assert!(detector.consume(Request::OpenMenu));
+        assert!(!detector.scroll_open(), "the same edge also opened scrollback");
+
+        detector.poll(&ChordSet::factory(), input, false);
+        assert!(detector.scroll_open(), "without the menu binding the scroll chord wins");
+    }
 }
 
 #[test]

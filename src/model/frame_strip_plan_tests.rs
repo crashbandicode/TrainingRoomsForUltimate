@@ -59,6 +59,24 @@ fn true_combo() -> Tracker {
     t
 }
 
+#[test]
+fn scrollback_review_past_bracket_stops_at_the_view_edge() {
+    let mut t = true_combo();
+    let free = t.latest_link().unwrap().free.unwrap();
+    assert!(free > t.newest().unwrap());
+    let bracket = |t: &Tracker, back| {
+        let mut visible = false;
+        Renderer::new().draw_with_spec(t,
+            StripDraw { shown: true, back, spots: false, parry: None, history_enabled: true, cells: false, spec: &C },
+            |index, look, _| if index == at::BRACKET_TEXT { visible = look.visible });
+        visible
+    };
+    assert!(bracket(&t, None), "live can project the CPU's free frame");
+    assert!(!bracket(&t, Some(15)), "the projected free frame is outside this historical view");
+    while t.newest().unwrap() < free { t.step(idle(), idle(), NONE); }
+    assert!(bracket(&t, Some(15)), "both ends are now inside the historical window");
+}
+
 fn directional_combo(from: Move, to: Move, from_angle: Option<crate::model::frame_strip::Angle>,
                      to_angle: Option<crate::model::frame_strip::Angle>) -> Tracker {
     let mut tracker = Tracker::new();

@@ -1402,6 +1402,20 @@ fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
     }
 }
 
+#[test]
+fn scrollback_review_both_history_lock_sites_are_game_callbacks_only() {
+    for graph in [runtime_graph(), diag_runtime_graph()] {
+        let (ctx, scan) = scan_mode(&graph, true);
+        let back = ctx.locks.iter().position(|(f, l)| f == "features/input_display.rs" && l == "BACK").unwrap();
+        let shared = shared_locks(&ctx, &scan);
+        let waits = &shared.game_waits[&back];
+        for entry in ["input_display::sample_frame", "input_display::hud_tick"] {
+            assert!(waits.iter().any(|w| w.starts_with(&format!("{entry} (hook "))), "{entry}: {waits:?}");
+        }
+        assert!(!shared.plugin_holds.contains_key(&back));
+    }
+}
+
 /// A camera mutex is forbidden even if no plugin thread holds it. Seed the real callbacks and require the normal
 /// game-entry walk to find each wait from cpu::on_frame; a disconnected camera callback cannot make this test pass.
 #[test]
