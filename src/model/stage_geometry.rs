@@ -376,5 +376,75 @@ mod tests {
         assert_eq!(stage.ray(ray(7.)).unwrap().0.id, 1);
         assert_eq!(eggs(&scanned(&stage, [0., 10., 12., -50.])), [[[-50., 0.], [50., 0.]]]);
     }
+
+    #[test]
+    fn the_ray_is_cast_in_one_place() {
+        let geometry = include_str!("../runtime/features/stage_geometry.rs");
+        assert_eq!(geometry.lines().filter(|line| line.contains("transmute") && line.contains("FLOOR_RAY")).count(), 1);
+        assert_eq!(geometry.matches("struct RayPoint").count(), 1);
+        assert_eq!(geometry.matches("fn cast(").count(), 1);
+        assert!(!geometry.contains("(self.cast)("));
+        assert_eq!(geometry.matches("native_ray(").count(), 2);
+
+        let tech_surfaces = include_str!("../runtime/features/tech_surfaces.rs");
+        assert_eq!(tech_surfaces.matches("native_ray(").count(), 1);
+        assert_eq!(tech_surfaces.matches("native_ray(").count(), tech_surfaces.matches("cast(native_ray(").count());
+        let users = [
+            include_str!("../runtime/features/mashout.rs"),
+            include_str!("../runtime/features/tech.rs"),
+            include_str!("../runtime/features/edge_juggle.rs"),
+            include_str!("../runtime/features/egg_zone.rs"),
+            include_str!("../runtime/features/placement.rs"),
+            include_str!("../runtime/features/hitbox.rs"),
+            include_str!("../runtime/features/record_place.rs"),
+        ];
+        for source in users {
+            assert!(!source.contains("native_ray"));
+            assert!(!source.contains("RayCast"));
+        }
+        // tech_spike.rs is diag-only research; tech_surfaces_guards.rs holds guard data.
+        for source in users.into_iter().chain([tech_surfaces]) {
+            assert!(!source.contains("0x202a240"));
+            assert!(!source.lines().any(|line| line.contains("transmute") && line.contains("FLOOR_RAY")));
+            assert!(!source.contains("struct RayPoint"));
+            assert!(!source.contains("struct NativePoint"));
+            assert!(!source.contains("type RayCast"));
+        }
+    }
+
+    #[test]
+    fn every_user_reads_the_stage_through_the_module() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let edge = include_str!("../runtime/features/edge_juggle.rs");
+        let eggs = include_str!("../runtime/features/egg_zone.rs");
+        let mashout = include_str!("../runtime/features/mashout.rs");
+        let tech = include_str!("../runtime/features/tech_surfaces.rs");
+        for source in [placement, edge, eggs, mashout] {
+            assert!(source.contains("stage_geometry::"));
+        }
+        assert!(tech.contains("stage_geometry"));
+        assert!(tech.contains("native_ray"));
+        assert!(tech.contains("scan_step"));
+        for source in [placement, edge, eggs, mashout, tech] {
+            assert!(!source.contains("struct FloorRay"));
+        }
+        assert!(!edge.contains("unsafe fn ledge("));
+        assert!(!edge.contains("fn stage_floor("));
+        assert!(!tech.contains("fn training_outline("));
+        assert!(!tech.contains("FrameOutlineReader"));
+    }
+
+    #[test]
+    fn no_stage_is_named() {
+        for source in [
+            include_str!("stage_geometry.rs"),
+            include_str!("../runtime/features/stage_geometry.rs"),
+        ] {
+            let code = source.split("#[cfg(test)]").next().unwrap();
+            for name in ["stage_id", "StageID", "stage_key", "lobby_stages", "fighter_kind"] {
+                assert!(!code.contains(name), "{name}");
+            }
+        }
+    }
     }
 }

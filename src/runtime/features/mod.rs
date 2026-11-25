@@ -23,6 +23,7 @@ pub mod notices;
 pub mod practice;
 pub mod edge_juggle;
 mod placement;
+mod stage_geometry;
 pub(super) mod egg_zone;
 pub mod recorder;
 pub mod record_place;
