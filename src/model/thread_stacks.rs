@@ -110,7 +110,9 @@ pub const THREADS: [ThreadStack; 19] = [
     // Merge 3D (2026-11-25): a special's own travel keeps its entry velocity, so a combo's four-entry travel table grew
     // from 96 to 120 B and the same path, which holds combos by value, to 54,144 B (release) and 54,176 B (diag, gate
     // fdd7994d). The stack's size is unchanged: the measured 57,648 B still decides what it needs.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_176, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Smoke fix 1 on merge 3D (2026-11-25): the release path is unchanged at 54,144 B; the diag build's
+    // `decode::<ComboRecord>` frame is 16 B larger (7,792 B), so the path reads 54,192 B there (gate 074fd9c3).
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_192, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
