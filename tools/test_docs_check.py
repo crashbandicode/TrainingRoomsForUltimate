@@ -506,6 +506,22 @@ class GateStage(unittest.TestCase):
         os.remove(os.path.join(root, "docs/media/clip.mp4"))
         self.assertEqual([p.rule for p in d.check(root, NO_ALLOWANCE)], ["video-src"])
 
+    def test_a_video_blob_must_belong_to_a_committed_mp4(self):
+        url = VideoSources.url + VideoSources.blob
+        for case in ("ignored", "untracked", "modified", "staged"):
+            with self.subTest(case=case):
+                path = "docs/media/draft.mp4"
+                files = {"README.md": CLEAN["README.md"] + f'\n<video src="{url}"></video>\n'}
+                if case in ("modified", "staged"):
+                    files[path] = "committed version"
+                root = self.stage(files, ignore=path if case == "ignored" else "")
+                git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                    "commit", "-qm", "fixture")
+                pathlib.Path(root, path).write_bytes(b"fixture mp4")
+                if case == "staged":
+                    git(root, "add", path)
+                self.assertEqual([p.rule for p in d.check(root, NO_ALLOWANCE)], ["video-src"])
+
     def test_a_clip_that_git_does_not_hold_fails_even_when_it_is_on_disk(self):
         root = self.stage({"README.md": CLEAN["README.md"] + "\n![x](docs/media/local.gif)\n", "docs/media/local.gif": "GIF"}, ignore="local.gif\n")
         self.assertEqual([(p.rule, p.text) for p in d.check(root, NO_ALLOWANCE)], [("link-missing", "`docs/media/local.gif`: no such file or folder")])
