@@ -96,6 +96,10 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
             hold(body, at);
             true
         }
+        PreviewAct::Stand => {
+            stand(body, at, natives::lr(body));
+            false
+        }
     };
     let loupe = konst(C::WorkFlagIsLoupe);
     if let Some(preview) = slot {

@@ -4,7 +4,7 @@ use super::cpu::ids::C;
 use super::crosshair::{Crosshair, Marks};
 use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
-use super::state::record::StartState;
+use super::state::record::{SavedState, StartState};
 
 pub const READY_FRAMES: u16 = 60;
 pub const CHECK_FRAMES: u16 = 60;
@@ -262,12 +262,93 @@ pub struct Fighter {
 
 pub type Setup = [Fighter; 2];
 
+/// `Ask` comes before the five pages, and only on a save that macros start from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Page { Where, Spot, State, Percent, Preview }
+pub enum Page { Ask, Where, Spot, State, Percent, Preview }
 
-/// What the wizard is opened for: a Record start, or the spots of a save state (Where and Spot only).
+/// What the wizard is opened for: a Record start, or a save state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode { Record, Save }
+
+/// A save that macros start from (operator 2026-11-25, PC5): how many macro files link it, and whether the picker
+/// was opened from one of them (its own screen or the Replays row) or from the save itself.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shared {
+    pub macros: u8,
+    pub from_macro: bool,
+}
+
+/// The Advanced setting "Shared start save": ask each time, or always take one answer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SharedStart {
+    #[default]
+    Prompt,
+    Change,
+    Copy,
+}
+
+/// How a picker was left.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Leave {
+    /// B on the first page, or a save that could not be written: the fighters go back.
+    Cancel,
+    /// Anything else: a Record start or a load places the fighters, or the scene is gone.
+    Other,
+}
+
+/// What leaving does with one body the picker held.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Release {
+    /// Not the body the picker took: it is not written, woken or moved.
+    Nothing,
+    /// Woken where it is.
+    Wake,
+    /// Woken and put back where it stood when the picker took it.
+    PutBack,
+}
+
+/// `same_body`: the role's body is still the one the picker took. `loading`: a save state is loading, and a load
+/// places the fighters itself.
+pub const fn release(leave: Leave, same_body: bool, loading: bool) -> Release {
+    let _ = (leave, same_body, loading);
+    Release::Nothing
+}
+
+/// A finished save belongs to the picker that asked for it. `waiting`: that picker's ticket, while it still waits.
+pub const fn accepts(waiting: Option<u32>, ticket: u32) -> bool {
+    let _ = (waiting, ticket);
+    false
+}
+
+/// How far a spot may go: on stage the camera's range, off stage up to 1 unit inside the blast line (Guard the
+/// Edge's limit), `[left, right, top, bottom]`. Without the blast line the camera's range stands in.
+pub fn reach(place: Place, camera: [f32; 4], blast: Option<[f32; 4]>) -> [f32; 4] {
+    let _ = (place, blast);
+    camera
+}
+
+/// The game's situation kinds a save records.
+pub const SITUATION_GROUND: i32 = 0;
+pub const SITUATION_CLIFF: i32 = 1;
+pub const SITUATION_AIR: i32 = 2;
+
+/// One half of a save as the wizard shows it, and whether it was saved hanging on a ledge.
+pub fn saved_fighter(saved: &SavedState) -> (Fighter, bool) {
+    let _ = saved;
+    (Fighter { place: Place::OnStage, at: [0.0; 2], state: StartState::Standard, percent: 0 }, false)
+}
+
+/// A confirmed placement written into a save's two halves: only what was edited, field by field. An edited spot
+/// takes its place and the stage it was placed on; everything else in the record stays as saved.
+pub fn patch(pair: [&mut SavedState; 2], setup: &Setup, edits: [Edits; 2], stage: i32) {
+    let _ = (pair, setup, edits, stage);
+}
+
+/// The approved refusal for a save that could not be written (tr-primary-2, 2026-11-25).
+pub fn write_not_saved(name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
+    let _ = name;
+    write!(out, "")
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Raw {
@@ -331,7 +412,7 @@ pub fn write_shown(shown: &Shown, first: bool, popup: bool, role: Who, out: &mut
     push_str(out, "place.phase", match shown.stage { Stage::Idle => "idle", Stage::Pages => "pages", Stage::Start => "start" });
     push_str(out, "place.page", if shown.stage == Stage::Pages {
         match shown.page {
-            Page::Where => "where", Page::Spot => "spot", Page::State => "state",
+            Page::Ask => "ask", Page::Where => "where", Page::Spot => "spot", Page::State => "state",
             Page::Percent => "percent", Page::Preview => "preview",
         }
     } else { "" });
@@ -396,6 +477,17 @@ impl Edits {
     }
 }
 
+/// A placement confirmed on a save, as the picker hands it to the worker that writes the file. `ticket`: the
+/// visit it belongs to. `copy`: it goes into a copy of the save. `stage`: the stage it was placed on.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Commit {
+    pub ticket: u32,
+    pub copy: bool,
+    pub setup: Setup,
+    pub edits: [Edits; 2],
+    pub stage: i32,
+}
+
 pub struct Wizard {
     pub page: Page,
     pub edit: Who,
@@ -404,6 +496,8 @@ pub struct Wizard {
     mode: Mode,
     ledge: [bool; 2],
     home: Option<[f32; 2]>,
+    shared: Option<Shared>,
+    copy: bool,
     cross: Crosshair,
     hop: floor_hop::Hop,
     was: u16,
@@ -414,12 +508,31 @@ impl Wizard {
     pub fn new(defaults: Setup, remembered: Option<Setup>) -> Self {
         let setup = remembered.unwrap_or(defaults);
         Self { page: Page::Where, edit: Who::P1, setup, defaults, mode: Mode::Record, ledge: [false; 2], home: None,
-            cross: Crosshair::new(setup[0].at), hop: floor_hop::Hop::new(), was: 0, repeat: 0 }
+            shared: None, copy: false, cross: Crosshair::new(setup[0].at), hop: floor_hop::Hop::new(), was: 0, repeat: 0 }
     }
 
     /// Opened on a save state: its spots are the defaults (X puts them back). `ledge`: saved hanging on a ledge.
     pub fn for_save(saved: Setup, ledge: [bool; 2], edit: Who) -> Self {
         Self { edit, mode: Mode::Save, ledge, cross: Crosshair::new(saved[edit.index()].at), ..Self::new(saved, None) }
+    }
+
+    /// The save is a start save of `shared.macros` macros (operator 2026-11-25, PC5). `Prompt` opens on the
+    /// question: change the save for all of them, or copy it. The other two settings answer it unasked. A save no
+    /// macro starts from is changed, unasked.
+    pub fn sharing(self, shared: Shared, rule: SharedStart) -> Self {
+        let _ = (shared, rule);
+        self
+    }
+
+    /// The answer to the question: the placement goes into a copy of the save, not the save.
+    pub fn copies(&self) -> bool {
+        self.copy
+    }
+
+    /// What a save of this visit writes.
+    pub fn commit(&self, ticket: u32, stage: i32) -> Commit {
+        let _ = (ticket, stage);
+        Commit { ticket: 0, copy: false, setup: self.defaults, edits: [Edits::default(); 2], stage: 0 }
     }
 
     /// The main floor's point under the middle of the stage, where a fighter with no floor under it goes on stage.
@@ -494,10 +607,20 @@ impl Wizard {
         let was = self.was;
         self.was = pad.held;
         let pressed = |key| pad.pressed & (1u16 << key) != 0;
+        if self.page == Page::Ask {
+            // Two choices and B: nothing else acts on the question, + included.
+            if pressed(logical::B) { return Outcome::Closed; }
+            if pressed(logical::A) {
+                self.page = Page::Where;
+            } else if pressed(logical::DPAD_UP) || pressed(logical::DPAD_DOWN) {
+                self.copy = !self.copy;
+            }
+            return Outcome::Open;
+        }
         if pressed(logical::PLUS) { return Outcome::Start; }
         if pressed(logical::B) {
             self.page = match self.page {
-                Page::Where => return Outcome::Closed,
+                Page::Ask | Page::Where => return Outcome::Closed,
                 Page::Spot => Page::Where,
                 Page::State => Page::Spot,
                 Page::Percent => Page::State,
@@ -507,7 +630,7 @@ impl Wizard {
         }
         if pressed(logical::A) {
             self.page = match self.page {
-                Page::Where => {
+                Page::Ask | Page::Where => {
                     self.cross.jump(self.setup[self.edit.index()].at);
                     Page::Spot
                 }
@@ -595,7 +718,7 @@ impl Wizard {
                 let delta = motion[0] as i32 + 10 * motion[1] as i32;
                 self.setup[i].percent = (i32::from(self.setup[i].percent) + delta).clamp(0, 300) as u16;
             }
-            Page::Where | Page::Preview => {}
+            Page::Ask | Page::Where | Page::Preview => {}
         }
         Outcome::Open
     }
@@ -624,6 +747,7 @@ impl Wizard {
     /// The notice. `name`: the save's name when the wizard is opened on one.
     pub fn write_text(&self, recorded: Who, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
         let (number, title) = match self.page {
+            Page::Ask => return self.write_ask(name, out),
             Page::Where => (1, "Where"), Page::Spot => (2, "Spot"), Page::State => (3, "State"),
             Page::Percent => (4, "Percent"), Page::Preview => (5, "Preview"),
         };
@@ -644,6 +768,7 @@ impl Wizard {
                 write!(out, "{name} ")?;
             }
             match self.page {
+                Page::Ask => {}
                 Page::Where | Page::Spot | Page::Preview => {
                     let place = if self.on_ledge(who.index()) { "Ledge" }
                         else if fighter.place == Place::OnStage { "On stage" } else { "Off stage" };
@@ -658,6 +783,7 @@ impl Wizard {
             writeln!(out)?;
         }
         match self.page {
+            Page::Ask => Ok(()),
             Page::Where => write!(out, "L / R fighter · ← → on / off stage · A next\n{reset} · {plus} · B cancel"),
             Page::Spot if save => write!(out, "Stick or D-pad move · L / R fighter · A next\n{reset} · Y on / off stage · {plus} · B back"),
             Page::Spot => write!(out, "Stick or D-pad move · L / R fighter · A next\n{reset} · Y on / off stage · B back · {plus}"),
@@ -669,6 +795,19 @@ impl Wizard {
             Page::Percent => write!(out, "L / R fighter · ← → 1 · ↑ ↓ 10 · A next · B back · {reset} · {plus}"),
             Page::Preview => write!(out, "A / {plus} · B back"),
         }
+    }
+
+    /// The question before the pages: two choices and B.
+    fn write_ask(&self, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
+        let Shared { macros, from_macro } = self.shared.unwrap_or(Shared { macros: 0, from_macro: false });
+        let mark = |chosen: bool| if chosen { ">" } else { " " };
+        if macros == 1 {
+            writeln!(out, "{name} · 1 macro starts here\n{} Change it for its macro", mark(!self.copy))?;
+        } else {
+            writeln!(out, "{name} · {macros} macros start here\n{} Change it for all {macros} macros", mark(!self.copy))?;
+        }
+        let copy = if from_macro { "Copy it for this macro" } else { "Copy it to a new save" };
+        write!(out, "{} {copy}\n↑ ↓ choose · A next · B cancel", mark(self.copy))
     }
 
     pub fn plans(&self) -> [Plan; 2] {
@@ -1957,6 +2096,323 @@ mod tests {
             assert!(page.contains("+ start") && !page.contains("save"), "{page}");
             wizard_press(&mut record, A);
         }
+    }
+
+    #[test]
+    fn b_puts_back_only_the_body_the_picker_took() {
+        assert_eq!(release(Leave::Cancel, true, false), Release::PutBack);
+        // A body that is no longer the one the picker took is not written, woken or moved, however it is left.
+        for leave in [Leave::Cancel, Leave::Other] {
+            for loading in [false, true] {
+                assert_eq!(release(leave, false, loading), Release::Nothing);
+            }
+        }
+    }
+
+    #[test]
+    fn a_competing_load_ends_the_picker_without_a_put_back() {
+        // A loading save places the fighters itself: the held body is only woken, B or not.
+        assert_eq!(release(Leave::Cancel, true, true), Release::Wake);
+        for loading in [false, true] {
+            assert_eq!(release(Leave::Other, true, loading), Release::Wake);
+        }
+        let place = include_str!("../runtime/features/record_place.rs");
+        let target = place.split("pub(super) fn load_target(").nth(1).unwrap().split("pub(super) fn load_cancelled()").next().unwrap();
+        assert!(target.contains("leave(&mut engine, Leave::Other)"));
+    }
+
+    #[test]
+    fn a_late_completion_for_a_dropped_ticket_is_discarded() {
+        assert!(accepts(Some(4), 4));
+        // The picker was left (no ticket waits), or another visit waits: the finished save is not this picker's.
+        assert!(!accepts(None, 4));
+        assert!(!accepts(Some(5), 4));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(commit.find("record_place::waiting(").unwrap() < commit.find("request_named_load(").unwrap());
+    }
+
+    #[test]
+    fn a_failed_save_puts_the_same_bodies_back_and_says_so() {
+        let mut text = String::new();
+        write_not_saved("Jab start", &mut text).unwrap();
+        assert_eq!(text, "Not saved · Jab start could not be written");
+        let place = include_str!("../runtime/features/record_place.rs");
+        let failed = place.split("FAILED.swap(").nth(1).unwrap().split("leave(").nth(1).unwrap();
+        assert!(failed.starts_with("&mut engine, Leave::Cancel)"));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(commit.contains("record_place::save_failed(") && commit.contains("// restriction: place-save-write"));
+    }
+
+    #[test]
+    fn both_fighters_stand_at_their_spots_while_placing() {
+        use crate::model::btt;
+        use crate::model::chords::logical::A;
+        // Each fighter's own body is at its spot, so neither gets a mark; the crosshair is the picker's and stays.
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        let marks = w.marks([true, true]);
+        assert_eq!((marks.looks[0], marks.looks[1]), (None, None));
+        assert_eq!(marks.looks[btt::LOOKS - 1], Some(w.cross.look()));
+        let place = include_str!("../runtime/features/record_place.rs");
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        assert!(frame.contains("placement::hold_at(&mut holds[who.index()]"));
+        let look = place.split("pub fn look(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(look.contains("wizard.marks(held)"));
+    }
+
+    #[test]
+    fn an_off_stage_fighter_is_held_at_the_crosshair() {
+        use crate::model::btt::Pad;
+        use crate::model::chords::logical::{A, L};
+        use crate::model::crosshair::{hold_step, Origin, PreviewAct, PREVIEW_SETTLE};
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        w.step(&button(L), Some, floors);
+        for _ in 0..4 { w.step(&Pad { stick: [-1.0, 1.0], ..Pad::default() }, Some, floors); }
+        assert_eq!((w.setup[1].place, w.setup[1].at, w.cursor()), (Place::OffStage, [-88.0, -3.0], [-88.0, -3.0]));
+        // The body is lifted there, then held asleep: the shared hold of the Guard the Edge and Juggler pickers.
+        let mut slot = None;
+        let origin = || Origin { at: [9.0, 0.0], grounded: true, facing: 1.0 };
+        let acts: Vec<_> = (0..PREVIEW_SETTLE + 1).map(|_| hold_step(&mut slot, 3, w.setup[1].place == Place::OnStage, origin)).collect();
+        assert_eq!(acts.last(), Some(&PreviewAct::Hold));
+        assert_eq!(hold_step(&mut slot, 3, w.setup[0].place == Place::OnStage, origin), PreviewAct::Stand);
+    }
+
+    #[test]
+    fn the_dotted_pointer_is_not_drawn_while_either_fighter_stands_at_its_point() {
+        use crate::model::chords::logical::{A, L};
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        w.step(&button(L), Some, floors);
+        assert_eq!(w.marks([true, true]).pointer, Some([-80.0, -11.0]));
+        // Held, the game shows the body or its own magnifier of it: the border pointer is left out.
+        assert_eq!(w.marks([true, true]).shown(true).pointer, None);
+        let place = include_str!("../runtime/features/record_place.rs");
+        let look = place.split("pub fn look(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(look.contains(".shown(held[wizard.edit.index()] && published::hud())"));
+    }
+
+    #[test]
+    fn off_stage_reaches_one_unit_inside_the_blast_line() {
+        let camera = [-150.0, 150.0, 120.0, -40.0];
+        let blast = [-240.0, 240.0, 190.0, -140.0];
+        assert_eq!(reach(Place::OnStage, camera, Some(blast)), camera);
+        assert_eq!(reach(Place::OffStage, camera, Some(blast)), [-239.0, 239.0, 189.0, -139.0]);
+        assert_eq!(reach(Place::OffStage, camera, None), camera);
+    }
+
+    #[test]
+    fn leaving_change_placement_puts_both_fighters_back() {
+        let place = include_str!("../runtime/features/record_place.rs");
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        let closed = frame.split("Outcome::Closed => {").nth(1).unwrap().split("Outcome::Start").next().unwrap();
+        assert!(closed.contains("leave(&mut engine, Leave::Cancel)"));
+        let leave = place.split("unsafe fn leave(").nth(1).unwrap().split("unsafe fn end(").next().unwrap();
+        assert!(leave.contains("record_place::release(") && leave.contains("states::is_loading()"));
+        assert!(leave.contains("placement::restore(") && leave.contains("natives::battle_object_id("));
+    }
+
+    #[test]
+    fn guard_juggler_and_placement_hold_through_one_preview_path() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let preview = placement.split("pub(super) unsafe fn preview(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(preview.contains("hold_at(slot, body, id, at, false)"));
+        assert_eq!(placement.matches("crosshair::hold_step(").count(), 1);
+        assert!(include_str!("../runtime/features/edge_juggle.rs").contains("placement::preview("));
+        assert!(include_str!("../runtime/features/record_place.rs").contains("placement::hold_at("));
+    }
+
+    #[test]
+    fn the_pickers_share_one_floor_read() {
+        let place = include_str!("../runtime/features/record_place.rs");
+        let tech = include_str!("../runtime/features/tech.rs");
+        assert!(place.contains("placement::floor_under("));
+        assert!(include_str!("../runtime/features/edge_juggle.rs").contains("placement::floor_under("));
+        // The traced floors are Tech practice's surface walk, stepped by one function for both.
+        assert!(tech.contains("discovery.step(") && place.contains("discovery.step("));
+        assert!(!tech.contains("PlatformScan::new(") && !place.contains("PlatformScan::new("));
+        assert!(!place.contains("Bootstrap::new("));
+        // A floor list is given to the picker only when the walk and its platform scan are both done.
+        let floors = place.split("fn traced_floors(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(floors.contains("Found::Done") && floors.contains("Some(Kind::Floor)"));
+    }
+
+    #[test]
+    fn change_placement_runs_wherever_practice_is_live() {
+        let place = include_str!("../runtime/features/record_place.rs");
+        assert!(!place.contains("is_native_training") && !place.contains("lobby_active"));
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        let open = frame.split("OPEN.swap(false").nth(1).unwrap();
+        assert!(open.contains("scene::current().is_some()") && open.contains("take_open("));
+    }
+
+    #[test]
+    fn a_shared_start_save_asks_change_or_copy() {
+        use crate::model::chords::logical::{A, B, DPAD_DOWN, DPAD_UP, PLUS, X};
+        let shared = Shared { macros: 2, from_macro: true };
+        let mut w = save_wizard().sharing(shared, SharedStart::Prompt);
+        assert_eq!((w.page, w.copies()), (Page::Ask, false));
+        assert_eq!(text(&w, "Jab start"),
+            "Jab start · 2 macros start here\n> Change it for all 2 macros\n  Copy it for this macro\n↑ ↓ choose · A next · B cancel");
+        // Two choices and B: + does not save from the question, and no other key acts on it.
+        for key in [PLUS, X] {
+            assert_eq!(wizard_press(&mut w, key), Outcome::Open);
+            assert_eq!((w.page, w.copies(), w.setup), (Page::Ask, false, saved()));
+        }
+        wizard_press(&mut w, DPAD_DOWN);
+        assert!(w.copies());
+        assert!(text(&w, "Jab start").contains("\n  Change it for all 2 macros\n> Copy it for this macro\n"));
+        wizard_press(&mut w, DPAD_UP);
+        assert!(!w.copies());
+        wizard_press(&mut w, DPAD_DOWN);
+        assert_eq!(wizard_press(&mut w, A), Outcome::Open);
+        assert_eq!((w.page, w.copies()), (Page::Where, true));
+        // B on the first page cancels; the question is not asked again on the way back.
+        assert_eq!(wizard_press(&mut w, B), Outcome::Closed);
+        let mut cancelled = save_wizard().sharing(shared, SharedStart::Prompt);
+        assert_eq!(wizard_press(&mut cancelled, B), Outcome::Closed);
+        // From the save's own screen a copy is a new save that no macro uses; one macro reads in the singular.
+        let own = save_wizard().sharing(Shared { macros: 1, from_macro: false }, SharedStart::Prompt);
+        assert_eq!(text(&own, "Jab start"),
+            "Jab start · 1 macro starts here\n> Change it for its macro\n  Copy it to a new save\n↑ ↓ choose · A next · B cancel");
+        let long = save_wizard().sharing(Shared { macros: 255, from_macro: true }, SharedStart::Prompt);
+        assert!(text(&long, &"n".repeat(40)).len() <= 224);
+    }
+
+    #[test]
+    fn always_change_and_always_copy_skip_the_question() {
+        let shared = Shared { macros: 3, from_macro: true };
+        let change = save_wizard().sharing(shared, SharedStart::Change);
+        assert_eq!((change.page, change.copies()), (Page::Where, false));
+        let copy = save_wizard().sharing(shared, SharedStart::Copy);
+        assert_eq!((copy.page, copy.copies()), (Page::Where, true));
+        // A save that no macro starts from is changed, whatever the setting says.
+        for rule in [SharedStart::Prompt, SharedStart::Change, SharedStart::Copy] {
+            let alone = save_wizard().sharing(Shared { macros: 0, from_macro: false }, rule);
+            assert_eq!((alone.page, alone.copies()), (Page::Where, false));
+        }
+        assert_eq!(SharedStart::default(), SharedStart::Prompt);
+    }
+
+    /// A save's two halves, as an old file holds them: Player 1 standing, the CPU on a ledge at 6.3 %.
+    fn saved_pair() -> [SavedState; 2] {
+        let mut p1 = SavedState::never_saved();
+        (p1.x, p1.y, p1.percent, p1.lr, p1.fighter_kind, p1.saved_stage) = (-30.0, 30.0, 12.0, -1.0, 4, Some(7));
+        let mut cpu = SavedState::never_saved();
+        (cpu.x, cpu.y, cpu.percent, cpu.situation_kind, cpu.fighter_kind, cpu.saved_stage) = (-80.0, -11.0, 6.3, SITUATION_CLIFF, 9, Some(7));
+        [p1, cpu]
+    }
+
+    fn opened(pair: &[SavedState; 2]) -> Wizard {
+        let [p1, cpu] = [saved_fighter(&pair[0]), saved_fighter(&pair[1])];
+        Wizard::for_save([p1.0, cpu.0], [p1.1, cpu.1], Who::P1)
+    }
+
+    fn patched(pair: &[SavedState; 2], w: &Wizard, stage: i32) -> [SavedState; 2] {
+        let [mut p1, mut cpu] = pair.clone();
+        patch([&mut p1, &mut cpu], &w.setup, w.edits(), stage);
+        [p1, cpu]
+    }
+
+    #[test]
+    fn a_save_opens_as_the_file_holds_it() {
+        let pair = saved_pair();
+        assert_eq!(saved_fighter(&pair[0]), (Fighter { place: Place::OnStage, at: [-30.0, 30.0], state: StartState::Standard, percent: 12 }, false));
+        // A ledge save is off stage and reads Ledge; its damage shows rounded, and the file keeps its own.
+        assert_eq!(saved_fighter(&pair[1]), (Fighter { place: Place::OffStage, at: [-80.0, -11.0], state: StartState::Standard, percent: 6 }, true));
+        let mut air = pair[0].clone();
+        (air.situation_kind, air.start_state, air.percent) = (SITUATION_AIR, StartState::Tumble, 999.0);
+        assert_eq!(saved_fighter(&air), (Fighter { place: Place::OffStage, at: [-30.0, 30.0], state: StartState::Tumble, percent: 300 }, false));
+        assert!(text(&opened(&pair), "Jab start").contains("  CPU  Ledge (-80, -11)"));
+    }
+
+    #[test]
+    fn a_saved_placement_rewrites_only_the_moved_fighters_spot() {
+        use crate::model::btt::Pad;
+        use crate::model::chords::logical::{A, PLUS};
+        let pair = saved_pair();
+        let mut w = opened(&pair);
+        wizard_press(&mut w, A);
+        for _ in 0..10 { w.step(&Pad { stick: [0.0, -1.0], ..Pad::default() }, Some, floors); }
+        assert_eq!(wizard_press(&mut w, PLUS), Outcome::Start);
+        let [p1, cpu] = patched(&pair, &w, 31);
+        assert_eq!((p1.x, p1.y, p1.situation_kind, p1.saved_stage), (-30.0, 0.0, SITUATION_GROUND, Some(31)));
+        // The fighter that was not edited keeps its whole record: its ledge, its stage and its 6.3 %.
+        assert_eq!(cpu, pair[1]);
+        assert_eq!(cpu.percent.to_bits(), 6.3f32.to_bits());
+    }
+
+    #[test]
+    fn a_placement_save_keeps_every_other_field_of_the_file() {
+        use crate::model::chords::logical::{A, DPAD_RIGHT, L};
+        let pair = saved_pair();
+        let mut w = opened(&pair);
+        w.set_home(Some([0.0, 0.0]));
+        // Player 1 goes off stage; the CPU comes off its ledge onto the stage.
+        wizard_press(&mut w, DPAD_RIGHT);
+        w.step(&button(L), Some, floors);
+        w.step(&button(DPAD_RIGHT), Some, floors);
+        wizard_press(&mut w, A);
+        let [p1, cpu] = patched(&pair, &w, 31);
+        assert_eq!((p1.x, p1.y, p1.situation_kind, p1.saved_stage), (-30.0, 30.0, SITUATION_AIR, Some(31)));
+        assert_eq!((cpu.x, cpu.y, cpu.situation_kind, cpu.saved_stage), (0.0, 0.0, SITUATION_GROUND, Some(31)));
+        for (now, was) in [(p1, &pair[0]), (cpu, &pair[1])] {
+            let kept = SavedState { x: was.x, y: was.y, situation_kind: was.situation_kind, saved_stage: was.saved_stage, ..now };
+            assert_eq!(&kept, was);
+        }
+    }
+
+    #[test]
+    fn an_untouched_ledge_fighter_keeps_its_record_on_another_stage() {
+        use crate::model::chords::logical::{A, DPAD_RIGHT};
+        let pair = saved_pair();
+        // Opened on another stage, the ledge spot is shown fitted to that stage's range. That is not an edit.
+        let [p1, cpu] = [saved_fighter(&pair[0]), saved_fighter(&pair[1])];
+        let mut w = Wizard::for_save([p1.0, Fighter { at: [-60.0, -11.0], ..cpu.0 }], [p1.1, cpu.1], Who::P1);
+        assert_eq!(w.edited(), [false; 2]);
+        for _ in 0..2 { wizard_press(&mut w, A); }
+        wizard_press(&mut w, DPAD_RIGHT);
+        let [p1, cpu] = patched(&pair, &w, 31);
+        assert_eq!(cpu, pair[1]);
+        // A state edit alone writes the state and nothing else: the spot and its stage stay as saved.
+        assert_eq!(p1, SavedState { start_state: StartState::MissedTechUp, ..pair[0].clone() });
+    }
+
+    #[test]
+    fn plus_from_every_page_saves_only_what_was_edited() {
+        use crate::model::chords::logical::{A, DPAD_UP, L, PLUS};
+        let pair = saved_pair();
+        // + on every page with nothing touched, the Percent page visited: the file is unchanged, 6.3 % included.
+        let mut w = opened(&pair);
+        for _ in 0..5 {
+            assert_eq!(wizard_press(&mut w, PLUS), Outcome::Start);
+            assert_eq!(patched(&pair, &w, 31), pair);
+            wizard_press(&mut w, A);
+        }
+        // A damage edit alone writes that fighter's damage and nothing else.
+        let mut w = opened(&pair);
+        for _ in 0..3 { wizard_press(&mut w, A); }
+        assert_eq!(w.page, Page::Percent);
+        w.step(&button(L), Some, floors);
+        wizard_press(&mut w, DPAD_UP);
+        assert_eq!(wizard_press(&mut w, PLUS), Outcome::Start);
+        let [p1, cpu] = patched(&pair, &w, 31);
+        assert_eq!(p1, pair[0]);
+        assert_eq!(cpu, SavedState { percent: 16.0, ..pair[1].clone() });
+    }
+
+    #[test]
+    fn a_confirmed_placement_carries_its_ticket_and_the_answer() {
+        use crate::model::chords::logical::{A, DPAD_DOWN, DPAD_RIGHT};
+        let mut w = save_wizard().sharing(Shared { macros: 2, from_macro: true }, SharedStart::Prompt);
+        wizard_press(&mut w, DPAD_DOWN);
+        wizard_press(&mut w, A);
+        wizard_press(&mut w, DPAD_RIGHT);
+        let commit = w.commit(9, 31);
+        assert_eq!(commit, Commit { ticket: 9, copy: true, setup: w.setup, edits: w.edits(), stage: 31 });
+        assert_eq!(commit.edits[0], Edits { spot: true, ..Edits::default() });
     }
 
     #[test]
