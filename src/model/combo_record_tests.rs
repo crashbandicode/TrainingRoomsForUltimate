@@ -128,6 +128,76 @@ fn the_library_saves_lists_renames_deletes_and_selects() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+fn the_links_are_read_straight_into_the_record() {
+    let source = include_str!("combo_record.rs");
+    let body = source.split_once("fn from_value(").unwrap().1.split_once("\nfn recorded_fighter(").unwrap().0;
+    assert!(body.contains("combo.push(link)"));
+    assert!(!body.contains("from_links("));
+    assert!(!body.contains("collect::<"));
+}
+
+fn a_combo_file_keeps_its_load_rules() {
+    let template = record("Rules").to_value()["links"][0].clone();
+    let links: Vec<_> = (0_i32..16).map(|n| {
+        let mut link = template.clone();
+        link["window"] = json!([n, n + 1]);
+        link
+    }).collect();
+    let combo_file = json!({"schema_version": 1, "name": "Rules", "links": links});
+    let loaded: ComboRecord = serde_json::from_value(combo_file.clone()).unwrap();
+    assert_eq!(loaded.combo.len(), 16);
+    assert_eq!(loaded.combo.links().map(|link| link.window).collect::<Vec<_>>(),
+        (0_i32..16).map(|n| Some((n, n + 1))).collect::<Vec<_>>());
+    let round_trip: ComboRecord = serde_json::from_value(serde_json::to_value(&loaded).unwrap()).unwrap();
+    assert_eq!(round_trip, loaded);
+
+    let error = |value: Value| serde_json::from_value::<ComboRecord>(value).unwrap_err().to_string();
+    let mut invalid = combo_file.clone();
+    invalid["links"] = json!([]);
+    assert!(error(invalid).contains("bad combo field: links"));
+    let mut invalid = combo_file.clone();
+    invalid["links"] = json!(vec![template.clone(); 17]);
+    assert!(error(invalid.clone()).contains("bad combo field: links"));
+    invalid["links"][0]["to"] = json!("not-a-move");
+    assert!(error(invalid).contains("bad combo field: links"));
+    for index in [0, 15] {
+        let mut invalid = combo_file.clone();
+        invalid["links"][index]["to"] = json!("not-a-move");
+        assert!(error(invalid).contains("bad combo field: to"));
+    }
+
+    let press = |button: &str, offset: i32| json!({"kind": "press", "button": button, "dir": "neutral", "offset": offset});
+    let drill = json!({
+        "schema_version": 2, "kind": "input_drill", "name": "Rules drill",
+        "input_steps": [
+            {"events": [press("attack", 0), press("special", 5)]},
+            {"events": [press("jump", 7)]}
+        ]
+    });
+    let mut invalid = drill.clone();
+    invalid["input_steps"] = json!([]);
+    assert!(error(invalid).contains("bad combo field: input_steps"));
+    let mut invalid = drill.clone();
+    invalid["input_steps"][0]["events"] = json!([]);
+    assert!(error(invalid).contains("bad combo field: events"));
+    let mut invalid = drill.clone();
+    invalid["input_steps"][0]["events"] = json!(vec![press("attack", 0); 13]);
+    assert!(error(invalid).contains("bad combo field: events"));
+    let mut invalid = drill.clone();
+    invalid["input_steps"][1]["events"][0]["offset"] = json!(4);
+    assert!(error(invalid).contains("bad combo field: offset"));
+    let mut invalid = drill.clone();
+    invalid["input_steps"][0]["events"][0]["offset"] = json!(1);
+    assert!(error(invalid).contains("bad combo field: offset"));
+    let loaded: ComboRecord = serde_json::from_value(drill).unwrap();
+    assert!(loaded.combo.input_only);
+    assert_eq!(loaded.combo.len(), 2);
+    assert_eq!(loaded.combo.get(0).unwrap().events().map(|event| event.offset).collect::<Vec<_>>(), [0, 5]);
+    assert_eq!(loaded.combo.get(1).unwrap().events().map(|event| event.offset).collect::<Vec<_>>(), [7]);
+    let round_trip: ComboRecord = serde_json::from_value(serde_json::to_value(&loaded).unwrap()).unwrap();
+    assert_eq!(round_trip, loaded);
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -137,6 +207,8 @@ fn case_table() {
         ("a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop", a_drills_take_is_kept_by_a_rename_and_dropped_by_a_crop as fn()),
         ("a_links_spot_is_saved_and_an_older_file_reads_as_none", a_links_spot_is_saved_and_an_older_file_reads_as_none as fn()),
         ("the_library_saves_lists_renames_deletes_and_selects", the_library_saves_lists_renames_deletes_and_selects as fn()),
+        ("the_links_are_read_straight_into_the_record", the_links_are_read_straight_into_the_record as fn()),
+        ("a_combo_file_keeps_its_load_rules", a_combo_file_keeps_its_load_rules as fn()),
     ]);
 }
 }

@@ -348,20 +348,21 @@ impl ComboRecord {
         let key = if input { "input_steps" } else { "links" };
         let links = object.get(key).and_then(Value::as_array).ok_or(key)?;
         if links.is_empty() || links.len() > LINKS { return Err(key); }
+        let mut record = ComboRecord {
+            name,
+            combo: Combo::EMPTY,
+            recorded_on,
+            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
+            made_from,
+            take,
+            source: None,
+        };
+        let combo = &mut record.combo;
         let mut previous = 0;
-        let mut combo = Combo::from_links(links.iter().map(|value| {
-            if !input { return link_of(value, aims); }
-            let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
-            if events.is_empty() || events.len() > STEPS { return Err("events"); }
-            let mut link = LinkRec::INPUT;
-            for (slot, event) in link.events.iter_mut().zip(events) {
-                let event = parse_event(event.as_object().ok_or("event")?, aims)?;
-                if event.offset < previous { return Err("offset"); }
-                previous = event.offset;
-                *slot = Some(event);
-            }
-            Ok(link)
-        }).collect::<Result<Vec<_>,_>>()?).ok_or(key)?;
+        for value in links {
+            let link = if input { input_step(value, aims, &mut previous)? } else { link_of(value, aims)? };
+            if !combo.push(link) { return Err(key); }
+        }
         combo.input_only = input;
         if input && combo.get(0).unwrap().events().next().unwrap().offset != 0 { return Err("offset"); }
         if input {
@@ -379,15 +380,8 @@ impl ComboRecord {
             }
             combo.join_split_steps();
         }
-        Ok(ComboRecord {
-            name,
-            combo,
-            recorded_on,
-            fighter: object.get("recorded_fighter").and_then(recorded_fighter),
-            made_from,
-            take,
-            source: Some(object.clone()),
-        })
+        record.source = Some(object.clone());
+        Ok(record)
     }
 }
 
@@ -410,6 +404,20 @@ fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static s
         .get(key)
         .and_then(int_value)
         .ok_or(key)
+}
+
+/// One input drill step: its events in file order. `previous` carries the last offset across steps.
+fn input_step(value: &Value, aims: bool, previous: &mut i32) -> Result<LinkRec, &'static str> {
+    let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
+    if events.is_empty() || events.len() > STEPS { return Err("events"); }
+    let mut link = LinkRec::INPUT;
+    for (slot, event) in link.events.iter_mut().zip(events) {
+        let event = parse_event(event.as_object().ok_or("event")?, aims)?;
+        if event.offset < *previous { return Err("offset"); }
+        *previous = event.offset;
+        *slot = Some(event);
+    }
+    Ok(link)
 }
 
 fn link_of(value: &Value, aims: bool) -> Result<LinkRec, &'static str> {
