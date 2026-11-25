@@ -766,6 +766,7 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
 fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
     let (x, y) = (f32::from(end.0), f32::from(end.1));
     action::Travel {
+        entry: action::Entry::UNKNOWN,
         stick: Some(stick),
         heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
         distance: (x.hypot(y) * 10.0).round() as u16,
@@ -874,16 +875,16 @@ fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
     }
 }
 
-/// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
+/// The travel table's static cost: an entry is packed into 30 bytes, so the table adds 120 bytes to a combo, which
 /// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
 /// more code than the data it saved (`833913b3`), so every combo carries the table.
 #[test]
-fn the_travel_table_is_packed_into_96_bytes_a_combo() {
+fn the_travel_table_is_packed_into_120_bytes_a_combo() {
     use core::mem::size_of;
     let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
     println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
         size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
-    assert_eq!((entry, DETAILS * entry), (24, 96), "a travel detail and a combo's table");
+    assert_eq!((entry, DETAILS * entry), (30, 120), "a travel detail and a combo's table");
     assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
 }
 
@@ -1083,6 +1084,357 @@ fn a_later_links_first_move_borrows_its_travel_arrows() {
     assert_eq!(core::mem::size_of::<LinkRec>(), 124);
     let read: ComboRecord = serde_json::from_value(serde_json::to_value(&record).unwrap()).unwrap();
     assert_eq!(read, record);
+}
+
+/// Mario's up special as the early install-4 smoke sampled it on a game (`i4-early-yoga-01`): the frame of the rise
+/// and his offset from where he stood, facing right, with the stick held up-left and with no direction. The whole
+/// rise is the special's start status. Between the samples the positions here are straight lines; the game's are not.
+const STEERED: [(f32, f32, f32); 5] =
+    [(0.0, 0.0, 0.0), (4.0, 0.40, 8.50), (13.0, 9.70, 44.89), (24.0, 15.37, 50.64), (34.0, 18.11, 47.30)];
+const STRAIGHT: [(f32, f32, f32); 5] =
+    [(0.0, 0.0, 0.0), (4.0, 1.23, 8.42), (13.0, 14.03, 43.73), (22.0, 19.46, 49.20), (33.0, 22.45, 45.78)];
+/// Frames of the special's start status.
+const RISE: u32 = 35;
+
+fn rise(samples: &[(f32, f32, f32); 5], frame: u32) -> (f32, f32) {
+    let f = frame as f32;
+    let k = samples.windows(2).position(|pair| f <= pair[1].0).unwrap_or(3);
+    let (a, b) = (samples[k], samples[k + 1]);
+    let t = ((f - a.0) / (b.0 - a.0)).min(1.0);
+    (a.1 + (b.1 - a.1) * t, a.2 + (b.2 - a.2) * t)
+}
+
+/// One cast of the special: where Mario is on each frame of the rise, and the stick held from the B release on.
+#[derive(Clone, Copy)]
+struct Cast {
+    path: fn(u32) -> (f32, f32),
+    stick: (i8, i8),
+}
+
+const UP_LEFT: (i8, i8) = (-90, 90);
+const STEERED_CAST: Cast = Cast { path: |frame| rise(&STEERED, frame), stick: UP_LEFT };
+const STRAIGHT_CAST: Cast = Cast { path: |frame| rise(&STRAIGHT, frame), stick: (0, 0) };
+
+/// One game frame of a cast, counted from the B press: B with the stick up for three frames, then the cast's stick.
+/// The start status begins on the frame after the press and lasts `RISE` frames; a fall and a landing follow.
+fn cast_frame(cast: Cast, frame: u32) -> (Sample, MappedInputs) {
+    let (lstick_x, lstick_y) = if frame < 3 { (0, 127) } else { cast.stick };
+    let inputs = MappedInputs { buttons: if frame < 3 { SPECIAL } else { 0 }, lstick_x, lstick_y, ..MappedInputs::NEUTRAL };
+    let top = (cast.path)(RISE - 1);
+    let sample = if frame == 0 {
+        Sample { pos: Some((0.0, 0.0)), ..standing() }
+    } else if frame <= RISE {
+        Sample { attack: Some(Move::UpSpecial), status: 0x1de, pos: Some((cast.path)(frame - 1)), facing: 1,
+            airborne: true, ..Sample::default() }
+    } else if frame <= RISE + 20 {
+        Sample { status: 16, pos: Some((top.0, top.1 - (frame - RISE) as f32 * 2.0)), facing: 1, airborne: true,
+            ..Sample::default() }
+    } else {
+        Sample { pos: Some((top.0, 0.0)), ..standing() }
+    };
+    (sample, inputs)
+}
+
+/// A cast recorded as a drill: the strip's tracker steps, and the take's capture reads its snap and its late
+/// decisions, as `rr_host::observe_input` does.
+fn recorded_cast(cast: Cast) -> Combo {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    for _ in 0..5 {
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..standing() }, standing(), MappedInputs::NEUTRAL);
+    }
+    for frame in 0..RISE + 40 {
+        let (sample, inputs) = cast_frame(cast, frame);
+        tracker.step(sample, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+    }
+    capture.combo
+}
+
+/// A cast flown as an attempt at a drill, through the tracker and the helper as `combo::after_strip` does.
+fn attempted_cast(reference: Combo, cast: Cast, match_stick: bool) -> Summary {
+    let mut tracker = Tracker::new();
+    let mut helper = Helper::new();
+    helper.set_target(Some(reference));
+    let settings = Settings { match_stick, ..Settings::factory() };
+    for _ in 0..5 {
+        tracker.step(Sample { pos: Some((0.0, 0.0)), ..standing() }, standing(), MappedInputs::NEUTRAL);
+        let _out = helper.step(&tracker, settings);
+    }
+    for frame in 0..RISE + 40 {
+        let (sample, inputs) = cast_frame(cast, frame);
+        tracker.step(sample, standing(), inputs);
+        let _out = helper.step(&tracker, settings);
+    }
+    let result = *helper.results().next().expect("the drill resolved");
+    result
+}
+
+fn why(result: &Summary) -> String {
+    String::from_utf16(crate::model::combo_plan::reason_text(result).units()).unwrap()
+}
+
+/// EXPECTED RED. Flown on the early install-4 smoke: Mario's up special recorded with the stick up-left saved no
+/// direction, and a replay with no direction graded clean. The special's own travel belongs to its press: the stick
+/// most held while it travelled is compared 8-way, when the two paths also differ by more than the floor.
+#[test]
+fn a_steered_special_must_be_steered() {
+    let steered = recorded_cast(STEERED_CAST);
+    assert_eq!(steered.len(), 1, "set-up: one step, B and its release");
+    assert!(!steered.has_aim(), "rule D: a special going its own way has no aim event");
+    let straight = attempted_cast(steered, STRAIGHT_CAST, false);
+    assert!(!straight.clean, "a drill recorded steering up-left does not pass with no steering");
+    assert_eq!(why(&straight), "L1 Special steer wrong");
+    assert!(attempted_cast(steered, STEERED_CAST, false).clean, "the same steer is clean");
+    let reverse = attempted_cast(recorded_cast(STRAIGHT_CAST), STEERED_CAST, false);
+    assert_eq!(why(&reverse), "L1 Special steer wrong", "a straight drill does not pass with a steer either");
+}
+
+/// GUARD, green today. A special whose travel ignores the stick cannot fault on the stick: the paths are equal.
+#[test]
+fn a_special_that_ignores_the_stick_cannot_fault() {
+    let ignoring = Cast { stick: UP_LEFT, ..STRAIGHT_CAST };
+    let drill = recorded_cast(ignoring);
+    for match_stick in [false, true] {
+        assert!(attempted_cast(drill, STRAIGHT_CAST, match_stick).clean);
+        assert!(attempted_cast(drill, Cast { stick: (45, 45), ..STRAIGHT_CAST }, match_stick).clean);
+    }
+}
+
+/// EXPECTED RED. A steer far from the saved one fails on its path, as an aimed part does, whatever the stick was.
+#[test]
+fn a_wide_steer_fails_on_its_path() {
+    let wide = Cast { path: |frame| { let (x, y) = rise(&STRAIGHT, frame); (-x, y) }, stick: UP_LEFT };
+    let result = attempted_cast(recorded_cast(wide), Cast { stick: UP_LEFT, ..STRAIGHT_CAST }, false);
+    assert!(!result.clean);
+    assert_eq!(why(&result), "L1 Special path off");
+}
+
+/// GUARD, green today. Momentum carried into the special moves the path a little; inside the floor the stick held
+/// is not compared, so it is no fault.
+#[test]
+fn carried_momentum_inside_the_floor_is_not_a_steer_fault() {
+    let carried = Cast {
+        path: |frame| { let (x, y) = rise(&STRAIGHT, frame); (x + 0.6 * frame as f32 / 34.0, y) },
+        stick: UP_LEFT,
+    };
+    assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, false).clean);
+    assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, true).clean);
+}
+
+/// Use five airborne approach frames, so entry velocity is observed before the move and is not inferred from
+/// its kick or rise. The fixed diagonal trajectory models Wizard's Foot; the rise uses the Mario fixture above.
+fn airborne_cast(target: Option<Combo>, kick: bool, cast: Cast, speed: (f32, f32), toggle: bool) -> (Combo, Option<Summary>) {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    let mut helper = Helper::new();
+    helper.set_target(target);
+    let mut result = None;
+    for f in -5..75 {
+        let (mut p, mut inputs) = if f < 0 { (standing(), MappedInputs::NEUTRAL) } else { cast_frame(cast, f as u32) };
+        if kick {
+            if p.attack.is_some() { p.attack = Some(Move::DownSpecial); p.status = 0x1df; }
+            if (0..3).contains(&f) { inputs.lstick_y = -60; } // Down B, short of a separate fast-fall edge.
+        }
+        let (x, y) = if kick { let n = (f - 1).clamp(0, 34) as f32; (n, -n) } else { p.pos.unwrap_or_default() };
+        p.pos = Some((x + f as f32 * speed.0, 100.0 + y + f as f32 * speed.1));
+        p.airborne = true;
+        tracker.step(p, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        if target.is_some() {
+            let out = helper.step(&tracker, Settings { match_stick: toggle, ..Settings::factory() });
+            if out.resolved.is_some() { result = out.resolved; }
+        }
+    }
+    (capture.combo, result)
+}
+
+#[test]
+fn entry_motion_does_not_turn_an_airborne_fixed_kick_into_a_steer() {
+    let saved = airborne_cast(None, true, STRAIGHT_CAST, (0.25, 0.0), false).0;
+    let held = Cast { stick: UP_LEFT, ..STRAIGHT_CAST };
+    for speed in [(0.375, 0.0), (0.25, -0.125)] {
+        for toggle in [false, true] {
+            let (actual, result) = airborne_cast(Some(saved), true, held, speed, toggle);
+            let endpoint = |combo: Combo| combo.travel(0, 0).unwrap().path[7];
+            let ((x, y), (a, b)) = (endpoint(saved), endpoint(actual));
+            assert!(f32::from(x - a).hypot(f32::from(y - b)) > 2.0);
+            assert!(result.unwrap().clean, "fixed kick: {speed:?}, {toggle}, {result:?}");
+        }
+    }
+}
+
+#[test]
+fn entry_motion_on_a_steer_must_match_to_judge_the_stick() {
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, 0.0), false).0;
+    for toggle in [false, true] {
+        let run = |vx| airborne_cast(Some(saved), false, STRAIGHT_CAST, (vx, 0.0), toggle).1.unwrap();
+        assert_eq!(run(0.25).fault, Some((0, Reason::Steer)), "matching entry still grades the steer");
+        assert_eq!(run(0.3125).fault, Some((0, Reason::Steer)), "at the inclusive velocity tolerance");
+        assert!(run(0.31640625).clean, "one recorded velocity unit past the tolerance");
+        assert!(run(0.375).clean, "different entry cannot establish a steering error");
+    }
+}
+
+#[test]
+fn entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick() {
+    use crate::model::combo_record::ComboRecord;
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, -0.125), false).0;
+    let record = ComboRecord::new("Air".into(), saved, None);
+    let mut value = serde_json::to_value(&record).unwrap();
+    let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    let run = |target| airborne_cast(Some(target), false, STRAIGHT_CAST, (0.25, -0.125), true).1.unwrap();
+    assert_eq!(run(read.combo).fault, Some((0, Reason::Steer)));
+    let mut falling = value.clone();
+    let press = &mut falling["input_steps"][0]["events"][0];
+    press["entry_y"] = serde_json::json!(-0.25);
+    assert!(run(serde_json::from_value::<ComboRecord>(falling.clone()).unwrap().combo).clean);
+    falling["input_steps"][0]["events"][0]["entry_change"] = serde_json::json!(0.125);
+    let accelerated: ComboRecord = serde_json::from_value(falling).unwrap();
+    assert_eq!(accelerated.combo.travel(0, 0).unwrap().entry.change(), 0.125);
+    assert_eq!(run(accelerated.combo).fault, Some((0, Reason::Steer)));
+    let press = value["input_steps"][0]["events"][0].as_object_mut().unwrap();
+    assert_eq!(press.remove("entry_x"), Some(serde_json::json!(0.25)));
+    assert_eq!(press.remove("entry_y"), Some(serde_json::json!(-0.125)));
+    for (x, y) in [(serde_json::json!(0), None), (serde_json::json!(false), Some(0)), (serde_json::json!(128), Some(0))] {
+        let mut bad = value.clone();
+        let press = &mut bad["input_steps"][0]["events"][0];
+        press["entry_x"] = x;
+        if let Some(y) = y { press["entry_y"] = serde_json::json!(y); }
+        assert!(serde_json::from_value::<ComboRecord>(bad).is_err());
+    }
+    let legacy: ComboRecord = serde_json::from_value(value).unwrap();
+    assert!(legacy.combo.travel(0, 0).is_some());
+    assert!(run(legacy.combo).clean);
+}
+
+/// EXPECTED RED. What the press keeps: the path of the special's own travel and the stick most held during it. A
+/// special that does not move keeps nothing.
+#[test]
+fn a_specials_own_travel_is_kept_on_its_press() {
+    let steered = recorded_cast(STEERED_CAST);
+    let kept = steered.travel(0, 0).expect("the travel is on the B press");
+    assert_eq!(kept.stick, Some((1350, 100)), "up-left was held for all but the first three frames");
+    assert_eq!(kept.path[7], (18, 47), "where the rise ended, forward and up");
+    assert!((680..=700).contains(&kept.heading) && (500..=512).contains(&kept.distance), "{kept:?}");
+    assert_eq!(recorded_cast(STRAIGHT_CAST).travel(0, 0).and_then(|kept| kept.stick), Some((0, 0)), "no direction held");
+    let still = Cast { path: |_| (0.0, 0.0), stick: UP_LEFT };
+    assert_eq!(recorded_cast(still).travel(0, 0), None, "a special that does not move has no path");
+}
+
+/// EXPECTED RED. With *Match angle and deflection* On the press's stick is graded as an aim's is, when the paths
+/// differ by more than the floor: half a tilt in the same direction reads the deflection.
+#[test]
+fn the_stick_toggle_also_grades_a_steered_specials_stick() {
+    let drill = recorded_cast(STEERED_CAST);
+    let half = Cast { stick: (-45, 45), ..STRAIGHT_CAST };
+    assert!(attempted_cast(drill, half, false).clean, "the same 8-way direction, toggle Off");
+    let result = attempted_cast(drill, half, true);
+    assert!(!result.clean);
+    assert_eq!(why(&result), "L1 Special deflection 47% low");
+}
+
+/// EXPECTED RED. The press's travel is written in the same optional keys as an aim's, and the drill stays version 2.
+#[test]
+fn a_press_keeps_its_own_travel_in_optional_keys() {
+    use crate::model::combo_record::ComboRecord;
+    let record = ComboRecord::new("Drill".into(), recorded_cast(STEERED_CAST), None);
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["schema_version"], 2);
+    let press = &value["input_steps"][0]["events"][0];
+    assert_eq!((press["kind"].as_str(), press["button"].as_str()), (Some("press"), Some("special")));
+    assert_eq!(press["path"].as_array().map(Vec::len), Some(8), "{press}");
+    assert_eq!(press["stick"], serde_json::json!({"angle": 135.0, "deflection": 100}));
+    assert!(press["heading"].is_number() && press["distance"].is_number());
+    let read: ComboRecord = serde_json::from_value(value).unwrap();
+    assert_eq!(read, record);
+    assert_eq!(read.combo.travel(0, 0), record.combo.travel(0, 0));
+}
+
+/// EXPECTED RED. The four details of a drill are shared. An aim's detail takes the place of a press's path when the
+/// table is full; a press's path never takes an aim's.
+#[test]
+fn an_aims_detail_is_not_displaced_by_a_press_path() {
+    let path = travel((-40, 0), (1800, 100));
+    let detail = travel((-30, 0), (1800, 100));
+    let mut combo = Combo::EMPTY;
+    combo.input_only = true;
+    for i in 0..5 {
+        assert!(combo.push(LinkRec { events: retain([
+            Event { kind: Kind::Press(Button::Special), dir: Dir::Up, offset: i * 40 },
+            Event { kind: Kind::Aim(1), dir: Dir::Back, offset: i * 40 + 10 },
+        ]), ..LinkRec::INPUT }));
+    }
+    for i in 0..4 { assert!(combo.attach_travel(i, 0, path)); }
+    assert!(!combo.attach_travel(4, 0, path), "a fifth press path is dropped");
+    assert!(combo.attach_travel(0, 1, detail), "an aim's detail takes the place of the last press path");
+    assert_eq!((combo.travel(0, 1), combo.travel(3, 0), combo.travel(2, 0)), (Some(detail), None, Some(path)));
+    for i in 1..4 { assert!(combo.attach_travel(i, 1, detail)); }
+    for i in 0..4 { assert_eq!((combo.travel(i, 1), combo.travel(i, 0)), (Some(detail), None)); }
+    assert!(!combo.attach_travel(4, 1, detail), "a fifth aim detail is dropped");
+    assert!(!combo.attach_travel(4, 0, path), "a press path does not displace an aim's detail");
+}
+
+/// Edge: the travel ends on the very next frame after its step was graded. The grade is amended on that frame.
+#[test]
+fn a_travel_that_ends_the_frame_after_its_step_was_graded_amends_the_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false), (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 5).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1, "step 1 is graded before its travel ends");
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 5 {
+                let result = helper.results().next().map(|r| (r.outcome, r.clean, r.fault));
+                assert_eq!(result, (!clean).then_some((Outcome::Completed, false, Some((0, Reason::AimPath(1))))));
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+/// Edge: *Match angle and deflection* flipped while a drill is being attempted. A step keeps the grade it got under
+/// the setting in force when it was graded; a travel that ends later is graded under the setting in force then.
+#[test]
+fn the_stick_toggle_flipped_mid_drill_applies_from_the_next_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    let off_angle = travel((-40, 0), (1600, 100));
+    // The frame the travel is handed over, the frame the toggle flips, whether it is On before the flip, the result.
+    for (handed, flips, first, clean) in [
+        (4, 5, false, true),
+        (4, 5, true, false),
+        (9, 6, false, false),
+        (9, 6, true, true),
+    ] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        let mut resolved = None;
+        for frame in 0..=44 {
+            helper.settings = Settings { match_stick: first != (frame >= flips), ..Settings::factory() };
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == handed).then_some((1, off_angle)), ..action::Late::NONE
+            }), &mut Out::default());
+            if resolved.is_none() {
+                resolved = helper.results().next().copied();
+            }
+        }
+        let result = resolved.expect("the drill resolved");
+        assert_eq!(result.clean, clean, "handed {handed}, flips {flips}, On first {first}");
+        if !clean {
+            assert_eq!(result.fault, Some((0, Reason::AimAngle(1, -200))));
+        }
+    }
 }
 
 }
