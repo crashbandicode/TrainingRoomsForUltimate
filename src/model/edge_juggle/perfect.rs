@@ -98,25 +98,6 @@ impl Default for Outline {
     }
 }
 
-/// Endpoints of the current connected solid floor, including its slope.
-pub fn floor_ledges(floors: impl IntoIterator<Item = Segment>) -> Option<[Point; 2]> {
-    let mut points = floors.into_iter().flatten();
-    let first = points.next()?;
-    let [mut left, mut right] = [first; 2];
-    for point in std::iter::once(first).chain(points) {
-        if !point.into_iter().all(f32::is_finite) {
-            return None;
-        }
-        if point[0] < left[0] {
-            left = point;
-        }
-        if point[0] > right[0] {
-            right = point;
-        }
-    }
-    (left[0] < right[0]).then_some([left, right])
-}
-
 /// Seed the solid outline walk at the stage center through the full blast zone.
 pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> {
     let [cam_left, cam_right, _, _] = camera;
@@ -1357,19 +1338,6 @@ mod tests {
             assert!(plans.iter().flatten().all(|plan| plan.route != Route::Opposite),
                 "stage {stage} requires a measured fighter route as well as geometry");
         }
-    }
-
-    #[test]
-    fn moving_stage_ledges_come_from_the_current_solid_floor() {
-        let tilted = [
-            [[-32.0, 1.0], [-80.0, -18.0]],
-            [[-32.0, 1.0], [32.0, 5.0]],
-            [[80.0, -2.0], [32.0, 5.0]],
-        ];
-        assert_eq!(floor_ledges(tilted), Some([[-80.0, -18.0], [80.0, -2.0]]));
-        assert_eq!(floor_ledges([]), None);
-        assert_eq!(floor_ledges([[[0.0, 0.0], [0.0, 2.0]]]), None);
-        assert_eq!(floor_ledges([[[f32::NAN, 0.0], [2.0, 2.0]]]), None);
     }
 
     #[test]
