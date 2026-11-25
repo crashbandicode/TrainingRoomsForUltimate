@@ -1251,3 +1251,7 @@ mod tests;
 #[cfg(test)]
 #[path = "action_moves_tests.rs"]
 mod action_moves_tests;
+
+#[cfg(test)]
+#[path = "action_edge_tests.rs"]
+mod action_edge_tests;

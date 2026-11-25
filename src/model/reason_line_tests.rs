@@ -10,9 +10,10 @@ use crate::model::panes::{cb::CHIPS, iv::FONT_SUB, strip_layout::C};
 
 const BUTTONS: [Button; 5] = [Button::Attack, Button::Special, Button::Jump, Button::Shield, Button::Grab];
 const FLICKS: [Flick; 3] = [Flick::FastFall, Flick::Dash, Flick::TapJump];
-const MOVES: [Move; 14] = [
+const MOVES: [Move; 20] = [
     Move::Jab, Move::DashAttack, Move::SideTilt, Move::UpTilt, Move::DownTilt, Move::SideSmash, Move::UpSmash,
     Move::DownSmash, Move::Aerial, Move::NeutralSpecial, Move::SideSpecial, Move::UpSpecial, Move::DownSpecial, Move::Other,
+    Move::Grab, Move::Throw, Move::FinalSmash, Move::LedgeAttack, Move::GetupAttack, Move::TripAttack,
 ];
 const SPOTS: [Spot; 3] = [Spot::Sweet, Spot::Sour, Spot::Late];
 /// One frame, the tracker's whole ring, and the widest number an offset's type holds.
