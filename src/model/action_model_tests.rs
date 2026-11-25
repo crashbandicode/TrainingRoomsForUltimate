@@ -123,7 +123,7 @@ fn a_specials_first_aim_stays_in_its_step_however_late() {
     assert_eq!(step.events().last().map(|e| e.dir), Some(Dir::BackUp));
     let lines = crate::model::recording_menu::combo_link_lines(&drill, crate::model::move_names::Namer::OFF);
     assert_eq!(lines.len(), 2, "the list shows one step and its one event line: {lines:?}");
-    assert_eq!(lines[0], "S1 Step 1");
+    assert_eq!(lines[0], "S1 special ↑");
 }
 
 /// Pikachu's Quick Attack as flown: B with the stick up, then left, then right; the first zip's direction is known on
@@ -770,7 +770,7 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
     let value = serde_json::to_value(&record).unwrap();
     assert_eq!(value["schema_version"], 2);
     assert_eq!(value["kind"], "input_drill");
-    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF), vec!["S1 Step 1", "↑→ A · release"]);
+    assert_eq!(crate::model::recording_menu::combo_link_lines(&combo, crate::model::move_names::Namer::OFF), vec!["S1 side tilt ↑", "↑→ A · release"]);
 }
 
 fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {

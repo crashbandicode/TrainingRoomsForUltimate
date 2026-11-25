@@ -2961,3 +2961,35 @@ ceiling = 201909
 date = "2026-11-25"
 reason = "Install 4 integration, the replay editor: the crop editor as a strip over the live game, with move starts and ends, Y snap and a CPU or Player 1 preview (feat/replay-editor 42be97a3) on top of merge 7. Measured 201909 on the merged tree: the merge 7 head measures 201005 and the editor adds 904 (its own entry allows 201006 on merge 3D, which measures 200093; the pin measures 200997)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for the replay editor (201006, approved 2026-11-25 01:35:06Z) and for merge 7 (201005)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200403
+date = "2026-11-25"
+reason = "Install 4 merge 6: a drill step stores the move its press became in its own link record (no added bytes) and the bar and the menu show it instead of a step number. Measured 200403, 310 above the measured install-4 head 74f9f21e (200093)."
+approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY, re-measured after the fold)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200432
+date = "2026-11-25"
+reason = "Merge 6 review: name an aim continuation from the tracked cast even when its press is a middle title input. Measured 200432, 29 above ff1d46e2."
+approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200810
+date = "2026-11-25"
+reason = "Install 4 merge 6 folded on smoke fix 1: drill steps store and show their move (310) with the review correction for a later aim part (29). Measured 200810 on the folded tree, 339 above the measured install-4 head bdfe4213 (200471)."
+approved_by = "tr-primary-2 rulings 2026-11-24 22:47:32Z and 2026-11-25 02:07:42Z (the merge-6 ceiling at the measured value, +310) and the standing rule of 2026-11-24 21:46:20Z (a reviewer fix up to +60 lines: +29)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 202248
+date = "2026-11-25"
+reason = "Install 4 integration, merge 6: drill steps store and show their move, never Step N (feat/drill-step-moves add4ea62) on top of the replay editor merge. Measured 202248 on the merged tree: the editor merge measures 201909 and merge 6 adds 339 (its own entry: 200810 on smoke fix 1, which measures 200471)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for merge 6 (200810) and for the replay editor merge (201909)."

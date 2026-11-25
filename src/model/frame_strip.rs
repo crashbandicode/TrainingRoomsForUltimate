@@ -791,6 +791,7 @@ impl Tracker {
             let origin = self.presses().find(|p| p.frame <= frame && frame - p.frame <= INPUT_LOOKBACK).map(|p| p.frame);
             self.action.origin = origin;
             self.action.told = None;
+            self.action.told_named = None;
             self.action.variant = 0;
             self.action.variant_known = false;
             self.active_seen = false;
@@ -828,6 +829,11 @@ impl Tracker {
             self.late.open = Some((self.action.origin, side));
             self.action.told = side;
         }
+        let named = (self.action.mv, self.action.shown.of, self.action.variant);
+        if (named.0 != Move::Other || named.1.is_some()) && self.action.told_named != Some(named) {
+            self.late.named = Some((self.action.origin, named.0, named.1, named.2));
+            self.action.told_named = Some(named);
+        }
         let start = match p1.attack {
             Some(Move::NeutralSpecial) => Some(super::aim::Family::Neutral),
             Some(Move::SideSpecial) => Some(super::aim::Family::Side),
@@ -857,6 +863,13 @@ impl Tracker {
                 })
         });
         self.late.travel = self.rule.ended();
+        if let Some((press, family)) = self.rule.cast().filter(|_| seen.part > 1) {
+            self.late.press = press;
+            self.late.continuation = Some(match family {
+                super::aim::Family::Neutral => Move::NeutralSpecial, super::aim::Family::Side => Move::SideSpecial,
+                super::aim::Family::Up => Move::UpSpecial, super::aim::Family::Down => Move::DownSpecial,
+            });
+        }
         if let Some((0, _)) = self.late.travel {
             self.late.press = self.rule.own_press();
         }
