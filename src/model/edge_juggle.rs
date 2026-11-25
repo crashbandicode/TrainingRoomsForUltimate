@@ -801,8 +801,23 @@ pub enum StartRefusal {
 pub fn start_stage(
     stage: &mut impl geometry::Probe, drill: Drill, blast: [f32; 4], camera: [f32; 4], p1: [f32; 2],
 ) -> Result<(Stage, [f32; 2]), StartRefusal> {
-    let _ = (stage, drill);
-    Stage::of_run(blast, camera, [[p1[0] - 1.0, p1[1]], [p1[0] + 1.0, p1[1]]], [None; 2]).map(|stage| (stage, p1)).ok_or(StartRefusal::Unread)
+    let unread = |_: geometry::Unread| StartRefusal::Unread;
+    let run = geometry::floor_run(stage, blast, p1).map_err(unread)?.ok_or(StartRefusal::NoFloor)?;
+    let mut spots = [None; 2];
+    for (spot, ledge) in spots.iter_mut().zip(run.ledges) {
+        if let Some(ledge) = ledge {
+            *spot = geometry::default_spot(stage, blast, ledge).map_err(unread)?;
+        }
+    }
+    if drill == Drill::GuardEdge && spots == [None; 2] {
+        return Err(StartRefusal::NoLedge);
+    }
+    let found = Stage::of_run(blast, camera, run.ends, spots).ok_or(StartRefusal::Unread)?;
+    // Player 1's default start: the camera's middle when the run holds it, as before; else Player 1's own column.
+    let middle = camera[0].midpoint(camera[1]);
+    let from = if found.on_run(middle) { [middle, blast[2]] } else { [p1[0], p1[1] + geometry::SLACK] };
+    let floor = stage.first(from, blast[3], false).map_err(unread)?.filter(|line| line.solid_floor());
+    Ok((found, floor.and_then(|line| line.height(from[0])).map_or(p1, |y| [from[0], y])))
 }
 
 impl Stage {
@@ -906,36 +921,6 @@ impl Stage {
     pub fn default_juggle(self, p1: [f32; 2]) -> [f32; 2] {
         [p1[0], p1[1].midpoint(self.camera[2])]
     }
-
-    /// The class of a start point. `solid` is the closed outline of the stage's solid: a point is in it when a
-    /// ray from the point to the right crosses an odd number of its lines, and under it when it is not in it and
-    /// one of its lines is straight above.
-    pub fn start_class(self, point: [f32; 2], solid: &[perfect::Segment]) -> StartClass {
-        let [x, y] = point;
-        let crossed = solid.iter().filter(|[[ax, ay], [bx, by]]| {
-            (*ay > y) != (*by > y) && x < ax + (y - ay) / (by - ay) * (bx - ax)
-        });
-        let above = |[[ax, ay], [bx, by]]: &perfect::Segment| {
-            (*ax > x) != (*bx > x) && ay + (x - ax) / (bx - ax) * (by - ay) > y
-        };
-        if self.edge_cursor(point) != Some(point) {
-            StartClass::Outside
-        } else if self.off_stage(point).is_some() {
-            StartClass::Open
-        } else if crossed.count() % 2 == 1 {
-            StartClass::Solid
-        } else if solid.iter().any(above) {
-            StartClass::Under
-        } else {
-            StartClass::Over
-        }
-    }
-
-    /// Whether a start kept for this stage is still one Start may use without the wizard: a Guard the Edge start
-    /// that is not beside the stage was accepted as one under it, and needs that option.
-    pub fn keeps_start(self, drill: Drill, cpu: [f32; 2], options: StartOptions) -> bool {
-        drill == Drill::Juggler || options.under || self.off_stage(cpu).is_some()
-    }
 }
 
 /// Guard the Edge's two start options (the menu rows `edge_under` and `edge_jumps`).
@@ -957,16 +942,6 @@ impl StartOptions {
             fields.start_options = Some([self.under, self.jumps_used]);
         }
     }
-}
-
-/// Where a start point lies: beside the stage, under it, over it, in its solid, or outside the blast lines.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StartClass {
-    Open,
-    Under,
-    Over,
-    Solid,
-    Outside,
 }
 
 fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option<[f32; 2]> {
@@ -1199,8 +1174,8 @@ impl Wizard {
     pub fn kept_setup(
         &self, stage: Stage, run: perfect::Segment, setup: Setup, unmoved: bool, options: StartOptions,
     ) -> Option<Setup> {
-        let _ = run;
-        stage.keeps_start(self.drill, setup.cpu, options).then(|| self.remembered(stage, setup, unmoved))
+        let beside = self.drill == Drill::Juggler || options.under || stage.off_stage(setup.cpu).is_some();
+        (run == stage.ledges && beside).then(|| self.remembered(stage, setup, unmoved))
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
@@ -1236,29 +1211,13 @@ impl Wizard {
         }
     }
 
-    pub fn accepts_cpu(&self, stage: Stage) -> bool {
-        self.drill == Drill::Juggler || stage.off_stage(self.setup.cpu).is_some()
-    }
-
-    /// Whether A takes a CPU start of this class.
-    pub fn accepts_class(&self, class: StartClass, options: StartOptions) -> bool {
-        self.drill == Drill::Juggler || class == StartClass::Open || options.under && class == StartClass::Under
-    }
-
-    /// A on the CPU page, once the point's class is known: an accepted point goes on to the next page.
-    pub fn confirm_cpu(&mut self, class: StartClass, options: StartOptions) -> bool {
-        let accepted = self.step == WizardStep::Cpu && self.accepts_class(class, options);
-        if accepted {
-            self.advance();
-        }
-        accepted
-    }
-
     /// Whether the drill takes a CPU start at this place: Guard the Edge in open air, or under the stage with
     /// that option; Juggler over the stage or in open air.
     pub fn takes(&self, place: geometry::Place, options: StartOptions) -> bool {
-        let _ = options;
-        self.drill == Drill::Juggler || place == geometry::Place::Open
+        match self.drill {
+            Drill::GuardEdge => place.off_stage(options.under),
+            Drill::Juggler => matches!(place, geometry::Place::OverStage | geometry::Place::Open),
+        }
     }
 
     /// A on the CPU page, once the rule has classed the point A was pressed on. `None`: the press is stale, the
@@ -1266,7 +1225,9 @@ impl Wizard {
     pub fn confirm_start(
         &mut self, at: [f32; 2], place: Result<geometry::Place, geometry::Unread>, options: StartOptions,
     ) -> Option<bool> {
-        let _ = at;
+        if self.step != WizardStep::Cpu || self.setup.cpu != at {
+            return None;
+        }
         let taken = place.is_ok_and(|place| self.takes(place, options));
         if taken {
             self.advance();

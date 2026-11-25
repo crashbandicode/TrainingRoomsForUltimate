@@ -283,11 +283,14 @@ fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage()
     assert!(poll.contains("wizard.set_side_default(run.stage, false)"));
     let y = poll.find("key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu").unwrap();
     let other = poll[y..].find("wizard.set_side_default(run.stage, true)").unwrap() + y;
-    let check = poll.find("!wizard.accepts_cpu(run.stage)").unwrap();
-    let refusal = poll[check..].find("notices::refuse(\"Pick a point off the stage\"); // restriction: edge-juggle-start-over-stage").unwrap() + check;
-    let back = poll[refusal..].find("return true;").unwrap() + refusal;
+    // A on the CPU page only records the point; the next fighter frame asks the off-stage rule and refuses there.
+    let check = poll.find("run.confirm_cpu = Some(wizard.setup.cpu);").unwrap();
+    let back = poll[check..].find("return true;").unwrap() + check;
     let save = poll.find("run.setup = wizard.setup").unwrap();
-    assert!(y < other && other < check && check < refusal && refusal < back && back < save);
+    assert!(y < other && other < check && check < back && back < save);
+    let frame = item(&runtime, "pub unsafe fn frame(");
+    let asked = frame.find("if let Some(at) = run.confirm_cpu.take()").unwrap();
+    assert!(frame[asked..].contains("Drill::GuardEdge => notices::refuse(\"Pick a point off the stage\"), // restriction: edge-juggle-start-over-stage"));
 }
 
 #[test]
@@ -306,7 +309,7 @@ fn every_refusal_goes_through_the_queue_s_refusal_post() {
     assert!(chords[refused..].contains("notices::refuse(\"Stop the drill to start recording or play inputs\")"));
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let poll = item(&runtime, "pub unsafe fn poll(");
-    assert!(poll.contains("notices::refuse(\"Pick a point off the stage\"); // restriction: edge-juggle-start-over-stage"));
+    assert!(item(&runtime, "pub unsafe fn frame(").contains("notices::refuse(\"Pick a point off the stage\"), // restriction: edge-juggle-start-over-stage"));
     assert!(!poll.contains("notices::show_now("));
 }
 
@@ -829,7 +832,7 @@ fn guard_the_edge_runtime_enters_and_leaves_through_the_shared_path() {
     let no_body = frame.split_once("let Some((drill, body))").unwrap().1.split_once("let cpu = body.accessor").unwrap().0;
     assert!(no_body.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "ended drill or missing body");
     let stage_change = frame.split_once("if engine.run.as_ref().is_some_and(|run| run.wizard.is_some() && run.stage_key != stage_key)").unwrap().1
-        .split_once("let Some((stage, p1_start)) = setup_stage(p1)").unwrap().0;
+        .split_once("let (stage, p1_start) = match setup_stage(p1, drill)").unwrap().0;
     assert!(stage_change.contains("WIZARDS.set_up(Kind::DrillStart, false)"), "stage change clears even if new setup fails");
     assert!(frame.contains("WIZARDS.set_up(Kind::DrillStart, editing)"), "wizard entry and non-editing start");
     let worker = src("src/runtime/ui/worker.rs");
