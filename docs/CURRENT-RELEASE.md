@@ -76,7 +76,8 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Playback is slow to start.** Playback took a second or more to start (the operator's report on install 4). A fix is in work for the next build.
+- **Playback is slow to start.** Playback took a second or more to start (the operator's report on install 4). A
+  change for that wait is merged for the next build; it has not been timed in a game.
 - **Not covered by the final Eden session:** the editor in the waiting room; the Quick Play practice pick, new pick
   and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
   attacks; the Trim setting's migration; and the CPU's playback indicator.

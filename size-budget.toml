@@ -3149,7 +3149,15 @@ approved_by = "tr-primary-2 2026-11-25 17:47:41Z (one entry for the whole item a
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 205854
+ceiling = 205357
 date = "2026-11-25"
-reason = "Change placement on the save itself: one picker on the live game for Record and Change placement (five pages; On stage on the traced floors with the floor hop; Off stage on the shared crosshair, with the Off-stage switch T1 A), four entry points, the shared start save question and its Advanced setting, the save edit on the recording worker, and the Momentum and Offset rows of a macro. The Replays key grid, its kept offset and the Place page of macro naming are removed. Measured 205854 on the joined head, which contains Guard the Edge (205039): +815 (src/model +706, src/runtime/features +462, src/model/macro_ui -277, src/runtime/macros -77, the rest +1)."
+reason = "The eggs Off stage zone on the off-stage rule, on main 2d140506 (204799): the stage read through the rule's probe, each ledge's open air, the stage's other lines copied in the zone's columns, a spot and a move asked off stage, and the Outer step's stop. Measured 205117 (tools/sloc.py tree), 318 above 204799. Includes the editor's crop slot keeping its layout's full address (rv-hit-streak 241e9be9). Merged after Guard the Edge (205039), so the ceiling is the joined count: 205039 + 318 = 205357 (next-build merge 9)."
+approved_by = "tr-primary-2 2026-11-25 19:21:22Z (one entry at the measured value of the final head, on top of stage geometry's); the two appended entries joined by the integrator in the merge commit under tr-primary-2's ruling of 2026-11-25 19:41:46Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 206172
+date = "2026-11-25"
+reason = "Change placement on the save itself: one picker on the live game for Record and Change placement (five pages; On stage on the traced floors with the floor hop; Off stage on the shared crosshair, with the Off-stage switch T1 A), four entry points, the shared start save question and its Advanced setting, the save edit on the recording worker, and the Momentum and Offset rows of a macro. The Replays key grid, its kept offset and the Place page of macro naming are removed. Measured 205854 on 137189e4, which held Guard the Edge alone (205039): +815 (src/model +706, src/runtime/features +462, src/model/macro_ui -277, src/runtime/macros -77, the rest +1). Folded after the eggs Off stage zone (205357), so the ceiling is the joined count: 205357 + 815 = 206172."
 approved_by = "tr-primary-2 2026-11-25 15:23:38Z and 15:53:07Z (line budget for feat/placement-crosshair approved at the measured value; flag it over +600). +815 is over that line and is flagged in the READY post."

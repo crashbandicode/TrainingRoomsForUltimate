@@ -406,6 +406,9 @@ slots. The playing role is neutral while it waits, the indicator stays visible, 
 - **Values:** None, 10, 20, 30, 45, 60, 90 or 120 frames
 - **Default:** None
 - **How:** Left/Right cycle through the values; A opens the list.
+- **Known limit:** if a Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can
+  pass what you hold instead of neutral. It is at most one frame, at the start of the wait; the chord's own buttons
+  never reach the game.
 
 ### Place fighters before Record
 

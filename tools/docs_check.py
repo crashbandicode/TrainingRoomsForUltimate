@@ -2,9 +2,9 @@
 
 Ordered 2026-11-15: checks for stale links and outdated version references, run as gates. Run by
 `tests/docs_gates.rs` on every `cargo test` (`python3 -I tools/docs_check.py [--root DIR] [--verbose]`). It reads only the
-files under the root: no network and no clock, so every host gives the same answer. The one outside call is `git ls-files`,
-when the root has a `.git`: the gate hosts' stage leaves docs/media and every .gif out of the work tree, so a link target
-is judged by what the commit holds (`tracked_paths`). Exit 0: clean; 1: problems
+files under the root: no network and no clock, so every host gives the same answer. With a `.git`, it also reads the
+tracked paths and, for skip-worktree media files absent from disk, their indexed bytes: gate hosts leave docs/media and
+every .gif out of the work tree (`tracked_paths`). Exit 0: clean; 1: problems
 (printed one per line as `rule path:line: message`); 2: it could not run (no root, unreadable file).
 `tools/check_external_links.py` is the network check (a release step); it reuses `external_links` below.
 
@@ -16,6 +16,7 @@ Rules (a problem's rule name is the first word of its line):
   link-anchor      `#anchor` (alone, or after a .md file) with no heading or `<a id/name>` of that name in the target.
   link-ref         `[text][label]` or `[label][]` whose `[label]: target` is not defined in the same file.
   link-syntax      a `](` that does not form a link (the forge would print it as plain text).
+  video-src        a `<video>` must use the forge's media blob URL with the git blob id of an .mp4 in docs/media/.
   orphan           a .md page under docs/ that no chain of links from README.md or docs/README.md reaches. A link to a
                    folder does not reach the pages in it; the folders of project records are listed in `ORPHAN_OK`.
   version-line     docs/CURRENT-RELEASE.md has no `Current release: rc.N` line, or more than one.
@@ -56,6 +57,7 @@ indented code blocks (a link inside one is read like any other), and what a page
 import argparse
 import bisect
 import fnmatch
+import hashlib
 import html
 import os
 import posixpath
@@ -310,7 +312,8 @@ def parse_links(text):
         else:
             links.append(Link(line, parsed[0].strip()))
     for match in HTML_ATTR.finditer(plain):
-        links.append(Link(line_of(starts, match.start()), (match.group(1) or match.group(2)).strip()))
+        target = match.group(1) if match.group(1) is not None else match.group(2)
+        links.append(Link(line_of(starts, match.start()), target.strip()))
     defs = set()
     for match in REF_DEF.finditer(plain):
         defs.add(match.group(1).strip().lower())
@@ -513,6 +516,78 @@ def check_links(tree, problems, graph):
             if fragment and target_file.endswith(".md") and os.path.isfile(os.path.join(tree.root, target_file)):
                 if fragment not in tree.anchors(target_file):
                     problems.append(Problem("link-anchor", rel, link.line, f"`{link.target}`: {target_file} has no heading `#{fragment}`"))
+
+
+# --- video sources ----------------------------------------------------------------------------------------------------
+
+
+VIDEO_BLOB = "https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/"
+VIDEO_URL = re.compile(re.escape(VIDEO_BLOB) + r"([0-9a-fA-F]{40})")
+VIDEO_TAG = re.compile(r"""<video(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>""", re.I)
+VIDEO_ATTRIBUTE = re.compile(r"""([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?""")
+
+
+def blob_id(data):
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def media_blobs(tree):
+    """Use committed identities even in sparse checkouts; a plain export has only its file bytes."""
+    if tree.listed is not None:
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+        def records(*args):
+            result = subprocess.run(["git", "-C", tree.root, *args], capture_output=True,
+                                    check=True, env=env, timeout=120)
+            return result.stdout.split(b"\0")
+
+        try:
+            sparse = {entry[2:] for entry in records("ls-files", "-v", "-z", "--", "docs/media/")
+                      if entry[:2].upper() == b"S "}
+            found = set()
+            for entry in records("ls-tree", "-r", "-z", "HEAD", "--", "docs/media/"):
+                if not entry.endswith(b".mp4"):
+                    continue
+                meta, path = entry.split(b"\t", 1)
+                mode, _, oid = meta.split()
+                if mode in (b"100644", b"100755") and (
+                        path in sparse or os.path.isfile(os.path.join(tree.root, os.fsdecode(path)))):
+                    found.add(oid.decode("ascii"))
+            return found
+        except subprocess.SubprocessError as error:
+            raise OSError(f"could not read committed media in {tree.root}: {error}") from error
+
+    found = set()
+    for folder, _, files in os.walk(os.path.join(tree.root, "docs", "media")):
+        for name in files:
+            if not name.endswith(".mp4"):
+                continue
+            path = os.path.join(folder, name)
+            with open(path, "rb") as handle:
+                found.add(blob_id(handle.read()))
+    return found
+
+
+def check_video_sources(tree, problems):
+    blobs = None
+    for rel in tree.files:
+        plain = mask_inline_code(mask_blocks(tree.text(rel)))
+        starts = line_starts(plain)
+        for tag in VIDEO_TAG.finditer(plain):
+            attributes = VIDEO_ATTRIBUTE.finditer(tag.group(0)[len("<video"):-1])
+            sources = [next((value for value in attr.groups()[1:] if value is not None), None)
+                       for attr in attributes if attr.group(1).lower() == "src"]
+            source = sources[0] if len(sources) == 1 else None
+            url = VIDEO_URL.fullmatch(source) if source is not None else None
+            line = line_of(starts, tag.start())
+            if url is None:
+                problems.append(Problem("video-src", rel, line, "use the media blob URL of the clip"))
+                continue
+            if blobs is None:
+                blobs = media_blobs(tree)
+            if url.group(1).lower() not in blobs:
+                problems.append(Problem("video-src", rel, line,
+                                        f"blob {url.group(1)} is not an .mp4 in docs/media/; use the media blob URL of the clip"))
 
 
 def matches(path, patterns):
@@ -852,6 +927,7 @@ def check(root, config=None, used=None):
     tree = Tree(root)
     problems, graph = [], {}
     check_links(tree, problems, graph)
+    check_video_sources(tree, problems)
     check_orphans(tree, config, problems, graph, used)
     check_versions(tree, config, problems, used)
     check_notices(tree, config, problems, used)
