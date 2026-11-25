@@ -492,9 +492,10 @@ When a start cannot happen, a message says why and the menu row reads **Start** 
 | "The stage could not be read" | Start, when the stage's lines could not be read on that frame. Try Start again. |
 | "Stand on the stage to start this drill" | Start, when there is no solid floor under you (over a gap, or in the air off stage). |
 | "This floor has no ledge to guard" | Guard the Edge's Start, when neither end of your floor has open air beside it: it meets a wall or a step, or runs out past the blast line. |
-| "Pick a point over the stage or beside it" | Juggler's CPU page, **A** on a point under the stage, inside it or outside the blast lines. |
 
-Guard the Edge's own "Pick a point off the stage" is unchanged. Not yet seen in a game.
+In the setup, **A** on a CPU point the drill cannot use shows "Pick a point over the stage or beside it" for
+Juggler or "Pick a point off the stage" for Guard the Edge. You stay on the CPU page: move the crosshair and
+press **A** again. Not yet seen in a game.
 
 While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
 is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
