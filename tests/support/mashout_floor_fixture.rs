@@ -66,6 +66,12 @@ mod entry {
     }
 }
 
+mod model {
+    pub mod stage_geometry {
+        // FLOOR_RULE
+    }
+}
+
 use sites_mashout::{FLOOR_RAY, FLOOR_RAY_IMPL};
 // FLOOR_RAY_READER
 

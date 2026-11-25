@@ -158,7 +158,7 @@ mod tests {
         let frames = (0..2000).map(|i| ReplayFrame { input: InputFrame::default(),
             start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
-        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
+        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,
             quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()
     }
 

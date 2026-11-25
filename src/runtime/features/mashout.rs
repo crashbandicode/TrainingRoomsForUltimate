@@ -2,6 +2,7 @@
 //! Hooks publish values only; the existing diagnostic worker owns solver, grading and bests.
 
 use super::{notices, recorder, states};
+use super::stage_geometry::FloorRay;
 use crate::model::cpu::{
     hash::lua_bind_hash,
     ids::{C, COUNT, NAMES as CPU_NAMES},
@@ -14,7 +15,6 @@ use crate::model::mashout::{
     native::Clock,
 };
 use crate::model::practice_games::Game as PracticeGame;
-use crate::model::sites_mashout::{self, FLOOR_RAY, FLOOR_RAY_IMPL};
 use crate::model::{
     input_delay::MappedInputs,
     notify::DEFAULT_COLOR,
@@ -37,82 +37,6 @@ mod interposer;
 mod reader;
 #[path = "mashout/worker.rs"]
 mod worker;
-
-// This 13.0.5 ray reads and writes all 16 bytes of its Vector2f references.
-#[repr(C, align(16))]
-struct RayPoint([f32; 4]);
-
-type RayCast = unsafe extern "C" fn(usize, *const RayPoint, *const RayPoint, *mut RayPoint, bool) -> usize;
-
-pub(super) struct FloorRay {
-    accessor: usize,
-    cast: RayCast,
-}
-
-impl FloorRay {
-    /// Validate the exact borrowed-line and endpoint reader contract before any ray.
-    pub(super) unsafe fn new(p1: usize) -> Option<Self> {
-        if !sites_mashout::SITES.iter().filter(|site| sites_mashout::placement_floor(site))
-            .all(|site| game::granted(site.offset) && game::read_window(site.offset) == site.guard)
-        {
-            return None;
-        }
-        let base = game::text_base();
-        let ground = ((p1 + 0x58) as *const usize).read();
-        if ground == 0 {
-            return None;
-        }
-        let vtable = (ground as *const usize).read();
-        if (vtable != base + 0x4f87560 && vtable != base + 0x4f6d8b0)
-            || ((vtable + 0x668) as *const usize).read() != base + FLOOR_RAY_IMPL
-        {
-            return None;
-        }
-        let cast: RayCast = core::mem::transmute(base + FLOOR_RAY);
-        Some(Self { accessor: p1, cast })
-    }
-
-    /// The caller must consume the borrowed line on this game-thread pass.
-    pub(super) unsafe fn borrowed_line(
-        &self, x: f32, [top, bottom]: [f32; 2], platforms: bool,
-    ) -> Option<usize> {
-        if ![x, top, bottom].into_iter().all(f32::is_finite) || top <= bottom {
-            return None;
-        }
-        let mut hit = RayPoint([0.; 4]);
-        let line = (self.cast)(
-            self.accessor, &RayPoint([x, top, 0., 0.]), &RayPoint([0., bottom - top, 0., 0.]),
-            &mut hit, platforms,
-        );
-        (line != 0).then_some(line)
-    }
-
-    /// The native result is borrowed only until the next query. Copy its current geometry.
-    pub(super) unsafe fn floor(&self, x: f32, limits: [f32; 2], platforms: bool) -> Option<entry::PlacementFloor> {
-        let line = self.borrowed_line(x, limits, platforms)?;
-        let flags = ((line + 0xc4) as *const u32).read();
-        // Classify one-way platforms before using the solid floor bit.
-        let normal_y = ((line + 0xa4) as *const f32).read();
-        if !normal_y.is_finite() {
-            return None;
-        }
-        let is_floor = if flags & 0x2000 != 0 {
-            platforms && flags & 0x0300 == 0 && normal_y > 0.0
-        } else {
-            flags & 0x0800 != 0
-        };
-        if !is_floor {
-            return None;
-        }
-        let vertices = ((line + 0x88) as *const [usize; 2]).read();
-        if vertices.contains(&0) {
-            return None;
-        }
-        let ends = vertices.map(|ptr| ((ptr + 0x10) as *const [f32; 2]).read());
-        let stationary = ends == vertices.map(|ptr| ((ptr + 0x20) as *const [f32; 2]).read());
-        Some(entry::PlacementFloor { ends, stationary, flags })
-    }
-}
 
 /// Supply only the selected move's native resource on the CPU body confirmed at Reload.
 unsafe fn refill_attacker_resource(

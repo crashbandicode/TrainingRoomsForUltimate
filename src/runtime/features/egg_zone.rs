@@ -16,7 +16,7 @@ use crate::model::storage::FixedPath;
 use crate::model::wizard::Kind;
 use crate::runtime::{game::natives, published, scene, ui::worker};
 
-use super::{edge_juggle, mashout::FloorRay, notices, states, tech_surfaces};
+use super::{stage_geometry::{self, FloorRay}, notices, states, tech_surfaces};
 
 const NOTICE: u8 = 0x35;
 const INSET_BACKING: [u8; 4] = [10, 15, 27, 235];
@@ -165,8 +165,8 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     let range = [left, right, top, bottom];
     let (mid, limits) = perfect::outline_probe(camera, range)?;
     let ray = FloorRay::new(p1)?;
-    let (ledges, _) = edge_juggle::stage_floor(&ray, camera)?;
-    let (outline, _) = tech_surfaces::training_outline(&ray, mid, limits)?;
+    let (ledges, _) = stage_geometry::stage_floor(&ray, camera)?;
+    let (outline, _) = stage_geometry::training_outline(&ray, mid, limits)?;
     Stage::new(id, range, ledges, outline)
 }
 

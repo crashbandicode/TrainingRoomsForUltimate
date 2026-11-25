@@ -927,7 +927,7 @@ fn edge_juggle_passes_are_nonblocking() {
     let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
     let mut graph = Graph::scan(&runtime, &[]);
     graph.precise_imports = true;
-    for root in ["edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction", "tech_surfaces::frame_read_line", "tech_surfaces::frame_next_line"] {
+    for root in ["edge_juggle::frame", "edge_juggle::poll", "edge_juggle::look", "edge_juggle::ai_correction", "stage_geometry::frame_read_line", "stage_geometry::frame_next_line"] {
         let violations = game_pass_waits(&graph, &runtime, root, &[], true);
         assert!(violations.is_empty(), "{root}: {violations:#?}");
     }

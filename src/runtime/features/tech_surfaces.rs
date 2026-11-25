@@ -1,6 +1,8 @@
 //! Read-only native stage surfaces. Called only on the owned P1 game thread.
 //! Field/call evidence: DESIGN §4 and TECH-UI-SURFACE-GUARDS.json (owned 13.0.5).
+use super::stage_geometry::{native_ray, RayPoint};
 use crate::model::guard::{guard_outcome, GuardOutcome, SeamKind};
+use crate::model::sites_mashout::FLOOR_RAY;
 use crate::model::sites_tech_surfaces::windows as guards;
 use crate::model::tech::discovery::{decode, far_end, Bootstrap, Rays};
 use crate::model::tech::surface::{damaging_material, Kind, Line, Source, Surfaces, Walk};
@@ -14,8 +16,6 @@ static PASSIVE_TABLES: OnceLock<[Option<usize>; 2]> = OnceLock::new();
 const GROUND_TABLES: [usize; 2] = [0x4f87560, 0x4f6d8b0];
 const GROUND_GEOMETRY: [(usize, usize); 2] = [(0x4d8, 0x463c40), (0x668, 0x4658b0)];
 
-#[repr(C, align(16))]
-struct NativePoint([f32; 4]);
 #[repr(C)]
 #[derive(Default)]
 struct MemoryInfo {
@@ -100,7 +100,7 @@ pub(super) unsafe fn init() -> bool {
         good
     })
 }
-unsafe fn guarded() -> bool {
+pub(super) unsafe fn guarded() -> bool {
     VERIFIED.get().copied().unwrap_or(false)
 }
 
@@ -216,20 +216,11 @@ impl NativeSource {
     /// The second vector is a displacement; true leaves exclusion bit 0x2000 clear.
     /// Inputs and output reserve the complete 16-byte SIMD storage used by native.
     unsafe fn ray(&mut self, origin: Vec2, delta: Vec2) -> Result<Option<(Line, Vec2)>, ()> {
-        if !game::granted(0x202a240) {
+        if !game::granted(FLOOR_RAY) {
             return Err(());
         }
-        let call: extern "C" fn(
-            usize,
-            *const NativePoint,
-            *const NativePoint,
-            *mut NativePoint,
-            bool,
-        ) -> usize = std::mem::transmute(game::text_base() + 0x202a240);
-        let origin = NativePoint([origin.x, origin.y, 0.0, 0.0]);
-        let delta = NativePoint([delta.x, delta.y, 0.0, 0.0]);
-        let mut hit = NativePoint([f32::NAN; 4]);
-        let id = call(self.accessor, &origin, &delta, &mut hit, true);
+        let mut hit = RayPoint([f32::NAN; 4]);
+        let id = super::stage_geometry::cast(native_ray(game::text_base()), self.accessor, [origin.x, origin.y], [delta.x, delta.y], true, &mut hit);
         if id == 0 {
             return Ok(None);
         }
@@ -276,9 +267,9 @@ impl Source for NativeSource {
             if !game::granted(0x15cbc60) {
                 return None;
             }
-            let call: extern "C" fn(usize, *const NativePoint) -> usize =
+            let call: extern "C" fn(usize, *const RayPoint) -> usize =
                 std::mem::transmute(game::text_base() + 0x15cbc60);
-            let id = call(line.id, &NativePoint([shared.x, shared.y, 0.0, 0.0]));
+            let id = call(line.id, &RayPoint([shared.x, shared.y, 0.0, 0.0]));
             let next = self.read(id)?;
             far_end(shared, next).map(|end| (id, end))
         }
@@ -301,20 +292,16 @@ impl PlatformScan {
     }
     /// At most one native ray per invocation, including stacked-platform continuation.
     pub fn step(&mut self, source: &mut NativeSource, surfaces: &mut Surfaces) -> ScanState {
-        let Some(ray) = self.rays.current() else {
-            return ScanState::Done;
-        };
-        match unsafe { source.ray(ray.origin, ray.delta) } {
-            Ok(Some((line, hit))) => {
-                if self.rays.hit(line, hit).is_err() {
-                    return ScanState::Broken;
-                }
+        use crate::model::stage_geometry::{scan_step, Scan};
+        match scan_step(&mut self.rays, |ray| unsafe { source.ray(ray.origin, ray.delta) }) {
+            Scan::Done => return ScanState::Done,
+            Scan::Hit(line) => {
                 if line.passable && line.kind().is_some() && !surfaces.push(line) {
                     return ScanState::Full;
                 }
             }
-            Ok(None) => self.rays.miss(),
-            Err(()) => return ScanState::Broken,
+            Scan::Miss => {}
+            Scan::Broken => return ScanState::Broken,
         }
         if self.rays.current().is_none() {
             ScanState::Done
@@ -394,18 +381,14 @@ impl NativeSource {
     /// One native ray of `rays` (Tech's column walk, stacked platforms included), and the floor it met as world geometry
     /// only: no borrowed line id survives the call.
     pub fn floor_step(&mut self, rays: &mut Rays) -> FloorStep {
-        let Some(ray) = rays.current() else {
-            return FloorStep::Done;
-        };
-        match unsafe { self.ray(ray.origin, ray.delta) } {
-            Ok(Some((line, hit))) if rays.hit(line, hit).is_ok() => {
+        use crate::model::stage_geometry::{scan_step, Scan};
+        match scan_step(rays, |ray| unsafe { self.ray(ray.origin, ray.delta) }) {
+            Scan::Done => FloorStep::Done,
+            Scan::Hit(line) => {
                 FloorStep::Next((line.kind() == Some(Kind::Floor)).then(|| line.ends.map(|e| [e.x, e.y])))
             }
-            Ok(Some(_)) | Err(()) => FloorStep::Broken,
-            Ok(None) => {
-                rays.miss();
-                FloorStep::Next(None)
-            }
+            Scan::Miss => FloorStep::Next(None),
+            Scan::Broken => FloorStep::Broken,
         }
     }
 }
@@ -437,100 +420,4 @@ pub(super) unsafe fn training_blast_bounds() -> Option<[f32; 4]> {
     let holder = ((game::text_base() + CAMERA_MANAGER_SLOT_OFFSET) as *const *const usize).read_volatile();
     let manager = (!holder.is_null()).then(|| holder.read_volatile())?;
     (manager != 0).then(|| ((manager + 0xc30) as *const [f32; 4]).read_unaligned())
-}
-
-struct FrameOutlineReader;
-impl FrameOutlineReader {
-    fn frame_read_line(&mut self, id: usize) -> Option<Line> {
-        // The id is a borrowed line from the guarded no-cull ray or its
-        // checked next-line call. This reader is confined to one native pass.
-        let aligned = |address: usize| address >= 0x10000 && address & 7 == 0 && address >> 47 == 0;
-        if !aligned(id) {
-            return None;
-        }
-        unsafe {
-            let owner = ((id + 0x118) as *const usize).read();
-            if !aligned(owner) || ((owner + 8) as *const i64).read() == -1
-                || ((id + 0x100) as *const u8).read() == 0
-            {
-                return None;
-            }
-            let vertices = ((id + 0x88) as *const [usize; 2]).read();
-            if !vertices.into_iter().all(aligned) {
-                return None;
-            }
-            let ends = vertices.map(|ptr| {
-                let [x, y] = ((ptr + 0x10) as *const [f32; 2]).read();
-                Vec2 { x, y }
-            });
-            let [x, y] = ((id + 0xa0) as *const [f32; 2]).read();
-            decode(id, ends, Vec2 { x, y }, ((id + 0xc5) as *const u8).read())
-        }
-    }
-
-    fn frame_next_line(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
-        let shared = *line.ends.get(end)?;
-        if self.frame_read_line(line.id)? != line {
-            return None;
-        }
-        unsafe {
-            const NEXT: usize = 0x15cbc60;
-            if !game::granted(NEXT) {
-                return None;
-            }
-            let call: extern "C" fn(usize, *const NativePoint) -> usize =
-                std::mem::transmute(game::text_base() + NEXT);
-            let id = call(line.id, &NativePoint([shared.x, shared.y, 0.0, 0.0]));
-            let next = self.frame_read_line(id)?;
-            far_end(shared, next).map(|end| (id, end))
-        }
-    }
-}
-
-impl Source for FrameOutlineReader {
-    fn read(&mut self, id: usize) -> Option<Line> {
-        self.frame_read_line(id)
-    }
-
-    fn next(&mut self, line: Line, end: usize) -> Option<(usize, usize)> {
-        self.frame_next_line(line, end)
-    }
-}
-
-/// Copy one closed outline in the current native Training frame. The returned
-/// geometry has no raw line identities or borrowed native pointers.
-pub(super) unsafe fn training_outline(
-    ray: &super::mashout::FloorRay, x: f32, limits: [f32; 2],
-) -> Option<(crate::model::edge_juggle::perfect::Outline, Option<[[f32; 2]; 2]>)> {
-    use crate::model::edge_juggle::perfect::{floor_ledges, Outline};
-    use crate::model::tech::surface::{Walk, MAX_LINES};
-    if !guarded() || !game::granted(0x15cbc60) {
-        return None;
-    }
-    let seed = ray.borrowed_line(x, limits, false)?;
-    let mut reader = FrameOutlineReader;
-    let line = reader.read(seed)?;
-    if line.kind() != Some(Kind::Floor) || line.passable {
-        return None;
-    }
-    let mut walk = Surfaces::EMPTY;
-    walk.begin(seed, 0);
-    for _ in 0..MAX_LINES {
-        match walk.step(&mut reader) {
-            Walk::More => {}
-            Walk::Closed => {
-                let mut outline = Outline::new();
-                let ends = |line: crate::model::tech::surface::Line| {
-                    line.ends.map(|point| [point.x, point.y])
-                };
-                for line in walk.lines() {
-                    outline.add(ends(line));
-                }
-                let floor = walk.lines().filter(|line| line.kind() == Some(Kind::Floor) && !line.passable);
-                return Some((outline, floor_ledges(floor.map(ends))));
-            }
-            _ => return None,
-        }
-    }
-    None
 }

@@ -129,7 +129,10 @@ pub const THREADS: [ThreadStack; 19] = [
     // The same fold on the install 4 head with the editor and the drill-step moves (cdfbd917): 56,720 B (release) and
     // 56,688 B (diag, gate 2c679acb); the larger is recorded.
     // Trim and Vault fold: 56,864 B release and 56,864 B diag in ELFs d3d74eaa.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_864, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Mark variants (2026-11-25): a take keeps its marks' variants and its recorded fighter, and the save path holds
+    // the larger take by value: 57,152 B on both the release and the diag ELF (gate e6e893f5). The allocation is
+    // unchanged: the measured 57,648 B still decides what the stack needs.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 57_152, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
@@ -138,7 +141,9 @@ pub const THREADS: [ThreadStack; 19] = [
     // diag: diag-macro.req read and parse
     row(ThreadId::MacroDiag, c"tr-macro-diag", 28 * KIB, 3_392, 9_152, "Eden st-02..st-12, final-surface-of-1261f56c, final-rc8-yoga-1/rc8-surface-1-9d6c7e02", "macros::diag::start::{closure#0}"),
     // the replay capture archive and Mii preset writer
-    row(ThreadId::ReplaySave, c"replay-capture-save", 60 * KIB, 33_232, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
+    // Mark variants (2026-11-25): a written capture's header carries each track's fighter identity: 33,248 B on both
+    // ELFs (gate e6e893f5). The 60 KiB allocation is unchanged.
+    row(ThreadId::ReplaySave, c"replay-capture-save", 60 * KIB, 33_248, 25_344, "Eden st-02..st-12, f6-37/sh-01, final-surface-cov-4e336da4", "replay_store::start_writer::{closure#0}"),
     // the saved Mii catalog read for the library
     row(ThreadId::MiiCatalog, c"mii-catalog", 28 * KIB, 6_048, 8_016, "Eden f6-31/f6-37/sh-01", "replay_store::init_catalog_fallback::{closure#0}::{closure#0}"),
     // console-practice-trace builds only: the practice trace file writer
