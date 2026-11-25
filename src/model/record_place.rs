@@ -385,6 +385,9 @@ pub struct Wizard {
     pub edit: Who,
     pub setup: Setup,
     defaults: Setup,
+    mode: Mode,
+    ledge: [bool; 2],
+    home: Option<[f32; 2]>,
     cross: Crosshair,
     was: u16,
     repeat: u8,
@@ -393,28 +396,50 @@ pub struct Wizard {
 impl Wizard {
     pub fn new(defaults: Setup, remembered: Option<Setup>) -> Self {
         let setup = remembered.unwrap_or(defaults);
-        Self { page: Page::Spot, edit: Who::P1, setup, defaults,
+        Self { page: Page::Where, edit: Who::P1, setup, defaults, mode: Mode::Record, ledge: [false; 2], home: None,
             cross: Crosshair::new(setup[0].at), was: 0, repeat: 0 }
     }
 
     /// Opened on a save state: its spots are the defaults (X puts them back). `ledge`: saved hanging on a ledge.
     pub fn for_save(saved: Setup, ledge: [bool; 2], edit: Who) -> Self {
-        let _ = ledge;
-        Self { edit, cross: Crosshair::new(saved[edit.index()].at), ..Self::new(saved, None) }
+        Self { edit, mode: Mode::Save, ledge, cross: Crosshair::new(saved[edit.index()].at), ..Self::new(saved, None) }
     }
 
     /// The main floor's point under the middle of the stage, where a fighter with no floor under it goes on stage.
     pub fn set_home(&mut self, home: Option<[f32; 2]>) {
-        let _ = home;
+        self.home = home;
     }
 
     pub fn mode(&self) -> Mode {
-        Mode::Record
+        self.mode
     }
 
-    /// Which fighters differ from what the wizard opened with: the place, the spot or the ledge reading.
+    /// Which fighters differ from what the wizard opened with, by value: the place or the spot. A fighter moved and
+    /// brought back, or reset with X, is not edited.
     pub fn edited(&self) -> [bool; 2] {
-        [false; 2]
+        [0, 1].map(|i| self.setup[i].place != self.defaults[i].place || self.setup[i].at != self.defaults[i].at)
+    }
+
+    /// A fighter saved hanging on a ledge reads so until it is edited.
+    fn on_ledge(&self, i: usize) -> bool {
+        self.ledge[i] && !self.edited()[i]
+    }
+
+    /// On stage / off stage for the edited fighter. Off: the spot stays. On: the floor under it, else `home`, else
+    /// nothing changes. A Record start cannot keep a state of the other place; a save's state is the worker's rule.
+    fn toggle_place(&mut self, at: [f32; 2], floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, home: Option<[f32; 2]>) {
+        let fighter = &mut self.setup[self.edit.index()];
+        let (place, at) = match fighter.place {
+            Place::OnStage => (Place::OffStage, at),
+            Place::OffStage => match floor(at).or(home) {
+                Some(at) => (Place::OnStage, at),
+                None => return,
+            },
+        };
+        (fighter.place, fighter.at) = (place, at);
+        if self.mode == Mode::Record {
+            fighter.state = StartState::Standard;
+        }
     }
 
     pub fn cursor(&self) -> [f32; 2] {
@@ -430,7 +455,8 @@ impl Wizard {
         if pressed(logical::PLUS) { return Outcome::Start; }
         if pressed(logical::B) {
             self.page = match self.page {
-                Page::Where | Page::Spot => return Outcome::Closed,
+                Page::Where => return Outcome::Closed,
+                Page::Spot => Page::Where,
                 Page::State => Page::Spot,
                 Page::Percent => Page::State,
                 Page::Preview => Page::Percent,
@@ -439,7 +465,11 @@ impl Wizard {
         }
         if pressed(logical::A) {
             self.page = match self.page {
-                Page::Where => Page::Spot,
+                Page::Where => {
+                    self.cross.jump(self.setup[self.edit.index()].at);
+                    Page::Spot
+                }
+                Page::Spot if self.mode == Mode::Save => return Outcome::Start,
                 Page::Spot => Page::State,
                 Page::State => Page::Percent,
                 Page::Percent => Page::Preview,
@@ -447,7 +477,9 @@ impl Wizard {
             };
             return Outcome::Open;
         }
-        if self.page != Page::Preview && (pressed(logical::L) || pressed(logical::R)) {
+        let other = pressed(logical::L) || pressed(logical::R)
+            || self.page == Page::Where && (pressed(logical::DPAD_UP) || pressed(logical::DPAD_DOWN));
+        if self.page != Page::Preview && other {
             self.edit = self.edit.other();
             self.cross.jump(self.setup[self.edit.index()].at);
             return Outcome::Open;
@@ -467,29 +499,24 @@ impl Wizard {
             return Outcome::Open;
         }
         if self.page == Page::Spot && pressed(logical::Y) {
-            match self.setup[i].place {
-                Place::OnStage => {
-                    self.setup[i].place = Place::OffStage;
-                    self.setup[i].at = self.cross.at;
-                    self.setup[i].state = StartState::Standard;
-                }
-                Place::OffStage => {
-                    if let Some(at) = floor(self.cross.at) {
-                        self.setup[i].place = Place::OnStage;
-                        self.setup[i].at = at;
-                        self.setup[i].state = StartState::Standard;
-                    }
-                }
-            }
+            self.toggle_place(self.cross.at, floor, None);
+            return Outcome::Open;
+        }
+        if self.page == Page::Where && (pressed(logical::DPAD_LEFT) || pressed(logical::DPAD_RIGHT)) {
+            self.toggle_place(self.setup[i].at, floor, self.home);
+            self.cross.jump(self.setup[i].at);
             return Outcome::Open;
         }
         match self.page {
             Page::Spot => {
-                self.cross.step(pad, fit);
+                let moved = self.cross.step(pad, fit);
                 if self.setup[i].place == Place::OffStage {
                     self.setup[i].at = self.cross.at;
-                } else if let Some(at) = floor(self.cross.at) {
-                    self.setup[i].at = at;
+                } else if self.mode == Mode::Record || moved {
+                    // A save's spot follows the floor only once the crosshair moves: reading the floor is not an edit.
+                    if let Some(at) = floor(self.cross.at) {
+                        self.setup[i].at = at;
+                    }
                 }
             }
             Page::State => {
@@ -520,13 +547,12 @@ impl Wizard {
 
     /// The marks to draw. `held`: that fighter's own body stands at its spot, so it gets no mark.
     pub fn marks(&self, held: [bool; 2]) -> Marks {
-        let _ = held;
         let mut looks = [None; btt::LOOKS];
         for who in [Who::P1, Who::Cpu] {
             let i = who.index();
             let fighter = self.setup[i];
             let editing_spot = self.page == Page::Spot && self.edit == who;
-            if !editing_spot || fighter.place == Place::OnStage {
+            if !held[i] && (!editing_spot || fighter.place == Place::OnStage) {
                 let scale = if editing_spot || who == Who::P1 { 0.3 } else { EGG_WHOLE.scale };
                 looks[i] = Some((fighter.at, EggLook { scale, ..EGG_WHOLE }));
             }
@@ -534,18 +560,24 @@ impl Wizard {
         if self.page == Page::Spot {
             looks[btt::LOOKS - 1] = Some(self.cross.look());
         }
-        let pointer = looks[Who::Cpu.index()].map(|(at, _)| at);
+        // The border pointer is for the fighter being edited, off stage; never for the other one.
+        let edited = self.setup[self.edit.index()];
+        let pointer = (edited.place == Place::OffStage).then_some(edited.at);
         Marks { looks, pointer }
     }
 
     /// The notice. `name`: the save's name when the wizard is opened on one.
     pub fn write_text(&self, recorded: Who, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
-        let _ = name;
         let (number, title) = match self.page {
-            Page::Where => (0, "Where"), Page::Spot => (1, "Spot"), Page::State => (2, "State"),
-            Page::Percent => (3, "Percent"), Page::Preview => (4, "Preview"),
+            Page::Where => (1, "Where"), Page::Spot => (2, "Spot"), Page::State => (3, "State"),
+            Page::Percent => (4, "Percent"), Page::Preview => (5, "Preview"),
         };
-        writeln!(out, "Record ({}) · {number}/4 {title}", recorded.name())?;
+        let save = self.mode == Mode::Save;
+        if save {
+            writeln!(out, "{name} · {number}/2 {title}")?;
+        } else {
+            writeln!(out, "Record ({}) · {number}/5 {title}", recorded.name())?;
+        }
         for who in [Who::P1, Who::Cpu] {
             let fighter = self.setup[who.index()];
             let name = if who == Who::P1 { "P1  " } else { "CPU " };
@@ -556,7 +588,8 @@ impl Wizard {
             }
             match self.page {
                 Page::Where | Page::Spot | Page::Preview => {
-                    let place = if fighter.place == Place::OnStage { "On stage" } else { "Off stage" };
+                    let place = if self.on_ledge(who.index()) { "Ledge" }
+                        else if fighter.place == Place::OnStage { "On stage" } else { "Off stage" };
                     write!(out, "{place} ({}, {})", fighter.at[0].round() as i32, fighter.at[1].round() as i32)?;
                     if self.page == Page::Preview {
                         write!(out, " · {} · {}%", fighter.state.title(), fighter.percent)?;
@@ -568,7 +601,10 @@ impl Wizard {
             writeln!(out)?;
         }
         match self.page {
-            Page::Where | Page::Spot => write!(out, "L / R fighter · Y on / off stage · A next · B back\nX defaults · + start"),
+            Page::Where if save => write!(out, "L / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel"),
+            Page::Where => write!(out, "L / R fighter · ← → on / off stage · A next\nX defaults · + start · B cancel"),
+            Page::Spot if save => write!(out, "Stick or D-pad move · L / R fighter · A save\nX as saved · Y on / off stage · B back"),
+            Page::Spot => write!(out, "Stick or D-pad move · L / R fighter · A next\nX defaults · Y on / off stage · B back · + start"),
             Page::State => {
                 let face = matches!(self.setup[self.edit.index()].state, StartState::MissedTechUp | StartState::MissedTechDown);
                 let x = if face { "X face up / down" } else { "X defaults" };
