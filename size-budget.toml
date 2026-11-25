@@ -3089,3 +3089,19 @@ ceiling = 203585
 date = "2026-11-25"
 reason = "The drill takes the Training reset from the chord on its own poll, carried through Input Delay in its record: a reset chord alone leaves no result and starts no load at any hold length. Measured 203585 on the card head 0d28433d (203532): +53."
 approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command; a raise up to the +60 review-fix rule)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203599
+date = "2026-11-25"
+reason = "Combo files name grab, throw and the ledge, get-up and trip attacks in a link's from and to: the reader takes both forms, and a named endpoint without descriptions is compared by its name. Measured 203599 on main a945b0c1 (203585): +14."
+approved_by = "tr-primary-2 ruling 2026-11-25 14:34:17Z (line budget +14 for feat/named-grab-throw-keys)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203703
+date = "2026-11-25"
+reason = "Replay captures can be deleted: a Delete row on the screen of a recording and Y in the Replay window, the archive delete, the Vault capture drop and the lists rebuilt from storage. Measured 203703 on main 76c00df3 (203599): +104."
+approved_by = "tr-primary-2 ruling 2026-11-25 15:04:02Z (feat/capture-delete DESIGN accepted; line budget up to +130)."

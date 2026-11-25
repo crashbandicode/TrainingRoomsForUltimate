@@ -487,7 +487,7 @@ unsafe fn chord_step(body: Body) {
         }
         return;
     }
-    // rc.9 C14: Play on Player 1 is refused while an AI drives Player 1 (the same check as Record's B4).
+    // rc.9 C14: Play on Player 1 is refused while an AI drives Player 1 (decision B4's AI fact).
     let play_player = match crate::model::recording::play_player_chord(play_player, || {
         crate::model::recording::p1_driven_by_ai(
             natives::is_operation_cpu(0),
@@ -502,7 +502,7 @@ unsafe fn chord_step(body: Body) {
             false
         }
     };
-    // A Record that would start the worker's capture asks the same refusals as every other record start (B4).
+    // A Record that would start the worker's capture asks the same refusals as every other record start.
     let record = match record_chord(record, recording_host::capturing(), || record_refusal()) {
         Ok(record) => record,
         Err(refusal) => {
@@ -535,16 +535,10 @@ unsafe fn begin_playback(slot: u8, facing: i8, ledge: bool) {
     }
 }
 
-/// Why a recording (numbered or named) is not started now: B4 an AI drives P1, a fighter is missing, a save state is loading.
-/// The order lives in the model (`record_refusal`, host-tested); these are the live facts, all guarded per-frame reads. B4's AI
-/// fact includes the standalone pilot, read through its own export (`p1_driven_by_ai`).
+/// Why a recording (numbered or named) is not started now: a fighter is missing, a save state is loading.
+/// The order lives in the model (`record_refusal`, host-tested); these are the live facts, all guarded per-frame reads.
 unsafe fn record_refusal() -> Option<RecordRefusal> {
     crate::model::recording::record_refusal(
-        crate::model::recording::p1_driven_by_ai(
-            natives::is_operation_cpu(0),
-            crate::runtime::p1::cpu_pilot::emitting(),
-            pilot_export(),
-        ),
         natives::fighter_entry(0) != 0,
         states::is_loading(),
     )
