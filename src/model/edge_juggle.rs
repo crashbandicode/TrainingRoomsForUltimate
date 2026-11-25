@@ -1218,7 +1218,7 @@ impl Wizard {
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
-        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu {
+        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu || (other && self.starts.contains(&None)) {
             return;
         }
         let side = stage.side(self.setup.cpu[0]) ^ usize::from(other);

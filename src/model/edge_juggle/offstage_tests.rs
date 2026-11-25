@@ -123,6 +123,31 @@ fn on_the_training_stage_guard_the_edge_starts_from_the_long_floor_and_the_islan
 }
 
 #[test]
+fn other_side_leaves_a_moved_cursor_alone_on_a_one_ledge_floor() {
+    use crate::model::btt::Pad;
+    for (p1, only_side, stick, frames) in [
+        ([-30.0, 0.01], 0, 1.0, 220),     // Long floor: left ledge only.
+        ([-450.0, 0.01], 1, -1.0, 60),     // Low floor: right ledge only.
+    ] {
+        let (stage, p1) = on_training(Drill::GuardEdge, p1).unwrap();
+        let mut wizard = Wizard::on(Drill::GuardEdge, stage, p1, 100, (308, 0), None, |_| true).unwrap();
+        let default = stage.spot(only_side).unwrap();
+        assert_eq!(wizard.setup.cpu, default);
+        assert_eq!(stage.spot(only_side ^ 1), None);
+        for _ in 0..frames {
+            wizard.steer(stage, &Pad { stick: [stick, 0.0], ..Pad::default() });
+        }
+        let moved = wizard.cursor();
+        assert_eq!(stage.side(moved[0]), only_side ^ 1, "cursor reached the half without a ledge");
+        assert!(!wizard.unmoved());
+        wizard.set_side_default(stage, true);
+        assert_eq!((wizard.cursor(), wizard.setup.cpu, wizard.unmoved()), (moved, moved, false), "Y on a one-ledge floor");
+        wizard.set_side_default(stage, false);
+        assert_eq!((wizard.cursor(), wizard.setup.cpu, wizard.unmoved()), (default, default, true), "X still restores the default");
+    }
+}
+
+#[test]
 fn a_start_that_cannot_happen_names_its_reason() {
     for drill in [Drill::GuardEdge, Drill::Juggler] {
         // Over a gap there is no floor to start from.
