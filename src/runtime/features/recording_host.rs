@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::engine::library::Role;
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
 use crate::model::flow::{self, NameStep};
@@ -15,11 +16,14 @@ const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
 /// A role's live fighter identity, for the take it records (`rr_host::post_record_start`).
-fn role_fighter(role: crate::engine::library::Role) -> Option<crate::model::move_names::FighterId> {
+fn role_fighter(role: Role) -> Option<crate::model::move_names::FighterId> {
     // SAFETY: a take start is posted from the game thread only (the chord step, the placement poll), where the
     // role's body is live this frame.
     unsafe {
-        let body = super::recorder::body_of(if role == crate::engine::library::Role::Cpu { 1 } else { 0 })?;
+        let body = match role {
+            Role::Cpu => super::recorder::cpu_body(),
+            Role::Player => super::recorder::body_of(0),
+        }?;
         let kind = ((body.fighter + super::recorder::FIGHTER_KIND_FIELD) as *const i32).read();
         super::move_names::fighter_id(body.accessor, kind)
     }

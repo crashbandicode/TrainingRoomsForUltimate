@@ -187,9 +187,11 @@ impl Marks {
 
     /// Names the moves a preview finds as `namer` gives them.
     pub fn named(mut self, namer: Namer<'static>) -> Self {
-        self.namer = namer;
+        self.set_namer(namer);
         self
     }
+
+    pub(super) fn set_namer(&mut self, namer: Namer<'static>) { self.namer = namer; }
 
     pub fn from_inputs(frames: impl Iterator<Item = InputFrame>) -> Self {
         let mut marks = Self::new();
@@ -968,6 +970,11 @@ mod tests {
         // The one feed, in either scene, gives the watch the animation the variant is read from.
         assert!(sample.contains("clip_marks::watched_motion(s.motion, mv.is_some(), "));
         assert!(callback.contains("input_display::sample_frame("));
+        // The capture's identity must follow the same body as its start pose (Training entry 1, lobby entry 4).
+        let host = include_str!("../../runtime/features/recording_host.rs");
+        let reader = host.split_once("fn role_fighter(").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(reader.contains("Role::Cpu => super::recorder::cpu_body()"), "CPU take identity bypasses the scene's practice CPU");
+        assert!(reader.contains("Role::Player => super::recorder::body_of(0)"), "Player take identity must read entry 0");
     }
 
     /// A drill's crop names each step as the Recording list does (`combo_link_lines`, the recorded fighter): since the
@@ -1517,7 +1524,8 @@ mod tests {
         assert_eq!(MII_KINDS, 0x48..=0x4a);
         assert!(include_str!("../mii/mii_setup.rs").contains("if !(0x48..=0x4a).contains(&self.kind)"));
         let panel = include_str!("clip_panel.rs").split("#[cfg(test)]").next().unwrap();
-        assert!(panel.contains("saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)"));
+        assert!(panel.contains("Namer::recorded(recording.recorded_fighter.or_else("));
+        assert!(panel.contains("PUBLISHED.player(), recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials)"));
         assert!(!panel.contains("recorded_identity("));
     }
 
@@ -1586,6 +1594,24 @@ mod tests {
         assert!(other.select_entry(0));
         let ClipEffect::Export(plain) = other.on_action(ClipAction::Confirm) else { panic!("export") };
         assert_eq!(plain.recorded_fighter, None);
+        // A crop wholly after a transformation is valid; the first form cannot name the later one's special.
+        archive.apply(VaultEvent::Begin { epoch: 2 }, 0);
+        for frame in 0..40 {
+            let sample = ReplayFrame { input: InputFrame::default(), x: 0.0, y: 0.0,
+                start: StartState::neutral(if frame < 20 { 8 } else { 9 }, 0, 1.0) };
+            archive.apply(VaultEvent::Sample { epoch: 2, entry: 1, sample, quantized: false }, 0);
+            if frame == 0 { archive.apply(VaultEvent::Fighter { epoch: 2, entry: 1, fighter: beta }, 0); }
+        }
+        archive.apply(VaultEvent::End { epoch: 2, truncated: false }, 0);
+        let mut later = ClipEditor::new(archive.session, vec![0]).unwrap();
+        later.on_action(ClipAction::SelectIn);
+        later.on_action(ClipAction::Nudge(20));
+        let ClipEffect::Preview(preview) = later.on_action(ClipAction::TogglePlay) else { panic!("later form preview") };
+        assert_eq!((preview.start.fighter_kind, preview.recorded_fighter), (9, None));
+        later.watch(&[Span { start: 2, end: Some(8), mv: Some(Move::UpSpecial), ..Span::default() }]);
+        later.preview_cursor(3);
+        assert_eq!(later.view().cursor, 22);
+        assert_eq!(later.view().move_text, "Start of Up special");
         // The three producers: each reads the identity once, on the game's own thread.
         for (text, wanted) in [
             (include_str!("../../runtime/features/recording_host.rs"), "rr_host::set_fighter_reader(role_fighter);"),

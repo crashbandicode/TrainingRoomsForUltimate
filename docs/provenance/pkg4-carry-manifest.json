@@ -1395,7 +1395,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "b5f3e750a2885c920a6ecdb24bb98a894645eeed5b3a05fdb7ac8641327a9fc8",
+   "dest_sha256": "40a152a7395654642cd1e6296ca31574b1104ce1a0c2c261c9d4504411fbd925",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1891,6 +1891,31 @@
     {
      "old": "    let _ = stored;\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
      "new": "    Namer::recorded(stored.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii)))",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            Ok(recording) => {\n                self.playing = true;",
+     "new": "            Ok(recording) => {\n                // The selected window may be a different form from the track's first frame.\n                self.marks.set_namer(saved_namer(&recording));\n                self.playing = true;",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording,\n                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)),",
+     "new": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording)),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    Marks::from_inputs(track.frames.iter().map(|frame| frame.input))\n        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None, track.fighter))\n}",
+     "new": "    Marks::from_inputs(track.frames.iter().map(|frame| frame.input))\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    Namer::recorded(stored.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii)))",
+     "new": "    Namer::recorded(recording.recorded_fighter.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(\n        PUBLISHED.player(), recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))))",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "fn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {",
+     "new": "fn saved_namer(recording: &MacroRecording) -> crate::model::move_names::Namer<'static> {",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]

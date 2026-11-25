@@ -329,14 +329,14 @@ fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
 
 /// The move names of a saved take or capture: the toggle, and its own fighter's special names when they are known
 /// (the identity stored with it, else `clip_marks::take_identity`); the common names otherwise.
-fn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {
+fn saved_namer(recording: &MacroRecording) -> crate::model::move_names::Namer<'static> {
     use crate::model::move_names::{Namer, PUBLISHED};
-    Namer::recorded(stored.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii)))
+    Namer::recorded(recording.recorded_fighter.or_else(|| crate::engine::macro_ui::clip_marks::take_identity(
+        PUBLISHED.player(), recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))))
 }
 
 fn track_marks(track: &ReplayTrack) -> Marks {
     Marks::from_inputs(track.frames.iter().map(|frame| frame.input))
-        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None, track.fighter))
 }
 
 impl ClipEditor {
@@ -380,8 +380,7 @@ impl ClipEditor {
 
     fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
         let marks = match &file {
-            FileSource::Macro { recording, .. } => Marks::from_recording(recording,
-                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)),
+            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording)),
             FileSource::Combo(recording) => Marks::from_units(
                 crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()
                     .filter(|line| crate::model::recording_menu::link_head(line))),
@@ -557,6 +556,8 @@ impl ClipEditor {
         }
         match self.export_selection("Preview") {
             Ok(recording) => {
+                // The selected window may be a different form from the track's first frame.
+                self.marks.set_namer(saved_namer(&recording));
                 self.playing = true;
                 ClipEffect::Preview(Box::new(recording))
             }
