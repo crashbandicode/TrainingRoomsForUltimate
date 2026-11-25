@@ -15,10 +15,10 @@ action, result) before a clip was kept. The raw takes stay outside git with thei
   read at 1280×720.
 - **In the picture:** the stage is Final Destination's flat form. The yellow BRIDGE LIVE banner is the test bridge's
   overlay.
-- **Frame pacing:** the game ran at 61.0 to 62.6 frames a second under a 60 fps capture, so a few frames repeat;
-  `i4-cpu-damage-range.mp4` has three repeated frames.
-- **Not here:** the ledge attack was not filmed. The 1080p evidence clips, the GIFs, the trip-attack clips and the
-  other takes stay outside git, under `artifacts/phase23/install4-media/20261125-1352Z/` with their ledger.
+- **Frame pacing:** the game ran at 61.0 to 62.6 fps, so the 60 fps capture could not include every game frame.
+  Some captured frames also repeat: `i4-cpu-damage-range.mp4` has three repeats.
+- **Not here:** the ledge attack was not filmed. The 1080p evidence clips, GIFs and trip-attack clips are retained
+  with the ledger under `artifacts/phase23/install4-media/20261125-1352Z/`. The raw films were removed after encoding.
 - **Total:** 27,393,733 bytes.
 
 | File | Shows | Picture | Bytes | sha256 |

@@ -188,7 +188,7 @@ tool's, not TrainingRooms'.
 **Trim: Off, Start, End and Both**
 
 <video src="media/i4-trim-modes.mp4" autoplay muted loop playsinline controls></video><br>
-*The same take played with each Trim setting, side by side. With Start and Both the attack comes at once; with Off and End the idle lead-in plays first. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-trim-modes.mp4)
+*The same inputs were recorded four times, once per Trim setting. On playback, Start and Both skip the idle lead-in; Off and End keep it. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-trim-modes.mp4)
 
 **The playback indicator**
 
