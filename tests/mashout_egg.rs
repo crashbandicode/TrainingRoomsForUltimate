@@ -272,15 +272,19 @@ fn actual_runtime_egg_preparation_and_native_seed() {
 
 #[test]
 fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
-    let runtime = include_str!("../src/runtime/features/mashout.rs");
+    let runtime = include_str!("../src/runtime/features/stage_geometry.rs");
     let reader_start = runtime.find("#[repr(C, align(16))]").unwrap();
-    let reader_end = runtime.find("/// Supply only the selected move").unwrap();
+    let reader_end = runtime.find("/// The main floor under the camera's middle").unwrap();
+    let model = include_str!("../src/model/stage_geometry.rs");
+    let rule_start = model.find("/// True when the line is a placement floor.").unwrap();
+    let rule_end = model.find("/// One ray of the column scan").unwrap();
     let sites = include_str!("../src/model/sites_mashout.rs");
     let sites_start = sites.find("pub const FLOOR_RAY:").unwrap();
     let sites_end = sites.find("/// Fighter AttackModule").unwrap();
     let fixture = include_str!("support/mashout_floor_fixture.rs")
         .replace("// FLOOR_RAY_READER", &runtime[reader_start..reader_end].replace("pub(super)", "pub(crate)"))
         .replace("// FLOOR_SITE_SELECTION", &sites[sites_start..sites_end])
+        .replace("// FLOOR_RULE", &model[rule_start..rule_end])
         .replace(
             "/* GENERATED_SITES */ []",
             include_str!(concat!(env!("OUT_DIR"), "/tables/sites_mashout.SITES.rs")),
