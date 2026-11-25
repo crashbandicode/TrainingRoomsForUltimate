@@ -2853,7 +2853,7 @@ approved_by = "tr-primary-2 ruling 2026-11-24 23:31:00Z (the 3D line ceiling is 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 200138
-date = "2026-11-24"
-reason = "Install 4 merge 6: a drill step stores the move its press became in its own link record (no added bytes) and the bar and the menu show it instead of a step number. Measured 200138, 310 above the measured install-4 head 4905ec89 (199828)."
+ceiling = 200403
+date = "2026-11-25"
+reason = "Install 4 merge 6: a drill step stores the move its press became in its own link record (no added bytes) and the bar and the menu show it instead of a step number. Measured 200403, 310 above the measured install-4 head 74f9f21e (200093)."
 approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY, re-measured after the fold)."
