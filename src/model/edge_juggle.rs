@@ -3,6 +3,7 @@ use super::btt;
 use super::crosshair::{Crosshair, Marks};
 use super::panes::EGG_WHOLE;
 use crate::model::practice_state::Fields;
+use crate::model::stage_geometry as geometry;
 use super::practice_games::{record_max, record_time, result_tick, Game};
 
 #[path = "edge_juggle/perfect.rs"]
@@ -14,6 +15,9 @@ pub mod zoom;
 #[cfg(test)]
 #[path = "edge_juggle/crosshair_tests.rs"]
 mod crosshair_tests;
+#[cfg(test)]
+#[path = "edge_juggle/offstage_tests.rs"]
+mod offstage_tests;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
@@ -45,9 +49,11 @@ impl Drill {
         }
     }
 
-    /// The Edge recovery start is already airborne, so only aerial jumps are restored.
-    pub const fn placed_jump_count(self) -> i32 {
+    /// The Edge recovery start is already airborne, so only aerial jumps are restored. With the jumps `used`, the
+    /// counter starts at the fighter's own `max` (its `jump_count_max`), so no midair jump is left.
+    pub const fn placed_jump_count(self, used: bool, max: i32) -> i32 {
         match self {
+            Self::GuardEdge if used && max > 1 => max,
             Self::GuardEdge => 1,
             Self::Juggler => 0,
         }
@@ -774,6 +780,44 @@ pub struct Stage {
     blast: [f32; 4],
     camera: [f32; 4],
     pub ledges: [[f32; 2]; 2],
+    /// For the left and the right end: the default CPU start in the open air beside it; none where that end is
+    /// not a ledge with open air.
+    spots: [Option<[f32; 2]>; 2],
+}
+
+/// Why a drill cannot start where Player 1 stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartRefusal {
+    /// The stage could not be read.
+    Unread,
+    /// No solid floor under Player 1.
+    NoFloor,
+    /// Guard the Edge: the floor run has no ledge with open air beside it.
+    NoLedge,
+}
+
+/// The stage a drill starts on: the floor run Player 1 stands on, by the off-stage rule, with the default CPU start
+/// beside each of its ledges with open air, and Player 1's default start on it.
+pub fn start_stage(
+    stage: &mut impl geometry::Probe, drill: Drill, blast: [f32; 4], camera: [f32; 4], p1: [f32; 2],
+) -> Result<(Stage, [f32; 2]), StartRefusal> {
+    let unread = |_: geometry::Unread| StartRefusal::Unread;
+    let run = geometry::floor_run(stage, blast, p1).map_err(unread)?.ok_or(StartRefusal::NoFloor)?;
+    let mut spots = [None; 2];
+    for (spot, ledge) in spots.iter_mut().zip(run.ledges) {
+        if let Some(ledge) = ledge {
+            *spot = geometry::default_spot(stage, blast, ledge).map_err(unread)?;
+        }
+    }
+    if drill == Drill::GuardEdge && spots == [None; 2] {
+        return Err(StartRefusal::NoLedge);
+    }
+    let found = Stage::of_run(blast, camera, run.ends, spots).ok_or(StartRefusal::Unread)?;
+    // Player 1's default start: the camera's middle when the run holds it, as before; else Player 1's own column.
+    let middle = camera[0].midpoint(camera[1]);
+    let from = if found.on_run(middle) { [middle, blast[2]] } else { [p1[0], p1[1] + geometry::SLACK] };
+    let floor = stage.first(from, blast[3], false).map_err(unread)?.filter(|line| line.solid_floor());
+    Ok((found, floor.and_then(|line| line.height(from[0])).map_or(p1, |y| [from[0], y])))
 }
 
 impl Stage {
@@ -781,6 +825,28 @@ impl Stage {
         self.blast
     }
 
+    /// A floor run and the default spots beside its ends. Unlike `new`, an end may lie outside the blast lines:
+    /// it then has no spot.
+    pub fn of_run(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2], spots: [Option<[f32; 2]>; 2]) -> Option<Self> {
+        let [_, _, top, bottom] = blast;
+        let [[lx, ly], [rx, ry]] = ledges;
+        (blast.into_iter().chain(camera).chain(ledges.into_iter().flatten()).all(f32::is_finite)
+            && lx < rx
+            && [ly, ry].into_iter().all(|y| bottom < y && y < top))
+        .then_some(Self { blast, camera, ledges, spots })
+    }
+
+    /// The default CPU start beside an end; none where the end has no open air.
+    pub fn spot(self, side: usize) -> Option<[f32; 2]> {
+        self.spots[side]
+    }
+
+    /// Whether `x` lies on the floor run.
+    pub fn on_run(self, x: f32) -> bool {
+        self.ledges[0][0] <= x && x <= self.ledges[1][0]
+    }
+
+    #[cfg(test)]
     pub fn new(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2]) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;
@@ -793,10 +859,9 @@ impl Stage {
             && lx < rx
             && rx < right
             && [ly, ry].into_iter().all(|y| bottom < y && y < top))
-        .then_some(Self {
-            blast,
-            camera,
-            ledges,
+        .then(|| {
+            let stage = Self { blast, camera, ledges, spots: [None; 2] };
+            Self { spots: [stage.lower_middle(0), stage.lower_middle(1)], ..stage }
         })
     }
 
@@ -809,12 +874,14 @@ impl Stage {
         clamp_point(point, [left + 1.0, right - 1.0, top - 1.0, bottom + 1.0])
     }
 
+    #[cfg(test)]
     pub fn off_stage(self, point: [f32; 2]) -> Option<[f32; 2]> {
         (self.edge_cursor(point) == Some(point)
             && (point[0] <= self.ledges[0][0] - 1.0 || point[0] >= self.ledges[1][0] + 1.0))
             .then_some(point)
     }
 
+    #[cfg(test)]
     fn lower_middle(self, side: usize) -> Option<[f32; 2]> {
         let [left, right, _, bottom] = self.blast;
         let [x, y] = self.ledges[side];
@@ -859,6 +926,27 @@ impl Stage {
     }
 }
 
+/// Guard the Edge's two start options (the menu rows `edge_under` and `edge_jumps`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StartOptions {
+    pub under: bool,
+    pub jumps_used: bool,
+}
+
+impl StartOptions {
+    pub fn read(snapshot: &crate::model::settings::Snapshot) -> Self {
+        let select = |id| crate::model::tech_settings::selected(snapshot, id);
+        Self { under: select("edge_under") == 0, jumps_used: select("edge_jumps") == 1 }
+    }
+
+    /// Names the options in the drill's bridge state (`under=`, `jumps=`); Juggler has neither.
+    pub fn describe(self, drill: Drill, fields: &mut Fields) {
+        if drill == Drill::GuardEdge {
+            fields.start_options = Some([self.under, self.jumps_used]);
+        }
+    }
+}
+
 fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option<[f32; 2]> {
     (x.is_finite() && y.is_finite() && left <= right && bottom <= top)
         .then(|| [x.clamp(left, right), y.clamp(bottom, top)])
@@ -900,12 +988,28 @@ pub enum WizardStep {
     Preview,
 }
 
+/// A setup kept for Start without the wizard: the ends of the floor run it was made on, whether its CPU start is
+/// still the default, and whether A confirmed that start under the stage.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Kept {
+    pub run: perfect::Segment,
+    pub setup: Setup,
+    pub unmoved: bool,
+    pub under: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
+    #[cfg(test)]
     area_offset: Option<[f32; 2]>,
+    #[cfg(test)]
     left_start: Option<[f32; 2]>,
+    /// The default CPU start beside the left and the right end of the floor run.
+    starts: [Option<[f32; 2]>; 2],
     moved: bool,
+    /// The CPU start A confirmed lies under the stage.
+    under: bool,
     cross: Crosshair,
     floor_at: [f32; 2],
     pub step: WizardStep,
@@ -913,9 +1017,11 @@ pub struct Wizard {
 }
 
 impl Wizard {
-    pub fn new(
+    /// As `new`, with a fighter's own start kept only where `open` says the point is open air by the off-stage
+    /// rule; elsewhere the side's default is the rule's spot.
+    pub fn on(
         drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
-        stage_key: (i32, u32), fighter: Option<i32>,
+        stage_key: (i32, u32), fighter: Option<i32>, mut open: impl FnMut([f32; 2]) -> bool,
     ) -> Option<Self> {
         let link_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
@@ -1000,12 +1106,26 @@ impl Wizard {
             }
             _ => None,
         };
+        let mut starts = [None; 2];
+        for (side, start) in starts.iter_mut().enumerate() {
+            let Some(spot) = stage.spot(side) else { continue };
+            let offset = if side == 0 { left_start.or(area_offset) } else { area_offset };
+            let own = offset.map(|[outside, height]| {
+                let ledge = stage.ledges[side];
+                [if side == 0 { ledge[0] - outside } else { ledge[0] + outside }, ledge[1] + height]
+            });
+            *start = Some(own.filter(|&point| open(point)).unwrap_or(spot));
+        }
         let cpu = stage.default_juggle(p1);
         let mut wizard = Self {
             drill,
+            #[cfg(test)]
             area_offset,
+            #[cfg(test)]
             left_start,
+            starts,
             moved: false,
+            under: false,
             cross: Crosshair::new(cpu),
             floor_at: cpu,
             step: WizardStep::Cpu,
@@ -1016,24 +1136,26 @@ impl Wizard {
             },
         };
         if drill == Drill::GuardEdge {
-            wizard.setup.cpu = wizard.default_cpu(stage, 0)?;
+            wizard.setup.cpu = wizard.default_cpu(stage, 0).or_else(|| wizard.default_cpu(stage, 1))?;
             wizard.cross.jump(wizard.setup.cpu);
         }
         wizard.floor_at = wizard.cross.at;
         Some(wizard)
     }
 
-    pub fn default_cpu(&self, stage: Stage, side: usize) -> Option<[f32; 2]> {
-        let offset = if side == 0 { self.left_start.or(self.area_offset) } else { self.area_offset };
-        if let Some([outside, height]) = offset {
-            let ledge = stage.ledges[side];
-            let x = if side == 0 { ledge[0] - outside } else { ledge[0] + outside };
-            let point = [x, ledge[1] + height];
-            if stage.off_stage(point) == Some(point) {
-                return Some(point);
-            }
-        }
-        stage.lower_middle(side)
+    /// The one-solid form of `on`: a fighter's own start is kept where it is at least 1 unit outside a ledge.
+    #[cfg(test)]
+    pub fn new(
+        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
+        stage_key: (i32, u32), fighter: Option<i32>,
+    ) -> Option<Self> {
+        Self::on(drill, stage, p1, percent, stage_key, fighter, |point| stage.off_stage(point).is_some())
+    }
+
+    /// The default CPU start on a side of the stage the wizard was made for: the fighter's own start where the
+    /// rule called it open air, else the rule's spot; none where that end of the floor run has no open air.
+    pub fn default_cpu(&self, _stage: Stage, side: usize) -> Option<[f32; 2]> {
+        self.starts[side]
     }
 
     pub fn unmoved(&self) -> bool {
@@ -1067,6 +1189,7 @@ impl Wizard {
     pub fn back_to_defaults(&mut self, defaults: Setup) {
         self.setup = defaults;
         self.moved = false;
+        self.under = false;
         self.step = WizardStep::Preview;
         self.jump_page();
     }
@@ -1080,12 +1203,28 @@ impl Wizard {
         setup
     }
 
+    /// What Start keeps of this wizard's setup.
+    pub fn kept(&self, stage: Stage) -> Kept {
+        Kept { run: stage.ledges, setup: self.setup, unmoved: self.unmoved(), under: self.under }
+    }
+
+    /// The setup Start uses without the wizard. A kept one is reused only on the floor run it was made on (the
+    /// saved ends are compared), and a CPU start that A confirmed under the stage only while that option is On.
+    /// The place A confirmed decides; nothing is read or measured again. `None`: Start opens the wizard at this
+    /// run's defaults.
+    pub fn kept_setup(&self, stage: Stage, kept: Kept, options: StartOptions) -> Option<Setup> {
+        let taken = self.drill == Drill::Juggler || !kept.under || options.under;
+        (kept.run == stage.ledges && taken).then(|| self.remembered(stage, kept.setup, kept.unmoved))
+    }
+
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
-        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu {
+        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu || (other && self.starts.contains(&None)) {
             return;
         }
         let side = stage.side(self.setup.cpu[0]) ^ usize::from(other);
-        if let Some(cpu) = self.default_cpu(stage, side) {
+        // The point's own side may have no ledge with open air: its default is then the other side's.
+        let own = || self.default_cpu(stage, side).or_else(|| self.default_cpu(stage, side ^ 1));
+        if let Some(cpu) = if other { self.default_cpu(stage, side) } else { own() } {
             self.setup.cpu = cpu;
             self.moved = false;
             self.cross.jump(cpu);
@@ -1111,8 +1250,29 @@ impl Wizard {
         }
     }
 
-    pub fn accepts_cpu(&self, stage: Stage) -> bool {
-        self.drill == Drill::Juggler || stage.off_stage(self.setup.cpu).is_some()
+    /// Whether the drill takes a CPU start at this place: Guard the Edge in open air, or under the stage with
+    /// that option; Juggler over the stage or in open air.
+    pub fn takes(&self, place: geometry::Place, options: StartOptions) -> bool {
+        match self.drill {
+            Drill::GuardEdge => place.off_stage(options.under),
+            Drill::Juggler => matches!(place, geometry::Place::OverStage | geometry::Place::Open),
+        }
+    }
+
+    /// A on the CPU page, once the rule has classed the point A was pressed on. `None`: the press is stale, the
+    /// page or the point has changed since. An unread stage refuses the point.
+    pub fn confirm_start(
+        &mut self, at: [f32; 2], place: Result<geometry::Place, geometry::Unread>, options: StartOptions,
+    ) -> Option<bool> {
+        if self.step != WizardStep::Cpu || self.setup.cpu != at {
+            return None;
+        }
+        let taken = place.is_ok_and(|place| self.takes(place, options));
+        if taken {
+            self.under = place == Ok(geometry::Place::Under);
+            self.advance();
+        }
+        Some(taken)
     }
 
     /// The Player page keeps its cursor over a floor: a move with none under it is undone.
@@ -1487,9 +1647,9 @@ mod tests {
         // Stock jump_count_max includes the ground jump. The verified Sheik,
         // Pit and Meta Knight starts have one, three and five aerial jumps.
         for (native_max, reference_reserve) in [(2, 1), (4, 3), (6, 5)] {
-            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
+            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(false, native_max), reference_reserve);
         }
-        assert_eq!(Drill::Juggler.placed_jump_count(), 0);
+        assert_eq!(Drill::Juggler.placed_jump_count(false, 2), 0);
     }
 
     #[test]

@@ -107,7 +107,7 @@ fn bridge_page_list_counts_only_cursor_stops_and_writes_drawn_values() {
 fn bridge_game_lists_match_in_training_and_waiting_rooms() {
     use crate::model::bridge_state::list_view;
     for (game, group, count, want) in [
-        (Game::GuardEdge, table::EDGE, 7, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "CPU percent", "Attempts", "Zoom landing window"][..]),
+        (Game::GuardEdge, table::EDGE, 9, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "Under the stage", "CPU percent", "CPU midair jumps", "Attempts", "Zoom landing window"][..]),
         (Game::Juggler, table::JUGGLE, 6, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "Attempts", "Zoom landing window"][..]),
     ] {
         for waiting_room in [false, true] {
@@ -129,11 +129,32 @@ fn bridge_game_lists_match_in_training_and_waiting_rooms() {
 }
 
 #[test]
+fn guard_the_edge_lists_its_two_start_options() {
+    assert_eq!(titles(table::EDGE), ["Start", "CPU fighter and mode", "Reaction", "Set up…", "Under the stage", "CPU percent",
+        "CPU midair jumps", "Attempts", "Zoom landing window"]);
+    let under = &ROWS[row("Under the stage", table::EDGE)];
+    assert_eq!(under.id, "edge_under");
+    assert!(matches!(under.control, Control::Toggle));
+    assert_eq!(under.help, "Off (default): the CPU start must be beside the stage.\nOn: A also takes a point under the stage.");
+    let jumps = &ROWS[row("CPU midair jumps", table::EDGE)];
+    assert_eq!(jumps.id, "edge_jumps");
+    assert!(matches!(jumps.control, Control::Dropdown(["Kept", "Used"])));
+    assert_eq!(jumps.help, "Kept (default): the CPU starts with its midair jumps.\nUsed: it starts with every midair jump already spent.");
+    for r in [under, jumps] {
+        let (a, b) = r.help_lines();
+        assert!(!b.is_empty() && a.chars().count() <= 67 && b.chars().count() <= 67, "{}", r.title);
+    }
+    // Both are Guard the Edge's: Juggler has neither.
+    assert!(ROWS.iter().all(|r| r.group != table::JUGGLE || !matches!(r.id, "edge_under" | "edge_jumps")));
+    assert_eq!(ROWS.iter().filter(|r| matches!(r.id, "edge_under" | "edge_jumps")).count(), 2);
+}
+
+#[test]
 fn bridge_dropdown_and_slider_follow_the_active_screen() {
     use crate::model::bridge_state::{list_view, ListView};
     let mut m = opened(Game::GuardEdge);
-    for _ in 0..5 { m.press(Button::Down); }
-    let row = m.sub_rows(table::EDGE).nth(5).unwrap();
+    for _ in 0..7 { m.press(Button::Down); }
+    let row = m.sub_rows(table::EDGE).nth(7).unwrap();
     let before = list_view(&m).value;
     m.press(Button::Right);
     let after = list_view(&m).value;
@@ -356,6 +377,36 @@ fn running_shows_in_green_on_the_list_and_stop_on_the_sub_screen() {
     // Not running: Start, ">".
     let f = frame(&opened(Game::Eggs));
     assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy(), f.rows[0].value_tone), ("Start".into(), ">".into(), Tone::Normal));
+}
+
+/// The Ally rows of 2026-11-25 (run `tso-3fd708bc-ally-1`): on the Training stage Start did nothing, and the menu then
+/// read "Running" for a drill that never started.
+#[test]
+fn a_refused_start_ends_the_game_so_the_menu_reads_start() {
+    // The row follows the running game: Stop and Running while it runs, Start once it has ended.
+    for game in [Game::GuardEdge, Game::Juggler] {
+        let mut m = running(game);
+        on_list(&mut m, game);
+        m.press(Button::A);
+        let f = frame(&m);
+        assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy()), ("Stop".into(), "Running  >".into()));
+        assert_eq!(f.help[0].string_lossy(), format!("{} is running. A stops it, and the row reads Start.", game.title()));
+        let f = frame(&opened(game));
+        assert_eq!((f.rows[0].label.string_lossy(), f.rows[0].value.string_lossy(), f.rows[0].value_tone), ("Start".into(), ">".into(), Tone::Normal));
+    }
+    // A start the drill's frame refuses ends the game before the frame returns, so nothing is left running.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    let drill_frame = runtime.split_once("pub unsafe fn frame(").unwrap().1;
+    let refused = drill_frame.split_once("Err(refusal) => {").expect("the refused start").1.split_once("return;").unwrap().0;
+    assert!(refused.contains("START.store(0, Ordering::Release);"));
+    assert!(refused.contains("practice::finish(drill.game());"));
+    assert!(refused.contains("published::WIZARDS.set_up(Kind::DrillStart, false);"));
+    assert!(!runtime.contains("let Some((stage, p1_start)) = setup_stage(p1) else"), "a failed start is no longer silent");
+    // The menu's "running" is the game the worker reports, and an ended game reports none.
+    let practice = include_str!("../../runtime/features/practice.rs");
+    let finish = practice.split_once("pub fn finish(game: Game)").unwrap().1.split_once("\n}").unwrap().0;
+    assert!(finish.contains("word & !GAME_MASK"));
+    assert!(include_str!("../../runtime/ui/worker.rs").contains("running: crate::runtime::features::practice::running(),"));
 }
 
 #[test]
