@@ -2878,7 +2878,7 @@ approved_by = "tr-primary-2 ruling 2026-11-24 23:01:06Z (the smoke fix's line ce
 scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 200471
-date = "2026-11-24"
+date = "2026-11-25"
 reason = "Install 4 integration, smoke fix 1: a release is graded only when the game reacted to it, and a reset chord alone leaves no result (fix/action-smoke-1 fd465242) on top of the menu-polish merge. Measured 200471 on the merged tree: the menu-polish head measures 200220 and the fix adds 251 (its own entry: 200344 on merge 3D, which measures 200093)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for smoke fix 1 (200344) and for the menu-polish merge (200220)."
 
