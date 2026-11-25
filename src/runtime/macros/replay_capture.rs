@@ -919,7 +919,7 @@ pub fn worker_preview_notices() {
                 } else { false }
             })
         };
-        if play { apply_action(ClipAction::TogglePlay); }
+        if play { apply_action_as(ClipAction::TogglePlay, true); }
     }
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
         let before = editor.view();
@@ -1032,7 +1032,9 @@ pub fn on_action(action: ClipAction) {
     apply_action(action);
 }
 
-fn apply_action(action: ClipAction) {
+fn apply_action(action: ClipAction) { apply_action_as(action, false); }
+
+fn apply_action_as(action: ClipAction, playback: bool) {
     if matches!(action, ClipAction::TogglePlay | ClipAction::Restart)
         && EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.switch) {
         notify("Wait for the requested fighter to load".into());
@@ -1071,7 +1073,11 @@ fn apply_action(action: ClipAction) {
             Err(error) => preview_failed(&error.to_string()),
             Ok(()) => {
                 TAIL.lock().unwrap().restart();
-                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());
+                if playback {
+                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());
+                } else {
+                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());
+                }
             }
         },
         Some(ClipEffect::PreviewFile { start, end, player }) => {
