@@ -78,17 +78,27 @@ pub fn close_panel() {
     }
 }
 
+/// What the Recording page's panels and the placement picker wait for, in the layer's own words: both practice
+/// fighters there (`practice`: the practice scene is on), and no record, playback or load in progress. One check, so
+/// the Replays row's Change placement says what its key grid said.
+pub fn practice_wait(practice: bool) -> Option<&'static str> {
+    if !practice || !crate::runtime::ui::facts::fact_fighters_present() {
+        return Some("Wait for both practice fighters");
+    }
+    if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
+        return Some("Finish the current practice action first");
+    }
+    None
+}
+
 /// Why `editor`'s panel did not open, in the words of the layer's own refusals (its notice is hidden while the menu is open, so the
 /// menu says it on the row's help line). The predicates are the layer's: the published facts, the recorder and the save states.
 pub fn refusal_of(editor: Editor, slot: Option<usize>) -> &'static str {
     if matches!(editor, Editor::NamedLibrary | Editor::SaveSlotToLibrary) && slot.is_none() {
         return "Choose a Record Slot first";
     }
-    if !crate::runtime::ui::facts::fact_fighters_present() {
-        return "Wait for both practice fighters";
-    }
-    if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
-        return "Finish the current practice action first";
+    if let Some(wait) = practice_wait(true) {
+        return wait;
     }
     match editor {
         Editor::ReplayWindow => "Open the replay window in idle practice, with a saved replay capture",

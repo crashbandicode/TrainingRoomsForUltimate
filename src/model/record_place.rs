@@ -2393,8 +2393,14 @@ mod tests {
         assert!(ask.contains("self.last_effect = Effect::ChangeActivePlacement;"));
         let host = include_str!("../runtime/features/recording_host.rs");
         let open = host.split("fn place_open(").nth(1).unwrap().split("\n}").next().unwrap();
-        for fact in ["fact_practice_enabled()", "fact_fighters_present()", "recording_or_playback()", "save_states::is_loading()"] {
-            assert!(open.find(fact).unwrap() < open.find("record_place::open_save(").unwrap(), "{fact}");
+        // The Recording panels' one check, asked before the picker is opened; its text is not copied here.
+        let asked = open.find("external::practice_wait(practice)").unwrap();
+        assert!(open.find("fact_practice_enabled()").unwrap() < asked && asked < open.find("record_place::open_save(").unwrap());
+        assert!(!open.contains("\"Wait for"));
+        let panels = include_str!("../runtime/ui/external.rs");
+        let wait = panels.split("pub fn practice_wait(practice: bool)").nth(1).unwrap().split("\n}").next().unwrap();
+        for fact in ["!practice", "fact_fighters_present()", "recording_or_playback()", "save_states::is_loading()"] {
+            assert!(wait.contains(fact), "{fact}");
         }
         // PC5: the picker is given the Advanced setting, so "always" skips the question.
         assert!(open.contains("rule: super::recorder::settings().shared,") && !open.contains("SharedStart::Prompt"));
