@@ -3948,6 +3948,42 @@ mod tests {
         assert_eq!(write.stick_x, playback_controller(stored).stick_x);
     }
 
+    /// A take with the role set to CPU while an AI writes Player 1's record: the record the poll is handed drives the
+    /// CPU and fills the take, and Player 1 is left neutral, as for a human.
+    fn a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("ai-cpu-take");
+        cpu_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord();
+        let _ = service_at(&root, &none(), "2026-11-25", state(13), state(7));
+        for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
+            assert!(drive_cpu(1).is_none());
+        }
+        let given = [(42u32, 80i8, -30i8), (7, -100, 100), (36_872, 0, 0)];
+        for (index, (buttons, x, y)) in given.into_iter().enumerate() {
+            let input = MappedInputs { buttons, lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL };
+            let mut player = input;
+            assert!(cpu_role_poll(&mut player));
+            assert_eq!(player, MappedInputs::NEUTRAL, "Player 1 stands neutral");
+            let write = cpu_role_control().write.expect("the CPU is driven");
+            let expected = playback_controller(to_frame(input));
+            assert_eq!((write.buttons, write.stick_x), (expected.buttons, expected.stick_x));
+            assert_eq!(unpack(CAP_FRAMES[index].load(Ordering::Acquire)), to_frame(input));
+        }
+        assert_eq!(CAP_LEN.load(Ordering::Acquire), 3);
+        on_chords(true, false, false);
+        cpu_role_after_chord();
+        let _ = service_at(&root, &none(), "2026-11-25", state(13), state(7));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let stored: Vec<_> = saved.frames.iter().map(|f| (f.buttons, f.lstick_x, f.lstick_y)).collect();
+        assert_eq!(stored, given);
+    }
+
     fn cpu_role_lockout_or_standby_press_is_not_stored() {
         let _hold = hold();
         reset_host();
@@ -6715,6 +6751,7 @@ mod tests {
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),
             ("save_last_combo_writes_the_latest_exchange_names_it_and_drills_it", save_last_combo_writes_the_latest_exchange_names_it_and_drills_it as fn()),
             ("a_player_take_stores_the_record_the_poll_was_given", a_player_take_stores_the_record_the_poll_was_given as fn()),
+            ("a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral", a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral as fn()),
             ("a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced", a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced as fn()),
             ("mismatch_holds_playback_until_keep_or_switch", mismatch_holds_playback_until_keep_or_switch as fn()),
             ("an_answered_mismatch_wakes_the_service_gate_and_plays", an_answered_mismatch_wakes_the_service_gate_and_plays as fn()),

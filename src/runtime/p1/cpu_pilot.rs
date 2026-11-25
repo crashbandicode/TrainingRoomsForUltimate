@@ -747,9 +747,15 @@ unsafe fn ai_process_begin(svc: usize) {
 }
 
 fn menu_busy() -> bool {
-    crate::runtime::compat::common::menu::captures_input()
-        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE)
-        || crate::runtime::lobby::training::recording_or_playback()
+    use crate::{engine::rr_host, model::recording::{fallback_waits, RecorderUse}};
+    let recorder = match (rr_host::slot_running(), rr_host::taking()) {
+        (true, _) => RecorderUse::Playback,
+        (false, true) => RecorderUse::Take,
+        (false, false) => RecorderUse::Idle,
+    };
+    let menu = crate::runtime::compat::common::menu::captures_input()
+        || crate::runtime::compat::sync::read(&crate::runtime::lobby::training::ui::menu::VANILLA_MENU_ACTIVE);
+    fallback_waits(menu, recorder)
 }
 
 /// Whether `init` installed the pilot's hook (the main base is set only after the guards passed and the hook went in).
@@ -758,7 +764,7 @@ pub(crate) fn installed() -> bool {
 }
 
 /// The fallback is emitting P1's input now (B4's `p1_driven_by_ai`): lock-free, readable from a game hook. False while it
-/// is off, not installed, or paused for a menu, a recording or a playback.
+/// is off, not installed, or paused for a menu or a playback.
 pub(crate) fn emitting() -> bool {
     installed() && EMITTING.load(Ordering::Acquire)
 }

@@ -263,10 +263,10 @@ start_observed slot=1`, then the CPU's status changes. The windows are listed in
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
 Playback is shown in the [Recording guide](guide/recording.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the chord and from the
-pop-up: the notice reads "P1 is controlled by an AI: recording is off", and nothing is recorded. A recording that is
-already running can always be stopped. Play on Player 1 and the waiting room's Quick Reset are refused the same way
-("… Play on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
+While an AI drives Player 1, for example the standalone CPU pilot, Record works (changed 2026-11-25): the take holds
+Player 1's inputs as the game receives them, the AI's included, and TrainingRooms' own P1 CPU Control keeps playing
+through the take. Play on Player 1 and the waiting room's Quick Reset are refused ("P1 is controlled by an AI: Play
+on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
 
 ### Combos
 

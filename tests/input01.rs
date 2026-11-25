@@ -439,7 +439,8 @@ fn r2_5_mash_interrupt_stops_a_running_playback_only_when_enabled() {
 
 /// Record's refusals as a start asks them. `ai` is whether an AI drives Player 1.
 fn start(ai: bool, present: bool, loading: bool) -> Option<RecordRefusal> {
-    record_refusal(ai, present, loading)
+    let _ = ai;
+    record_refusal(present, loading)
 }
 
 fn body<'a>(source: &'a str, name: &str) -> &'a str {
@@ -586,6 +587,17 @@ fn a_record_start_asks_no_scene_and_no_ai_fact() {
     }
     let quick = include_str!("../src/runtime/features/states/quick_reset.rs");
     assert!(quick.contains("p1_driven_by_ai("), "Quick Reset still asks");
+}
+
+/// tr-primary-2 2026-11-25: logs, the bridge and harness rows read `record_refused reason=N`. The AI reason's number,
+/// 0, is retired; the others keep theirs.
+#[test]
+fn record_refusal_reasons_keep_their_numbers() {
+    assert_eq!(RecordRefusal::FightersMissing as i64, 1);
+    assert_eq!(RecordRefusal::SaveStateLoading as i64, 2);
+    assert_eq!(RecordRefusal::Busy as i64, 3);
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    assert!(body(recorder, "unsafe fn chord_step(body: Body) {").contains("let reason = refusal as i64;"));
 }
 
 /// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts, and
