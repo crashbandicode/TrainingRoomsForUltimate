@@ -492,6 +492,7 @@ enum Act {
     PlaybackSlot,
     Trim,
     Bind,
+    Placement,
     Duplicate,
     Rename,
     Crop,
@@ -1086,8 +1087,8 @@ impl RecordingScreens {
             let group = if self.tab() == 0 { SAVES_MACROS } else { COMBOS_SEQ };
             let cpu = self.popup_role == ViewRole::Cpu;
             match (group, self.current_section(face, group), cpu) {
-                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
-                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   ZR role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, false) => "A bind   X place   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, true) => "A bind   X place   Left/Right section   ZR role   ZL+Up/Down page   B close",
                 (SAVES_MACROS, _, false) => {
                     "A set active   X loop   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close"
                 }
@@ -1191,7 +1192,10 @@ impl RecordingScreens {
             Button::ZR => self.set_popup_role(self.popup_role.other()),
             Button::ZL | Button::L | Button::R => self.toggle_tab(),
             Button::X => {
-                if self.in_macros(Face::Popup, group) {
+                if let Some(save) = self.focused(Face::Popup, group).filter(|item| item.kind == ItemKind::Save) {
+                    self.last_effect = Effect::ChangePlacement { save: save.id, relink: None };
+                    self.popup_open = false;
+                } else if self.in_macros(Face::Popup, group) {
                     self.cycle_x(self.popup_role);
                 } else if !self.preview_drill(Face::Popup, group) {
                     return false;
@@ -1210,7 +1214,13 @@ impl RecordingScreens {
     /// One Recording-page button. L, R, and B pass through unless a file screen is open.
     pub fn handle_page(&mut self, button: Button, on_library: bool, group: u8) -> PageHit {
         if self.page_overlay_open() {
-            return if self.press_overlay(button, Face::Page) { PageHit::Consumed } else { PageHit::Ignored };
+            let acted = self.press_overlay(button, Face::Page);
+            // Change placement leaves the menu for the picker on the live game.
+            if matches!(self.last_effect, Effect::ChangePlacement { .. }) {
+                self.file = None;
+                return PageHit::Close;
+            }
+            return if acted { PageHit::Consumed } else { PageHit::Ignored };
         }
         if button == Button::B && on_library && self.place(Face::Page, group).drills { self.toggle_drills(Face::Page, group); return PageHit::Consumed; }
         if button == Button::B && on_library && self.place(Face::Page, group).recordings { self.toggle_recordings(group); return PageHit::Consumed; }
@@ -1563,6 +1573,19 @@ impl RecordingScreens {
                 let Some(file) = self.file.as_ref() else { return };
                 let Some(side) = self.recording_by_id(&id).and_then(|recording| recording.sides.get(file.capture_side)) else { return };
                 self.last_effect = Effect::OpenRecording { id, entry: side.entry, player: file.capture_player, make, play };
+            }
+            Act::Placement => {
+                // The save itself; a macro's start save; a chain's macro 1's, with macro 1 the one a copy is linked to.
+                let target = match self.macro_by_id(&id) {
+                    Some(file) if file.chain => self.chain_start_id(file).map(str::to_owned).zip(file.steps.first().cloned()),
+                    Some(file) => file.start_save.clone().map(|save| (save, id.clone())),
+                    None => None,
+                };
+                self.last_effect = match target {
+                    Some((save, relink)) => Effect::ChangePlacement { save, relink: Some(relink) },
+                    None if kind == ItemKind::Save => Effect::ChangePlacement { save: id, relink: None },
+                    None => Effect::None,
+                };
             }
             Act::Duplicate => {
                 self.duplicate_save(&id);
@@ -2265,6 +2288,7 @@ impl RecordingScreens {
         let on = self.bound.as_deref() == Some(id);
         vec![
             row("Bind to Save / Load", if on { "On" } else { "Off" }, Act::Bind),
+            row("Change placement", "", Act::Placement),
             row("Duplicate", "", Act::Duplicate),
             row_rename(),
             row_delete(),
@@ -2277,6 +2301,7 @@ impl RecordingScreens {
             if let Some(save) = file.start_save.as_ref() {
                 let name = self.save_name(save).unwrap_or_else(|| save.clone());
                 rows.push(row("Start save", if file.start_save_on { format!("{name} · On") } else { "Off".into() }, Act::StartSave));
+                rows.push(row("Change placement", "", Act::Placement));
             }
         }
         rows.push(self.active_row(id));
@@ -2297,6 +2322,7 @@ impl RecordingScreens {
         if let Some(file) = self.macro_by_id(id) {
             if let Some(name) = self.chain_start_name(file) {
                 rows.push(row("Start save", if file.start_save_on { format!("{name} · On") } else { "Off".into() }, Act::StartSave));
+                rows.push(row("Change placement", "", Act::Placement));
             }
         }
         rows.push(self.active_row(id));
