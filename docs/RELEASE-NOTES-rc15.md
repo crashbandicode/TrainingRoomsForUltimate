@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -75,6 +75,17 @@ and the expected log lines), then the operator's full test on the console.
   fighter's own names whoever Player 1 is.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
 
+#### Playback starts without reading the library (merged 2026-11-25)
+
+- Play no longer reads the whole recording library before it starts. It reads the index, the file each side plays
+  and its start save, and nothing while a macro plays. How long a start now takes has not been measured in a game.
+- **Playback delay** is a new option under Recording › Options, None by default (10 to 120 frames). It waits after
+  the fighters are placed and before the first input, once per Play. It applies to Play on Player 1, Play on CPU, a
+  capture's Play back and Make combo's pass; not to the editor's previews or the CPU's Playback Slots.
+- **Known limit:** if Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can pass
+  what you hold instead of nothing. It is one frame at most, at the start.
+- More: [Playback delay](menu/recording.md#playback-delay).
+
 ### In work
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
@@ -89,8 +100,6 @@ Planned for this build and not merged yet. Each moves up to Merged when it lands
   the zone stops at the next solid.
 - **In work: placement's Off stage switch.** A fighter switched to Off stage whose spot is not off stage goes beside
   the nearest ledge that has open air. The crosshair then moves freely.
-- **In work: playback starts at once.** The wait before a recording starts to play is removed, and a playback delay
-  setting is added, with no delay by default. The operator reported the wait on install 4.
 - **In work: placement on the crosshair.** Changing where a save state puts the fighters uses the crosshair, on the
   save state itself.
 
@@ -160,8 +169,9 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
-  took a second or more to start. A fix for the wait is in work for the next build. They also asked for
-  placement changes and a Delete for replay captures; the Delete is merged for the next build.
+  took a second or more to start. A change for that wait is merged for the next build; it has not been timed in a
+  game. They also asked for placement changes and a Delete for replay captures; the Delete is merged for the next
+  build, and placement is in work.
 
 ## Install 3
 

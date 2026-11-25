@@ -146,13 +146,13 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 19:35 | install 3 | Quick Play: after a match the loser declined the rematch, picked a different fighter and came back to the room; the earlier fighter was put back as both the CPU and Player 1. | Install 4 (`6146f8e9`). Not run in Eden: the final session exercised no Quick Play feature of TrainingRooms. |
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
-| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | The wait and placement are in work for the next build, not merged. The Delete is merged for the next build (`3fd708bc`), host-tested only. |
+| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is merged for the next build (`445d1100`), host-tested only and not timed in a game. Placement is in work, not merged. The Delete is merged for the next build (`3fd708bc`), host-tested only. |
 
 ## The next build
 
 Merges after `a945b0c1` are listed in the release notes. Each head in the table passed the six gate steps on a build
-host (`artifacts/phase23/next-build/gate-<commit>/`). The five feature changes have host-test evidence; merely booting
-one of those builds does not test those changes.
+host (`artifacts/phase23/next-build/gate-<commit>/`). The feature changes in the table have host-test evidence; merely
+booting one of those builds does not test those changes.
 
 On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
 **before** the off-stage changes. Guard the Edge and Juggler did not start there. This was not a test of the proposed
@@ -167,3 +167,5 @@ operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is 
 | Preview stop and the pop-up's chord line | `d807f1e4` | `gate-d807f1e4` |
 | Delete for replay captures | `3fd708bc` | `gate-3fd708bc` |
 | The clip editor's marks name the form of a move | `c51f4d81` | `gate-c51f4d81` |
+| Stage geometry: one floor ray for every reader and the off-stage rule (no change in play intended) | `afd4ce01` | `gate-afd4ce01` |
+| Playback starts without reading the library; Playback delay | `445d1100` | `gate-2d140506` (one gate for this merge and the two docs merges after it) |
