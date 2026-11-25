@@ -805,8 +805,10 @@ mod tests {
     fn a_drill_crop_marks_every_step_and_names_it() {
         let editor = combo_editor(true);
         let view = editor.view();
+        let expected = crate::model::recording_menu::combo_link_lines(&combo(true), crate::model::move_names::Namer::recorded(None));
         assert_eq!(view.mark_count, 2);
-        assert!(view.move_text.contains("Step 1"));
+        assert!(expected[0].starts_with("S1 "));
+        assert!(view.move_text.contains(&expected[0]));
         let mut editor = editor;
         editor.on_action(ClipAction::SelectIn);
         editor.on_action(ClipAction::Nudge(1));
