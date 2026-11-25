@@ -717,7 +717,14 @@ impl ClipEditor {
                     Err(error) => ClipEffect::Error(error),
                 };
             }
-            ClipAction::Cancel => { self.pause(); return ClipEffect::Close; }
+            ClipAction::Cancel => {
+                if self.playing {
+                    self.pause();
+                    self.window.seek(self.window.start());
+                    return ClipEffect::StopPreview;
+                }
+                return ClipEffect::Close;
+            }
         }
         ClipEffect::StopPreview
     }
@@ -771,6 +778,44 @@ mod tests {
         let recording = MacroRecording::new("Recorded", "13.0.5", replay.track().frames[0].start,
             replay.track().frames.iter().map(|frame| frame.input).collect()).unwrap();
         ClipEditor::macro_file(recording, player).unwrap()
+    }
+
+    fn b_stops_a_clip_preview_without_leaving() {
+        for mut e in [editor(), saved_macro(false), saved_macro(true)] {
+            e.on_action(ClipAction::SelectIn);
+            e.on_action(ClipAction::Nudge(2));
+            for pad in [Pad::Back, Pad::Extra] {
+                assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));
+                e.preview_cursor(4);
+                assert!(e.view().playing);
+                let action = e.action_for_pad(pad).unwrap();
+                assert!(matches!(e.on_action(action), ClipEffect::StopPreview));
+                assert!(!e.view().playing);
+                assert_eq!(e.view().cursor, e.view().start);
+            }
+        }
+    }
+
+    fn a_second_b_leaves_the_editor() {
+        for mut e in [editor(), saved_macro(false), saved_macro(true)] {
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::Close));
+            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));
+            let view = e.view();
+            e.preview_cursor(view.end - view.start);
+            assert_eq!(e.view().cursor, view.end - 1);
+            assert!(e.view().playing);
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));
+            assert!(!e.view().playing);
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::Close));
+            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::Close));
+        }
     }
 
     fn replay_and_saved_macro_controls_have_parity() {
@@ -905,7 +950,7 @@ mod tests {
         let preview = e.action_for_pad(Pad::Extra).unwrap();
         assert!(matches!(e.on_action(preview), ClipEffect::Preview(_)));
         let cancel = e.action_for_pad(Pad::Back).unwrap();
-        assert!(matches!(e.on_action(cancel), ClipEffect::Close));
+        assert!(matches!(e.on_action(cancel), ClipEffect::StopPreview));
         assert!(e.confirm_release_pending());
         assert!(poll_a(&mut e, false, false, false).is_none());
         let confirm = e.action_for_pad(Pad::Confirm).unwrap();
@@ -1046,6 +1091,8 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("b_stops_a_clip_preview_without_leaving", b_stops_a_clip_preview_without_leaving as fn()),
+            ("a_second_b_leaves_the_editor", a_second_b_leaves_the_editor as fn()),
             ("a_saved_macro_previews_its_kept_window_on_its_role", a_saved_macro_previews_its_kept_window_on_its_role as fn()),
             ("a_replay_preview_stays_playing", a_replay_preview_stays_playing as fn()),
             ("the_preview_tail_waits_sixty_frames_after_the_last_input", the_preview_tail_waits_sixty_frames_after_the_last_input as fn()),

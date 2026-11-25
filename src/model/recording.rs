@@ -164,24 +164,22 @@ impl Phase {
 /// The header every recorder notice carries; the recorder clears it before it posts the next phase.
 pub const NOTICE_HEADER: &str = "Input Recording";
 
-/// Why a recording was not started.
+/// Why a recording was not started. The numbers are the `record_refused reason=` values logs and harness rows read;
+/// 0 was "an AI drives P1" (B4), retired on 2026-11-25 and never reused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecordRefusal {
-    /// B4: an AI drives P1 (the pilot or the fallback).
-    P1DrivenByAi,
     /// The CPU or P1 body is missing (hot swap, hat load).
-    FightersMissing,
+    FightersMissing = 1,
     /// A save state is loading (§6.4).
-    SaveStateLoading,
+    SaveStateLoading = 2,
     /// The CPU is not in a state the recorder can own (preview / capture owners, SPEC-input-01 §6.12).
-    Busy,
+    Busy = 3,
 }
 
 impl RecordRefusal {
     /// The HUD notice's text.
     pub const fn text(self) -> &'static str {
         match self {
-            RecordRefusal::P1DrivenByAi => "P1 is controlled by an AI: recording is off",
             RecordRefusal::FightersMissing => "Both fighters must be present",
             RecordRefusal::SaveStateLoading => "Wait for the save state to load",
             RecordRefusal::Busy => "Recording is busy",
@@ -190,27 +188,19 @@ impl RecordRefusal {
 }
 
 /// The first reason a recording cannot start, in the runtime's check order (`features/recorder.rs`
-/// applies it to the live facts). B4 (SPEC-input-01 question 7, decided 2026-11-01): an AI-driven P1
-/// is checked first — the pilot or the fallback drives entry 0 — then the missing fighters, then a
-/// save state loading.
-pub const fn record_refusal(
-    p1_driven_by_ai: bool,
-    entry0_present: bool,
-    save_state_loading: bool,
-) -> Option<RecordRefusal> {
-    if p1_driven_by_ai {
-        Some(RecordRefusal::P1DrivenByAi)
-    } else if !entry0_present {
-        Some(RecordRefusal::FightersMissing)
-    } else if save_state_loading {
-        Some(RecordRefusal::SaveStateLoading)
-    } else {
-        None
+/// applies it to the live facts): the missing fighters, then a save state loading. Who drives P1 is not
+/// asked (operator 2026-11-25, reversing B4 of 2026-11-01 for Record): a take holds P1's record as the
+/// game receives it, an AI's included.
+pub const fn record_refusal(entry0_present: bool, loading: bool) -> Option<RecordRefusal> {
+    match (entry0_present, loading) {
+        (false, _) => Some(RecordRefusal::FightersMissing),
+        (true, true) => Some(RecordRefusal::SaveStateLoading),
+        (true, false) => None,
     }
 }
 
 /// A Record chord for the recording worker, which toggles a capture (`rr_host::on_chords`). A chord that would start one
-/// asks `refusal` first, the same refusals as every other record start (B4 first); a chord that stops the running capture
+/// asks `refusal` first, the same refusals as every other record start; a chord that stops the running capture
 /// always passes, and `refusal` is not asked. `Ok` is whether a Record goes to the worker; `Err` is the notice instead.
 pub fn record_chord(
     record: bool,
@@ -224,7 +214,7 @@ pub fn record_chord(
 }
 
 /// rc.9 C14: Play on Player 1 writes Player 1's input, as an AI driving P1 does (the standalone CPU pilot, or the game's
-/// operator flag): its chord is refused then, with Record's B4 check (`p1_driven_by_ai`, asked only for a Play) and
+/// operator flag): its chord is refused then, with B4's check (`p1_driven_by_ai`, asked only for a Play) and
 /// notice style. `Ok` is whether the Play goes to the worker.
 pub fn play_player_chord(play_player: bool, p1_driven_by_ai: impl FnOnce() -> bool) -> Result<bool, &'static str> {
     if play_player && p1_driven_by_ai() {
@@ -234,7 +224,23 @@ pub fn play_player_chord(play_player: bool, p1_driven_by_ai: impl FnOnce() -> bo
     }
 }
 
-/// The refusal's notice, worded as Record's (`RecordRefusal::P1DrivenByAi`).
+/// What the recorder is doing, for TrainingRooms' own P1 CPU Control (the fallback pilot).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecorderUse {
+    Idle,
+    /// A take is open, or its Record edge is still to be serviced.
+    Take,
+    /// A Playback Slot run.
+    Playback,
+}
+
+/// Whether the fallback pilot stands down now: Player 1's pad goes back to the player and its AI does not think.
+/// It plays through a take, so the take holds what it wrote.
+pub const fn fallback_waits(menu: bool, recorder: RecorderUse) -> bool {
+    menu || matches!(recorder, RecorderUse::Playback)
+}
+
+/// The refusal's notice.
 pub const PLAY_PLAYER_AI_REFUSAL: &str = "P1 is controlled by an AI: Play on Player 1 is off";
 
 /// The standalone ssbu-cpu-pilot's state export, `ssbu_cpu_pilot_state_v1(out) -> bool` (ABI 1, its
@@ -253,7 +259,7 @@ pub struct PilotStateV1 {
     pub last_input: u64,
 }
 
-/// B4's `p1_driven_by_ai` for `record_refusal`: the game's operator flag on entry 0, TR's own fallback pilot (P1 CPU
+/// B4's `p1_driven_by_ai` (Play on Player 1 and Quick Reset ask it): the game's operator flag on entry 0, TR's own fallback pilot (P1 CPU
 /// Control), or the standalone pilot's own answer. Neither pilot drives P1 by flipping the flag (each arms the AI and
 /// returns its decision as P1's mapped input, `core/src/native.rs:242`; the fallback leaves no operation-CPU change
 /// behind), so the fallback says whether it is emitting P1's input now (`fallback`), and the standalone pilot's export

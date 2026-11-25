@@ -120,14 +120,13 @@ With the Online Deluxe plugin installed, some chords are held back so its own bu
 
 While an AI plays Player 1 (the CPU pilot), these are refused with a notice:
 
-- Record: "P1 is controlled by an AI: recording is off".
 - Play on Player 1: "P1 is controlled by an AI: Play on Player 1 is off".
 - L + R + A in a waiting room: "P1 is controlled by an AI: Quick Reset is off".
 
-More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
+Record works then: the recording holds Player 1's inputs as the game receives them, the AI's included (changed
+2026-11-25; not yet seen in a game).
 
-![The notice "P1 is controlled by an AI: recording is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-refusal.png)<br>
-*While the CPU pilot plays Player 1, Record shows "P1 is controlled by an AI: recording is off". Eden, rc.13 (untested on hardware).*
+More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
 
 ![The notice "P1 is controlled by an AI: Play on Player 1 is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-play-refusal.png)<br>
 *While the CPU pilot plays Player 1, Play on Player 1 shows "P1 is controlled by an AI: Play on Player 1 is off". Eden, rc.13 (untested on hardware).*

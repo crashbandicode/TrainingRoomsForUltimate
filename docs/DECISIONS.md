@@ -42,7 +42,7 @@ working default until they are. The new requirements the answers add are collect
 | B1 | Plugin name | `training_rooms` | **as recommended** |
 | B2 | Panic policy | log it, no pop-up | **as recommended** |
 | B3 | Another mod's training HUD layout | inject anyway, document it | **as recommended** |
-| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused | **as recommended** |
+| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused | **as recommended**; Record reversed 2026-11-25 (see the end) |
 | B5 | Input playback and the CPU settings | the recording wins | **the recording wins by default;** an advanced row lets the settings override it (default Off) |
 | B6 | Ice Climbers state | one state per fighter | **as recommended** |
 | B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere | **as recommended** |
@@ -294,6 +294,9 @@ drivers never fight over P1, and no new game site is needed. Cost: recording the
 alternative (reading P1's controller slot).
 
 ![B4 P1 AI](decisions/B4-p1-ai.png)
+
+**Reversed for Record on 2026-11-25:** see [Record while an AI plays Player 1](#record-while-an-ai-plays-player-1-2026-11-25).
+The CPU-settings half stands.
 
 ### B5 · Input playback and the CPU settings (`SPEC-cpu-02` question 7, `SPEC-cpu-04` question 6, `SPEC-cpu-06` question 7)
 
@@ -1990,3 +1993,34 @@ adapter reaches 150% from 0 at poll 168.
 
 This reverses SPEC-core-02's slider keys and increments (Left / Right handles, ±1 and ±10) and the r8 pop-up's L and R
 role keys (primary 2026-11-08 15:55Z).
+
+## Record while an AI plays Player 1 (2026-11-25)
+
+Decided by the operator on 2026-11-25 (about 14:05Z, relayed by tr-primary-2, inbox 14:02:10Z): "the mod shouldn't
+block record while ai plays player 1". The design was accepted by tr-primary-2 on 2026-11-25 14:15:33Z.
+
+- Record starts while the CPU pilot or P1 CPU Control plays Player 1, from the Record chord, which is the one start
+  for the pop-up, Record drill and Record placement, in Training and in waiting rooms.
+- The take holds Player 1's inputs as the game receives them: the mapped record after the pilot or P1 CPU Control
+  wrote it. P1 CPU Control keeps playing through a take; it still waits for a menu and for a Playback Slot run.
+- With the Recording role set to CPU, those inputs drive the CPU and fill the take, and Player 1 stands neutral, as
+  for a player.
+- The `record_refused` log reasons keep their numbers (1 fighter missing, 2 save state loading, 3 busy); 0 is
+  retired.
+- Unchanged: Play on Player 1 and the waiting room's L + R + A Quick Reset are refused while an AI plays Player 1,
+  and the CPU settings never apply to entry 0.
+
+This reverses the Record half of B4 (2026-11-01: "Record is refused with a notice"). Vault and match captures never
+had that refusal. Host tests only; not yet seen in a game.
+
+## Preview stop and Recording chord hints (2026-11-25)
+
+Decided by the operator on 2026-11-25 (relayed by tr-primary-2, inbox 14:29:24Z): the five preview entry points share
+B as the stop key and `B stop preview` as their hint. B stops and drops the remaining frames without closing the
+editor; a second B closes it. X also stops, and an editor ZR tap switches target and stops a preview.
+
+The Recording pop-up's first help line shows the configured Record and Play chords. It uses the full names when they
+fit the pane's UTF-16 capacity and width, then P1 and CPU, then a pointer to the chords screen. The hint shows only
+while the preview is running; the key line reads `B back` during the approximately one-second tail (tr-primary-2's
+ruling, 2026-11-25 15:11:54Z). The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended
+after review by rv-hit-streak at 14:36:00Z.

@@ -327,6 +327,35 @@ mod tests {
     lib_unit_tests! {
     use super::*;
 
+    fn a_physical_b_is_neutral_while_a_preview_owns_player_one() {
+        let actual = MappedInputs { buttons: crate::model::edge_juggle::perfect::SPECIAL, ..MappedInputs::NEUTRAL };
+        let mut queue = DelayQueue::new();
+        for owner in [Owners::MENU, Owners::REPLAY_EDITOR] {
+            assert_eq!(queue.poll_with(0, owner, actual, Sticks::NEUTRAL).0, MappedInputs::NEUTRAL);
+        }
+        assert_eq!(queue.poll_with(0, Owners::NONE, actual, Sticks::NEUTRAL).0, actual);
+        assert!(crate::model::flow::menu_owns_input(true, false, false, false));
+        assert!(crate::model::flow::menu_owns_input(false, true, false, false));
+        let worker = include_str!("../runtime/ui/worker.rs");
+        assert!(worker.contains("PREVIEW_HIDES.store(true, Ordering::Release)"));
+        assert!(worker.contains("let gone = !(OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire))"));
+        assert!(worker.contains("if popup && !open {"));
+        assert!(worker.contains("INPUT_OWNERS.fetch_or(Owners::MENU.bits()"));
+        assert!(worker.contains("flow::menu_owns_input(open, popup, CLOSING.load(Ordering::Acquire), PROMPT.load(Ordering::Acquire))"));
+        let input = include_str!("../runtime/ui/input.rs");
+        assert!(input.contains("INPUT_OWNERS.fetch_or(Owners::MENU.bits()"));
+        let macros = include_str!("../runtime/macros/mod.rs");
+        assert!(macros.contains("let held = replay_capture::panel_visible() || replay_capture::browser_visible();"));
+        assert!(macros.contains("(Owners::REPLAY_EDITOR, held)"));
+        assert!(macros.contains("published::INPUT_OWNERS.fetch_or(owner.bits()"));
+        assert!(include_str!("../runtime/macros/port.rs").contains("super::sync_owner();"));
+        assert!(include_str!("../runtime/features/input_delay.rs").contains("adapter.poll_with(&published::INPUT_OWNERS"));
+        let capture = include_str!("../runtime/macros/replay_capture.rs");
+        let panel = capture.split("pub fn panel_visible() -> bool").nth(1).unwrap()
+            .split("\n}").next().unwrap();
+        assert!(panel.contains("EDITOR.lock().unwrap().is_some()"));
+    }
+
     fn stop_hands_the_cpu_back_under_the_menu() {
         for bits in 0..64 {
             for running in [false, true] {
@@ -478,6 +507,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_physical_b_is_neutral_while_a_preview_owns_player_one", a_physical_b_is_neutral_while_a_preview_owns_player_one as fn()),
             ("stop_hands_the_cpu_back_under_the_menu", stop_hands_the_cpu_back_under_the_menu as fn()),
             ("the_drill_restore_is_wired", the_drill_restore_is_wired as fn()),
             ("two_polls_late", two_polls_late as fn()),
