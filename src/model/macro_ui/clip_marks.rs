@@ -46,15 +46,16 @@ impl Default for Marks {
 /// A mark's name: today's short name with the move-name toggle Off; with it On, what the combo and drill views write
 /// for the same move, variant and angle.
 pub fn mark_name(namer: Namer<'_>, mv: Move, variant: u8, angle: Option<Angle>) -> String {
-    let _ = (namer, variant, angle);
-    mv.name().into()
+    if !namer.is_on() { return mv.name().into(); }
+    let mut name = String::new();
+    let _ = crate::model::action::ActionDesc { mv, of: None, angle, normal: variant, parts: [None; 2] }.write(&mut name, false, namer);
+    name
 }
 
 /// The animation the watch reads for the fighter it follows. A sample carries one only for the acting side, so the
 /// other fighter's is read, and only while its status is a named move.
 pub fn watched_motion(sampled: u64, named: bool, read: impl FnOnce() -> u64) -> u64 {
-    let _ = (named, read);
-    sampled
+    if sampled != 0 || !named { sampled } else { read() }
 }
 
 fn angle_key(angle: Angle) -> &'static str {
@@ -139,7 +140,21 @@ impl Watch {
     /// animation on the first frame the span has its move; a Jab that becomes the rapid jab or its finisher; a grab's
     /// throw. A side attack keeps the last angle its animation named.
     fn describe(&mut self, seen: Seen) {
-        let _ = (seen, Normal::Unknown, self.told);
+        let span = &mut self.spans[self.len - 1];
+        let (Some(mv), Some(now)) = (span.mv, seen.mv) else { return };
+        let normal = Normal::of(seen.motion);
+        if !self.told {
+            span.variant = normal as u8;
+            self.told = true;
+        } else if (mv == Move::Jab && now == Move::Jab && matches!(normal, Normal::RapidJab | Normal::RapidJabFinisher))
+            || (mv == Move::Grab && now == Move::Throw
+                && matches!(normal, Normal::ForwardThrow | Normal::BackThrow | Normal::UpThrow | Normal::DownThrow))
+        {
+            span.variant = normal as u8;
+        }
+        if matches!(now, Move::SideTilt | Move::SideSmash) {
+            if let Some(angle) = frame_strip::angle_of(seen.motion) { span.angle = Some(angle); }
+        }
     }
     pub fn run(&self) -> u32 { self.run }
     pub fn spans(&self) -> &[Span] { &self.spans[..self.len] }

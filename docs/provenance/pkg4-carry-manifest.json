@@ -534,7 +534,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "5a412d1a14d2ad6c71a5d33925776e89953a32cd11e3540d0cb68017679f7615",
+   "dest_sha256": "6abd1bb13821bc2d252c39ed23bce04a39409e99082494b4b48256bd09c1e734",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -619,6 +619,16 @@
      "old": "            frames,\n            actions: Vec::new(),\n            start_save: None,",
      "new": "            frames,\n            trim: crate::model::trim::Trim::Off,\n            actions: Vec::new(),\n            start_save: None,",
      "reason": "New recordings default to Off for the per-file trim field."
+    },
+    {
+     "old": "    pub mv: Option<String>,\n}",
+     "new": "    pub mv: Option<String>,\n    /// The move's variant as a combo link's description stores it (`move_names::Normal`); 0 is none and is not written.\n    #[serde(default, skip_serializing_if = \"is_no_variant\")]\n    pub variant: u8,\n    /// A side tilt's or side smash's angle, `up` or `down`, as a combo link's description stores it.\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n    pub angle: Option<String>,\n}\n\nfn is_no_variant(variant: &u8) -> bool {\n    *variant == 0\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "\n#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\npub struct ActionMark {",
+     "new": "\n#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]\npub struct ActionMark {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -1260,7 +1270,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "c54cc886d59c75dcb9165c1b618e915a10823b0b2b3926f5997eedb11a8ae876",
+   "dest_sha256": "2b80d00a88ca60ba7213e333215d5c7d816c46201323cbbfd00b94e1c2e1178e",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1677,6 +1687,36 @@
      "old": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }\n        else { \"\" },",
      "new": "    let controls = format!(\"{}{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" } else { \"\" },\n        if view.target.is_some() { \"ZR Player/CPU. \" } else { \"\" },",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                    self.marks = Marks::from_inputs(self.session.tracks[0].frames.iter().map(|frame| frame.input));",
+     "new": "                    self.marks = track_marks(&self.session.tracks[0]);",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        self.marks = Marks::from_inputs(self.session.tracks[index].frames.iter().map(|frame| frame.input));",
+     "new": "        self.marks = track_marks(&self.session.tracks[index]);",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording),",
+     "new": "            FileSource::Macro { recording, .. } => Marks::from_recording(recording, saved_namer(recording.start.fighter_kind)),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let marks = Marks::from_inputs(session.tracks[0].frames.iter().map(|frame| frame.input));",
+     "new": "        let marks = track_marks(&session.tracks[0]);",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "impl ClipEditor {\n    pub fn new(session: ReplaySession, clean_statuses: Vec<i32>) -> Result<Self, String> {",
+     "new": "impl ClipEditor {\n    /// The same take or capture with its marks named by `namer` instead of the published toggle and fighter.\n    pub fn with_namer(mut self, namer: crate::model::move_names::Namer<'static>) -> Self {\n        if let Some(FileSource::Macro { recording, .. }) = &self.file {\n            self.marks = Marks::from_recording(recording, namer);\n        } else if self.file.is_none() {\n            self.marks = Marks::from_inputs(self.session.tracks[self.track].frames.iter().map(|frame| frame.input)).named(namer);\n        }\n        self\n    }\n\n    pub fn new(session: ReplaySession, clean_statuses: Vec<i32>) -> Result<Self, String> {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "\nimpl ClipEditor {",
+     "new": "\n/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that\n/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.\nfn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};\n    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))\n}\n\nfn track_marks(track: &ReplayTrack) -> Marks {\n    Marks::from_inputs(track.frames.iter().map(|frame| frame.input))\n        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind)))\n}\n\nimpl ClipEditor {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },

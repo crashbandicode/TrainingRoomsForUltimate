@@ -448,7 +448,7 @@ pub unsafe fn sample_frame(player: usize) {
     } else {
         None
     };
-    if let Some((run, index, (s, _accessor))) = watched {
+    if let Some((run, index, (s, accessor))) = watched {
         let mv = ids.attack(s.status).or(ids.named_move(s.status));
         rr_host::watch_feed(run, index, crate::engine::macro_ui::clip_marks::Seen {
             busy: !s.actionable && !s.hitstun && !s.shieldstun,
@@ -456,7 +456,8 @@ pub unsafe fn sample_frame(player: usize) {
             status: s.status,
             motion_frame: s.motion_frame,
             stop: s.stop,
-            motion: 0,
+            // SAFETY: `accessor` is the watched fighter's live accessor of this frame.
+            motion: crate::engine::macro_ui::clip_marks::watched_motion(s.motion, mv.is_some(), || unsafe { p1_motion(accessor) }),
         });
     }
     if !sampling && !input_drill {
