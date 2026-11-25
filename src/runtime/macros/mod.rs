@@ -106,7 +106,6 @@ pub(crate) unsafe fn frame_after(fighter: usize) {
         step(24);
         if crate::runtime::features::recorder::is_primary_cpu_body(module) {
             step(27);
-            named_macros::preview(module);
             // The facts the menu's entry points read (game reads stay in this wrapper, never on the menu worker).
             crate::runtime::ui::facts::publish_frame_facts(module);
             crate::runtime::ui::worker::wake();

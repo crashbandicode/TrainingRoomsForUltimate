@@ -638,7 +638,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     span: file.frames.len() as u32,
                 }, file.trim, MacroPlace {
                     offset: [file.placement.delta_x.to_bits(), file.placement.delta_y.to_bits()],
-                    rest: file.placement.momentum == crate::model::macros::MomentumMode::AtRest,
+                    rest: file.placement.momentum == crate::engine::macros::MomentumMode::AtRest,
                 }),
                 Err(file) => (MacroFile {
                     id,

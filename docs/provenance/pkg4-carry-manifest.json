@@ -2220,7 +2220,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "081724d3c034ff24e712f12fb61de9e8b765e37cb7b5a2f2eed49ea9a5db10d8",
+   "dest_sha256": "02a434bd5d40f6cdad0c2fcf47f2c461e3283f1db914a783bf4dee07c431692f",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -3048,6 +3048,303 @@
      "old": "            (\"edit_placement_opens_on_the_active_macro_and_writes_that_file\", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),\n",
      "new": "",
      "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "line_patch": [
+      [
+       143,
+       146,
+       []
+      ],
+      [
+       221,
+       221,
+       []
+      ],
+      [
+       223,
+       227,
+       []
+      ],
+      [
+       311,
+       317,
+       []
+      ],
+      [
+       332,
+       332,
+       []
+      ],
+      [
+       337,
+       337,
+       [
+        "/// Menu, naming, and the restore/character sequence for one macro."
+       ]
+      ],
+      [
+       346,
+       350,
+       []
+      ],
+      [
+       368,
+       370,
+       []
+      ],
+      [
+       403,
+       409,
+       []
+      ],
+      [
+       432,
+       438,
+       []
+      ],
+      [
+       492,
+       492,
+       [
+        "                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   B: return\","
+       ]
+      ],
+      [
+       510,
+       511,
+       []
+      ],
+      [
+       536,
+       549,
+       []
+      ],
+      [
+       649,
+       649,
+       []
+      ],
+      [
+       701,
+       720,
+       []
+      ],
+      [
+       809,
+       815,
+       []
+      ],
+      [
+       872,
+       873,
+       [
+        "        self.stop_playback();"
+       ]
+      ],
+      [
+       877,
+       877,
+       [
+        "    /// invalidate playback and character acknowledgments."
+       ]
+      ],
+      [
+       880,
+       880,
+       [
+        "        self.stop_playback();"
+       ]
+      ],
+      [
+       887,
+       887,
+       [
+        "    fn stop_playback(&mut self) {"
+       ]
+      ],
+      [
+       891,
+       892,
+       []
+      ],
+      [
+       905,
+       905,
+       []
+      ],
+      [
+       952,
+       952,
+       []
+      ],
+      [
+       1041,
+       1041,
+       []
+      ],
+      [
+       1113,
+       1113,
+       []
+      ],
+      [
+       1128,
+       1131,
+       []
+      ],
+      [
+       1188,
+       1188,
+       []
+      ],
+      [
+       1193,
+       1193,
+       [
+        "            Key::Empty => Effect::None,"
+       ]
+      ],
+      [
+       1197,
+       1219,
+       []
+      ],
+      [
+       1271,
+       1296,
+       []
+      ],
+      [
+       1347,
+       1396,
+       []
+      ],
+      [
+       1398,
+       1405,
+       []
+      ],
+      [
+       1407,
+       1407,
+       [
+        "            Screen::Save(_) | Screen::Library(_) => self.discard(),"
+       ]
+      ],
+      [
+       1412,
+       1423,
+       []
+      ],
+      [
+       1425,
+       1425,
+       []
+      ],
+      [
+       1511,
+       1511,
+       []
+      ],
+      [
+       1517,
+       1535,
+       []
+      ],
+      [
+       1594,
+       1594,
+       []
+      ],
+      [
+       1596,
+       1608,
+       [
+        "        Key::Empty => \"\","
+       ]
+      ],
+      [
+       1612,
+       1618,
+       []
+      ],
+      [
+       1824,
+       1857,
+       []
+      ],
+      [
+       1886,
+       1886,
+       [
+        "    fn saving_a_named_draft_keeps_its_selected_momentum() {"
+       ]
+      ],
+      [
+       1888,
+       1888,
+       []
+      ],
+      [
+       1892,
+       1892,
+       [
+        "        goto(&mut ui, 19);"
+       ]
+      ],
+      [
+       1894,
+       1897,
+       []
+      ],
+      [
+       1902,
+       1902,
+       [
+        "        assert_eq!(recording.placement.delta_x, 0.0);"
+       ]
+      ],
+      [
+       1951,
+       1951,
+       [
+        "    fn exact_mii_naming_retry_and_same_class_ack_keep_identity() {"
+       ]
+      ],
+      [
+       1976,
+       1977,
+       [
+        "        ui.restore_draft(ui.loaded.as_ref().unwrap().recording.clone());"
+       ]
+      ],
+      [
+       2189,
+       2190,
+       []
+      ],
+      [
+       2261,
+       2262,
+       []
+      ],
+      [
+       2264,
+       2264,
+       [
+        "            (\"saving_a_named_draft_keeps_its_selected_momentum\", saving_a_named_draft_keeps_its_selected_momentum as fn()),"
+       ]
+      ],
+      [
+       2266,
+       2266,
+       [
+        "            (\"exact_mii_naming_retry_and_same_class_ack_keep_identity\", exact_mii_naming_retry_and_same_class_ack_keep_identity as fn()),"
+       ]
+      ]
+     ],
+     "reason": "PC2/PC6 A, 2026-11-25 20:50:36Z: naming is not a placement entry. Remove the unopenable offset grid, its state and its keys; keep the draft's recorded offset, momentum, inputs and Mii through naming."
     }
    ]
   },
@@ -3343,7 +3640,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "4255c5088c9d068aecd75b4ff33857ade99851ef3996eec74d55a3429a543181",
+   "dest_sha256": "adc84b82417af6543c8aaf5eb571d895292f43747f05624eb18b79a322e98dbb",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -4354,6 +4651,53 @@
      "old": "        Ok(()) => {\n            crate::engine::rr_host::placement_written(&id);\n            notify(\"Placement written\");\n        }\n",
      "new": "        Ok(()) => notify(\"Placement written\"),\n",
      "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "line_patch": [
+      [
+       9,
+       9,
+       []
+      ],
+      [
+       411,
+       411,
+       []
+      ],
+      [
+       422,
+       422,
+       [
+        "        suspended: suspended(),"
+       ]
+      ],
+      [
+       588,
+       591,
+       []
+      ],
+      [
+       751,
+       757,
+       []
+      ],
+      [
+       787,
+       820,
+       []
+      ],
+      [
+       843,
+       843,
+       []
+      ],
+      [
+       884,
+       890,
+       []
+      ]
+     ],
+     "reason": "PC2/PC6 A, 2026-11-25 20:50:36Z: native macro naming handles the keyboard and Back, not placement. Drop the old grid's Y handler, overwrite action and no-longer-reachable spark marker."
     }
    ]
   },
