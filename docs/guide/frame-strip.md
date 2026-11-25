@@ -12,6 +12,9 @@ Set Display & Controls › [Input Display](../menu/display-and-controls.md#input
 Frame strip is the default. The default chord **R + D-pad Down** switches it without opening the menu; on a GameCube
 controller R is Z. The choice is saved, and you can change the chord in [Controls](controls.md#changing-a-chord).
 
+While Spacing grader is On the frame strip stays on screen, even with Input Display Off. Parry practice keeps it on
+screen the same way while it runs.
+
 The strip hides while a menu or the clip editor is open and comes back when it closes. It clears on a scene change,
 fighter replacement, Training reset or save-state load. While the strip is visible, the separate Frame Advantage
 notice stays down.

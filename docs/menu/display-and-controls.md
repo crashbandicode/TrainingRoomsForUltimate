@@ -107,6 +107,8 @@ On grades Player 1 hits, and Player 2 hits when the second fighter is player-con
 hurtbox. With the frame strip visible, the grade appears on the attacker's lane: **Excellent** near the hurtbox edge,
 **Good** slightly inside, and **OK** near its centre.
 
+While Spacing grader is On the frame strip stays on screen, even with Input Display Off.
+
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
@@ -131,6 +133,9 @@ More: [Frame strip › ADVANTAGE](../guide/frame-strip.md#advantage)
 Frame strip draws the last second of frames at the top of the screen: your presses, your frames and the CPU's, how
 each follow-up linked, and the frame advantage. It works in Training and in waiting-room practice. It steps aside while
 a menu or the clip editor is open, the waiting room's own menu included, and comes back when it closes. The combo or drill helper bar steps aside with it.
+
+While Spacing grader is On the frame strip stays on screen, even with Input Display Off. Parry practice keeps it on
+screen the same way while it runs.
 
 - **Values:** Off, Frame strip
 - **Default:** Frame strip
