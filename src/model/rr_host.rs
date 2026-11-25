@@ -17,7 +17,7 @@ use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
+    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, unused_name, Capture,
     KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
 };
 use crate::model::action::Late;
@@ -1641,10 +1641,66 @@ pub enum Placed {
     Saved { ticket: u32, pair: Box<[SavedState; 2]>, notice: String },
 }
 
-/// The picker confirmed a placement on the save its visit opened: the worker writes it.
+/// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
+fn place_open(root: &Path, book: &Book, save: &str, relink: Option<String>) -> Option<PlaceOpen> {
+    let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok()?;
+    let shared = Shared { macros: book.starts_from(save), from_macro: relink.is_some() };
+    Some(PlaceOpen { save: save.to_owned(), relink, name: file.name, pair: [file.player, file.cpu], edit: record_role(), shared })
+}
+
+/// The picker confirmed a placement on the save its visit opened: the worker writes it. Only what was edited is
+/// written, field by field (`record_place::patch`); with nothing edited no file is written and none is copied. A
+/// copy is a new save, written before `relink` is linked to it; if that link cannot be written the copy is
+/// removed again, so the old link stands. No macro file is touched otherwise: a macro's offset stays its own.
 pub fn commit_placement(root: &Path, save: &str, relink: Option<&str>, commit: Commit) -> Placed {
-    let _ = (root, save, relink);
-    Placed::Refused { ticket: commit.ticket, name: String::new() }
+    let ticket = commit.ticket;
+    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let Ok(mut file) = saves.load(save) else { return Placed::Refused { ticket, name: String::new() } };
+    let name = file.name.clone();
+    if !commit.edits.iter().any(|edit| edit.any()) {
+        return Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice: format!("Nothing changed · {name}") };
+    }
+    crate::model::record_place::patch([&mut file.player, &mut file.cpu], &commit.setup, commit.edits, commit.stage);
+    let notice = if commit.copy {
+        match copy_placed(root, &saves, &file, relink) {
+            Some(copy) => format!("Saved a copy · {copy}"),
+            None => return Placed::Refused { ticket, name },
+        }
+    } else {
+        if saves.overwrite(save, &file).is_err() {
+            return Placed::Refused { ticket, name };
+        }
+        invalidate_bound();
+        match commit.macros {
+            0 => format!("Saved · {name}"),
+            1 => format!("Saved · {name} · 1 macro starts here"),
+            macros => format!("Saved · {name} · {macros} macros start here"),
+        }
+    };
+    Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice }
+}
+
+/// The placed pair as a new save, and `relink` linked to it; the copy's name. `None`: nothing is left behind.
+fn copy_placed(root: &Path, saves: &Store<NamedSave>, placed: &NamedSave, relink: Option<&str>) -> Option<String> {
+    let names = saves.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
+    let copy = NamedSave::new(unused_name("Save", &names), placed.player.clone(), placed.cpu.clone()).ok()?;
+    let id = saves.save_new(&copy).ok()?;
+    if let Some(recording) = relink {
+        let macros = Library::new(root.join(MACROS_DIR));
+        let linked = macros.load(recording).ok().and_then(|mut file| {
+            file.set_start_save(Some(&id)).ok()?;
+            macros.overwrite(recording, &file).ok()
+        });
+        if linked.is_none() {
+            let _ = saves.delete(&id);
+            return None;
+        }
+    }
+    let _ = RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &id, Use::Recorded, unix_now())?;
+        Ok(true)
+    });
+    Some(copy.name)
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
@@ -2245,7 +2301,15 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
-        Effect::ChangePlacement { .. } | Effect::ChangeActivePlacement => {}
+        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, book, &save, relink),
+        // The Replays row: the start save of the pop-up role's active macro (a chain: its macro 1's).
+        Effect::ChangeActivePlacement => match placement_target(root) {
+            Ok(target) => {
+                tick.place = target.recording.start_save.as_deref()
+                    .and_then(|save| place_open(root, book, save, Some(target.id.clone())));
+            }
+            Err(refusal) => tick.notices.push(refusal),
+        },
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
