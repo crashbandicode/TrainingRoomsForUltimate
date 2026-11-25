@@ -1596,25 +1596,14 @@ pub fn setup_bound(restore: bool) {
     }
 }
 
-/// What Edit placement edits (primary 2026-11-08 #70 (a)): the active macro of the Recording pop-up's role (`RECORD_ROLE`,
-/// not the page's ZR view), the file Play plays, and the position its start save gives that role. Play warps there and
-/// adds the offset (`warp_pair`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct PlacementTarget {
-    pub role: Role,
-    pub id: String,
-    pub recording: MacroRecording,
-    pub anchor: (f32, f32),
-}
-
 /// The game's `SITUATION_KIND_AIR` (ground 0, cliff 1).
 const SITUATION_AIR: i32 = 2;
 
 pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
 pub const PLACE_NO_START: &str = "Link a start save to the macro first";
 
-pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
-    let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
+/// The save to open and the macro to relink on Copy. Reading the save belongs to `place_open`.
+fn active_placement_ids(root: &Path, role: Role) -> Result<(String, String), &'static str> {
     let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
     let active = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
     // A chain warps to macro 1's start save and plays with macro 1's placement (`play_placement`), so it edits macro 1.
@@ -1624,18 +1613,8 @@ pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
     };
     let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
     let start_on = chain_on.unwrap_or(recording.start_save_on);
-    let save = recording
-        .start_save
-        .as_deref()
-        .filter(|_| start_on)
-        .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
-        .ok_or(PLACE_NO_START)?;
-    let at = match role {
-        Role::Player => &save.player,
-        Role::Cpu => &save.cpu,
-    };
-    let anchor = (at.x, at.y);
-    Ok(PlacementTarget { role, id, recording, anchor })
+    let save = recording.start_save.filter(|_| start_on).ok_or(PLACE_NO_START)?;
+    Ok((save, id))
 }
 
 /// The placement a Play of `id` warps with: the file's own (a chain: macro 1's, whose start save it is).
@@ -1688,10 +1667,10 @@ pub enum Placed {
 
 /// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
 #[inline(never)]
-fn place_open(root: &Path, save: &str, relink: Option<String>) -> Option<PlaceOpen> {
-    let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok()?;
-    let shared = Shared { macros: macros_starting_from(root, save), from_macro: relink.is_some() };
-    Some(PlaceOpen { save: save.to_owned(), relink, name: file.name, pair: [file.player, file.cpu], edit: record_role(), shared })
+fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<PlaceOpen> {
+    let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save).ok()?;
+    let shared = Shared { macros: macros_starting_from(root, &save), from_macro: relink.is_some() };
+    Some(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared })
 }
 
 /// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
@@ -2320,14 +2299,17 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
-        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, &save, relink),
+        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, save, relink, record_role()),
         // The Replays row: the start save of the pop-up role's active macro (a chain: its macro 1's).
-        Effect::ChangeActivePlacement => match placement_target(root) {
-            Ok(target) => {
-                tick.place = target.recording.start_save.as_deref()
-                    .and_then(|save| place_open(root, save, Some(target.id.clone())));
+        Effect::ChangeActivePlacement => {
+            let role = record_role();
+            match active_placement_ids(root, role) {
+                Ok((save, id)) => {
+                    tick.place = place_open(root, save, Some(id), role);
+                    if tick.place.is_none() { tick.notices.push(PLACE_NO_START); }
+                }
+                Err(refusal) => tick.notices.push(refusal),
             }
-            Err(refusal) => tick.notices.push(refusal),
         },
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
@@ -6054,7 +6036,7 @@ mod tests {
         let root = scratch("placement");
         migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
         set_record_role(Role::Cpu);
-        assert_eq!(placement_target(&root), Err(PLACE_NO_MACRO));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_MACRO));
         let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
         let mut cpu = at_x(30.0);
         cpu.fighter_kind = 7;
@@ -6067,16 +6049,14 @@ mod tests {
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&loose), 1).unwrap();
         index.save(&root).unwrap();
-        assert_eq!(placement_target(&root), Err(PLACE_NO_START), "no warp, no anchor");
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_START));
         recording.set_start_save(Some(&start)).unwrap();
         recording.set_placement(Placement { delta_x: 1.5, delta_y: 0.0, ..Placement::default() }).unwrap();
         let id = macros.save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&id), 2).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("the CPU's active macro");
-        assert_eq!((target.role, target.id.as_str(), target.anchor), (Role::Cpu, id.as_str(), (30.0, 2.0)));
-        assert_eq!(target.recording.placement.delta_x, 1.5);
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start.clone(), id.clone())));
 
         on_chords(false, false, true);
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
@@ -6096,8 +6076,7 @@ mod tests {
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&chain_id), 3).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("a chain edits its macro 1");
-        assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start, id)));
     }
 
     /// A save named Jab start (Player 1 at x 10, the CPU at x 50 with 6.3 %), and two macros that start from it;
@@ -6295,12 +6274,12 @@ mod tests {
         let copy = written.start_save.clone().unwrap();
         assert_ne!(copy, save);
         assert_eq!(saved_pair(&root, &copy)[1].x, 40.0);
-        assert_eq!(placement_target(&root).unwrap().recording.start_save.as_ref(), Some(&copy));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((copy.clone(), macros[0].clone())));
         first.start_save = Some(copy);
         assert_eq!(written.start_save_on, first.start_save_on, "copy must not turn standalone warps On");
         assert_eq!(written, first, "the new start-save id is the only macro edit");
         RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 2)?; Ok(true) }).unwrap();
-        assert_eq!(placement_target(&root).unwrap_err(), PLACE_NO_START);
+        assert_eq!(active_placement_ids(&root, Role::Cpu).unwrap_err(), PLACE_NO_START);
     }
 
     /// rv-edge-juggle-sol 16:38:12Z: the second write fails (a directory stands where the macro's temporary file
