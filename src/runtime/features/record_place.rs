@@ -815,7 +815,7 @@ pub unsafe fn frame(fighter: usize) {
                         .unwrap_or(0);
                     let outcome = wizard.step_on(&pad,
                         |at| camera.and_then(|camera| fit(at, record_place::reach(edited.place, camera, blast))),
-                        |at| placement::floor_under(p1, at, true), &floors[..count]);
+                        |at| placement::floor_under(p1, at, true), |_| None, &floors[..count]);
                     pad.pressed = 0;
                     match outcome {
                         Outcome::Closed => {
