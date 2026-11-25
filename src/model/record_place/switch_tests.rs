@@ -153,7 +153,7 @@ fn battlefield_switches_go_beside_the_two_ledges() {
 }
 
 #[test]
-fn a_spot_already_off_stage_is_not_moved_and_reads_nothing_more() {
+fn a_crosshair_already_off_stage_is_not_moved_and_reads_nothing_more() {
     let lines = training();
     for (at, expected) in [
         ([-250., -117.85], stage_geometry::Place::Under),
@@ -178,6 +178,39 @@ fn a_spot_already_off_stage_is_not_moved_and_reads_nothing_more() {
     w.step_on(&button(Y), Some, |_| None, &off, &[]);
     assert_eq!((w.setup[0].place, w.setup[0].at, w.cursor()), (Place::OffStage, cursor, cursor));
     assert_eq!(cursor[0], -250.);
+    assert_eq!(asked.get(), 1);
+}
+
+#[test]
+fn spot_y_classifies_the_crosshair_not_the_fighter() {
+    let lines = training();
+    let asked = Cell::new(0);
+    let off = rule(&lines, TRAINING, &asked);
+    // The fighter stays on the long floor (no floor is read under the free crosshair); the crosshair goes over the island.
+    let mut w = Wizard::new(setup([-30., 0.]), None);
+    w.step_on(&button(A), Some, |_| None, &off, &[]);
+    for _ in 0..135 {
+        w.step_on(&Pad { stick: [-1., 0.], ..Pad::default() }, Some, |_| None, &off, &[]);
+    }
+    for _ in 0..5 {
+        w.step_on(&Pad { stick: [0., 1.], ..Pad::default() }, Some, |_| None, &off, &[]);
+    }
+    let cursor = w.cursor();
+    assert_eq!(cursor, [-300., 10.]);
+    assert_eq!((w.setup[0].place, w.setup[0].at), (Place::OnStage, [-30., 0.]));
+    assert_eq!(stage_geometry::classify(&mut Copied(&lines), TRAINING, cursor), Ok(stage_geometry::Place::OverStage));
+    w.step_on(&button(Y), Some, |_| None, &off, &[]);
+    let spot = w.setup[0].at;
+    assert_eq!(w.setup[0].place, Place::OffStage);
+    // The island's left ledge is nearest the crosshair; the long floor's ledge is nearest the fighter.
+    near(spot, [-375., -68.419]);
+    same_as_rule(&lines, TRAINING, cursor, spot);
+    let by_fighter = off_stage_spot(&mut Copied(&lines), TRAINING, [-30., 0.]).unwrap();
+    near(by_fighter, [-125., -68.426]);
+    assert_ne!(spot, by_fighter);
+    assert_eq!(w.cursor(), spot);
+    w.step_on(&Pad::default(), Some, |_| None, &off, &[]);
+    assert_eq!((w.cursor(), w.setup[0].at), (spot, spot));
     assert_eq!(asked.get(), 1);
 }
 
