@@ -442,7 +442,8 @@ impl Source for FrameOutlineReader {
 pub(super) unsafe fn training_outline(
     ray: &super::mashout::FloorRay, x: f32, limits: [f32; 2],
 ) -> Option<(crate::model::edge_juggle::perfect::Outline, Option<[[f32; 2]; 2]>)> {
-    use crate::model::edge_juggle::perfect::{floor_ledges, Outline};
+    use crate::model::edge_juggle::perfect::Outline;
+    use crate::model::stage_geometry::floor_ledges;
     use crate::model::tech::surface::{Walk, MAX_LINES};
     if !guarded() || !game::granted(0x15cbc60) {
         return None;

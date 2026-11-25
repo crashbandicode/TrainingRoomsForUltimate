@@ -98,8 +98,6 @@ impl Default for Outline {
     }
 }
 
-pub use crate::model::stage_geometry::floor_ledges;
-
 /// Seed the solid outline walk at the stage center through the full blast zone.
 pub fn outline_probe(camera: [f32; 4], blast: [f32; 4]) -> Option<(f32, Point)> {
     let [cam_left, cam_right, _, _] = camera;
@@ -1340,19 +1338,6 @@ mod tests {
             assert!(plans.iter().flatten().all(|plan| plan.route != Route::Opposite),
                 "stage {stage} requires a measured fighter route as well as geometry");
         }
-    }
-
-    #[test]
-    fn moving_stage_ledges_come_from_the_current_solid_floor() {
-        let tilted = [
-            [[-32.0, 1.0], [-80.0, -18.0]],
-            [[-32.0, 1.0], [32.0, 5.0]],
-            [[80.0, -2.0], [32.0, 5.0]],
-        ];
-        assert_eq!(floor_ledges(tilted), Some([[-80.0, -18.0], [80.0, -2.0]]));
-        assert_eq!(floor_ledges([]), None);
-        assert_eq!(floor_ledges([[[0.0, 0.0], [0.0, 2.0]]]), None);
-        assert_eq!(floor_ledges([[[f32::NAN, 0.0], [2.0, 2.0]]]), None);
     }
 
     #[test]

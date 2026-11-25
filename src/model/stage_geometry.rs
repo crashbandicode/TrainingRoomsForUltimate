@@ -5,8 +5,8 @@ use super::tech::discovery::{Ray, Rays};
 use super::tech::surface::{Kind, Line, Surfaces, MAX_LINES};
 use super::tech::Vec2;
 
-/// Placement's floor rule.
-pub fn placement_floor(flags: u32, normal_y: f32, platforms: bool) -> bool {
+/// True when the line is a placement floor.
+pub fn is_placement_floor(flags: u32, normal_y: f32, platforms: bool) -> bool {
     if flags & 0x2000 != 0 {
         platforms && flags & 0x0300 == 0 && normal_y > 0.0
     } else {
@@ -225,7 +225,7 @@ mod tests {
             (0x2800, -1., true, false), (0x0900, -1., false, true),
             (0x0100, 1., false, false),
         ] {
-            assert_eq!(placement_floor(flags, normal_y, platforms), expected, "flags={flags:#x} y={normal_y} platforms={platforms}");
+            assert_eq!(is_placement_floor(flags, normal_y, platforms), expected, "flags={flags:#x} y={normal_y} platforms={platforms}");
         }
     }
 
@@ -244,15 +244,15 @@ mod tests {
             let actual = decode(1, [point([-1., 0.]), point([1., 0.])], point(normal), (flags >> 8) as u8)
                 .and_then(|line| line.kind());
             assert_eq!(actual, tech, "{name}: Tech");
-            assert_eq!(placement_floor(flags, normal[1], platforms), placement, "{name}: placement");
+            assert_eq!(is_placement_floor(flags, normal[1], platforms), placement, "{name}: placement");
         }
     }
 
     #[test]
     fn the_first_obstacle_is_kept_not_skipped() {
         for platforms in [false, true] {
-            assert!(!placement_floor(0x0100, 0., platforms));
-            assert!(!placement_floor(0, -1., platforms));
+            assert!(!is_placement_floor(0x0100, 0., platforms));
+            assert!(!is_placement_floor(0, -1., platforms));
         }
         let main = floor([[-10., 0.], [10., 0.]]);
         let lower = floor([[10., -5.], [30., -5.]]);
