@@ -2885,15 +2885,55 @@ approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceili
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 200501
+ceiling = 200254
 date = "2026-11-25"
-reason = "Ledge, get-up and trip attacks as actions with their own moves: three move kinds with their names, the three engine-common statuses in the strip's table, their keys in the two file tables, and the tracker opening such an attack's own action from a wait that is not actionable. Measured 200501 on the install 4 head with smoke fix 1 (9eeb1164, 200471): +30, as measured on the smoke fix's own pin (200374 against 200344)."
-approved_by = "tr-primary-2 ruling 2026-11-25 02:17:20Z (the edge attacks' line budget approved at the measured value, +30 on smoke fix 1) and its standing rule of 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value)."
+reason = "Merge 7: the frame strip's scrollback (hold R3, D-pad Left or Right): the hold, the ten seconds of history, the view the HUD draws from it. Measured 200254 (tools/sloc.py tree), 426 above install 4 merge 4b 4905ec89 (199828)."
+approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the line ceiling is approved at the measured value), on the operator's request relayed at 23:23:39Z."
 
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 200505
+ceiling = 200293
 date = "2026-11-25"
-reason = "Edge review: keep description-only move keys out of the bare link endpoints while retaining earlier accepted aliases. Measured 200505, four above the submitted 1d1c8dc0."
-approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z (measured fixes through +60, disclosed to primary)."
+reason = "Merge 7 review: an editable menu shortcut takes precedence, past brackets stop at the view edge, and the cursor and its published column count reset together. Measured 200293, 39 above 47b52049."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200312
+date = "2026-11-25"
+reason = "Merge 7: the bridge publishes the frame strip's scroll state (strip.scroll, strip.back_ms) from the HUD pass that drew it. Measured 200312 (tools/sloc.py tree), 58 above the scrollback's 200254."
+approved_by = "tr-primary-2 2026-11-25 00:45:38Z (the scroll state as a bridge field on feat/strip-scrollback; lines approved at the measured value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200351
+date = "2026-11-25"
+reason = "Merge 7 with the reviewer's correction (fix/rv-scroll-shortcut 237a9661) and the bridge fields in one tree: measured 200351 (tools/sloc.py tree), which is the scrollback's 200254 plus the correction's 39 and the bridge's 58, with no lines from the merge."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on its 21:46:20Z rule (the correction) and 2026-11-25 00:45:38Z (the bridge fields)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200362
+date = "2026-11-25"
+reason = "Scrollback bridge time retains the full elapsed frame count from the HUD pass, including long idle stretches. Measured 200362, 11 above 6f88b5df."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201005
+date = "2026-11-25"
+reason = "Install 4 integration, merge 7: the input-display scrollback chord (feat/strip-scrollback 1836edcf) on top of smoke fix 1. Measured 201005 on the merged tree: the smoke fix 1 head measures 200471 and merge 7 adds 534 (its own entry: 200362 on merge 4b, which measures 199828)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for merge 7 (200362) and for smoke fix 1 (200471)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201039
+date = "2026-11-25"
+reason = "Ledge, get-up and trip attacks as actions with their own moves, with the review's correction that keeps their file keys out of a link's bare from and to (fix/rv-edge-file-keys be321a1b). Measured 201039 on the install 4 head with merge 7 (45425cb0, 201005): +34, which is the edge attacks' 30 (200501 on the smoke fix 1 head) and the correction's 4 (200505)."
+approved_by = "tr-primary-2 ruling 2026-11-25 02:17:20Z (the edge attacks' line budget approved at the measured value, +30), its standing rule of 2026-11-24 21:46:20Z (a measured correction up to 60 lines, here +4) and its standing rule of 17:59:40Z (the merged ceiling is written at the measured merged value)."

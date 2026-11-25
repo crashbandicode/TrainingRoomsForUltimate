@@ -275,6 +275,7 @@ struct Run {
 /// The tracker laid out once per tick: runs, the frames on screen and their slots.
 struct Content<'a> {
     spec: &'a StripSpec,
+    back: Option<u32>,
     history: bool,
     fold_link: bool,
     cells: bool,
@@ -337,7 +338,7 @@ impl<'a> Content<'a> {
                 }
             }
         }
-        Self { spec: &draw.spec.strip, history, fold_link: !draw.history_enabled, cells: draw.cells, tracker,
+        Self { spec: &draw.spec.strip, back: draw.back, history, fold_link: !draw.history_enabled, cells: draw.cells, tracker,
             aims: aims_shown(tracker), frames, sticks, first_slot, runs, spots: draw.spots, parry: draw.parry }
     }
 
@@ -345,7 +346,7 @@ impl<'a> Content<'a> {
     fn slot(&self, frame: u32) -> Option<f32> {
         let newest = self.tracker.newest()?;
         if frame > newest {
-            return Some((WINDOW - 1) as f32 + (frame - newest) as f32);
+            return self.back.is_none().then(|| (WINDOW - 1) as f32 + (frame - newest) as f32);
         }
         (self.first_slot..WINDOW).find(|s| self.frames[*s] == frame).map(|s| s as f32)
     }
@@ -394,7 +395,7 @@ impl<'a> Content<'a> {
             i if (BRACKET..BRACKET + 6).contains(&i) => self.bracket((i - BRACKET) / 3, Some((i - BRACKET) % 3)),
             i if (BRACKET_TEXT..BRACKET_TEXT + 2).contains(&i) => self.bracket(i - BRACKET_TEXT, None),
             NOW => Look::paint(self.spec.now(0), MUTED),
-            NOW_TEXT => Look::label(self.spec.now(1), Text::new("now"), MUTED),
+            NOW_TEXT => Look::label(self.spec.now(1), self.back.map_or_else(|| Text::new("now"), back_text), MUTED),
             i if (READ_LABEL..READ_LABEL + 3).contains(&i) => {
                 let n = i - READ_LABEL;
                 let names = if self.parry.is_some() { ["ADVANTAGE", "PARRY", "SET"] } else { ["ADVANTAGE", "LINK", "INPUT"] };
@@ -738,6 +739,7 @@ impl<const N: usize, const L: usize> Panes<N, L> {
 #[derive(Clone, Copy)]
 pub struct StripDraw<'a> {
     pub shown: bool,
+    pub back: Option<u32>,
     pub spots: bool,
     pub parry: Option<&'a super::parry::View>,
     pub history_enabled: bool,
@@ -765,7 +767,7 @@ impl Renderer {
     /// `draw_spots`, with Parry practice's readouts, window and pills when `parry` (rc.15).
     #[cfg(test)]
     pub fn draw_parry(&mut self, tracker: &Tracker, shown: bool, spots: bool, parry: Option<&super::parry::View>, apply: impl FnMut(usize, &Look, Changed)) -> usize {
-        self.draw_with_spec(tracker, StripDraw { shown, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
+        self.draw_with_spec(tracker, StripDraw { shown, back: None, spots, parry, history_enabled: true, cells: false, spec: &C }, apply).0
     }
 
     /// All text, including the folded link, travels through the pane cache.
@@ -782,6 +784,12 @@ impl Renderer {
         let content = Content::new(tracker, draw, history);
         (self.show(super::panes::iv::units, |i| content.look(i), apply), history)
     }
+}
+
+pub fn back_text(frames: u32) -> Text {
+    let mut text = Text::EMPTY;
+    let _ = write!(text, "-{}.{} s", frames / 60, frames % 60 * 10 / 60);
+    text
 }
 
 #[cfg(test)]
