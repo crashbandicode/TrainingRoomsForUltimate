@@ -1,59 +1,51 @@
 # Game speed
 
-Slow the game down to watch a move in slow motion, or speed it up, without opening a menu. It works in Training and in
-waiting-room practice.
+Slow down or speed up practice without opening a menu. The same controls work in Training and waiting rooms.
 
-![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](../media/rc11-game-speed.gif)
+<!-- CLIP: tut-game-speed.mp4 | A smash at x1 → hold R + D-pad Up, Left steps to 1/4, the stopwatch shows it → the same smash, slow -->
 
 ## Changing the speed
 
-1. Hold R and press D-pad Up. A "Game speed" pop-up shows the current speed.
-2. Keep holding R. D-pad Left goes slower, D-pad Right faster. It stops at both ends.
-3. Let go. The pop-up goes away and the speed stays.
+1. Hold R and press D-pad Up to open the Game speed pop-up.
+2. Keep holding R. Tap D-pad Left for slower or Right for faster.
+3. Let go. The pop-up closes and the speed stays.
 
-![The five speeds, 1/4, 1/2, 2/3, x1 and x1.5, on one scale: D-pad Left steps slower, D-pad Right faster](../diagrams/game-speed-scale.png)
+| Speed, slowest first | What happens |
+| --- | --- |
+| 1 Frame | The game holds still until you step it. |
+| 1/4, 1/2, 2/3 | Slow motion. |
+| x1 | Normal speed. |
+| x1.5 | Faster than normal. |
 
-The scale's slowest step is 1 Frame, one step left of 1/4: 1 Frame, 1/4, 1/2, 2/3, x1, x1.5. At 1 Frame the game
-holds still. Each press of ZL (L on a GameCube controller) moves it one frame. Hold the button and the game runs from
-the 18th frame on, until you let go. This is the same button Training uses for its 1 Frame.
+On a GameCube controller use Z + D-pad Up. You can change the chord at Display & Controls ›
+[Button chords](../menu/display-and-controls.md#button-chords).
 
-While you hold the speed chord, ZL doesn't step and doesn't reach the game. If ZL is still down when you let go of the
-chord, it counts as held, not as a new press. A ZL that is part of another chord never steps, however long you hold
-it: D-pad Down + ZL saves a state and the game stays on its frame.
+## 1 Frame
 
-While you hold the chord, D-pad Left and Right don't reach the game and no other chord fires, so ZL + D-pad Left can't
-cycle the CPU by accident. The chord doesn't work while a menu is open (this one or the game's pause menu).
+<!-- CLIP: tut-one-frame.mp4 | Speed stepped to 1 Frame: the label names its button → ZL steps frame by frame through a jab -->
 
-On a GameCube controller the chord is Z + D-pad Up ([Controls](controls.md#gamecube-controller)). To use another chord,
-change the Game speed row of Display & Controls › [Button chords](../menu/display-and-controls.md#button-chords). Any
-chord you set works the same way: hold it, then D-pad Left or Right.
+1. Hold R + D-pad Up and tap Left until the pop-up reads 1 Frame.
+2. Let go of the chord. Press ZL once to advance one frame, or hold it to keep advancing after the initial delay.
+3. Hold the speed chord again and tap Right to return to x1.
+
+The pop-up shows `1 Frame` between the Left and Right markers. In Training, the game's Speed row names the step button
+when the controller's glyph is available. ZL is L on a GameCube controller.
+
+ZL does not step while the speed chord is held, or while it is part of another chord. Let go before pressing it again.
+
 ## In Training
 
-The chord sets Training's own Speed, so the game's pause menu (Other Settings › Speed) shows the same value. Training's
-HUD shows a stopwatch with the speed whenever it isn't x1, and the stopwatch goes away at x1.
-
-1 Frame is Training's own 1 Frame: the game pauses, ZL steps, and the stopwatch shows it. Training keeps its Speed the
-way the game does, so 1 Frame stays set after you reset the positions. A new Training starts at x1.
-
-![The HUD stopwatch reads x1.5, then goes away back at x1](../media/rc8-speed-hud-fixed.gif)
+The Training pause menu's Speed row shows the same value. The HUD stopwatch appears away from x1 and goes away at x1.
+Resetting positions keeps the speed; a new Training starts at x1.
 
 ## In the waiting rooms
 
-With Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On, the same chord and the same
-six speeds work in a waiting room. Only your practice changes speed: the room's own timers keep their normal pace.
-There is no stopwatch there; the pop-up shows the speed while you hold the chord. At 1 Frame your practice holds still
-and ZL steps it, as in Training; the room keeps running.
-
-Each new practice starts at x1. The speed ends with the practice, so a match always starts at x1.
-
-![In a waiting room: Sheik's forward smash at x1; the pop-up steps to 2/3, then 1/2; the same smash, slower](../media/rc11-lobby-speed.gif)
-
-More: [Waiting rooms](waiting-rooms.md)
+With Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On, the chord changes your
+practice, not the room's timers. There is no stopwatch in the room. Each new practice and each match starts at x1.
 
 ## With Online Deluxe
 
-While L is held (Online Deluxe's L + R chords), the chord doesn't open and D-pad Left and Right don't change the speed.
-A Game speed chord of yours that uses L itself isn't held back by L. With Online Deluxe's window open on a settings
-page, the default chord (R + D-pad Up) still opens and steps the speed, because Online Deluxe ignores the D-pad while R
-is held; a chord of yours on a D-pad button that page uses waits.
-[Controls › Online Deluxe](controls.md#online-deluxe) has the details.
+The speed chord waits while L is held, unless your chord itself uses L. On an open Online Deluxe settings page, a chord
+on a button that page uses waits. More: [Controls › Online Deluxe](controls.md#online-deluxe).
+
+More: [Waiting rooms](waiting-rooms.md), [Controls](controls.md).
