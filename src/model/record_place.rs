@@ -1,3 +1,4 @@
+use super::box_handoff::BoxHandoff;
 use super::btt;
 use super::chords::logical;
 use super::cpu::ids::C;
@@ -325,6 +326,21 @@ pub const fn accepts(waiting: Option<u32>, ticket: u32) -> bool {
         Some(open) => open == ticket,
         None => false,
     }
+}
+
+/// The worker's answer to a confirmed placement: the visit it belongs to, and the written pair to load once.
+/// `None`: the save could not be written.
+pub struct Answer {
+    pub ticket: u32,
+    pub pair: Option<[SavedState; 2]>,
+}
+
+/// The posted answer, for the visit `ticket` that still waits for it: its pair, moved out of the box (what stays
+/// is the worker's to drop). An answer for any other visit is given back unread, so a visit that ended gets no
+/// load and the next visit does not inherit one. Game thread, one taker at a time; no allocation and no free.
+pub fn take_answer(posted: &BoxHandoff<Answer>, ticket: u32) -> Option<Option<[SavedState; 2]>> {
+    let _ = (posted, ticket);
+    None
 }
 
 /// How far a spot may go: on stage the camera's range, off stage up to 1 unit inside the blast line (Guard the
@@ -2144,15 +2160,43 @@ mod tests {
         assert!(target.contains("leave(&mut engine, Leave::Other)"));
     }
 
+    fn answer(ticket: u32, x: Option<f32>) -> Box<Answer> {
+        let pair = x.map(|x| {
+            let mut p1 = SavedState::never_saved();
+            (p1.x, p1.fighter_kind) = (x, 4);
+            [p1, SavedState::never_saved()]
+        });
+        Box::new(Answer { ticket, pair })
+    }
+
+    /// rv-edge-juggle-sol 2026-11-25 16:38:12Z: the answer is posted while its visit waits, the visit ends, and
+    /// only then is the answer taken on a fighter frame.
     #[test]
     fn a_late_completion_for_a_dropped_ticket_is_discarded() {
-        assert!(accepts(Some(4), 4));
-        // The picker was left (no ticket waits), or another visit waits: the finished save is not this picker's.
-        assert!(!accepts(None, 4));
-        assert!(!accepts(Some(5), 4));
+        let posted = crate::model::box_handoff::BoxHandoff::new();
+        assert_eq!(take_answer(&posted, 4), None, "nothing posted");
+        // Visit 4's pair is posted; visit 4 was left and visit 5 waits now. It does not inherit the old result,
+        // and the old answer is gone: no later frame can load it.
+        posted.post(Some(answer(4, Some(-30.0))));
+        assert_eq!(take_answer(&posted, 5), None);
+        assert!(!posted.pending());
+        // The visit that still waits takes its own pair, once.
+        posted.post(Some(answer(5, Some(12.0))));
+        let pair = take_answer(&posted, 5).unwrap().unwrap();
+        assert_eq!((pair[0].x, pair[0].fighter_kind), (12.0, 4));
+        assert_eq!(take_answer(&posted, 5), None);
+        // A save that could not be written is an answer with no pair.
+        posted.post(Some(answer(6, None)));
+        assert_eq!(take_answer(&posted, 6), Some(None));
+        // The load is started by the picker that waits, on Player 1's frame: the worker posts the answer and never
+        // asks for the load itself, so a pair a Play posted for its warp is never replaced by a placement.
         let host = include_str!("../runtime/features/recording_host.rs");
         let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(commit.find("record_place::waiting(").unwrap() < commit.find("request_named_load(").unwrap());
+        assert!(commit.contains("record_place::post_placed(") && !commit.contains("request_named_load("));
+        let place = include_str!("../runtime/features/record_place.rs");
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        assert!(frame.find("record_place::take_answer(&PLACED, ticket)").unwrap() < frame.find("states::begin_placed(").unwrap());
+        assert_eq!(place.matches("states::begin_placed(").count(), 1);
     }
 
     #[test]
@@ -2161,14 +2205,32 @@ mod tests {
         write_not_saved("Jab start", &mut text).unwrap();
         assert_eq!(text, "Not saved · Jab start could not be written");
         let place = include_str!("../runtime/features/record_place.rs");
-        // The worker says the write failed; the picker that still waits for that ticket puts the fighters back.
-        let failed = place.split("FAILED.swap(").nth(1).unwrap().split("leave(&mut engine, Leave::Cancel);").nth(1).unwrap();
+        // The worker's answer has no pair: the picker that still waits for that visit puts the fighters back.
+        let failed = place.split("record_place::take_answer(&PLACED, ticket)").nth(1).unwrap()
+            .split("leave(&mut engine, Leave::Cancel);").nth(1).unwrap();
         let said = failed.split("return;").next().unwrap();
         assert!(said.contains("record_place::write_not_saved(") && said.contains("// restriction: place-save-write"));
-        assert!(place.split("FAILED.swap(").next().unwrap().contains("record_place::accepts(Some(ticket), "));
         let host = include_str!("../runtime/features/recording_host.rs");
         let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(commit.contains("record_place::save_failed("));
+        assert!(commit.contains("Placed::Refused { ticket } => super::record_place::post_placed(ticket, None)"));
+    }
+
+    /// tr-primary-2 2026-11-25 16:48:42Z: flat BSS, and "on stage reuses the tracing stage". The picker keeps no
+    /// outline and no walk of its own. What it hands the worker and takes from it crosses in three small cells.
+    #[test]
+    fn the_picker_keeps_no_outline_of_its_own() {
+        let place = include_str!("../runtime/features/record_place.rs");
+        for gone in ["Surfaces", "Discovery", "NativeSource", "AtomicU32"] {
+            assert!(!place.contains(gone), "{gone}");
+        }
+        assert_eq!(place.matches("BoxHandoff::new()").count(), 2);
+        assert!(place.contains("static COMMITS: Mailbox<Commit, 1>") && place.matches("Mailbox<").count() == 1);
+        assert_eq!(place.matches("\nstatic ").count(), 15);
+        let tech = include_str!("../runtime/features/tech.rs");
+        let view = tech.split("struct ViewState {").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(view.contains("surfaces: Surfaces,") && view.contains("discovery: Discovery,"));
+        let run = tech.split("struct Practice {").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(!run.contains("Discovery"));
     }
 
     #[test]
@@ -2256,13 +2318,18 @@ mod tests {
         let tech = include_str!("../runtime/features/tech.rs");
         assert!(place.contains("placement::floor_under("));
         assert!(include_str!("../runtime/features/edge_juggle.rs").contains("placement::floor_under("));
-        // The traced floors are Tech practice's surface walk, stepped by one function for both.
-        assert!(tech.contains("discovery.step(") && place.contains("discovery.step("));
-        assert!(!tech.contains("PlatformScan::new(") && !place.contains("PlatformScan::new("));
-        assert!(!place.contains("Bootstrap::new("));
-        // A floor list is given to the picker only when the walk and its platform scan are both done.
-        let floors = place.split("fn traced_floors(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(floors.contains("Found::Done") && floors.contains("Some(surface::Kind::Floor)"));
+        // The traced floors are Tech practice's one outline, walked by one function: Tech's own run and the picker.
+        assert_eq!(tech.matches(".discovery.step(&mut source, range, &mut view.surfaces)").count(), 2);
+        assert!(!tech.contains("PlatformScan::new(") && !tech.contains("Bootstrap::new("));
+        assert_eq!(place.matches("super::tech::floors(").count(), 1);
+        // The outline is never waited for, and a floor list is given only when the walk and its platform scan
+        // are both done, for this stage, form and Training session, with no Training reset since.
+        let floors = tech.split("pub(super) unsafe fn floors(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(floors.contains("VIEW.try_lock()?") && !floors.contains(".lock()"));
+        assert!(floors.contains("STALE.swap(false") && floors.contains("view.surfaces.epoch() != Some(epoch)"));
+        assert!(floors.find("view.discovery.done(&view.surfaces)").unwrap() < floors.find("Some(SurfaceKind::Floor)").unwrap());
+        let reset = tech.split("pub fn reset() {").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(reset.contains("STALE.store(true"));
     }
 
     #[test]
@@ -2270,8 +2337,8 @@ mod tests {
         let place = include_str!("../runtime/features/record_place.rs");
         assert!(!place.contains("is_native_training") && !place.contains("lobby_active"));
         let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
-        let open = frame.split("OPEN.swap(false").nth(1).unwrap();
-        assert!(open.contains("scene::current().is_some()") && open.contains("take_open("));
+        let open = frame.split("OPEN.swap(0").nth(1).unwrap();
+        assert!(open.contains("scene::current().is_some()") && open.contains("OPENS.take("));
     }
 
     #[test]
