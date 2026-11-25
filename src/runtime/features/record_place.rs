@@ -610,7 +610,7 @@ pub unsafe fn frame(fighter: usize) {
                     }
                     Outcome::Open => {
                         let mut text = FixedPath::<224>::new();
-                        let _ = wizard.write_text(recorded, &mut text);
+                        let _ = wizard.write_text(recorded, "", &mut text);
                         post_text(&mut notice, text);
                     }
                 }
@@ -683,7 +683,7 @@ pub fn look(active: bool) -> Marks {
     }
     let Some(engine) = ENGINE.try_lock() else { return empty };
     match &engine.session {
-        Some(Session::Pages { wizard, .. }) => wizard.marks(),
+        Some(Session::Pages { wizard, .. }) => wizard.marks([false; 2]),
         _ => empty,
     }
 }
