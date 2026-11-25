@@ -236,8 +236,8 @@ Where the recording code is (moved here from the Recording guide; named by funct
   `src/runtime/features/record_place.rs`. On stage it steps between the floors of Tech practice's one traced outline
   (`tech::floors`, `src/model/floor_hop.rs`). A fighter switched to Off stage is placed by `off_stage_spot`, on the
   off-stage rule of `src/model/stage_geometry.rs`, read on that frame only. The worker writes the save in
-  `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's target macro is `placement_target`,
-  and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`).
+  `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's save and macro are
+  `active_placement_ids`, and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`).
 - Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
   `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
   `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is
