@@ -2897,3 +2897,11 @@ ceiling = 200217
 date = "2026-11-25"
 reason = "Trim ownership correction: a drill previews its own Trim, while editor ranges stay exact. Measured 200217, 20 above 7a8c50e8."
 approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200860
+date = "2026-11-25"
+reason = "Trim, the macro playback indicator and the drill-ownership correction folded on install 4 smoke fix 1: measured 200860, 389 above 9eeb1164's 200471"
+approved_by = "tr-primary-2, inbox 2026-11-25 00:38:26Z (+369) and the +60 review-fix rule (+20)"

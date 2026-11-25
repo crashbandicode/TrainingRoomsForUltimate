@@ -113,7 +113,8 @@ pub const THREADS: [ThreadStack; 19] = [
     // Smoke fix 1 on merge 3D (2026-11-25): the release path is unchanged at 54,144 B; the diag build's
     // `decode::<ComboRecord>` frame is 16 B larger (7,792 B), so the path reads 54,192 B there (gate 074fd9c3).
     // Trim preview ownership: 54,080 B release and 54,112 B diag in ELFs 15c3e619.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_192, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Trim and smoke fix 1 fold: 54,352 B release and 54,384 B diag in ELFs b0272197.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 54_384, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
