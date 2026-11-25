@@ -285,6 +285,39 @@ fn edge_attacks_round_trip_in_files_and_in_the_packed_link() {
 }
 
 #[test]
+fn edge_file_keys_belong_to_descriptions_not_bare_link_endpoints() {
+    let mut accepted = Vec::new();
+    for (mv, _, _, _, key) in EDGE {
+        for (field, shown) in [("from", "from_shown"), ("to", "to_shown")] {
+            let mut file = serde_json::json!({"name":"Shared", "schema_version":1, "links":[{
+                "from":"jab", "to":"jab", "events":[], "verdict":{"kind":"true","link":null}
+            }]});
+            file["links"][0][field] = serde_json::json!(key);
+            match serde_json::from_value::<ComboRecord>(file.clone()) {
+                Ok(record) => {
+                    let crop = record.crop_units(0, 1).unwrap();
+                    let encoded = serde_json::to_value(crop).unwrap();
+                    accepted.push(format!("{field}={key} reopened as {}", encoded["links"][0][field]));
+                }
+                Err(err) => assert!(err.to_string().contains(field), "{err}"),
+            }
+            file["links"][0][field] = serde_json::json!("other");
+            file["links"][0]["from_shown"] = serde_json::json!({});
+            file["links"][0]["to_shown"] = serde_json::json!({});
+            file["links"][0][shown] = serde_json::json!({"move":key});
+            let crop = serde_json::from_value::<ComboRecord>(file).unwrap().crop_units(0, 1).unwrap();
+            let saved = serde_json::to_vec(&crop).unwrap();
+            let reopened: ComboRecord = serde_json::from_slice(&saved).unwrap();
+            assert_eq!(reopened.combo.get(0).unwrap().desc(usize::from(field == "to")).mv, mv);
+        }
+    }
+    for key in ["grab", "throw", "final_smash"] {
+        let _ = hit_record(key, key, None, None); // These spellings already loaded before the edge moves.
+    }
+    assert!(accepted.is_empty(), "accepted lossy endpoint keys: {accepted:?}");
+}
+
+#[test]
 fn an_old_file_grades_an_edge_attack_as_before() {
     let old = hit_record("jab", "other", None, None);
     let value = serde_json::to_value(ComboRecord::new("Drill".into(), old.combo, None)).unwrap();
