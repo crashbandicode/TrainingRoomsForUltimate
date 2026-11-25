@@ -175,8 +175,12 @@ The plan was one short Eden smoke run on the finished build, then the operator's
 On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10,
 with the card's 20 other plugins. Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate
 (`artifacts/phase23/next-build/gate-b7a382e4/status.json`). The game did not crash. Receipts:
-`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md`, and for each row its JSON and one frame under
-`smoke/evidence/out/<row>/` there. Reported by dup-audit (inbox 22:57:42Z).
+`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its
+JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
+
+Two rows, the eggs zone and placement, passed on a later try in the same boot, after the test's own steps were
+corrected (it looked for a row named Stop, and expected the placement card to open on Spot). The build did not change
+between tries.
 
 A pass on a Start row means the set-up opened on its CPU page with no refusal. **No drill was played through**: no
 CPU was launched and no attempt was scored.
