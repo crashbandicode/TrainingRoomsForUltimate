@@ -4,7 +4,12 @@ Find **Practice games** on **Fighters & Stages**. Works in Training and in the [
 
 Press **A** on a game below to open its settings. **Start** starts that game and closes the menu; while it runs, **Stop** ends it with the menu open. Only one game runs at a time. Closing the menu with **B** leaves the current game running.
 
-For choices, use **Left/Right** or **A** to open the list, **Up/Down** to choose and **A** to confirm; for checklists, **A** opens the list and checks or unchecks a choice. For a range, **A** opens it, **Left/Right** selects a handle, **A** picks it up, the D-pad changes it and **A** puts it down. **A** opens an editor or performs an action; **B** goes back and **Y** resets a setting. Hold **Up/Down** to scroll faster or use **ZL + Up/Down** to jump through a list; see [Using the menu](../guide/using-the-menu.md).
+- **Choice:** Left/Right changes the value on the row. To choose from the list, press A, move with Up/Down and confirm with A.
+- **Checklist:** A opens the list; A on an item checks or unchecks it.
+- **Range:** A opens it. Up/Down chooses Min or Max; press A to edit that end. Up/Down changes its value; A or B finishes the edit.
+
+B goes back and Y resets a setting. Hold Up/Down to scroll faster or use ZL + Up/Down to jump through a list; see
+[Using the menu](../guide/using-the-menu.md).
 
 Starting or stopping a game does not flash the game's pause screen, except that Guard the Edge and Juggler may briefly open it when changing or restoring CPU Behavior involving **Control** or a non-CPU-controlled fighter.
 
