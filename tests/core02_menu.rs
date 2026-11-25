@@ -229,10 +229,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Spacing grader adds one Display & Controls row (12 → 13).
     // Off-stage zone, Moving paths and Target expiry add three Eggs-ercise rows.
     // rc.15 compact strip: Display & Controls gained Link history (the operator's order via the primary, 2026-11-21 18:48Z; 13 → 14).
-    assert_eq!(counts(false), [34, 11, 18, 91, 14, 3]);
-    assert_eq!(counts(true), [33, 11, 18, 91, 14, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 168);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 167);
+    // Change placement: Recording gained the Advanced row Shared start save (operator 2026-11-25, PC5; 18 → 19).
+    assert_eq!(counts(false), [34, 11, 19, 91, 14, 3]);
+    assert_eq!(counts(true), [33, 11, 19, 91, 14, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 169);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 168);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
