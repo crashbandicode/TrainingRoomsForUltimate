@@ -167,7 +167,7 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     let ray = FloorRay::new(p1)?;
     let (ledges, _) = stage_geometry::stage_floor(&ray, camera)?;
     let (outline, _) = stage_geometry::training_outline(&ray, mid, limits)?;
-    Stage::new(id, range, ledges, outline)
+    Stage::new(id, range, ledges, outline, [Some(range[0]), Some(range[1])], &[])
 }
 
 /// The editor's state for the optional test bridge (`zone.*`). Call it before `LIVE` changes.

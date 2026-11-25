@@ -4,6 +4,7 @@
 use super::chords::logical as key;
 use super::edge_juggle::perfect::{Outline, Point, Segment};
 use super::eggs::RADIUS;
+use super::stage_geometry::{floor_run, Met, Probe, Unread};
 
 const EDGE_MARGIN: f32 = 8.0;
 const BOTTOM_MARGIN: f32 = 24.0;
@@ -93,7 +94,8 @@ pub fn blast_rect([left, right, top, bottom]: [f32; 4]) -> [Point; 2] {
 }
 
 impl Stage {
-    pub fn new(id: i32, blast: [f32; 4], ledges: [Point; 2], outline: Outline) -> Option<Self> {
+    pub fn new(id: i32, blast: [f32; 4], ledges: [Point; 2], outline: Outline,
+        _air: [Option<f32>; 2], _others: &[Met]) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;
         let available = [
@@ -123,6 +125,14 @@ impl Stage {
             outline,
             available,
         })
+    }
+
+    pub fn read(id: i32, blast: [f32; 4], camera: [f32; 4], outline: Outline,
+        stage: &mut impl Probe) -> Result<Option<Self>, Unread> {
+        let Some(run) = floor_run(stage, blast, [camera[0].midpoint(camera[1]), camera[2]])? else {
+            return Ok(None);
+        };
+        Ok(Self::new(id, blast, run.ends, outline, [None; 2], &[]))
     }
 
     pub fn id(&self) -> i32 {

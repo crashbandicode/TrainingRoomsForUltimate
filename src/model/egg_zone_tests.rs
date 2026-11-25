@@ -7,7 +7,7 @@ fn stage(blast: [f32; 4], points: &[[f32; 2]]) -> Stage {
     for i in 0..points.len() {
         outline.add([points[i], points[(i + 1) % points.len()]]);
     }
-    Stage::new(0, blast, [points[0], points[1]], outline).unwrap()
+    Stage::new(0, blast, [points[0], points[1]], outline, [Some(blast[0]), Some(blast[1])], &[]).unwrap()
 }
 
 fn battlefield() -> Stage {
@@ -86,7 +86,8 @@ fn training_keeps_the_real_recovery_side_when_the_other_end_is_past_blast() {
     for i in 0..points.len() {
         outline.add([points[i], points[(i + 1) % points.len()]]);
     }
-    let stage = Stage::new(308, blast, ledges, outline).expect("the left ledge has recovery room");
+    let stage = Stage::new(308, blast, ledges, outline, [Some(-170.0), None], &[])
+        .expect("the left ledge has recovery room");
     assert_eq!(stage.ledges(), ledges);
     let mut wizard = Wizard::new(None);
     assert_eq!(wizard.input(&stage, [0.0; 2], 1 << key::X), Outcome::Editing);
@@ -99,7 +100,8 @@ fn training_keeps_the_real_recovery_side_when_the_other_end_is_past_blast() {
     assert!(stage.contains(&zone, Side::Left, [-100.0, -10.0]));
     assert!(!stage.contains(&zone, Side::Right, [490.0, -40.0]));
     assert!(stage.supports(ledges));
-    assert!(Stage::new(308, [-70.0, blast[1], blast[2], blast[3]], ledges, outline).is_none());
+    assert!(Stage::new(308, [-70.0, blast[1], blast[2], blast[3]], ledges, outline,
+        [Some(-170.0), None], &[]).is_none());
 }
 
 #[test]

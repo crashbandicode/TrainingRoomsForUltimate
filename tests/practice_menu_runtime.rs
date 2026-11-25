@@ -875,6 +875,16 @@ fn egg_zone_runtime_enters_and_leaves_through_the_shared_path() {
 }
 
 #[test]
+fn egg_zone_reads_its_stage_through_the_off_stage_rule() {
+    let zone = src("src/runtime/features/egg_zone.rs");
+    let read = item(&zone, "unsafe fn read_stage(");
+    assert!(read.contains("RayProbe::new(p1)"));
+    assert!(read.contains("Stage::read("));
+    assert!(!read.contains("stage_floor("));
+    assert!(!read.contains("scene::"));
+}
+
+#[test]
 fn every_wizard_is_lowered_by_the_menu_and_by_its_own_frame() {
     let tech = src("src/runtime/features/tech.rs");
     let btt = src("src/runtime/features/btt.rs");
