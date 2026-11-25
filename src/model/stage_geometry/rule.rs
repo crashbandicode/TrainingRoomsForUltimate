@@ -2,22 +2,38 @@
 //! the ledges with open air, the default spot beside one. Pure: the stage is read through `Probe`, by the game's ray
 //! on a fighter's frame or from copied lines. No stage is named.
 use super::{Point, Segment};
-use crate::model::tech::surface::Line;
+use crate::model::tech::surface::{Line, MAX_LINES};
+
+/// Open-air columns are this far apart, as the stage scan's are.
+const COLUMN: f32 = 10.0;
+/// Lines read in one column before the read gives up.
+const LINES: usize = 16;
+/// Columns or runs searched on one side.
+const SEARCH: usize = 64;
 
 /// One stage line as world geometry. No native id survives the read.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Met {
     pub ends: Segment,
-    /// A fighter can stand on it: placement's floor rule with platforms.
+    /// A fighter can stand on it: placement's floor rule with platforms (`is_placement_floor(flags, normal_y, true)`).
     pub stand: bool,
     /// A pass-through platform. It is never part of a solid.
     pub through: bool,
 }
 impl Met {
     /// The line's height at `x` (its ends' line; `None` for a vertical line).
-    pub fn height(self, _x: f32) -> Option<f32> { None }
+    pub fn height(self, x: f32) -> Option<f32> {
+        let [[a, y], [b, z]] = self.ends;
+        if ![a, y, b, z, x].into_iter().all(f32::is_finite) || a == b {
+            return None;
+        }
+        let height = y + (z - y) * ((x - a) / (b - a));
+        height.is_finite().then_some(height)
+    }
     /// `stand && !through`.
-    pub fn solid_floor(self) -> bool { false }
+    pub fn solid_floor(self) -> bool {
+        self.stand && !self.through
+    }
 }
 
 /// The stage could not be read (a guard, a line that is gone).
@@ -26,43 +42,121 @@ pub struct Unread;
 
 /// The stage on this frame, read by the point ray.
 pub trait Probe {
-    /// The first line of any kind from `from` straight to the height `to`.
+    /// The first line of any kind the ray meets from `from` straight to the height `to`: down when `to < from[1]`,
+    /// up when `to > from[1]`. `platforms = false` passes through pass-through lines, as the game's ray does.
     fn first(&mut self, from: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread>;
 }
 
-/// The box is this far inside every blast line.
+/// The box is this far inside every blast line (Guard the Edge's limit today).
 pub const INSIDE: f32 = 1.0;
-/// A point up to this far under a floor's surface stands on it.
+/// A point up to this far under a floor's surface stands on it (`placement::floor_under`'s slack).
 pub const SLACK: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Place {
     /// Not `INSIDE` every blast line.
     Outside,
-    /// In a solid.
+    /// In a solid: the nearest solid line above the point is a floor, more than `SLACK` above it.
     Solid,
-    /// A line a fighter can stand on lies under the point.
+    /// A line a fighter can stand on (a solid floor or a platform) lies under the point, above the bottom blast line.
     OverStage,
     /// Off stage, no solid above the point.
     Open,
-    /// Off stage, a solid above the point.
+    /// Off stage, a solid above the point (below an island, below the main stage).
     Under,
 }
 impl Place {
     /// `Open`, or `Under` when `under` is allowed.
-    pub fn off_stage(self, _under: bool) -> bool { false }
+    pub fn off_stage(self, under: bool) -> bool {
+        self == Self::Open || under && self == Self::Under
+    }
 }
 
-/// Classify a point against the stage and blast lines.
-pub fn classify(_stage: &mut impl Probe, _blast: [f32; 4], _at: Point) -> Result<Place, Unread> {
-    Ok(Place::Outside)
+/// Where the next cast starts to pass a line met at `height` on the way to `to`: the game's ray accepts a line 1e-5
+/// of its length behind its origin (`tech::discovery::Rays`).
+fn past(height: f32, to: f32) -> f32 {
+    let reach = 1e-5 * (to - height).abs();
+    if to < height { (height - reach).next_down() } else { (height + reach).next_up() }
+}
+
+/// The lines of one column from `from` toward `to`, nearest first, until `each` says stop.
+fn column(
+    stage: &mut impl Probe, x: f32, from: f32, to: f32, platforms: bool, mut each: impl FnMut(Met, f32) -> bool,
+) -> Result<(), Unread> {
+    let down = to < from;
+    let mut y = from;
+    for _ in 0..LINES {
+        if y == to || (to < y) != down {
+            return Ok(());
+        }
+        let Some(line) = stage.first([x, y], to, platforms)? else { return Ok(()) };
+        let height = line.height(x).ok_or(Unread)?;
+        if !each(line, height) {
+            return Ok(());
+        }
+        let next = past(height, to);
+        if next == y || (next < y) != down {
+            return Err(Unread);
+        }
+        y = next;
+    }
+    // One more look: a column that still holds a line is too deep to be read.
+    if y == to || (to < y) != down {
+        return Ok(());
+    }
+    match stage.first([x, y], to, platforms)? {
+        Some(_) => Err(Unread),
+        None => Ok(()),
+    }
+}
+
+/// `blast` is `[left, right, top, bottom]`, as `tech_surfaces::blast_bounds` gives it.
+pub fn classify(stage: &mut impl Probe, blast: [f32; 4], at: Point) -> Result<Place, Unread> {
+    let [left, right, top, bottom] = blast;
+    let [x, y] = at;
+    if !(left + INSIDE <= x && x <= right - INSIDE && bottom + INSIDE <= y && y <= top - INSIDE) {
+        return Ok(Place::Outside);
+    }
+    // The nearest solid line above the point, however near: down the column from the top, and up from the point.
+    let mut above: Option<(Met, f32)> = None;
+    column(stage, x, top, y, false, |line, height| {
+        if height > y {
+            above = Some((line, height));
+        }
+        true
+    })?;
+    column(stage, x, y, top, false, |line, height| {
+        if height <= y {
+            return true;
+        }
+        if above.is_none_or(|(_, nearest)| height < nearest) {
+            above = Some((line, height));
+        }
+        false
+    })?;
+    let mut start = y + SLACK;
+    if let Some((line, height)) = above {
+        if line.solid_floor() {
+            // The floor-only slack: a point a little under a floor's surface stands on it.
+            return Ok(if height <= y + SLACK { Place::OverStage } else { Place::Solid });
+        }
+        if height <= start {
+            start = past(height, bottom);
+        }
+    }
+    let mut over = false;
+    column(stage, x, start, bottom, true, |line, height| {
+        over = line.stand && height > bottom;
+        !over
+    })?;
+    Ok(if over { Place::OverStage } else if above.is_some() { Place::Under } else { Place::Open })
 }
 
 /// An end of a solid floor run with open air beside it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ledge {
     pub at: Point,
-    /// Where the open air is: `-1.0` left, `1.0` right.
+    /// Where the open air is: `-1.0` left of the ledge, `1.0` right of it.
     pub facing: f32,
 }
 
@@ -71,27 +165,156 @@ pub struct Ledge {
 pub struct FloorRun {
     /// Its left end and its right end.
     pub ends: Segment,
-    /// The ledge at each end, when it has open air beside it.
+    /// For the left end and the right end: the ledge, when that end has open air beside it.
     pub ledges: [Option<Ledge>; 2],
 }
 
-/// The solid floor run under `at`.
-pub fn floor_run(_stage: &mut impl Probe, _blast: [f32; 4], _at: Point) -> Result<Option<FloorRun>, Unread> { Ok(None) }
-/// Where the open air beside a ledge ends.
-pub fn open_air_end(_stage: &mut impl Probe, _blast: [f32; 4], _ledge: Ledge) -> Result<f32, Unread> { Ok(f32::NAN) }
-/// The default spot beside a ledge.
-pub fn default_spot(_stage: &mut impl Probe, _blast: [f32; 4], _ledge: Ledge) -> Result<Option<Point>, Unread> { Ok(None) }
-/// The nearest ledge with open air to a point.
-pub fn nearest_ledge(_stage: &mut impl Probe, _blast: [f32; 4], _at: Point) -> Result<Option<Ledge>, Unread> { Ok(None) }
+/// The first solid line from `at` down to the bottom blast line, when it is a solid floor.
+fn solid_floor_at(stage: &mut impl Probe, at: Point, bottom: f32) -> Result<Option<Met>, Unread> {
+    if !(at[1] > bottom) {
+        return Ok(None);
+    }
+    Ok(stage.first(at, bottom, false)?.filter(|line| line.solid_floor()))
+}
+
+/// A run's end on one side: the walk through solid floors that share an exact end point.
+fn run_end(stage: &mut impl Probe, bottom: f32, mut floor: Met, right: bool) -> Result<Point, Unread> {
+    let dir = if right { 1.0 } else { -1.0 };
+    for _ in 0..MAX_LINES {
+        let [a, b] = floor.ends;
+        let end = if (a[0] < b[0]) == right { b } else { a };
+        match solid_floor_at(stage, [end[0] + dir, end[1] + SLACK], bottom)? {
+            Some(next) if next.ends.contains(&end) && next.ends != floor.ends => floor = next,
+            _ => return Ok(end),
+        }
+    }
+    Err(Unread)
+}
+
+fn ledge(stage: &mut impl Probe, blast: [f32; 4], end: Point, facing: f32) -> Result<Option<Ledge>, Unread> {
+    let beside = [end[0] + facing, end[1] - 1.0];
+    Ok((classify(stage, blast, beside)? == Place::Open).then_some(Ledge { at: end, facing }))
+}
+
+/// The solid floor run under `at` (the ledge walk, seeded at any floor). `None`: no solid floor under the point.
+pub fn floor_run(stage: &mut impl Probe, blast: [f32; 4], at: Point) -> Result<Option<FloorRun>, Unread> {
+    let bottom = blast[3];
+    let Some(floor) = solid_floor_at(stage, [at[0], at[1] + SLACK], bottom)? else { return Ok(None) };
+    let ends = [run_end(stage, bottom, floor, false)?, run_end(stage, bottom, floor, true)?];
+    let ledges = [ledge(stage, blast, ends[0], -1.0)?, ledge(stage, blast, ends[1], 1.0)?];
+    Ok(Some(FloorRun { ends, ledges }))
+}
+
+/// Where the open air beside a ledge ends: the x of the next solid's near end, or of the side blast line. No inset.
+pub fn open_air_end(stage: &mut impl Probe, blast: [f32; 4], ledge: Ledge) -> Result<f32, Unread> {
+    let [left, right, top, bottom] = blast;
+    let dir = if ledge.facing < 0.0 { -1.0 } else { 1.0 };
+    let limit = if dir < 0.0 { left } else { right };
+    // The end of a line that is nearer the ledge.
+    let near = |line: Met| {
+        let [a, b] = line.ends;
+        if (a[0] < b[0]) == (dir > 0.0) { a[0] } else { b[0] }
+    };
+    let mut open = ledge.at[0];
+    let mut x = open + dir;
+    for _ in 0..4 * SEARCH {
+        if (limit - x) * dir <= 0.0 {
+            return Ok(limit);
+        }
+        if let Some(line) = stage.first([x, top], bottom, false)? {
+            let mut end = near(line);
+            // A joined face nearer the ledge: step back toward the last open column.
+            for _ in 0..8 {
+                let back = end - dir;
+                if (back - open) * dir <= 0.0 {
+                    break;
+                }
+                match stage.first([back, top], bottom, false)? {
+                    Some(line) if (near(line) - end) * dir < 0.0 => end = near(line),
+                    _ => break,
+                }
+            }
+            return Ok(if (end - open) * dir < 0.0 { open } else { end });
+        }
+        open = x;
+        x += dir * COLUMN;
+    }
+    Err(Unread)
+}
+
+/// The default spot beside a ledge: halfway across its open air and halfway down to the bottom of the box.
+/// `None`: that spot is not `Place::Open`.
+pub fn default_spot(stage: &mut impl Probe, blast: [f32; 4], ledge: Ledge) -> Result<Option<Point>, Unread> {
+    let dir = if ledge.facing < 0.0 { -1.0 } else { 1.0 };
+    let end = open_air_end(stage, blast, ledge)?;
+    let spot = [(ledge.at[0] + dir).midpoint(end - dir), (blast[3] + INSIDE).midpoint(ledge.at[1])];
+    Ok((classify(stage, blast, spot)? == Place::Open).then_some(spot))
+}
+
+/// The nearest ledge with open air to a point. `None`: the stage has none within reach of the search.
+pub fn nearest_ledge(stage: &mut impl Probe, blast: [f32; 4], at: Point) -> Result<Option<Ledge>, Unread> {
+    let [left, right, top, bottom] = blast;
+    if !at.into_iter().chain(blast).all(f32::is_finite) || left + INSIDE > right - INSIDE {
+        return Ok(None);
+    }
+    let start = at[0].clamp(left + INSIDE, right - INSIDE);
+    let mut best: Option<(Ledge, f32)> = None;
+    for right_side in [false, true] {
+        let dir = if right_side { 1.0 } else { -1.0 };
+        let mut x = start;
+        // The first column starts at the point; the columns after it are read from the top.
+        let mut from = (at[1] + SLACK).min(top);
+        for _ in 0..SEARCH {
+            if !(left + INSIDE <= x && x <= right - INSIDE) {
+                break;
+            }
+            let mut floor = solid_floor_at(stage, [x, from], bottom)?;
+            if floor.is_none() && from != top {
+                floor = solid_floor_at(stage, [x, top], bottom)?;
+            }
+            from = top;
+            let Some(floor) = floor else {
+                x += dir * COLUMN;
+                continue;
+            };
+            let end = run_end(stage, bottom, floor, right_side)?;
+            if let Some(found) = ledge(stage, blast, end, dir)? {
+                let distance = (found.at[0] - at[0]).hypot(found.at[1] - at[1]);
+                if best.is_none_or(|(_, nearest)| distance < nearest) {
+                    best = Some((found, distance));
+                }
+                break;
+            }
+            let next = end[0] + dir;
+            x = if (next - x) * dir > 0.0 { next } else { x + dir * COLUMN };
+        }
+    }
+    Ok(best.map(|(found, _)| found))
+}
 
 /// The same queries over copied lines; pure, any thread.
 pub struct Copied<'a>(pub &'a [Met]);
 impl Probe for Copied<'_> {
-    fn first(&mut self, _from: Point, _to: f32, _platforms: bool) -> Result<Option<Met>, Unread> { Ok(None) }
+    fn first(&mut self, [x, y]: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread> {
+        let (low, high) = if to < y { (to, y) } else { (y, to) };
+        Ok(self.0.iter().copied()
+            .filter(|line| platforms || !line.through)
+            .filter(|line| {
+                let [a, b] = line.ends;
+                a[0].min(b[0]) <= x && x <= a[0].max(b[0])
+            })
+            .filter_map(|line| line.height(x).map(|height| (line, height)))
+            .filter(|&(_, height)| low <= height && height <= high)
+            .min_by(|a, b| (a.1 - y).abs().total_cmp(&(b.1 - y).abs()))
+            .map(|(line, _)| line))
+    }
 }
 
-/// A traced line as the rule sees it.
-pub fn met(_line: Line) -> Met { Met { ends: [[0.0; 2]; 2], stand: false, through: false } }
+/// A traced line as the rule sees it: `stand` is placement's floor rule with platforms.
+pub fn met(line: Line) -> Met {
+    let stand = if line.passable { !line.wall && line.normal.y > 0.0 } else { line.floor };
+    Met { ends: line.ends.map(|point| [point.x, point.y]), stand, through: line.passable }
+}
 
 #[cfg(test)]
 mod tests {
