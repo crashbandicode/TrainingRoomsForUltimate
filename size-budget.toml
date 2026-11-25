@@ -3081,3 +3081,11 @@ ceiling = 203532
 date = "2026-11-25"
 reason = "The replay editor stores a take mark's own move key, so a saved take keeps the name of a grab, a throw, a final smash and a ledge, get-up or trip attack: one helper in combo_record.rs. Measured 203532 on install 4 a9131331 (203529): +3."
 approved_by = "tr-primary-2 ruling 2026-11-25 05:04:41Z (the fix ordered; lines under the +60 review-fix rule of 2026-11-24 21:46:20Z)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203585
+date = "2026-11-25"
+reason = "The drill takes the Training reset from the chord on its own poll, carried through Input Delay in its record: a reset chord alone leaves no result and starts no load at any hold length. Measured 203585 on the card head 0d28433d (203532): +53."
+approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command; a raise up to the +60 review-fix rule)."
