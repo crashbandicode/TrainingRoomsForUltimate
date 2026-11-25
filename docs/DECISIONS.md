@@ -2088,3 +2088,86 @@ full test as before, you do a lightweight smoke test as mentioned earlier."
 
 Who builds what is in tr-primary-2's inbox post of 17:06:54Z. The rule lives in the stage-geometry module
 (`artifacts/phase23/stage-geometry/DESIGN.md`).
+## Change placement: the crosshair, on the save itself (2026-11-25): decided (operator)
+
+The operator, 2026-11-25 about 14:40Z (relayed by tr-primary-2, inbox 14:40:44Z), verbatim:
+
+- "The placement I thought we were using the break the target crosshair to make it easier with option to change p1 or
+  cpu. It should also edit on the save state itself instead of going to the replay menu."
+- "on the change placement you should be able to first select on stage, off stage (on stage reuses the tracing stage
+  and you can go down to select the ground vs a platform) off stage uses the crosshair as well with the magnifying
+  glass etc. there should be good reuse there".
+
+**The design** (lane tile-fix-g4; `artifacts/phase23/placement-crosshair/DESIGN.md`): Change placement is the wizard of
+Place fighters before Record, opened on a save state, on the live game. The fighters stand at the spots while you
+place them, and A writes the spots into the save file. Six choices were put to the operator on the review page
+[decisions/placement-crosshair/README.md](decisions/placement-crosshair/README.md). A green outline in a picture marks
+the lane's recommendation at the time, which is not always what was decided.
+
+![The flow: the save's own screen, then Where, then Spot, then A saves](decisions/placement-crosshair/place-next-01-flow.png)
+
+**The operator's answers**, 2026-11-25 about 15:50Z (relayed by tr-primary-2, inbox 15:53:07Z), verbatim: "PC1 B, I
+thought this was what was already done why is it extra code?; PC2 all 4; PC3l all 5 but you can hit + at any time for
+the defaults; PC4 A; PC5, when the save is tied to a macro a dialogue will ask one way or another. advanced settings
+allow you to always copy or always change for all. default is prompt; PC6 A"
+
+**Decided:**
+
+| | Choice | Decided |
+| --- | --- | --- |
+| PC1 | On stage: how the floor is chosen | **B, the floor hop.** Left / Right move the fighter along its floor; Up / Down step to the floor above or below. The floors are the ones Tech practice's surface walk traces; no second tracer. A stick held diagonally does not change floor. Until the walk is done the fighter stands on the floor under a free crosshair. |
+| PC2 | Where it opens | **All four:** a save's own screen; a macro's or a chain's own screen (it opens the start save); X on a save in the Recording pop-up; and the row in Recording › Replays, which opens the same picker on the active macro's start save. |
+| PC3 | The pages | **All five:** Where, Spot, State, Percent, Preview. **+ saves from any page**; a page you did not visit keeps the save's own values. |
+| PC4 | Place fighters before Record | **A, one wizard for both.** It gets the Where page, the live fighters, the game's magnifier and the range to the blast line. |
+| PC5 | A start save that macros share | **A question.** When macros start from the save, the picker first asks whether to change it for all of them (it says how many) or to copy it. Opened from a macro, the copy becomes that macro's start save; opened from the save's own screen, the copy is a new save no macro uses. An Advanced setting, **Shared start save**, answers it ahead: Prompt (the default), Always change, Always copy. |
+| PC6 | The old offsets and the Momentum key | **A.** The key grid goes. Momentum becomes a row on the macro's own screen. A macro that has an offset shows it in an Offset row there, and A clears it. |
+
+![PC1](decisions/placement-crosshair/place-next-PC1-on-stage.png)
+
+![PC2](decisions/placement-crosshair/place-next-PC2-where-it-opens.png)
+
+![PC3](decisions/placement-crosshair/place-next-PC3-pages.png)
+
+![PC4](decisions/placement-crosshair/place-next-PC4-record-wizard.png)
+
+![PC5](decisions/placement-crosshair/place-next-PC5-shared-start.png)
+
+![PC6](decisions/placement-crosshair/place-next-PC6-old-offsets.png)
+
+**What a save writes** (design review by rv-edge-juggle-sol, 2026-11-25 15:19:35Z; accepted by tr-primary-2 15:23:38Z):
+
+- Only the save file, and in it only what you edited, field by field: a fighter's spot and place, its start state,
+  its damage. With nothing edited no file is written.
+- No macro file is touched. A macro's offset stays its own, and Play still adds it on top of the save's spot.
+- If the file cannot be written the picker says `Not saved · {save} could not be written` and puts both fighters
+  back (`docs/RESTRICTIONS.md`, `place-save-write`).
+
+**Switching a fighter to Off stage (T1 A).** The operator's answer of 2026-11-25 about 17:05Z (inbox 17:06:54Z; the
+full record is the section "Off stage, found from the stage's own lines") begins "T1 A": a fighter switched to Off
+stage whose spot is not off stage goes to the default spot beside the nearest ledge with open air, and the crosshair
+then stays free. A spot under a solid counts as off stage.
+
+- **Which point is read** (tr-primary-2, 2026-11-25 19:44:44Z): on the Spot page it is the crosshair's point, because
+  off stage the fighter follows the crosshair. In open air or under a solid, the fighter goes to the crosshair and
+  nothing else moves. Over the stage or in a solid, the crosshair and the fighter both go to the default spot beside
+  the ledge nearest the crosshair. On the Where page, which shows no crosshair, it is the fighter's spot.
+- The rule is read on the switch only, never while the crosshair moves. Opening a save whose fighter is already Off
+  stage is not a switch, and moving the crosshair back over a floor afterwards moves nothing.
+- When the stage cannot be read, or it has no ledge with open air, the fighter is switched to Off stage where it is.
+
+**Memory** (tr-primary-2, 2026-11-25 16:48:42Z): the picker keeps no outline of its own. It reads the one outline
+Tech practice traces, and walks it there when it is not traced yet.
+
+**Reverses:**
+
+- Edit placement as an offset editor in Recording › Replays (`docs/FEATURE-LEDGER.md` row 70; primary 2026-11-08
+  #70 (a)). The row stays, renamed Change placement, and opens the picker.
+- "The recording start picker keeps its chevron: its spots are clamped to the camera's range"
+  (`docs/design/rc15-gte-wizard-start.md`, 2026-11-23). Under PC4 A it holds the fighters at their spots and reaches
+  to 1 unit inside the blast line off stage.
+- Place fighters before Record had four pages; it has five.
+
+**Followed:** one shared crosshair (Guard the Edge and Juggler, 2026-11-22, above); Training and the waiting room
+alike (2026-11-22, above); no per-stage and no per-fighter table.
+
+Host tests only; not yet seen in a game.

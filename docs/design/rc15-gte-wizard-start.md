@@ -49,7 +49,7 @@ The game shows that magnifier only for a fighter that is itself out of the camer
 
 While the Guard the Edge or Juggler picker is up, the CPU now waits at its picked start: placed awake with a Fall request for `PREVIEW_SETTLE` frames, then held asleep there, with the placement the drill's own start uses (`model::crosshair::CpuPreview`, `placement::preview`). In view the game draws the CPU under the crosshair; out of view it draws its magnifier with the direction pointer. The chevron stays where the body cannot be held (constants or grants missing) and while the game HUD is off, which hides the magnifier. Leaving the picker without starting puts the CPU back where it stood, except while a save state loads. A started drill wakes it and the existing placement runs unchanged. `tr.practice` reports `wizard.cpu` as `in_view` or `magnifier`; the second is the game's `FLAG_IS_LOUPE` read back.
 
-The recording start picker keeps its chevron: its spots are clamped to the camera's range.
+The recording start picker keeps its chevron: its spots are clamped to the camera's range. *Changed 2026-11-25: the recording start picker and Change placement are one wizard that holds both fighters at their spots; see "Change placement: the crosshair, on the save itself" in `docs/DECISIONS.md`.*
 
 | Requirement | Design | Test |
 | --- | --- | --- |

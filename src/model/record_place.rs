@@ -4,6 +4,7 @@ use super::cpu::ids::C;
 use super::crosshair::{Crosshair, Marks};
 use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
+use super::stage_geometry::{classify, default_spot, nearest_ledge, Probe};
 use super::state::record::{SavedState, StartState};
 
 pub const READY_FRAMES: u16 = 60;
@@ -344,6 +345,18 @@ pub fn reach(place: Place, camera: [f32; 4], blast: Option<[f32; 4]>) -> [f32; 4
     }
 }
 
+/// Where a fighter switched to Off stage goes (operator 2026-11-25, T1 A). `None`: its spot stays. A spot that is
+/// off stage by the rule stays, in open air or under a solid, and nothing more is read for it. Any other spot goes
+/// to the default spot beside the nearest ledge with open air. A stage that cannot be read, or that has no such
+/// ledge or spot, moves nothing. `at` is the crosshair's point on the Spot page, and the fighter's spot on the Where page.
+pub fn off_stage_spot(stage: &mut impl Probe, blast: [f32; 4], at: [f32; 2]) -> Option<[f32; 2]> {
+    if classify(stage, blast, at).ok()?.off_stage(true) {
+        return None;
+    }
+    let ledge = nearest_ledge(stage, blast, at).ok()??;
+    default_spot(stage, blast, ledge).ok()?
+}
+
 /// The game's situation kinds a save records.
 pub const SITUATION_GROUND: i32 = 0;
 pub const SITUATION_CLIFF: i32 = 1;
@@ -600,13 +613,15 @@ impl Wizard {
         self.ledge[i] && !self.edits()[i].spot
     }
 
-    /// On stage / off stage for the edited fighter. Off: the spot stays. On: the floor under it, else `home`, else
-    /// nothing changes. A Record start begins Standard at the new place. A save keeps its state unless that state
+    /// On stage / off stage for the edited fighter. Off: the spot stays when it is off stage by the stage rule, else
+    /// `off` gives the default spot beside the nearest ledge with open air (T1 A). On: the floor under it, else `home`,
+    /// else nothing changes. A Record start begins Standard at the new place. A save keeps its state unless that state
     /// cannot exist there (a missed tech or a trip in the air; a tumble, helpless or footstool start on a floor).
-    fn toggle_place(&mut self, at: [f32; 2], floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, home: Option<[f32; 2]>) {
+    fn toggle_place(&mut self, at: [f32; 2], floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, home: Option<[f32; 2]>,
+        off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>) {
         let fighter = &mut self.setup[self.edit.index()];
         let (place, at) = match fighter.place {
-            Place::OnStage => (Place::OffStage, at),
+            Place::OnStage => (Place::OffStage, off(at).unwrap_or(at)),
             Place::OffStage => match floor(at).or(home) {
                 Some(at) => (Place::OnStage, at),
                 None => return,
@@ -623,11 +638,11 @@ impl Wizard {
         self.cross.at
     }
 
-    /// `step_on` before the stage's floors are traced.
+    /// `step_on` before the stage's floors are traced. No stage rule is read: the spot stays.
     pub fn step(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
         floor: impl Fn([f32; 2]) -> Option<[f32; 2]>) -> Outcome
     {
-        self.step_on(pad, fit, floor, &[])
+        self.step_on(pad, fit, floor, |_| None, &[])
     }
 
     /// One frame of the pad. `floors`: the traced floor lines of the stage (Tech practice's surface walk). With
@@ -635,7 +650,8 @@ impl Wizard {
     /// below (operator 2026-11-25, PC1 B). Without (the walk is not finished, or the fighter stands on a floor it
     /// did not trace), the fighter stands on the floor under a free crosshair.
     pub fn step_on(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
-        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, floors: &[floor_hop::Floor]) -> Outcome
+        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>,
+        floors: &[floor_hop::Floor]) -> Outcome
     {
         let was = self.was;
         self.was = pad.held;
@@ -696,11 +712,12 @@ impl Wizard {
             return Outcome::Open;
         }
         if self.page == Page::Spot && pressed(logical::Y) {
-            self.toggle_place(self.cross.at, floor, None);
+            self.toggle_place(self.cross.at, floor, None, off);
+            if self.setup[i].place == Place::OffStage { self.cross.jump(self.setup[i].at); }
             return Outcome::Open;
         }
         if self.page == Page::Where && (pressed(logical::DPAD_LEFT) || pressed(logical::DPAD_RIGHT)) {
-            self.toggle_place(self.setup[i].at, floor, self.home);
+            self.toggle_place(self.setup[i].at, floor, self.home, off);
             self.cross.jump(self.setup[i].at);
             return Outcome::Open;
         }
@@ -1850,7 +1867,7 @@ mod tests {
     }
 
     fn hop_press(w: &mut Wizard, key: u8) -> Outcome {
-        w.step_on(&button(key), Some, floors, &traced())
+        w.step_on(&button(key), Some, floors, |_| None, &traced())
     }
 
     #[test]
@@ -1870,7 +1887,7 @@ mod tests {
             hop_press(&mut w, DPAD_DOWN);
             assert_eq!(w.setup[0].at, [-30.0, 0.0]);
             // One flick of the stick is one floor, however long it is held.
-            for _ in 0..30 { w.step_on(&Pad { stick: [0.0, 1.0], ..Pad::default() }, Some, floors, &traced()); }
+            for _ in 0..30 { w.step_on(&Pad { stick: [0.0, 1.0], ..Pad::default() }, Some, floors, |_| None, &traced()); }
             assert_eq!(w.setup[0].at, [-30.0, 30.0]);
         }
     }
@@ -1882,12 +1899,12 @@ mod tests {
         let mut w = spot_wizard(saved(), None);
         hop_press(&mut w, DPAD_UP);
         // The stick: 2 units a frame, as Break the Targets; the D-pad: one unit a press.
-        for _ in 0..3 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, &traced()); }
+        for _ in 0..3 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, |_| None, &traced()); }
         assert_eq!((w.setup[0].at, w.cursor()), ([-24.0, 55.0], [-24.0, 55.0]));
         hop_press(&mut w, DPAD_LEFT);
         assert_eq!(w.setup[0].at, [-25.0, 55.0]);
         // The cursor cannot leave a floor: it stops at the floor's end.
-        for _ in 0..20 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, &traced()); }
+        for _ in 0..20 { w.step_on(&Pad { stick: [1.0, 0.0], ..Pad::default() }, Some, floors, |_| None, &traced()); }
         assert_eq!((w.setup[0].place, w.setup[0].at, w.cursor()), (Place::OnStage, [-20.0, 55.0], [-20.0, 55.0]));
     }
 
@@ -1896,10 +1913,10 @@ mod tests {
         use crate::model::btt::Pad;
         let mut w = spot_wizard(saved(), None);
         // Past the tilt, but more sideways than up: no hop, and the fighter slides 2 units a frame.
-        for _ in 0..5 { w.step_on(&Pad { stick: [1.0, 0.75], ..Pad::default() }, Some, floors, &traced()); }
+        for _ in 0..5 { w.step_on(&Pad { stick: [1.0, 0.75], ..Pad::default() }, Some, floors, |_| None, &traced()); }
         assert_eq!((w.setup[0].at, w.cursor()), ([-20.0, 30.0], [-20.0, 30.0]));
         // More down than sideways, but short of the tilt: no hop either.
-        for _ in 0..5 { w.step_on(&Pad { stick: [-0.5, -0.6875], ..Pad::default() }, Some, floors, &traced()); }
+        for _ in 0..5 { w.step_on(&Pad { stick: [-0.5, -0.6875], ..Pad::default() }, Some, floors, |_| None, &traced()); }
         assert_eq!((w.setup[0].at, w.cursor()), ([-25.0, 30.0], [-25.0, 30.0]));
     }
 
@@ -1911,11 +1928,11 @@ mod tests {
         // Off stage the traced floors change nothing: the crosshair is free, as Break the Targets.
         let mut w = spot_wizard(saved(), None);
         hop_press(&mut w, L);
-        for _ in 0..3 { w.step_on(&up, Some, floors, &traced()); }
+        for _ in 0..3 { w.step_on(&up, Some, floors, |_| None, &traced()); }
         assert_eq!((w.setup[1].place, w.setup[1].at), (Place::OffStage, [-80.0, -5.0]));
         // Without traced floors the fighter stands on the floor under a free crosshair.
         let mut w = spot_wizard(saved(), None);
-        for _ in 0..3 { w.step_on(&up, Some, floors, &[]); }
+        for _ in 0..3 { w.step_on(&up, Some, floors, |_| None, &[]); }
         assert_eq!((w.cursor(), w.setup[0].at), ([-30.0, 36.0], [-30.0, 30.0]));
     }
 
@@ -2859,3 +2876,7 @@ mod tests {
     }
     }
 }
+
+#[cfg(test)]
+#[path = "record_place/switch_tests.rs"]
+mod switch_tests;

@@ -126,7 +126,6 @@ NOTICE_OK = [
     ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
     ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
     ("docs/menu/fighters-and-stages.md", "1/3 Layout 2 · Battlefield: 6", "the Saved layouts notice, built from the position, the layout's name and its target count"),
-    ("docs/menu/recording.md", "Offset X 0.00 Y 0.00 Keep recorded speed", "the first line of a longer help text: src/model/macro_ui/macro_panel.rs writes 'Offset X {} Y {} {}' and more after it"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
 
