@@ -758,12 +758,12 @@ impl RecordingScreens {
         &self.last_effect
     }
 
-    /// The host takes the effect once. A second read is [`Effect::None`].
     /// The Replays row: ask the host for the placement picker on the active macro's start save.
     pub fn ask_active_placement(&mut self) {
         self.last_effect = Effect::ChangeActivePlacement;
     }
 
+    /// The host takes the effect once. A second read is [`Effect::None`].
     pub fn take_effect(&mut self) -> Effect {
         std::mem::replace(&mut self.last_effect, Effect::None)
     }
