@@ -798,6 +798,58 @@ mod tests {
         snap_capture_with(7, 45, 0)
     }
 
+    fn long_action_capture(last: u32) -> ClipEditor {
+        let frames = (0..60).map(|i| ReplayFrame {
+            input: InputFrame { buttons: u32::from(i == 5 || i == 36), ..InputFrame::default() },
+            start: StartState { status: if (8..=last).contains(&i) { 45 } else { 0 },
+                ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0,
+        }).collect();
+        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {
+            entry: 0, fighter: None, quantized_analog: false, frames,
+        }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap().with_move_rules(snap_rules())
+    }
+
+    fn second_y_does_not_reselect_a_different_mark_near_the_action_frame() {
+        // A later press in the same long move is farther from its start than the preceding idle mark.
+        let mut e = long_action_capture(40);
+        assert_eq!(e.marks.list().iter().map(|m| m.start).collect::<Vec<_>>(), [5, 36]);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(36));
+        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));
+        let selected = e.view().move_start.unwrap();
+        assert_eq!((selected.frame, selected.action_frame), (7, 8));
+        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));
+        assert_eq!((e.view().start, e.view().move_start), (7, Some(selected)));
+    }
+
+    fn y_checks_the_in_applied_by_a_shortened_out() {
+        let mut e = long_action_capture(32);
+        e.on_action(ClipAction::SelectOut);
+        e.on_action(ClipAction::Nudge(-30));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(29));
+        assert_eq!(e.marks.snap_in(29), Some(36)); // clean, but outside [In, Out)
+        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));
+        assert_eq!(e.view().end, 30);
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)), "Y left the applied In mid-action");
+        e.preview_progress(30);
+        assert!(matches!(e.on_action(ClipAction::Confirm), ClipEffect::Export(_)));
+    }
+
+    fn a_refused_x_leaves_the_watched_mark_available_to_y() {
+        let mut e = long_action_capture(32);
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        e.watch(&[Span { start: 28, ..Span::default() }]);
+        e.preview_progress(60);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(28));
+        assert_eq!(e.marks.snap_in(28), Some(28));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));
+        assert_eq!(e.marks.snap_in(28), Some(28), "no preview started; its mark should still be available to Y");
+        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));
+        assert_eq!(e.view().move_start.unwrap().action_frame, 8);
+    }
+
     /// Operator 2026-11-25 (install 5): "I used snap but it still gives that message". Y on In, then X, then A.
     fn y_snap_on_a_mid_action_in_previews_and_saves() {
         let mut e = snap_capture();
@@ -1273,6 +1325,9 @@ mod tests {
             ("y_snap_on_a_mid_action_in_previews_and_saves", y_snap_on_a_mid_action_in_previews_and_saves as fn()),
             ("y_after_a_refused_preview_snaps_previews_and_saves", y_after_a_refused_preview_snaps_previews_and_saves as fn()),
             ("a_second_y_keeps_the_same_move", a_second_y_keeps_the_same_move as fn()),
+            ("second_y_does_not_reselect_a_different_mark_near_the_action_frame", second_y_does_not_reselect_a_different_mark_near_the_action_frame as fn()),
+            ("y_checks_the_in_applied_by_a_shortened_out", y_checks_the_in_applied_by_a_shortened_out as fn()),
+            ("a_refused_x_leaves_the_watched_mark_available_to_y", a_refused_x_leaves_the_watched_mark_available_to_y as fn()),
             ("y_snap_to_an_idle_mark_stays_a_plain_start", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),
             ("y_snap_where_no_move_can_start_says_why", y_snap_where_no_move_can_start_says_why as fn()),
             ("the_lead_in_key_then_x_and_a_work_on_the_same_take", the_lead_in_key_then_x_and_a_work_on_the_same_take as fn()),
