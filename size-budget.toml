@@ -2818,6 +2818,9 @@ date = "2026-11-24"
 reason = "Merge 4b: a combo file's links are read straight into the record, which takes the menu worker's deepest stack path from 57,728 to 53,888 B. Measured 199828 (tools/sloc.py tree), 4 above merge 4's 199824."
 approved_by = "tr-primary-2 2026-11-24 23:01:06Z (merge 4b, owner f15-lobby) and its standing rule of 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)."
 
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
 ceiling = 199998
 date = "2026-11-24"
 reason = "Merge 3D of install 4: a special's own travel is measured, kept on its press and graded (path within the steering tolerance; beyond a 2-unit floor the stick most held, and with the stick toggle its angle and deflection). Measured 199998 on 3c5d0295, 174 above merge 4 (199824, 436c7a68)."
