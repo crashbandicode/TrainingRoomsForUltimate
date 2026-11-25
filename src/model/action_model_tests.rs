@@ -1375,4 +1375,66 @@ fn an_aims_detail_is_not_displaced_by_a_press_path() {
     assert!(!combo.attach_travel(4, 0, path), "a press path does not displace an aim's detail");
 }
 
+/// Edge: the travel ends on the very next frame after its step was graded. The grade is amended on that frame.
+#[test]
+fn a_travel_that_ends_the_frame_after_its_step_was_graded_amends_the_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    for (attempt, clean) in [(travel((-38, 14), (1800, 100)), false), (travel((-40, 2), (1800, 100)), true)] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        for frame in 0..=44 {
+            helper.settings = Settings::factory();
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == 5).then_some((1, attempt)), ..action::Late::NONE
+            }), &mut Out::default());
+            if frame == 4 {
+                assert_eq!(helper.attempt().unwrap().len(), 1, "step 1 is graded before its travel ends");
+                assert!(helper.results().next().is_none());
+            }
+            if frame == 5 {
+                let result = helper.results().next().map(|r| (r.outcome, r.clean, r.fault));
+                assert_eq!(result, (!clean).then_some((Outcome::Completed, false, Some((0, Reason::AimPath(1))))));
+            }
+        }
+        if clean {
+            let result = helper.results().next().unwrap();
+            assert!(result.clean);
+            assert_eq!(result.graded, 2);
+        }
+    }
+}
+
+/// Edge: *Match angle and deflection* flipped while a drill is being attempted. A step keeps the grade it got under
+/// the setting in force when it was graded; a travel that ends later is graded under the setting in force then.
+#[test]
+fn the_stick_toggle_flipped_mid_drill_applies_from_the_next_grade() {
+    let target = steering_capture(travel((-40, 0), (1800, 100)), true);
+    let off_angle = travel((-40, 0), (1600, 100));
+    // The frame the travel is handed over, the frame the toggle flips, whether it is On before the flip, the result.
+    for (handed, flips, first, clean) in [
+        (4, 5, false, true),
+        (4, 5, true, false),
+        (9, 6, false, false),
+        (9, 6, true, true),
+    ] {
+        let mut helper = Helper::new();
+        helper.set_target(Some(target));
+        let mut resolved = None;
+        for frame in 0..=44 {
+            helper.settings = Settings { match_stick: first != (frame >= flips), ..Settings::factory() };
+            helper.step_inputs_late(steering_snap(frame, true), Some(action::Late {
+                travel: (frame == handed).then_some((1, off_angle)), ..action::Late::NONE
+            }), &mut Out::default());
+            if resolved.is_none() {
+                resolved = helper.results().next().copied();
+            }
+        }
+        let result = resolved.expect("the drill resolved");
+        assert_eq!(result.clean, clean, "handed {handed}, flips {flips}, On first {first}");
+        if !clean {
+            assert_eq!(result.fault, Some((0, Reason::AimAngle(1, -200))));
+        }
+    }
+}
+
 }
