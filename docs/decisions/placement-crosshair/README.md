@@ -73,7 +73,9 @@ Either way, the old Edit placement row in Recording › Replays is removed.
 
 | | Option |
 | --- | --- |
-| **A** | The grid goes, and Momentum becomes a row on the macro's own screen. Keep and New go too: B cancels, and Duplicate copies a save. |
+| **A** | The grid goes, and Momentum becomes a row on the macro's own screen. A macro that already has an offset shows it in a new Offset row, and A clears it. Keep and New go too: B cancels, and Duplicate copies a save. |
 | B | The grid stays as "Fine offset". That gives two ways to move a start, and the offset is still added on top of the picked spot. |
 
-Old saves and macros keep working either way. Nothing in the file format changes, and a macro's old offset applies until you place it with the new picker.
+Old saves and macros keep working either way. Nothing in the file format changes. The picker moves the save itself and never edits a macro file. A macro's old offset stays, and Play adds it on top of the new spot until you clear it (with option A, in the Offset row).
+
+*Updated 2026-11-25 15:31Z: the PC6 picture and text were corrected by the design lane. Earlier, a macro's offset became 0 after you used the picker; now it stays until you clear it.*
