@@ -2,7 +2,9 @@
 
 Use and change the button chords for practice. They work in Training and in the waiting rooms.
 
-<!-- CLIP: tut-controls-change-chord.mp4 | Save State Save reads ZL + D-pad Down → Button chords, X, hold ZL + D-pad Left → the new chord saves -->
+<video src="../media/tut-controls-change-chord.mp4" autoplay muted loop playsinline controls></video>
+
+*Button chords: Save State Save reads ZL + D-pad Down; X, then holding ZL + D-pad Left sets the new chord, and that chord saves. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](../media/tut-controls-change-chord.mp4)
 
 A chord is "hold one button, then press the others". It fires once per press. The game doesn't see a chord's
 buttons while you hold them, and chords don't fire while a menu is open.
