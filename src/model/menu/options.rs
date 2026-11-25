@@ -31,6 +31,7 @@ pub static HITSTUN_PLAYBACK: [&str; 3] = ["As Hitstun Ends", "As Hitstop Ends", 
 /// Change placement on a start save that macros share (operator 2026-11-25, PC5).
 pub static SHARED_START: [&str; 3] = ["Prompt", "Always change", "Always copy"];
 pub static TRIM: [&str; 4] = ["Start", "End", "Both", "Off"];
+pub static PLAYBACK_DELAY: [&str; 8] = ["None", "10 frames", "20 frames", "30 frames", "45 frames", "60 frames", "90 frames", "120 frames"];
 /// The loop counts X cycles, and the Options row shows. The factory row stays length 2.
 pub static LOOP_COUNTS: [&str; 6] = ["∞", "1", "2", "3", "5", "10"];
 pub static BUFFS: [&str; 18] = [

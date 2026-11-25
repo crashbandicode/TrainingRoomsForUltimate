@@ -118,9 +118,11 @@ static CAPTURE: Mutex<Capture> = Mutex::new(Capture::new());
 struct VaultHook {
     epoch: u64, recording: bool, truncated: bool, counts: [usize; 8],
     pending: [Option<ReplayFrame>; 8],
+    /// The entries whose fighter identity this capture has posted.
+    named: [bool; 8],
 }
 static VAULT_HOOK: hos_lock::Mutex<VaultHook> = hos_lock::Mutex::new(VaultHook {
-    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8],
+    epoch: 0, recording: false, truncated: false, counts: [0; 8], pending: [None; 8], named: [false; 8],
 });
 // rc.8 R4: the slots are sized in `handoff::REPLAY_EVENT_SLOTS`, which says what a full mailbox does.
 static VAULT_EVENTS: hos_lock::Mailbox<VaultEvent, { crate::engine::macros::handoff::REPLAY_EVENT_SLOTS }> = hos_lock::Mailbox::new();
@@ -194,6 +196,26 @@ fn open_browser(expected_revision: Option<u64>) {
         notify("Open the replay window in idle practice".into());
         return;
     }
+    let (rows, skipped) = browser_rows();
+    if rows.is_empty() {
+        notify("Save a replay with match capture on, or play one in Vault first".into());
+        return;
+    }
+    {
+        let mut browser = BROWSER.lock().unwrap();
+        // A refusal may rescan the library, but must not reopen after Cancel or
+        // interruption while that I/O was in flight.
+        if expected_revision.is_some_and(|revision|
+            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
+        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
+        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
+            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });
+    }
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+}
+
+/// The Replay window's rows as storage has them now, and how many files were skipped.
+fn browser_rows() -> (Vec<LibraryRow>, usize) {
     let mut rows = Vec::new();
     {
         let capture = CAPTURE.lock().unwrap();
@@ -216,21 +238,23 @@ fn open_browser(expected_revision: Option<u64>) {
         }
         Err(error) => notify(format!("Saved capture library: {error}")),
     }
-    if rows.is_empty() {
-        notify("Save a replay with match capture on, or play one in Vault first".into());
-        return;
+    (rows, skipped)
+}
+
+/// Deletes one capture: a Vault capture of this boot from memory, a saved one from the card. A failure is reported and
+/// leaves it in storage; the caller lists again afterwards.
+pub fn delete_recording(id: &str) {
+    let deleted = match id {
+        "latest" | "previous" => {
+            CAPTURE.lock().unwrap().forget(id == "latest");
+            Ok(true)
+        }
+        _ => id.strip_prefix("saved:").ok_or_else(|| "Unknown replay capture".to_owned())
+            .and_then(|id| crate::runtime::macros::replay_store::archive().delete(id).map_err(|error| error.to_string())),
+    };
+    if let Err(error) = deleted {
+        notify(format!("Saved capture library: {error}"));
     }
-    {
-        let mut browser = BROWSER.lock().unwrap();
-        // A refusal may rescan the library, but must not reopen after Cancel or
-        // interruption while that I/O was in flight.
-        if expected_revision.is_some_and(|revision|
-            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }
-        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }
-        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),
-            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });
-    }
-    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
 }
 
 pub fn recordings() -> Vec<crate::model::recording_menu::RecordingFile> {
@@ -577,6 +601,14 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
             }
         }
         BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }
+        BrowserEffect::Delete(id) => {
+            delete_recording(&id);
+            let (rows, skipped) = browser_rows();
+            let listed = BROWSER.lock().unwrap().as_mut().is_some_and(|b| b.revision == revision && b.ui.relist(rows, skipped));
+            if !listed {
+                close_editor_revision(false, Some(revision));
+            }
+        }
         BrowserEffect::TimedOut => {
             let recording = BROWSER.lock().unwrap().as_ref().is_some_and(|b| b.revision == revision && b.request.is_some());
             if close_editor_revision(false, Some(revision)) {
@@ -889,7 +921,7 @@ pub fn worker_preview_notices() {
                 } else { false }
             })
         };
-        if play { apply_action(ClipAction::TogglePlay); }
+        if play { apply_action_as(ClipAction::TogglePlay, true); }
     }
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
         let before = editor.view();
@@ -1002,7 +1034,9 @@ pub fn on_action(action: ClipAction) {
     apply_action(action);
 }
 
-fn apply_action(action: ClipAction) {
+fn apply_action(action: ClipAction) { apply_action_as(action, false); }
+
+fn apply_action_as(action: ClipAction, playback: bool) {
     if matches!(action, ClipAction::TogglePlay | ClipAction::Restart)
         && EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.switch) {
         notify("Wait for the requested fighter to load".into());
@@ -1041,7 +1075,11 @@ fn apply_action(action: ClipAction) {
             Err(error) => preview_failed(&error.to_string()),
             Ok(()) => {
                 TAIL.lock().unwrap().restart();
-                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());
+                if playback {
+                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());
+                } else {
+                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());
+                }
             }
         },
         Some(ClipEffect::PreviewFile { start, end, player }) => {
@@ -1251,6 +1289,7 @@ pub unsafe fn before_frame(fighter: &mut Fighter) {
         hook.recording = true;
         hook.truncated = false;
         hook.counts = [0; 8];
+        hook.named = [false; 8];
         hook.pending = [None; 8];
         if !post_vault(hook.epoch, VaultEvent::Begin { epoch: hook.epoch }) { hook.truncated = true; }
     }
@@ -1276,7 +1315,15 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     let (input, quantized) = observed.unwrap().project();
     sample.input = input;
     hook.counts[entry as usize] += 1;
-    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; }
+    if !post_vault(hook.epoch, VaultEvent::Sample { epoch: hook.epoch, entry, sample, quantized }) { hook.truncated = true; return; }
+    // Once per entry and capture: the identity its specials are named by (`recorded_fighter`).
+    if !core::mem::replace(&mut hook.named[entry as usize], true) {
+        // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.
+        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut smash::app::BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };
+        if let Some(fighter) = fighter {
+            if !post_vault(hook.epoch, VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }) { hook.truncated = true; }
+        }
+    }
 }
 
 pub(crate) unsafe fn observed_input(module: &mut BattleObjectModuleAccessor) -> Option<LiveInput> {

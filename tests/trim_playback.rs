@@ -517,8 +517,8 @@ fn marked_frames(include_open: bool) -> (Vec<InputFrame>, [Span; 2]) {
     if include_open { frames[50] = frame(1); }
     frames[90] = frame(2);
     let spans = [
-        Span { start: 12, end: Some(40), mv: Some(Move::Jab) },
-        Span { start: 92, end: Some(150), mv: Some(Move::SideTilt) },
+        Span { start: 12, end: Some(40), mv: Some(Move::Jab), ..Span::default() },
+        Span { start: 92, end: Some(150), mv: Some(Move::SideTilt), ..Span::default() },
     ];
     (frames, spans)
 }
@@ -527,7 +527,7 @@ fn marked_frames(include_open: bool) -> (Vec<InputFrame>, [Span; 2]) {
 fn record_time_trim_moves_the_marks_with_the_kept_frames() {
     let root = Scratch::new();
     let (frames, later_spans) = marked_frames(true);
-    let spans = [Span { start: 2, end: Some(15), mv: Some(Move::UpTilt) }, later_spans[0], later_spans[1]];
+    let spans = [Span { start: 2, end: Some(15), mv: Some(Move::UpTilt), ..Span::default() }, later_spans[0], later_spans[1]];
     for (trim, range, marks) in [
         (Trim::Start, 10..200, vec![(0, Some(30)), (40, None), (80, Some(140))]),
         (Trim::End, 0..91, vec![(2, Some(15)), (10, Some(40)), (50, None), (90, Some(91))]),

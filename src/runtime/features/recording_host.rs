@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::engine::library::Role;
 use crate::engine::macros::InputFrame;
 use crate::engine::rr_host::{self, Tick};
 use crate::model::flow::{self, NameStep};
@@ -14,7 +15,22 @@ static NAME_ASKED: AtomicBool = AtomicBool::new(false);
 const NOTICE_ID: u8 = 0x2C;
 const NOTICE_COLOR: [u8; 4] = [255, 255, 255, 255];
 
+/// A role's live fighter identity, for the take it records (`rr_host::post_record_start`).
+fn role_fighter(role: Role) -> Option<crate::model::move_names::FighterId> {
+    // SAFETY: a take start is posted from the game thread only (the chord step, the placement poll), where the
+    // role's body is live this frame.
+    unsafe {
+        let body = match role {
+            Role::Cpu => super::recorder::cpu_body(),
+            Role::Player => super::recorder::body_of(0),
+        }?;
+        let kind = ((body.fighter + super::recorder::FIGHTER_KIND_FIELD) as *const i32).read();
+        super::move_names::fighter_id(body.accessor, kind)
+    }
+}
+
 pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, play_cpu: bool) {
+    rr_host::set_fighter_reader(role_fighter);
     // A Record that starts keeps both fighters as they are now: the start save is where the macro starts
     // (RECORDING-REDESIGN, "Start save"), and the macro keeps the recorded role's speed (PLAY-MOMENTUM).
     if record && rr_host::capture_role() == 0 {
@@ -237,6 +253,7 @@ pub fn service() {
     rr_host::set_strip_sample(super::combo::strip_sample());
     rr_host::set_record_trim(super::recorder::settings().trim);
     rr_host::set_playback_indicator(super::recorder::settings().indicator);
+    rr_host::set_playback_delay(super::recorder::settings().delay);
     if player.fighter_kind >= 0 {
         rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }
@@ -409,16 +426,20 @@ fn apply(tick: &Tick) {
         super::states::request_preview_home(home);
     }
     if let Some(id) = &tick.warp {
-        let root = std::path::Path::new(crate::model::storage::ROOT);
-        let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
-            root.join(crate::engine::library::SAVES_DIR),
-        );
-        if let Ok(save) = saves.load(id) {
-            // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
-            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
+        if let Some(pair) = tick.warp_pair.clone() {
+            super::states::request_named_load(*pair);
         } else {
-            // No restore was asked for, so none will land.
-            rr_host::warp_landed();
+            let root = std::path::Path::new(crate::model::storage::ROOT);
+            let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
+                root.join(crate::engine::library::SAVES_DIR),
+            );
+            if let Ok(save) = saves.load(id) {
+                // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
+                super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
+            } else {
+                // No restore was asked for, so none will land.
+                rr_host::warp_landed();
+            }
         }
     }
     if let Some(open) = &tick.place {

@@ -531,6 +531,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
                 with(|cpu| role_adapter::current_frame(cpu, scene, r)).unwrap_or(false)
             });
             crate::runtime::features::tech_spike::frame(a0, fresh);
+            super::stage_probe::frame(a0);
         }
         let primary_p1 = a0 != 0
             && unsafe { ((a0 + FIGHTER_ENTRY_FIELD) as *const i32).read() } == 0

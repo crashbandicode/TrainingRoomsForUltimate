@@ -15,97 +15,17 @@ use super::library::{
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
 use super::macro_ui::clip_marks::{Marks, Span};
 use super::macros::{ActionMark, InputFrame, Library, MacroRecording, StartState};
-#[cfg(test)]
-use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
 use crate::model::combo_record::{clean_name, default_name, drill_take_name, is_drill_take_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 
-/// One minute at 60 fps. Five hot macros stay resident.
-pub const RESIDENT_FRAMES: usize = 3_600;
-/// The worker reads this many frames past the resident minute.
-pub const READ_WINDOW: usize = 600;
 pub const MISSING_START_SAVE: &str = "No start save. This macro plays from where the fighters are.";
 pub const CHORD_NOTICE: &str =
     "Record, Play on Player 1, Play on CPU, and the recording pop-up replace Input Record and Input Playback.";
 pub const EMPTY_RECORDING: &str = "Recording was empty";
 /// The sentence Save last combo already uses when the strip has no link.
 pub const EMPTY_COMBO: &str = "No combo yet: land a hit and a follow-up first.";
-
-/// Frames the hook may index. The rest of a long file stays out of this struct until the worker reads a window.
-#[derive(Clone, Debug)]
-pub struct Tape {
-    resident: Vec<InputFrame>,
-    window: Vec<InputFrame>,
-    window_start: usize,
-    len: usize,
-    reads: Vec<(usize, usize)>,
-}
-
-impl Tape {
-    pub fn load(frames: &[InputFrame]) -> Self {
-        let n = frames.len().min(RESIDENT_FRAMES);
-        Self {
-            resident: frames[..n].to_vec(),
-            window: Vec::new(),
-            window_start: 0,
-            len: frames.len(),
-            reads: Vec::new(),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn resident_len(&self) -> usize {
-        self.resident.len()
-    }
-
-    #[cfg(test)]
-    pub fn window_len(&self) -> usize {
-        self.window.len()
-    }
-
-    #[cfg(test)]
-    pub fn reads(&self) -> &[(usize, usize)] {
-        &self.reads
-    }
-
-    /// Hook path. It does not read the card and it does not allocate.
-    pub fn hook_frame(&self, index: usize) -> Option<InputFrame> {
-        if index < self.resident.len() {
-            return Some(self.resident[index]);
-        }
-        if index >= self.window_start && index < self.window_start + self.window.len() {
-            return Some(self.window[index - self.window_start]);
-        }
-        None
-    }
-
-    /// Worker path. The closure is the only reader.
-    pub fn fill_window(
-        &mut self,
-        index: usize,
-        mut read: impl FnMut(usize, usize) -> Vec<InputFrame>,
-    ) {
-        if index < self.resident.len() || index >= self.len {
-            return;
-        }
-        let start = RESIDENT_FRAMES + ((index - RESIDENT_FRAMES) / READ_WINDOW) * READ_WINDOW;
-        let count = READ_WINDOW.min(self.len - start);
-        if self.window_start == start && self.window.len() == count {
-            return;
-        }
-        self.reads.push((start, count));
-        self.window = read(start, count);
-        self.window_start = start;
-    }
-}
-
-/// The file cap stays 36,000. A length inside it is kept.
-#[cfg(test)]
-pub fn length_is_kept(frames: usize) -> bool {
-    frames > 0 && frames <= MAX_FRAMES
-}
 
 #[derive(Clone, Debug)]
 pub struct Capture {
@@ -114,6 +34,8 @@ pub struct Capture {
     frames: Vec<InputFrame>,
     /// The action spans the watch logged while this take was open (Marks::capture).
     spans: Vec<Span>,
+    /// The recorded role's fighter, as its take start read it (`MacroRecording::recorded_fighter`).
+    fighter: Option<crate::model::move_names::FighterId>,
 }
 
 impl Capture {
@@ -123,11 +45,16 @@ impl Capture {
             role: Role::Player,
             frames: Vec::new(),
             spans: Vec::new(),
+            fighter: None,
         }
     }
 
     pub fn set_spans(&mut self, spans: &[Span]) {
         self.spans = spans.to_vec();
+    }
+
+    pub fn set_fighter(&mut self, fighter: Option<crate::model::move_names::FighterId>) {
+        self.fighter = fighter;
     }
 
     pub fn role(&self) -> Role {
@@ -225,6 +152,7 @@ pub fn finish_recording(
     let start_id = saves.save_new(&start)?;
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = capture.fighter;
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
@@ -242,6 +170,11 @@ pub fn finish_recording(
 /// A directly recorded drill's frames, as a macro named by its `take` (F10). The menu hides it and `delete_combo`
 /// removes it with the drill. No start save, active role or recent-use mark. `None` when no frame is left.
 pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: crate::model::trim::Trim, at: u64, spans: &[Span]) -> Result<Option<String>, Error> {
+    save_drill_take_of(root, frames, start, trim, at, spans, None)
+}
+
+/// The same, for a take whose recorded fighter is known (`MacroRecording::recorded_fighter`).
+pub fn save_drill_take_of(root: &Path, frames: Vec<InputFrame>, start: StartState, trim: crate::model::trim::Trim, at: u64, spans: &[Span], fighter: Option<crate::model::move_names::FighterId>) -> Result<Option<String>, Error> {
     let (frames, marks) = finish_take(frames, spans, trim);
     if frames.is_empty() {
         return Ok(None);
@@ -250,6 +183,7 @@ pub fn save_drill_take(root: &Path, frames: Vec<InputFrame>, start: StartState, 
     let name = drill_take_name(drill_take_key(&frames, at));
     let mut recording = MacroRecording::new(name, "13.0.5", start, frames).map_err(record)?;
     recording.actions = marks;
+    recording.recorded_fighter = fighter;
     macros.save_new(&recording).map_err(record).map(Some)
 }
 
@@ -363,7 +297,7 @@ pub enum Generated { Macro(String), Pass(super::rr_host::MakeAsk) }
 pub fn generate(root: &Path, recording: MacroRecording, typed: &str, make: crate::model::recording_menu::Make, role: Role, at: u64) -> Result<Generated, Error> {
     use crate::model::recording_menu::Make;
     if make == Make::Drill {
-        let source = save_drill_take(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[])?
+        let source = save_drill_take_of(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[], recording.recorded_fighter)?
             .ok_or_else(|| Error::Record(EMPTY_RECORDING.into()))?;
         return Ok(Generated::Pass(super::rr_host::MakeAsk { source, role, drill: Some(typed.trim().into()) }));
     }
@@ -1218,28 +1152,6 @@ mod tests {
         );
     }
 
-    fn a_long_macro_plays_from_a_600_frame_window() {
-        assert!(length_is_kept(MAX_FRAMES));
-        assert!(!length_is_kept(MAX_FRAMES + 1));
-        let frames: Vec<InputFrame> = (0..4_300).map(|index| frame(index as u32)).collect();
-        let mut tape = Tape::load(&frames);
-        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
-        assert_eq!(tape.hook_frame(3_599).unwrap().buttons, 3_599);
-        assert!(tape.reads().is_empty());
-        assert!(tape.hook_frame(3_600).is_none());
-        tape.fill_window(3_600, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads(), &[(3_600, 600)]);
-        assert_eq!(tape.window_len(), 600);
-        assert_eq!(tape.hook_frame(3_600).unwrap().buttons, 3_600);
-        assert_eq!(tape.hook_frame(4_199).unwrap().buttons, 4_199);
-        tape.fill_window(4_100, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads().len(), 1);
-        tape.fill_window(4_200, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads(), &[(3_600, 600), (4_200, 100)]);
-        assert_eq!(tape.hook_frame(4_200).unwrap().buttons, 4_200);
-        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
-    }
-
     fn the_play_chords_drive_the_role_machines() {
         let mut index = RecordingIndex::fresh();
         index.set_active(Role::Player, Some("p"), 1).unwrap();
@@ -2030,6 +1942,7 @@ mod tests {
                 index.set_active(opposite, Some(&other), 1).unwrap();
                 index.save(&root).unwrap();
                 let track = |entry: i32, base: u32| ReplayTrack {
+                    fighter: None,
                     entry, quantized_analog: false,
                     frames: (0..3).map(|i| ReplayFrame { input: frame(base + i),
                         start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
@@ -2072,7 +1985,6 @@ mod tests {
             ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
             ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
-            ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),
             ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),

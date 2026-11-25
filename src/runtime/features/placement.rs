@@ -1,4 +1,4 @@
-use super::{cpu::konst, mashout::FloorRay};
+use super::{cpu::konst, stage_geometry::FloorRay};
 use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::crosshair::{self, CpuPreview, Origin, PreviewAct};
 use crate::runtime::{game::{self, natives}, state_natives as state};

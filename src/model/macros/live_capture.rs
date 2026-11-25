@@ -205,7 +205,7 @@ impl LiveCapturePool {
                     live.session.truncated = true;
                     return false;
                 }
-                live.session.tracks.push(LiveTrack { entry, frames });
+                live.session.tracks.push(LiveTrack { fighter: None, entry, frames });
                 live.session.tracks.len() - 1
             }
         };
@@ -220,6 +220,13 @@ impl LiveCapturePool {
         live.session.first_counter.get_or_insert(tick);
         live.last_tick[slot] = Some(tick);
         true
+    }
+
+    /// The identity of an entry's fighter, read once by the hook after the entry's first sample.
+    pub fn name_entry(&mut self, key: NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId) {
+        if self.active != Some(key) { return; }
+        let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) else { return };
+        if let Some(track) = live.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }
     }
 
     pub fn finish_record(&mut self) {

@@ -127,15 +127,12 @@ Save states, recording and practice games:
 | "Both triggers are Online Deluxe's L + R: hold one of them" | A GameCube controller with both triggers held. | Hold one. |
 | "Save states have not started in this match yet" | The save-state step's game values aren't ready at the start of a match. | Try again a little later. |
 | "This Playback Slot is empty: pick its macro on the Recording page" | The CPU picked a Playback Slot that no macro fills. | Pick a macro for the slot on the Recording page. |
-| "P1 is controlled by an AI: recording is off", "P1 is controlled by an AI: Play on Player 1 is off" and "P1 is controlled by an AI: Quick Reset is off" | An AI, such as the standalone CPU pilot, plays Player 1. | They work again when it stops: [Controls](controls.md#when-the-cpu-pilot-plays-player-1). |
+| "P1 is controlled by an AI: Play on Player 1 is off" and "P1 is controlled by an AI: Quick Reset is off" | An AI, such as the standalone CPU pilot, plays Player 1. | They work again when it stops: [Controls](controls.md#when-the-cpu-pilot-plays-player-1). |
 | "The CPU is hidden: turn Hide CPU Off first" | Play on CPU feeds the CPU's controller, and a hidden CPU takes no action. | Turn Hide CPU Off (CPU page). |
 | "The CPU is hidden during this game" | The same, because a practice game hides the CPU. | Set Fighters & Stages › CPU during a game to Show, or turn the practice game Off. |
 | "Preview fighter is not available" | The fighter of a replay capture isn't one the roster can load, so there is nothing to preview or switch to. | Nothing to fix. |
 | "Recorded Mii metadata is unavailable" | The capture's Mii couldn't be found, so Switch can't load that exact Mii. | Choose Keep: it still plays the inputs. |
 | "Could not save button_config.ini" | The menu shortcuts file couldn't be written. | The change lasts until you close the game. |
-
-![The notice "P1 is controlled by an AI: recording is off" on screen while the CPU pilot plays Player 1](../media/rc13-pilot-refusal.png)<br>
-*While the CPU pilot plays Player 1, Record shows "P1 is controlled by an AI: recording is off". Eden, rc.13 (untested on hardware).*
 
 A Mii tile whose help line reads "… - unavailable" is greyed: the role has no Mii of that class it can load ([Mii
 fighters](mii.md)). Every refusal with the reason it was added: [Restrictions](../RESTRICTIONS.md).
@@ -181,7 +178,7 @@ More: [Fighter cycles › What the Loading rows do](fighter-cycles.md#what-the-l
   game. Close the menu (B), then open the game's menu to Leave Battle.
 - **A fighter swap says "Close the current game menu before swapping".** The game's own menu is open. Close it.
 - **Eggs-ercise and Break the Targets** show their targets on your own screen only.
-- **While the CPU pilot plays Player 1,** Record, Play on Player 1 and L + R + A are refused.
+- **While the CPU pilot plays Player 1,** Play on Player 1 and L + R + A are refused. Record works.
 
 More: [Waiting rooms](waiting-rooms.md).
 
