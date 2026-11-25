@@ -27,7 +27,8 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 ## Next build (not installed yet)
 
 The build after install 4. Its name is expected to be rc.16. The first part below is merged; the second is still in
-work. None of it has been seen in a game: each merge passed the host tests and builds only.
+work. The merged changes passed host tests and builds. Targeted Eden checks of stage geometry are listed in
+[Install evidence](EVIDENCE-rc15-installs.md#the-next-build); they do not replace a smoke test of the finished build.
 
 **How this build is tested:** one short Eden smoke boot on the finished build (each new item started once, no crash
 and the expected log lines), then the operator's full test on the console.

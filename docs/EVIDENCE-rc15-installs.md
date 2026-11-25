@@ -150,14 +150,22 @@ plugins are left out, except the first, which was made in Training and turned ou
 
 ## The next build
 
-Merges after `a945b0c1` are listed in the release notes. Each head in the table passed the six gate steps on a build
-host (`artifacts/phase23/next-build/gate-<commit>/`). The feature changes in the table have host-test evidence; merely
-booting one of those builds does not test those changes.
+Merges after `a945b0c1` are listed in the release notes. The Gate column names the receipt under
+`artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
+documentation merges that followed it. These receipts are host tests and builds, not gameplay tests.
 
 On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
 **before** the off-stage changes. Guard the Edge and Juggler did not start there. This was not a test of the proposed
 fix or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
-17:39:04Z report from training-offstage. The plan remains one short Eden smoke run on the finished build, then the
+17:39:04Z report from training-offstage.
+
+A later Eden probe (`sg-probe-yoga-01`, diagnostic `0f39ec04`) read the Training stage's long floor and Battlefield.
+The point below the long floor read Solid; the point beneath Battlefield read Under. This was not a run of the
+merged head `afd4ce01` or of any placement or playback feature. Receipts:
+`artifacts/phase23/next-build-smoke/20261125-1745Z/probe/evidence/sdlog/previous-184632.log` (lines 270-274)
+and `current-184745.log` in the same directory (lines 375-379).
+
+The plan remains one short Eden smoke run on the finished build, then the
 operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is claimed here.
 
 | Merge | Head | Gate |
