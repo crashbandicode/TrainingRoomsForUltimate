@@ -418,7 +418,8 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
 /// the outline then. When it is not done for this stage, form and Training session, or a Training reset has passed
 /// since it was traced, the picker walks it here, one step a frame; Tech traces again at its next Start, as it
 /// always does. `found`: the picker's own note of how its walk went. Returns the floors written, 0 until the walk
-/// is done; `None` when the outline or the receipt is in use this frame, which is never waited for.
+/// is done; `None` when the outline or the receipt is in use this frame, which is never waited for. The walk's
+/// native calls are Tech practice's: where its guards did not pass, no floor is given.
 pub(super) unsafe fn floors(
     p1: usize,
     (stage, form): (i32, u32),
@@ -426,6 +427,9 @@ pub(super) unsafe fn floors(
     found: &mut Found,
     out: &mut [Floor; MAX_LINES],
 ) -> Option<usize> {
+    if !super::tech_adapter::tech_ready() {
+        return Some(0);
+    }
     let mut view = VIEW.try_lock()?;
     let view = &mut *view;
     let Some(training) = super::cpu::tech_player_receipt().ok()? else {
@@ -438,13 +442,13 @@ pub(super) unsafe fn floors(
         view.discovery = Discovery::NEW;
         *found = Found::More;
     }
-    *found = if view.discovery.done(&view.surfaces) {
+    *found = if view.discovery.walked(&view.surfaces) {
         Found::Done
     } else if *found == Found::Failed {
         Found::Failed
     } else {
         match NativeSource::new(p1) {
-            Some(mut source) => view.discovery.step(&mut source, range, &mut view.surfaces),
+            Some(mut source) => view.discovery.walk_step(&mut source, range, &mut view.surfaces),
             None => Found::Failed,
         }
     };
@@ -572,7 +576,7 @@ fn with_practice_frame(
                         StateView::Paused
                     } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
                         StateView::Failed
-                    } else if !view.discovery.done(&view.surfaces) {
+                    } else if !view.discovery.walked(&view.surfaces) {
                         StateView::Discovering
                     } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
                         StateView::Wizard(wizard, view.preview_blocked)
@@ -825,7 +829,7 @@ pub unsafe fn frame(fighter: usize) {
             return;
         };
         view.range = Some(range);
-        match view.discovery.step(&mut source, range, &mut view.surfaces) {
+        match view.discovery.walk_step(&mut source, range, &mut view.surfaces) {
             Found::Done => {}
             Found::More => {
                 notice(run, Some("Finding stage surfaces…"));

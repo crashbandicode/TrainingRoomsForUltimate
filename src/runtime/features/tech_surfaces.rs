@@ -344,19 +344,19 @@ impl Discovery {
     pub(super) const NEW: Self = Self { scan: None, scan_done: false, bootstrap: None };
 
     /// The outline is closed and the platform scan is done: `surfaces` holds every line.
-    pub(super) fn done(&self, surfaces: &Surfaces) -> bool {
+    pub(super) fn walked(&self, surfaces: &Surfaces) -> bool {
         surfaces.state == Walk::Closed && self.scan_done
     }
 
     /// One frame of the walk inside the camera's `range`.
-    pub(super) fn step(&mut self, source: &mut NativeSource, range: [f32; 4], surfaces: &mut Surfaces) -> Found {
+    pub(super) fn walk_step(&mut self, source: &mut NativeSource, range: [f32; 4], surfaces: &mut Surfaces) -> Found {
         if self.scan.is_none() {
             self.scan = PlatformScan::new(range);
         }
         if self.bootstrap.is_none() {
             self.bootstrap = Bootstrap::new(range, source.touched());
         }
-        if !self.done(surfaces) && !self.bootstrap.as_mut().is_some_and(Bootstrap::tick) {
+        if !self.walked(surfaces) && !self.bootstrap.as_mut().is_some_and(Bootstrap::tick) {
             return Found::Failed;
         }
         if surfaces.state == Walk::Broken && surfaces.lines().next().is_none() {
@@ -380,7 +380,7 @@ impl Discovery {
         if surfaces.state == Walk::Full || (surfaces.state == Walk::Broken && surfaces.lines().next().is_some()) {
             return Found::Failed;
         }
-        if self.done(surfaces) { Found::Done } else { Found::More }
+        if self.walked(surfaces) { Found::Done } else { Found::More }
     }
 }
 

@@ -2310,7 +2310,7 @@ mod tests {
         assert!(place.contains("placement::floor_under("));
         assert!(include_str!("../runtime/features/edge_juggle.rs").contains("placement::floor_under("));
         // The traced floors are Tech practice's one outline, walked by one function: Tech's own run and the picker.
-        assert_eq!(tech.matches(".discovery.step(&mut source, range, &mut view.surfaces)").count(), 2);
+        assert_eq!(tech.matches(".discovery.walk_step(&mut source, range, &mut view.surfaces)").count(), 2);
         assert!(!tech.contains("PlatformScan::new(") && !tech.contains("Bootstrap::new("));
         assert_eq!(place.matches("super::tech::floors(").count(), 1);
         // The outline is never waited for, and a floor list is given only when the walk and its platform scan
@@ -2318,7 +2318,9 @@ mod tests {
         let floors = tech.split("pub(super) unsafe fn floors(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(floors.contains("VIEW.try_lock()?") && !floors.contains(".lock()"));
         assert!(floors.contains("STALE.swap(false") && floors.contains("view.surfaces.epoch() != Some(epoch)"));
-        assert!(floors.find("view.discovery.done(&view.surfaces)").unwrap() < floors.find("Some(SurfaceKind::Floor)").unwrap());
+        assert!(floors.find("view.discovery.walked(&view.surfaces)").unwrap() < floors.find("Some(SurfaceKind::Floor)").unwrap());
+        // The walk's native calls stay Tech practice's own: the picker stops at its gate.
+        assert!(floors.trim_start().starts_with(") -> Option<usize> {\n    if !super::tech_adapter::tech_ready() {\n        return Some(0);"));
         let reset = tech.split("pub fn reset() {").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(reset.contains("STALE.store(true"));
     }
