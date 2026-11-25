@@ -714,3 +714,7 @@ impl Wizard {
         self.bins[i] = bin;
     }
 }
+
+#[cfg(test)]
+#[path = "egg_zone_rule_tests.rs"]
+mod rule_tests;

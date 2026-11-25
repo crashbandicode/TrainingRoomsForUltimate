@@ -323,8 +323,6 @@ pub mod sites_tech_hitlag;
 lib_unit_tests! {
     #[path = "model/egg_zone_tests.rs"]
     mod egg_zone_tests;
-    #[path = "model/egg_zone_rule_tests.rs"]
-    mod egg_zone_rule_tests;
 }
 
 #[path = "model/egg_zone.rs"]

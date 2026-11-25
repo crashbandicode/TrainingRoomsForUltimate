@@ -1,51 +1,49 @@
-use super::chords::logical as key;
-use super::edge_juggle::perfect::{Outline, Point, Segment};
-use super::egg_zone::{Side, Stage, Step, Wizard, Zone};
-use super::stage_geometry::{Copied, Met, Probe, Unread};
+lib_unit_tests! {
+use super::*;
 
 type Line = (Segment, bool, bool);
 
-// training.json: camera range [left, right, top, bottom] [-509.999755859375, 420.0, 280.0000305175781, -39.86418533325195]; blast lines [-589.9998168945312, 500.0, 360.0001525878906, -137.85206604003906]
+// training.json (f32): camera range [left, right, top, bottom] [-509.99976, 420.0, 280.00003, -39.864185]; blast lines [-589.9998, 500.0, 360.00015, -137.85207]
 const TRAINING_LINES: [(Segment, bool, bool); 22] = [
     ([[620.0, 0.0], [-80.0, 0.0]], true, false), // L1 COL_curve1 floor
     ([[-80.0, 0.0], [-80.0, -340.0]], false, false), // L2 COL_curve1 wall
     ([[-80.0, -340.0], [620.0, -340.0]], false, false), // L3 COL_curve1 ceiling
     ([[620.0, -340.0], [620.0, 0.0]], false, false), // L4 COL_curve1 wall
-    ([[-635.0, 47.39080810546875], [-490.0, 47.39080810546875]], true, false), // L5 COL_curve36 floor
-    ([[-490.0, 47.39080810546875], [-490.0, 0.0]], false, false), // L6 COL_curve36 wall
+    ([[-635.0, 47.39081], [-490.0, 47.39081]], true, false), // L5 COL_curve36 floor
+    ([[-490.0, 47.39081], [-490.0, 0.0]], false, false), // L6 COL_curve36 wall
     ([[-490.0, 0.0], [-420.0, 0.0]], true, false), // L7 COL_curve36 floor
     ([[-420.0, 0.0], [-420.0, -165.0]], false, false), // L8 COL_curve36 wall
     ([[-420.0, -165.0], [-635.0, -165.0]], false, false), // L9 COL_curve36 ceiling
-    ([[-635.0, -165.0], [-635.0, 47.39080810546875]], false, false), // L10 COL_curve36 wall
-    ([[-309.4219970703125, 24.118999481201172], [-274.78900146484375, 24.118999481201172]], true, true), // L11 COL_00_Platform01_through floor
-    ([[-267.3164978027344, 47.189002990722656], [-232.68350219726562, 47.189002990722656]], true, true), // L12 COL_00_Platform02_through floor
-    ([[-225.21099853515625, 24.118999481201172], [-190.5780029296875, 24.118999481201172]], true, true), // L13 COL_00_Platform03_through floor
-    ([[-329.985595703125, -8.207711219787598], [-330.0, 0.01357623003423214]], false, false), // L14 COL_curve35 wall
-    ([[-330.0, 0.01357623003423214], [-249.92056274414062, 0.01357623003423214]], true, false), // L15 COL_curve35 floor
-    ([[-249.92056274414062, 0.01357623003423214], [-170.0, 0.01357623003423214]], true, false), // L16 COL_curve35 floor
-    ([[-170.0, 0.01357623003423214], [-170.0106964111328, -8.207711219787598]], false, false), // L17 COL_curve35 wall
-    ([[-170.0106964111328, -8.207711219787598], [-185.6127166748047, -24.99210548400879]], false, false), // L18 COL_curve35 wall
-    ([[-185.6127166748047, -24.99210548400879], [-208.58384704589844, -40.0070686340332]], false, false), // L19 COL_curve35 ceiling
-    ([[-208.58384704589844, -40.0070686340332], [-291.3962097167969, -39.98797607421875]], false, false), // L20 COL_curve35 ceiling
-    ([[-291.3962097167969, -39.98797607421875], [-314.39471435546875, -25.000001907348633]], false, false), // L21 COL_curve35 ceiling
-    ([[-314.39471435546875, -25.000001907348633], [-329.985595703125, -8.207711219787598]], false, false), // L22 COL_curve35 wall
+    ([[-635.0, -165.0], [-635.0, 47.39081]], false, false), // L10 COL_curve36 wall
+    ([[-309.422, 24.119], [-274.789, 24.119]], true, true), // L11 COL_00_Platform01_through floor
+    ([[-267.3165, 47.189003], [-232.6835, 47.189003]], true, true), // L12 COL_00_Platform02_through floor
+    ([[-225.211, 24.119], [-190.578, 24.119]], true, true), // L13 COL_00_Platform03_through floor
+    ([[-329.9856, -8.207711], [-330.0, 0.01357623]], false, false), // L14 COL_curve35 wall
+    ([[-330.0, 0.01357623], [-249.92056, 0.01357623]], true, false), // L15 COL_curve35 floor
+    ([[-249.92056, 0.01357623], [-170.0, 0.01357623]], true, false), // L16 COL_curve35 floor
+    ([[-170.0, 0.01357623], [-170.0107, -8.207711]], false, false), // L17 COL_curve35 wall
+    ([[-170.0107, -8.207711], [-185.61272, -24.992105]], false, false), // L18 COL_curve35 wall
+    ([[-185.61272, -24.992105], [-208.58385, -40.00707]], false, false), // L19 COL_curve35 ceiling
+    ([[-208.58385, -40.00707], [-291.3962, -39.987976]], false, false), // L20 COL_curve35 ceiling
+    ([[-291.3962, -39.987976], [-314.3947, -25.000002]], false, false), // L21 COL_curve35 ceiling
+    ([[-314.3947, -25.000002], [-329.9856, -8.207711]], false, false), // L22 COL_curve35 wall
 ];
 
-// battlefield.json: camera range [left, right, top, bottom] [-170.0, 170.0, 130.0, -80.0]; blast lines [-240.0, 240.0, 192.00009155273438, -140.00003051757812]
+// battlefield.json (f32): camera range [left, right, top, bottom] [-170.0, 170.0, 130.0, -80.0]; blast lines [-240.0, 240.0, 192.00009, -140.00003]
 const BATTLEFIELD_LINES: [(Segment, bool, bool); 13] = [
-    ([[41.41615676879883, -40.11806869506836], [-41.39619827270508, -40.098976135253906]], false, false), // L1 COL_00_Floor01 ceiling
-    ([[-41.39619827270508, -40.098976135253906], [-64.39470672607422, -25.111000061035156]], false, false), // L2 COL_00_Floor01 ceiling
-    ([[-64.39470672607422, -25.111000061035156], [-79.98560333251953, -8.318714141845703]], false, false), // L3 COL_00_Floor01 wall
-    ([[-79.98560333251953, -8.318714141845703], [-79.98560333251953, 0.00025950794224627316]], false, false), // L4 COL_00_Floor01 wall
-    ([[-79.98560333251953, 0.00025950794224627316], [-74.98560333251953, 0.00025950794224627316]], true, false), // L5 COL_00_Floor01 floor
-    ([[-74.98560333251953, 0.00025950794224627316], [74.98930358886719, 0.00025950794224627316]], true, false), // L6 COL_00_Floor01 floor
-    ([[74.98930358886719, 0.00025950794224627316], [79.98930358886719, 0.00025950794224627316]], true, false), // L7 COL_00_Floor01 floor
-    ([[79.98930358886719, 0.00025950794224627316], [79.98930358886719, -8.318714141845703]], false, false), // L8 COL_00_Floor01 wall
-    ([[79.98930358886719, -8.318714141845703], [64.38729095458984, -25.103105545043945]], false, false), // L9 COL_00_Floor01 wall
-    ([[64.38729095458984, -25.103105545043945], [41.41615676879883, -40.11806869506836]], false, false), // L10 COL_00_Floor01 ceiling
-    ([[-59.422000885009766, 24.118999481201172], [-24.788999557495117, 24.118999481201172]], true, true), // L11 COL_00_Platform01_through floor
-    ([[-17.316495895385742, 47.189002990722656], [17.316495895385742, 47.189002990722656]], true, true), // L12 COL_00_Platform02_through floor
-    ([[24.788999557495117, 24.118999481201172], [59.42198944091797, 24.118999481201172]], true, true), // L13 COL_00_Platform03_through floor
+    ([[41.416157, -40.11807], [-41.3962, -40.098976]], false, false), // L1 COL_00_Floor01 ceiling
+    ([[-41.3962, -40.098976], [-64.39471, -25.111]], false, false), // L2 COL_00_Floor01 ceiling
+    ([[-64.39471, -25.111], [-79.9856, -8.318714]], false, false), // L3 COL_00_Floor01 wall
+    ([[-79.9856, -8.318714], [-79.9856, 0.00025950794]], false, false), // L4 COL_00_Floor01 wall
+    ([[-79.9856, 0.00025950794], [-74.9856, 0.00025950794]], true, false), // L5 COL_00_Floor01 floor
+    ([[-74.9856, 0.00025950794], [74.9893, 0.00025950794]], true, false), // L6 COL_00_Floor01 floor
+    ([[74.9893, 0.00025950794], [79.9893, 0.00025950794]], true, false), // L7 COL_00_Floor01 floor
+    ([[79.9893, 0.00025950794], [79.9893, -8.318714]], false, false), // L8 COL_00_Floor01 wall
+    ([[79.9893, -8.318714], [64.38729, -25.103106]], false, false), // L9 COL_00_Floor01 wall
+    ([[64.38729, -25.103106], [41.416157, -40.11807]], false, false), // L10 COL_00_Floor01 ceiling
+    ([[-59.422, 24.119], [-24.789, 24.119]], true, true), // L11 COL_00_Platform01_through floor
+    ([[-17.316496, 47.189003], [17.316496, 47.189003]], true, true), // L12 COL_00_Platform02_through floor
+    ([[24.789, 24.119], [59.42199, 24.119]], true, true), // L13 COL_00_Platform03_through floor
 ];
 
 // Recorded on a game: ib-practice-publisher/combined-yoga-main-1/out/bridge-run/bridge.log (zone.stage=3).
@@ -147,8 +145,8 @@ fn plain_battlefield() -> Stage {
 }
 
 fn stage_three() -> Stage {
-    // These ledges are the stage file's own values.
-    let ledges = [[-79.98560333251953, 0.0], [79.98930358886719, 0.0]];
+    // The stage file's floor ends: with them rounded to -79.986 and 79.989 one recorded row differs in its last digit.
+    let ledges = [BATTLEFIELD_LINES[4].0[0], BATTLEFIELD_LINES[6].0[1]];
     Stage::new(3, [-240.0, 240.0, 180.0, -140.0], ledges,
         outline(&BATTLEFIELD_LINES, 10), [Some(-240.0), Some(240.0)], &[]).unwrap()
 }
@@ -423,4 +421,5 @@ fn the_outer_step_stops_at_the_solid_without_dead_travel() {
 fn the_stage_grows_by_its_two_open_air_ends_only() {
     assert_eq!(std::mem::size_of::<Stage>(), 1080);
     assert_eq!(std::mem::size_of::<Option<Stage>>(), 1080);
+}
 }
