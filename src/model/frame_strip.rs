@@ -1270,3 +1270,6 @@ mod tests;
 #[cfg(test)]
 #[path = "action_moves_tests.rs"]
 mod action_moves_tests;
+
+#[path = "strip_back.rs"]
+pub mod back;

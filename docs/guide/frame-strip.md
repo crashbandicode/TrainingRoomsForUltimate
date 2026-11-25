@@ -20,6 +20,11 @@ An older settings file that still says Smash Inputs, Raw Inputs or Status Only b
 The **LINK** readout then shows the newest move pair with its verdict, such as **TRUE · Jab > Jab**. During a drill,
 the link cells use the LAST row's space. The strip and the drill card fade together when a fighter moves behind them.
 
+**Scroll back:** hold R3 (right stick click) and press D-pad Left or Right to move through about ten seconds of inputs.
+Hold a direction to repeat. The marker shows how far behind the present the view is; let go of R3 to return to live.
+While you scroll, R3 and the D-pad's Left and Right do not reach the game. This works in Training and waiting-room
+practice. A clear also clears the history.
+
 ## What is on it
 
 The newest frame is on the right. Player 1 and the CPU each have a lane, and Player 1's button presses are chips above

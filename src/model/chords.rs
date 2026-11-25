@@ -197,6 +197,8 @@ pub struct Sample {
     /// Online Deluxe's window shows a page with rows (`model::deluxe_overlay::rows_page_visible`): they move with D-pad
     /// Up/Down and change with ZR + Left/Right. Its Performance and Debug views have none.
     pub overlay: bool,
+    /// The input display is drawn, so the scroll may open.
+    pub strip: bool,
 }
 
 impl Sample {
@@ -206,12 +208,17 @@ impl Sample {
             pressed: logical_set(style, just_down),
             gamecube: style == STYLE_GAMECUBE,
             overlay: false,
+            strip: false,
         }
     }
 
     /// The same sample with Online Deluxe's window state for this poll.
     pub const fn with_overlay(self, overlay: bool) -> Self {
         Self { overlay, ..self }
+    }
+
+    pub const fn with_strip(self, strip: bool) -> Self {
+        Self { strip, ..self }
     }
 }
 
@@ -390,13 +397,16 @@ pub struct Detector {
     /// rc.8: the game speed hold and what the last poll did to it.
     hold: Hold,
     hold_event: HoldEvent,
+    scroll: super::strip_scroll::Scroll,
+    scroll_event: super::strip_scroll::ScrollEvent,
     /// rc.12: the Save or Load press this poll did not raise, and why (`take_refused`).
     refused: Option<(Action, Refused)>,
 }
 
 impl Detector {
     pub const fn new() -> Self {
-        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle, refused: None }
+        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle,
+            scroll: super::strip_scroll::Scroll::new(), scroll_event: super::strip_scroll::ScrollEvent::Idle, refused: None }
     }
 
     /// The Save or Load press the last poll did not raise, and why; once (rc.12, "no silent no-ops").
@@ -407,6 +417,14 @@ impl Detector {
     /// What the last poll did to the game speed hold (the runtime opens, steps and closes the pop-up from it).
     pub fn hold_event(&self) -> HoldEvent {
         self.hold_event
+    }
+
+    pub fn scroll_event(&self) -> super::strip_scroll::ScrollEvent {
+        self.scroll_event
+    }
+
+    pub fn scroll_open(&self) -> bool {
+        self.scroll.is_open()
     }
 
     /// The logical buttons this poll keeps from the game: those of a chord that passed, from the poll it passed until
@@ -436,11 +454,14 @@ impl Detector {
     /// (SPEC-input-04 §5.3). Returns the set of chords that passed this poll as a bit set of
     /// `Request`s for the runtime's diagnostics.
     pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
+        let was_scrolling = self.scroll.is_open();
         let was_open = self.hold.is_open();
-        self.hold_event = self.hold.poll(chords.game_speed, sample, blocked);
+        self.hold_event = self.hold.poll(chords.game_speed, sample, blocked || was_scrolling);
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
         self.refused = None;
         if blocked {
             self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::Owner));
+            self.scroll_event = self.scroll.poll(sample, true, false);
             self.hold_back(0, sample);
             return 0;
         }
@@ -450,6 +471,12 @@ impl Detector {
         if was_open || self.hold.is_open() {
             self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::SpeedHold));
             self.hold_back(self.hold.hidden(), sample);
+            return 0;
+        }
+        if was_scrolling {
+            self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::StripScroll));
+            self.scroll_event = self.scroll.poll(sample, false, false);
+            self.hold_back(self.scroll.hidden(), sample);
             return 0;
         }
         let mut passed = 0u16;
@@ -484,8 +511,12 @@ impl Detector {
                 passed |= request.bit();
             }
         }
-        self.hold_back(fired, sample);
         let open = chords.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0);
+        if fired == 0 && !open {
+            self.scroll_event = self.scroll.poll(sample, false, sample.strip);
+            fired |= self.scroll.hidden();
+        }
+        self.hold_back(fired, sample);
         if self.pending & Request::OpenMenu.bit() == 0 && open {
             self.pending |= Request::OpenMenu.bit();
             passed |= Request::OpenMenu.bit();
@@ -542,6 +573,8 @@ impl Detector {
         (self.swallow, self.hidden) = (0, 0);
         let open = self.hold.is_open();
         self.hold.clear();
+        self.scroll.clear();
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
         open
     }
 
@@ -551,6 +584,8 @@ impl Detector {
         self.pending = 0;
         self.hold.clear();
         self.hold_event = HoldEvent::Idle;
+        self.scroll.clear();
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
     }
 }
 
@@ -643,6 +678,67 @@ mod tests {
 
     fn factory_row(id: &str) -> &[u8] {
         DEFS.iter().find(|def| def.id == id).unwrap_or_else(|| panic!("{id} missing")).default
+    }
+
+    #[test]
+    fn the_scroll_keeps_its_buttons_from_the_game_until_each_is_released() {
+        use crate::model::strip_scroll::ScrollEvent;
+        let set = ChordSet::factory();
+        let mut detector = Detector::new();
+        let r3 = logical::STICK_R;
+        detector.poll(&set, sample(&[r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert_eq!(detector.hidden() & bits(&[r3, DPAD_LEFT]), bits(&[r3, DPAD_LEFT]));
+        detector.poll(&set, sample(&[r3, DPAD_LEFT, DPAD_RIGHT], &[DPAD_RIGHT]).with_strip(true), false);
+        assert_eq!(detector.hidden() & bits(&[r3, DPAD_LEFT, DPAD_RIGHT]), bits(&[r3, DPAD_LEFT, DPAD_RIGHT]));
+        detector.poll(&set, sample(&[DPAD_LEFT], &[]).with_strip(true), false);
+        assert_eq!(detector.scroll_event(), ScrollEvent::Closed);
+        assert_eq!(detector.hidden() & bits(&[r3, DPAD_LEFT]), bits(&[r3, DPAD_LEFT]));
+        detector.poll(&set, sample(&[DPAD_LEFT], &[]).with_strip(true), false);
+        assert_ne!(detector.hidden() & bits(&[DPAD_LEFT]), 0);
+        detector.poll(&set, sample(&[], &[]).with_strip(true), false);
+        detector.poll(&set, sample(&[DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert_eq!(detector.hidden() & bits(&[DPAD_LEFT]), 0);
+    }
+
+    #[test]
+    fn a_configured_chord_wins_the_opening_poll() {
+        use crate::model::strip_scroll::{Dir, ScrollEvent};
+        let set = ChordSet::factory();
+        let r3 = logical::STICK_R;
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::ZL, r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert!(detector.consume(Request::CpuCycle));
+        assert!(!detector.scroll_open());
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), true);
+        assert!(!detector.scroll_open());
+        detector.poll(&set, sample(&[r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert!(detector.scroll_open());
+        assert_eq!(detector.poll(&set, sample(&[logical::ZL, r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false), 0);
+        assert_eq!(detector.scroll_event(), ScrollEvent::Step(Dir::Back));
+        assert!(!detector.consume(Request::CpuCycle));
+        detector.poll(&set, sample(&[r3, DPAD_LEFT], &[]).with_strip(true), true);
+        assert_eq!(detector.scroll_event(), ScrollEvent::Closed);
+        assert!(!detector.scroll_open());
+    }
+
+    #[test]
+    fn the_speed_hold_and_the_scroll_do_not_open_together() {
+        use crate::model::game_speed::{Dir, HoldEvent};
+        let set = ChordSet::factory();
+        let r3 = logical::STICK_R;
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[logical::R, DPAD_UP], &[DPAD_UP]).with_strip(true), false);
+        assert_eq!(detector.hold_event(), HoldEvent::Opened);
+        detector.poll(&set, sample(&[logical::R, r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert_eq!(detector.hold_event(), HoldEvent::Step(Dir::Left));
+        assert!(!detector.scroll_open());
+        let mut detector = Detector::new();
+        detector.poll(&set, sample(&[r3, DPAD_LEFT], &[DPAD_LEFT]).with_strip(true), false);
+        assert!(detector.scroll_open());
+        detector.poll(&set, sample(&[r3, logical::R, DPAD_UP], &[DPAD_UP]).with_strip(true), false);
+        assert_eq!(detector.hold_event(), HoldEvent::Idle);
+        assert!(detector.scroll_open());
     }
 
     #[test]

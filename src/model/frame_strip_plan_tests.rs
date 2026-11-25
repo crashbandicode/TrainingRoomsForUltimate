@@ -13,6 +13,20 @@ fn idle() -> Sample {
     Sample { actionable: true, ..Sample::default() }
 }
 
+#[test]
+fn the_marker_tells_how_far_back() {
+    assert_eq!(back_text(72), Text::new("-1.2 s"));
+    assert_eq!(back_text(0), Text::new("-0.0 s"));
+    assert_eq!(back_text(600), Text::new("-10.0 s"));
+    for (back, text) in [(Some(72), "-1.2 s"), (None, "now")] {
+        let mut looks = vec![Look::HIDDEN; COUNT];
+        Renderer::new().draw_with_spec(&Tracker::new(),
+            StripDraw { shown: true, back, spots: false, parry: None, history_enabled: true, cells: false, spec: &C },
+            |index, look, _| looks[index] = *look);
+        assert_eq!(looks[at::NOW_TEXT].text, Text::new(text));
+    }
+}
+
 fn attack(mv: Move, status: i32, frame: u32) -> Sample {
     Sample { attack: Some(mv), status, motion_frame: frame as f32, ..Sample::default() }
 }
@@ -43,6 +57,24 @@ fn true_combo() -> Tracker {
         t.step(p1, cpu, inputs);
     }
     t
+}
+
+#[test]
+fn scrollback_review_past_bracket_stops_at_the_view_edge() {
+    let mut t = true_combo();
+    let free = t.latest_link().unwrap().free.unwrap();
+    assert!(free > t.newest().unwrap());
+    let bracket = |t: &Tracker, back| {
+        let mut visible = false;
+        Renderer::new().draw_with_spec(t,
+            StripDraw { shown: true, back, spots: false, parry: None, history_enabled: true, cells: false, spec: &C },
+            |index, look, _| if index == at::BRACKET_TEXT { visible = look.visible });
+        visible
+    };
+    assert!(bracket(&t, None), "live can project the CPU's free frame");
+    assert!(!bracket(&t, Some(15)), "the projected free frame is outside this historical view");
+    while t.newest().unwrap() < free { t.step(idle(), idle(), NONE); }
+    assert!(bracket(&t, Some(15)), "both ends are now inside the historical window");
 }
 
 fn directional_combo(from: Move, to: Move, from_angle: Option<crate::model::frame_strip::Angle>,
@@ -148,7 +180,7 @@ fn the_last_row_and_the_link_line_name_the_direction_beside_the_move() {
     assert_eq!(String::from_utf16(folded_link(&link).units()).unwrap(), "TRUE · Jab > Side tilt ↑");
     let mut line = Text::EMPTY;
     Renderer::new().draw_with_spec(
-        &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: false, cells: false, spec: &C },
+        &tracker, StripDraw { shown: true, back: None, spots: false, parry: None, history_enabled: false, cells: false, spec: &C },
         |i, look, _| if i == at::READ_SUB + 1 { line = look.text },
     );
     assert_eq!(String::from_utf16(line.units()).unwrap(), "TRUE · Jab > Side tilt ↑");
@@ -183,7 +215,7 @@ fn runtime_and_archive_share_the_strip_layout() {
     let collect = |spec: &LayoutSpec| {
         let mut looks = [Look::HIDDEN; COUNT];
         let (_, history) = Renderer::new().draw_with_spec(
-            &tracker, StripDraw { shown: true, spots: true, parry: None, history_enabled: true, cells: false, spec },
+            &tracker, StripDraw { shown: true, back: None, spots: true, parry: None, history_enabled: true, cells: false, spec },
             |i, look, _| looks[i] = *look,
         );
         let root = strip_pane_spec(spec, IDX_IV + at::CONTAINER);
@@ -212,7 +244,7 @@ fn link_history_hides_the_last_row_and_folds_the_newest_moves() {
     let mut draw = |on| {
         let mut line = None;
         let (_, history) = renderer.draw_with_spec(
-            &tracker, StripDraw { shown: true, spots: false, parry: None, history_enabled: on, cells: false, spec: &C },
+            &tracker, StripDraw { shown: true, back: None, spots: false, parry: None, history_enabled: on, cells: false, spec: &C },
             |i, look, changed| if i == at::READ_SUB + 1 && changed.text { line = Some(look.text) },
         );
         let last = renderer.written(at::LAST_TEXT).unwrap().visible;
@@ -559,7 +591,7 @@ fn parrys_grade_words_are_shown_in_full() {
     let mut renderer = Renderer::new();
     renderer.draw_with_spec(
         &Tracker::new(),
-        StripDraw { shown: true, spots: false, parry: Some(&view), history_enabled: true, cells: false, spec: &C },
+        StripDraw { shown: true, back: None, spots: false, parry: Some(&view), history_enabled: true, cells: false, spec: &C },
         |i, look, _| looks[i] = *look,
     );
     let words = "Grading unavailable (not counted)";

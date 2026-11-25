@@ -66,6 +66,9 @@ unchanged. LAST and folded LINK append arrows to names. A line that does not fit
 the arrows. The bridge publishes `strip.aims`, oldest first: only marks whose label box exists in the layout, and
 nothing on a stale or hidden pass.
 
+Scrollback also publishes `strip.scroll` (columns behind) and `strip.back_ms` (frames behind in milliseconds).
+Both are 0 on a live, hidden or stale pass.
+
 Chips, the stick row, combo grading, saved combos, the drill list, pane capacities and the layout archive are
 unchanged. No hook or native site is added; the angle and fighter reads use existing guarded rows.
 

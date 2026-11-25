@@ -72,7 +72,8 @@ pub unsafe fn on_poll(controller: usize) {
     let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
     let sample = Sample::of(style, current, just_down)
-        .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible());
+        .with_overlay(crate::runtime::deluxe_overlay::rows_page_visible())
+        .with_strip(crate::runtime::features::input_display::sampling());
     let modal = published::input_owners().contains(Owners::MENU) || recorder::replay_editor_occupied();
     let wizard = super::tech::wizard_active() || super::edge_juggle::wizard_active() || super::egg_zone::wizard_active() || super::record_place::wizard_active();
     let drill_running = super::edge_juggle::running();
@@ -98,6 +99,7 @@ pub unsafe fn on_poll(controller: usize) {
         let keys = (!block && btt::placing()).then(|| detector.take_placing());
         // rc.8: the game speed hold's event and the input display toggle are acted on once `STATE` is released.
         let hold = detector.hold_event();
+        let scroll = (detector.scroll_event(), detector.scroll_open());
         let display = detector.consume(Request::InputDisplay);
         let refused = detector.take_refused();
         PENDING.store(detector.has_pending_request(), Ordering::Release);
@@ -109,16 +111,16 @@ pub unsafe fn on_poll(controller: usize) {
         }
         #[cfg(not(feature = "diag"))]
         let _ = passed;
-        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, display, refused, keys, block, recorder_refused, closed)
+        (!block && !wizard && chords::plus_shortcut_accepted(set, sample), chords::physical_mask(style, detector.hidden()), hold, scroll, display, refused, keys, block, recorder_refused, closed)
     };
-    let (accepted, chord_bits, hold, display, refused, keys, block, recorder_refused, closed) = accepted;
+    let (accepted, chord_bits, hold, scroll, display, refused, keys, block, recorder_refused, closed) = accepted;
     // The re-entry's close is the first thing after the lock is let go: the old pop-up goes before any notice this poll posts.
     if closed {
         crate::runtime::features::game_speed::on_hold(HoldEvent::Closed, style);
     }
     // rc.15: the step button never steps while the speed hold is open or while a chord that passed keeps it (Save
     // State's ZL saved and stepped in 985c79c6; held on, Training ran from its 18th update).
-    let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_));
+    let hold_open = matches!(hold, HoldEvent::Opened | HoldEvent::Held | HoldEvent::Step(_)) || scroll.1;
     let step_take = lobby_speed::step_take(style, hold_open, chord_bits);
     // Placing keeps all of P1's controller from the game (the cursor has it); Ready waits for its first input.
     // SAFETY: controller is the live Controller of this poll.
@@ -133,6 +135,7 @@ pub unsafe fn on_poll(controller: usize) {
         crate::runtime::features::notices::refuse("Stop the drill to start recording or play inputs");
     }
     crate::runtime::features::game_speed::on_hold(hold, style);
+    crate::runtime::features::input_display::on_scroll(scroll.0, scroll.1);
     crate::runtime::features::game_speed::training_apply();
     // rc.15: the lobby's 1 Frame step, the native button without what this poll keeps from the game.
     let (pressed, held) = lobby_speed::step_input(style, current, just_down, step_take | chord_bits);

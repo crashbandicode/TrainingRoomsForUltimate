@@ -73,6 +73,8 @@ pub mod action;
 pub mod frame_strip_plan;
 #[path = "model/game_speed.rs"]
 pub mod game_speed;
+#[path = "model/strip_scroll.rs"]
+pub mod strip_scroll;
 /// rc.8 R2: the waiting-room practice's 2/3 pace and x1.5 extra pass.
 #[path = "model/lobby_speed.rs"]
 pub mod lobby_speed;

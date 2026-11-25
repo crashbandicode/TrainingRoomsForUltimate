@@ -154,12 +154,13 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
     let container = strip[iv::at::CONTAINER] as *mut Pane;
     if !container.is_null() {
         let labels = [strip[iv::at::RUN_LABEL] != 0, strip[iv::at::RUN_LABEL + 1] != 0];
-        let (history, aims) = input_display::hud_tick(
+        let (history, aims, scroll) = input_display::hud_tick(
             strip_shown, draw_settings, parry.as_ref(), card.is_some(), labels, |local, look, changed| {
                 write_look(strip[local] as *mut Pane, p::IDX_IV + local, look, changed)
             },
         );
         crate::runtime::bridge_state::note_strip_aims(aims);
+        crate::runtime::bridge_state::note_strip_scroll(scroll);
         let backdrop = strip[iv::at::BACKDROP] as *mut Pane;
         if !backdrop.is_null() {
             pane::set_height(backdrop, C.strip.bounds(history, card.is_some())[3]);
@@ -172,6 +173,7 @@ pub unsafe fn draw(layout: *mut Layout, name: &[u8]) {
         }
     } else {
         crate::runtime::bridge_state::note_strip_aims([None; 2]);
+        crate::runtime::bridge_state::note_strip_scroll((0, 0));
     }
 }
 
