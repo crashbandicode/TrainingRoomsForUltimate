@@ -348,7 +348,7 @@ pub fn reach(place: Place, camera: [f32; 4], blast: Option<[f32; 4]>) -> [f32; 4
 /// Where a fighter switched to Off stage goes (operator 2026-11-25, T1 A). `None`: its spot stays. A spot that is
 /// off stage by the rule stays, in open air or under a solid, and nothing more is read for it. Any other spot goes
 /// to the default spot beside the nearest ledge with open air. A stage that cannot be read, or that has no such
-/// ledge or spot, moves nothing.
+/// ledge or spot, moves nothing. `at` is the crosshair's point on the Spot page, and the fighter's spot on the Where page.
 pub fn off_stage_spot(stage: &mut impl Probe, blast: [f32; 4], at: [f32; 2]) -> Option<[f32; 2]> {
     if classify(stage, blast, at).ok()?.off_stage(true) {
         return None;
