@@ -305,6 +305,24 @@ fn core04_slider_rows() {
 }
 
 #[test]
+fn damage_half_slider_codec() {
+    assert_eq!(settings::half_ends(&[12, 150, 1, 0]), (25, 300));
+    assert_eq!(settings::half_ends(&[20, 140]), (40, 280));
+    assert_eq!(settings::half_ends(&[12]), (24, 0));
+    assert_eq!(settings::half_ends(&[12, 150, 5, 0]), (25, 300));
+    assert_eq!(settings::half_row(25, 300), ([12, 150, 1, 0], 4));
+    let (row, len) = settings::half_row(40, 280);
+    assert_eq!(len, 2);
+    assert_eq!(&row[..len], &[20, 140]);
+    let mut text = String::new();
+    settings::write_half(25, &mut text).unwrap();
+    assert_eq!(text, "12.5");
+    text.clear();
+    settings::write_half(24, &mut text).unwrap();
+    assert_eq!(text, "12");
+}
+
+#[test]
 fn old_whole_percent_file_loads_and_saves_without_doubling() {
     use model::state::settings::StateSettings;
 

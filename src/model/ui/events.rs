@@ -16,22 +16,25 @@ pub struct Packet {
     pub held: u16,
     pub pressed: u16,
     navigation: u16,
+    repeats: u8,
 }
 
 impl Packet {
     pub fn from_step(step: &Step) -> Self {
         Self { held: step.held, pressed: step.pressed,
-            navigation: step.presses().fold(0, |bits, b| bits | (1 << b as u8)) }
+            navigation: step.presses().fold(0, |bits, b| bits | (1 << b as u8)), repeats: step.repeats & 3 }
     }
 
     /// Capture consumes a whole poll before its preview/navigation controls.
     pub fn presses(self, menu: &mut Menu) -> impl Iterator<Item = Button> + use<> {
+        menu.note_repeats(self.repeats);
         let bits = if menu.chord_poll(self.held, self.pressed) { 0 } else { self.navigation };
         BUTTONS.into_iter().filter(move |b| bits & (1 << *b as u8) != 0)
     }
 
     fn encode(self) -> u64 {
         u64::from(self.held) | (u64::from(self.pressed) << 16) | (u64::from(self.navigation) << 32)
+            | (u64::from(self.repeats) << 48)
     }
 }
 
@@ -42,7 +45,8 @@ impl Event {
     fn encode(self) -> u64 { match self { Self::Open => 1 << 63, Self::Poll(p) => p.encode() } }
     fn decode(word: u64) -> Self {
         if word >> 63 != 0 { Self::Open } else {
-            Self::Poll(Packet { held: word as u16, pressed: (word >> 16) as u16, navigation: (word >> 32) as u16 })
+            Self::Poll(Packet { held: word as u16, pressed: (word >> 16) as u16, navigation: (word >> 32) as u16,
+                repeats: ((word >> 48) & 3) as u8 })
         }
     }
 }

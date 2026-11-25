@@ -973,15 +973,15 @@ impl RecordingScreens {
             let group = if self.tab() == 0 { SAVES_MACROS } else { COMBOS_SEQ };
             let cpu = self.popup_role == ViewRole::Cpu;
             match (group, self.current_section(face, group), cpu) {
-                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
-                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, false) => "A bind   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, 0, true) => "A bind   Left/Right section   ZR role   ZL+Up/Down page   B close",
                 (SAVES_MACROS, _, false) => {
-                    "A set active   X loop   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close"
+                    "A set active   X loop   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close"
                 }
-                (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   L/R role   ZL+Up/Down page   B close",
+                (SAVES_MACROS, _, true) => "A set active   X loop   Left/Right section   ZR role   ZL+Up/Down page   B close",
                 _ if self.drill_take(face, group).is_some() =>
-                    "A drill   X preview   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
-                _ => "A drill   Left/Right section   ZL/ZR tab   L/R role   ZL+Up/Down page   B close",
+                    "A drill   X preview   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
+                _ => "A drill   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close",
             }
         } else if page_group.is_some_and(|group| self.drill_take(Face::Page, group).is_some()) {
             "A open   X preview   ZR role   L/R page   B close"
@@ -1074,9 +1074,8 @@ impl RecordingScreens {
             Button::B if self.place(Face::Popup, group).drills => self.toggle_drills(Face::Popup, group),
             Button::B => self.popup_open = false,
             Button::Y => return false,
-            Button::L => self.set_popup_role(ViewRole::Player),
-            Button::R => self.set_popup_role(ViewRole::Cpu),
-            Button::ZL | Button::ZR => self.toggle_tab(),
+            Button::ZR => self.set_popup_role(self.popup_role.other()),
+            Button::ZL | Button::L | Button::R => self.toggle_tab(),
             Button::X => {
                 if self.in_macros(Face::Popup, group) {
                     self.cycle_x(self.popup_role);

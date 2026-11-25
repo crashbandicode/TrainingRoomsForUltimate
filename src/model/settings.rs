@@ -9,7 +9,7 @@
 //!
 //! Every setting is an array of small integers, one element per option in the option set's
 //! declaration order (`0` not selected, `1` selected, `2..=5` a weight on a weighted row); a slider
-//! is `[lower, upper]`. The shape and the ids are the fork's, checked against two real files from
+//! is `[lower, upper]`; damage sliders append two half-percent flags when needed. The shape and the ids are the fork's, checked against two real files from
 //! the fork (`tests/fixtures/fork-menu-*.json`).
 //!
 //! Reading is field by field (S2): a field that does not parse takes its factory value, the rest of
@@ -51,6 +51,8 @@ pub enum Kind {
     Weighted,
     /// `[lower, upper]`, `lower <= upper <= max` (Tech ranges: their declared scale).
     Slider { max: u8 },
+    /// Whole-percent ends with optional half-percent flags.
+    HalfSlider { max: u8 },
     /// The optional range of a delay row (N3): empty (no range) or `[min, max]` as **option
     /// indices** of the row's own value set, `min <= max <= RANGE_INDEX_MAX`. Absent from the file
     /// while empty.
@@ -65,7 +67,7 @@ impl Kind {
         match self {
             Kind::Single | Kind::Multiple => 1,
             Kind::Weighted => WEIGHT_MAX,
-            Kind::Slider { max } => max,
+            Kind::Slider { max } | Kind::HalfSlider { max } => max,
             Kind::Range => RANGE_INDEX_MAX,
         }
     }
@@ -86,6 +88,27 @@ pub use super::factory::{DEFS, INPUT_DELAY, LRA_RESET, STAGE_HAZARDS};
 /// The table row called `id`, with its index.
 pub fn def(id: &str) -> Option<(usize, &'static Def)> {
     DEFS.iter().enumerate().find(|(_, def)| def.id == id)
+}
+
+/// A damage row's ends in half percents.
+pub fn half_ends(row: &[u8]) -> (u16, u16) {
+    let end = |index| u16::from(row.get(index).copied().unwrap_or(0)) * 2
+        + u16::from(row.get(index + 2).copied().unwrap_or(0).min(1));
+    (end(0), end(1))
+}
+
+/// The canonical damage row for ends in half percents.
+pub fn half_row(lower: u16, upper: u16) -> ([u8; 4], usize) {
+    let row = [(lower / 2) as u8, (upper / 2) as u8, (lower % 2) as u8, (upper % 2) as u8];
+    let len = if row[2] == 0 && row[3] == 0 { 2 } else { 4 };
+    (row, len)
+}
+
+/// Write a half-percent count as a percentage.
+pub fn write_half(units: u16, out: &mut impl fmt::Write) -> fmt::Result {
+    write!(out, "{}", units / 2)?;
+    if !units.is_multiple_of(2) { out.write_str(".5")?; }
+    Ok(())
 }
 
 /// Why a value or a file was refused.
@@ -138,6 +161,9 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
     let Value::Array(items) = value else {
         return Err(Reason::NotAnArray);
     };
+    if matches!(def.kind, Kind::HalfSlider { .. }) && !matches!(items.len(), 2 | 4) {
+        return Err(Reason::BadSliderLength);
+    }
     let mut elements = Vec::with_capacity(items.len());
     for (index, item) in items.iter().enumerate() {
         // rc.15: keep the seven-slot file layout; the retired colour-mode slot has no meaning.
@@ -146,13 +172,29 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
             continue;
         }
         let byte = item.as_u64().and_then(|n| u8::try_from(n).ok()).ok_or(Reason::ElementNotAByte)?;
-        if byte > super::tech_settings::scale(def.id).map_or(def.kind.max(), |s| s.max) {
+        let max = if matches!(def.kind, Kind::HalfSlider { .. }) && index >= 2 {
+            1
+        } else {
+            super::tech_settings::scale(def.id).map_or(def.kind.max(), |s| s.max)
+        };
+        if byte > max {
             return Err(Reason::ElementAboveMax);
         }
         elements.push(byte);
     }
     if def.kind == Kind::Range && elements.is_empty() {
         return Ok(elements);
+    }
+    if let Kind::HalfSlider { max } = def.kind {
+        let (lower, upper) = half_ends(&elements);
+        if lower > u16::from(max) * 2 || upper > u16::from(max) * 2 {
+            return Err(Reason::ElementAboveMax);
+        }
+        if lower > upper {
+            return Err(Reason::BadSliderRange);
+        }
+        let (row, len) = half_row(lower, upper);
+        return Ok(row[..len].to_vec());
     }
     if matches!(def.kind, Kind::Slider { .. } | Kind::Range) {
         let &[lower, upper] = elements.as_slice() else {

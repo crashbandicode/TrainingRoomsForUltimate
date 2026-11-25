@@ -148,6 +148,8 @@ pub struct Step {
     /// Release-only polls must reach an active physical chord capture too.
     pub changed: bool,
     pub presses: [Option<Button>; 14],
+    /// Up and Down presses that repeat a held direction.
+    pub repeats: u8,
     pub hold_ends: [Option<HoldEnd>; 4],
 }
 
@@ -238,6 +240,9 @@ impl Adapter {
                 let repeat = self.repeat[i].frame(!self.stale[i] && if vertical { held } else { stick[i] }, pace, !self.backlog);
                 if (dpad[i] && !self.dpad[i]) || (stick[i] && !self.stick[i]) || repeat {
                     let button = DIRECTION_BUTTONS[i];
+                    if repeat && vertical {
+                        step.repeats |= 1 << (i / 2);
+                    }
                     if held && !self.stale[i] {
                         self.holds[i].fires = self.holds[i].fires.saturating_add(1);
                         self.holds[i].jump |= vertical && zl_held && jumps;

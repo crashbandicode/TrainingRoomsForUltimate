@@ -18,7 +18,8 @@ use super::panes::ROWS as ROW_LINES;
 const HINT_LIST: &str = "Up/Down choose   ZL+Up/Down jump   A set   B back";
 const HINT_CHECKLIST: &str = "Up/Down move   ZL+Up/Down jump   A tick   ZL all or none   B back";
 const HINT_DELAY: &str = "Up/Down move   ZL+Up/Down jump   A tick or edit the handle   Y clear   ZL all   B back";
-const HINT_SLIDER: &str = "Left/Right other handle   A pick up or put down   Up/Down/Left/Right change   B back";
+const HINT_SLIDER: &str = "Up/Down Min or Max   A edit   B back";
+const HINT_SLIDER_EDIT: &str = "Up/Down change   hold to speed up   A or B done";
 const HINT_DIRECTIONS: &str = "Up/Down move   A add one weight   Y clear   ZL all or none   B back";
 const HINT_CHORD: &str = "X capture   A confirm   Y empty   B cancel";
 const HINT_ROWS: &str = "L/R page   Up/Down move   ZL+Up/Down jump   Left/Right change   A open   Y reset row   B back";
@@ -286,12 +287,17 @@ fn slider_frame(menu: &Menu, screen: &Screen, row: usize, state: SliderState, fr
     for (i, name) in ["Min", "Max"].into_iter().enumerate() {
         let value = values.get(i).copied().unwrap_or(0);
         let mut label = String::new();
-        if let Some(spec) = super::tech_settings::scale(ROWS[row].id) { let _ = spec.write(value, &mut label); }
-        else { let _ = write!(label, "{value}%"); }
+        if let Some(spec) = super::tech_settings::scale(ROWS[row].id) {
+            let _ = spec.write(value, &mut label);
+        } else if super::settings::def(ROWS[row].id).is_some_and(|(_, d)| matches!(d.kind, super::settings::Kind::HalfSlider { .. })) {
+            let ends = super::settings::half_ends(&values);
+            let _ = super::settings::write_half(if i == 0 { ends.0 } else { ends.1 }, &mut label);
+            let _ = label.write_char('%');
+        } else { let _ = write!(label, "{value}%"); }
         push(frame, name, &label, if selected && (i == 0) == lower { Tone::On } else { Tone::Normal });
     }
     frame.focus = Some(u8::from(!lower));
-    let _ = frame.hint.write_str(HINT_SLIDER);
+    let _ = frame.hint.write_str(if selected { HINT_SLIDER_EDIT } else { HINT_SLIDER });
 }
 
 fn directions_frame(menu: &Menu, screen: &Screen, row: usize, chip: usize, frame: &mut Frame) {

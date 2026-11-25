@@ -599,9 +599,14 @@ pub fn write_value(menu: &Menu, row: usize, out: &mut Text<72>) {
         }
         RowValue::Slider { lower, upper } => {
             if let Some(spec) = super::tech_settings::scale(r.id) {
-                let _ = spec.write(lower, out);
+                let _ = spec.write(lower as u8, out);
                 let _ = out.write_str(" - ");
-                let _ = spec.write(upper, out);
+                let _ = spec.write(upper as u8, out);
+                let _ = out.write_str("  >");
+            } else if super::settings::def(r.id).is_some_and(|(_, d)| matches!(d.kind, super::settings::Kind::HalfSlider { .. })) {
+                let _ = super::settings::write_half(lower, out);
+                let _ = out.write_str(" - ");
+                let _ = super::settings::write_half(upper, out);
                 let _ = out.write_str("  >");
             } else { let _ = write!(out, "{lower} - {upper}  >"); }
         }
@@ -875,10 +880,10 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
             frame.tab_count = (i + 1) as u8;
         }
         frame.tab_active = rec.tab() as u8;
-        // The r8 title: "Recording", with the role in the L/R tabs beside it.
+        // The r8 title: "Recording", with the role tabs beside it.
         let _ = frame.crumb.write_str("Recording");
         frame.role_tab = Some(u8::from(rec.role(face) == super::recording_menu::ViewRole::Cpu));
-        frame.role_keys = super::panes::RoleKeys::LR;
+        frame.role_keys = if rec.popup_accepts_place_first() { super::panes::RoleKeys::ZR } else { super::panes::RoleKeys::None };
         // The page tabs are outlined boxes under the title line; the red tab is the role's.
         frame.tab_boxes = true;
     } else {
