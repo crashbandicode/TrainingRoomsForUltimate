@@ -157,7 +157,9 @@ plugins are left out, except the first, which was made in Training and turned ou
   its readback matches `99e00e92`.
 - **Gate:** `artifacts/phase23/next-build/gate-b7a382e4/status.json`: all six steps exit 0; 3,048 tests passed, 0
   failed, 4 ignored. The installed file is that gate's release file.
-- **After it:** `main` went on to `f55dfbbe` with documentation only; the NRO did not change (f9-fix, inbox 22:27:13Z).
+- **Later docs build:** `f55dfbbe` changed only documentation. Its release NRO embeds the later commit tag and has a
+  different SHA-256 (`0414f116…`); it was not installed. The card readback still matches `b7a382e4` (`0cb29525…`).
+  Compare `artifacts/phase23/next-build/gate-f55dfbbe/SUMMARY.md` with the install gate above.
 - **Eden:** the smoke boot below, on this exact file.
 - **The operator's reports:** none yet.
 
