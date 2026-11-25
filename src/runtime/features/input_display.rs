@@ -471,7 +471,8 @@ pub unsafe fn sample_frame(player: usize) {
     tracker.step_graded(p1, cpu, inputs, taken);
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
-            crate::engine::rr_host::observe_input(snap, tracker.late(), tracker.contact_now());
+            let tolerance = super::combo::settings().tolerance;
+            crate::engine::rr_host::observe_input(snap, tracker.late(), tolerance, tracker.contact_now());
         }
         // The combo helper reads the same step (SPEC-input-07 §3); lock order TRACKER, then the helper's.
         // SAFETY: `player` is the live P1 accessor of this frame.

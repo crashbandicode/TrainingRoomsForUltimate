@@ -60,6 +60,8 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+    /// A status change and the origin of the action whose status changed.
+    pub turned: Option<Option<u32>>,
     /// The originating press and its known move, base and variant.
     pub named: Option<(Option<u32>, Move, Option<Move>, u8)>,
     /// On a later aim part, the move that began the cast.
@@ -71,7 +73,7 @@ pub struct Late {
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None, travel: None, named: None, continuation: None, press: 0 };
+    pub const NONE: Late = Late { open: None, turned: None, named: None, continuation: None, travel: None, press: 0 };
 }
 
 /// Facing-relative entry velocity, in 1/256 game units per unstopped frame. Unknown is distinct from standing still.

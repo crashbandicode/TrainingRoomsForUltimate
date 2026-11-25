@@ -166,6 +166,30 @@ fn a_drill_step_stores_the_move_its_press_became() {
     assert_eq!(jab().get(0).unwrap().step_side(1).map(|d| d.mv), Some(Move::Jab));
 }
 
+#[test]
+fn a_reacted_release_does_not_change_a_steps_title() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
+    for frame in 0..4 {
+        tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Jab), status: 0x27,
+            motion_frame: frame as f32, facing: 1, ..Sample::default() },
+            MappedInputs { buttons: 1, ..MappedInputs::NEUTRAL });
+    }
+    tick(&mut tracker, &mut capture, Sample { attack: Some(Move::Jab), status: 0x28,
+        facing: 1, ..Sample::default() }, MappedInputs::NEUTRAL);
+    let step = capture.combo.get(0).unwrap();
+    assert!(step.events().any(|event| event.kind == Kind::LetGo(Button::Attack)));
+    assert_eq!(bar(capture.combo)[0], "1 Jab");
+    assert_eq!(step.step_side(0), None);
+    assert_eq!(step.step_side(1).map(|d| d.mv), Some(Move::Jab));
+    let record = ComboRecord::new("Drill".into(), capture.combo, None);
+    let value = serde_json::to_value(&record).unwrap();
+    assert_eq!(value["input_steps"][0]["to_shown"], serde_json::json!({"move": "jab"}));
+    assert_eq!(value["input_steps"][0]["events"][1]["reacted"], true);
+    assert_eq!(serde_json::from_value::<ComboRecord>(value).unwrap(), record);
+}
+
 fn two_described() -> Combo {
     let mut tracker = Tracker::new();
     let mut capture = InputCapture::new();

@@ -56,6 +56,24 @@ fn names(dir: &Path) -> Vec<String> {
     all
 }
 
+#[test]
+fn damage_recovery_note_names_both_valid_lengths() {
+    let dir = folder("damage-length");
+    let input = json!({"menu": {
+        "save_damage_limits_cpu": [12, 15, 1],
+        "save_damage_limits_player": [254, 255, 1, 0],
+        "tech_damage_range": [2, 3, 1],
+    }});
+    fs::write(dir.join(file::SETTINGS), input.to_string()).unwrap();
+    let boot = settings_file::load(&dir);
+    assert_eq!(boot.settings.menu.get("save_damage_limits_player"), Some(&[254, 255, 1, 0][..]));
+    let note = |id: &str| boot.notes.iter().find(|n| n.contains(&format!("at=menu.{id} "))).unwrap();
+    assert!(note("tech_damage_range").contains("exactly two elements"));
+    let damage = note("save_damage_limits_cpu");
+    assert!(damage.contains("two or four elements"), "{damage}");
+    fs::remove_dir_all(&dir).unwrap();
+}
+
 /// What boot 1 recovers: the valid nondefault fields, the saved defaults and the unknown keys, with
 /// the bad field at its factory value.
 fn check_recovered(s: &Settings) {

@@ -45,6 +45,10 @@ A toggle press increments the value and wraps from `max` to 0. A single-choice s
 | Left / Right | move the submenu cursor a column (wrap; skip empty cells; moving left onto an empty cell slides further left until a filled cell) | move the toggle cursor a column | selected handle: value ∓ / ± 1 (slow step); no handle selected: switch hover between Min and Max | switch hover between No and Yes |
 | Start | upstream defined "close" for Start but never dispatched it from the controller (see SPEC-core-03 §2.3) | | | |
 
+The SLIDER column above describes upstream. **TrainingRooms, 2026-11-24:** Up / Down switch the hovered handle; while
+editing, Up raises and Down lowers it. Left / Right do nothing. A edits or puts a handle down; B puts it down or
+leaves. A tap moves one step; a hold quickens.
+
 Grid movement rules: `next_row`/`prev_row` wrap within the table's row count; `next_col`/`prev_col` wrap within the column count; after a move the cursor must land on a filled cell: moving down/up or right onto an empty cell repeats the move in the same direction; moving left onto an empty cell slides left ("carriage return") until a filled cell. A row with no filled cell is a model error (panic upstream) and cannot occur with ≤ 32 items filled row-major.
 
 Hold repeat: Up / Down on the d-pad or either stick repeat after 21 frames, then quicken to every 8 frames, every 5 from 60 held frames and every 4 from 120. Left / Right repeat only on a stick, every 21 frames; held ZL + Up / Down jumps repeat every 21 frames. A direction held before the menu takes input does not repeat until released, and a repeat waits while the worker has an input pending. This rule is implemented in the input adapter (SPEC-core-03 §3).
@@ -54,6 +58,9 @@ Hold repeat: Up / Down on the d-pad or either stick repeat after 21 frames, then
 - Fields: `state` ∈ {LowerHover, UpperHover, LowerSelected, UpperSelected, None}, `lower`, `upper`, `min`, `max`, `incr_slow`, `incr_fast`. Upstream constants: `min 0`, `max 150`, `slow 1`, `fast 10`; the only sliders are the two damage ranges, default `[0, 150]`. TrainingRooms rc.15 raises the Player maximum to 255%.
 - Increments saturate and clamp: raising `lower` never passes `upper`; raising `upper` never passes `max`; lowering `lower` never passes `min`; lowering `upper` never passes `lower`.
 - A opens the slider page with `LowerHover`; A again selects the hovered handle (`*Selected`), A once more deselects; B deselects or leaves the page.
+- **TrainingRooms, 2026-11-24:** damage ranges step by 0.5% and Tech ranges by their own step. Held presses accelerate:
+  presses 1–2 use one step, 3–6 two, 7–12 four, 13–22 ten and later presses twenty. With the adapter's repeats,
+  0–150% takes 168 polls. Min and Max remain clamped as above.
 
 ### 2.5 Reset and defaults
 
@@ -223,7 +230,7 @@ None. The model never touches game memory. Its outputs are:
 | Output | Consumer |
 | --- | --- |
 | the page, cursors, hover and selection states | the renderer (SPEC-core-03) |
-| `serialized_settings`: the current settings as a JSON object `id → [u8]` (sliders `[lower, upper]`), refreshed after every A/B press and after every bulk update | the commit on close (SPEC-core-04) |
+| `serialized_settings`: the current settings as a JSON object `id → [u8]` (sliders `[lower, upper]`, with optional half flags on damage ranges), refreshed after every A/B press and after every bulk update | the commit on close (SPEC-core-04) |
 | `serialized_default_settings`: the defaults snapshot, replaced on X | the commit on close |
 | the combined close payload `{"menu": <settings>, "defaults_menu": <defaults>}` | SPEC-core-04 |
 | "should show Clear Toggle hint" = page is `TOGGLE` and the submenu is multiple-choice and the selected toggle's `max > 1` | the renderer |
@@ -232,14 +239,14 @@ None. The model never touches game memory. Its outputs are:
 
 - The model advances only on button events delivered by the input adapter, once per input frame while the menu is open. Rendering reads it on the UI thread; the two run under one lock (SPEC-core-03 §5).
 - Serialization happens on every A and B press (upstream serialized the whole menu to a JSON string on each press); that is acceptable for a menu but must not run per frame.
-- Bulk updates (`update_all_from_json`, `update_one_from_json`) accept a map `id → [u8]` and write each submenu's values by index; **the fork fix to fold in:** clear every toggle of the submenu to 0 before applying the array, so an array shorter than the current option list (an older file, or a catalog that grew) leaves the appended options off instead of keeping stale values. Slider arrays must have exactly two elements.
+- Bulk updates (`update_all_from_json`, `update_one_from_json`) accept a map `id → [u8]` and write each submenu's values by index; **the fork fix to fold in:** clear every toggle of the submenu to 0 before applying the array, so an array shorter than the current option list (an older file, or a catalog that grew) leaves the appended options off instead of keeping stale values. Upstream slider arrays have exactly two elements; TrainingRooms damage ranges also accept four, with half-percent flags (SPEC-core-04 §3.1).
 - A missing id in the map leaves that submenu unchanged; an unknown id in the map is ignored.
 
 ## 6. Edge cases and interactions
 
 - **Single choice with no selection**: allowed (see §2.2); consumers treat it as the empty set.
 - **Weighted toggles with all zeros**: the consuming feature does nothing (empty set).
-- **Reset while on a slider page**: "reset current" replaces `[lower, upper]` from the defaults and keeps the hover state.
+- **Reset while on a slider page**: "reset current" replaces the slider row from the defaults and keeps the hover state.
 - **X on the confirmation page** is ignored (upstream let X through on every page; the fork too — recommendation: ignore on `CONFIRMATION`/`CLOSE`; Q1).
 - **Tab ring with one tab**: previous/next return the same tab.
 - **Menu open/closed**: SPEC-core-03 owns opening (`page = SUBMENU`) and closing (`page == CLOSE` → commit); the model only sets `CLOSE`.
@@ -275,10 +282,10 @@ None in the model. The close payload and its file are SPEC-core-04. The factory 
 | --- | --- | --- | --- |
 | Grid navigation wraps and skips empty cells; carriage return on left | `core02_table_nav_wrap_skip`, `core02_table_carriage_return` | `core02-E1` cursor walk screenshots | `docs/EDEN-RESULTS.md` |
 | Toggle increment wraps at max; single choice clears others; Y clears only weighted | `core02_toggle_single_exclusive`, `core02_toggle_wrap`, `core02_y_clears_weighted_only` | `core02-E2` | — |
-| Slider clamps and steps (±1 slow, ±10 fast), hover/select states | `core02_slider_clamp_steps`, `core02_slider_states` | `core02-E3` | — |
+| Slider clamps, half-percent taps, hover/select states | `core02_slider_clamp_steps`, `core02_slider_states` | `core02-E3` | — |
 | Page transitions for A/B on every page | `core02_page_machine` | `core02-E1` | — |
 | X saves defaults; R asks; Yes resets all / current; No cancels | `core02_defaults_and_reset` | `core02-E4` reset flow | `docs/EDEN-RESULTS.md` |
-| Serialization shape `id → [u8]`, sliders `[lower, upper]`; round trip through bulk update | `core02_serialize_roundtrip` | — | — |
+| Serialization shape `id → [u8]`, slider ends and optional damage half flags; round trip through bulk update | `core02_serialize_roundtrip` | — | — |
 | Bulk update clears before applying (short arrays leave appended options off) | `core02_update_from_shorter_array` | — | — |
 | Factory table: every row of §2.7 with kind, option count and default | `core02_factory_table_matches_spec` (table-driven) | `core02-E5` every tab screenshot | `docs/EDEN-RESULTS.md` |
 | Up / Down repeat and quicken; stick Left / Right and held jumps repeat steadily | `model::adapter::tests::case_table` | `core02-E6` superseded | — |
