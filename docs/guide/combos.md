@@ -137,8 +137,8 @@ recorded on one fighter can be practised on any other. All aerials are `aerial`;
 a forward air from a neutral air, relative to the facing. An older file's `aim` still uses `side` for both left and right.
 
 `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack` are written by name in `from` and `to`
-(2026-11-25). This is not backward compatible: a build up to `a945b0c1` skips a file that has one of the five
-there, with `bad combo field: from` or `to`. Files without them are not affected.
+(2026-11-25). This is not backward compatible: install 4 (`a945b0c1`) and earlier shipped installs skip a file that
+has one of the five there, with `bad combo field: from` or `to`. Files without them are not affected.
 
 An older file has `other` in `from` or `to` and the move in the description's `move`. It still reads the same.
 A rename keeps it as it is; a crop writes the names. A Final Smash keeps the older form: `other`, with

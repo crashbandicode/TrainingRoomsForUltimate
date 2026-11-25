@@ -227,7 +227,7 @@ move key), `angle` (`up` or `down`) and `variant` (0–31), and `move` for a Fin
 needed for a described link; `{}` is valid. `from` and `to` write `grab`, `throw`, `ledge_attack`,
 `getup_attack` and `trip_attack` by name (the operator's order of 2026-11-25, which reverses that day's rule
 that the six kinds belong in the description, for these five). It is not backward compatible: install 4
-(`a945b0c1`) and earlier builds refuse a file with one of the five in `from` or `to`. A Final Smash still
+(`a945b0c1`) and earlier shipped installs refuse a file with one of the five in `from` or `to`. A Final Smash still
 writes `other` with `move`, and the reader refuses `final_smash` straight in `from` or `to`. The reader still
 takes the older form of the five (`other` with `move`) and reads it to the same link; a file read from disk
 keeps its own JSON, and a crop or a new record writes the names. A named `from` or `to` with a `move` member is
