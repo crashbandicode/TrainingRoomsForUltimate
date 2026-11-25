@@ -407,7 +407,7 @@ type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 static PREVIEW: AtomicU8 = AtomicU8::new(0);
 static ACTION_WATCH: hos_lock::Mutex<Watch> = hos_lock::Mutex::new(Watch::new());
-static PREVIEW_ASK: Mutex<Option<PreviewAsk>> = Mutex::new(None);
+static PREVIEW_ASK: Mutex<PreviewRequests> = Mutex::new(PreviewRequests { stop: false, start: None });
 static DEFER_MIGRATE: AtomicBool = AtomicBool::new(false);
 static ROLE_KIND: [AtomicI32; 2] = [const { AtomicI32::new(-1) }; 2];
 static STRIP: Mutex<(u32, Option<Combo>, CaptureOwner)> = Mutex::new((0, None, CaptureOwner::UNKNOWN));
@@ -487,10 +487,13 @@ struct Resident {
     tape: Tape,
 }
 
-enum PreviewAsk {
-    Start { source: String, role: Role, frames: core::ops::Range<usize> },
-    Stop,
+struct PreviewStart { source: String, role: Role, frames: core::ops::Range<usize> }
+#[derive(Default)]
+struct PreviewRequests {
+    stop: bool,
+    start: Option<PreviewStart>,
 }
+const PREVIEW_REQUESTED: u8 = 3; // Owns the preview, but neither fighter receives this request's frames yet.
 
 pub const CLIP_ID: &str = "*clip";
 static PREVIEW_CLIP: Mutex<Option<MacroRecording>> = Mutex::new(None);
@@ -556,8 +559,12 @@ pub fn migrated() -> bool {
 /// The clip editor's preview of a saved macro: frames `start..end` of `source` play once on `role` through the role's
 /// Play queue, warped to the macro's start save. Running from this call until the run ends or `stop_preview`.
 pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
-    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: source.to_owned(), role, frames: start as usize..end as usize });
-    PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
+    queue_preview(PreviewStart { source: source.to_owned(), role, frames: start as usize..end as usize });
+}
+
+fn queue_preview(start: PreviewStart) {
+    lock(&PREVIEW_ASK).start = Some(start);
+    let _ = PREVIEW.compare_exchange(0, PREVIEW_REQUESTED, Ordering::AcqRel, Ordering::Acquire);
 }
 
 /// F10: a drill's take previews on Player 1 (`request_preview`), unless Player 1 has a Play queued or running:
@@ -573,8 +580,7 @@ pub fn request_drill_preview(source: &str, frames: u32) -> bool {
 pub fn request_clip_preview(recording: MacroRecording, role: Role) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
-    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: CLIP_ID.to_owned(), role, frames: 0..len });
-    PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
+    queue_preview(PreviewStart { source: CLIP_ID.to_owned(), role, frames: 0..len });
 }
 
 /// A Vault clip's preview has the fighters away from where it found them until the return lands.
@@ -595,7 +601,11 @@ pub fn previewing() -> bool { preview_running() || preview_away() }
 
 /// Stop a running preview (nothing otherwise): the rest of its frames is dropped.
 pub fn stop_preview() {
-    if previewing() { *lock(&PREVIEW_ASK) = Some(PreviewAsk::Stop); }
+    if previewing() {
+        let mut asks = lock(&PREVIEW_ASK);
+        asks.start = None;
+        asks.stop = true;
+    }
 }
 
 /// A preview was asked for and has not ended. Atomic read (a hook may call it).
@@ -1321,7 +1331,7 @@ pub fn service_at(
         retire_preview_run();
         take_preview_refusal(&mut tick);
         PREVIEW.store(0, Ordering::Release);
-        lock(&PREVIEW_ASK).take();
+        *lock(&PREVIEW_ASK) = PreviewRequests::default();
         drop_preview_home();
         return tick;
     };
@@ -2362,6 +2372,7 @@ fn take_preview_refusal(tick: &mut Tick) {
         PREVIEW_AWAY.store(0, Ordering::Release);
         PREVIEW.store(0, Ordering::Release);
         lock(&PREVIEW_CLIP).take();
+        *lock(&PREVIEW_ASK) = PreviewRequests::default();
     }
 }
 
@@ -2383,14 +2394,33 @@ fn retire_preview_run() {
 
 fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
     take_preview_refusal(tick);
-    let ask = lock(&PREVIEW_ASK).take();
-    let role = match PREVIEW.load(Ordering::Acquire) {
-        ROLE_PLAYER => Some(Role::Player),
-        ROLE_CPU => Some(Role::Cpu),
-        _ => None,
+    let role = preview_role();
+    let (stop, queued) = {
+        let mut asks = lock(&PREVIEW_ASK);
+        (core::mem::take(&mut asks.stop), asks.start.is_some())
     };
-    match ask {
-        Some(PreviewAsk::Start { source, role, frames }) => {
+    if stop {
+        if let Some(role) = role {
+            drive_mash(machine, role, true);
+            run_flag(role).store(false, Ordering::Release);
+            clear_cut(role);
+        }
+        PREVIEW.store(if queued { PREVIEW_REQUESTED } else { 0 }, Ordering::Release);
+        if PREVIEW_AWAY.compare_exchange(1, 2, Ordering::AcqRel, Ordering::Acquire).is_ok() {
+            tick.home = Some(HomeWarp::Return);
+            WARP_HOLD.store(true, Ordering::Release);
+            return;
+        }
+    }
+    if PREVIEW_AWAY.load(Ordering::Acquire) == 2 {
+        if WARP_HOLD.load(Ordering::Acquire) { return; }
+        drop_preview_home();
+        if !queued { lock(&PREVIEW_CLIP).take(); }
+    }
+    let start = lock(&PREVIEW_ASK).start.take();
+    match start {
+        Some(PreviewStart { source, role, frames }) => {
+            PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
             let owed = if source == CLIP_ID {
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
@@ -2406,25 +2436,8 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
                 PREVIEW.store(0, Ordering::Release);
             }
         }
-        Some(PreviewAsk::Stop) => {
-            if let Some(role) = role {
-                drive_mash(machine, role, true);
-                run_flag(role).store(false, Ordering::Release);
-                clear_cut(role);
-            }
-            PREVIEW.store(0, Ordering::Release);
-            if PREVIEW_AWAY.compare_exchange(1, 2, Ordering::AcqRel, Ordering::Acquire).is_ok() {
-                tick.home = Some(HomeWarp::Return);
-                WARP_HOLD.store(true, Ordering::Release);
-            }
-        }
         None if role.is_some_and(|role| !role_playing(role)) => PREVIEW.store(0, Ordering::Release),
         None => {}
-    }
-    if !WARP_HOLD.load(Ordering::Acquire)
-        && PREVIEW_AWAY.compare_exchange(2, 0, Ordering::AcqRel, Ordering::Acquire).is_ok()
-    {
-        lock(&PREVIEW_CLIP).take();
     }
 }
 
@@ -2672,7 +2685,7 @@ fn reset_host() {
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = None;
     PREVIEW.store(0, Ordering::Release);
-    *lock(&PREVIEW_ASK) = None;
+    *lock(&PREVIEW_ASK) = PreviewRequests::default();
     PREVIEW_AWAY.store(0, Ordering::Release);
     REFUSAL_SEEN.store(REFUSAL_SEQ.load(Ordering::Acquire), Ordering::Release);
     *lock(&PREVIEW_CLIP) = None;
@@ -3255,7 +3268,7 @@ mod tests {
         request_preview("macro-1", Role::Cpu, 0, 3);
         assert!(preview_running());
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        assert!(!preview_running() && lock(&PREVIEW_ASK).is_none());
+        assert!(!preview_running() && lock(&PREVIEW_ASK).start.is_none());
 
         reset_host();
         let root = scratch("vault-preview-bad-index");
@@ -6431,6 +6444,46 @@ mod tests {
         service_at(&root, &none(), "2026-11-24", state(8), state(7));
         assert!(!make_actor_cpu());
         assert!(include_str!("../runtime/features/input_display.rs").contains("frame_strip::acting("));
+    }
+
+    #[test]
+    fn a_tap_then_x_before_service_retires_the_old_preview_before_restarting() {
+        let _hold = hold();
+        for (old, next) in [(Role::Player, Role::Cpu), (Role::Cpu, Role::Player)] {
+            reset_host();
+            let root = scratch("preview-restart");
+            let tick = || service_at(&root, &none(), "2026-11-25", state(8), state(7));
+            let clip = |buttons: u32| MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0),
+                vec![InputFrame { buttons, ..InputFrame::default() }; 8]).unwrap();
+            let take = |role| if role == Role::Player { take_player_frame() } else { take_cpu_frame() };
+            request_clip_preview(clip(11), old);
+            assert_eq!(tick().home, Some(HomeWarp::Start { air: false, player: old == Role::Player }));
+            assert!(land_pair([state(8), state(7)], false));
+            tick();
+            assert_eq!(take(old).unwrap().buttons, 11);
+            // Two controller events can be drained before the recording worker services its requests.
+            stop_preview();
+            request_clip_preview(clip(23), next);
+            assert_eq!(tick().home, Some(HomeWarp::Return), "lost the stop on {old:?}");
+            assert!(take(old).is_none() && take(next).is_none());
+            assert_eq!(tick().home, None, "start overtook the unfinished return");
+            assert!(land_pair([state(8), state(7)], false));
+            let mut home = tick().home;
+            if home.is_none() { home = tick().home; }
+            assert_eq!(home, Some(HomeWarp::Start { air: false, player: next == Role::Player }));
+            assert!(land_pair([state(8), state(7)], false));
+            tick();
+            assert_eq!(take(next).unwrap().buttons, 23);
+            assert!(take(old).is_none(), "old fighter still got a frame");
+            stop_preview();
+            assert_eq!(tick().home, Some(HomeWarp::Return));
+            request_clip_preview(clip(33), old);
+            assert_eq!(tick().home, None);
+            stop_preview(); // Closing the editor must cancel the deferred X as well.
+            assert!(land_pair([state(8), state(7)], false));
+            assert_eq!(tick().home, None);
+            assert!(!previewing() && !pending());
+        }
     }
 
     fn a_vault_clip_previews_on_player_one_or_the_cpu() {
