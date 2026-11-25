@@ -2139,6 +2139,9 @@ allow you to always copy or always change for all. default is prompt; PC6 A"
 - Only the save file, and in it only what you edited, field by field: a fighter's spot and place, its start state,
   its damage. With nothing edited no file is written.
 - No macro file is touched. A macro's offset stays its own, and Play still adds it on top of the save's spot.
+- **Correction 2026-11-25:** the outcome described above was inaccurate. Copy from a macro relinks that macro only;
+  from a chain, macro 1; from the save, none. The picker leaves inputs, Momentum and offsets alone. The decision
+  itself is unchanged.
 - If the file cannot be written the picker says `Not saved · {save} could not be written` and puts both fighters
   back (`docs/RESTRICTIONS.md`, `place-save-write`).
 

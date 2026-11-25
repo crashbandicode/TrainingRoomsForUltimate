@@ -285,12 +285,13 @@ visit keeps the save's own values.
   the fighter. After that the crosshair moves freely, also back over the stage.
 - **A start save that macros share:** when macros start from the save, the picker first asks whether to change it for
   all of them (it says how many) or to copy it. Up / Down choose, A goes on, B cancels. Opened from a macro, the copy
-  becomes that macro's start save; opened from the save's own screen, the copy is a new save.
+  becomes that macro's start save. From a chain, only its first macro gets the new start-save link. From the save's
+  own screen, the copy is a new save and no macro is relinked.
   [Shared start save](#shared-start-save) answers the question ahead.
 - **What is saved:** only what you changed, for the fighter you changed: its spot, its start state, its damage. With
-  nothing changed the file is not written. The save then loads once, so both fighters end on the saved spots. A
-  macro's own file is never changed: a macro that was given an offset in an earlier build keeps it, and Play still
-  adds it on top of the save's spot until you clear it with the Offset row of the macro's
+  nothing changed the file is not written. The save then loads once, so both fighters end on the saved spots.
+  Copy changes at most a macro's start-save link, not its inputs, Momentum or offset. Play still
+  adds an existing offset on top of the save's spot until you clear it with the Offset row of the macro's
   [own screen](#a-file-s-own-screen).
 
 Host tests only; not yet seen in a game.
