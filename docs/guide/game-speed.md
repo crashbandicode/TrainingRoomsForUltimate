@@ -26,7 +26,7 @@ On a GameCube controller use Z + D-pad Up. You can change the chord at Display &
 
 1. Hold R + D-pad Up and tap Left until the pop-up reads 1 Frame.
 2. Let go of the chord. Press ZL once to advance one frame, or hold it to keep advancing after the initial delay.
-3. Hold the speed chord again and tap Right to return to x1.
+3. Hold the speed chord again and tap Right until it reads x1. From 1 Frame the first tap selects 1/4.
 
 The pop-up shows `1 Frame` between the Left and Right markers. In Training, the game's Speed row names the step button
 when the controller's glyph is available. ZL is L on a GameCube controller.

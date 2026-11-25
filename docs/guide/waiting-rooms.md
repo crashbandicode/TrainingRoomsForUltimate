@@ -51,7 +51,7 @@ More: [Game speed](game-speed.md#in-the-waiting-rooms).
 | Case | What happens |
 | --- | --- |
 | The game's menu | Close the TrainingRooms menu before opening it. Chords do not fire while the game's menu is open. |
-| The CPU pilot | While it plays Player 1, Play on Player 1 and L + R + A are refused. Record works. |
+| An AI plays Player 1 | Play on Player 1 and L + R + A are refused. Install 4 also refuses Record; in the next build you can record the AI's inputs. |
 | The name keyboard | A match closes it without applying the name. Back in the same room it reopens with what you typed. |
 
 ## When the match starts

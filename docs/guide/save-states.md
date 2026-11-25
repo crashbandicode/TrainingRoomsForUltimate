@@ -11,14 +11,15 @@ Save where both fighters are, then load to return to that spot. The options are 
 3. Hold ZL and press D-pad Down to save. Both fighters flash and the notice says "Save State · Saved".
 4. Hold ZL and press D-pad Up to load. Both fighters return to the saved spots.
 
-The chords work in Training and in a waiting room with Lobby Practice On. A refused Save or Load shows a notice; see
+The chords work in Training and in a waiting room with Lobby Practice On. A refused Save or Load normally shows a
+notice. A press used by a menu, the speed control or strip scroll-back shows no Save State notice. See
 [Troubleshooting](troubleshooting.md#a-notice-says-no). You can change the chords at
 [Button chords](controls.md#changing-a-chord).
 
 ## The bound save
 
 The Save and Load chords use the *bound save*. Save overwrites it; if nothing is bound, Save makes and binds a new
-save. Load with nothing bound does nothing.
+save. Load with nothing bound leaves the fighters in place and shows "Nothing is saved here yet: Save first, or bind a save".
 
 To bind another save, open the Recording pop-up with ZR + D-pad Right, choose a save and press A. The Recording page
 also lists the saves and lets you bind, rename, duplicate or delete them. More:

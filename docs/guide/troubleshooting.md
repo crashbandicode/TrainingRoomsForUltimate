@@ -62,7 +62,7 @@ Read the help line below the row. It tells you what must change.
 | "Select a Kirby hat first" | The hat list is empty. | Add a hat under Fighters & Stages › Kirby Hats. |
 | "Kirby hat could not be loaded" | The hat did not load. | Try again. |
 | "Wait for the practice fighters to finish loading" | The fighters are not ready. | Wait, then open the list again. |
-| "P1 is controlled by an AI: Play on Player 1 is off" or "P1 is controlled by an AI: Quick Reset is off" | The CPU pilot plays Player 1. | Stop the pilot to use that action. Record still works. |
+| "P1 is controlled by an AI: Play on Player 1 is off" or "P1 is controlled by an AI: Quick Reset is off" | An AI plays Player 1. | Take back Player 1 to use that action. Install 4 also refuses Record; the next build lets you record the AI's inputs. |
 | "Could not save button_config.ini" | The shortcut file could not be written. | The change lasts until you close the game. |
 
 More: [Restrictions](../RESTRICTIONS.md).
@@ -83,7 +83,7 @@ More: [Restrictions](../RESTRICTIONS.md).
 | The menu and chords do nothing | Lobby Practice is Off; a saved Off stays Off. | Turn it On in Training before looking for a match. |
 | Practice stops when the match starts | Practice is separate from the match. | Practise again when you return to the room. |
 | Plus does not open the game's Quick Play menu | The TrainingRooms menu is open. | Close it with B first. |
-| L + R + A is refused | An AI is playing Player 1. | Stop the CPU pilot to use Quick Reset. Record works. |
+| L + R + A is refused | An AI is playing Player 1. | Take back Player 1 to use Quick Reset. |
 
 More: [Waiting rooms](waiting-rooms.md).
 
@@ -93,7 +93,7 @@ More: [Waiting rooms](waiting-rooms.md).
 | --- | --- | --- |
 | A row is not what you set | Y restores its saved default; X saves the current settings as defaults. | Set the row again. See [Your defaults](using-the-menu.md#your-defaults). |
 | Settings were not read cleanly | The original is kept as `settings.invalid-1.json`, with a new number each time. | Check the preserved file; bad fields return to their defaults. |
-| Training Modpack settings did not import | Import runs once, marked by `sd:/ultimate/TrainingRooms/migration.json`. | Delete that file to import again. |
+| Training Modpack settings did not import | `sd:/ultimate/TrainingRooms/migration.json` marks a completed import. | Check the source folder and the import receipt. If you need to retry, close the game and move the marker aside before restarting. The importer copies missing files; it never overwrites existing files. |
 
 ## Where the logs are, and what to send
 
