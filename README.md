@@ -3,8 +3,9 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-**Current release: [rc.15](docs/CURRENT-RELEASE.md)**, an internal candidate, untested on hardware. What's new, how to
-install it and what is known not to work are on that page. New here? Start with [Getting started](docs/guide/getting-started.md). Something not
+**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 4 (`a945b0c1`, 2026-11-25), is
+tested in Eden in part and has no recorded hardware test. What's new, how to install it and what is known not to work
+are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
 ![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtbox pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
@@ -176,9 +177,10 @@ endorsed by Nintendo.
 ## More
 
 [The docs](docs/README.md): every menu page and guide. The current release is [rc.15](docs/CURRENT-RELEASE.md),
-**an internal candidate, untested on hardware** (see [Status](docs/TECHNICAL.md#status)): what's new, how to install it and its
-known issues.
-Release notes for rc.12, rc.13 and rc.14 are on their
+**tested in Eden in part, with no recorded hardware test** (see [Status](docs/TECHNICAL.md#status)): what's new, how
+to install it and its known issues.
+The rc.15 builds are in [their release notes](docs/RELEASE-NOTES-rc15.md). Release notes for rc.12, rc.13 and rc.14
+are on their
 [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); the ones in the docs folder
 (rc.5, rc.6, rc.8 and rc.9) are listed on [the docs page](docs/README.md#reference). [Technical notes](docs/TECHNICAL.md).
 
