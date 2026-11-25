@@ -765,6 +765,10 @@ fn value_of<T: Copy>(table: &[(T, &'static str)], key: &str) -> Option<T> {
 pub fn move_key(m: Move) -> &'static str {
     key_of(&MOVES, m.legacy())
 }
+/// The full move key for a description or a take mark.
+pub fn full_move_key(m: Move) -> &'static str {
+    key_of(&MOVES, m)
+}
 pub(crate) fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
 }

@@ -1,7 +1,7 @@
 use crate::engine::macros::{ActionMark, InputFrame, MacroRecording};
 use crate::model::bridge_events::Clip;
 use crate::model::combo::{self, Kind, STEPS};
-use crate::model::combo_record::{move_key, move_of};
+use crate::model::combo_record::{full_move_key, move_of};
 use crate::model::frame_strip::{self, Button, Move, Snap};
 
 pub const SHOWN_MARKS: usize = 24;
@@ -246,7 +246,7 @@ impl Marks {
             self.list[index].end = span.end.map(|end| base.saturating_add(end));
             if let Some(mv) = span.mv.filter(|mv| *mv != Move::Other) {
                 self.list[index].name = mv.name().into();
-                self.keys[index] = Some(move_key(mv).into());
+                self.keys[index] = Some(full_move_key(mv).into());
             }
         }
     }
