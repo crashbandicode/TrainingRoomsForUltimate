@@ -77,15 +77,24 @@ fn preview_ready() -> bool {
 /// game draws it there, or its own magnifier with the direction pointer when the point is out of the camera's view;
 /// the game's `FLAG_IS_LOUPE` is read back. `Some(asleep)`; `None` when the preview cannot run here.
 pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32, at: [f32; 2]) -> Option<bool> {
+    hold_at(slot, body, id, at, false)
+}
+
+/// `preview` for either fighter and either place (the placement picker). `grounded`: the body stands on its floor
+/// point, awake, every frame; a body the hold had put to sleep is woken first.
+pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32, at: [f32; 2], grounded: bool) -> Option<bool> {
     if !preview_ready() {
         *slot = None;
         return None;
     }
-    let act = crosshair::preview_step(slot, id, || Origin {
+    let act = crosshair::hold_step(slot, id, grounded, || Origin {
         at: [natives::pos_x(body), natives::pos_y(body)],
         grounded: natives::situation_kind(body) == konst(C::SituationGround),
         facing: natives::lr(body),
     });
+    if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
+        state::set_sleep(body, false);
+    }
     let asleep = match act {
         PreviewAct::Lift => {
             lift(body, at, natives::lr(body));
@@ -103,6 +112,7 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
     };
     let loupe = konst(C::WorkFlagIsLoupe);
     if let Some(preview) = slot {
+        preview.asleep = asleep;
         preview.magnified = loupe != UNRESOLVED && natives::is_flag(body, loupe);
     }
     Some(asleep)

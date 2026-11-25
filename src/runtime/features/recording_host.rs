@@ -249,11 +249,47 @@ pub fn service() {
     }
     sync_bound(root);
     sync_slots(root);
+    place_commit(root);
     if !rr_host::pending() {
         return;
     }
     let tick = rr_host::service_pending(root, player, cpu);
     apply(&tick);
+}
+
+/// Change placement: the picker confirmed a placement on a save, and the worker writes the file. While the picker
+/// still waits for that visit the written pair loads once, as Play's warp loads a start save. A write that failed
+/// goes back to the picker, which puts both fighters back and says so.
+fn place_commit(root: &Path) {
+    let Some(commit) = super::record_place::take_commit() else { return };
+    match rr_host::commit_placement(root, commit) {
+        rr_host::Placed::Refused { ticket } => super::record_place::save_failed(ticket),
+        rr_host::Placed::Saved { ticket, pair, notice } => {
+            if super::record_place::waiting(ticket) {
+                super::states::request_named_load(*pair);
+            }
+            super::notices::upsert(NOTICE_ID, "Change placement", &notice, 240, NOTICE_COLOR);
+        }
+    }
+}
+
+/// Change placement: hand the save the worker read to the placement picker, as the picker shows a save.
+fn place_open(open: &rr_host::PlaceOpen) {
+    use crate::model::record_place::{saved_fighter, Who};
+    use core::fmt::Write as _;
+    let [p1, cpu] = [saved_fighter(&open.pair[0]), saved_fighter(&open.pair[1])];
+    let mut name = crate::model::storage::FixedPath::<48>::new();
+    // A name that does not fit is cut at the buffer.
+    let _ = open.name.chars().try_for_each(|c| name.write_char(c));
+    super::record_place::open_save(super::record_place::SaveOpen {
+        ticket: open.ticket,
+        name,
+        saved: [p1.0, cpu.0],
+        ledge: [p1.1, cpu.1],
+        edit: if open.edit == crate::engine::library::Role::Cpu { Who::Cpu } else { Who::P1 },
+        shared: open.shared,
+        rule: open.rule,
+    });
 }
 
 /// Save writes the bound save; the save-state machine's active slot holds the bound save (RECORDING.md, "Save states
@@ -369,6 +405,9 @@ fn apply(tick: &Tick) {
             // No restore was asked for, so none will land.
             rr_host::warp_landed();
         }
+    }
+    if let Some(open) = &tick.place {
+        place_open(open);
     }
     for text in &tick.notices {
         super::notices::upsert(NOTICE_ID, "Recording", text, 240, NOTICE_COLOR);

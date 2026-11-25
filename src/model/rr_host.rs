@@ -30,6 +30,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
+use crate::model::record_place::{Commit, Shared, SharedStart};
 use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -538,6 +539,8 @@ pub struct Tick {
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
+    /// Change placement: the save the placement picker opens on.
+    pub place: Option<PlaceOpen>,
 }
 
 /// The existing Fighter Mismatch screen, named for the wrapper that opens it.
@@ -1612,6 +1615,34 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
         }
     }
     pair
+}
+
+/// Change placement: a save the placement picker is asked to open on, as the worker read it. `ticket` names the
+/// visit; the picker hands it back with what it confirmed (`commit_placement`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlaceOpen {
+    pub ticket: u32,
+    pub name: String,
+    pub pair: [SavedState; 2],
+    /// The fighter the picker edits first.
+    pub edit: Role,
+    pub shared: Shared,
+    pub rule: SharedStart,
+}
+
+/// What a confirmed placement did to its save, for the Switch wrapper.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Placed {
+    /// Nothing was written: the save, its copy or the macro's link could not be written, or no visit has this ticket.
+    Refused { ticket: u32 },
+    /// The save holds the placement (or nothing was edited): the pair to load once, and the notice.
+    Saved { ticket: u32, pair: Box<[SavedState; 2]>, notice: String },
+}
+
+/// The picker confirmed a placement on the save its visit opened: the worker writes it.
+pub fn commit_placement(root: &Path, commit: Commit) -> Placed {
+    let _ = root;
+    Placed::Refused { ticket: commit.ticket }
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.

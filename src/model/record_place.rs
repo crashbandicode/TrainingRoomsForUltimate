@@ -310,21 +310,30 @@ pub enum Release {
 /// `same_body`: the role's body is still the one the picker took. `loading`: a save state is loading, and a load
 /// places the fighters itself.
 pub const fn release(leave: Leave, same_body: bool, loading: bool) -> Release {
-    let _ = (leave, same_body, loading);
-    Release::Nothing
+    if !same_body {
+        Release::Nothing
+    } else if matches!(leave, Leave::Cancel) && !loading {
+        Release::PutBack
+    } else {
+        Release::Wake
+    }
 }
 
 /// A finished save belongs to the picker that asked for it. `waiting`: that picker's ticket, while it still waits.
 pub const fn accepts(waiting: Option<u32>, ticket: u32) -> bool {
-    let _ = (waiting, ticket);
-    false
+    match waiting {
+        Some(open) => open == ticket,
+        None => false,
+    }
 }
 
 /// How far a spot may go: on stage the camera's range, off stage up to 1 unit inside the blast line (Guard the
 /// Edge's limit), `[left, right, top, bottom]`. Without the blast line the camera's range stands in.
 pub fn reach(place: Place, camera: [f32; 4], blast: Option<[f32; 4]>) -> [f32; 4] {
-    let _ = (place, blast);
-    camera
+    match (place, blast) {
+        (Place::OffStage, Some([left, right, top, bottom])) => [left + 1.0, right - 1.0, top - 1.0, bottom + 1.0],
+        _ => camera,
+    }
 }
 
 /// The game's situation kinds a save records.
@@ -334,20 +343,32 @@ pub const SITUATION_AIR: i32 = 2;
 
 /// One half of a save as the wizard shows it, and whether it was saved hanging on a ledge.
 pub fn saved_fighter(saved: &SavedState) -> (Fighter, bool) {
-    let _ = saved;
-    (Fighter { place: Place::OnStage, at: [0.0; 2], state: StartState::Standard, percent: 0 }, false)
+    let place = if saved.situation_kind == SITUATION_GROUND { Place::OnStage } else { Place::OffStage };
+    let percent = saved.percent.round().clamp(0.0, 300.0) as u16;
+    (Fighter { place, at: [saved.x, saved.y], state: saved.start_state, percent }, saved.situation_kind == SITUATION_CLIFF)
 }
 
 /// A confirmed placement written into a save's two halves: only what was edited, field by field. An edited spot
 /// takes its place and the stage it was placed on; everything else in the record stays as saved.
 pub fn patch(pair: [&mut SavedState; 2], setup: &Setup, edits: [Edits; 2], stage: i32) {
-    let _ = (pair, setup, edits, stage);
+    for ((saved, fighter), edit) in pair.into_iter().zip(setup).zip(edits) {
+        if edit.spot {
+            [saved.x, saved.y] = fighter.at;
+            saved.situation_kind = if fighter.place == Place::OnStage { SITUATION_GROUND } else { SITUATION_AIR };
+            saved.saved_stage = Some(stage);
+        }
+        if edit.state {
+            saved.start_state = fighter.state;
+        }
+        if edit.percent {
+            saved.percent = f32::from(fighter.percent);
+        }
+    }
 }
 
 /// The approved refusal for a save that could not be written (tr-primary-2, 2026-11-25).
 pub fn write_not_saved(name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
-    let _ = name;
-    write!(out, "")
+    write!(out, "Not saved · {name} could not be written")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -520,8 +541,11 @@ impl Wizard {
     /// question: change the save for all of them, or copy it. The other two settings answer it unasked. A save no
     /// macro starts from is changed, unasked.
     pub fn sharing(self, shared: Shared, rule: SharedStart) -> Self {
-        let _ = (shared, rule);
-        self
+        if shared.macros == 0 {
+            return self;
+        }
+        let page = if rule == SharedStart::Prompt { Page::Ask } else { self.page };
+        Self { page, shared: Some(shared), copy: rule == SharedStart::Copy, ..self }
     }
 
     /// The answer to the question: the placement goes into a copy of the save, not the save.
@@ -531,8 +555,7 @@ impl Wizard {
 
     /// What a save of this visit writes.
     pub fn commit(&self, ticket: u32, stage: i32) -> Commit {
-        let _ = (ticket, stage);
-        Commit { ticket: 0, copy: false, setup: self.defaults, edits: [Edits::default(); 2], stage: 0 }
+        Commit { ticket, copy: self.copy, setup: self.setup, edits: self.edits(), stage }
     }
 
     /// The main floor's point under the middle of the stage, where a fighter with no floor under it goes on stage.
@@ -1053,7 +1076,7 @@ mod tests {
         let poll = place.split("pub unsafe fn poll(").nth(1).unwrap().split("unsafe fn stage(").next().unwrap();
         let cancel = poll.split("Session::Start(mut start) =>").nth(1).unwrap().split("let ready").next().unwrap();
         assert!(cancel.contains("!block") && cancel.contains("!start.live_given") && cancel.contains("StartKind::Record"));
-        assert!(cancel.contains("key::B") && cancel.contains("leave(&mut engine)"));
+        assert!(cancel.contains("key::B") && cancel.contains("leave(&mut engine, Leave::Other)"));
         let clearing = place.split("fn clear_engine(").nth(1).unwrap().split("pub(super) fn open(").next().unwrap();
         assert!(clearing.contains("CANCEL_LOAD") && clearing.contains("WAKE.fetch_or") && clearing.contains("abort_warp()"));
         let cancel_load = place.split("pub(super) fn load_cancelled()").nth(1).unwrap().split("pub(super) fn session_clear()").next().unwrap();
@@ -2138,11 +2161,14 @@ mod tests {
         write_not_saved("Jab start", &mut text).unwrap();
         assert_eq!(text, "Not saved · Jab start could not be written");
         let place = include_str!("../runtime/features/record_place.rs");
-        let failed = place.split("FAILED.swap(").nth(1).unwrap().split("leave(").nth(1).unwrap();
-        assert!(failed.starts_with("&mut engine, Leave::Cancel)"));
+        // The worker says the write failed; the picker that still waits for that ticket puts the fighters back.
+        let failed = place.split("FAILED.swap(").nth(1).unwrap().split("leave(&mut engine, Leave::Cancel);").nth(1).unwrap();
+        let said = failed.split("return;").next().unwrap();
+        assert!(said.contains("record_place::write_not_saved(") && said.contains("// restriction: place-save-write"));
+        assert!(place.split("FAILED.swap(").next().unwrap().contains("record_place::accepts(Some(ticket), "));
         let host = include_str!("../runtime/features/recording_host.rs");
         let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(commit.contains("record_place::save_failed(") && commit.contains("// restriction: place-save-write"));
+        assert!(commit.contains("record_place::save_failed("));
     }
 
     #[test]
@@ -2236,7 +2262,7 @@ mod tests {
         assert!(!place.contains("Bootstrap::new("));
         // A floor list is given to the picker only when the walk and its platform scan are both done.
         let floors = place.split("fn traced_floors(").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(floors.contains("Found::Done") && floors.contains("Some(Kind::Floor)"));
+        assert!(floors.contains("Found::Done") && floors.contains("Some(surface::Kind::Floor)"));
     }
 
     #[test]

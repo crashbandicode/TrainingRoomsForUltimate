@@ -1,26 +1,57 @@
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 
-use hos_lock::Mutex;
+use hos_lock::{Mailbox, Mutex};
 
+use super::tech_surfaces::{self, Discovery, Found, NativeSource};
 use super::{cpu::konst, notices, placement, practice, recorder, states};
 use crate::engine::{library::Role, rr_host};
 use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::ids::{C, UNRESOLVED};
-use crate::model::crosshair::Marks;
+use crate::model::crosshair::{CpuPreview, Marks};
+use crate::model::floor_hop::Floor;
 use crate::model::notify::{Body, DEFAULT_COLOR};
 use crate::model::record_place::{
-    self, Act, End, Kept, Live, Orders, Outcome, Place, Plan, Raw, Seen, Setup, Shown, Status, Sync, Watch, Who, Wizard,
-    CHECK_FRAMES, LIVE_FRAMES, READY_FRAMES,
+    self, Act, Commit, End, Fighter, Kept, Leave, Live, Orders, Outcome, Place, Plan, Raw, Release, Seen, Setup, Shared,
+    SharedStart, Shown, Status, Sync, Watch, Who, Wizard, CHECK_FRAMES, LIVE_FRAMES, READY_FRAMES,
 };
 use crate::model::state::{machine::StartWait, record::StartState};
 use crate::model::storage::FixedPath;
+use crate::model::tech::surface::{self, StageEpoch, Surfaces, MAX_LINES};
 use crate::model::wizard::Kind;
 use crate::runtime::{game::{self, natives}, published, scene, state_natives as state};
 
 const NOTICE: u8 = 0x36;
+/// Frames a save asked for may take to start its load before the picker lets the fighters go.
+const SAVE_FRAMES: u16 = 180;
+/// Frames a save's picker waits for the menu to close before the request is dropped.
+const OPEN_FRAMES: u8 = 120;
 type Stage = (i32, u32);
 
+/// A save the worker asks the picker to open on (`open_save`): the worker's ticket for the visit, the save's name,
+/// its two halves as the wizard shows them, and the macros that start from it.
+#[derive(Clone, Copy)]
+pub(crate) struct SaveOpen {
+    pub ticket: u32,
+    pub name: FixedPath<48>,
+    pub saved: Setup,
+    pub ledge: [bool; 2],
+    pub edit: Who,
+    pub shared: Shared,
+    pub rule: SharedStart,
+}
+
+/// The saves asked for (worker to game), each with the session it was asked in, and the placements confirmed
+/// (game to worker). No lock and no wait on either side.
+static OPENS: Mailbox<(u32, SaveOpen), 2> = Mailbox::new();
+static COMMITS: Mailbox<Commit, 2> = Mailbox::new();
+/// Counts session clears: a save asked for in an earlier session is not opened in a later one.
+static SESSION: AtomicU32 = AtomicU32::new(0);
+/// The ticket of the visit whose save is with the worker (0: none), and of one that could not be written.
+static SAVING: AtomicU32 = AtomicU32::new(0);
+static FAILED: AtomicU32 = AtomicU32::new(0);
+/// A Training reset rebuilt the stage's collision: the picker traces the floors again.
+static RETRACE: AtomicBool = AtomicBool::new(false);
 static OPEN: AtomicBool = AtomicBool::new(false);
 static PAGES: AtomicBool = AtomicBool::new(false);
 static HOLDING: AtomicBool = AtomicBool::new(false);
@@ -40,6 +71,9 @@ struct Engine {
     shown: Shown,
     published: Shown,
     watch: Option<(Watch, bool)>,
+    /// A save asked for while the menu was still closing, and the frames it has waited.
+    asked: Option<(SaveOpen, u8)>,
+    trace: Trace,
 }
 
 enum Session {
@@ -49,8 +83,63 @@ enum Session {
         recorded: Who,
         notice: FixedPath<224>,
         pad: Pad,
+        /// Each fighter's own body at its spot (`placement::hold_at`).
+        holds: [Option<CpuPreview>; 2],
+        /// The save the wizard is opened on.
+        save: Option<Visit>,
     },
     Start(Start),
+}
+
+/// A visit to a save: the worker's ticket, the save's name, and the frames since its save was asked for.
+#[derive(Clone, Copy)]
+struct Visit {
+    ticket: u32,
+    name: FixedPath<48>,
+    saving: Option<u16>,
+}
+
+/// The stage's floors for the step between floors (operator 2026-11-25, PC1 B): Tech practice's surface walk, run
+/// for the picker into its own lines.
+struct Trace {
+    surfaces: Surfaces,
+    discovery: Discovery,
+    found: Found,
+}
+
+impl Trace {
+    const NEW: Self = Self { surfaces: Surfaces::EMPTY, discovery: Discovery::NEW, found: Found::More };
+
+    /// One frame of the walk, on Player 1's pass. A new stage, form or Training session starts it again.
+    unsafe fn step(&mut self, p1: usize, stage: Stage, range: [f32; 4]) {
+        if RETRACE.swap(false, Ordering::AcqRel) {
+            *self = Self::NEW;
+        }
+        let Some(training) = super::cpu::tech_player_receipt().ok().flatten() else { return };
+        if self.surfaces.bind(StageEpoch { stage: stage.0, form: stage.1, training }) {
+            (self.discovery, self.found) = (Discovery::NEW, Found::More);
+        }
+        if self.found == Found::More {
+            self.found = match NativeSource::new(p1) {
+                Some(mut source) => self.discovery.step(&mut source, range, &mut self.surfaces),
+                None => Found::Failed,
+            };
+        }
+    }
+}
+
+/// The traced floor lines, once the outline and its platform scan are both done. None before that, or after a
+/// broken walk: the picker then stands its fighter on the floor under a free crosshair.
+fn traced_floors(trace: &Trace, floors: &mut [Floor; MAX_LINES]) -> usize {
+    if trace.found != Found::Done {
+        return 0;
+    }
+    let mut count = 0;
+    for line in trace.surfaces.lines().filter(|line| line.kind() == Some(surface::Kind::Floor)) {
+        floors[count] = line.ends.map(|end| [end.x, end.y]);
+        count += 1;
+    }
+    count
 }
 
 struct Start {
@@ -80,6 +169,8 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     shown: Shown::IDLE,
     published: Shown::IDLE,
     watch: None,
+    asked: None,
+    trace: Trace::NEW,
 });
 
 struct Publishing(hos_lock::MutexGuard<'static, Engine>);
@@ -175,6 +266,7 @@ fn clear_engine(engine: &mut Engine) {
         stop_watch(engine);
         engine.session = None;
         engine.targets = [None; 2];
+        engine.asked = None;
         engine.kept = Kept::new();
         CANCEL_LOAD.store(false, Ordering::Release);
         WAKE.store(0, Ordering::Release);
@@ -193,15 +285,63 @@ fn clear_engine(engine: &mut Engine) {
     }
 }
 
-pub(super) fn open() {
+/// The picker may open: none is open, and no practice game runs (that is refused).
+fn may_open() -> bool {
     if ACTIVE.load(Ordering::Acquire) {
-        return;
+        return false;
     }
     if practice::active().is_some() {
         notices::refuse(record_place::PRACTICE_ACTIVE); // restriction: record-place-practice
-        return;
+        return false;
     }
-    OPEN.store(true, Ordering::Release);
+    true
+}
+
+pub(super) fn open() {
+    if may_open() {
+        OPEN.store(true, Ordering::Release);
+    }
+}
+
+/// Change placement: the worker asks the picker to open on a save it read. Worker thread.
+pub(crate) fn open_save(open: SaveOpen) {
+    if INSTALLED.load(Ordering::Acquire) && may_open() && OPENS.post((SESSION.load(Ordering::Acquire), open)) {
+        OPEN.store(true, Ordering::Release);
+    }
+}
+
+/// The newest save asked for in this session. Player 1's pass only: it is the one reader.
+fn take_open() -> Option<SaveOpen> {
+    let (session, mut newest) = (SESSION.load(Ordering::Acquire), None);
+    OPENS.drain(|(asked_in, open)| {
+        if asked_in == session {
+            newest = Some(open);
+        }
+    });
+    newest
+}
+
+/// A placement the picker confirmed, for the worker that writes the save. Worker thread: it is the one reader.
+pub(crate) fn take_commit() -> Option<Commit> {
+    let mut newest = None;
+    COMMITS.drain(|commit| newest = Some(commit));
+    newest
+}
+
+/// The picker still waits for the save of this visit: only then may the worker ask for its load.
+pub(crate) fn waiting(ticket: u32) -> bool {
+    let saving = SAVING.load(Ordering::Acquire);
+    record_place::accepts((saving != 0).then_some(saving), ticket)
+}
+
+/// The save of this visit could not be written: its picker puts both fighters back and says so.
+pub(crate) fn save_failed(ticket: u32) {
+    FAILED.store(ticket, Ordering::Release);
+}
+
+/// A Training reset: the stage's collision may be rebuilt, so an open picker traces its floors again.
+pub(crate) fn retrace() {
+    RETRACE.store(true, Ordering::Release);
 }
 
 pub fn wizard_active() -> bool {
@@ -216,9 +356,9 @@ pub(super) fn holding() -> bool {
     HOLDING.load(Ordering::Acquire)
 }
 
-fn post_text(old: &mut FixedPath<224>, text: FixedPath<224>) {
+fn post_text(old: &mut FixedPath<224>, header: &'static str, text: FixedPath<224>) {
     if old.as_str() != text.as_str() {
-        notices::upsert(NOTICE, "Recording", text.as_str(), u16::MAX, DEFAULT_COLOR);
+        notices::upsert(NOTICE, header, text.as_str(), u16::MAX, DEFAULT_COLOR);
         *old = text;
     }
 }
@@ -237,10 +377,13 @@ unsafe fn wake(slept: [bool; 2]) {
     }
 }
 
-unsafe fn leave(engine: &mut Engine) {
+unsafe fn leave(engine: &mut Engine, how: Leave) {
     if let Some(session) = engine.session.take() {
         match session {
-            Session::Pages { .. } => super::btt_camera::interrupt_placement(),
+            Session::Pages { holds, .. } => {
+                super::btt_camera::interrupt_placement();
+                let_go(holds, how);
+            }
             Session::Start(start) => {
                 wake(start.slept);
                 if matches!(start.kind, StartKind::Load) {
@@ -251,6 +394,8 @@ unsafe fn leave(engine: &mut Engine) {
         }
     }
     engine.targets = [None; 2];
+    engine.asked = None;
+    SAVING.store(0, Ordering::Release);
     OPEN.store(false, Ordering::Release);
     PAGES.store(false, Ordering::Release);
     HOLDING.store(false, Ordering::Release);
@@ -258,6 +403,23 @@ unsafe fn leave(engine: &mut Engine) {
     LOAD_ACTIVE.store(false, Ordering::Release);
     notices::clear(NOTICE);
     announce(false);
+}
+
+/// The picker lets go of the bodies it held (`record_place::release`). A body that is still the one it took is
+/// woken, and after a cancel put back where it stood, unless a save state is loading. Any other body is left alone.
+unsafe fn let_go(holds: [Option<CpuPreview>; 2], how: Leave) {
+    let bodies = [natives::module_accessor(0), recorder::cpu_body().map(|body| body.accessor)];
+    let loading = states::is_loading();
+    for (hold, body) in holds.into_iter().zip(bodies) {
+        let (Some(hold), Some(body)) = (hold, body) else { continue };
+        let release = record_place::release(how, natives::battle_object_id(body) == hold.body(), loading);
+        if release != Release::Nothing && hold.asleep {
+            state::set_sleep(body, false);
+        }
+        if release == Release::PutBack {
+            placement::restore(body, hold.origin());
+        }
+    }
 }
 
 unsafe fn end(engine: &mut Engine, start: Start, outcome: End) {
@@ -351,13 +513,13 @@ pub unsafe fn poll(controller: usize, sample: Sample, block: bool) -> bool {
     clear_engine(&mut engine);
     let Some(session) = engine.session.take() else { return false };
     match session {
-        Session::Pages { wizard, stage, recorded, notice, mut pad } => {
+        Session::Pages { wizard, stage, recorded, notice, mut pad, holds, save } => {
             if !block {
                 pad.pressed |= sample.pressed;
                 pad.held = sample.held;
                 pad.stick = [0, 1].map(|i| ((controller + field::STICKS[i]) as *const f32).read_volatile());
             }
-            engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad });
+            engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
             !block
         }
         Session::Start(mut start) => {
@@ -365,7 +527,7 @@ pub unsafe fn poll(controller: usize, sample: Sample, block: bool) -> bool {
                 && sample.pressed & (1u16 << key::B) != 0
             {
                 engine.session = Some(Session::Start(start));
-                leave(&mut engine);
+                leave(&mut engine, Leave::Other);
                 return true;
             }
             let ready = matches!(start.kind, StartKind::Record { .. }) || rr_host::start_ready();
@@ -553,21 +715,52 @@ pub unsafe fn frame(fighter: usize) {
                 || stage() != old_stage || cpu.is_none() || practice::active().is_some())
         });
         if leaving {
-            leave(&mut engine);
+            leave(&mut engine, Leave::Other);
             return;
         }
         if OPEN.swap(false, Ordering::AcqRel) && engine.session.is_none() && scene::current().is_some() {
-            if let (Some(cpu), Some(stage), Some(camera)) = (cpu, stage(), natives::camera_limit_range()) {
-                let bodies = [p1, cpu.accessor];
-                let live = bodies.map(|body| {
-                    let at = [natives::pos_x(body), natives::pos_y(body)];
-                    (at, natives::damage(body, 0), placement::floor_under(body, at, true))
-                });
-                if let Some(defaults) = record_place::defaults(live, |at| fit(at, camera)) {
-                    let wizard = Wizard::new(defaults, engine.kept.get(stage));
+            let asked = take_open().map(|open| (open, 0)).or(engine.asked.take());
+            let covered = published::input_owners().covers_strip() || states::is_loading();
+            if let Some((open, waited)) = asked.filter(|_| covered) {
+                // The menu that asked is still closing: the save waits for it, for a moment.
+                if waited < OPEN_FRAMES {
+                    engine.asked = Some((open, waited + 1));
+                    OPEN.store(true, Ordering::Release);
+                }
+            } else if let (Some(cpu), Some(stage), Some(camera)) = (cpu, stage(), natives::camera_limit_range()) {
+                let blast = tech_surfaces::training_blast_bounds();
+                let reach = |place| record_place::reach(place, camera, blast);
+                let opened = match asked {
+                    Some((open, _)) => {
+                        // A save's spots are shown fitted to this stage; the file keeps its own until one is edited.
+                        let fitted = open.saved.map(|fighter| fit(fighter.at, reach(fighter.place)).map(|at| Fighter { at, ..fighter }));
+                        let visit = Visit { ticket: open.ticket, name: open.name, saving: None };
+                        match fitted {
+                            [Some(first), Some(second)] => Some((
+                                Wizard::for_save([first, second], open.ledge, open.edit).sharing(open.shared, open.rule),
+                                Some(visit),
+                            )),
+                            _ => None,
+                        }
+                    }
+                    None => {
+                        let live = [p1, cpu.accessor].map(|body| {
+                            let at = [natives::pos_x(body), natives::pos_y(body)];
+                            (at, natives::damage(body, 0), placement::floor_under(body, at, true))
+                        });
+                        record_place::defaults(live, |at| fit(at, reach(Place::OffStage)))
+                            .map(|defaults| (Wizard::new(defaults, engine.kept.get(stage)), None))
+                    }
+                };
+                if let Some((mut wizard, save)) = opened {
+                    let [left, right, top, _] = camera;
+                    wizard.set_home(placement::floor_under(p1, [left.midpoint(right), top], false));
                     let recorded = if rr_host::record_role() == Role::Cpu { Who::Cpu } else { Who::P1 };
                     stop_watch(&mut engine);
-                    engine.session = Some(Session::Pages { wizard, stage, recorded, notice: FixedPath::new(), pad: Pad::default() });
+                    engine.trace = Trace::NEW;
+                    engine.session = Some(Session::Pages {
+                        wizard, stage, recorded, notice: FixedPath::new(), pad: Pad::default(), holds: [None; 2], save,
+                    });
                     ACTIVE.store(true, Ordering::Release);
                     PAGES.store(true, Ordering::Release);
                     announce(true);
@@ -585,37 +778,93 @@ pub unsafe fn frame(fighter: usize) {
     }
     let Some(session) = engine.session.take() else { return };
     match session {
-        Session::Pages { mut wizard, stage, recorded, mut notice, mut pad } => {
+        Session::Pages { mut wizard, stage, recorded, mut notice, mut pad, mut holds, mut save } => {
             if who == Who::P1 {
                 let camera = natives::camera_limit_range();
-                let outcome = wizard.step(&pad, |at| camera.and_then(|camera| fit(at, camera)),
-                    |at| placement::floor_under(p1, at, true));
-                pad.pressed = 0;
-                match outcome {
-                    Outcome::Closed => {
-                        engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad });
-                        leave(&mut engine);
-                        return;
+                if let Some(camera) = camera {
+                    engine.trace.step(p1, stage, camera);
+                }
+                let saving = match &mut save {
+                    Some(Visit { ticket, saving: Some(frames), .. }) => {
+                        *frames = frames.saturating_add(1);
+                        Some((*ticket, *frames > SAVE_FRAMES))
                     }
-                    Outcome::Start => {
-                        let setup = wizard.setup;
-                        let start = Start::new(wizard.plans(), READY_FRAMES,
-                            StartKind::Record { setup, stage, recorded }, Some(stage));
-                        stop_watch(&mut engine);
-                        engine.shown.live = [[None; 2]; 2];
-                        PAGES.store(false, Ordering::Release);
-                        HOLDING.store(true, Ordering::Release);
-                        engine.session = Some(Session::Start(start));
-                        return;
-                    }
-                    Outcome::Open => {
+                    _ => None,
+                };
+                if let Some((ticket, late)) = saving {
+                    // The save is with the worker: both fighters wait at their spots for its load.
+                    pad.pressed = 0;
+                    let failed = record_place::accepts(Some(ticket), FAILED.swap(0, Ordering::AcqRel));
+                    if failed || late {
+                        let name = save.map_or(FixedPath::new(), |visit| visit.name);
+                        engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
+                        if !failed {
+                            leave(&mut engine, Leave::Other);
+                            return;
+                        }
+                        // The file could not be written: both fighters go back, as for B, and the notice says so.
+                        leave(&mut engine, Leave::Cancel);
                         let mut text = FixedPath::<224>::new();
-                        let _ = wizard.write_text(recorded, "", &mut text);
-                        post_text(&mut notice, text);
+                        let _ = record_place::write_not_saved(name.as_str(), &mut text);
+                        notices::post_body("Input Recording", Body::copied(text.as_str()), 120, DEFAULT_COLOR); // restriction: place-save-write
+                        return;
+                    }
+                } else {
+                    let edited = wizard.setup[wizard.edit.index()];
+                    let blast = tech_surfaces::training_blast_bounds();
+                    let mut floors = [[[0.0; 2]; 2]; MAX_LINES];
+                    let count = traced_floors(&engine.trace, &mut floors);
+                    let outcome = wizard.step_on(&pad,
+                        |at| camera.and_then(|camera| fit(at, record_place::reach(edited.place, camera, blast))),
+                        |at| placement::floor_under(p1, at, true), &floors[..count]);
+                    pad.pressed = 0;
+                    match outcome {
+                        Outcome::Closed => {
+                            engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
+                            leave(&mut engine, Leave::Cancel);
+                            return;
+                        }
+                        Outcome::Start => match &mut save {
+                            Some(visit) => {
+                                // A save: the worker writes the file and asks for one load of it.
+                                visit.saving = Some(0);
+                                SAVING.store(visit.ticket, Ordering::Release);
+                                if !COMMITS.post(wizard.commit(visit.ticket, stage.0)) {
+                                    FAILED.store(visit.ticket, Ordering::Release);
+                                }
+                                crate::runtime::ui::worker::wake();
+                            }
+                            None => {
+                                // A Record start places both fighters itself: a body held asleep is woken for it.
+                                let_go(holds, Leave::Other);
+                                let setup = wizard.setup;
+                                let start = Start::new(wizard.plans(), READY_FRAMES,
+                                    StartKind::Record { setup, stage, recorded }, Some(stage));
+                                stop_watch(&mut engine);
+                                engine.shown.live = [[None; 2]; 2];
+                                PAGES.store(false, Ordering::Release);
+                                HOLDING.store(true, Ordering::Release);
+                                engine.session = Some(Session::Start(start));
+                                return;
+                            }
+                        },
+                        Outcome::Open => {
+                            let mut text = FixedPath::<224>::new();
+                            let (header, name) = match &save {
+                                Some(visit) => ("Change placement", visit.name.as_str()),
+                                None => ("Recording", ""),
+                            };
+                            let _ = wizard.write_text(recorded, name, &mut text);
+                            post_text(&mut notice, header, text);
+                        }
                     }
                 }
             }
-            engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad });
+            // The fighter's own body stands on its floor point, or is held at its spot in the air.
+            let fighter = wizard.setup[who.index()];
+            placement::hold_at(&mut holds[who.index()], accessor, natives::battle_object_id(accessor), fighter.at,
+                fighter.place == Place::OnStage);
+            engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
         }
         Session::Start(mut start) => {
             if who == Who::P1 {
@@ -683,7 +932,12 @@ pub fn look(active: bool) -> Marks {
     }
     let Some(engine) = ENGINE.try_lock() else { return empty };
     match &engine.session {
-        Some(Session::Pages { wizard, .. }) => wizard.marks([false; 2]),
+        Some(Session::Pages { wizard, holds, .. }) => {
+            // A fighter whose own body is at its spot gets no mark. The game shows an out-of-view body in its
+            // magnifier; without the game HUD the magnifier is hidden too, so the border pointer stays.
+            let held = [holds[0].is_some(), holds[1].is_some()];
+            wizard.marks(held).shown(held[wizard.edit.index()] && published::hud())
+        }
         _ => empty,
     }
 }
@@ -696,7 +950,8 @@ pub(super) fn load_target(role: usize, target: StartWait) {
     let Some(mut engine) = lock_engine() else { return };
     clear_engine(&mut engine);
     if matches!(engine.session, Some(Session::Pages { .. } | Session::Start(Start { kind: StartKind::Record { .. }, .. }))) {
-        unsafe { leave(&mut engine) };
+        // A load places the fighters itself: the picker only wakes the bodies it held.
+        unsafe { leave(&mut engine, Leave::Other) };
     }
     if engine.session.is_some() {
         return;
@@ -736,6 +991,8 @@ pub(super) fn load_cancelled() -> bool {
 }
 
 pub(super) fn session_clear() {
+    SESSION.fetch_add(1, Ordering::AcqRel);
+    SAVING.store(0, Ordering::Release);
     WATCHING.store(false, Ordering::Release);
     OPEN.store(false, Ordering::Release);
     PAGES.store(false, Ordering::Release);

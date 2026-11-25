@@ -96,8 +96,11 @@ impl CpuPreview {
         self.origin
     }
 
-    fn act(&mut self) -> PreviewAct {
-        if self.frames < PREVIEW_SETTLE {
+    fn act(&mut self, grounded: bool) -> PreviewAct {
+        if grounded {
+            self.frames = 0;
+            PreviewAct::Stand
+        } else if self.frames < PREVIEW_SETTLE {
             self.frames += 1;
             PreviewAct::Lift
         } else {
@@ -109,18 +112,17 @@ impl CpuPreview {
 /// One frame of a picker's CPU preview: a preview starts for `body` when none runs for it (`origin` is read then),
 /// and the frame's act is returned.
 pub fn preview_step(slot: &mut Option<CpuPreview>, body: u32, origin: impl FnOnce() -> Origin) -> PreviewAct {
-    if slot.is_none_or(|preview| preview.body != body) {
-        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, asleep: false, magnified: false });
-    }
-    slot.as_mut().map_or(PreviewAct::Lift, CpuPreview::act)
+    hold_step(slot, body, false, origin)
 }
 
 /// One frame of a picker's hold on either fighter (the placement picker holds both). In the air it is
 /// `preview_step`. `grounded`: the body stands on its floor point, awake, every frame; taken into the air after
 /// that it settles again before it is held.
 pub fn hold_step(slot: &mut Option<CpuPreview>, body: u32, grounded: bool, origin: impl FnOnce() -> Origin) -> PreviewAct {
-    let _ = grounded;
-    preview_step(slot, body, origin)
+    if slot.is_none_or(|preview| preview.body != body) {
+        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, asleep: false, magnified: false });
+    }
+    slot.as_mut().map_or(PreviewAct::Lift, |preview| preview.act(grounded))
 }
 
 /// How the picker's CPU point is shown, for the practice state: the body is there in view, or the game shows its
