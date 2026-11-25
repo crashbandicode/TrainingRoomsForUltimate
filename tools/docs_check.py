@@ -533,7 +533,31 @@ def blob_id(data):
 
 
 def media_blobs(tree):
-    """Git blob ids computed from the bytes of every .mp4 under docs/media/."""
+    """Use committed identities even in sparse checkouts; a plain export has only its file bytes."""
+    if tree.listed is not None:
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+        def records(*args):
+            result = subprocess.run(["git", "-C", tree.root, *args], capture_output=True,
+                                    check=True, env=env, timeout=120)
+            return result.stdout.split(b"\0")
+
+        try:
+            sparse = {entry[2:] for entry in records("ls-files", "-v", "-z", "--", "docs/media/")
+                      if entry[:2].upper() == b"S "}
+            found = set()
+            for entry in records("ls-tree", "-r", "-z", "HEAD", "--", "docs/media/"):
+                if not entry.endswith(b".mp4"):
+                    continue
+                meta, path = entry.split(b"\t", 1)
+                mode, _, oid = meta.split()
+                if mode in (b"100644", b"100755") and (
+                        path in sparse or os.path.isfile(os.path.join(tree.root, os.fsdecode(path)))):
+                    found.add(oid.decode("ascii"))
+            return found
+        except subprocess.SubprocessError as error:
+            raise OSError(f"could not read committed media in {tree.root}: {error}") from error
+
     found = set()
     for folder, _, files in os.walk(os.path.join(tree.root, "docs", "media")):
         for name in files:
@@ -542,29 +566,11 @@ def media_blobs(tree):
             path = os.path.join(folder, name)
             with open(path, "rb") as handle:
                 found.add(blob_id(handle.read()))
-    if tree.listed is None:
-        return found
-    missing = sorted(path for path in tree.listed[0]
-                     if path.startswith("docs/media/") and path.endswith(".mp4")
-                     and not os.path.isfile(os.path.join(tree.root, path)))
-    if not missing:
-        return found
-    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-    try:
-        listing = subprocess.run(["git", "-C", tree.root, "ls-files", "-v", "-z", "--", *missing],
-                                 capture_output=True, check=True, env=env, timeout=120).stdout
-        for entry in listing.decode("utf-8").split("\0"):
-            if entry and entry[0].upper() == "S":
-                data = subprocess.run(["git", "-C", tree.root, "cat-file", "blob", ":" + entry[2:]],
-                                      capture_output=True, check=True, env=env, timeout=120).stdout
-                found.add(blob_id(data))
-    except subprocess.SubprocessError as error:
-        raise OSError(f"could not read skip-worktree media in {tree.root}: {error}") from error
     return found
 
 
 def check_video_sources(tree, problems):
-    blobs = media_blobs(tree)
+    blobs = None
     for rel in tree.files:
         plain = mask_inline_code(mask_blocks(tree.text(rel)))
         starts = line_starts(plain)
@@ -577,7 +583,10 @@ def check_video_sources(tree, problems):
             line = line_of(starts, tag.start())
             if url is None:
                 problems.append(Problem("video-src", rel, line, "use the media blob URL of the clip"))
-            elif url.group(1).lower() not in blobs:
+                continue
+            if blobs is None:
+                blobs = media_blobs(tree)
+            if url.group(1).lower() not in blobs:
                 problems.append(Problem("video-src", rel, line,
                                         f"blob {url.group(1)} is not an .mp4 in docs/media/; use the media blob URL of the clip"))
 
