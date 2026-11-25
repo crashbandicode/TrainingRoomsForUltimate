@@ -10,7 +10,7 @@
 //! Every read is a guarded native (`game::natives`). The hitstun-left read is optional: when its work id or
 //! `WorkModule::get_float` is unavailable, a true combo shows no margin and everything else is drawn (SPEC-input-06 §4).
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use hos_lock::Mutex;
 use skyline::hooks::InlineCtx;
@@ -49,8 +49,7 @@ static IDS_READY: AtomicBool = AtomicBool::new(false);
 static IDS: Mutex<Option<Table>> = Mutex::new(None);
 static TRACKER: Mutex<Tracker> = Mutex::new(Tracker::new());
 static BACK: Mutex<crate::model::frame_strip::back::Back> = Mutex::new(crate::model::frame_strip::back::Back::new());
-static BACK_SPAN: AtomicU64 = AtomicU64::new(0);
-static SCROLL: AtomicU32 = AtomicU32::new(0);
+static SCROLL: crate::model::strip_scroll::Cursor = crate::model::strip_scroll::Cursor::new();
 static RENDERER: Mutex<Renderer> = Mutex::new(Renderer::new());
 
 /// Boot: the display's closure passed its guards.
@@ -466,16 +465,14 @@ pub unsafe fn sample_frame(player: usize) {
     };
     let cleared = CLEAR_DUE.swap(false, Ordering::Relaxed);
     if cleared {
-        tracker.clear_live_strip(&PUBLISHED);
+        clear_live_strip(&mut tracker);
         super::parry::reset();
     }
     #[cfg(feature = "diag")]
     let (check, advantage) = (tracker.stun_check, tracker.advantage());
     tracker.step_graded(p1, cpu, inputs, taken);
     if let Some(mut back) = BACK.try_lock() {
-        back.record(&tracker);
-        let (count, kept) = back.span();
-        BACK_SPAN.store(u64::from(count) | (u64::from(kept) << 32), Ordering::Release);
+        SCROLL.record(&mut back, &tracker);
     }
     if shown || input_drill {
         if let Some(snap) = tracker.snaps().last() {
@@ -651,28 +648,22 @@ fn diag_frame(cpu: &Sample, before: Option<(u32, u32)>, now: Option<(u32, u32)>,
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
 pub fn session_clear() {
-    SCROLL.store(0, Ordering::Release);
     GRADER_LIVE.store(false, Ordering::Relaxed);
     LANES.set(0, None);
     LANES.set(1, None);
     CLEAR_DUE.store(false, Ordering::Relaxed);
     GRADER.skip();
-    TRACKER.lock().clear_live_strip(&PUBLISHED);
+    clear_live_strip(&mut TRACKER.lock());
     crate::runtime::features::combo::session_clear();
 }
 
 pub fn on_scroll(event: crate::model::strip_scroll::ScrollEvent, open: bool) {
-    use crate::model::strip_scroll::{self, ScrollEvent};
-    if !open {
-        SCROLL.store(0, Ordering::Release);
-        return;
-    }
-    if let ScrollEvent::Opened(dir) | ScrollEvent::Step(dir) = event {
-        let span = BACK_SPAN.load(Ordering::Acquire);
-        let anchor = SCROLL.load(Ordering::Acquire);
-        let next = strip_scroll::stepped((anchor != 0).then_some(anchor), dir, span as u32, (span >> 32) as u32);
-        SCROLL.store(next.unwrap_or(0), Ordering::Release);
-    }
+    SCROLL.poll(event, open);
+}
+
+fn clear_live_strip(tracker: &mut Tracker) {
+    SCROLL.clear();
+    tracker.clear_live_strip(&PUBLISHED);
 }
 
 /// The game initialised a fighter object again (`reset_hub::on_init`): a Training reset, a CPU replaced, a respawn.
@@ -681,7 +672,7 @@ pub fn on_scroll(event: crate::model::strip_scroll::ScrollEvent, open: bool) {
 #[inline(never)]
 pub fn fighter_initialised() {
     if ENABLED.load(Ordering::Acquire) {
-        TRACKER.lock().clear_live_strip(&PUBLISHED);
+        clear_live_strip(&mut TRACKER.lock());
     }
 }
 
@@ -701,7 +692,7 @@ pub fn hud_tick(
     mut apply: impl FnMut(usize, &Look, Changed),
 ) -> (bool, [Option<u8>; 2]) {
     let mut tracker = *TRACKER.lock();
-    let anchor = SCROLL.load(Ordering::Acquire);
+    let anchor = SCROLL.anchor();
     let back = if anchor != 0 { BACK.lock().rewind(&mut tracker, anchor) } else { None };
     let (_, history) = RENDERER.lock().draw_with_spec(
         &tracker, StripDraw { shown, back, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },

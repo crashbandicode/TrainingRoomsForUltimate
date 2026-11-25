@@ -2825,3 +2825,11 @@ ceiling = 200254
 date = "2026-11-25"
 reason = "Merge 7: the frame strip's scrollback (hold R3, D-pad Left or Right): the hold, the ten seconds of history, the view the HUD draws from it. Measured 200254 (tools/sloc.py tree), 426 above install 4 merge 4b 4905ec89 (199828)."
 approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the line ceiling is approved at the measured value), on the operator's request relayed at 23:23:39Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200293
+date = "2026-11-25"
+reason = "Merge 7 review: an editable menu shortcut takes precedence, past brackets stop at the view edge, and the cursor and its published column count reset together. Measured 200293, 39 above 47b52049."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z: post measured correction increases up to 60 lines."

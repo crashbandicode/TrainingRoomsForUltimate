@@ -1,7 +1,10 @@
 //! Merge 7's R3 + D-pad Left / Right scroll of the frame strip.
 //! Pure; polled by the chord detector.
 
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use super::chords::{deluxe_rows_take, deluxe_shoulders, logical, Sample};
+use super::frame_strip::{back::{Back, COLUMNS}, Tracker};
 use super::menu::chord::Chord;
 
 /// Columns moved by one step.
@@ -95,6 +98,45 @@ pub fn stepped(anchor: Option<u32>, dir: Dir, count: u32, kept: u32) -> Option<u
             if to >= count { None } else { Some(to) }
         }
     }
+}
+
+/// High half: published column count. Low half: the selected column, or zero for live.
+/// A single word prevents a poll based on the previous timeline racing a reset and restoring its anchor.
+pub struct Cursor(AtomicU64);
+
+impl Cursor {
+    pub const fn new() -> Self { Self(AtomicU64::new(0)) }
+    pub fn anchor(&self) -> u32 { self.0.load(Ordering::Acquire) as u32 }
+    pub fn clear(&self) { self.0.store(0, Ordering::Release); }
+
+    /// The tracker lock serializes this producer with `clear`; polls only change the low half.
+    pub fn record(&self, back: &mut Back, tracker: &Tracker) {
+        let old = (self.0.load(Ordering::Relaxed) >> 32) as u32;
+        if old == 0 && back.span().0 != 0 { back.clear(); }
+        back.record(tracker);
+        let count = back.span().0;
+        if count != old {
+            self.0.fetch_add(u64::from(count.wrapping_sub(old)) << 32, Ordering::Release);
+        }
+    }
+
+    pub fn poll(&self, event: ScrollEvent, open: bool) {
+        let _ = self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+            let anchor = state as u32;
+            let count = (state >> 32) as u32;
+            let next = match event {
+                _ if !open => 0,
+                ScrollEvent::Opened(dir) | ScrollEvent::Step(dir) =>
+                    stepped((anchor != 0).then_some(anchor), dir, count, count.min(COLUMNS as u32)).unwrap_or(0),
+                _ => return None,
+            };
+            (next != anchor).then_some((u64::from(count) << 32) | u64::from(next))
+        });
+    }
+}
+
+impl Default for Cursor {
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]

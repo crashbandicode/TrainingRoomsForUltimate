@@ -511,12 +511,12 @@ impl Detector {
                 passed |= request.bit();
             }
         }
-        if fired == 0 {
+        let open = chords.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0);
+        if fired == 0 && !open {
             self.scroll_event = self.scroll.poll(sample, false, sample.strip);
             fired |= self.scroll.hidden();
         }
         self.hold_back(fired, sample);
-        let open = chords.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0);
         if self.pending & Request::OpenMenu.bit() == 0 && open {
             self.pending |= Request::OpenMenu.bit();
             passed |= Request::OpenMenu.bit();
