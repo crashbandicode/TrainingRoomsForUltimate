@@ -1884,6 +1884,15 @@ impl InputCapture {
     pub fn step_late(&mut self, snap: Snap, late: Late) {
         self.step_with(snap, late, true, true);
     }
+    fn continuation(&self, press: u32, mv: Move) -> Option<ActionDesc> {
+        let offset = i32::try_from(press.checked_sub(self.first?)?).ok()?;
+        let link = self.combo.links().find(|link| link.events().any(|e|
+            e.offset == offset && matches!(e.kind, Kind::Press(_) | Kind::CStick)))?;
+        // The cast can be the unprinted middle input. Use its exact variant when the step still has it.
+        let saved = link.title_side(offset).and_then(|side| link.step_side(side));
+        Some(saved.filter(|d| d.of.unwrap_or(d.mv) == mv)
+            .unwrap_or(ActionDesc { mv, of: None, angle: None, normal: 0, parts: [None; 2] }))
+    }
     #[cfg(test)]
     fn step_mode(&mut self, snap: Snap, group_idle: bool, aims: bool) {
         self.step_with(snap, Late::NONE, group_idle, aims);
@@ -1917,13 +1926,9 @@ impl InputCapture {
                         .last
                         .is_some_and(|last| event.frame - last > super::frame_strip::DROP_MAX))
             {
-                let previous = if next_part {
-                    self.combo.links().last().and_then(|link| {
-                        [1, 0].into_iter().filter_map(|side| link.step_side(side)).find(|desc| LinkRec::is_special(*desc))
-                    })
-                } else { None };
+                let cast = late.continuation.filter(|_| next_part).and_then(|mv| self.continuation(late.press, mv));
                 if !self.combo.push(LinkRec::INPUT) { return [None; 2]; }
-                if let Some(desc) = previous {
+                if let Some(desc) = cast {
                     self.combo.links[self.combo.len - 1].as_mut().unwrap().set_step_side(0, Some(desc));
                 }
             }

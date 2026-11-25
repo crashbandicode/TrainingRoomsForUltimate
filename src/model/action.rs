@@ -62,14 +62,16 @@ pub struct Late {
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
     /// The originating press and its known move, base and variant.
     pub named: Option<(Option<u32>, Move, Option<Move>, u8)>,
+    /// On a later aim part, the move that began the cast.
+    pub continuation: Option<Move>,
     /// The part that ended on this frame and its measured travel. Part 0 is the special's own travel.
     pub travel: Option<(u8, Travel)>,
-    /// With part 0: the press that began that special.
+    /// With part 0 travel or a continuation: the press that began that special.
     pub press: u32,
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None, travel: None, named: None, press: 0 };
+    pub const NONE: Late = Late { open: None, travel: None, named: None, continuation: None, press: 0 };
 }
 
 /// Facing-relative entry velocity, in 1/256 game units per unstopped frame. Unknown is distinct from standing still.

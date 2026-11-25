@@ -860,6 +860,13 @@ impl Tracker {
                 })
         });
         self.late.travel = self.rule.ended();
+        if let Some((press, family)) = self.rule.cast().filter(|_| seen.part > 1) {
+            self.late.press = press;
+            self.late.continuation = Some(match family {
+                super::aim::Family::Neutral => Move::NeutralSpecial, super::aim::Family::Side => Move::SideSpecial,
+                super::aim::Family::Up => Move::UpSpecial, super::aim::Family::Down => Move::DownSpecial,
+            });
+        }
         if let Some((0, _)) = self.late.travel {
             self.late.press = self.rule.own_press();
         }

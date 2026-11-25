@@ -751,7 +751,36 @@ fn a_second_zip_names_its_cast_even_when_the_first_step_no_longer_titles_it() {
     assert_eq!(bar(combo)[0], "1 Jump > Shield \u{2192}");
     assert_eq!(bar(combo)[1], "2 Up B \u{2192}");
     let value = serde_json::to_value(ComboRecord::new("Drill".into(), combo, None)).unwrap();
-    assert!(value["input_steps"][1].get("from_shown").is_some());
+    assert_eq!(value["input_steps"][1]["from_shown"]["move"], "up_special");
+    // Split the tail of the first step at the shield release; loading must join it without changing the next cast.
+    let mut split = value.clone();
+    let steps = split["input_steps"].as_array_mut().unwrap();
+    let release = steps[0]["events"].as_array_mut().unwrap().pop().unwrap();
+    assert_eq!(release["kind"], "release");
+    steps.insert(1, serde_json::json!({"events": [release]}));
+    for wire in [value, split] {
+        let loaded: ComboRecord = serde_json::from_value(wire).unwrap();
+        assert_eq!(bar(loaded.combo)[..2], bar(combo)[..2]);
+        let cropped = loaded.crop_units(1, 2).unwrap();
+        assert_eq!(bar(cropped.combo)[0], "1 Up B \u{2192}");
+        assert_eq!(serde_json::to_value(cropped).unwrap()["input_steps"][0]["from_shown"]["move"], "up_special");
+    }
+}
+
+#[test]
+fn a_second_zip_whose_cast_predates_the_take_keeps_the_input_fallback() {
+    let (mut tracker, _) = zips_capture(false, 18);
+    let mut capture = InputCapture::new();
+    for frame in 0..9 {
+        tick(&mut tracker, &mut capture, Sample { pos: Some((-44.0, 0.0)), ..zip_sample(Move::Other, None) },
+            MappedInputs { buttons: if frame == 3 { 8 } else { 0 }, lstick_x: 100, ..MappedInputs::NEUTRAL });
+    }
+    for frame in 0..5 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((-44.0 + 9.9 * frame as f32, 0.0))),
+            MappedInputs { lstick_x: 100, ..MappedInputs::NEUTRAL });
+    }
+    assert_eq!(capture.combo.len(), 2);
+    assert_eq!(bar(capture.combo)[1], "2 2nd direction \u{2192}");
 }
 
 #[test]
