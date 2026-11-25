@@ -1,7 +1,7 @@
 use super::btt;
 use super::chords::logical;
 use super::cpu::ids::C;
-use super::crosshair::{Crosshair, Marks};
+use super::crosshair::{CpuPreview, Crosshair, Marks};
 use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
 use super::stage_geometry::{classify, default_spot, nearest_ledge, Probe};
@@ -320,10 +320,11 @@ pub const fn release(leave: Leave, same_body: bool, loading: bool) -> Release {
     }
 }
 
-/// Whether this page visit can use the currently active fighters. Extracted
-/// from the native frame's presence check; the preview supplies its body ID.
-pub fn page_bodies_present(_held: &[Option<super::crosshair::CpuPreview>; 2], active: [Option<u32>; 2]) -> bool {
-    active.iter().all(Option::is_some)
+/// A role can acquire its first hold, but cannot transfer that hold to a replacement body.
+pub fn page_bodies_present(held: &[Option<CpuPreview>; 2], active: [Option<u32>; 2]) -> bool {
+    held.iter().zip(active).all(|(preview, id)| {
+        id.is_some_and(|id| preview.is_none_or(|p| p.body() == id))
+    })
 }
 
 /// The worker's answer to a confirmed placement: the visit it belongs to, and the written pair to load once.
@@ -2937,6 +2938,7 @@ mod page_body_tests {
     #[test]
     fn replacement_cpu_is_not_admitted_to_the_old_preview() {
         let holds = held();
+        assert!(page_bodies_present(&[holds[0], None], [Some(7), Some(31)]));
         assert!(page_bodies_present(&holds, [Some(7), Some(31)]));
         assert!(!page_bodies_present(&holds, [Some(7), None]));
         assert!(!page_bodies_present(&holds, [Some(7), Some(32)]),
