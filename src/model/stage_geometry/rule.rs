@@ -637,3 +637,7 @@ mod tests {
     }
     }
 }
+
+#[cfg(test)]
+#[path = "rule_tests.rs"]
+mod rule_tests;
