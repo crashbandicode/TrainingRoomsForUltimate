@@ -2372,6 +2372,8 @@ mod tests {
         for fact in ["fact_practice_enabled()", "fact_fighters_present()", "recording_or_playback()", "save_states::is_loading()"] {
             assert!(open.find(fact).unwrap() < open.find("record_place::open_save(").unwrap(), "{fact}");
         }
+        // PC5: the picker is given the Advanced setting, so "always" skips the question.
+        assert!(open.contains("rule: super::recorder::settings().shared,") && !open.contains("SharedStart::Prompt"));
     }
 
     #[test]

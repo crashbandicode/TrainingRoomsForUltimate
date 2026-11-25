@@ -66,6 +66,25 @@ fn settings_rows_are_read() {
     assert_eq!(s.hitstun, HitstunTiming::HitstopBegins);
 }
 
+/// Operator 2026-11-25, PC5: "advanced settings allow you to always copy or always change for all. default is prompt".
+#[test]
+fn the_shared_start_save_setting_is_prompt_by_default() {
+    use model::menu::table::ROWS;
+    use model::record_place::SharedStart;
+    let mut snap = Snapshot::factory();
+    assert_eq!(RecorderSettings::factory().shared, SharedStart::Prompt);
+    assert_eq!(RecorderSettings::from_snapshot(&snap).shared, SharedStart::Prompt);
+    for (row, rule) in [([0, 1, 0], SharedStart::Change), ([0, 0, 1], SharedStart::Copy), ([1, 0, 0], SharedStart::Prompt)] {
+        snap.set("shared_start_save", &row).unwrap();
+        assert_eq!(RecorderSettings::from_snapshot(&snap).shared, rule);
+    }
+    // An Advanced row of Recording › Options, right after the other one there.
+    let at = ROWS.iter().position(|row| row.id == "shared_start_save").expect("the row");
+    assert_eq!((ROWS[at].title, ROWS[at].advanced), ("Shared start save", true));
+    assert_eq!((ROWS[at - 1].id, ROWS[at - 1].group), ("settings_override_playback", ROWS[at].group));
+    assert_eq!(model::menu::options::SHARED_START, ["Prompt", "Always change", "Always copy"]);
+}
+
 #[test]
 fn neutral_frame_rules() {
     assert!(is_neutral(MappedInputs::NEUTRAL));

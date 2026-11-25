@@ -2,6 +2,7 @@
 
 use super::cpu::ids::{Table, C};
 use super::input_delay::MappedInputs;
+use super::record_place::SharedStart;
 use super::settings::Snapshot;
 
 pub const SLOTS: usize = 5;
@@ -49,6 +50,8 @@ pub struct RecorderSettings {
     pub place: bool,
     pub hitstun: HitstunTiming,
     pub mash_interrupt: bool,
+    /// Change placement on a start save that macros share (`shared_start_save`): ask, or always one answer.
+    pub shared: SharedStart,
 }
 
 impl RecorderSettings {
@@ -59,6 +62,7 @@ impl RecorderSettings {
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
             mash_interrupt: true,
+            shared: SharedStart::Prompt,
         }
     }
 
@@ -77,6 +81,7 @@ impl RecorderSettings {
                 _ => HitstunTiming::HitstunEnds,
             },
             mash_interrupt: on("playback_mash"),
+            shared: SharedStart::Prompt,
         }
     }
 }
