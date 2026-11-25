@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 171] = [
+pub static ROWS: [Row; 172] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -657,6 +657,8 @@ pub static ROWS: [Row; 171] = [
       "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
     r(OPTIONS, "Show playback indicator", "playback_indicator", TOGGLE,
       "On: show which role is playing a recording.\nOff: hide the playback indicator."),
+    r(OPTIONS, "Playback delay", "playback_delay", Control::Dropdown(&o::PLAYBACK_DELAY),
+      "Frames to wait after the fighters are placed, before\na played recording's first input. 60 frames is one second."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

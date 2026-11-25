@@ -253,6 +253,7 @@ pub fn service() {
     rr_host::set_strip_sample(super::combo::strip_sample());
     rr_host::set_record_trim(super::recorder::settings().trim);
     rr_host::set_playback_indicator(super::recorder::settings().indicator);
+    rr_host::set_playback_delay(super::recorder::settings().delay);
     if player.fighter_kind >= 0 {
         rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }
@@ -374,16 +375,20 @@ fn apply(tick: &Tick) {
         super::states::request_preview_home(home);
     }
     if let Some(id) = &tick.warp {
-        let root = std::path::Path::new(crate::model::storage::ROOT);
-        let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
-            root.join(crate::engine::library::SAVES_DIR),
-        );
-        if let Ok(save) = saves.load(id) {
-            // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
-            super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
+        if let Some(pair) = tick.warp_pair.clone() {
+            super::states::request_named_load(*pair);
         } else {
-            // No restore was asked for, so none will land.
-            rr_host::warp_landed();
+            let root = std::path::Path::new(crate::model::storage::ROOT);
+            let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
+                root.join(crate::engine::library::SAVES_DIR),
+            );
+            if let Ok(save) = saves.load(id) {
+                // Edit placement's offset for the playing role (primary 2026-11-08 #70 (a)).
+                super::states::request_named_load(rr_host::warp_pair(save, tick.warp_place));
+            } else {
+                // No restore was asked for, so none will land.
+                rr_host::warp_landed();
+            }
         }
     }
     for text in &tick.notices {

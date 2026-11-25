@@ -368,6 +368,16 @@ Off hides the playback indicator.
 - **Values:** On, Off
 - **Default:** On
 
+### Playback delay
+
+Waits after the fighters are placed and before the first input, once per Play, not on later loop passes. It applies to
+Play on Player 1, Play on CPU, Vault Play back and Make combo's pass, but not to editor previews or CPU Playback
+slots. The playing role is neutral while it waits, the indicator stays visible, and Stop cancels the run.
+
+- **Values:** None, 10, 20, 30, 45, 60, 90 or 120 frames
+- **Default:** None
+- **How:** Left/Right cycle through the values; A opens the list.
+
 ### Place fighters before Record
 
 On: Record first opens four pages to place Player 1 and the CPU, choose their starting states and set their
