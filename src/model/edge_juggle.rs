@@ -846,6 +846,7 @@ impl Stage {
         self.ledges[0][0] <= x && x <= self.ledges[1][0]
     }
 
+    #[cfg(test)]
     pub fn new(blast: [f32; 4], camera: [f32; 4], ledges: [[f32; 2]; 2]) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;
@@ -873,12 +874,14 @@ impl Stage {
         clamp_point(point, [left + 1.0, right - 1.0, top - 1.0, bottom + 1.0])
     }
 
+    #[cfg(test)]
     pub fn off_stage(self, point: [f32; 2]) -> Option<[f32; 2]> {
         (self.edge_cursor(point) == Some(point)
             && (point[0] <= self.ledges[0][0] - 1.0 || point[0] >= self.ledges[1][0] + 1.0))
             .then_some(point)
     }
 
+    #[cfg(test)]
     fn lower_middle(self, side: usize) -> Option<[f32; 2]> {
         let [left, right, _, bottom] = self.blast;
         let [x, y] = self.ledges[side];
@@ -998,8 +1001,12 @@ pub struct Kept {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Wizard {
     drill: Drill,
+    #[cfg(test)]
     area_offset: Option<[f32; 2]>,
+    #[cfg(test)]
     left_start: Option<[f32; 2]>,
+    /// The default CPU start beside the left and the right end of the floor run.
+    starts: [Option<[f32; 2]>; 2],
     moved: bool,
     /// The CPU start A confirmed lies under the stage.
     under: bool,
@@ -1014,15 +1021,7 @@ impl Wizard {
     /// rule; elsewhere the side's default is the rule's spot.
     pub fn on(
         drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
-        stage_key: (i32, u32), fighter: Option<i32>, open: impl FnMut([f32; 2]) -> bool,
-    ) -> Option<Self> {
-        let _ = open;
-        Self::new(drill, stage, p1, percent, stage_key, fighter)
-    }
-
-    pub fn new(
-        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
-        stage_key: (i32, u32), fighter: Option<i32>,
+        stage_key: (i32, u32), fighter: Option<i32>, mut open: impl FnMut([f32; 2]) -> bool,
     ) -> Option<Self> {
         let link_start = drill == Drill::GuardEdge
             && fighter == Some(perfect::link::KIND)
@@ -1107,11 +1106,24 @@ impl Wizard {
             }
             _ => None,
         };
+        let mut starts = [None; 2];
+        for (side, start) in starts.iter_mut().enumerate() {
+            let Some(spot) = stage.spot(side) else { continue };
+            let offset = if side == 0 { left_start.or(area_offset) } else { area_offset };
+            let own = offset.map(|[outside, height]| {
+                let ledge = stage.ledges[side];
+                [if side == 0 { ledge[0] - outside } else { ledge[0] + outside }, ledge[1] + height]
+            });
+            *start = Some(own.filter(|&point| open(point)).unwrap_or(spot));
+        }
         let cpu = stage.default_juggle(p1);
         let mut wizard = Self {
             drill,
+            #[cfg(test)]
             area_offset,
+            #[cfg(test)]
             left_start,
+            starts,
             moved: false,
             under: false,
             cross: Crosshair::new(cpu),
@@ -1131,19 +1143,19 @@ impl Wizard {
         Some(wizard)
     }
 
-    /// The default CPU start on a side; none where that end of the floor run has no open air.
-    pub fn default_cpu(&self, stage: Stage, side: usize) -> Option<[f32; 2]> {
-        let spot = stage.spot(side)?;
-        let offset = if side == 0 { self.left_start.or(self.area_offset) } else { self.area_offset };
-        if let Some([outside, height]) = offset {
-            let ledge = stage.ledges[side];
-            let x = if side == 0 { ledge[0] - outside } else { ledge[0] + outside };
-            let point = [x, ledge[1] + height];
-            if stage.off_stage(point) == Some(point) {
-                return Some(point);
-            }
-        }
-        Some(spot)
+    /// The one-solid form of `on`: a fighter's own start is kept where it is at least 1 unit outside a ledge.
+    #[cfg(test)]
+    pub fn new(
+        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
+        stage_key: (i32, u32), fighter: Option<i32>,
+    ) -> Option<Self> {
+        Self::on(drill, stage, p1, percent, stage_key, fighter, |point| stage.off_stage(point).is_some())
+    }
+
+    /// The default CPU start on a side of the stage the wizard was made for: the fighter's own start where the
+    /// rule called it open air, else the rule's spot; none where that end of the floor run has no open air.
+    pub fn default_cpu(&self, _stage: Stage, side: usize) -> Option<[f32; 2]> {
+        self.starts[side]
     }
 
     pub fn unmoved(&self) -> bool {

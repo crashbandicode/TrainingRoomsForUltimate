@@ -1985,7 +1985,12 @@ pub unsafe fn frame(fighter: usize) {
             Drill::GuardEdge => (config.edge_percent, config.edge_limit),
             Drill::Juggler => (JUGGLE_PERCENT, config.juggle_limit),
         };
-        let Some(wizard) = Wizard::new(drill, stage, p1_start, percent, stage_key, natives::fighter_kind(cpu)) else {
+        let open = |point| {
+            RayProbe::new(p1).is_some_and(|mut probe| {
+                geometry::classify(&mut probe, stage.blast(), point) == Ok(geometry::Place::Open)
+            })
+        };
+        let Some(wizard) = Wizard::on(drill, stage, p1_start, percent, stage_key, natives::fighter_kind(cpu), open) else {
             return;
         };
         let last = engine.kept[drill as usize]
