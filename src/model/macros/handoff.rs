@@ -37,7 +37,14 @@ impl VaultArchive {
         if last_lost_epoch != 0 && self.epoch <= last_lost_epoch { self.session.truncated = true; }
     }
     /// Drops one Vault capture of this boot: the latest, or the previous.
-    pub fn forget(&mut self, _latest: bool) {}
+    pub fn forget(&mut self, latest: bool) {
+        if latest {
+            // More of the same replay after this is a partial capture, never a whole one.
+            self.session = crate::engine::macros::ReplaySession { truncated: true, ..Default::default() };
+        } else {
+            self.previous = None;
+        }
+    }
     pub fn apply(&mut self, event: VaultEvent, last_lost_epoch: u64) {
         use crate::engine::macros::{ReplayTrack, MAX_FRAMES};
         let epoch = match event {

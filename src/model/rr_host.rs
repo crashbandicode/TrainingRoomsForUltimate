@@ -2298,7 +2298,11 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
         FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
         FileKind::Combo => super::rr_runtime::delete_combo(root, id),
         FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
-        FileKind::Capture => false,
+        // A saved capture's files. Captures are in no index, so nothing else is touched.
+        FileKind::Capture => {
+            return id.strip_prefix("saved:")
+                .is_some_and(|id| super::macros::CaptureArchive::new(root.join("replay_captures")).delete(id).unwrap_or(false));
+        }
     };
     if !deleted {
         return false;

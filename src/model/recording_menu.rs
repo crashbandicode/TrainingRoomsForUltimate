@@ -1575,6 +1575,12 @@ impl RecordingScreens {
             }
             Act::EditChain => self.open_picker(PickerKind::EditChain, Face::Page, Some(id)),
             Act::EditCombos => self.open_picker(PickerKind::EditSequence, Face::Page, Some(id)),
+            // A capture is in no catalog and no pick: only its own screen closes. Its row goes when the host has listed
+            // what storage holds after the delete.
+            Act::Delete if kind == ItemKind::Captured => {
+                (self.file, self.recordings) = (None, None);
+                self.last_effect = Effect::DeleteFile { kind: FileKind::Capture, id };
+            }
             Act::Delete => {
                 let file = match kind {
                     ItemKind::Recording if self.macro_by_id(&id).is_some_and(|file| file.chain) => Some(FileKind::Chain),
@@ -2255,6 +2261,7 @@ impl RecordingScreens {
             row("Make macro…", "", Act::CaptureOpen(Make::Macro, false)),
             row("Make combo…", "", Act::CaptureOpen(Make::Combo, false)),
             row("Make drill…", "", Act::CaptureOpen(Make::Drill, false)),
+            row_delete(),
         ]
     }
 

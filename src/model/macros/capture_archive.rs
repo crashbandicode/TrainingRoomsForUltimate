@@ -345,8 +345,23 @@ impl CaptureArchive {
     }
 
     /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.
-    pub fn delete(&self, _id: &str) -> io::Result<bool> {
-        Ok(false)
+    /// An error leaves a capture that still lists and opens, so the delete can be tried again.
+    pub fn delete(&self, id: &str) -> io::Result<bool> {
+        decode_file_id(id).map_err(invalid_data)?;
+        // The plain file first: a folder of the same id hides it, and it must not come back when the folder goes.
+        let plain = remove_if_there(&self.capture_path(id))?;
+        let Some(cache) = self.shared_cache_path(id)? else { return Ok(plain) };
+        let dir = self.dir.join(format!("{id}.smd"));
+        // The editor's file last: the list and the editor read only that one.
+        for item in fs::read_dir(&dir)? {
+            let path = item?.path();
+            if path != cache {
+                fs::remove_file(path)?;
+            }
+        }
+        remove_if_there(&cache)?;
+        fs::remove_dir(dir)?;
+        Ok(true)
     }
 
     fn capture_path(&self, id: &str) -> PathBuf {
@@ -652,6 +667,14 @@ fn ensure_existing_identity(
         ));
     }
     Ok(())
+}
+
+fn remove_if_there(path: &Path) -> io::Result<bool> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
+    }
 }
 
 fn file_type_if_exists(path: &Path) -> io::Result<Option<FileType>> {
@@ -1249,11 +1272,31 @@ mod tests {
         assert!(!CaptureArchive::new(temp.0.join("absent")).delete(&kept).unwrap(), "no folder yet: nothing to delete");
     }
 
+    fn a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let id = encode_file_id("bundle");
+        let dir = temp.0.join(format!("{id}.smd"));
+        fs::create_dir_all(dir.join("not-a-file")).unwrap();
+        CaptureArchive::new(&dir).save("bundle", "Bundle", "13.0.5", &two_sides()).unwrap();
+        fs::copy(dir.join(format!("{id}.tmrc")), temp.0.join(format!("{id}.tmrc"))).unwrap();
+        assert!(archive.delete(&id).is_err(), "a folder inside is not this module's to remove");
+        let listed = archive.list().unwrap();
+        assert_eq!(listed.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [id.as_str()]);
+        assert!(listed.skipped.is_empty());
+        assert!(archive.load(&id).is_ok(), "it still opens");
+        // Once the obstacle is gone the same delete finishes.
+        fs::remove_dir(dir.join("not-a-file")).unwrap();
+        assert!(archive.delete(&id).unwrap());
+        assert!(archive.list().unwrap().entries.is_empty() && !dir.exists());
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
             ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
+            ("a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),
             ("a_capture_file_with_no_new_key_reads_back_both_sides", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),
             ("a_capture_being_written_is_not_listed_until_it_is_committed", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),

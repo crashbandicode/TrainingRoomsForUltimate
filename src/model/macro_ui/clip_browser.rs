@@ -19,7 +19,7 @@ pub struct ClipBrowser { ui: MacroUi, selection: Selection }
 impl ClipBrowser {
     pub fn new(rows: Vec<LibraryRow>, skipped: usize) -> Self {
         let mut ui = MacroUi::new();
-        ui.open_library(rows, skipped);
+        ui.open_library_forward(rows, skipped, "Named Library", Some("deletes".into()));
         Self { ui, selection: Selection::Browsing }
     }
 
@@ -51,7 +51,12 @@ impl ClipBrowser {
     }
 
     /// After a delete: the list as storage has it now. False when nothing is left and the window closed.
-    pub fn relist(&mut self, _rows: Vec<LibraryRow>, _skipped: usize) -> bool {
+    pub fn relist(&mut self, rows: Vec<LibraryRow>, skipped: usize) -> bool {
+        if rows.is_empty() {
+            self.selection = Selection::Closed;
+            return false;
+        }
+        self.ui.open_library_forward(rows, skipped, "Named Library", Some("deletes".into()));
         true
     }
 
@@ -72,6 +77,8 @@ impl ClipBrowser {
                 self.selection = Selection::Opening;
                 Effect::Open(id)
             }
+            // Y: the row's own id. The runtime deletes, then calls `relist`.
+            MenuEffect::Alternate { id } => Effect::Delete(id),
             MenuEffect::Notify(error) => Effect::Notify(error),
             _ => Effect::None,
         }
@@ -150,7 +157,7 @@ mod tests {
 
     fn y_deletes_the_highlighted_capture_and_keeps_the_list_open() {
         let mut browser = browser();
-        assert_eq!(browser.view().unwrap().footer, "A loads, Y deletes, B closes.");
+        assert!(browser.view().unwrap().footer.ends_with("A loads, Y deletes, B closes."));
         assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);
         // The effect carries the highlighted row's own id. The list is rebuilt from what storage holds afterwards.
         assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete("saved:other".into()));
@@ -159,7 +166,7 @@ mod tests {
         assert_eq!(view.title, "Replay Captures");
         assert!(view.labels.iter().any(|label| label.contains("Replay500f")));
         assert!(!view.labels.iter().any(|label| label.contains("Other capture")));
-        assert_eq!(view.footer, "A loads, Y deletes, B closes.");
+        assert!(view.footer.ends_with("A loads, Y deletes, B closes."));
         assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open("saved:500".into()));
     }
 
