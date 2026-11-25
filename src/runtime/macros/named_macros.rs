@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use smash::app::{lua_bind::*, BattleObjectModuleAccessor};
 use smash::lib::lua_const::*;
-use smash::phx::{Hash40, Vector3f};
 use {crate::engine::macros::Library, crate::engine::macros::MacroRecording};
 use crate::runtime::macros::port::sync::*;
 use crate::model::flow::{NameJob, NamePhase};
@@ -408,7 +407,6 @@ pub fn hook_queries() -> crate::model::macro_handoff::MacroQueries {
 /// after panel mutations, before servicing a potentially blocking native applet.
 pub fn publish_queries() {
     observe_loaded();
-    let marker = lock_read(&UI).marker();
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
     let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.playing)
         || crate::engine::rr_host::preview_away();
@@ -419,7 +417,7 @@ pub fn publish_queries() {
         clip_editor_open: crate::runtime::macros::replay_capture::editor_open(),
         clip_previewing,
         replay_loading: crate::runtime::macros::replay_capture::loading(), browser_pending, browser_release,
-        suspended: suspended(), marker,
+        suspended: suspended(),
     });
 }
 
@@ -585,10 +583,6 @@ pub fn on_pad(pad: Pad) {
         match pad {
             Pad::Confirm => request_native_name(),
             Pad::Back => { lock_write(&UI).on_pad(Pad::Back); }
-            Pad::Extra => {
-                let effect = lock_write(&UI).native_name_placement();
-                apply_effect(effect);
-            }
             _ => {}
         }
         assign(&menu::MENU_RECEIVED_INPUT, true);
@@ -748,13 +742,6 @@ pub fn service_character() {
     submit_loaded_character();
 }
 
-pub unsafe fn preview(module_accessor: &mut BattleObjectModuleAccessor) {
-    let Some((x, y)) = hook_queries().marker else {
-        return;
-    };
-    draw_cross(module_accessor, x, y);
-}
-
 pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccessor) {
     let Ok(context) = practice::try_context() else { return; };
     let id = module_accessor.battle_object_id;
@@ -784,40 +771,6 @@ pub unsafe fn hold_panel_fighter(module_accessor: &mut BattleObjectModuleAccesso
     }
 }
 
-unsafe fn draw_cross(module_accessor: &mut BattleObjectModuleAccessor, x: f32, y: f32) {
-    // Same spark the fast-fall cue uses. Killing the kind also clears other
-    // flashes of this effect while the placement editor is open.
-    EffectModule::kill_kind(
-        module_accessor,
-        Hash40::new("sys_smash_flash_s"),
-        false,
-        true,
-    );
-    let rotation = Vector3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    for (dx, dy) in [(0.0, 0.0), (2.5, 0.0), (-2.5, 0.0), (0.0, 2.5), (0.0, -2.5)] {
-        let pos = Vector3f {
-            x: x + dx,
-            y: y + dy,
-            z: 0.0,
-        };
-        EffectModule::req(
-            module_accessor,
-            Hash40::new("sys_smash_flash_s"),
-            &pos,
-            &rotation,
-            0.45,
-            0,
-            0,
-            true,
-            *EFFECT_SUB_ATTRIBUTE_CONCLUDE_STATUS,
-        );
-    }
-}
-
 /// The effect of a confirmed keyboard name, waiting for the menu worker (one at a time: a second keyboard cannot open before the first
 /// was applied). Handing it over allocates nothing.
 static DEFERRED: std::sync::Mutex<Option<Effect>> = std::sync::Mutex::new(None);
@@ -840,7 +793,6 @@ fn apply_effect(effect: Effect) {
         Effect::None => {}
         Effect::Notify(text) => notify(&text),
         Effect::Save(recording) => save_new(*recording),
-        Effect::Overwrite { id, recording } => overwrite(id, *recording),
         Effect::Choose(id) => load_id(&id),
         Effect::BindToSlot { .. } => {}
         Effect::Alternate { id } => *lock_write(&LIST_ACTION) = Some(id),
@@ -878,13 +830,6 @@ fn save_new(recording: MacroRecording) {
             assign(&menu::MENU_RECEIVED_INPUT, true);
             notify(&text);
         }
-    }
-}
-
-fn overwrite(id: String, recording: MacroRecording) {
-    match library().overwrite(&id, &recording) {
-        Ok(()) => notify("Placement written"),
-        Err(err) => notify(&err.to_string()),
     }
 }
 
