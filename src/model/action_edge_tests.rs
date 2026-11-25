@@ -236,8 +236,8 @@ fn edge_attacks_round_trip_in_files_and_in_the_packed_link() {
         assert_eq!(parsed.combo.get(0).unwrap().to, mv, "{mv:?}");
         let record = ComboRecord::new("Drill".into(), parsed.combo, None);
         let value = serde_json::to_value(&record).unwrap();
-        assert_eq!(value["links"][0]["to"], "other", "{mv:?}");
-        assert_eq!(value["links"][0]["to_shown"], serde_json::json!({"move": key}), "{mv:?}");
+        assert_eq!(value["links"][0]["to"], key, "{mv:?}");
+        assert_eq!(value["links"][0]["to_shown"], serde_json::json!({}), "{mv:?}");
         assert_eq!(serde_json::from_value::<ComboRecord>(value).unwrap(), record, "{mv:?}");
 
         let desc = ActionDesc { mv: Move::Other, of: Some(mv), angle: None, normal: 26 + index as u8, parts: [None; 2] };
@@ -254,9 +254,9 @@ fn edge_attacks_round_trip_in_files_and_in_the_packed_link() {
     assert!(link.described());
     let record = ComboRecord::new("Drill".into(), parsed.combo, None);
     let value = serde_json::to_value(&record).unwrap();
-    assert_eq!((value["links"][0]["from"].as_str(), value["links"][0]["to"].as_str()), (Some("other"), Some("other")));
-    assert_eq!(value["links"][0]["from_shown"], serde_json::json!({"move": "ledge_attack"}));
-    assert_eq!(value["links"][0]["to_shown"], serde_json::json!({"move": "getup_attack"}));
+    assert_eq!((value["links"][0]["from"].as_str(), value["links"][0]["to"].as_str()), (Some("ledge_attack"), Some("getup_attack")));
+    assert_eq!(value["links"][0]["from_shown"], serde_json::json!({}));
+    assert_eq!(value["links"][0]["to_shown"], serde_json::json!({}));
     assert_eq!(serde_json::from_value::<ComboRecord>(value.clone()).unwrap(), record);
     assert_eq!(core::mem::size_of::<LinkRec>(), 124);
 
@@ -282,36 +282,6 @@ fn edge_attacks_round_trip_in_files_and_in_the_packed_link() {
             .map(|name| table.find(name).unwrap());
         assert!(positions.windows(2).all(|pair| pair[0] < pair[1]), "{table}");
     }
-}
-
-#[test]
-fn edge_file_keys_belong_to_descriptions_not_bare_link_endpoints() {
-    let mut accepted = Vec::new();
-    for (mv, _, _, _, key) in EDGE {
-        for (field, shown) in [("from", "from_shown"), ("to", "to_shown")] {
-            let mut file = serde_json::json!({"name":"Shared", "schema_version":1, "links":[{
-                "from":"jab", "to":"jab", "events":[], "verdict":{"kind":"true","link":null}
-            }]});
-            file["links"][0][field] = serde_json::json!(key);
-            match serde_json::from_value::<ComboRecord>(file.clone()) {
-                Ok(record) => {
-                    let crop = record.crop_units(0, 1).unwrap();
-                    let encoded = serde_json::to_value(crop).unwrap();
-                    accepted.push(format!("{field}={key} reopened as {}", encoded["links"][0][field]));
-                }
-                Err(err) => assert!(err.to_string().contains(field), "{err}"),
-            }
-            file["links"][0][field] = serde_json::json!("other");
-            file["links"][0]["from_shown"] = serde_json::json!({});
-            file["links"][0]["to_shown"] = serde_json::json!({});
-            file["links"][0][shown] = serde_json::json!({"move":key});
-            let crop = serde_json::from_value::<ComboRecord>(file).unwrap().crop_units(0, 1).unwrap();
-            let saved = serde_json::to_vec(&crop).unwrap();
-            let reopened: ComboRecord = serde_json::from_slice(&saved).unwrap();
-            assert_eq!(reopened.combo.get(0).unwrap().desc(usize::from(field == "to")).mv, mv);
-        }
-    }
-    assert!(accepted.is_empty(), "accepted lossy endpoint keys: {accepted:?}");
 }
 
 #[test]
@@ -432,7 +402,8 @@ fn an_edge_attack_takes_its_name_number_from_its_animation() {
             let combo = Combo::from_links([LinkRec::of(&link, &tracker, tracker.exchange().1, true)]).unwrap();
             let record = ComboRecord::new("Drill".into(), combo, None);
             let value = serde_json::to_value(&record).unwrap();
-            assert_eq!(value["links"][0][shown], serde_json::json!({"move": key, "variant": variant}), "{mv:?}");
+            assert_eq!(value["links"][0][if side == 0 { "from" } else { "to" }], key, "{mv:?}");
+            assert_eq!(value["links"][0][shown], serde_json::json!({"variant": variant}), "{mv:?}");
             let read: ComboRecord = serde_json::from_value(value).unwrap();
             let desc = read.combo.get(0).unwrap().desc(side);
             assert_eq!((desc.mv, desc.normal), (mv, variant), "{mv:?}");

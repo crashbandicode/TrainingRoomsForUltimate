@@ -2196,3 +2196,7 @@ mod drill_step_moves_tests;
 #[cfg(test)]
 #[path = "action_smoke_tests.rs"]
 mod action_smoke_tests;
+
+#[cfg(test)]
+#[path = "named_endpoint_tests.rs"]
+mod named_endpoint_tests;

@@ -568,8 +568,8 @@ fn link_descriptions_round_trip_in_optional_keys() {
     let parsed = hit_record("other", "side_tilt", Some(serde_json::json!({"move":"throw"})), Some(serde_json::json!({"angle":"up"})));
     let record = ComboRecord::new("Drill".into(), parsed.combo, None);
     let mut value = serde_json::to_value(&record).unwrap();
-    assert_eq!(value["links"][0]["from"], "other");
-    assert_eq!(value["links"][0]["from_shown"], serde_json::json!({"move":"throw"}));
+    assert_eq!(value["links"][0]["from"], "throw");
+    assert_eq!(value["links"][0]["from_shown"], serde_json::json!({}));
     assert_eq!(value["links"][0]["to_shown"], serde_json::json!({"angle":"up"}));
     let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
     assert_eq!(read, record);
@@ -577,6 +577,12 @@ fn link_descriptions_round_trip_in_optional_keys() {
     let error = serde_json::from_value::<ComboRecord>(value.clone()).unwrap_err();
     assert!(error.to_string().contains("to_shown"));
     value["links"][0].as_object_mut().unwrap().remove("to_shown");
+    let partial: ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    let link = partial.combo.get(0).unwrap();
+    assert!(!link.described());
+    assert_eq!(link.from, Move::Throw);
+    value["links"][0]["from"] = serde_json::json!("other");
+    value["links"][0]["from_shown"] = serde_json::json!({"move":"throw"});
     let partial: ComboRecord = serde_json::from_value(value).unwrap();
     let link = partial.combo.get(0).unwrap();
     assert!(!link.described());
