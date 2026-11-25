@@ -968,6 +968,11 @@ mod tests {
         // The one feed, in either scene, gives the watch the animation the variant is read from.
         assert!(sample.contains("clip_marks::watched_motion(s.motion, mv.is_some(), "));
         assert!(callback.contains("input_display::sample_frame("));
+        // The capture's identity must follow the same body as its start pose (Training entry 1, lobby entry 4).
+        let host = include_str!("../../runtime/features/recording_host.rs");
+        let reader = host.split_once("fn role_fighter(").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(reader.contains("Role::Cpu => super::recorder::cpu_body()"), "CPU take identity bypasses the scene's practice CPU");
+        assert!(reader.contains("Role::Player => super::recorder::body_of(0)"), "Player take identity must read entry 0");
     }
 
     /// A drill's crop names each step as the Recording list does (`combo_link_lines`, the recorded fighter): since the
