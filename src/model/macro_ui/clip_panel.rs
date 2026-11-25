@@ -758,7 +758,118 @@ impl ClipEditor {
 mod tests {
     lib_unit_tests! {
     use super::*;
-    use {crate::engine::macros::InputFrame, crate::engine::macros::StartState};
+    use {crate::engine::macros::InputFrame, crate::engine::macros::MoveFamily, crate::engine::macros::StartState};
+
+    fn snap_rules() -> MoveStartRules {
+        MoveStartRules { families: vec![MoveFamily { fighter: None, statuses: vec![45, 46, 47], buttons: 0 }],
+            setup: vec![6, 7], ground: 0, air: 2, wait: 0, fall: 14, trigger_buttons: 0 }
+    }
+
+    fn snap_capture_with(setup: i32, action: i32, tail: i32) -> ClipEditor {
+        let frames = (0..60).map(|i| ReplayFrame {
+            input: InputFrame { buttons: if (23..=26).contains(&i) { 1 } else { 0 }, ..InputFrame::default() },
+            start: StartState { status: match i { 0..=19 => 0, 20..=24 => setup, 25..=39 => action, _ => tail },
+                ..StartState::neutral(74, 0, 1.0) },
+            x: 0.0, y: 0.0,
+        }).collect();
+        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {
+            entry: 1, fighter: None, quantized_analog: false, frames,
+        }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap().with_move_rules(snap_rules())
+    }
+
+    fn snap_capture() -> ClipEditor {
+        snap_capture_with(7, 45, 0)
+    }
+
+    /// Operator 2026-11-25 (install 5): "I used snap but it still gives that message". Y on In, then X, then A.
+    fn y_snap_on_a_mid_action_in_previews_and_saves() {
+        let mut e = snap_capture();
+        assert_eq!(e.marks.list().len(), 1);
+        assert_eq!(e.marks.list()[0].start, 23);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        assert_eq!(e.view().start, 30);
+        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+        assert!(e.view().error.is_none());
+        let want = snap_rules().snap(e.track(), 23).unwrap();
+        assert_eq!(want.action_frame, 25);
+        assert_eq!(e.view().move_start, Some(want));
+        assert_eq!(e.view().start, want.frame);
+        assert!(e.view().clean_start);
+        let inputs: Vec<_> = e.track().frames[want.frame as usize..60].iter().map(|frame| frame.input).collect();
+        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!("preview refused") };
+        assert_eq!(preview.frames, inputs);
+        e.preview_progress(60 - want.frame);
+        let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        assert_eq!(saved.frames, preview.frames);
+        assert_eq!(saved.start, preview.start);
+    }
+
+    /// Operator 2026-11-25 (install 5): X refuses, then "I used snap but it still gives that message".
+    fn y_after_a_refused_preview_snaps_previews_and_saves() {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        let ClipEffect::Error(text) = e.on_action(ClipAction::TogglePlay) else { panic!("preview did not refuse") };
+        assert_eq!(text, "In is mid-action. Snap to a move start before previewing or saving.");
+        assert_eq!(e.view().handle, Handle::In);
+        let ClipEffect::Error(saved_error) = e.on_action(ClipAction::Confirm) else { panic!("save did not refuse") };
+        assert_eq!(saved_error, text);
+        assert_eq!(e.view().handle, Handle::In);
+        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+        let want = snap_rules().snap(e.track(), 23).unwrap();
+        assert_eq!(e.view().move_start, Some(want));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        e.preview_progress(60 - want.frame);
+        assert!(matches!(e.on_action(ClipAction::Confirm), ClipEffect::Export(_)));
+    }
+
+    fn a_second_y_keeps_the_same_move() {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+        let want = snap_rules().snap(e.track(), 23).unwrap();
+        assert_eq!(e.view().move_start, Some(want));
+        let first = (e.view().start, e.view().move_start);
+        for _ in 0..2 {
+            assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+            assert_eq!((e.view().start, e.view().move_start), first);
+        }
+    }
+
+    fn y_snap_to_an_idle_mark_stays_a_plain_start() {
+        let mut e = snap_capture_with(0, 45, 0);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        e.on_action(ClipAction::Snap);
+        assert_eq!(e.view().start, 23);
+        assert!(e.view().move_start.is_none());
+        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!("preview refused") };
+        assert_eq!(preview.start.status, 0);
+    }
+
+    fn y_snap_where_no_move_can_start_says_why() {
+        let mut e = snap_capture_with(99, 99, 99);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        let ClipEffect::Error(text) = e.on_action(ClipAction::Snap) else { panic!("snap did not refuse") };
+        assert_eq!(text, snap_rules().snap(e.track(), 23).unwrap_err());
+        assert!(!text.contains("mid-action"));
+        assert_eq!(e.view().start, 23);
+        assert!(e.view().move_start.is_none());
+        assert_eq!(e.view().error, Some(text));
+    }
+
+    fn y_snap_on_a_saved_macro_is_unchanged() {
+        let mut e = saved_macro(false);
+        assert!(!e.marks.list().is_empty());
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(2));
+        let boundary = e.marks.snap_in(2).unwrap();
+        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));
+        assert_eq!(e.view().start, boundary);
+    }
 
     fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {
         use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};
@@ -1126,6 +1237,12 @@ mod tests {
             ("combo_clip_has_no_preview_action_or_help", combo_clip_has_no_preview_action_or_help as fn()),
             ("file_clip_single_side_does_not_change_selection", file_clip_single_side_does_not_change_selection as fn()),
             ("move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent", move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent as fn()),
+            ("y_snap_on_a_mid_action_in_previews_and_saves", y_snap_on_a_mid_action_in_previews_and_saves as fn()),
+            ("y_after_a_refused_preview_snaps_previews_and_saves", y_after_a_refused_preview_snaps_previews_and_saves as fn()),
+            ("a_second_y_keeps_the_same_move", a_second_y_keeps_the_same_move as fn()),
+            ("y_snap_to_an_idle_mark_stays_a_plain_start", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),
+            ("y_snap_where_no_move_can_start_says_why", y_snap_where_no_move_can_start_says_why as fn()),
+            ("y_snap_on_a_saved_macro_is_unchanged", y_snap_on_a_saved_macro_is_unchanged as fn()),
             ("normalized_pad_cannot_bypass_or_clear_opening_press_ownership", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),
             ("invalid_start_requires_explicit_lead_in_and_keeps_selection", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),
             ("saved_capture_name_survives_crop_without_exceeding_macro_name_limit", saved_capture_name_survives_crop_without_exceeding_macro_name_limit as fn()),
