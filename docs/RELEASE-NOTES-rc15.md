@@ -79,9 +79,10 @@ and the expected log lines), then the operator's full test on the console.
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
 
-- **In work: Guard the Edge and Juggler start on the Training stage.** Both drills start from the floor you stand
-  on, at its ledges that have open air beside them. A floor with no such ledge shows a message instead of doing
-  nothing.
+- **In work: Guard the Edge and Juggler start on the Training stage.** Both use the floor you stand on to find its
+  ledges. Guard the Edge uses a ledge with open air beside it. Juggler keeps its above-floor start with the CPU over
+  Player 1; an open gap is also allowed, but not a spot under the stage or inside solid ground. A floor with no
+  open ledge shows a message.
 - **In work: two Guard the Edge options.** One starts the CPU under the stage. The other starts the CPU with its
   midair jumps already used. Both are Off by default, which is how the drill works today.
 - **In work: Eggs-ercise's Off stage zone stays out of solid ground.** Spots that are not off stage are dropped, and
@@ -277,7 +278,8 @@ that day. The operator reported:
   fighters frozen after the menu closed. Install 2 changes the chain picker: B backs out and saves nothing;
 - in Guard the Edge, picking the CPU in the fighter picker and backing out left a black box over Hitbox Visualization. Install 2
   puts back the part of the menu the pop-up had borrowed;
-- the Guard the Edge rule that a KO counts once Player 1 is back worked on the build they were playing.
+- the Guard the Edge case GJ1-2 worked on the build they were playing. That build counted the KO immediately;
+  waiting for Player 1 to return was new in install 1.
 
 Each report with its time and the build it was made on: [Install evidence](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
 
