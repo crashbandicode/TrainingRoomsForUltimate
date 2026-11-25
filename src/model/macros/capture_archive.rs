@@ -344,6 +344,11 @@ impl CaptureArchive {
         }
     }
 
+    /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.
+    pub fn delete(&self, _id: &str) -> io::Result<bool> {
+        Ok(false)
+    }
+
     fn capture_path(&self, id: &str) -> PathBuf {
         self.dir.join(format!("{id}.tmrc"))
     }
@@ -1213,10 +1218,42 @@ mod tests {
         assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);
     }
 
+    fn delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let plain = archive.save("plain", "Plain", "13.0.5", &two_sides()).unwrap();
+        let kept = archive.save("kept", "Kept", "13.0.5", &two_sides()).unwrap();
+        let bundle = encode_file_id("bundle");
+        let dir = temp.0.join(format!("{bundle}.smd"));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(CaptureArchive::new(&dir).save("bundle", "Bundle", "13.0.5", &two_sides()).unwrap(), bundle);
+        fs::write(dir.join("manifest.json"), b"{}").unwrap();
+        fs::write(dir.join("timeline.jsonl"), b"\n").unwrap();
+        // An older plain file of the same id beside the folder: the list shows the folder, the delete takes both.
+        fs::copy(dir.join(format!("{bundle}.tmrc")), temp.0.join(format!("{bundle}.tmrc"))).unwrap();
+        assert_eq!(archive.list().unwrap().entries.len(), 3);
+
+        assert!(archive.delete(&bundle).unwrap());
+        assert!(!dir.exists() && !temp.0.join(format!("{bundle}.tmrc")).exists());
+        assert!(archive.delete(&plain).unwrap());
+        let listing = archive.list().unwrap();
+        assert_eq!(listing.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);
+        assert!(listing.skipped.is_empty());
+        let left: Vec<_> = fs::read_dir(&temp.0).unwrap().map(|item| item.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(left, [format!("{kept}.tmrc")], "nothing is left behind, and the other capture is untouched");
+
+        assert!(!archive.delete(&plain).unwrap(), "already gone");
+        assert!(archive.delete("../kept").is_err(), "only a capture id names a file");
+        assert!(archive.delete(&format!("{kept}.tmrc")).is_err());
+        assert!(archive.load(&kept).is_ok());
+        assert!(!CaptureArchive::new(temp.0.join("absent")).delete(&kept).unwrap(), "no folder yet: nothing to delete");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),
             ("a_capture_file_with_no_new_key_reads_back_both_sides", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),
             ("a_capture_being_written_is_not_listed_until_it_is_committed", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),

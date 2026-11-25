@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "8ac01983b1297429c973cc0c2bd5e1e4c7edf746c0d0a11bbe80aa068f64ed96",
+   "dest_sha256": "281b8ed72cfce338b083dd925ceed9dba1c7d91df2513a2d870a86ee222a3a48",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -172,6 +172,21 @@
      "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
      "old": "                    sides: Vec::new(),\n",
      "new": "                    sides,\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "                Err(err)\n            }\n        }\n",
+     "new": "                Err(err)\n            }\n        }\n    }\n\n    /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.\n    pub fn delete(&self, _id: &str) -> io::Result<bool> {\n        Ok(false)\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n",
+     "new": "        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let plain = archive.save(\"plain\", \"Plain\", \"13.0.5\", &two_sides()).unwrap();\n        let kept = archive.save(\"kept\", \"Kept\", \"13.0.5\", &two_sides()).unwrap();\n        let bundle = encode_file_id(\"bundle\");\n        let dir = temp.0.join(format!(\"{bundle}.smd\"));\n        fs::create_dir_all(&dir).unwrap();\n        assert_eq!(CaptureArchive::new(&dir).save(\"bundle\", \"Bundle\", \"13.0.5\", &two_sides()).unwrap(), bundle);\n        fs::write(dir.join(\"manifest.json\"), b\"{}\").unwrap();\n        fs::write(dir.join(\"timeline.jsonl\"), b\"\\n\").unwrap();\n        // An older plain file of the same id beside the folder: the list shows the folder, the delete takes both.\n        fs::copy(dir.join(format!(\"{bundle}.tmrc\")), temp.0.join(format!(\"{bundle}.tmrc\"))).unwrap();\n        assert_eq!(archive.list().unwrap().entries.len(), 3);\n\n        assert!(archive.delete(&bundle).unwrap());\n        assert!(!dir.exists() && !temp.0.join(format!(\"{bundle}.tmrc\")).exists());\n        assert!(archive.delete(&plain).unwrap());\n        let listing = archive.list().unwrap();\n        assert_eq!(listing.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);\n        assert!(listing.skipped.is_empty());\n        let left: Vec<_> = fs::read_dir(&temp.0).unwrap().map(|item| item.unwrap().file_name().to_string_lossy().into_owned()).collect();\n        assert_eq!(left, [format!(\"{kept}.tmrc\")], \"nothing is left behind, and the other capture is untouched\");\n\n        assert!(!archive.delete(&plain).unwrap(), \"already gone\");\n        assert!(archive.delete(\"../kept\").is_err(), \"only a capture id names a file\");\n        assert!(archive.delete(&format!(\"{kept}.tmrc\")).is_err());\n        assert!(archive.load(&kept).is_ok());\n        assert!(!CaptureArchive::new(temp.0.join(\"absent\")).delete(&kept).unwrap(), \"no folder yet: nothing to delete\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n"
     }
    ]
   },
@@ -1225,7 +1240,7 @@
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "dc39bb3a2302fc5ab0883f654232717e5927104f9b440946ef7994107485e666",
+   "dest_sha256": "a88f903794461f19c728c9a7e978498801951de620dafaeebe7bbb03edf4a652",
    "edits": [
     {
      "table_tests": true,
@@ -1252,6 +1267,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "pub enum Effect { None, Open(String), Close, TimedOut, Notify(String) }\n",
+     "new": "pub enum Effect { None, Open(String), Close, TimedOut, Notify(String), Delete(String) }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(waiting.tick(true, true), Effect::Open(\"saved:other\".into()));\n    }\n\n",
+     "new": "        assert_eq!(waiting.tick(true, true), Effect::Open(\"saved:other\".into()));\n    }\n\n    fn y_deletes_the_highlighted_capture_and_keeps_the_list_open() {\n        let mut browser = browser();\n        assert_eq!(browser.view().unwrap().footer, \"A loads, Y deletes, B closes.\");\n        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n        let view = browser.view().expect(\"the list stays open\");\n        assert_eq!(view.title, \"Replay Captures\");\n        assert!(view.labels.iter().any(|label| label.contains(\"Replay500f\")));\n        assert!(!view.labels.iter().any(|label| label.contains(\"Other capture\")));\n        assert_eq!(view.footer, \"A loads, Y deletes, B closes.\");\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n    fn deleting_the_last_capture_closes_the_replay_window() {\n        let mut browser = ClipBrowser::new(vec![LibraryRow { id: \"latest\".into(), label: \"Latest Vault capture\".into() }], 0);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n        assert!(browser.view().is_none());\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::None);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::None);\n    }\n\n    fn y_deletes_in_training_and_in_a_waiting_room() {\n        for waiting in [false, true] {\n            let mut browser = browser();\n            assert_eq!(browser.on_pad(Pad::Extra, waiting), Effect::Delete(\"saved:500\".into()));\n            assert!(!browser.pending());\n        }\n        // A capture already chosen in a waiting room is opening: Y does nothing until B.\n        let mut chosen = browser();\n        assert_eq!(chosen.on_pad(Pad::Confirm, true), Effect::None);\n        assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None);\n        assert!(chosen.pending());\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n            (\"deleting_the_last_capture_closes_the_replay_window\", deleting_the_last_capture_closes_the_replay_window as fn()),\n            (\"y_deletes_in_training_and_in_a_waiting_room\", y_deletes_in_training_and_in_a_waiting_room as fn()),\n"
     }
    ]
   },

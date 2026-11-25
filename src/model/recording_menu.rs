@@ -194,6 +194,8 @@ pub enum FileKind {
     Chain,
     Combo,
     Sequence,
+    /// A replay capture: a saved one (`saved:<id>`), or a Vault capture of this boot.
+    Capture,
 }
 
 /// One named save in the snapshot the host loaded.
@@ -3882,6 +3884,74 @@ mod tests {
         }
     }
 
+    fn a_recording_screen_ends_with_delete_as_a_macros_does() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vault_sides());
+        let rows = screens.file_rows();
+        assert_eq!(rows.len(), 7);
+        let (delete, saves) = (row_delete(), screens.save_file_rows("corner"));
+        assert_eq!((rows[6].title.as_str(), rows[6].value.as_str()), (delete.title.as_str(), delete.value.as_str()));
+        assert_eq!(rows[6].title, "Delete");
+        assert_eq!(saves.last().map(|row| row.title.as_str()), Some("Delete"), "the row a save, macro or combo ends with");
+        assert_eq!(rows[5].title, "Make drill…", "the six rows before it are as they were");
+    }
+
+    fn deleting_a_recording_removes_its_row_and_posts_the_file_delete() {
+        let mut screens = screens();
+        enter_recordings(&mut screens);
+        let mut other = vault_file(vault_sides());
+        other.id = "previous".into();
+        other.name = "Other".into();
+        screens.set_recordings(vec![vault_file(vault_sides()), other]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(screens.file_open());
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, id: "saved:01".into() });
+        assert!(!screens.file_open(), "one A: the screen closes, nothing is asked");
+        let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
+        assert_eq!(rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(), ["Other"]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, id: "previous".into() });
+    }
+
+    fn b_on_a_recording_screen_deletes_nothing() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vault_sides());
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::B, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::None);
+        assert!(!screens.file_open());
+        assert_eq!(screens.section(Face::Page, SAVES_MACROS, 1).rows[0].name, "Replay");
+    }
+
+    fn deleting_the_last_recording_shows_no_recordings_yet() {
+        let mut screens = screens();
+        open_vault_file(&mut screens, vault_sides());
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(matches!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, .. }));
+        let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
+        assert_eq!(rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(), ["No recordings yet"]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::None);
+        assert!(!screens.file_open());
+    }
+
+    fn the_popup_lists_no_recordings() {
+        for role in [ViewRole::Player, ViewRole::Cpu] {
+            let mut screens = screens();
+            screens.set_roles([role, role]);
+            screens.set_recordings(vec![vault_file(vault_sides())]);
+            for section in [0, 1] {
+                let rows = screens.section(Face::Popup, SAVES_MACROS, section).rows;
+                assert!(!rows.iter().any(|row| row.name == "RECORDINGS >" || row.name == "Replay"));
+            }
+        }
+    }
+
     fn a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it() {
         let mut screens = screens();
         open_vault_file(&mut screens, vault_sides());
@@ -4270,6 +4340,11 @@ mod tests {
             ("the_recording_screen_offers_inputs_from_and_plays_on", the_recording_screen_offers_inputs_from_and_plays_on as fn()),
             ("recordings_has_its_own_row_in_macros_like_drills", recordings_has_its_own_row_in_macros_like_drills as fn()),
             ("the_recordings_list_names_each_recording_with_its_sides_and_length", the_recordings_list_names_each_recording_with_its_sides_and_length as fn()),
+            ("a_recording_screen_ends_with_delete_as_a_macros_does", a_recording_screen_ends_with_delete_as_a_macros_does as fn()),
+            ("deleting_a_recording_removes_its_row_and_posts_the_file_delete", deleting_a_recording_removes_its_row_and_posts_the_file_delete as fn()),
+            ("b_on_a_recording_screen_deletes_nothing", b_on_a_recording_screen_deletes_nothing as fn()),
+            ("deleting_the_last_recording_shows_no_recordings_yet", deleting_the_last_recording_shows_no_recordings_yet as fn()),
+            ("the_popup_lists_no_recordings", the_popup_lists_no_recordings as fn()),
             ("a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill", a_recording_screen_plays_back_and_makes_a_macro_a_combo_or_a_drill as fn()),
             ("play_back_opens_the_recording_playing_on_the_target", play_back_opens_the_recording_playing_on_the_target as fn()),
             ("a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it", a_waiting_room_opening_says_it_waits_for_the_cpu_and_b_cancels_it as fn()),

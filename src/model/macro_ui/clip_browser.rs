@@ -12,7 +12,7 @@ enum Selection {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Effect { None, Open(String), Close, TimedOut, Notify(String) }
+pub enum Effect { None, Open(String), Close, TimedOut, Notify(String), Delete(String) }
 
 pub struct ClipBrowser { ui: MacroUi, selection: Selection }
 
@@ -143,6 +143,40 @@ mod tests {
         assert_eq!(waiting.tick(true, true), Effect::Open("saved:other".into()));
     }
 
+    fn y_deletes_the_highlighted_capture_and_keeps_the_list_open() {
+        let mut browser = browser();
+        assert_eq!(browser.view().unwrap().footer, "A loads, Y deletes, B closes.");
+        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);
+        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete("saved:other".into()));
+        let view = browser.view().expect("the list stays open");
+        assert_eq!(view.title, "Replay Captures");
+        assert!(view.labels.iter().any(|label| label.contains("Replay500f")));
+        assert!(!view.labels.iter().any(|label| label.contains("Other capture")));
+        assert_eq!(view.footer, "A loads, Y deletes, B closes.");
+        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open("saved:500".into()));
+    }
+
+    fn deleting_the_last_capture_closes_the_replay_window() {
+        let mut browser = ClipBrowser::new(vec![LibraryRow { id: "latest".into(), label: "Latest Vault capture".into() }], 0);
+        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete("latest".into()));
+        assert!(browser.view().is_none());
+        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::None);
+        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::None);
+    }
+
+    fn y_deletes_in_training_and_in_a_waiting_room() {
+        for waiting in [false, true] {
+            let mut browser = browser();
+            assert_eq!(browser.on_pad(Pad::Extra, waiting), Effect::Delete("saved:500".into()));
+            assert!(!browser.pending());
+        }
+        // A capture already chosen in a waiting room is opening: Y does nothing until B.
+        let mut chosen = browser();
+        assert_eq!(chosen.on_pad(Pad::Confirm, true), Effect::None);
+        assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None);
+        assert!(chosen.pending());
+    }
+
     fn explicit_cancel_before_or_after_readiness_cannot_open_on_return() {
         for ready in [false, true] {
             let mut browser = browser();
@@ -161,6 +195,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("y_deletes_the_highlighted_capture_and_keeps_the_list_open", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),
+            ("deleting_the_last_capture_closes_the_replay_window", deleting_the_last_capture_closes_the_replay_window as fn()),
+            ("y_deletes_in_training_and_in_a_waiting_room", y_deletes_in_training_and_in_a_waiting_room as fn()),
             ("active_waiting_cpu_can_finish_before_the_exact_capture_opens", active_waiting_cpu_can_finish_before_the_exact_capture_opens as fn()),
             ("idle_training_stays_immediate_and_waiting_can_choose_another_capture", idle_training_stays_immediate_and_waiting_can_choose_another_capture as fn()),
             ("explicit_cancel_before_or_after_readiness_cannot_open_on_return", explicit_cancel_before_or_after_readiness_cannot_open_on_return as fn()),
