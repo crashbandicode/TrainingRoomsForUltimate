@@ -27,11 +27,19 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 ## Next build (not installed yet)
 
 The build after install 4. Its name is expected to be rc.16. Everything planned for it is merged; nothing is still
-in work. The merged changes passed host tests and builds. Targeted Eden checks of stage geometry are listed in
-[Install evidence](EVIDENCE-rc15-installs.md#the-next-build); they do not replace a smoke test of the finished build.
+in work. The merged changes passed host tests and builds.
 
-**How this build is tested:** one short Eden smoke boot on the finished build (each new item started once, no crash
-and the expected log lines), then the operator's full test on the console.
+**How this build is tested:** one short Eden smoke boot on the finished build, then the operator's full test on the
+console.
+
+- **The smoke boot ran on 2026-11-25** on build `b7a382e4`, with no crash. Nine of its ten checks passed: Guard the
+  Edge and Juggler opened their set-up on the Training stage, from the island and on Battlefield; Eggs-ercise had
+  its one off-stage zone in the Training stage's gap; placement's Off stage switch moved Player 1 beside the ledge;
+  a take played on Player 1; and the clip editor opened and previewed. The waiting-room check was not run, because
+  the test's own route failed.
+- **It is a short check, not a play test.** No drill was played through, and most of the other new items were not
+  touched. What ran and what did not: [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build).
+- **The operator's test on the console has not happened.** It includes the waiting room.
 
 ### Merged
 

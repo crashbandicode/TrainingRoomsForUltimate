@@ -167,8 +167,45 @@ merged head `afd4ce01` or of any placement or playback feature. Receipts:
 `artifacts/phase23/next-build-smoke/20261125-1745Z/probe/evidence/sdlog/previous-184632.log` (lines 270-274)
 and `current-184745.log` in the same directory (lines 375-379).
 
-The plan remains one short Eden smoke run on the finished build, then the
-operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is claimed here.
+The plan was one short Eden smoke run on the finished build, then the operator's full test on the console (inbox
+17:06:54Z, tr-primary-2). The smoke run is below. The operator's test has not happened.
+
+### The Eden smoke boot of the finished build
+
+On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10,
+with the card's 20 other plugins. Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate
+(`artifacts/phase23/next-build/gate-b7a382e4/status.json`). The game did not crash. Receipts:
+`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md`, and for each row its JSON and one frame under
+`smoke/evidence/out/<row>/` there. Reported by dup-audit (inbox 22:57:42Z).
+
+A pass on a Start row means the set-up opened on its CPU page with no refusal. **No drill was played through**: no
+CPU was launched and no attempt was scored.
+
+| Row | Verdict | What was read |
+| --- | --- | --- |
+| Guard the Edge, Training stage (`s1-guard-training`) | pass | Start opened the set-up on the CPU page at (−125, −68), beside the long floor's left ledge |
+| Under the stage On (`s2-guard-under`) | pass | the set-up reported the option On; the setting was put back |
+| Guard the Edge from the island (`s2b-guard-island`) | pass | with Player 1 on the island's floor the set-up opened beside its left ledge, and Y moved it to the right one |
+| Juggler, Training stage (`s3-juggler-training`) | pass | Start opened the set-up on the CPU page at (−45, 140) |
+| Eggs-ercise's off-stage zone (`s4-eggs-offstage`) | pass | one zone, in the gap between the island and the long floor; the game started with Off stage only and no "No usable Off stage zone" |
+| Placement's Off stage switch (`s5-place-offstage`) | pass | Player 1's spot went from on stage at (−30, 0) to off stage at (−125, −68); D-pad Right then moved it to (−124, −68) |
+| Play on Player 1 (`s6-playback`) | pass | a 64-frame take was played: 64 of 64 frames delivered. The time to start was not measured |
+| The clip editor (`s7-marks-preview`) | pass | the editor opened with four marks; X played the preview to its end |
+| Guard the Edge, Battlefield (`s8-guard-battlefield`) | pass | the set-up opened with CPU midair jumps set to Used; the setting was put back |
+| The waiting room (`s9-lobby`) | **not run** | the test's route stopped at the main menu before its first input, twice; the cause is in the test bridge, not shown to be in TrainingRooms. Nothing about the waiting room was tested |
+| Settings after the rows (`z-audit`) | pass | no setting differed from its factory value |
+
+Not covered by the smoke boot:
+
+- playing any drill through, and what the two Guard the Edge options do once the CPU is launched;
+- the waiting room, which goes to the operator's test on the console (inbox 23:00:34Z, tr-primary-2);
+- Record while an AI plays Player 1, the named grab, throw and edge-attack keys, B stopping a preview, Delete for
+  replay captures, the form names on the editor's marks, the Playback delay option, and Change placement's save with
+  its shared start save question.
+
+For this page, each row file's `pass` field and the values quoted in the table were read from the row files, and the
+frame of the first row was looked at. The other frames are dup-audit's reads; its result file says which frames it
+read and that one frame (`s8-guard-battlefield`) does not show the set-up card.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
