@@ -81,7 +81,11 @@ impl RecorderSettings {
                 _ => HitstunTiming::HitstunEnds,
             },
             mash_interrupt: on("playback_mash"),
-            shared: SharedStart::Prompt,
+            shared: match first("shared_start_save") {
+                Some(1) => SharedStart::Change,
+                Some(2) => SharedStart::Copy,
+                _ => SharedStart::Prompt,
+            },
         }
     }
 }

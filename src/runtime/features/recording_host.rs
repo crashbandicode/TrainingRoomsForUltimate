@@ -303,7 +303,7 @@ fn place_open(open: &rr_host::PlaceOpen) {
         ledge: [p1.1, cpu.1],
         edit: if open.edit == crate::engine::library::Role::Cpu { Who::Cpu } else { Who::P1 },
         shared: open.shared,
-        rule: crate::model::record_place::SharedStart::Prompt,
+        rule: super::recorder::settings().shared,
     });
 }
 

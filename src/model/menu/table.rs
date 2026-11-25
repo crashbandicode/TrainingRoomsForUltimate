@@ -403,6 +403,8 @@ pub static ROWS: [Row; 171] = [
       "How many times the active macro plays.\nX cycles this while the cursor is in MACROS."),
     Row { advanced: true, ..r(OPTIONS, "Settings override playback", "settings_override_playback", TOGGLE,
       "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
+    Row { advanced: true, ..r(OPTIONS, "Shared start save", "shared_start_save", Control::Dropdown(&o::SHARED_START),
+      "Change placement on a start save that macros share: ask,\nalways change it for all, or always copy it for one.") },
     r(OPTIONS, "Combo helper", "combo_helper", TOGGLE,
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
     r(OPTIONS, "Match sweet/sour spot", "spots_combo", TOGGLE,
