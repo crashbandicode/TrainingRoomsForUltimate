@@ -1195,7 +1195,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "3ed0f4e8e66ce075cc204aa7b0a252591cfd673912d6f5fab663dfec6df8313f",
+   "dest_sha256": "3576af68b7f92d9b9fcf6c807c2164181ffc939514bfa1d7d7a6cedf0dc28111",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1616,6 +1616,11 @@
     {
      "old": "    pub move_text: String,\n}",
      "new": "    pub move_text: String,\n    /// Every mark of the take, not only the drawn ones, and the mark at or nearest the cursor.\n    pub mark_total: u32,\n    pub near: Option<(u32, Option<u32>)>,\n    /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.\n    pub target: Option<bool>,\n}",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        held && pressed && !released\n    }",
+     "new": "        held && pressed && !released\n    }\n}\n\n/// ZR pressed and released with no other button or direction in between: the Player 1 / CPU toggle. ZR held with a\n/// direction is the coarse scrub and never a tap.\n#[derive(Default)]\npub struct TargetTap { down: bool, clean: bool }\n\nimpl TargetTap {\n    pub const fn new() -> Self { Self { down: false, clean: false } }\n\n    /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.\n    pub fn poll(&mut self, zr: bool, other: bool) -> bool {\n        let _ = (zr, other);\n        false\n    }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

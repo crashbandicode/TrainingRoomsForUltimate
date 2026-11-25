@@ -447,13 +447,47 @@ mod tests {
         assert!(!worker.contains("v.hides_page()"));
     }
 
-    fn up_and_down_swap_the_play_target_between_the_cpu_and_player_1() {
-        let mut editor = ClipEditor::macro_file(recording(), false).unwrap();
+    /// tr-primary-2 00:36:47Z: a ZR tap is the Player 1 / CPU toggle, as on the Recording page; ZR held with a direction
+    /// stays the coarse scrub; D-pad Up and Down no longer switch a saved macro's target.
+    fn a_zr_tap_swaps_the_play_target_between_the_cpu_and_player_1() {
+        use clip_panel::TargetTap;
+        let press = |tap: &mut TargetTap, editor: &mut ClipEditor, samples: &[(bool, bool)]| {
+            for &(zr, other) in samples {
+                if tap.poll(zr, other) { editor.on_action(ClipAction::SwapTarget); }
+            }
+        };
+        let target = |editor: &ClipEditor| bridge_clip(&editor.view(), None, false).text();
+        let mut editor = ClipEditor::macro_file(recorded(), false).unwrap();
+        let mut tap = TargetTap::new();
+        press(&mut tap, &mut editor, &[(true, false), (true, false), (false, false)]);
+        assert_eq!(editor.context(), ClipContext::Macro { player: true });
+        assert!(target(&editor).contains(" target=p1 "));
+        press(&mut tap, &mut editor, &[(true, false), (false, false)]);
+        assert_eq!(editor.context(), ClipContext::Macro { player: false });
+        assert!(target(&editor).contains(" target=cpu "));
+        // Held with Left or Right (on a GameCube pad ZR is the only modifier): the scrub moves, the target stays.
+        let holds: [&[(bool, bool)]; 3] = [&[(true, false), (true, true), (true, false), (false, false)],
+            &[(true, true), (false, false)], &[(true, false), (false, true)]];
+        for samples in holds {
+            press(&mut tap, &mut editor, samples);
+            assert_eq!(editor.context(), ClipContext::Macro { player: false });
+        }
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(clip_panel::scrub_step(70)));
+        assert_eq!(editor.view().start, 20);
         for action in [ClipAction::PreviousFighter, ClipAction::NextFighter] {
             editor.on_action(action);
-            let expected = matches!(action, ClipAction::PreviousFighter);
-            assert_eq!(editor.context(), ClipContext::Macro { player: expected });
+            assert_eq!(editor.context(), ClipContext::Macro { player: false });
         }
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { player: false, .. }));
+        press(&mut tap, &mut editor, &[(true, false), (false, false)]);
+        assert!(!editor.view().playing);
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { player: true, .. }));
+        let controls = clip_panel::clip_help(&editor.view(), "ZL or ZR", "ZL", 0).controls;
+        assert!(controls.starts_with("ZR Player/CPU. X preview. Y snap."), "{controls}");
+        let adapter = include_str!("../../runtime/macros/replay_capture.rs");
+        assert!(adapter.contains("TARGET_TAP.lock().unwrap().poll("));
+        assert!(!adapter.contains("controller.just_down.dpad_up() || controller.just_down.dpad_down()"));
     }
 
     fn swapping_cpu_and_p1_mid_preview_stops_it_and_x_plays_on_the_other_fighter() {
@@ -872,7 +906,7 @@ mod tests {
         crate::test_table::run(&[
             ("the_editor_is_a_strip_at_the_bottom_and_leaves_the_fighters_visible", the_editor_is_a_strip_at_the_bottom_and_leaves_the_fighters_visible),
             ("the_strip_stays_up_while_a_preview_plays", the_strip_stays_up_while_a_preview_plays),
-            ("up_and_down_swap_the_play_target_between_the_cpu_and_player_1", up_and_down_swap_the_play_target_between_the_cpu_and_player_1),
+            ("a_zr_tap_swaps_the_play_target_between_the_cpu_and_player_1", a_zr_tap_swaps_the_play_target_between_the_cpu_and_player_1),
             ("swapping_cpu_and_p1_mid_preview_stops_it_and_x_plays_on_the_other_fighter", swapping_cpu_and_p1_mid_preview_stops_it_and_x_plays_on_the_other_fighter),
             ("the_carried_fork_hunks_are_listed_with_commit_file_and_lines", the_carried_fork_hunks_are_listed_with_commit_file_and_lines),
             ("originating_inputs_mark_move_starts_for_any_fighter", originating_inputs_mark_move_starts_for_any_fighter),

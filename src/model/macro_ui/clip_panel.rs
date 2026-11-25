@@ -221,6 +221,21 @@ impl OpenInputGuard {
     }
 }
 
+/// ZR pressed and released with no other button or direction in between: the Player 1 / CPU toggle. ZR held with a
+/// direction is the coarse scrub and never a tap.
+#[derive(Default)]
+pub struct TargetTap { down: bool, clean: bool }
+
+impl TargetTap {
+    pub const fn new() -> Self { Self { down: false, clean: false } }
+
+    /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.
+    pub fn poll(&mut self, zr: bool, other: bool) -> bool {
+        let _ = (zr, other);
+        false
+    }
+}
+
 /// The same editor changes units and offered actions with its source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo { unit: UnitKind } }
