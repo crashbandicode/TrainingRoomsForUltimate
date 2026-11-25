@@ -342,4 +342,63 @@
             assert!(!place.off_stage(true));
         }
     }
+
+    /// The Training stage's collision lines as the stage file has them (training-offstage's fixture rows, copied):
+    /// the two ends, the stored normal's y, pass-through. `stand` is taken from the normal as that fixture takes it.
+    const STAGE_FILE_BLAST: [f32; 4] = [-589.999_8, 500.0, 360.00015, -137.85207];
+    const STAGE_FILE_ROWS: [(Segment, f32, bool); 22] = [
+        ([[620.0, 0.0], [-80.0, 0.0]], 1.0, false),
+        ([[-80.0, 0.0], [-80.0, -340.0]], 0.0, false),
+        ([[-80.0, -340.0], [620.0, -340.0]], -1.0, false),
+        ([[620.0, -340.0], [620.0, 0.0]], 0.0, false),
+        ([[-635.0, 47.391], [-490.0, 47.391]], 1.0, false),
+        ([[-490.0, 47.391], [-490.0, 0.0]], 0.0, false),
+        ([[-490.0, 0.0], [-420.0, 0.0]], 1.0, false),
+        ([[-420.0, 0.0], [-420.0, -165.0]], 0.0, false),
+        ([[-420.0, -165.0], [-635.0, -165.0]], -1.0, false),
+        ([[-635.0, -165.0], [-635.0, 47.391]], 0.0, false),
+        ([[-309.422, 24.119], [-274.789, 24.119]], 1.0, true),
+        ([[-267.316, 47.189], [-232.684, 47.189]], 1.0, true),
+        ([[-225.211, 24.119], [-190.578, 24.119]], 1.0, true),
+        ([[-329.986, -8.208], [-330.0, 0.014]], -0.002, false),
+        ([[-330.0, 0.014], [-249.921, 0.014]], 1.0, false),
+        ([[-249.921, 0.014], [-170.0, 0.014]], 1.0, false),
+        ([[-170.0, 0.014], [-170.011, -8.208]], -0.001, false),
+        ([[-170.011, -8.208], [-185.613, -24.992]], -0.681, false),
+        ([[-185.613, -24.992], [-208.584, -40.007]], -0.837, false),
+        ([[-208.584, -40.007], [-291.396, -39.988]], -1.0, false),
+        ([[-291.396, -39.988], [-314.395, -25.0]], -0.838, false),
+        ([[-314.395, -25.0], [-329.986, -8.208]], -0.68, false),
+    ];
+    fn stage_file_training() -> Vec<(Met, bool)> {
+        STAGE_FILE_ROWS
+            .iter()
+            .map(|&(ends, normal_y, through)| {
+                let stand = if through { normal_y > 0.0 } else { normal_y >= 0.7 };
+                (line(ends, stand, through), normal_y > 0.0)
+            })
+            .collect()
+    }
+
+    /// The two spots Player 1 stood on in the probe boot of 2026-11-25 (dup-audit, inbox 19:08:07Z), where the probe
+    /// printed nothing: on the island's floor, and on the platform over it. And the floor's own height.
+    #[test]
+    fn a_fighter_grounded_on_the_island_has_its_run_and_both_ledges() {
+        each(&stage_file_training(), |stage| {
+            for at in [[-215.88, 0.024], [-215.9, 24.1], [-215.88, 0.014]] {
+                assert_eq!(
+                    floor_run(stage, STAGE_FILE_BLAST, at),
+                    Ok(Some(FloorRun {
+                        ends: [[-330.0, 0.014], [-170.0, 0.014]],
+                        ledges: [ledge([-330.0, 0.014], -1.0), ledge([-170.0, 0.014], 1.0)],
+                    })),
+                    "{at:?}"
+                );
+                assert_eq!(nearest_ledge(stage, STAGE_FILE_BLAST, at), Ok(ledge([-170.0, 0.014], 1.0)), "{at:?}");
+            }
+            for at in [[-215.88, 0.024], [-215.9, 24.1]] {
+                assert_eq!(classify(stage, STAGE_FILE_BLAST, at), Ok(Place::OverStage), "{at:?}");
+            }
+        });
+    }
     }
