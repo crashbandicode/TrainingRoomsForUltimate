@@ -742,7 +742,7 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     if accepted && capture.named[entry as usize] != Some(pending.key) {
         capture.named[entry as usize] = Some(pending.key);
         // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.
-        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };
+        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut smash::app::BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };
         if let Some(fighter) = fighter { capture.pool.name(pending.key, entry, fighter); }
     }
     #[cfg(feature = "named-input-trace")]

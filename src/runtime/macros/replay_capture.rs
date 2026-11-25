@@ -1283,7 +1283,7 @@ pub unsafe fn after_frame(fighter: &mut Fighter) {
     // Once per entry and capture: the identity its specials are named by (`recorded_fighter`).
     if !core::mem::replace(&mut hook.named[entry as usize], true) {
         // SAFETY: `module` is this fighter's live accessor, in the fighter's own frame.
-        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };
+        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut smash::app::BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };
         if let Some(fighter) = fighter {
             if !post_vault(hook.epoch, VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }) { hook.truncated = true; }
         }

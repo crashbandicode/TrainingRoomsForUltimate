@@ -4211,7 +4211,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "56b09a720f111a6c6fc58ec8f83890338b9033e2c8ffe69c8a6ac6b3b94e0461",
+   "dest_sha256": "586ec8d3639ce3b008331094d833d482f181c7a83eedcc9fa45d2224afcddf86",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5077,6 +5077,11 @@
      "old": "    pending: [Option<ReplayFrame>; 8],\n}",
      "new": "    pending: [Option<ReplayFrame>; 8],\n    /// The entries whose fighter identity this capture has posted.\n    named: [bool; 8],\n}",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };",
+     "new": "        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut smash::app::BattleObjectModuleAccessor as usize, sample.start.fighter_kind) };",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -5312,7 +5317,7 @@
    "dest": "src/runtime/macros/live_replay.rs",
    "crate": "root",
    "src_sha256": "fd955747dc9d40bcb6bae4b9877d2040e89d17c313215db53019c3d278ba5592",
-   "dest_sha256": "643dcd99cdad8acd73e8d6f101396556bdc7218da113ecf30356c1fe1c5001f1",
+   "dest_sha256": "7e23d54f2fec0b4a3eaa9961db848559cdf5e75037977692688801cc27523240",
    "edits": [
     {
      "old": "    let accepted = capture.pool.push(pending.key, entry, pending.tick, pending.sample);",
@@ -5644,6 +5649,11 @@
     {
      "old": "    pending: [None; 8], saves: VecDeque::new(),",
      "new": "    pending: [None; 8], named: [None; 8], saves: VecDeque::new(),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };",
+     "new": "        let fighter = unsafe { crate::runtime::features::move_names::fighter_id(module as *mut smash::app::BattleObjectModuleAccessor as usize, pending.sample.start.fighter_kind) };",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
