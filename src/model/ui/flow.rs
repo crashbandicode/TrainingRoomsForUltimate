@@ -176,6 +176,8 @@ pub fn after_session_reset(phase: Phase) -> Phase {
 pub fn next(phase: Phase, seen: Seen) -> (Phase, Step) {
     match phase {
         Phase::Menu if !seen.menu_open && seen.prompt_visible && !seen.clip_visible => (Phase::Prompt, Step::ShowPrompt),
+        // A recording opened from its own menu page can ask about the CPU before the clip gets the pad.
+        Phase::Menu if seen.menu_open && seen.clip_visible && seen.prompt_visible => (Phase::Panel, Step::Nothing),
         Phase::Menu if seen.menu_open && seen.clip_visible && seen.clip_foreground => (Phase::Clip, Step::HandOverToClip),
         Phase::Menu => (Phase::Menu, Step::Nothing),
         // The clip editor's own question answered or retired: the editor is drawn again.

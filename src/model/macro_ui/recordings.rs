@@ -1,6 +1,6 @@
 use crate::engine::macro_ui::{clip_browser, clip_browser::ClipBrowser, macro_panel::{LibraryRow, Pad}};
 use crate::engine::macros::{CaptureEntry, ReplaySession};
-use crate::model::recording_menu::{Make, RecordingFile, RecordingSide};
+use crate::model::recording_menu::{capture_side_label, Make, RecordingFile, RecordingSide};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpenRequest { pub entry: u8, pub player: bool, pub make: Make, pub play: bool }
@@ -34,7 +34,7 @@ pub fn rows(latest: Option<&ReplaySession>, previous: Option<&ReplaySession>, sa
 }
 
 pub fn editor_label(entry: i32, fighter: &str, player: bool) -> String {
-    format!("P{} {fighter} · plays on {}", entry + 1, if player { "Player 1" } else { "CPU" })
+    format!("{} {fighter} · plays on {}", capture_side_label(entry), if player { "Player 1" } else { "CPU" })
 }
 
 pub fn open_one(id: &str, waiting: bool) -> (ClipBrowser, clip_browser::Effect) {
@@ -89,6 +89,30 @@ mod tests {
         assert_eq!(editor_label(2, "Fox", true), "P3 Fox · plays on Player 1");
     }
 
+    fn legacy_capture_sources_are_selected_by_entry_not_file_order_or_fighter() {
+        use crate::engine::macros::CaptureArchive;
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEffect};
+        let archive = CaptureArchive::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vault-recording-sides"));
+        let listed = archive.list().unwrap();
+        assert!(listed.skipped.is_empty());
+        assert_eq!(listed.entries.len(), 2);
+        for item in listed.entries {
+            let both = item.replay_name == "same-fighter-entry1-first";
+            assert!(both || item.replay_name == "entry1-only");
+            assert_eq!(item.sides, if both { vec![(1, 0), (0, 0)] } else { vec![(1, 0)] });
+            let saved = archive.load(&item.id).unwrap();
+            let mut editor = ClipEditor::new(saved.session, vec![0]).unwrap();
+            for entry in [0, 1] {
+                assert_eq!(editor.select_entry(entry), entry == 1 || both);
+                if entry == 0 && !both { continue; }
+                let ClipEffect::Export(take) = editor.on_action(ClipAction::Confirm) else { panic!("no export") };
+                let inputs = take.frames.iter().map(|f| (f.buttons, f.lstick_x, f.lstick_y)).collect::<Vec<_>>();
+                assert_eq!(inputs, if entry == 0 { [(1, 30, 0), (0, 0, 0), (2, -30, 0)] }
+                    else { [(2, 0, 40), (1, 0, -40), (0, 0, 0)] });
+            }
+        }
+    }
+
     /// The waiting room: three seconds (180 layout ticks) with the CPU never idle end the opening; nothing opens later.
     fn a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds() {
         let (mut waiting, effect) = open_one("latest", true);
@@ -106,6 +130,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_captured_side_is_named_independently_of_the_play_target", a_captured_side_is_named_independently_of_the_play_target as fn()),
+            ("legacy_capture_sources_are_selected_by_entry_not_file_order_or_fighter", legacy_capture_sources_are_selected_by_entry_not_file_order_or_fighter as fn()),
             ("an_empty_capture_is_not_listed_and_does_not_open", an_empty_capture_is_not_listed_and_does_not_open as fn()),
             ("the_recordings_rows_are_the_same_in_the_lobby_and_training", the_recordings_rows_are_the_same_in_the_lobby_and_training as fn()),
             ("a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds", a_waiting_opening_that_never_finds_the_cpu_idle_ends_after_three_seconds as fn()),

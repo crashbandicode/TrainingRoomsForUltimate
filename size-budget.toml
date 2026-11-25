@@ -2825,3 +2825,11 @@ ceiling = 200659
 date = "2026-11-25"
 reason = "Vault recordings on merge 4b (4905ec89): the RECORDINGS list and a recording's screen (Inputs from, Plays on, Play back, Make macro, combo, drill), a Make pass on either role, the Vault clip preview on either role, and the waiting-room opening's status. Measured 200659 (tools/sloc.py tree), 831 above merge 4b's 199828."
 approved_by = "tr-primary-2 2026-11-25 00:48:43Z (lines approved at the measured value of the final head, up to +900)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200672
+date = "2026-11-25"
+reason = "Vault review: label the second input source CPU and route the opening fighter question through its panel. Measured 200672, 15 above the submitted 962ad694 and 844 above merge 4b."
+approved_by = "tr-primary-2 2026-11-25 00:48:43Z (final measured value through +900), 02:16:35Z (review correction)."

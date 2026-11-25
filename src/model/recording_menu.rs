@@ -169,6 +169,10 @@ pub struct RecordingSide {
     pub fighter: String,
 }
 
+pub(crate) fn capture_side_label(entry: i32) -> &'static str {
+    ["P1", "CPU", "P3", "P4", "P5", "P6", "P7", "P8"].get(entry as usize).copied().unwrap_or("?")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordingFile {
     pub id: String,
@@ -1929,7 +1933,7 @@ impl RecordingScreens {
         match item.kind {
             ItemKind::Save => self.save_by_id(&item.id).map(|file| file.fighters.clone()).unwrap_or_default(),
             ItemKind::Captured => self.recording_by_id(&item.id).map(|file| {
-                let mut parts: Vec<String> = file.sides.iter().map(|side| format!("P{} {}", side.entry + 1, side.fighter)).collect();
+                let mut parts: Vec<String> = file.sides.iter().map(|side| format!("{} {}", capture_side_label(side.entry.into()), side.fighter)).collect();
                 parts.push(format!("{} frames", file.frames));
                 parts.join(" · ")
             }).unwrap_or_default(),
@@ -2201,7 +2205,7 @@ impl RecordingScreens {
     fn capture_file_rows(&self, file: &FileScreen) -> Vec<BuiltRow> {
         let Some(side) = self.recording_by_id(&file.id).and_then(|recording| recording.sides.get(file.capture_side)) else { return Vec::new() };
         vec![
-            row("Inputs from", format!("P{} · {}", side.entry + 1, side.fighter), Act::CaptureSide),
+            row("Inputs from", format!("{} · {}", capture_side_label(side.entry.into()), side.fighter), Act::CaptureSide),
             row("Plays on", if file.capture_player { "Player 1" } else { "CPU" }, Act::CaptureTarget),
             row("Play back", "", Act::CaptureOpen(Make::Macro, true)),
             row("Make macro…", "", Act::CaptureOpen(Make::Macro, false)),
