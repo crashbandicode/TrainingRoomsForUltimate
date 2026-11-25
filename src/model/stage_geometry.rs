@@ -1,9 +1,14 @@
 //! Shared pure stage geometry: placement classification, scans, outlines and ledges.
-use super::edge_juggle::perfect::{Outline, Point, Segment};
+use super::edge_juggle::perfect::Outline;
+pub use super::edge_juggle::perfect::{Point, Segment};
 use super::mashout::entry::PlacementFloor;
 use super::tech::discovery::{Ray, Rays};
 use super::tech::surface::{Kind, Line, Surfaces, MAX_LINES};
 use super::tech::Vec2;
+
+#[path = "stage_geometry/rule.rs"]
+mod rule;
+pub use rule::*;
 
 /// True when the line is a placement floor.
 pub fn is_placement_floor(flags: u32, normal_y: f32, platforms: bool) -> bool {
@@ -439,6 +444,7 @@ mod tests {
     fn no_stage_is_named() {
         for source in [
             include_str!("stage_geometry.rs"),
+            include_str!("stage_geometry/rule.rs"),
             include_str!("../runtime/features/stage_geometry.rs"),
         ] {
             let code = source.split("#[cfg(test)]").next().unwrap();
