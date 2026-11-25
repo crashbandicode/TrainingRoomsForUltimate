@@ -120,7 +120,7 @@ pub struct QuickInput {
     pub refused: bool,
 }
 
-/// The refusal's notice, worded as Record's (`recording::RecordRefusal::P1DrivenByAi`).
+/// The refusal's notice.
 pub const AI_REFUSAL: &str = "P1 is controlled by an AI: Quick Reset is off";
 
 #[cfg(test)]

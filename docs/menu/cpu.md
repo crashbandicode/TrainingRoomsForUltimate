@@ -457,8 +457,8 @@ you set it on its own page (Online Deluxe's CPU Pilot page), not here.
 ### P1 CPU Control
 
 Shown only when the CPU pilot plugin is not installed. On: the game's CPU AI plays Player 1 in Training once you close
-the menu. It waits while a menu is open or a recording is made or played. While it plays, Record and Play on
-Player 1 are refused.
+the menu. It waits while a menu is open or a recording is played, and keeps playing while a recording is made: that
+recording holds its inputs. While it plays, Play on Player 1 is refused.
 
 - **Values:** On, Off.
 - **Default:** Off: you play Player 1.
