@@ -117,7 +117,7 @@ don't turn the page while a file's screen is open.
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
 | Trim | Start, End, Both or Off: skip neutral frames at those sides during playback, without changing the saved frames. A, Left or Right cycles. |
-| Crop | Opens the [clip editor](#replay-window). It is a strip over the bottom of the screen, so both fighters stay visible. L picks In, R picks Out; Left/Right move it and Y snaps it to the nearest move. Macros use frames and X previews on the CPU or Player 1 (a ZR tap swaps); combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays, and a crop of the role's active macro becomes active. B stops a preview, or leaves when none is playing. |
+| Crop | Opens the [clip editor](#replay-window). It is a strip over the bottom of the screen, so both fighters stay visible. L picks In, R picks Out; Left/Right move it and Y snaps it to the nearest move. Macros use frames and X previews on the CPU or Player 1 (a ZR tap swaps); combos use whole links and drills use whole steps, with no X action. A names and saves a new file of the same kind; the original stays, and a crop of the role's active macro becomes active. B stops a preview or its tail, and leaves when the editor is idle. |
 | Make combo | Plays the file once on Player 1 from its start save: hits make a combo; a pass with no hits makes an input drill. |
 | Drill, Drill sequence | Makes this the one combo or sequence the combo helper grades. |
 | Edit chain, Edit combos | Opens the numbered picker. |
@@ -200,8 +200,9 @@ Each step shows its first and last inputs' moves, or the inputs when no move was
 as one input; stick flicks appear in the title only without a button or C-stick input. Grading still checks inputs.
 
 On a drill row, X previews its recorded inputs on Player 1. While the take plays, the strip's key line reads
-`B stop preview`. B or X stops it and drops the rest of its frames; the page or pop-up returns. If the take finishes
-without a stop, the page returns after its short tail.
+`B stop preview`. B or X stops it and drops the rest of its frames; the page or pop-up returns. After the last frame
+the result stays on screen for about a second with an empty key line; B or X returns to the page or pop-up at once,
+or it returns after the tail.
 
 The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
 
@@ -283,9 +284,10 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
 | X | Previews the kept part: a capture on the CPU (or on Player 1 after a ZR tap, or when its Plays on says so), or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early and drops its remaining frames. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
-| B | Stops a preview without leaving; the next B closes the editor. B closes at once when not previewing. |
+| B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
 
-While a preview plays, the key line reads `B stop preview`. It returns to the usual keys when the preview ends.
+While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
+a second with an empty key line; B or X ends that tail without closing the editor, and the usual keys return.
 
 Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a capture the strip names the captured side and where the preview plays.
 

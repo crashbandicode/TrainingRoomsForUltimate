@@ -28,7 +28,6 @@ pub struct PreviewTail { ended: Option<u64> }
 impl PreviewTail {
     pub const fn new() -> Self { Self { ended: None } }
     pub fn restart(&mut self) { self.ended = None; }
-    pub fn ended(&self) -> bool { self.ended.is_some() }
     /// `running`: the playback still has frames. `frame`: the game's frame number. True once the tail has passed.
     pub fn over(&mut self, running: bool, frame: u64) -> bool {
         if running {
@@ -799,6 +798,16 @@ mod tests {
 
     fn a_second_b_leaves_the_editor() {
         for mut e in [editor(), saved_macro(false), saved_macro(true)] {
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::Close));
+            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));
+            let view = e.view();
+            e.preview_cursor(view.end - view.start);
+            assert_eq!(e.view().cursor, view.end - 1);
+            assert!(e.view().playing);
+            let back = e.action_for_pad(Pad::Back).unwrap();
+            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));
+            assert!(!e.view().playing);
             let back = e.action_for_pad(Pad::Back).unwrap();
             assert!(matches!(e.on_action(back), ClipEffect::Close));
             assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));

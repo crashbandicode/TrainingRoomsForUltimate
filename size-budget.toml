@@ -3093,7 +3093,7 @@ approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 203633
+ceiling = 203632
 date = "2026-11-25"
-reason = "Preview stop and the Recording pop-up's configured chord line: measured 203633 (tools/sloc.py tree), 48 above 203585."
+reason = "Preview stop and the Recording pop-up's configured chord line: measured 203632 (tools/sloc.py tree), 47 above 203585."
 approved_by = "tr-primary-2 standing rule of 2026-11-24 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)"

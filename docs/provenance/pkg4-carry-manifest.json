@@ -1260,7 +1260,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "719e63159e1f96731b339b61e4eece7774e91e7c5cf3e6497e6aad5afcdef7ab",
+   "dest_sha256": "046d12a7d0f9b01fbc366b7c23baae0c765999aa9868ba1faccdaeba43773224",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1707,6 +1707,16 @@
      "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): B stops a playing preview without closing the editor, and the editor redraws when the preview ends",
      "old": "            ClipAction::Cancel => { self.pause(); return ClipEffect::Close; }\n",
      "new": "            ClipAction::Cancel => {\n                if self.playing {\n                    self.pause();\n                    self.window.seek(self.window.start());\n                    return ClipEffect::StopPreview;\n                }\n                return ClipEffect::Close;\n            }\n"
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): the unused tail accessor of the tests-first commit is removed",
+     "old": "    pub fn ended(&self) -> bool { self.ended.is_some() }\n",
+     "new": ""
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): the unused tail accessor of the tests-first commit is removed",
+     "old": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n",
+     "new": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n            let view = e.view();\n            e.preview_cursor(view.end - view.start);\n            assert_eq!(e.view().cursor, view.end - 1);\n            assert!(e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));\n            assert!(!e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n"
     }
    ]
   },

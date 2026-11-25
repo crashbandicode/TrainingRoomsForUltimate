@@ -19,10 +19,13 @@ const CHORD: &str = "ZL";
 
 pub const PREVIEW_STOP_HINT: &str = "B stop preview";
 
-pub fn stop_hint(frame: &mut Frame, running: bool) {
-    if running {
+/// `playing` is the editor or strip's preview state (tail included); `running` means the engine still has frames.
+pub fn stop_hint(frame: &mut Frame, playing: bool, running: bool) {
+    if playing {
         frame.hint.clear();
-        let _ = frame.hint.write_str(PREVIEW_STOP_HINT);
+        if running {
+            let _ = frame.hint.write_str(PREVIEW_STOP_HINT);
+        }
     }
 }
 
@@ -132,12 +135,15 @@ mod tests {
         let mut f = Frame::new();
         v.playing = true;
         clip_frame(&v, "Pikachu", 0, &mut f);
-        stop_hint(&mut f, true);
+        stop_hint(&mut f, true, true);
         assert_eq!(f.hint.string_lossy(), "B stop preview");
-        for playing in [true, false] {
-            v.playing = playing;
+        clip_frame(&v, "Pikachu", 0, &mut f);
+        stop_hint(&mut f, true, false);
+        assert!(f.hint.is_empty());
+        for running in [true, false] {
+            v.playing = false;
             clip_frame(&v, "Pikachu", 0, &mut f);
-            stop_hint(&mut f, false);
+            stop_hint(&mut f, false, running);
             let hint = f.hint.string_lossy();
             assert!(hint.contains("B close.") && !hint.contains("stop preview"), "{hint}");
         }

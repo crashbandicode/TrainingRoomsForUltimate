@@ -89,25 +89,22 @@ mod tests {
         let strip = publish.split("if !flow::frame_needs_menu(s.phase)").next().unwrap();
         let editor = publish.split("if !flow::frame_needs_menu(s.phase)").nth(1).unwrap()
             .split("let Some(menu)").next().unwrap();
-        for branch in [strip, editor] {
-            assert!(branch.contains("stop_hint(") && branch.contains("preview_running()"));
-        }
-        assert!(editor.contains("view.playing &&"));
-        assert!(!worker.contains("\"X or B: stop.\""));
+        assert!(strip.contains("stop_hint(&mut next, true,") && strip.contains("preview_running()"));
+        assert!(editor.contains("stop_hint(&mut next, view.playing,") && editor.contains("preview_running()"));
+        assert!(!worker.contains(concat!("X or B:", " stop.")));
     }
 
     #[test]
     fn the_editor_redraws_when_the_preview_ends() {
         let mut tail = PreviewTail::new();
-        assert!(!tail.ended());
         assert!(!tail.over(true, 10));
-        assert!(!tail.ended());
         assert!(!tail.over(false, 11));
-        assert!(tail.ended());
-        assert!(!tail.over(false, 12));
-        assert!(tail.ended());
+        let end = 11 + crate::engine::macro_ui::clip_panel::PREVIEW_TAIL_FRAMES;
+        assert!(!tail.over(false, end - 1));
+        assert!(tail.over(false, end));
         tail.restart();
-        assert!(!tail.ended());
+        assert!(!tail.over(false, end));
+        assert!(tail.over(false, end + crate::engine::macro_ui::clip_panel::PREVIEW_TAIL_FRAMES));
         let source = include_str!("../../runtime/macros/replay_capture.rs");
         let service = source.split("pub fn service_reload()").nth(1).unwrap()
             .split("pub fn preview_failed(").next().unwrap();

@@ -1429,8 +1429,7 @@ fn publish_frame(s: &Session) {
             next.help[0].clear();
             let _ = next.help[0].write_str("Previewing the drill's take.");
             next.help[1].clear();
-            next.hint.clear();
-            stop_hint(&mut next, crate::engine::rr_host::preview_running());
+            stop_hint(&mut next, true, crate::engine::rr_host::preview_running());
             hand_over(&next);
             crate::runtime::ui::state::PREVIEW_STRIP.store(true, Ordering::Release);
             return;
@@ -1442,7 +1441,7 @@ fn publish_frame(s: &Session) {
         let mut next = NEXT_FRAME.lock();
         next.reset();
         clip_frame(&view, &replay_capture::clip_fighter_label(&view), replay_capture::scrub_pace(), &mut next);
-        stop_hint(&mut next, view.playing && crate::engine::rr_host::preview_running());
+        stop_hint(&mut next, view.playing, crate::engine::rr_host::preview_running());
         hand_over(&next);
         return;
     }
