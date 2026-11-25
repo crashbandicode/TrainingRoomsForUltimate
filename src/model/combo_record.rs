@@ -245,7 +245,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
-        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
+        let identity = self.fighter.map(fighter_value);
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -418,6 +418,25 @@ fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
         *out = u8::try_from(value.as_u64()?).ok().filter(|value| *value <= 2)?;
     }
     Some(super::move_names::FighterId { chara, specials })
+}
+
+pub(crate) fn fighter_value(fighter: super::move_names::FighterId) -> Value {
+    json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials})
+}
+
+/// The `recorded_fighter` key of a combo file, for the other files that store the same identity.
+pub mod fighter_key {
+    use super::super::move_names::FighterId;
+
+    pub fn serialize<S: serde::Serializer>(fighter: &Option<FighterId>, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&fighter.map(super::fighter_value), serializer)
+    }
+
+    /// A key of the wrong shape reads as no identity: the file still loads.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<FighterId>, D::Error> {
+        let value: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+        Ok(super::recorded_fighter(&value))
+    }
 }
 
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
