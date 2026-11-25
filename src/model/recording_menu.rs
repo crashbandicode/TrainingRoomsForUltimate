@@ -2770,6 +2770,46 @@ mod tests {
         assert_eq!(screens.selection().bound.as_deref(), Some("platform"));
     }
 
+    /// Operator 2026-11-25, PC2: Change placement opens from the save's own screen, and the menu closes for it.
+    fn change_placement_is_a_row_of_the_saves_own_screen() {
+        let mut screens = screens();
+        screens.set_cursor(Face::Page, SAVES_MACROS, 0, 0);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        let titles: Vec<_> = screens.file_rows().iter().map(|row| row.title.clone()).collect();
+        assert_eq!(titles[..2], ["Bind to Save / Load", "Change placement"]);
+        screens.set_file_cursor(1);
+        assert!(matches!(screens.handle_page(Button::A, true, SAVES_MACROS), PageHit::Close));
+        assert_eq!(screens.take_effect(), Effect::ChangePlacement { save: "corner".into(), relink: None });
+    }
+
+    /// PC2: a macro's and a chain's own screen open their start save (a chain: its macro 1's). The macro that asked
+    /// is the one a copy is linked to. A macro with no start save has no such row.
+    fn a_macro_and_a_chain_open_their_start_save() {
+        let mut screens = screens();
+        for (id, opens) in [("nair", true), ("pressure", true), ("dash", false)] {
+            screens.open_file(id.into(), ItemKind::Recording);
+            let at = screens.file_rows().iter().position(|row| row.title == "Change placement");
+            assert_eq!(at, opens.then_some(1), "{id}: right after Start save");
+            if let Some(at) = at {
+                screens.set_file_cursor(at);
+                assert!(matches!(screens.handle_page(Button::A, true, SAVES_MACROS), PageHit::Close), "{id}");
+                assert_eq!(screens.take_effect(), Effect::ChangePlacement { save: "nair-start".into(), relink: Some("nair".into()) });
+            }
+            screens.file = None;
+        }
+    }
+
+    /// PC2: X on a save in the pop-up opens the picker on it; the pop-up closes.
+    fn the_pop_up_opens_change_placement_with_x_on_a_save() {
+        let mut screens = screens();
+        open_popup(&mut screens);
+        screens.set_cursor(Face::Popup, SAVES_MACROS, 0, 1);
+        assert!(screens.hint(Face::Popup).starts_with("A bind   X place   "));
+        assert!(screens.press_popup_outcome(Button::X));
+        assert_eq!(screens.take_effect(), Effect::ChangePlacement { save: "platform".into(), relink: None });
+        assert!(!screens.popup_open());
+    }
+
     fn popup_buttons_match_q11() {
         let mut screens = screens();
         open_popup(&mut screens);
@@ -4299,6 +4339,9 @@ mod tests {
             ("the_lists_say_loading_until_the_catalog_arrives", the_lists_say_loading_until_the_catalog_arrives as fn()),
             ("one_save_is_bound_and_the_page_opens_it", one_save_is_bound_and_the_page_opens_it as fn()),
             ("popup_buttons_match_q11", popup_buttons_match_q11 as fn()),
+            ("change_placement_is_a_row_of_the_saves_own_screen", change_placement_is_a_row_of_the_saves_own_screen as fn()),
+            ("a_macro_and_a_chain_open_their_start_save", a_macro_and_a_chain_open_their_start_save as fn()),
+            ("the_pop_up_opens_change_placement_with_x_on_a_save", the_pop_up_opens_change_placement_with_x_on_a_save as fn()),
             ("popup_zr_toggles_the_role_like_the_page", popup_zr_toggles_the_role_like_the_page as fn()),
             ("popup_l_r_zl_switch_tabs_and_never_set_the_role", popup_l_r_zl_switch_tabs_and_never_set_the_role as fn()),
             ("popup_footer_names_zr_role_and_tab_keys", popup_footer_names_zr_role_and_tab_keys as fn()),
