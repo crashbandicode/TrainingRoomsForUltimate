@@ -230,10 +230,11 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Off-stage zone, Moving paths and Target expiry add three Eggs-ercise rows.
     // rc.15 compact strip: Display & Controls gained Link history (the operator's order via the primary, 2026-11-21 18:48Z; 13 → 14).
     // Change placement: Recording gained the Advanced row Shared start save (operator 2026-11-25, PC5; 18 → 19).
-    assert_eq!(counts(false), [34, 11, 19, 91, 14, 3]);
-    assert_eq!(counts(true), [33, 11, 19, 91, 14, 3]);
-    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 169);
-    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 168);
+    // Guard the Edge's two start options, Under the stage and CPU midair jumps (91 → 93).
+    assert_eq!(counts(false), [34, 11, 19, 93, 14, 3]);
+    assert_eq!(counts(true), [33, 11, 19, 93, 14, 3]);
+    assert_eq!(counts(false)[..5].iter().sum::<usize>(), 171);
+    assert_eq!(counts(true)[..5].iter().sum::<usize>(), 170);
     // Controls (MENU-DRAFT §2): 4 direction grids, 7 delay rows, 13 multi-selects (the 12 checklists,\n    // 3 of them slot sets, and Swap groups).
     let n = |f: &dyn Fn(&Control) -> bool| ROWS.iter().filter(|r| r.vis != model::menu::table::Vis::PilotPresent && f(&r.control)).count();
     assert_eq!(n(&|c| matches!(c, Control::DirectionGrid { .. })), 5);
@@ -253,7 +254,8 @@ fn layout_row_counts_match_the_rc_freeze() {
     // Eggs spawn area adds one existing-group setting row (144 → 145).
     // Spacing grader adds one Display & Controls row (145 → 146).
     // Playback delay (171 → 172); Change placement adds the Advanced row Shared start save (172 → 173).
-    assert_eq!(ROWS.len(), 173);
+    // Guard the Edge's two start options are two of these rows (173 → 175).
+    assert_eq!(ROWS.len(), 175);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }

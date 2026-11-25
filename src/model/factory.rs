@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 181;
+pub const COUNT: usize = 183;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -278,6 +278,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("juggle_reaction", Single, 3, [1]),
     row!("juggle_reaction_frames", Single, 30, [11]),
     row!("edge_cpu_percent", Single, 301, [100]),
+    row!("edge_under", Single, 2, [1]),
+    row!("edge_jumps", Single, 2, [0]),
     row!("edge_attempts", Single, 3, [0]),
     row!("juggle_attempts", Single, 3, [0]),
 

@@ -71,15 +71,6 @@ fn edge_wizard_refuses_a_start_over_the_stage() {
     assert_eq!(stage.off_stage([f32::NAN, 0.0]), None);
     assert_eq!(stage.edge_cursor([-1000.0, 1000.0]), Some([-229.0, 184.0]));
     assert_eq!(stage.edge_cursor([1000.0, -1000.0]), Some([229.0, -139.0]));
-    let mut edge = wizard(Drill::GuardEdge, None);
-    assert!(edge.accepts_cpu(stage));
-    for _ in 0..40 {
-        edge.steer(stage, &pad([1.0, 0.0], 0));
-    }
-    assert!(!edge.accepts_cpu(stage));
-    let mut juggle = wizard(Drill::Juggler, None);
-    juggle.steer(stage, &pad([1.0, 0.0], 0));
-    assert!(juggle.accepts_cpu(stage));
 }
 
 #[test]
@@ -294,5 +285,79 @@ fn wizard_notice_fits_its_buffer() {
     let mut preview = FixedPath::<128>::new();
     assert!(write!(preview, "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start").is_ok());
     assert_eq!(Body::copied(preview.as_str()).as_str(), preview.as_str());
+}
+
+#[test]
+fn used_jumps_spend_every_midair_jump_of_the_fighter() {
+    // `max` is the fighter's own `jump_count_max`, which counts the ground jump: 2 for most, 3 and 6 for the
+    // fighters with two and five midair jumps.
+    for max in [2, 3, 6] {
+        assert_eq!(Drill::GuardEdge.placed_jump_count(true, max), max);
+        assert_eq!(Drill::GuardEdge.placed_jump_count(false, max), 1);
+    }
+    // A count that cannot be read keeps the jumps.
+    for max in [1, 0, -1] {
+        assert_eq!(Drill::GuardEdge.placed_jump_count(true, max), 1);
+        assert_eq!(Drill::GuardEdge.placed_jump_count(false, max), 1);
+    }
+}
+
+#[test]
+fn juggler_ignores_the_two_start_options() {
+    use crate::model::practice_state::Fields;
+    let juggle = wizard(Drill::Juggler, None);
+    for used in [false, true] {
+        for max in [-1, 0, 2, 6] {
+            assert_eq!(Drill::Juggler.placed_jump_count(used, max), 0);
+        }
+        for under in [false, true] {
+            use crate::model::stage_geometry::Place;
+            let options = StartOptions { under, jumps_used: used };
+            for place in [Place::Open, Place::Under, Place::OverStage, Place::Solid, Place::Outside] {
+                assert_eq!(juggle.takes(place, options), juggle.takes(place, StartOptions::default()), "{place:?}");
+            }
+            let mut fields = Fields::default();
+            options.describe(Drill::Juggler, &mut fields);
+            assert_eq!(fields.start_options, None);
+        }
+    }
+}
+
+#[test]
+fn the_drill_state_names_the_two_start_options() {
+    use crate::model::practice_games::Game;
+    use crate::model::practice_state::{snapshot, Fields, CPU_ENTRIES};
+    let wire = |options: StartOptions| {
+        let mut fields = Fields { phase: "live", ..Fields::default() };
+        options.describe(Drill::GuardEdge, &mut fields);
+        let mut wire = String::new();
+        snapshot(Some(Game::GuardEdge), fields, [0; CPU_ENTRIES], &mut wire);
+        wire
+    };
+    let has = |wire: &str, line: &str| wire.lines().any(|l| l == line);
+    let set = wire(StartOptions { under: true, jumps_used: true });
+    assert!(has(&set, "under=on") && has(&set, "jumps=used"), "{set}");
+    let default = wire(StartOptions::default());
+    assert!(has(&default, "under=off") && has(&default, "jumps=kept"), "{default}");
+    // Every other game, and Juggler, has neither line.
+    let mut none = String::new();
+    snapshot(Some(Game::Juggler), Fields { phase: "live", ..Fields::default() }, [0; CPU_ENTRIES], &mut none);
+    assert!(!none.contains("under=") && !none.contains("jumps="), "{none}");
+}
+
+#[test]
+fn the_start_options_read_no_scene() {
+    // Training and a waiting room run the same poll, frame and placement: the options come from the one published
+    // setting, the stage and the point's place from the one rule, and the jump count from the one write.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    assert_eq!(runtime.matches("StartOptions::read(snapshot)").count(), 1);
+    assert_eq!(runtime.matches("drill.placed_jump_count(options.jumps_used, ").count(), 1);
+    assert_eq!(runtime.matches("wizard.confirm_start(at, place, run.options)").count(), 1);
+    assert_eq!(runtime.matches("wizard.kept_setup(stage, kept, config.options)").count(), 1);
+    assert_eq!(runtime.matches("edge_juggle::start_stage(").count(), 1);
+    let body = |name: &str| runtime.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    for code in [body("unsafe fn try_place("), body("unsafe fn setup_stage(")] {
+        assert!(!code.contains("practice_scene") && !code.contains("Scene::") && !code.contains("LOBBY"));
+    }
 }
 }

@@ -450,8 +450,51 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 Guard the Edge's setup has three pages: CPU start, Player 1 start, then Preview. Move the crosshair with the stick
 (2 units a frame at full tilt) or D-pad (1 unit a press). The CPU start must be off the stage; **A** refuses a point
-over or under it. On the CPU page, **X** restores that side's default and **Y** picks the other side's default.
-Player 1's crosshair chooses a point on the main floor.
+over the stage or in it, and a point under it unless **Under the stage** is On. On the CPU page, **X** restores that
+side's default and **Y** picks the other side's default. Player 1's crosshair chooses a point on the main floor.
+
+2026-11-25. Two rows on the Guard the Edge page change how the CPU starts. Both apply at the next Start.
+
+- **Under the stage** (Off by default). On: **A** on the CPU page also takes a point under the stage. A point over the
+  stage, in it or outside the blast lines is still refused. A start under the stage that you set up is used again by
+  Start only while the row is On; with it Off, Start opens the setup at the default start.
+- **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with all its midair jumps already spent.
+  The number comes from the fighter's own jump count, so there is no list of fighters. Perfect mode plans its recovery
+  without them.
+
+Known limits:
+
+- A point just under the stage can put the fighter's upper body inside the stage. What the game does with such a start
+  is not known.
+- Perfect mode's route from under the stage is not established; it was built for starts beside the stage.
+- Whether a fighter's own moves give the jumps back after the start is not known. A second resource, such as a float,
+  is not touched.
+
+Not yet seen in a game.
+
+2026-11-25. Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with
+more than one piece of ground, such as the Training stage, stand on the piece you want to use and choose **Start**.
+
+- Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side:
+  **Y** (the other side) does nothing there. On the Training stage the long floor has its left ledge only, and the
+  island has both.
+- The default CPU start on a side is halfway across the open air beside that ledge and halfway down to the bottom
+  blast line. A fighter with a default start of its own keeps it only where that point is in open air.
+- Juggler needs no ledge. Its CPU spot can be over the stage (the default is above you) or in open air beside it.
+- Every point you confirm with **A** on the CPU page is checked against the stage one frame later.
+- A start you set up is used again by **Start** only on the floor it was made on. On another floor Start opens the
+  setup at that floor's defaults.
+
+When a start cannot happen, a message says why and the menu row reads **Start** again:
+
+| Message | When |
+| --- | --- |
+| "The stage could not be read" | Start, when the stage's lines could not be read on that frame. Try Start again. |
+| "Stand on the stage to start this drill" | Start, when there is no solid floor under you (over a gap, or in the air off stage). |
+| "This floor has no ledge to guard" | Guard the Edge's Start, when neither end of your floor has open air beside it: it meets a wall or a step, or runs out past the blast line. |
+| "Pick a point over the stage or beside it" | Juggler's CPU page, **A** on a point under the stage, inside it or outside the blast lines. |
+
+Guard the Edge's own "Pick a point off the stage" is unchanged. Not yet seen in a game.
 
 While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
 is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**

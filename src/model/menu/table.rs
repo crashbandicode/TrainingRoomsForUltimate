@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 173] = [
+pub static ROWS: [Row; 175] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -638,8 +638,12 @@ pub static ROWS: [Row; 173] = [
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
       "Choose the start area, the CPU's point and your point.\nPreview both positions before starting."),
+    r(EDGE, "Under the stage", "edge_under", TOGGLE,
+      "Off (default): the CPU start must be beside the stage.\nOn: A also takes a point under the stage."),
     r(EDGE, "CPU percent", "edge_cpu_percent", Control::Number { first: 0, step: 1 },
       "CPU damage at the start of each attempt.\nThe CPU starts in free fall."),
+    r(EDGE, "CPU midair jumps", "edge_jumps", Control::Dropdown(&["Kept", "Used"]),
+      "Kept (default): the CPU starts with its midair jumps.\nUsed: it starts with every midair jump already spent."),
     r(EDGE, "Attempts", "edge_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
     r(EDGE, "Zoom landing window", "edge_zoom_window", Control::Number { first: 1, step: 1 },

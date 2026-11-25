@@ -1,5 +1,6 @@
 use super::btt;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
+use super::practice_state::CpuView;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Crosshair {
@@ -127,11 +128,11 @@ pub fn hold_step(slot: &mut Option<CpuPreview>, body: u32, grounded: bool, origi
 
 /// How the picker's CPU point is shown, for the practice state: the body is there in view, or the game shows its
 /// magnifier of it; empty when the body is not there.
-pub fn cpu_view(preview: Option<&CpuPreview>) -> &'static str {
+pub fn cpu_view(preview: Option<&CpuPreview>) -> CpuView {
     match preview {
-        None => "",
-        Some(preview) if preview.magnified => "magnifier",
-        Some(_) => "in_view",
+        None => CpuView::NotHeld,
+        Some(preview) if preview.magnified => CpuView::Magnifier,
+        Some(_) => CpuView::InView,
     }
 }
 
@@ -277,12 +278,12 @@ mod tests {
 
     #[test]
     fn the_practice_state_says_how_the_cpu_point_is_shown() {
-        assert_eq!(cpu_view(None), "");
+        assert_eq!(cpu_view(None), CpuView::NotHeld);
         let mut slot = None;
         preview_step(&mut slot, 7, || origin(3.0));
-        assert_eq!(cpu_view(slot.as_ref()), "in_view");
+        assert_eq!(cpu_view(slot.as_ref()), CpuView::InView);
         slot.as_mut().unwrap().magnified = true;
-        assert_eq!(cpu_view(slot.as_ref()), "magnifier");
+        assert_eq!(cpu_view(slot.as_ref()), CpuView::Magnifier);
     }
     }
 }
