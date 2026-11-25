@@ -458,7 +458,7 @@ impl Provider {
         let send = |text: &str| event(handle, text.as_ptr(), text.len() as u32);
         self.events.flush(now_ms, send);
         let running = crate::engine::rr_host::preview_running();
-        let clip = self.drill.or_else(|| crate::runtime::macros::replay_capture::clip_view().map(|shown| Clip::of(&shown, None, running)));
+        let clip = self.drill.or_else(|| crate::runtime::macros::replay_capture::clip_view().map(|shown| crate::engine::macro_ui::clip_marks::bridge_clip(&shown, None, running)));
         self.clip.send(clip, send);
     }
 

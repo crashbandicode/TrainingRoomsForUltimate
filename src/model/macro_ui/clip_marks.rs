@@ -1,4 +1,5 @@
 use crate::engine::macros::{ActionMark, InputFrame, MacroRecording};
+use crate::model::bridge_events::Clip;
 use crate::model::combo::{self, Kind, STEPS};
 use crate::model::combo_record::{move_key, move_of};
 use crate::model::frame_strip::{self, Button, Move, Snap};
@@ -294,6 +295,25 @@ impl Marks {
     }
 }
 
+/// The editor's view as the bridge's `clip` line carries it; `ctx` names a strip that is not the editor's own (`drill`).
+pub fn bridge_clip(view: &crate::engine::macro_ui::clip_panel::ClipView, ctx: Option<&'static str>, running: bool) -> Clip {
+    use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
+    Clip {
+        ctx: ctx.unwrap_or(match view.context {
+            ClipContext::Replay { .. } => "replay",
+            ClipContext::Macro { player: true } => "macro.p1",
+            ClipContext::Macro { player: false } => "macro.cpu",
+            ClipContext::Combo { .. } => "combo",
+        }),
+        total: view.total, start: view.start, end: view.end, cursor: view.cursor,
+        playing: view.playing,
+        handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
+        running,
+        target: match view.target { Some(true) => "p1", Some(false) => "cpu", None => "none" },
+        marks: view.mark_total, mark: view.near, text: crate::model::bridge_events::MoveText::new(&view.move_text),
+    }
+}
+
 fn input_name(kind: Kind) -> &'static str {
     match kind {
         Kind::Press(Button::Attack) => "Attack",
@@ -585,6 +605,35 @@ mod tests {
         assert_eq!((crossing.view().start, crossing.view().end), (90, 96));
     }
 
+    /// tr-primary-2 00:31:58Z: the line carries the play target, the mark count, the mark at or nearest the cursor and the
+    /// strip's move text, quoted and bounded; the drill take preview's strip sends the same line as `ctx=drill`.
+    fn a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text() {
+        use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
+        let mut frames = vec![InputFrame::default(); 200];
+        frames[10].buttons = 1;
+        frames[90].buttons = 2;
+        let mut recording = MacroRecording::new("Crop", "13.0.5", StartState::neutral(0, 0, 1.0), frames).unwrap();
+        recording.actions = vec![ActionMark { start: 10, end: Some(40), mv: None }, ActionMark { start: 90, end: None, mv: None }];
+        let mut editor = ClipEditor::macro_file(recording, false).unwrap();
+        let line = bridge_clip(&editor.view(), None, false).text();
+        assert!(line.starts_with("clip ctx=macro.cpu total=200 in=0 out=200 cursor=0 playing=0 handle=playhead running=0 "), "{line}");
+        assert!(line.ends_with("target=cpu marks=2 mark=10-40 move=\"No move here\""), "{line}");
+        editor.on_action(ClipAction::SwapTarget);
+        editor.on_action(ClipAction::SelectOut);
+        let line = bridge_clip(&editor.view(), None, false).text();
+        assert!(line.contains("ctx=macro.p1") && line.contains("cursor=199") && line.contains("handle=out"), "{line}");
+        assert!(line.ends_with("target=p1 marks=2 mark=90-none move=\"110 frames into Special\""), "{line}");
+        assert!(bridge_clip(&editor.view(), Some("drill"), true).text().starts_with("clip ctx=drill total=200 "));
+        let capture = ReplaySession { tracks: vec![ReplayTrack { entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
+            input: InputFrame::default(), start: StartState::neutral(74, 0, 1.0), x: 0.0, y: 0.0 }).collect() }],
+            truncated: false, breaks: Vec::new() };
+        let mut vault = ClipEditor::new(capture, vec![0]).unwrap();
+        assert!(bridge_clip(&vault.view(), None, false).text().contains("ctx=replay"));
+        assert!(bridge_clip(&vault.view(), None, false).text().contains(" target=cpu marks=0 mark=none move="));
+        vault.on_action(ClipAction::SwapTarget);
+        assert!(bridge_clip(&vault.view(), None, false).text().contains(" target=p1 "));
+    }
+
     fn the_timeline_draws_move_marks() {
         let editor = ClipEditor::macro_file(recording(), true).unwrap();
         let view = editor.view();
@@ -823,6 +872,7 @@ mod tests {
             ("a_move_restarted_while_busy_is_its_own_recorded_mark", a_move_restarted_while_busy_is_its_own_recorded_mark),
             ("marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to", marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to),
             ("a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames", a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames),
+            ("a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text", a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text),
             ("the_timeline_draws_move_marks", the_timeline_draws_move_marks),
             ("an_empty_recording_has_no_marks", an_empty_recording_has_no_marks),
             ("the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs", the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs),

@@ -70,25 +70,6 @@ impl MoveText {
 }
 
 impl Clip {
-    /// The editor's view as the bridge line carries it; `ctx` names a strip that is not the editor's own (`drill`).
-    pub fn of(view: &crate::engine::macro_ui::clip_panel::ClipView, ctx: Option<&'static str>, running: bool) -> Self {
-        use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
-        Clip {
-            ctx: ctx.unwrap_or(match view.context {
-                ClipContext::Replay { .. } => "replay",
-                ClipContext::Macro { player: true } => "macro.p1",
-                ClipContext::Macro { player: false } => "macro.cpu",
-                ClipContext::Combo { .. } => "combo",
-            }),
-            total: view.total, start: view.start, end: view.end, cursor: view.cursor,
-            playing: view.playing,
-            handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
-            running,
-            target: match view.target { Some(true) => "p1", Some(false) => "cpu", None => "none" },
-            marks: view.mark_total, mark: view.near, text: MoveText::new(&view.move_text),
-        }
-    }
-
     pub fn text(self) -> String {
         let mut line = format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={} target={} marks={} mark=",
             self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running),

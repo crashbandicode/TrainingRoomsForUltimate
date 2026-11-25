@@ -904,7 +904,7 @@ fn step_drill_clip(s: &mut Session) {
     if rr_host::fed_run(Role::Player).is_some_and(|(current, _)| current == run) {
         editor.watch(&spans[..count]);
     }
-    s.bridge.set_drill(Some(crate::model::bridge_events::Clip::of(&editor.view(), Some("drill"), rr_host::preview_running())));
+    s.bridge.set_drill(Some(crate::engine::macro_ui::clip_marks::bridge_clip(&editor.view(), Some("drill"), rr_host::preview_running())));
     publish_frame(s);
 }
 
