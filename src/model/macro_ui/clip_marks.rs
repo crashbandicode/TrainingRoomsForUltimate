@@ -925,6 +925,30 @@ mod tests {
         assert_eq!(editor.view().cursor, 35);
     }
 
+    fn a_saved_take_keeps_the_names_of_a_ledge_attack_a_throw_and_a_final_smash() {
+        let root = scratch("saved-move-names");
+        let moves = [Move::LedgeAttack, Move::Throw, Move::FinalSmash,
+            Move::Grab, Move::GetupAttack, Move::TripAttack];
+        let keys = ["ledge_attack", "throw", "final_smash", "grab", "getup_attack", "trip_attack"];
+        let mut frames = vec![InputFrame::default(); 181];
+        let spans: Vec<_> = moves.iter().enumerate().map(|(i, &mv)| {
+            let start = (i * 30) as u32;
+            frames[start as usize].buttons = 1;
+            Span { start, end: Some(start + 10), mv: Some(mv) }
+        }).collect();
+        let id = save_capture(&root, &frames, &spans, crate::model::trim::Trim::Off);
+        let loaded = Library::new(root.join("macros")).load(&id).unwrap();
+
+        assert_eq!(loaded.actions.iter().map(|mark| mark.mv.as_deref()).collect::<Vec<_>>(),
+            keys.into_iter().map(Some).collect::<Vec<_>>());
+        let marks = Marks::from_recording(&loaded);
+        assert_eq!(marks.list().iter().map(|mark| mark.name.as_str()).collect::<Vec<_>>(),
+            moves.iter().map(|mv| mv.name()).collect::<Vec<_>>());
+        let editor = ClipEditor::macro_file(loaded, true).unwrap();
+        assert_eq!(editor.view().move_text, "Start of Ledge attack");
+        assert!(bridge_clip(&editor.view(), None, false).text().ends_with("move=\"Start of Ledge attack\""));
+    }
+
     fn a_recorded_take_keeps_its_move_ends_and_out_snaps_to_one_before_any_preview() {
         let root = scratch("first-open");
         let id = save_capture(&root, &inputs(), &spans(), crate::model::trim::Trim::Off);
@@ -1053,6 +1077,7 @@ mod tests {
             ("a_drill_crop_marks_every_step_and_names_it", a_drill_crop_marks_every_step_and_names_it),
             ("a_combo_crop_marks_every_link_and_names_it", a_combo_crop_marks_every_link_and_names_it),
             ("a_drill_preview_shows_the_strip_with_its_playhead", a_drill_preview_shows_the_strip_with_its_playhead),
+            ("a_saved_take_keeps_the_names_of_a_ledge_attack_a_throw_and_a_final_smash", a_saved_take_keeps_the_names_of_a_ledge_attack_a_throw_and_a_final_smash),
             ("a_recorded_take_keeps_its_move_ends_and_out_snaps_to_one_before_any_preview", a_recorded_take_keeps_its_move_ends_and_out_snaps_to_one_before_any_preview),
             ("a_file_without_recorded_marks_falls_back_to_input_starts_and_watched_ends", a_file_without_recorded_marks_falls_back_to_input_starts_and_watched_ends),
             ("a_crop_keeps_the_recorded_marks_inside_its_window", a_crop_keeps_the_recorded_marks_inside_its_window),
