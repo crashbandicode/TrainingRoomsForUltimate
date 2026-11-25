@@ -3141,7 +3141,7 @@ approved_by = "tr-primary-2 ruling 2026-11-25 16:36:55Z (line ceiling for feat/p
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 205036
+ceiling = 205039
 date = "2026-11-25"
-reason = "Guard the Edge start options (Under the stage, CPU midair jumps) and both drills on the off-stage rule: the stage is the floor run the player stands on, a start that cannot happen says why, and a kept start remembers its run and the place A confirmed. Measured 205036 on 946a4b2e over main 2d140506 (204799): +237."
+reason = "Guard the Edge start options (Under the stage, CPU midair jumps) and both drills on the off-stage rule: the stage is the floor run the player stands on, a start that cannot happen says why, and a kept start remembers its run and the place A confirmed. Measured 205039 with the reviewer correction of the other-side key (fix/rv-edge-one-side-y c7d7155f), over main 2d140506 (204799): +240."
 approved_by = "tr-primary-2 2026-11-25 17:47:41Z (one entry for the whole item at the measured value of its final head, parts (a) and (b) together)"
