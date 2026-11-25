@@ -546,23 +546,22 @@ impl ClipEditor {
 
     fn start_preview(&mut self) -> ClipEffect {
         self.pause();
-        self.window.seek(self.window.start());
-        let handle = std::mem::replace(&mut self.handle, Handle::Playhead);
+        let effect = if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {
+            ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player }
+        } else {
+            let recording = match self.export_selection("Preview") {
+                Ok(recording) => recording,
+                Err(error) => return ClipEffect::Error(error),
+            };
+            self.marks.set_namer(saved_namer(&recording));
+            ClipEffect::Preview(Box::new(recording))
+        };
         self.watch_base = self.window.start();
-        self.marks.forget_watched(self.window.start(), self.window.end());
-        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {
-            self.playing = true;
-            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player };
-        }
-        match self.export_selection("Preview") {
-            Ok(recording) => {
-                // The selected window may be a different form from the track's first frame.
-                self.marks.set_namer(saved_namer(&recording));
-                self.playing = true;
-                ClipEffect::Preview(Box::new(recording))
-            }
-            Err(error) => { self.handle = handle; ClipEffect::Error(error) }
-        }
+        self.marks.forget_watched(self.watch_base, self.window.end());
+        self.window.seek(self.watch_base);
+        self.handle = Handle::Playhead;
+        self.playing = true;
+        effect
     }
 
     /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A
@@ -641,24 +640,19 @@ impl ClipEditor {
     fn apply_action(&mut self, action: ClipAction) -> ClipEffect {
         match action {
             ClipAction::Snap => {
-                let boundary = match self.handle {
+                let at = match self.handle {
                     Handle::Playhead => return ClipEffect::Error("Press L for the start or R for the end, then Y to snap".into()),
-                    Handle::In => self.marks.snap_in(self.move_start.map_or(self.window.start(), |start| start.action_frame)),
-                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),
+                    Handle::In if self.move_start.is_some() => Some(self.window.start()),
+                    Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),
+                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()).map(|mark| self.window.set_out(mark) - 1),
                 };
-                let Some(boundary) = boundary else { return ClipEffect::Error("No move marks yet: X previews and marks them".into()) };
+                let Some(at) = at else { return ClipEffect::Error("No move marks yet: X previews and marks them".into()) };
                 self.pause();
-                match self.handle {
-                    Handle::In => {
-                        self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start());
-                        // A mark is where a button was pressed, seldom an idle frame: take the move there, as the lead-in does.
-                        if self.file.is_none() && self.track().frames.get(boundary as usize)
-                            .is_some_and(|frame| !self.clean_statuses.contains(&frame.start.status)) {
-                            if let Some(Err(error)) = self.move_at(boundary) { return ClipEffect::Error(error); }
-                        }
-                    }
-                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }
-                    Handle::Playhead => {}
+                self.window.seek(at);
+                self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());
+                if self.handle == Handle::In && self.file.is_none() && self.move_start.is_none()
+                    && !self.clean_statuses.contains(&self.track().frames[at as usize].start.status) {
+                    if let Some(Err(error)) = self.move_at(at) { return ClipEffect::Error(error); }
                 }
             }
             ClipAction::SwapTarget => {
