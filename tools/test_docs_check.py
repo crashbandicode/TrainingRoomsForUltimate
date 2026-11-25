@@ -167,6 +167,57 @@ class Links(unittest.TestCase):
         self.assertEqual(rules(**{"README.md": CLEAN["README.md"] + "\n[a]: gone.md\n"}), ["link-missing"])
 
 
+class VideoSources(unittest.TestCase):
+    blob = "7634061256bdced74a25e63f3a15600361cec376"
+    url = "https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/"
+
+    def check_video(self, text):
+        files = {"docs/media/clip.mp4": "fixture mp4", "README.md": CLEAN["README.md"] + "\n" + text + "\n"}
+        return problems(files)
+
+    def test_a_relative_src_fails(self):
+        got = self.check_video('<video src="docs/media/clip.mp4" controls></video>')
+        self.assertEqual([r for r, _, _ in got], ["video-src"])
+        self.assertIn("use the media blob URL of the clip", got[0][2])
+
+    def test_an_unknown_blob_fails_and_names_the_id(self):
+        unknown = "a" * 40
+        got = self.check_video(f'<video src="{self.url}{unknown}"></video>')
+        self.assertEqual([r for r, _, _ in got], ["video-src"])
+        self.assertIn(unknown, got[0][2])
+
+    def test_a_blob_of_a_fixture_mp4_passes(self):
+        self.assertEqual(self.check_video(f'<video src="{self.url}{self.blob}" controls></video>'), [])
+
+    def test_code_and_comments_are_not_read(self):
+        text = '```html\n<video src="missing.mp4"></video>\n```\n<!-- <video src="missing.mp4"></video> -->'
+        self.assertEqual(self.check_video(text), [])
+
+    def test_missing_empty_wrong_and_duplicate_sources_fail(self):
+        for tag in ('<video controls></video>', '<video src=""></video>',
+                    '<video src="https://example.invalid/clip.mp4"></video>',
+                    f'<video src="{self.url}{self.blob}?download=1"></video>',
+                    f'<video src="{self.url}{self.blob}" src="{self.url}{self.blob}"></video>'):
+            with self.subTest(tag=tag):
+                self.assertEqual([r for r, _, _ in self.check_video(tag)], ["video-src"])
+
+    def test_single_quoted_unquoted_and_multiline_sources(self):
+        for tag in (f"<video src='{self.url}{self.blob}'></video>",
+                    f"<video\n controls src={self.url}{self.blob}\n></video>"):
+            with self.subTest(tag=tag):
+                self.assertEqual(self.check_video(tag), [])
+
+    def test_src_inside_another_attribute_is_not_a_source(self):
+        tag = f"""<video title='src="{self.url}{self.blob}"'></video>"""
+        self.assertEqual([r for r, _, _ in self.check_video(tag)], ["video-src"])
+
+    def test_inline_code_is_not_read_and_line_numbers_are_kept(self):
+        text = '`<video src="missing.mp4">`\n\n<video controls></video>'
+        root = build(dict(CLEAN, **{"README.md": CLEAN["README.md"] + "\n" + text + "\n"}))
+        got = d.check(root, NO_ALLOWANCE)
+        self.assertEqual([(p.rule, p.line) for p in got], [("video-src", 11)])
+
+
 class Anchors(unittest.TestCase):
     def test_a_missing_anchor_in_another_page_fails(self):
         self.assertEqual(rules(**{"docs/guide/getting-started.md": CLEAN["docs/guide/getting-started.md"] + "\n[x](../TECHNICAL.md#nope)\n"}), ["link-anchor"])
@@ -432,6 +483,8 @@ class GateStage(unittest.TestCase):
         if ignore:
             pathlib.Path(root, ".gitignore").write_text(ignore)
         git(root, "add", "-A")
+        git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "-qm", "fixture")
         return root
 
     def test_a_clip_that_git_holds_but_the_work_tree_lacks_passes(self):
@@ -439,6 +492,35 @@ class GateStage(unittest.TestCase):
         git(root, "update-index", "--skip-worktree", "docs/media/pic.gif")
         os.remove(os.path.join(root, "docs/media/pic.gif"))
         self.assertEqual(d.check(root, NO_ALLOWANCE), [])
+
+    def test_a_skip_worktree_video_uses_the_indexed_file_bytes(self):
+        url = VideoSources.url + VideoSources.blob
+        root = self.stage({"README.md": CLEAN["README.md"] + f'\n<video src="{url}"></video>\n',
+                           "docs/media/clip.mp4": "fixture mp4"})
+        git(root, "update-index", "--skip-worktree", "docs/media/clip.mp4")
+        os.remove(os.path.join(root, "docs/media/clip.mp4"))
+        self.assertEqual(d.check(root, NO_ALLOWANCE), [])
+
+    def test_a_deleted_video_is_not_mistaken_for_skip_worktree(self):
+        url = VideoSources.url + VideoSources.blob
+        root = self.stage({"README.md": CLEAN["README.md"] + f'\n<video src="{url}"></video>\n',
+                           "docs/media/clip.mp4": "fixture mp4"})
+        os.remove(os.path.join(root, "docs/media/clip.mp4"))
+        self.assertEqual([p.rule for p in d.check(root, NO_ALLOWANCE)], ["video-src"])
+
+    def test_a_video_blob_must_belong_to_a_committed_mp4(self):
+        url = VideoSources.url + VideoSources.blob
+        for case in ("ignored", "untracked", "modified", "staged"):
+            with self.subTest(case=case):
+                path = "docs/media/draft.mp4"
+                files = {"README.md": CLEAN["README.md"] + f'\n<video src="{url}"></video>\n'}
+                if case in ("modified", "staged"):
+                    files[path] = "committed version"
+                root = self.stage(files, ignore=path if case == "ignored" else "")
+                pathlib.Path(root, path).write_bytes(b"fixture mp4")
+                if case == "staged":
+                    git(root, "add", path)
+                self.assertEqual([p.rule for p in d.check(root, NO_ALLOWANCE)], ["video-src"])
 
     def test_a_clip_that_git_does_not_hold_fails_even_when_it_is_on_disk(self):
         root = self.stage({"README.md": CLEAN["README.md"] + "\n![x](docs/media/local.gif)\n", "docs/media/local.gif": "GIF"}, ignore="local.gif\n")

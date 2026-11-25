@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -27,7 +27,8 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 ## Next build (not installed yet)
 
 The build after install 4. Its name is expected to be rc.16. The first part below is merged; the second is still in
-work. None of it has been seen in a game: each merge passed the host tests and builds only.
+work. The merged changes passed host tests and builds. Targeted Eden checks of stage geometry are listed in
+[Install evidence](EVIDENCE-rc15-installs.md#the-next-build); they do not replace a smoke test of the finished build.
 
 **How this build is tested:** one short Eden smoke boot on the finished build (each new item started once, no crash
 and the expected log lines), then the operator's full test on the console.
@@ -75,6 +76,17 @@ and the expected log lines), then the operator's full test on the console.
   fighter's own names whoever Player 1 is.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
 
+#### Playback starts without reading the library (merged 2026-11-25)
+
+- Play no longer reads the whole recording library before it starts. It reads the index, the file each side plays
+  and its start save, and nothing while a macro plays. How long a start now takes has not been measured in a game.
+- **Playback delay** is a new option under Recording › Options, None by default (10 to 120 frames). It waits after
+  the fighters are placed and before the first input, once per Play. It applies to Play on Player 1, Play on CPU, a
+  capture's Play back and Make combo's pass; not to the editor's previews or the CPU's Playback Slots.
+- **Known limit:** if Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can pass
+  what you hold instead of nothing. It is one frame at most, at the start.
+- More: [Playback delay](menu/recording.md#playback-delay).
+
 ### In work
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
@@ -89,8 +101,6 @@ Planned for this build and not merged yet. Each moves up to Merged when it lands
   the zone stops at the next solid.
 - **In work: placement's Off stage switch.** A fighter switched to Off stage whose spot is not off stage goes beside
   the nearest ledge that has open air. The crosshair then moves freely.
-- **In work: playback starts at once.** The wait before a recording starts to play is removed, and a playback delay
-  setting is added, with no delay by default. The operator reported the wait on install 4.
 - **In work: placement on the crosshair.** Changing where a save state puts the fighters uses the crosshair, on the
   save state itself.
 
@@ -149,6 +159,109 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
 
 - **Quick Play.** Picking a different fighter at the character select starts the waiting-room practice fresh.
 
+### Clips
+
+Recorded in Eden on the installed build, not on the console. Where a clip is a close-up, the effect sits on a
+small panel that cannot be read at full-screen size. The yellow BRIDGE LIVE banner in some frames is the test
+tool's, not TrainingRooms'.
+
+**The clip editor over the game**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/99f4cf63a17f837c9077eecda13bb9a267650d8b" autoplay muted loop playsinline controls></video><br>
+*Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-timeline.mp4)
+
+**Preview on Player 1, then on the CPU**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7029a8b5915102970c6af108e1d3909f5e614645" autoplay muted loop playsinline controls></video><br>
+*X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-preview.mp4)
+
+**Recordings**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f5b8891b2eb0285ad5178ed34f668f765a5d28ce" autoplay muted loop playsinline controls></video><br>
+*RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-recordings-menu.mp4)
+
+**Playing a capture back**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a743aae1c8bfe6267175ce653776bd89eccd3da0" autoplay muted loop playsinline controls></video><br>
+*Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-playback.mp4)
+
+**Trim: Off, Start, End and Both**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e9f977ffad992d303fca7844745d5bf6847d48d8" autoplay muted loop playsinline controls></video><br>
+*The same inputs were recorded four times, once per Trim setting. On playback, Start and Both skip the idle lead-in; Off and End keep it. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-trim-modes.mp4)
+
+**The playback indicator**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e8416edabcabf441325f0d62e064fb3f6bf22e20" autoplay muted loop playsinline controls></video><br>
+*Close-up of the top left of the screen: the PLAY CPU mark shows while the CPU plays a take and goes when it ends. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-playback-indicator-zoom.mp4)
+
+**Drill steps are listed by move**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cd0b8b07aa26c3e00a692faedd589d16126e5410" autoplay muted loop playsinline controls></video><br>
+*DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-drill-step-names.mp4)
+
+**Move names Off and On**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video><br>
+*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-move-names-toggle.mp4)
+
+**Match angle and deflection, Off**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4857608ce263f1c0ce535dea1b78cfe447b81cc1" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A warp recorded at 135° is cast at 147° with the option Off: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-off-147-zoom.mp4)
+
+**Match angle and deflection, On, another angle**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f8fe3ec94aa9ed3aa18a6313f3a1c581f3b5a261" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. The same cast at 147° with the option On: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-147-zoom.mp4)
+
+**Match angle and deflection, On, the recorded angle**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4b1d65d8fab1b83e5d0199467a063377dc1463de" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A cast at the recorded 135° with the option On: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-135-zoom.mp4)
+
+**A steered special, steered**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3601efee83d20e7401cbe74b217770e30cd3fc1d" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A drill recorded with an up special steered up-left: the steered cast is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-steered-zoom.mp4)
+
+**A steered special, not steered**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6e2be13321f0d19ec828e933ef905fdf6b4a2a96" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. The same drill with the up special cast straight: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-straight-zoom.mp4)
+
+**A get-up attack, recorded**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cbc8cd75b8b22c99acd1e03fc910fb5efdf3ca5f" autoplay muted loop playsinline controls></video><br>
+*Place fighters starts Kirby lying down, and his get-up attack is recorded. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-record.mp4)
+
+**A get-up attack, played back**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/016231d178e57592cfe067807f46bbf627cc48f1" autoplay muted loop playsinline controls></video><br>
+*Playing the take puts Kirby down again and repeats the get-up attack. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-play.mp4)
+
+**L + R + A by itself**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ff5c2315ca6efcb51bbb8fea5d3205962e7c7295" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. After one green attempt, L + R + A alone, short and long, adds no square: the streak stays at 1. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-chord-alone-zoom.mp4)
+
+**L + R + A after a failed attempt**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ffcc3cfe7871855d69a43591dbbcfef92944d0ef" autoplay muted loop playsinline controls></video><br>
+*Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
+
+**Scrolling the input display back**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/16db06e0ff5b07c584ded3173e52cfade51d4dfa" autoplay muted loop playsinline controls></video><br>
+*Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-scrollback-zoom.mp4)
+
+**Damage range sliders**
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/04dbf0b9d7e33489a3bd051e0ffb1d49efaffc74" autoplay muted loop playsinline controls></video><br>
+*CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-cpu-damage-range.mp4)
+
+**A ledge attack:** Clip coming. The trip attack is filmed like the get-up attack and kept with the test records.
+
 ### Tested
 
 - **Installed:** yes, and read back.
@@ -160,8 +273,9 @@ Installed 2026-11-25 (07:26). Build `a945b0c1`.
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
-  took a second or more to start. A fix for the wait is in work for the next build. They also asked for
-  placement changes and a Delete for replay captures; the Delete is merged for the next build.
+  took a second or more to start. A change for that wait is merged for the next build; it has not been timed in a
+  game. They also asked for placement changes and a Delete for replay captures; the Delete is merged for the next
+  build, and placement is in work.
 
 ## Install 3
 
