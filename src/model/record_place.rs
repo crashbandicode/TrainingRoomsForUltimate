@@ -4,7 +4,7 @@ use super::cpu::ids::C;
 use super::crosshair::{Crosshair, Marks};
 use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
-use super::stage_geometry::Probe;
+use super::stage_geometry::{classify, default_spot, nearest_ledge, Probe};
 use super::state::record::{SavedState, StartState};
 
 pub const READY_FRAMES: u16 = 60;
@@ -349,8 +349,12 @@ pub fn reach(place: Place, camera: [f32; 4], blast: Option<[f32; 4]>) -> [f32; 4
 /// off stage by the rule stays, in open air or under a solid, and nothing more is read for it. Any other spot goes
 /// to the default spot beside the nearest ledge with open air. A stage that cannot be read, or that has no such
 /// ledge or spot, moves nothing.
-pub fn off_stage_spot(_stage: &mut impl Probe, _blast: [f32; 4], _at: [f32; 2]) -> Option<[f32; 2]> {
-    None
+pub fn off_stage_spot(stage: &mut impl Probe, blast: [f32; 4], at: [f32; 2]) -> Option<[f32; 2]> {
+    if classify(stage, blast, at).ok()?.off_stage(true) {
+        return None;
+    }
+    let ledge = nearest_ledge(stage, blast, at).ok()??;
+    default_spot(stage, blast, ledge).ok()?
 }
 
 /// The game's situation kinds a save records.
@@ -614,10 +618,10 @@ impl Wizard {
     /// else nothing changes. A Record start begins Standard at the new place. A save keeps its state unless that state
     /// cannot exist there (a missed tech or a trip in the air; a tumble, helpless or footstool start on a floor).
     fn toggle_place(&mut self, at: [f32; 2], floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, home: Option<[f32; 2]>,
-        _off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>) {
+        off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>) {
         let fighter = &mut self.setup[self.edit.index()];
         let (place, at) = match fighter.place {
-            Place::OnStage => (Place::OffStage, at),
+            Place::OnStage => (Place::OffStage, off(at).unwrap_or(at)),
             Place::OffStage => match floor(at).or(home) {
                 Some(at) => (Place::OnStage, at),
                 None => return,
@@ -646,7 +650,7 @@ impl Wizard {
     /// below (operator 2026-11-25, PC1 B). Without (the walk is not finished, or the fighter stands on a floor it
     /// did not trace), the fighter stands on the floor under a free crosshair.
     pub fn step_on(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
-        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, _off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>,
+        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, off: impl FnOnce([f32; 2]) -> Option<[f32; 2]>,
         floors: &[floor_hop::Floor]) -> Outcome
     {
         let was = self.was;
@@ -708,11 +712,12 @@ impl Wizard {
             return Outcome::Open;
         }
         if self.page == Page::Spot && pressed(logical::Y) {
-            self.toggle_place(self.cross.at, floor, None, |_| None);
+            self.toggle_place(self.cross.at, floor, None, off);
+            if self.setup[i].place == Place::OffStage { self.cross.jump(self.setup[i].at); }
             return Outcome::Open;
         }
         if self.page == Page::Where && (pressed(logical::DPAD_LEFT) || pressed(logical::DPAD_RIGHT)) {
-            self.toggle_place(self.setup[i].at, floor, self.home, |_| None);
+            self.toggle_place(self.setup[i].at, floor, self.home, off);
             self.cross.jump(self.setup[i].at);
             return Outcome::Open;
         }
