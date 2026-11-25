@@ -684,6 +684,13 @@ pub unsafe fn frame(fighter: usize) {
     };
     let Some(mut engine) = lock_engine() else { return };
     clear_engine(&mut engine);
+    if let Some(Session::Pages { holds, .. }) = &engine.session {
+        let active = [Some(natives::battle_object_id(p1)), cpu.map(|b| natives::battle_object_id(b.accessor))];
+        if !record_place::page_bodies_present(holds, active) {
+            leave(&mut engine, Leave::Other);
+            return;
+        }
+    }
     if who == Who::P1 {
         let waking = WAKE.swap(0, Ordering::AcqRel);
         if waking != 0 {

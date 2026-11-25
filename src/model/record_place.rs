@@ -320,6 +320,12 @@ pub const fn release(leave: Leave, same_body: bool, loading: bool) -> Release {
     }
 }
 
+/// Whether this page visit can use the currently active fighters. Extracted
+/// from the native frame's presence check; the preview supplies its body ID.
+pub fn page_bodies_present(_held: &[Option<super::crosshair::CpuPreview>; 2], active: [Option<u32>; 2]) -> bool {
+    active.iter().all(Option::is_some)
+}
+
 /// The worker's answer to a confirmed placement: the visit it belongs to, and the written pair to load once.
 /// `None`: the save could not be written.
 pub struct Answer {
@@ -2910,6 +2916,49 @@ mod name_page_tests {
             .split_once("assign(&menu::MENU_RECEIVED_INPUT").unwrap().0;
         assert!(name_input.contains("Pad::Confirm") && name_input.contains("Pad::Back"));
         assert!(!name_input.contains("Pad::Extra"), "the native name dialog still handles Y");
+    }
+    }
+}
+
+#[cfg(test)]
+mod page_body_tests {
+    lib_unit_tests! {
+    use super::page_bodies_present;
+    use crate::model::crosshair::{hold_step, CpuPreview, Origin};
+
+    fn held() -> [Option<CpuPreview>; 2] {
+        let mut holds = [None; 2];
+        for (slot, id) in holds.iter_mut().zip([7, 31]) {
+            hold_step(slot, id, false, || Origin { at: [0.0, 0.0], grounded: true, facing: 1.0 });
+        }
+        holds
+    }
+
+    #[test]
+    fn replacement_cpu_is_not_admitted_to_the_old_preview() {
+        let holds = held();
+        assert!(page_bodies_present(&holds, [Some(7), Some(31)]));
+        assert!(!page_bodies_present(&holds, [Some(7), None]));
+        assert!(!page_bodies_present(&holds, [Some(7), Some(32)]),
+            "a live replacement CPU passed the visit's frame guard");
+    }
+
+    #[test]
+    fn replacement_player_is_not_admitted_to_a_posted_save() {
+        let holds = held();
+        assert!(!page_bodies_present(&holds, [Some(8), Some(31)]),
+            "a replacement P1 may consume the previous pair's posted answer");
+    }
+
+    #[test]
+    fn both_callbacks_check_page_bodies_before_holding_or_taking_the_answer() {
+        let source = include_str!("../runtime/features/record_place.rs");
+        let frame = source.split_once("pub unsafe fn frame(fighter:").unwrap().1.split_once("\npub fn ").unwrap().0;
+        let (before, after) = frame.split_once("if !record_place::page_bodies_present(holds, active)").unwrap();
+        assert!(!before.contains("if who == Who::P1 {"));
+        let (guard, dispatch) = after.split_once("if who == Who::P1 {").unwrap();
+        assert!(guard.contains("leave(&mut engine, Leave::Other)") && guard.contains("return;"));
+        assert!(dispatch.contains("record_place::take_answer(") && dispatch.contains("placement::hold_at("));
     }
     }
 }
