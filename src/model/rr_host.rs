@@ -6537,12 +6537,13 @@ mod tests {
         let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected exported clip") };
         let made = super::super::rr_runtime::generate(&root, *recording, "From capture", Make::Macro, Role::Player, 1).unwrap();
         let super::super::rr_runtime::Generated::Macro(made) = made else { panic!("expected a macro") };
-        let index = root.join(super::super::library::INDEX_FILE);
-        let before = std::fs::read(&index).unwrap();
+        // One pass first: the host's own first pass settles the index (its migration mark).
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let before = RecordingIndex::load(&root).unwrap();
         post_effect(Effect::DeleteFile { kind: FileKind::Capture, id: format!("saved:{id}") });
         service_at(&root, &none(), "2026-11-25", state(8), state(7));
         assert!(archive.list().unwrap().entries.is_empty(), "the capture is gone");
-        assert_eq!(std::fs::read(&index).unwrap(), before, "captures are not in the index: it is not rewritten");
+        assert_eq!(RecordingIndex::load(&root).unwrap(), before, "captures are not in the index: the delete changes nothing in it");
         let kept = Library::new(root.join(MACROS_DIR)).load(&made).unwrap();
         assert_eq!(kept.name, "From capture");
         assert_eq!(kept.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), [1, 2, 3]);

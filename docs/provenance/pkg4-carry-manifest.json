@@ -1260,7 +1260,7 @@
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "1fe6f09a3ac6d2a32e79286e3ecae1a08fa1c4e467aaffd108320c3e7d89d383",
+   "dest_sha256": "2fb32dfbc2d0eabc29309fb4843cd9cf148e3af59c55ee1b8abfd714854b65e7",
    "edits": [
     {
      "table_tests": true,
@@ -1362,6 +1362,31 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "        assert_eq!(view.footer, \"A loads, Y deletes, B closes.\");\n",
      "new": "        assert!(view.footer.ends_with(\"A loads, Y deletes, B closes.\"));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        if !matches!(self.selection, Selection::Browsing) { return Effect::None; }\n",
+     "new": "        // X would hand the row to a rename and close the list: this window has none.\n        if !matches!(self.selection, Selection::Browsing) || matches!(pad, Pad::Rename) { return Effect::None; }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            MenuEffect::Choose(id) if waiting => {\n",
+     "new": "            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } if waiting => {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            MenuEffect::Choose(id) => {\n",
+     "new": "            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } => {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // B closes and deletes nothing.\n",
+     "new": "        // B closes and deletes nothing. X does nothing, and the list stays.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n",
+     "new": "        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n        let mut listed = browser();\n        assert_eq!(listed.on_pad(Pad::Rename, false), Effect::None);\n        assert!(listed.view().is_some());\n        assert_eq!(listed.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n"
     }
    ]
   },

@@ -3818,7 +3818,7 @@ mod tests {
             open_vault_file(&mut screens, vault_sides());
             let rows = screens.file_rows();
             assert_eq!(rows.iter().map(|row| row.title.as_str()).collect::<Vec<_>>(),
-                ["Inputs from", "Plays on", "Play back", "Make macro…", "Make combo…", "Make drill…"]);
+                ["Inputs from", "Plays on", "Play back", "Make macro…", "Make combo…", "Make drill…", "Delete"]);
             assert_eq!(rows[0].value, "P1 · Mario");
             assert_eq!(rows[1].value, role.label());
             screens.handle_page(Button::Left, true, SAVES_MACROS);

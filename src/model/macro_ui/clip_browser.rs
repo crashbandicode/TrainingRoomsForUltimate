@@ -67,13 +67,14 @@ impl ClipBrowser {
         }
         // Repeated Confirm and navigation cannot replace an admitted ID or renew
         // its deadline. Training continues to use immediate, validated opening.
-        if !matches!(self.selection, Selection::Browsing) { return Effect::None; }
+        // X would hand the row to a rename and close the list: this window has none.
+        if !matches!(self.selection, Selection::Browsing) || matches!(pad, Pad::Rename) { return Effect::None; }
         match self.ui.on_pad(pad) {
-            MenuEffect::Choose(id) if waiting => {
+            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } if waiting => {
                 self.selection = Selection::Settling { id, ticks: 0 };
                 Effect::None
             }
-            MenuEffect::Choose(id) => {
+            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } => {
                 self.selection = Selection::Opening;
                 Effect::Open(id)
             }
@@ -206,8 +207,12 @@ mod tests {
         assert!(chosen.pending());
         assert_eq!(chosen.tick(true, true), Effect::Open("saved:500".into()));
         assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None, "nor while it opens");
-        // B closes and deletes nothing.
+        // B closes and deletes nothing. X does nothing, and the list stays.
         assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);
+        let mut listed = browser();
+        assert_eq!(listed.on_pad(Pad::Rename, false), Effect::None);
+        assert!(listed.view().is_some());
+        assert_eq!(listed.on_pad(Pad::Confirm, false), Effect::Open("saved:500".into()));
     }
 
     fn explicit_cancel_before_or_after_readiness_cannot_open_on_return() {
