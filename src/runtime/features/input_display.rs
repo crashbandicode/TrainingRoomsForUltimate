@@ -42,6 +42,8 @@ static OWNER_ON: AtomicBool = AtomicBool::new(false);
 static LANES: Lanes = Lanes::new();
 static GRADER: Grader = Grader::new();
 static CLEAR_DUE: AtomicBool = AtomicBool::new(false);
+/// The acting side of the last sampled frame was the CPU (a Make pass on the CPU, `rr_host::make_actor_cpu`).
+static ACTOR_CPU: AtomicBool = AtomicBool::new(false);
 /// P1's latest mapped inputs, packed (`pack`).
 static INPUTS: AtomicU64 = AtomicU64::new(0);
 /// The constants resolved once (`ids`).
@@ -424,6 +426,9 @@ pub unsafe fn sample_frame(player: usize) {
     let cpu_accessor = cpu;
     let spots = spots_wanted();
     let cpu_pass = crate::engine::rr_host::make_actor_cpu();
+    if ACTOR_CPU.swap(cpu_pass, Ordering::Relaxed) != cpu_pass {
+        CLEAR_DUE.store(true, Ordering::Relaxed);
+    }
     let order = crate::model::frame_strip::acting(cpu_pass);
     let p1 = sample(player, &ids, order[0] == 0, spots);
     let cpu = sample(cpu, &ids, order[0] == 1, spots);

@@ -544,7 +544,8 @@ fn browser_effect(effect: BrowserEffect, revision: u64) {
     match effect {
         BrowserEffect::Open(id) => {
             if let Err(error) = open_capture(&id, revision) {
-                open_browser(Some(revision));
+                let listed = BROWSER.lock().unwrap().as_ref().is_none_or(|b| b.request.is_none());
+                if listed { open_browser(Some(revision)); }
                 // A busy/departed practice context may refuse the rescan too.
                 // Retire only the old owner, never a newly opened browser.
                 close_editor_revision(false, Some(revision));
