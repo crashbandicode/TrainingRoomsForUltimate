@@ -3009,3 +3009,11 @@ ceiling = 200672
 date = "2026-11-25"
 reason = "Vault review: label the second input source CPU and route the opening fighter question through its panel. Measured 200672, 15 above the submitted 962ad694 and 844 above merge 4b."
 approved_by = "tr-primary-2 2026-11-25 00:48:43Z (final measured value through +900), 02:16:35Z (review correction)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203086
+date = "2026-11-25"
+reason = "The Vault recordings line (aaecc259) folded onto the install 4 head cdfbd917 (202248) with the Vault play-target seam: measured 203086 on 2c679acb (remote-gate size step), +838 on the head. Vault alone was +844 on merge 4b (200672 against 199828); the seam and its test add about 100 and the fold shares lines with the editor."
+approved_by = "tr-primary-2 2026-11-25 02:44:33Z (Vault and Recordings merge ordered at its measured 200672) and 02:31:21Z and 03:01:20Z (the seam rides on the fold as one pin); the measured folded value is stated in the review post."
