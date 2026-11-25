@@ -3125,7 +3125,7 @@ approved_by = "tr-primary-2 2026-11-25 13:43:24Z (the item, operator 13:30Z) wit
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 204330
+ceiling = 204328
 date = "2026-11-25"
-reason = "Playback starts from held files and offers a per-role delay: measured 204330 on main c51f4d81 (204167): +163."
+reason = "Playback starts from held files and offers a per-role delay: measured 204328 on main d6eb6c63 (204167): +161."
 approved_by = "tr-primary-2 ruling 2026-11-25 16:36:55Z (line ceiling for feat/playback-immediate at the measured value)."

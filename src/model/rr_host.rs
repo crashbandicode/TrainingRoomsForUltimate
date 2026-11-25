@@ -1388,25 +1388,23 @@ pub fn service_at(
         Effect::MakeCombo { source, .. } => Some((Role::Player, source.clone())),
         _ => None,
     });
+    for (role, _) in [&menu_make, &make, &preview].into_iter().flatten() {
+        starts[role_index(*role)] = true;
+    }
     let mut held = lock(&BOOK);
-    let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
-    let in_use = [
-        starts[0] || role_playing(Role::Player),
-        starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
-    ];
-    for role in [Role::Player, Role::Cpu] {
-        let slot = role_index(role);
-        if starts[slot] || !in_use[slot] { sources[slot] = None; }
-    }
-    for (role, source) in [menu_make, make, preview].into_iter().flatten() {
-        starts[role_index(role)] = true;
-        sources[role_index(role)] = Some(Source { id: source, active: false });
-    }
-    let in_use = [
-        starts[0] || role_playing(Role::Player),
-        starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
-    ];
     if held_needs_read(held.as_ref(), root, starts) {
+        let in_use = [
+            starts[0] || role_playing(Role::Player),
+            starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
+        ];
+        let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
+        for role in [Role::Player, Role::Cpu] {
+            let slot = role_index(role);
+            if starts[slot] || !in_use[slot] { sources[slot] = None; }
+        }
+        for (role, source) in [menu_make, make, preview].into_iter().flatten() {
+            sources[role_index(role)] = Some(Source { id: source, active: false });
+        }
         match read_held(root, sources, in_use, starts) {
             Ok(next) => *held = Some(next),
             Err(()) => {
