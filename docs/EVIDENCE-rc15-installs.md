@@ -120,12 +120,14 @@ each gate's own; they were not compared test by test here.
 ## The build before install 1 (`17060a5e`)
 
 - **Card:** `artifacts/phase23/card-install/20261123-1140Z/INSTALL.md`: `0a17c793`, 2026-11-23 11:40.
-- **The operator's reports:** at five times on 2026-11-23, [below](#the-operator-s-reports-from-the-console).
+- **The operator's reports:** at seven times on 2026-11-23, [below](#the-operator-s-reports-from-the-console).
 
 ## The operator's reports from the console
 
-The operator's own reports from play on a Switch, relayed by the coordinator (inbox 2026-11-25 17:09:15Z,
-tr-primary-2). Each is placed on the build that was on the card at its time, by the install records' times above.
+The operator's own reports from play on a Switch. Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z,
+tr-primary-2). Two were recorded by the coordinator at the time, in its handoff
+(`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry. Each report is placed on the build
+that was on the card at its time, by the install records' times above.
 They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose
 history holds the change (`git merge-base --is-ancestor`), and what an Eden run showed of it. Reports about other
 plugins are left out, except the first, which was made in Training and turned out to be another plugin's.
@@ -133,9 +135,11 @@ plugins are left out, except the first, which was made in Training and turned ou
 | When (UTC) | Build on the card | The operator reported | Changed in |
 | --- | --- | --- | --- |
 | 2026-11-23 12:10 | before install 1 (`17060a5e`) | In Training's character select, L3 + B did not send the CPU's token to the hand. | Not TrainingRooms: the Tile Cursor plugin, whose 0.2.1 went on the card at 15:32 that day (`artifacts/phase23/card-install/20261123-1532Z-tile-0.2.1/INSTALL.md`). |
+| 2026-11-23 about 12:20 | before install 1 | In Training, the 1 Frame label at the top right left out the button to press. (Handoff entry 12:18:02Z.) | Install 1 (`2ae8d0fe`). Its Training row passed in Eden. |
 | 2026-11-23 12:32 | before install 1 | Lists inside the menu (save states, macros) did not wrap around. | Install 1 (`2158e5ff`). Its Training rows passed in Eden. |
 | 2026-11-23 12:32 | before install 1 | Recording Player 1 showed no indicator; red for Player 1 and blue for the CPU were asked for. | Install 1 (`2ae8d0fe`). Both indicators passed in Eden in Training. |
 | 2026-11-23 12:32 | before install 1 | Recording as the CPU made the left and right input shudder (CPU Greninja, Player 1 Mr. Game & Watch). | Install 1 (`6c717136`). Record and Play on the CPU gave the same turns in Training and in a waiting room. |
+| 2026-11-23 about 12:40 | before install 1 | Crop's preview kept the menu up and did not play to the end, and cropping a Player 1 macro did not work. (Handoff entry 12:56:08Z.) | Install 1 (`6bc005f6`): every preview plays through Recording's playback. In Eden a crop of a Player 1 macro saved the chosen range in Training and in a waiting room; the preview's delivery and timing rows did not run in the waiting room. |
 | 2026-11-23 15:51 | before install 1 | Starting a new chain and going back before saving opened the keyboard, froze the menu for a moment, and left Player 1 and the CPU frozen after the menu closed. | Install 2 (`d6015e33`): B backs out of the picker and saves nothing; X is done. Its rows did not qualify in the install 2 Eden runs, so this is not shown in a game. |
 | 2026-11-23 16:31 | before install 1 | In Guard the Edge, picking the CPU in the fighter picker and backing out left a black box over Hitbox Visualization. | Install 2 (`5f082c2f`): the pop-up gives back the pane it borrowed. Its visual row passed in Eden. |
 | 2026-11-23 19:12 | before install 1 | The Guard the Edge row GJ1-2 (the rule that a KO counts once Player 1 is back) worked on the build they were playing. | The row was then dropped from the Eden runs and left to a hand check (inbox 2026-11-23 19:13:17Z); that entry says it is not a pass. The change for this rule (`c40cb717`) is first in install 1, which went on the card 52 minutes later. |
@@ -143,11 +147,6 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
 | 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | The wait and placement are in work for the next build, not merged. The Delete is merged for the next build (`3fd708bc`), host-tested only. |
-
-Two more reports of 2026-11-23 are in the coordinator's handoff and not in that relayed list
-(`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`, the entries of 12:18:02Z and 12:56:08Z), both on the build
-before install 1: the 1 Frame label left out its button; and Crop's preview kept the menu up and did not play to the
-end, and cropping a Player 1 macro did not work. Install 1 changes both (`2ae8d0fe`, `6bc005f6`).
 
 ## The next build
 
