@@ -628,6 +628,23 @@ mod tests {
         assert_eq!(fs::read(foreign.join("keep")).unwrap(), b"kept", "another delete's leftover is not this one's");
     }
 
+    /// The same bundle, whose plain file of the same id cannot go (a folder has its name). The bundle comes back under
+    /// its own name: every byte as it was, the shared archive loads, it is listed once and nothing is left over.
+    fn a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back() {
+        let f = Fixture::new();
+        let dir = f.publish(&session());
+        let id = encode_file_id("native-id");
+        let archive = CaptureArchive::new(&f.0);
+        let before = bytes_in(&dir);
+        fs::create_dir(f.0.join(format!("{id}.tmrc"))).unwrap();
+        assert!(archive.delete(&id).is_err());
+        assert_eq!(bytes_in(&dir), before);
+        assert!(f.load().is_ok(), "the shared archive loads");
+        let listed = archive.list().unwrap();
+        assert!(listed.entries.len() == 1 && listed.skipped.is_empty());
+        assert!(!f.0.join(format!(".{id}.smd-0.del")).exists(), "nothing is left under the other name");
+    }
+
     /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with
     /// one global Gap before the resumed frame; the cache and the canonical load both return the break, complete.
     fn a_sudden_death_break_round_trips_with_its_gap_and_true_counters() {
@@ -713,6 +730,7 @@ mod tests {
             ("a_sudden_death_break_round_trips_with_its_gap_and_true_counters", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),
             ("a_delete_that_cannot_start_changes_nothing_in_a_real_bundle", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),
             ("a_delete_is_all_or_nothing_for_a_real_bundle", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),
+            ("a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back", a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back as fn()),
             ("replay_miis_publish_with_the_canonical_timeline_and_cache", replay_miis_publish_with_the_canonical_timeline_and_cache as fn()),
             ("partial_capture_and_identity_transitions_survive_one_pass", partial_capture_and_identity_transitions_survive_one_pass as fn()),
         ]);

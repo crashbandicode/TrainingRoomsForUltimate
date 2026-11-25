@@ -747,7 +747,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "26a9ecc30c79d388840dd0d4bb6c5e4765046f33484acdc124e0d7a71b0f4778",
+   "dest_sha256": "55df5b1971f1f7ba35cf800b5b68de347b592917446e04f81aed5fae990a08f0",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -879,6 +879,16 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n",
      "new": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n            (\"a_delete_that_cannot_start_changes_nothing_in_a_real_bundle\", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),\n            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n",
+     "new": "        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n    /// The same bundle, whose plain file of the same id cannot go (a folder has its name). The bundle comes back under\n    /// its own name: every byte as it was, the shared archive loads, it is listed once and nothing is left over.\n    fn a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back() {\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let before = bytes_in(&dir);\n        fs::create_dir(f.0.join(format!(\"{id}.tmrc\"))).unwrap();\n        assert!(archive.delete(&id).is_err());\n        assert_eq!(bytes_in(&dir), before);\n        assert!(f.load().is_ok(), \"the shared archive loads\");\n        let listed = archive.list().unwrap();\n        assert!(listed.entries.len() == 1 && listed.skipped.is_empty());\n        assert!(!f.0.join(format!(\".{id}.smd-0.del\")).exists(), \"nothing is left under the other name\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n",
+     "new": "            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n            (\"a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back\", a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back as fn()),\n"
     }
    ]
   },
