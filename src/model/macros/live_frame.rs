@@ -50,6 +50,8 @@ impl LiveFrame {
 pub struct LiveTrack {
     pub entry: i32,
     pub frames: Vec<LiveFrame>,
+    /// The identity of the entry's fighter, read once by the hook (`LiveEvent::Fighter`).
+    pub fighter: Option<crate::model::move_names::FighterId>,
 }
 
 /// A stretch of the native record with no live play at all (the TIME! to sudden-death

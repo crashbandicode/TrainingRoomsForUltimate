@@ -148,6 +148,10 @@ pub struct MacroRecording {
     pub trim: crate::model::trim::Trim,
     #[serde(default, deserialize_with = "lenient_actions", skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<ActionMark>,
+    /// The fighter the take was recorded on, as a combo file's `recorded_fighter` stores it: its specials are named by
+    /// it whoever Player 1 is. Absent in a take saved before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::model::combo_record::fighter_key")]
+    pub recorded_fighter: Option<crate::model::move_names::FighterId>,
     /// Save id this macro starts from. Absent means the file never had one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_save: Option<String>,
@@ -175,6 +179,7 @@ impl MacroRecording {
             frames,
             trim: crate::model::trim::Trim::Off,
             actions: Vec::new(),
+            recorded_fighter: None,
             start_save: None,
             start_save_on: true,
         };

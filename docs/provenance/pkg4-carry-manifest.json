@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "8ac01983b1297429c973cc0c2bd5e1e4c7edf746c0d0a11bbe80aa068f64ed96",
+   "dest_sha256": "2ba8e4c39a8e942e3da7359d86807cb47998cf26e2b3cc0cc1bcb8c0f7fcb5ea",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -172,6 +172,41 @@
      "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
      "old": "                    sides: Vec::new(),\n",
      "new": "                    sides,\n"
+    },
+    {
+     "old": "                entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,\n            }).collect() };",
+     "new": "                entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,\n                recorded_fighter: track.fighter,\n            }).collect() };",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            ReplayTrack { entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },\n            ReplayTrack { entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },",
+     "new": "            ReplayTrack { fighter: None, entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },\n            ReplayTrack { fighter: None, entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                ReplayTrack {\n                    entry: 0,",
+     "new": "                ReplayTrack {\n                    fighter: None,\n                    entry: 0,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                ReplayTrack {\n                    entry: 3,",
+     "new": "                ReplayTrack {\n                    fighter: None,\n                    entry: 3,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    quantized_analog: bool,\n}",
+     "new": "    quantized_analog: bool,\n    /// The entry's fighter identity, in a combo file's key; absent in a capture written before it was read.\n    #[serde(default, skip_serializing_if = \"Option::is_none\", with = \"crate::model::combo_record::fighter_key\")]\n    recorded_fighter: Option<crate::model::move_names::FighterId>,\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                    quantized_analog: track.quantized_analog,\n                })",
+     "new": "                    quantized_analog: track.quantized_analog,\n                    recorded_fighter: track.fighter,\n                })",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            tracks.push(ReplayTrack {\n                entry: track_header.entry,",
+     "new": "            tracks.push(ReplayTrack {\n                fighter: track_header.recorded_fighter,\n                entry: track_header.entry,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -267,7 +302,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "6fb029fc1c3311c45c643ca1d3ce2f26ec4fd17f36284ddebd2c9479d3d080b0",
+   "dest_sha256": "9882885f49519b35ca2866f31dae3af5f8c6e8616f3d9652c3bfa32f76cee1a5",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -440,6 +475,16 @@
       ]
      ],
      "reason": "rc.10 S3 (docs/CODE-REDUCTION-rc10.md): items no Switch build uses removed; items only tests use moved behind #[cfg(test)], with their imports"
+    },
+    {
+     "old": "        live.last_tick[slot] = Some(tick);\n        true\n    }\n",
+     "new": "        live.last_tick[slot] = Some(tick);\n        true\n    }\n\n    /// The identity of an entry's fighter, read once by the hook after the entry's first sample.\n    pub fn name_entry(&mut self, key: NativeRecordKey, entry: i32, fighter: crate::model::move_names::FighterId) {\n        let _ = (key, entry, fighter);\n    }\n",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                live.session.tracks.push(LiveTrack { entry, frames });",
+     "new": "                live.session.tracks.push(LiveTrack { fighter: None, entry, frames });",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -448,7 +493,7 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "6ff99b906f899c079f5ed7fa7629cdca7a0aca0f23e9733169acd77de13ba95a",
+   "dest_sha256": "4a3ef35442daf52b9ffeb74e546f5efd56da6c9a21c28ce30d976158d3bbd3ec",
    "edits": [
     {
      "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
@@ -481,6 +526,11 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "    pub frames: Vec<LiveFrame>,\n}",
+     "new": "    pub frames: Vec<LiveFrame>,\n    /// The identity of the entry's fighter, read once by the hook (`LiveEvent::Fighter`).\n    pub fighter: Option<crate::model::move_names::FighterId>,\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -489,7 +539,7 @@
    "dest": "src/model/macros/move_start.rs",
    "crate": "macros",
    "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
-   "dest_sha256": "0927832a995118f82c8823cc075ce70428f7c22fefc31954871d879a60123ada",
+   "dest_sha256": "14597ff7181079e295bafe7bc12894f4460438327501a34c5a6668d58bdbfdd7",
    "edits": [
     {
      "table_tests": true,
@@ -526,6 +576,11 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "        ReplayTrack { entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()",
+     "new": "        ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -534,7 +589,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "6abd1bb13821bc2d252c39ed23bce04a39409e99082494b4b48256bd09c1e734",
+   "dest_sha256": "20575b04a1971235adb242a3f8d3ce58ad00b41e65d2aa815ae0f8608d87cde6",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -629,6 +684,16 @@
      "old": "\n#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]\npub struct ActionMark {",
      "new": "\n#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]\npub struct ActionMark {",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            actions: Vec::new(),\n            start_save: None,",
+     "new": "            actions: Vec::new(),\n            recorded_fighter: None,\n            start_save: None,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    pub actions: Vec<ActionMark>,\n    /// Save id this macro starts from. Absent means the file never had one.",
+     "new": "    pub actions: Vec<ActionMark>,\n    /// The fighter the take was recorded on, as a combo file's `recorded_fighter` stores it: its specials are named by\n    /// it whoever Player 1 is. Absent in a take saved before the key existed.\n    #[serde(default, skip_serializing_if = \"Option::is_none\", with = \"crate::model::combo_record::fighter_key\")]\n    pub recorded_fighter: Option<crate::model::move_names::FighterId>,\n    /// Save id this macro starts from. Absent means the file never had one.",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -637,7 +702,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "886865e88806c2fee8eec050a2c7813438a9a427336d8f6d6f2699a91e8ed5ba",
+   "dest_sha256": "10cbc214c1bcd59ea502d9cb97df65b33d6fbeaac4692bdc78d53dba676f8e23",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -674,6 +739,21 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "        ReplayTrack { entry: 1, quantized_analog: false,",
+     "new": "        ReplayTrack { fighter: None, entry: 1, quantized_analog: false,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        MacroRecording::new(name, game_version, start, inputs)\n            .map_err(|e| e.to_string())",
+     "new": "        let mut recording = MacroRecording::new(name, game_version, start, inputs).map_err(|e| e.to_string())?;\n        // The identity is the first frame's fighter: a later form of the entry has none.\n        recording.recorded_fighter = self.fighter.filter(|_|\n            self.frames.first().is_some_and(|first| first.start.fighter_kind == start.fighter_kind));\n        Ok(recording)",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    pub quantized_analog: bool,\n}",
+     "new": "    pub quantized_analog: bool,\n    /// The identity of the entry's fighter, read once with the capture (its first frame's fighter); none in a\n    /// capture taken before it was read.\n    pub fighter: Option<crate::model::move_names::FighterId>,\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -682,7 +762,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "5ce6e7fce63a9f73f353189dabb6c63638adb1914994e48304301142ccc2a811",
+   "dest_sha256": "b1eec4f54343b6daab52f12efa59a2806b7a65ee01c1e7128cd716c07b63f68d",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -804,6 +884,46 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "old": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n            (\"replay_miis_publish_with_the_canonical_timeline_and_cache\", replay_miis_publish_with_the_canonical_timeline_and_cache as fn()),",
+     "new": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n            (\"a_written_capture_keeps_each_entrys_fighter_identity\", a_written_capture_keeps_each_entrys_fighter_identity as fn()),\n            (\"replay_miis_publish_with_the_canonical_timeline_and_cache\", replay_miis_publish_with_the_canonical_timeline_and_cache as fn()),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        s.tracks.insert(0, LiveTrack { entry: 7, frames: vec![frame([0.0;4])] });",
+     "new": "        s.tracks.insert(0, LiveTrack { fighter: None, entry: 7, frames: vec![frame([0.0;4])] });",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }",
+     "new": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n    /// tr-primary-2 14:51:40Z: a capture written for the Recordings list keeps each entry's fighter identity, from the\n    /// live hook's events through the written archive to the editor cache the menu loads. One written without it has none.\n    fn a_written_capture_keeps_each_entrys_fighter_identity() {\n        use crate::engine::macros::handoff::{FixedReplayId, FixedReplayTitle, LiveArchive, LiveEvent, LiveTokens};\n        let fighter = crate::model::move_names::FighterId { chara: 0xb2, specials: [0, 2, 1, 0] };\n        let mut tokens = LiveTokens::new();\n        let mut archive = LiveArchive::new();\n        let key = tokens.start_record(0);\n        archive.apply(1, LiveEvent::Start { key }, 0);\n        archive.apply(2, LiveEvent::Sample { key, entry: 1, tick: 20, sample: frame([0.0; 4]) }, 0);\n        archive.apply(3, LiveEvent::Fighter { key, entry: 1, fighter }, 0);\n        archive.apply(4, LiveEvent::Sample { key, entry: 1, tick: 21, sample: frame([0.0; 4]) }, 0);\n        archive.apply(5, LiveEvent::Finish { partial: false }, 0);\n        archive.apply(6, LiveEvent::Bind { save: 11, key }, 0);\n        let title = FixedReplayTitle::new(&\"Native title\".encode_utf16().collect::<Vec<_>>()).unwrap();\n        let commit = archive.apply(7, LiveEvent::Commit { save: 11, id: FixedReplayId::new(\"native-id\").unwrap(), title, miis: false }, 0).unwrap();\n        assert_eq!(commit.session.tracks[0].fighter, Some(fighter));\n        let written = Fixture::new();\n        written.publish(&commit.session);\n        let id = encode_file_id(\"native-id\");\n        assert_eq!(CaptureArchive::new(&written.0).load(&id).unwrap().session.tracks[0].fighter, Some(fighter));\n        assert_eq!(written.load().unwrap().session.tracks[0].fighter, Some(fighter));\n        let plain = Fixture::new();\n        plain.publish(&session());\n        assert_eq!(CaptureArchive::new(&plain.0).load(&id).unwrap().session.tracks[0].fighter, None);\n        // Archives written before the key existed.\n        let old = CaptureArchive::new(Path::new(env!(\"CARGO_MANIFEST_DIR\")).join(\"tests/fixtures/vault-recording-sides\"));\n        let entries = old.list().unwrap().entries;\n        assert!(!entries.is_empty());\n        for entry in entries {\n            assert!(old.load(&entry.id).unwrap().session.tracks.iter().all(|track| track.fighter.is_none()));\n        }\n    }",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        LiveSession { tracks: vec![LiveTrack { entry: 1, frames: vec![",
+     "new": "        LiveSession { tracks: vec![LiveTrack { fighter: None, entry: 1, frames: vec![",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            tracks.push(ReplayTrack { entry: entry.entry as i32, frames: Vec::new(), quantized_analog: false });",
+     "new": "            tracks.push(ReplayTrack { fighter: None, entry: entry.entry as i32, frames: Vec::new(), quantized_analog: false });",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        if !same_projection(&session, &cache.session) { return Err(bad(\"compact cache disagrees with canonical timeline\")); }\n        Ok(SavedCapture { replay_id, replay_name: name.into(), game_version: version.into(), session, miis })",
+     "new": "        if !same_projection(&session, &cache.session) { return Err(bad(\"compact cache disagrees with canonical timeline\")); }\n        for (track, cached) in session.tracks.iter_mut().zip(&cache.session.tracks) { track.fighter = cached.fighter; }\n        Ok(SavedCapture { replay_id, replay_name: name.into(), game_version: version.into(), session, miis })",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let (session, miis) = projector.finish(truncated)?;",
+     "new": "        let (mut session, miis) = projector.finish(truncated)?;",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let (projected, projected_miis) = projector.finish(session.truncated)?;",
+     "new": "        let (mut projected, projected_miis) = projector.finish(session.truncated)?;\n        // The identity read with the capture goes into the editor cache's header; the timeline has no field for it.\n        for track in &mut projected.tracks {\n            track.fighter = session.tracks.iter().find(|live| live.entry == track.entry).and_then(|live| live.fighter);\n        }",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -1270,7 +1390,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "22eefed693a88ec0de032e4a24018ff6167252a8d6398b926a36ce2d74d2e817",
+   "dest_sha256": "82d19367452df75f2ea55170d489f1663ee39f7a4817ffe0b0f2997f61b83b8f",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1732,6 +1852,36 @@
      "old": "/// The move names of a saved take or capture: the toggle, and its fighter's own special names when Player 1 is that\n/// fighter now (a take stores the fighter's kind, not its identity); the common names otherwise.\nfn saved_namer(kind: i32) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{recorded_identity, Namer, PUBLISHED};\n    Namer::recorded(recorded_identity(PUBLISHED.player(), kind))",
      "new": "/// The move names of a saved take or capture: the toggle, and its own fighter's special names when they are known\n/// (`clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {\n    use crate::model::move_names::{Namer, PUBLISHED};\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,",
+     "new": "        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            entry: 1, frames, quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()",
+     "new": "        let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            fighter: None,\n            entry: 1, frames, quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))),",
+     "new": "                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None))",
+     "new": "        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None, track.fighter))",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    use crate::model::move_names::{Namer, PUBLISHED};\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
+     "new": "    use crate::model::move_names::{Namer, PUBLISHED};\n    let _ = stored;\n    Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "/// (`clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {",
+     "new": "/// (the identity stored with it, else `clip_marks::take_identity`); the common names otherwise.\nfn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -1740,7 +1890,7 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "715b76b491c3cbc3574301f27a0f1381e966481f131f2e5f5a13a8dfa550c139",
+   "dest_sha256": "298650cd3c8e61421a2afa8e167974a3ce35fdc18f4182841fc569bd5f154664",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
@@ -1777,6 +1927,11 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "old": "        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,",
+     "new": "        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },
@@ -1785,7 +1940,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "069db4bc1d4fe4d7a9294abde645ddcdeb028539a9e41df9cbe9adcce8edf806",
+   "dest_sha256": "7dfe566aa22c575ab6149ed1471d67291acb709d4082820b305efdb472d1e98e",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -2513,6 +2668,36 @@
      "old": "pub fn crop_neutral_tail(frames: &mut Vec<InputFrame>) {\n    while frames.last().is_some_and(neutral_frame) {\n        frames.pop();\n    }\n}\n\nfn neutral_frame(frame: &InputFrame) -> bool {\n    let stick = |value: i8| value.unsigned_abs() < STICK_NEUTRAL as u8;\n    (frame.buttons == 0 || frame.buttons == FLICK_JUMP)\n        && stick(frame.lstick_x)\n        && stick(frame.lstick_y)\n        && stick(frame.rstick_x)\n        && stick(frame.rstick_y)\n}",
      "new": "pub fn crop_neutral_tail(frames: &mut Vec<InputFrame>) {\n    crate::model::trim::Trim::End.apply(frames);\n}",
      "reason": "The existing end crop delegates to the pure trim model."
+    },
+    {
+     "old": "        recording.actions = actions;\n        if let Some(configuration) = mii {",
+     "new": "        recording.actions = actions;\n        recording.recorded_fighter = recorded_fighter;\n        if let Some(configuration) = mii {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                    body.actions.clone(),\n                ),",
+     "new": "                    body.actions.clone(),\n                    body.recorded_fighter,\n                ),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "        let (name, version, start, frames, placement, mii, actions) = match &self.screen {",
+     "new": "        let (name, version, start, frames, placement, mii, actions, recorded_fighter) = match &self.screen {",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                actions: Vec::new(),\n            })),",
+     "new": "                actions: Vec::new(),\n                recorded_fighter: None,\n            })),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "                actions: recording.actions.clone(),\n            })),",
+     "new": "                actions: recording.actions.clone(),\n                recorded_fighter: recording.recorded_fighter,\n            })),",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    actions: Vec<crate::engine::macros::ActionMark>,\n}",
+     "new": "    actions: Vec<crate::engine::macros::ActionMark>,\n    recorded_fighter: Option<crate::model::move_names::FighterId>,\n}",
+     "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
     }
    ]
   },

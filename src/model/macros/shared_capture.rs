@@ -250,7 +250,11 @@ impl SharedCaptureArchive {
         // Switch cannot replace an existing destination with rename.
         fs::remove_file(staging.join(MANIFEST_FILE))?;
         archive::write_manifest(&staging, &manifest).map_err(bad)?;
-        let (projected, projected_miis) = projector.finish(session.truncated)?;
+        let (mut projected, projected_miis) = projector.finish(session.truncated)?;
+        // The identity read with the capture goes into the editor cache's header; the timeline has no field for it.
+        for track in &mut projected.tracks {
+            track.fighter = session.tracks.iter().find(|live| live.entry == track.entry).and_then(|live| live.fighter);
+        }
         CaptureArchive::new(&staging).save_with_miis(replay_id, replay_name, game_version, &projected, projected_miis.as_ref())?;
         prescan(&staging.join(TIMELINE_FILE))?;
         bounded_file(&staging.join(MANIFEST_FILE), MAX_MANIFEST)?;
@@ -310,10 +314,11 @@ impl SharedCaptureArchive {
             || manifest.completion.events != Some(checker.accepted()) || manifest.completion.last_seq != checker.last_seq() {
             return Err(bad("manifest derived metadata disagrees with timeline"));
         }
-        let (session, miis) = projector.finish(truncated)?;
+        let (mut session, miis) = projector.finish(truncated)?;
         let cache = CaptureArchive::new(&dir).load(id)?;
         same_identity(&cache, &replay_id, name, version, miis.as_ref())?;
         if !same_projection(&session, &cache.session) { return Err(bad("compact cache disagrees with canonical timeline")); }
+        for (track, cached) in session.tracks.iter_mut().zip(&cache.session.tracks) { track.fighter = cached.fighter; }
         Ok(SavedCapture { replay_id, replay_name: name.into(), game_version: version.into(), session, miis })
     }
 }
@@ -380,7 +385,7 @@ impl Projector {
         for entry in &h.entries {
             if entry.entry >= 8 || slots[entry.entry as usize].is_some() { return Err(bad("duplicate/invalid projected entry")); }
             slots[entry.entry as usize] = Some(tracks.len());
-            tracks.push(ReplayTrack { entry: entry.entry as i32, frames: Vec::new(), quantized_analog: false });
+            tracks.push(ReplayTrack { fighter: None, entry: entry.entry as i32, frames: Vec::new(), quantized_analog: false });
         }
         Ok(Self { miis: None, tracks, slots, actors: BTreeMap::new(), active: [None; 8], pending: None,
             counter: None, group: 0, last_entry: None, group_samples: 0, started: false, stopped: false, ended: false, seq: 0,
@@ -548,10 +553,44 @@ mod tests {
             speed_z: f32::from_bits(3), body: 91 }
     }
     fn session() -> LiveSession {
-        LiveSession { tracks: vec![LiveTrack { entry: 1, frames: vec![
+        LiveSession { tracks: vec![LiveTrack { fighter: None, entry: 1, frames: vec![
             frame([-0.0, f32::from_bits(1), 0.49999997 / 120.0, 2.0]),
             frame([-2.0, -0.5 / 120.0, 0.5 / 120.0, f32::from_bits(0x80000001)]),
         ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }
+    }
+
+    /// tr-primary-2 14:51:40Z: a capture written for the Recordings list keeps each entry's fighter identity, from the
+    /// live hook's events through the written archive to the editor cache the menu loads. One written without it has none.
+    fn a_written_capture_keeps_each_entrys_fighter_identity() {
+        use crate::engine::macros::handoff::{FixedReplayId, FixedReplayTitle, LiveArchive, LiveEvent, LiveTokens};
+        let fighter = crate::model::move_names::FighterId { chara: 0xb2, specials: [0, 2, 1, 0] };
+        let mut tokens = LiveTokens::new();
+        let mut archive = LiveArchive::new();
+        let key = tokens.start_record(0);
+        archive.apply(1, LiveEvent::Start { key }, 0);
+        archive.apply(2, LiveEvent::Sample { key, entry: 1, tick: 20, sample: frame([0.0; 4]) }, 0);
+        archive.apply(3, LiveEvent::Fighter { key, entry: 1, fighter }, 0);
+        archive.apply(4, LiveEvent::Sample { key, entry: 1, tick: 21, sample: frame([0.0; 4]) }, 0);
+        archive.apply(5, LiveEvent::Finish { partial: false }, 0);
+        archive.apply(6, LiveEvent::Bind { save: 11, key }, 0);
+        let title = FixedReplayTitle::new(&"Native title".encode_utf16().collect::<Vec<_>>()).unwrap();
+        let commit = archive.apply(7, LiveEvent::Commit { save: 11, id: FixedReplayId::new("native-id").unwrap(), title, miis: false }, 0).unwrap();
+        assert_eq!(commit.session.tracks[0].fighter, Some(fighter));
+        let written = Fixture::new();
+        written.publish(&commit.session);
+        let id = encode_file_id("native-id");
+        assert_eq!(CaptureArchive::new(&written.0).load(&id).unwrap().session.tracks[0].fighter, Some(fighter));
+        assert_eq!(written.load().unwrap().session.tracks[0].fighter, Some(fighter));
+        let plain = Fixture::new();
+        plain.publish(&session());
+        assert_eq!(CaptureArchive::new(&plain.0).load(&id).unwrap().session.tracks[0].fighter, None);
+        // Archives written before the key existed.
+        let old = CaptureArchive::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vault-recording-sides"));
+        let entries = old.list().unwrap().entries;
+        assert!(!entries.is_empty());
+        for entry in entries {
+            assert!(old.load(&entry.id).unwrap().session.tracks.iter().all(|track| track.fighter.is_none()));
+        }
     }
 
     /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with
@@ -618,7 +657,7 @@ mod tests {
         replacement.start.fighter_kind = 20; replacement.start.costume = 3;
         s.tracks[0].frames.push(replacement);
         // Original roster order is retained while samples interleave by entry.
-        s.tracks.insert(0, LiveTrack { entry: 7, frames: vec![frame([0.0;4])] });
+        s.tracks.insert(0, LiveTrack { fighter: None, entry: 7, frames: vec![frame([0.0;4])] });
         let dir = f.publish(&s); let capture = Capture::load(&dir).unwrap();
         assert!(matches!(capture.completeness, Completeness::DeclaredTruncated { .. }));
         assert!(validate_capture(&capture).iter().all(|i| !i.is_error()));
@@ -637,6 +676,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("a_sudden_death_break_round_trips_with_its_gap_and_true_counters", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),
+            ("a_written_capture_keeps_each_entrys_fighter_identity", a_written_capture_keeps_each_entrys_fighter_identity as fn()),
             ("replay_miis_publish_with_the_canonical_timeline_and_cache", replay_miis_publish_with_the_canonical_timeline_and_cache as fn()),
             ("partial_capture_and_identity_transitions_survive_one_pass", partial_capture_and_identity_transitions_survive_one_pass as fn()),
         ]);

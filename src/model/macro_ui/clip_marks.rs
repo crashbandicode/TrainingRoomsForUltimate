@@ -780,7 +780,7 @@ mod tests {
         assert!(line.contains("ctx=macro.p1") && line.contains("cursor=199") && line.contains("handle=out"), "{line}");
         assert!(line.ends_with("target=p1 marks=2 mark=90-none move=\"110 frames into Special\""), "{line}");
         assert!(bridge_clip(&editor.view(), Some("drill"), true).text().starts_with("clip ctx=drill total=200 "));
-        let capture = ReplaySession { tracks: vec![ReplayTrack { entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
+        let capture = ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
             input: InputFrame::default(), start: StartState::neutral(74, 0, 1.0), x: 0.0, y: 0.0 }).collect() }],
             truncated: false, breaks: Vec::new() };
         let mut vault = ClipEditor::new(capture, vec![0]).unwrap();
@@ -796,7 +796,7 @@ mod tests {
         use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
         use crate::model::chords::{bit, logical, logical_set, Buttons, STYLE_GAMECUBE};
         use clip_panel::TargetTap;
-        let track = |entry: i32| ReplayTrack { entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
+        let track = |entry: i32| ReplayTrack { fighter: None, entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
             input: InputFrame { buttons: i + 1, ..InputFrame::default() }, start: StartState::neutral(entry + 7, 0, 1.0),
             x: 0.0, y: 0.0 }).collect() };
         let capture = || ReplaySession { tracks: vec![track(0), track(1)], truncated: false, breaks: Vec::new() };
@@ -1517,8 +1517,85 @@ mod tests {
         assert_eq!(MII_KINDS, 0x48..=0x4a);
         assert!(include_str!("../mii/mii_setup.rs").contains("if !(0x48..=0x4a).contains(&self.kind)"));
         let panel = include_str!("clip_panel.rs").split("#[cfg(test)]").next().unwrap();
-        assert!(panel.contains("saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))"));
+        assert!(panel.contains("saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)"));
         assert!(!panel.contains("recorded_identity("));
+    }
+
+    /// tr-primary-2 14:33:53Z and 14:41:51Z: a take that stored its fighter, and a Vault capture's side, name their
+    /// specials by that fighter whoever Player 1 is. The capture is built by the hook's own events (`VaultArchive`).
+    fn a_take_and_a_vault_side_name_their_specials_by_their_own_fighter() {
+        use crate::engine::macros::handoff::{VaultArchive, VaultEvent};
+        use crate::engine::macros::ReplayFrame;
+        use crate::model::move_names::{FighterId, Names, PUBLISHED};
+        const CHILD: &str = "TR_MARK_NAMES_CHILD";
+        let name = "a_take_and_a_vault_side_name_their_specials_by_their_own_fighter";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "engine::macro_ui::clip_marks::tests::case_table", "--nocapture"])
+                .env("TR_TABLE_CASE", name).env(CHILD, "1").output().unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(output.status.success() && stdout.contains("running 1 test"), "{stdout}\n{}", String::from_utf8_lossy(&output.stderr));
+            return;
+        }
+        let id = |suffix: &str| FighterId { chara: crate::model::hash40::hash40(&format!("ui_chara_{suffix}")) & 0xff_ffff_ffff, specials: [0; 4] };
+        let (alpha, beta) = (id("alpha"), id("beta"));
+        PUBLISHED.publish(Box::new(Names::build(&crate::model::move_names::tests::shared_file()).unwrap()));
+        PUBLISHED.set_on(true);
+        // Player 1 is another fighter than the one recorded.
+        PUBLISHED.set_player(Some((6, alpha)));
+        let root = scratch("own-fighter");
+        let library = Library::new(root.join("macros"));
+        let reopened = |fighter: Option<FighterId>| {
+            let mut take = MacroRecording::new("Take", "13.0.5", StartState::neutral(8, 0, 1.0), vec![InputFrame::default(); 60]).unwrap();
+            take.actions = vec![ActionMark { start: 0, end: Some(20), mv: Some(full_move_key(Move::UpSpecial).into()), ..ActionMark::default() }];
+            take.recorded_fighter = fighter;
+            let id = library.save_new(&take).unwrap();
+            ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap().view().move_text
+        };
+        assert_eq!(reopened(Some(beta)), "Start of Test Lunar Lift");
+        assert_eq!(reopened(None), "Start of Up special");
+        // The Vault playback hook's events: both entries sampled, the CPU side's identity posted once after its first sample.
+        let mut archive = VaultArchive::new();
+        archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+        for frame in 0..40u32 {
+            for (entry, kind) in [(0, 6), (1, 8)] {
+                let sample = ReplayFrame { input: InputFrame { buttons: if frame == 5 { 2 } else { 0 }, ..InputFrame::default() },
+                    start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+                archive.apply(VaultEvent::Sample { epoch: 1, entry, sample, quantized: false }, 0);
+                if frame == 0 && entry == 1 { archive.apply(VaultEvent::Fighter { epoch: 1, entry, fighter: beta }, 0); }
+            }
+        }
+        archive.apply(VaultEvent::End { epoch: 1, truncated: false }, 0);
+        let mut editor = ClipEditor::new(archive.session.clone(), vec![0]).unwrap();
+        assert!(editor.select_entry(1));
+        let ClipEffect::Export(exported) = editor.on_action(ClipAction::Confirm) else { panic!("export") };
+        assert_eq!((exported.start.fighter_kind, exported.recorded_fighter), (8, Some(beta)));
+        for make in [crate::model::recording_menu::Make::Macro, crate::model::recording_menu::Make::Drill] {
+            let source = match rr_runtime::generate(&root, (*exported).clone(), "Made", make, Role::Cpu, 1).unwrap() {
+                rr_runtime::Generated::Macro(id) => id,
+                rr_runtime::Generated::Pass(ask) => ask.source,
+            };
+            assert_eq!(library.load(&source).unwrap().recorded_fighter, Some(beta), "{make:?}");
+        }
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::Preview(preview) if preview.recorded_fighter == Some(beta)));
+        editor.watch(&[Span { start: 6, end: Some(30), mv: Some(Move::UpSpecial), ..Span::default() }]);
+        editor.preview_cursor(6);
+        assert_eq!(editor.view().move_text, "Start of Test Lunar Lift");
+        // The capture's Player 1 side had no identity posted: its export has no key.
+        let mut other = ClipEditor::new(archive.session.clone(), vec![0]).unwrap();
+        assert!(other.select_entry(0));
+        let ClipEffect::Export(plain) = other.on_action(ClipAction::Confirm) else { panic!("export") };
+        assert_eq!(plain.recorded_fighter, None);
+        // The three producers: each reads the identity once, on the game's own thread.
+        for (text, wanted) in [
+            (include_str!("../../runtime/features/recording_host.rs"), "rr_host::set_fighter_reader(role_fighter);"),
+            (include_str!("../../runtime/features/recording_host.rs"), "super::move_names::fighter_id(body.accessor, kind)"),
+            (include_str!("../../runtime/macros/replay_capture.rs"), "VaultEvent::Fighter { epoch: hook.epoch, entry, fighter }"),
+            (include_str!("../../runtime/macros/live_replay.rs"), "capture.pool.name(pending.key, entry, fighter)"),
+            (include_str!("../rr_host.rs"), "cpu: CaptureOwner::new(start.poses[1].fighter_kind, read_fighter(Role::Cpu))"),
+        ] {
+            assert!(text.contains(wanted), "missing {wanted}");
+        }
     }
 
     #[test]
@@ -1568,6 +1645,7 @@ mod tests {
             ("a_crop_and_a_record_time_trim_keep_the_variants", a_crop_and_a_record_time_trim_keep_the_variants),
             ("the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on", the_reopened_editor_names_a_special_only_by_the_fighter_it_was_recorded_on),
             ("a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names", a_takes_specials_are_named_by_its_own_fighter_or_by_the_common_names),
+            ("a_take_and_a_vault_side_name_their_specials_by_their_own_fighter", a_take_and_a_vault_side_name_their_specials_by_their_own_fighter),
         ]);
     }
     }

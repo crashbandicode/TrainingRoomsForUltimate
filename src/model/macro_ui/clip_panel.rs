@@ -328,15 +328,16 @@ fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
 }
 
 /// The move names of a saved take or capture: the toggle, and its own fighter's special names when they are known
-/// (`clip_marks::take_identity`); the common names otherwise.
-fn saved_namer(kind: i32, mii: Option<[u8; 4]>) -> crate::model::move_names::Namer<'static> {
+/// (the identity stored with it, else `clip_marks::take_identity`); the common names otherwise.
+fn saved_namer(kind: i32, mii: Option<[u8; 4]>, stored: Option<crate::model::move_names::FighterId>) -> crate::model::move_names::Namer<'static> {
     use crate::model::move_names::{Namer, PUBLISHED};
+    let _ = stored;
     Namer::recorded(crate::engine::macro_ui::clip_marks::take_identity(PUBLISHED.player(), kind, mii))
 }
 
 fn track_marks(track: &ReplayTrack) -> Marks {
     Marks::from_inputs(track.frames.iter().map(|frame| frame.input))
-        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None))
+        .named(saved_namer(track.frames.first().map_or(-1, |frame| frame.start.fighter_kind), None, track.fighter))
 }
 
 impl ClipEditor {
@@ -381,7 +382,7 @@ impl ClipEditor {
     fn file(file: FileSource, total: u32, source_name: String) -> Result<Self, String> {
         let marks = match &file {
             FileSource::Macro { recording, .. } => Marks::from_recording(recording,
-                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials))),
+                saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)),
             FileSource::Combo(recording) => Marks::from_units(
                 crate::model::recording_menu::combo_link_lines(&recording.combo, crate::model::move_names::Namer::recorded(recording.fighter)).into_iter()
                     .filter(|line| crate::model::recording_menu::link_head(line))),
@@ -764,6 +765,7 @@ mod tests {
         frames[27].input.lstick_x = -127;
         let wanted: Vec<_> = frames[27..38].iter().map(|f| f.input).collect();
         let mut e = ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {
+            fighter: None,
             entry: 1, frames, quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap()
             .with_move_rules(MoveStartRules { families: vec![MoveFamily { fighter: None,
                 statuses: vec![45, 46, 47], buttons: 0 }], setup: vec![6, 7], ground: 0, air: 2,
@@ -938,7 +940,7 @@ mod tests {
         let frames = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },
             start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
-        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,
+        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,
             quantized_analog: false }], truncated: false, breaks: Vec::new() }, vec![14]).unwrap()
     }
     fn invalid_start_requires_explicit_lead_in_and_keeps_selection() {

@@ -433,11 +433,13 @@ struct PostedStart {
     seq: u64,
     start: RecordStart,
     owner: CaptureOwner,
+    /// The CPU's fighter, for a CPU-role take.
+    cpu: CaptureOwner,
 }
 
 /// One game-thread writer (chord or placement poll), one recording-worker reader.
 static RECORD_STARTS: hos_lock::TripleBuffer<PostedStart> =
-    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN });
+    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN, cpu: CaptureOwner::UNKNOWN });
 static START_SEQ: AtomicU64 = AtomicU64::new(0);
 static START_USED: AtomicU64 = AtomicU64::new(0);
 /// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
@@ -1102,9 +1104,21 @@ pub fn note_record_start(start: RecordStart) {
     post_record_start(start, fighter);
 }
 
+/// Reads a role's live fighter identity on the game thread. The runtime installs it once; set once, read without a lock.
+static FIGHTER_READER: std::sync::OnceLock<fn(Role) -> Option<crate::model::move_names::FighterId>> = std::sync::OnceLock::new();
+pub fn set_fighter_reader(reader: fn(Role) -> Option<crate::model::move_names::FighterId>) {
+    let _ = FIGHTER_READER.set(reader);
+}
+fn read_fighter(role: Role) -> Option<crate::model::move_names::FighterId> {
+    FIGHTER_READER.get().and_then(|reader| reader(role))
+}
+
+/// Every take start is posted here: the Record chord, and placement Ready through `note_record_start`. Each role's
+/// fighter identity is read here, so every take carries the one of the role that recorded it.
 pub fn post_record_start(start: RecordStart, fighter: Option<crate::model::move_names::FighterId>) {
     let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
-    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter) });
+    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter),
+        cpu: CaptureOwner::UNKNOWN });
 }
 
 fn take_record_start() -> Option<PostedStart> {
@@ -5924,6 +5938,71 @@ mod tests {
         StartPose { fighter_kind: kind, situation_kind: 0, x, y: 0.0, percent: 0.0, lr, start_state: PlacementStartState::Standard }
     }
 
+    /// tr-primary-2 14:33:53Z and 14:51:40Z: a take keeps the fighter of the role that recorded it, read where every take
+    /// start is posted: the Record chord, and placement Ready through `note_record_start`.
+    #[test]
+    fn a_take_keeps_the_fighter_of_the_role_that_recorded_it() {
+        use crate::model::move_names::FighterId;
+        static WHO: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+        fn reader(role: Role) -> Option<FighterId> {
+            let chara = WHO[role_index(role)].load(Ordering::Acquire);
+            (chara != 0).then_some(FighterId { chara, specials: [0, 1, 2, 0] })
+        }
+        let _hold = hold();
+        set_fighter_reader(reader);
+        let who = |chara| FighterId { chara, specials: [0, 1, 2, 0] };
+        let saved = |root: &Path| {
+            let macros = Library::new(root.join(MACROS_DIR));
+            let id = macros.list().unwrap().entries[0].id.clone();
+            let json: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join(MACROS_DIR).join(format!("{id}.json"))).unwrap()).unwrap();
+            (macros.load(&id).unwrap().recorded_fighter, json.get("recorded_fighter").cloned())
+        };
+        let take = |tag: &str, role: Role, side: u8, post: &dyn Fn(RecordStart)| {
+            reset_host();
+            let root = scratch(tag);
+            set_record_role(role);
+            post(RecordStart { poses: [pose(0, 0.0, 1.0), pose(8, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+            on_chords(true, false, false);
+            push_capture(side, InputFrame { buttons: 513, ..InputFrame::default() });
+            on_chords(true, false, false);
+            let _ = service_at(&root, &none(), "2026-11-25", live_pose(0).saved(), live_pose(1).saved());
+            saved(&root)
+        };
+        WHO[0].store(0xa1, Ordering::Release);
+        WHO[1].store(0xb2, Ordering::Release);
+        // Placement Ready starts a CPU-role take through `note_record_start`: the CPU's identity, in the combo file's key.
+        let (fighter, key) = take("rec-fighter-cpu", Role::Cpu, ROLE_CPU, &note_record_start);
+        assert_eq!(fighter, Some(who(0xb2)));
+        assert_eq!(key, Some(serde_json::json!({"ui_chara": "b2", "specials": [0, 1, 2, 0]})));
+        // A Player take: the identity the chord read, and the reader's when the caller had none.
+        let given = FighterId { chara: 0xc3, specials: [0; 4] };
+        assert_eq!(take("rec-fighter-p1", Role::Player, ROLE_PLAYER, &|start| post_record_start(start, Some(given))).0, Some(given));
+        assert_eq!(take("rec-fighter-p1-read", Role::Player, ROLE_PLAYER, &|start| post_record_start(start, None)).0, Some(who(0xa1)));
+        // A directly recorded drill's take is Player 1's.
+        reset_host();
+        let root = scratch("rec-fighter-drill");
+        set_record_role(Role::Player);
+        set_record_trim(crate::model::trim::Trim::Off);
+        post_effect(Effect::RecordDrill);
+        post_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(8, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] }, None);
+        on_chords(true, false, false);
+        for (f, b) in [1, 0].into_iter().enumerate() {
+            let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
+            unsafe { on_player_poll(&mut input); }
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
+        }
+        on_chords(true, false, false);
+        service_at(&root, &none(), "2026-11-25", state(0), state(8));
+        set_record_trim(crate::model::trim::Trim::End);
+        assert!(take_saved_drill().is_some());
+        assert_eq!(saved(&root).0, Some(who(0xa1)));
+        // No identity to read: the take has no key, as a take saved before it existed.
+        WHO[0].store(0, Ordering::Release);
+        WHO[1].store(0, Ordering::Release);
+        assert_eq!(take("rec-fighter-none", Role::Cpu, ROLE_CPU, &note_record_start), (None, None));
+        reset_host();
+    }
+
     #[test]
     fn a_record_start_is_posted_without_a_lock() {
         let source = include_str!("rr_host.rs");
@@ -6390,6 +6469,7 @@ mod tests {
         use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
         let track = |entry: i32, base: u32| ReplayTrack {
+            fighter: None,
             entry, quantized_analog: false,
             frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
