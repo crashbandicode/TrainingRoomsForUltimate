@@ -757,8 +757,8 @@ pub(crate) fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
 }
 fn endpoint_move(key: &str) -> Option<Move> {
-    // Preserve the three bare aliases accepted before descriptions gained the edge attacks.
-    move_of(key).filter(|m| m.legacy() == *m || matches!(m, Move::Grab | Move::Throw | Move::FinalSmash))
+    // A move older files call other belongs in the description, not a bare from or to.
+    move_of(key).filter(|m| m.legacy() == *m)
 }
 fn button_key(b: Button) -> &'static str {
     key_of(&BUTTONS, b)

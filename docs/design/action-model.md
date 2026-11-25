@@ -217,7 +217,7 @@ it the causal rule.
 Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `move` (`grab`,
 `throw`, `final_smash`, `ledge_attack`, `getup_attack` or `trip_attack`), `of` (a move key), `angle` (`up` or `down`)
 and `variant` (0–31). Both objects are needed for a described link; `{}` is valid. `from` and `to` write `other` for
-these six kinds for older readers.
+these six kinds for older readers. The reader refuses any of the six straight in `from` or `to`.
 
 An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a
 stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs). On reading, an aim event with `path` gets
@@ -337,4 +337,5 @@ selected version and name.
   `an_edge_attack_keeps_its_move_one_frame_past_its_end`, `an_edge_attack_links_on_both_sides_and_reads_alike`,
   `the_grader_tells_an_edge_attack_from_another_move`, `edge_attacks_round_trip_in_files_and_in_the_packed_link`,
   `an_old_file_grades_an_edge_attack_as_before`, `an_edge_attack_step_is_decided_when_its_action_opens`,
-  `an_edge_attack_takes_its_name_number_from_its_animation`.
+  `an_edge_attack_takes_its_name_number_from_its_animation`,
+  `a_grab_a_throw_and_a_final_smash_belong_to_descriptions_not_bare_link_endpoints`.
