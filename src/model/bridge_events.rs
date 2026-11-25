@@ -38,12 +38,49 @@ pub struct Clip {
     pub playing: bool,
     pub handle: &'static str,
     pub running: bool,
+    /// Where a preview plays: `p1`, `cpu`, or `none` for a source with no preview.
+    pub target: &'static str,
+    /// Every mark of the take, and the mark at or nearest the cursor.
+    pub marks: u32,
+    pub mark: Option<(u32, Option<u32>)>,
+    pub text: MoveText,
+}
+
+/// The strip's move text on a `clip` line: at most 48 bytes, cut at a character; a quote, a backslash or a control
+/// character is written as an apostrophe, so the quoted value never needs an escape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MoveText { bytes: [u8; 48], len: u8 }
+
+impl MoveText {
+    pub fn new(text: &str) -> Self {
+        let mut out = Self { bytes: [0; 48], len: 0 };
+        for c in text.chars() {
+            let c = if c == '"' || c == '\\' || c.is_control() { '\'' } else { c };
+            let mut buffer = [0u8; 4];
+            let unit = c.encode_utf8(&mut buffer).as_bytes();
+            let at = usize::from(out.len);
+            if at + unit.len() > out.bytes.len() { break; }
+            out.bytes[at..at + unit.len()].copy_from_slice(unit);
+            out.len += unit.len() as u8;
+        }
+        out
+    }
+
+    pub fn as_str(&self) -> &str { core::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("") }
 }
 
 impl Clip {
     pub fn text(self) -> String {
-        format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={}",
-            self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running))
+        let mut line = format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={} target={} marks={} mark=",
+            self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running),
+            self.target, self.marks);
+        let _ = match self.mark {
+            Some((start, Some(end))) => write!(line, "{start}-{end}"),
+            Some((start, None)) => write!(line, "{start}-none"),
+            None => line.write_str("none"),
+        };
+        let _ = write!(line, " move=\"{}\"", self.text.as_str());
+        line
     }
 }
 

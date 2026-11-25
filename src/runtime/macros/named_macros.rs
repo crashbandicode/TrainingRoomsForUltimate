@@ -410,7 +410,7 @@ pub fn publish_queries() {
     observe_loaded();
     let marker = lock_read(&UI).marker();
     let (browser_pending, browser_release) = crate::runtime::macros::replay_capture::browser_queries();
-    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page())
+    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.playing)
         || crate::engine::rr_host::preview_away();
     QUERIES.publish(crate::model::macro_handoff::MacroQueries {
         session: session_revision(),

@@ -1632,13 +1632,13 @@ fn events_between(
 }
 
 #[derive(Clone, Copy)]
-struct Timed {
-    kind: Kind,
+pub(crate) struct Timed {
+    pub(crate) kind: Kind,
     dir: Dir,
-    frame: u32,
+    pub(crate) frame: u32,
 }
 
-fn push_edges(
+pub(crate) fn push_edges(
     out: &mut [Option<Timed>; STEPS],
     count: &mut usize,
     prev: Option<Snap>,

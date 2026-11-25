@@ -331,6 +331,8 @@ struct Session {
     follow_drill: bool,
     /// The preview's button routing and post-play tail while the menu stays hidden.
     drill_preview: DrillPreview,
+    /// The previewed take as the strip draws it: timeline, move marks and playhead. `None` when the take could not be read.
+    drill_clip: Option<crate::engine::macro_ui::clip_panel::ClipEditor>,
     /// The card's recording catalog, kept across menu opens (menu-speed fix, Switch 2026-11-19): built after boot and
     /// after each TR file change a file per worker pass, so a menu open takes it without reading the card.
     catalog: CatalogCache,
@@ -874,7 +876,39 @@ fn start_drill_preview(source: &str, frames: u32) {
         || !crate::engine::rr_host::request_drill_preview(source, frames) {
         return;
     }
+    *DRILL_TAKE.lock() = Some(source.to_owned());
     PREVIEW_HIDES.store(true, Ordering::Release);
+}
+
+/// The take a drill preview just started on, until the next pass builds its strip.
+static DRILL_TAKE: Mutex<Option<String>> = Mutex::new(None);
+
+/// The strip of a drill's take: the whole take, playing, with its move marks. Read-only: nothing here crops or saves.
+fn drill_clip(source: &str) -> Option<crate::engine::macro_ui::clip_panel::ClipEditor> {
+    use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor};
+    let library = crate::engine::macros::Library::new(std::path::Path::new(ROOT).join(crate::engine::library::MACROS_DIR));
+    let mut clip = ClipEditor::macro_file(library.load(source).ok()?, true).ok()?;
+    clip.on_action(ClipAction::TogglePlay);
+    Some(clip)
+}
+
+/// One pass of the strip: the playhead follows the frames Player 1 took, and the watch adds the moves it saw.
+fn step_drill_clip(s: &mut Session) {
+    use crate::engine::library::Role;
+    use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
+    use crate::engine::rr_host;
+    if let Some(source) = DRILL_TAKE.lock().take() {
+        s.drill_clip = drill_clip(&source);
+    }
+    let Some(editor) = s.drill_clip.as_mut() else { return };
+    editor.preview_cursor(rr_host::fed_frames(Role::Player));
+    let mut spans = [Span::default(); WATCH_SPANS];
+    let (run, count) = rr_host::watch_copy(&mut spans);
+    if rr_host::fed_run(Role::Player).is_some_and(|(current, _)| current == run) {
+        editor.watch(&spans[..count]);
+    }
+    s.bridge.set_drill(Some(crate::engine::macro_ui::clip_marks::bridge_clip(&editor.view(), Some("drill"), rr_host::preview_running())));
+    publish_frame(s);
 }
 
 /// Every worker pass while a drill preview hides the menu: the page returns once the take and its tail are over, on
@@ -884,6 +918,7 @@ fn sync_drill_preview(s: &mut Session) {
         return;
     }
     let gone = !(OPEN.load(Ordering::Acquire) || POPUP.load(Ordering::Acquire));
+    step_drill_clip(s);
     let frame = crate::runtime::ui::facts::fact_frame_number();
     if gone || s.drill_preview.pass(crate::engine::rr_host::preview_running(), frame) == Step::Done {
         end_drill_preview(s, gone);
@@ -896,6 +931,10 @@ fn end_drill_preview(s: &mut Session, stop: bool) {
         return;
     }
     s.drill_preview = DrillPreview::new();
+    s.drill_clip = None;
+    s.bridge.set_drill(None);
+    DRILL_TAKE.lock().take();
+    crate::runtime::ui::state::PREVIEW_STRIP.store(false, Ordering::Release);
     if stop {
         crate::engine::rr_host::stop_preview();
     }
@@ -1236,7 +1275,7 @@ fn sync_panels(s: &mut Session) {
         }
     }
     if s.phase == Phase::Clip {
-        EXT_SHOWN.store(!crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page()), Ordering::Release);
+        EXT_SHOWN.store(true, Ordering::Release);
     }
     if open || s.phase == Phase::Clip || s.phase == Phase::Prompt {
         publish_frame(s);
@@ -1364,6 +1403,25 @@ fn stage_label(i: usize) -> &'static str {
 /// Build the frame of what is on screen (the clip editor, a layer panel, or the menu's own page and sub-screen) and hand it to the tick
 /// when it differs from the last one.
 fn publish_frame(s: &Session) {
+    if PREVIEW_HIDES.load(Ordering::Acquire) {
+        // A drill's take previews: the strip stands in for the hidden menu.
+        if let Some(view) = s.drill_clip.as_ref().map(|editor| editor.view()) {
+            use core::fmt::Write;
+            let mut next = NEXT_FRAME.lock();
+            next.reset();
+            clip_frame(&view, "", 0, &mut next);
+            next.rows[0].label.clear();
+            let _ = next.rows[0].label.write_str("Drill preview");
+            next.help[0].clear();
+            let _ = next.help[0].write_str("Previewing the drill's take.");
+            next.help[1].clear();
+            next.hint.clear();
+            let _ = next.hint.write_str("X or B: stop.");
+            hand_over(&next);
+            crate::runtime::ui::state::PREVIEW_STRIP.store(true, Ordering::Release);
+            return;
+        }
+    }
     if !flow::frame_needs_menu(s.phase) {
         // The clip editor: the hand-over closed the menu and the close dropped its model, so it draws from its own view.
         let Some(view) = replay_capture::clip_view() else { return };

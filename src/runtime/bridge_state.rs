@@ -423,10 +423,16 @@ pub struct Provider {
     notice: (String, String),
     events: Outbox,
     clip: ClipSeen,
+    /// The drill take preview's strip, while it is up (the worker sets it).
+    drill: Option<Clip>,
 }
 
 impl Provider {
     /// One worker pass. `view` builds the snapshot; it is called only once the bridge was found.
+    pub fn set_drill(&mut self, strip: Option<Clip>) {
+        self.drill = strip;
+    }
+
     pub fn tick(&mut self, now_ms: u64, view: impl FnOnce(&(String, String), u64, &mut String)) {
         if !enabled() {
             return;
@@ -465,21 +471,8 @@ impl Provider {
         self.events.lost(EVENTS.take_dropped());
         let send = |text: &str| event(handle, text.as_ptr(), text.len() as u32);
         self.events.flush(now_ms, send);
-        let clip = crate::runtime::macros::replay_capture::clip_view().map(|view| {
-            use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
-            Clip {
-                ctx: match view.context {
-                    ClipContext::Replay { .. } => "replay",
-                    ClipContext::Macro { player: true } => "macro.p1",
-                    ClipContext::Macro { player: false } => "macro.cpu",
-                    ClipContext::Combo { .. } => "combo",
-                },
-                total: view.total, start: view.start, end: view.end, cursor: view.cursor,
-                playing: view.playing,
-                handle: match view.handle { Handle::Playhead => "playhead", Handle::In => "in", Handle::Out => "out" },
-                running: crate::engine::rr_host::preview_running(),
-            }
-        });
+        let running = crate::engine::rr_host::preview_running();
+        let clip = self.drill.or_else(|| crate::runtime::macros::replay_capture::clip_view().map(|shown| crate::engine::macro_ui::clip_marks::bridge_clip(&shown, None, running)));
         self.clip.send(clip, send);
     }
 

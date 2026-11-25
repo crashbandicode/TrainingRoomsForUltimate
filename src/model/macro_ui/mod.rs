@@ -2,6 +2,7 @@
 //! `training_mod_tui` crate by `tools/carry_pkg4.py` (no terminal, no rendering: package 5 draws the `View` values these produce).
 
 pub mod clip_browser;
+pub mod clip_marks;
 pub mod clip_panel;
 pub mod drill_preview;
 pub mod macro_panel;

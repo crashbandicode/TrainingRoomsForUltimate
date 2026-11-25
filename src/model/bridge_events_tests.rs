@@ -5,7 +5,8 @@ fn hold(polls: u32) -> Event {
 }
 
 fn clip() -> Clip {
-    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true }
+    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true,
+        target: "cpu", marks: 2, mark: Some((90, None)), text: MoveText::new("66 frames into Special") }
 }
 
 fn fed(p1: u32, cpu: u32, preview: bool, hides: bool) -> Fed { Fed { p1, cpu, run: [0, 0], preview, hides } }
@@ -101,8 +102,10 @@ fn the_fed_sample_is_first_in_player_ones_poll_and_the_worker_never_sends_it() {
 #[test]
 fn clip_text_names_the_window_and_the_editor_cursor() {
     let c = clip();
-    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1");
+    assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
+        target=cpu marks=2 mark=90-none move=\"66 frames into Special\"");
 }
+
 
 #[test]
 fn a_clip_event_is_sent_once_per_change_and_retried_until_it_lands() {
@@ -182,4 +185,12 @@ fn old_or_overflowing_events_are_counted_as_lost() {
     let mut got = Vec::new();
     out.flush(2100, |s| { got.push(s.to_owned()); 0 });
     assert_eq!(got, vec![hold(6).text()]);
+}
+
+#[test]
+fn the_move_text_is_bounded_and_never_needs_an_escape() {
+    let quoted = MoveText::new(&"a\"b\\".repeat(30));
+    assert!(quoted.as_str().len() == 48 && !quoted.as_str().contains(['"', '\\']), "{}", quoted.as_str());
+    assert_eq!(MoveText::new(&"→".repeat(40)).as_str().chars().count(), 16);
+    assert_eq!(Clip { mark: None, ..clip() }.text().split(" mark=").nth(1), Some("none move=\"66 frames into Special\""));
 }

@@ -2929,3 +2929,35 @@ ceiling = 201005
 date = "2026-11-25"
 reason = "Install 4 integration, merge 7: the input-display scrollback chord (feat/strip-scrollback 1836edcf) on top of smoke fix 1. Measured 201005 on the merged tree: the smoke fix 1 head measures 200471 and merge 7 adds 534 (its own entry: 200362 on merge 4b, which measures 199828)."
 approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for merge 7 (200362) and for smoke fix 1 (200471)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200581
+date = "2026-11-25"
+reason = "Replay editor (install 4, inbox 22:10:39Z item 2): the crop strip over the game, move marks and the watch, Y snap, the CPU / Player 1 play target, the recorded actions key and the drill preview strip. Measured 200581 on the branch with merge 4b folded (remote-gate size step, 07de4957): 753 above merge 4b 199828; about 350 of them are its 26 tests."
+approved_by = "tr-primary-2 2026-11-24 23:45:23Z (+718 approved; the measured value at READY counts, up to +900)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200589
+date = "2026-11-25"
+reason = "Record-time trim keeps a known move end at the retained boundary for macros and drill takes. Measured +8 over replay editor fcb07e24; +761 over merge 4b."
+approved_by = "tr-primary-2 2026-11-24 23:45:23Z (review fixes at the measured value through +900) and 00:12:53Z (record-time trim)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201006
+date = "2026-11-25"
+reason = "Replay editor folded on merge 3D (74f9f21e, 200093) with the reviewer trim fix: the bridge clip line (target, marks, nearest mark, move text, the drill strip), the play target owned by the editor for every source and the ZR tap toggle, with their tests. Measured 201006 (remote-gate size step, dae6dfd6): +913 on merge 3D."
+approved_by = "tr-primary-2 2026-11-24 23:45:23Z (the editor, measured, up to +900) and 2026-11-25 00:31:58Z (the bridge line: lines approved at the measured value); the 13 lines above +900 are flagged in the READY post."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201909
+date = "2026-11-25"
+reason = "Install 4 integration, the replay editor: the crop editor as a strip over the live game, with move starts and ends, Y snap and a CPU or Player 1 preview (feat/replay-editor 42be97a3) on top of merge 7. Measured 201909 on the merged tree: the merge 7 head measures 201005 and the editor adds 904 (its own entry allows 201006 on merge 3D, which measures 200093; the pin measures 200997)."
+approved_by = "tr-primary-2 standing rule 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value, no more than the base plus the approved raises), on the approvals recorded in the entries above for the replay editor (201006, approved 2026-11-25 01:35:06Z) and for merge 7 (201005)."

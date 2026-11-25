@@ -221,7 +221,7 @@ recorded one.
   both fit in 12 events. Loading does not change the file.
 - **Progress:** the bar shows steps, Best counts steps that counted, and the streak counts complete clean attempts. After an attempt, more than 20 idle frames allow a fresh attempt.
 - **Crop:** the shared clip editor's handles select whole steps. It saves a new Drill N and leaves the original; the retained first event becomes time zero. X has no preview, as for hit combos.
-- **Preview:** on a drill's row, X plays the drill's recorded inputs once on Player 1 through Recording's playback. The menu hides while it plays; X or B stops it, and the page returns about a second after the last input. X does nothing while a macro is already playing on Player 1. Only a drill recorded directly in this build has its inputs: one recorded earlier, a crop, or one Make combo made shows "Re-record to preview" (a made drill's source macro can be played as a macro).
+- **Preview:** on a drill's row, X plays the drill's recorded inputs once on Player 1 through Recording's playback. The menu hides while it plays and a strip at the bottom shows the take's timeline, its moves and the playhead; X or B stops it, and the page returns about a second after the last input. X does nothing while a macro is already playing on Player 1. Only a drill recorded directly in this build has its inputs: one recorded earlier, a crop, or one Make combo made shows "Re-record to preview" (a made drill's source macro can be played as a macro).
 
 ![Drill 1 in the clip editor: four steps, then three selected whole steps](../media/rc15-input-drill.gif)<br>
 *A drill's Crop: L selects the start or R the end; Left/Right changes the kept steps (4 → 3 → 4 → 3). Eden, 2026-11-15, rc.15 `2eb3903e`. This early build's helper overlaps the editor; the overlap was fixed before the integrated release. The clip shows range selection, not recording or grading.*
@@ -232,12 +232,13 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 
 ### Crop
 
-Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)).
+Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
 
 - L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves.
+- The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
 - A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
-- A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame.
-- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. The page hides during preview and returns about a second after the last input; X or B stops it early.
+- A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame. Move marks recorded with the take stay with the frames they belong to.
+- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. A ZR tap swaps the preview between the CPU and Player 1. The strip stays up and its playhead follows the inputs; X or B stops it early.
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 

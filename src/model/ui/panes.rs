@@ -104,6 +104,14 @@ pub const ROWS: usize = 12;
 
 pub const PANEL_W: f32 = 1840.0;
 pub const PANEL_H: f32 = 1000.0;
+pub const CLIP_STRIP: [f32; 4] = [0.0, -390.0, 1920.0, 300.0];
+pub const CLIP_ROW_Y: [f32; 2] = [-268.0, -314.0];
+pub const CLIP_BAR_Y: f32 = -362.0;
+pub const CLIP_HELP_Y: [f32; 2] = [-408.0, -454.0];
+pub const CLIP_HINT_Y: f32 = -500.0;
+/// The strip's two text columns, centre x and width: the label starts at the timeline's left end and the value ends at its right end.
+pub const CLIP_LABEL_BOX: (f32, f32) = (-450.0, 700.0);
+pub const CLIP_VALUE_BOX: (f32, f32) = (360.0, 880.0);
 /// The recording pop-up's panel over the match. The r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
 /// `review/menu-proposal`) draws its tabs, rows, loop counts, highlight, help and hint inside the panel. The pop-up
 /// lays those out on the page's geometry, so its panel is the page's.

@@ -2267,7 +2267,7 @@ pub(crate) fn unused_n(prefix: &str, names: &[String]) -> u32 {
 }
 
 /// A link's move line ("L1 jab → jab TRUE"), not the events or drift line under it.
-fn link_head(line: &str) -> bool {
+pub(crate) fn link_head(line: &str) -> bool {
     line.strip_prefix(['L','S']).and_then(|rest| rest.split_once(' ')).is_some_and(|(n, _)| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
