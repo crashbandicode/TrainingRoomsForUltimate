@@ -363,7 +363,7 @@ pub enum Generated { Macro(String), Pass(super::rr_host::MakeAsk) }
 pub fn generate(root: &Path, recording: MacroRecording, typed: &str, make: crate::model::recording_menu::Make, role: Role, at: u64) -> Result<Generated, Error> {
     use crate::model::recording_menu::Make;
     if make == Make::Drill {
-        let source = save_drill_take(root, recording.frames, recording.start, false, at, &[])?
+        let source = save_drill_take(root, recording.frames, recording.start, crate::model::trim::Trim::Off, at, &[])?
             .ok_or_else(|| Error::Record(EMPTY_RECORDING.into()))?;
         return Ok(Generated::Pass(super::rr_host::MakeAsk { source, role, drill: Some(typed.trim().into()) }));
     }

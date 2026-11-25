@@ -6563,6 +6563,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_vault_clip_preview_is_exact_and_shows_its_role() {
+        let _hold = hold();
+        for role in [Role::Player, Role::Cpu] {
+            reset_host();
+            let root = scratch("vault-trim-preview");
+            let tick = || service_at(&root, &none(), "2026-11-25", state(8), state(7));
+            let frames: Vec<_> = [0, 1, 2, 0].into_iter()
+                .map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+            let mut clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), frames.clone()).unwrap();
+            clip.trim = Trim::Both;
+            request_clip_preview(clip, role);
+            assert_eq!(tick().home, Some(HomeWarp::Start { air: false, player: role == Role::Player }));
+            assert!(land_pair([state(8), state(7)], false));
+            for expected in &frames {
+                tick();
+                assert_eq!(playback_roles(), [role == Role::Player, role == Role::Cpu]);
+                let (player, cpu) = (take_player_frame(), take_cpu_frame());
+                assert_eq!(if role == Role::Player { player } else { cpu }, Some(*expected));
+                assert_eq!(if role == Role::Player { cpu } else { player }, None);
+            }
+            tick();
+            assert_eq!(playback_roles(), [false, false]);
+            assert!(!preview_running() && preview_away());
+
+            let idle = MacroRecording::new("Idle", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 4]).unwrap();
+            let id = Library::new(root.join(MACROS_DIR)).save_new(&idle).unwrap();
+            stop_preview();
+            assert!(request_drill_preview(&id, 4, Trim::Both));
+            assert_eq!(tick().home, Some(HomeWarp::Return));
+            assert!(land_pair([state(8), state(7)], false));
+            tick();
+            tick();
+            assert!(!preview_running() && !preview_away());
+            assert_eq!(playback_roles(), [false, false]);
+            assert!(take_player_frame().is_none() && take_cpu_frame().is_none());
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
