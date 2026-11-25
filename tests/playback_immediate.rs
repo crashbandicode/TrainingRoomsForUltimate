@@ -410,6 +410,40 @@ fn changed_active_and_loop_are_used_by_the_next_play() {
 }
 
 #[test]
+fn a_changed_active_file_does_not_end_the_run_that_plays() {
+    let _guard = HostGuard::new();
+    for role in [Role::Player, Role::Cpu] {
+        host::reset_host();
+        let f = fixture(false, LoopCount::Finite(1), &[180, 6]);
+        let library = Library::new(f.root.join(MACROS_DIR));
+        let mut next = library.load(&f.ids[1]).unwrap();
+        for frame in &mut next.frames { frame.buttons = 42; }
+        library.overwrite(&f.ids[1], &next).unwrap();
+        tick(&f.root);
+        chord(role);
+        tick(&f.root);
+        for frame in 0..10 {
+            assert_eq!(poll(role).map(|f| f.buttons), Some((frame % 7 + 1) as u32));
+        }
+        let generation = store::index_generation();
+        RecordingIndex::update(&f.root, |index| {
+            index.set_active(role, Some(&f.ids[1]), 3)?;
+            Ok(true)
+        }).unwrap();
+        assert!(store::index_generation() > generation);
+        for frame in 10..180 {
+            tick(&f.root);
+            assert_eq!(poll(role).map(|f| f.buttons), Some((frame % 7 + 1) as u32), "{role:?} frame {frame}");
+        }
+        tick(&f.root);
+        assert_eq!(poll(role), None);
+        chord(role);
+        tick(&f.root);
+        assert_eq!(poll(role).map(|f| f.buttons), Some(42));
+    }
+}
+
+#[test]
 fn an_active_chain_reads_its_steps_and_first_start_save() {
     let _guard = HostGuard::new();
     let f = small(true);
