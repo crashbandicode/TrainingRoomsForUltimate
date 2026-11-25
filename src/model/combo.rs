@@ -5,7 +5,7 @@
 use super::action::{self, ActionDesc, Late, Travel};
 use super::frame_strip::{
     bin_stick, stick_axis, Angle, Button, Link, Move, Snap, Tracker, Verdict, CSTICK_ON, DASH_FLICK_X,
-    DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, INPUT_LOOKBACK, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS,
+    DASH_STICK_X, DIVE_CONT, DIVE_FLICK, FLICK_JUMP, INPUT_LOOKBACK, JUMP_FLICK_Y, JUMP_STICK_Y, PRESS_BITS, RESET_COMMAND,
 };
 use super::spots::Spot;
 
@@ -1386,6 +1386,11 @@ impl Helper {
                 if entry.take().is_some_and(|entry| entry.load) { self.pending_load = true; }
             }
         }
+        // The game's reset is commanded on this frame: what is held now is its gesture, as at the clear that follows.
+        if snap.buttons & RESET_COMMAND != 0 {
+            self.clear_attempt(out);
+            return;
+        }
         let Some(start) = self.input.first else {
             return;
         };
@@ -1466,7 +1471,7 @@ impl Helper {
         }
     }
 
-    fn on_clear(&mut self, out: &mut Out) {
+    fn clear_attempt(&mut self, out: &mut Out) {
         let input_only = self.target.as_ref().is_some_and(|target| target.input_only);
         if input_only {
             let n = self.provisional.iter().take_while(|entry| entry.is_some()).count();
@@ -1503,6 +1508,10 @@ impl Helper {
         }
         self.pending_load = false;
         self.input.restart();
+    }
+
+    fn on_clear(&mut self, out: &mut Out) {
+        self.clear_attempt(out);
         if !self.capture.current.is_empty() {
             self.capture.previous = self.capture.current;
         }

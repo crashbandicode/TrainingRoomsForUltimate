@@ -37,9 +37,16 @@ at clear, with no release after that press, belongs to the clear gesture. A resu
 that opened its steps remain held, even after the attempt is forgotten. A clear withdraws the leading provisional
 results and restores their displaced history, streak and best; an open gesture-only attempt is discarded. Releasing
 an opening button makes its result and older provisional results final. Load after waits for a provisional result to
-become final and is dropped if the clear withdraws it. Otherwise an ungraded final gesture step is removed and an
-open attempt with a graded step is cleared; an open attempt without a graded step is discarded. Hit-combo clearing
-remains as before.
+become final and is dropped if the clear withdraws it. The game acts on its Training reset chord about eight frames
+before it initialises the fighters again (Eden `i4-final-yoga-01`: the chord's first status request at frame 58324,
+the fighter gone at 58332, initialised at 58336), so the drill takes the reset from the chord. On a poll where
+Player 1's raw controller holds L+R+A in native Training with L+R+A Reset On, the runtime sets `RESET_COMMAND` in
+that poll's buttons; it rides in the record through Input Delay (`input_delay::with_reset_command`,
+`split_reset_command`), so the game never gets the bit. On a frame that carries it the drill clears the attempt as
+at a clear, after the frame's presses are taken, and leaves the hit-combo capture alone. With L+R+A Reset Off the
+chord resets nothing and its presses are ordinary input.
+On a clear, an ungraded final gesture step is otherwise removed and an open attempt with a graded step is cleared;
+an open attempt without a graded step is discarded. Hit-combo clearing remains as before.
 
 ## Grading
 

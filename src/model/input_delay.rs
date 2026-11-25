@@ -5,6 +5,8 @@
 //! The queue advances once per P1 poll of the game's final input mapping, not once per frame
 //! (SPEC-input-03 §5.3, open question 1).
 
+use super::frame_strip::RESET_COMMAND;
+
 /// The largest delay in frames (the menu row has 31 options, `0..=30`).
 pub const MAX_DELAY: u8 = 30;
 /// The longest queue in reads: `MAX_DELAY` game frames at 1/4 (`game_speed::Speed::reads`).
@@ -33,11 +35,16 @@ impl MappedInputs {
 
 /// `record` as the delay queue keeps it: Player 1's reset command of the same poll rides in its buttons
 /// (`frame_strip::RESET_COMMAND`), so it leaves the delay with its own record and is dropped with it.
-pub const fn with_reset_command(record: MappedInputs, _commanded: bool) -> MappedInputs { record }
+pub const fn with_reset_command(record: MappedInputs, commanded: bool) -> MappedInputs {
+    let buttons = record.buttons & !RESET_COMMAND;
+    MappedInputs { buttons: if commanded { buttons | RESET_COMMAND } else { buttons }, ..record }
+}
 
 /// A record out of the delay queue: the record the game gets, never with the command bit, and whether it
 /// carried the command.
-pub const fn split_reset_command(record: MappedInputs) -> (MappedInputs, bool) { (record, false) }
+pub const fn split_reset_command(record: MappedInputs) -> (MappedInputs, bool) {
+    (MappedInputs { buttons: record.buttons & !RESET_COMMAND, ..record }, record.buttons & RESET_COMMAND != 0)
+}
 
 /// P1's physical sticks, read from the game's raw `Controller` (SPEC-input-04 §3.1), in the record's stick unit. The
 /// mapped record is not the physical stick: on the first frames of a C-stick attack the game writes the C-stick's

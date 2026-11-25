@@ -17,12 +17,12 @@ use skyline::hooks::InlineCtx;
 
 use crate::engine::{library::Role, rr_host};
 use crate::model::frame_strip::ids::{Table, C};
-use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker};
+use crate::model::frame_strip::{angle_of, Move, Sample, Settings, Tracker, RESET_COMMAND};
 use crate::model::move_names::PUBLISHED;
 use crate::model::spacing::{Grade, Grader, Lanes};
 use crate::model::frame_strip_plan::{Changed, StripDraw, Look, Renderer};
 use crate::model::panes::strip_layout::C;
-use crate::model::input_delay::{MappedInputs, Owners, Sticks};
+use crate::model::input_delay::{self, MappedInputs, Owners, Sticks};
 use crate::runtime::alloc::{HookId, HookScope};
 use crate::runtime::game::natives;
 use crate::runtime::{published, state_natives};
@@ -128,11 +128,11 @@ fn unpack(v: u64) -> MappedInputs {
 ///
 /// # Safety
 /// `out` is the delayed mapped record of the poll (or null).
-pub unsafe fn on_p1_poll(_controller: usize, out: *const MappedInputs, sticks: Sticks) {
+pub unsafe fn on_p1_poll(_controller: usize, out: *const MappedInputs, sticks: Sticks, command: bool) {
     if !ENABLED.load(Ordering::Acquire) || out.is_null() || published::input_owners().contains(Owners::MENU) {
         return;
     }
-    INPUTS.store(pack(sticks.onto(*out)), Ordering::Release);
+    INPUTS.store(pack(input_delay::with_reset_command(sticks.onto(*out), command)), Ordering::Release);
 }
 
 /// The constants, resolved through the game's own table on first use (`None` until the table answers anything).
@@ -491,7 +491,8 @@ pub unsafe fn sample_frame(player: usize) {
         }
     }
     let physical_inputs = unpack(INPUTS.load(Ordering::Acquire));
-    let inputs = if cpu_pass { crate::engine::rr_host::make_cpu_inputs() } else { physical_inputs };
+    let mut inputs = if cpu_pass { crate::engine::rr_host::make_cpu_inputs() } else { physical_inputs };
+    inputs.buttons |= physical_inputs.buttons & RESET_COMMAND;
     // P1's fighter, for a saved combo's "recorded on" (metadata; the existing guarded read, no new native site).
     let p1_kind = if shown || input_drill { p1_fighter([player, cpu_accessor][order[0]]) } else { None };
     let physical_kind = if cpu_pass {

@@ -126,12 +126,15 @@ fn apply() {
     let raw = pending.controller(&NativeTls);
     // SAFETY: `raw` is the live Controller of this mapping call or 0; `out` is the record the game just wrote.
     let sticks = unsafe { raw_sticks(raw) }.unwrap_or(Sticks::of_record(unsafe { *out }));
+    let commanded = unsafe { reset_commanded(raw) };
     // Input Delay counts game frames: the queue is that many frames of reads at the game's speed now.
     let delay = crate::runtime::features::game_speed::current().reads(published::input_delay());
     READS.store(delay, std::sync::atomic::Ordering::Relaxed);
     let mut adapter = ADAPTER.lock();
     // SAFETY: `out` is the 8-byte record the game just wrote through the call.
-    let (record, sticks, check) = adapter.poll_with(&published::INPUT_OWNERS, delay, unsafe { *out }, sticks);
+    let (record, sticks, check) = adapter.poll_with(&published::INPUT_OWNERS, delay,
+        input_delay::with_reset_command(unsafe { *out }, commanded), sticks);
+    let (record, command) = input_delay::split_reset_command(record);
     // SAFETY: as above.
     unsafe { *out = record };
     drop(adapter);
@@ -156,9 +159,18 @@ fn apply() {
             recorder::on_p1_poll(out);
             super::edge_juggle::observe_player_pad((*out).buttons);
             let (record, sticks) = sticks.after_recorder(before, *out);
-            input_display::on_p1_poll(controller, &record, sticks);
+            input_display::on_p1_poll(controller, &record, sticks, command);
         }
     }
+}
+
+/// # Safety
+/// `controller` is 0 or the live Controller of this mapping call.
+unsafe fn reset_commanded(controller: usize) -> bool {
+    if controller == 0 || controller % 4 != 0 { return false; }
+    let raw = ((controller + crate::model::chords::field::CURRENT_BUTTONS) as *const u32).read();
+    crate::model::state::quick_reset::QuickReset::chord_held(raw)
+        && published::lra_reset() && scene::is_native_training()
 }
 
 /// The raw Controller's four stick axes (SPEC-input-04 §3.1), or `None` without a controller or when a value is not a
