@@ -12,8 +12,8 @@ then **Add New…**. Each numbered entry shows the name and four specials in bra
 order. `>` marks the role's choice.
 
 Up / Down move, L / R turn a page, A picks, and B goes back. The Mii a role started with at character select is greyed
-in that role's list: it is the role's 0 in the cycle. If there are no saved configurations of the class, the footer
-says so.
+in that role's list: it is the role's 0 in the cycle. An empty-list notice means there are no saved or replay Miis of
+that class. A replay Mii can appear here even if Smash has no saved Mii of that class.
 
 ## Picking a saved Mii
 
@@ -60,8 +60,9 @@ make a new Mii.
 ## In a waiting room
 
 The lists and Add New work in local wireless and Quickplay waiting-room practice while
-[Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On. If a match starts in the editor, the unfinished
-Mii is kept but not saved; the editor returns when you return to the same room. Your practice Mii changes, while the
-match uses the fighter you picked for it.
+[Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On. In local wireless, Headgear, Outfit, Colour,
+Voice and Random are greyed out; you can still change the name and specials. If a match starts in the editor, the
+unfinished Mii is kept but not saved; the editor returns when you return to the same room. Your practice Mii changes,
+while the match uses the fighter you picked for it.
 
 More: [Waiting rooms](waiting-rooms.md).

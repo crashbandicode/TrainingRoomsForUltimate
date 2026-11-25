@@ -106,8 +106,9 @@ The readout may also show spare frames for a true combo or frames past the windo
 
 ## Scroll back
 
-Hold **R3** (right stick click) and press **D-pad Left or Right** to move through about ten seconds of history. Hold a
-direction to repeat. The marker shows how far behind the present you are; release R3 to return to live.
+Hold **R3** (right stick click) and press **D-pad Left or Right** to look back through the last 600 columns. Hold a
+direction to repeat. That's about ten seconds of continuous action. When the strip freezes during an idle stretch,
+no new columns are added, so the time on the marker can be much longer. Release R3 to return to live.
 
 <!-- CLIP: tut-input-scrollback.mp4 | R3 + D-pad Left scrolls the strip back, the label reads the time, Right returns to now -->
 *Clip coming.*
