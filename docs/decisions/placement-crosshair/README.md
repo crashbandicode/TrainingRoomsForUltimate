@@ -1,5 +1,11 @@
 # Change placement: six choices
 
+**Answered 2026-11-25 (about 15:50Z):** PC1 B; PC2 all four ways in (the Replays row stays and opens the same
+picker); PC3 all five pages, with + saving from any page; PC4 A; PC5 a question each time, with an Advanced setting
+(Prompt by default, Always change, Always copy); PC6 A. The record, with the answer verbatim, is in
+[DECISIONS.md](../../DECISIONS.md), "Change placement: the crosshair, on the save itself". The page below is as it
+was put, before the answers.
+
 Your order (2026-11-25):
 - placement uses the Break the Targets crosshair;
 - you pick Player 1 or the CPU;
