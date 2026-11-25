@@ -187,9 +187,11 @@ impl Marks {
 
     /// Names the moves a preview finds as `namer` gives them.
     pub fn named(mut self, namer: Namer<'static>) -> Self {
-        self.namer = namer;
+        self.set_namer(namer);
         self
     }
+
+    pub(super) fn set_namer(&mut self, namer: Namer<'static>) { self.namer = namer; }
 
     pub fn from_inputs(frames: impl Iterator<Item = InputFrame>) -> Self {
         let mut marks = Self::new();
@@ -1522,7 +1524,8 @@ mod tests {
         assert_eq!(MII_KINDS, 0x48..=0x4a);
         assert!(include_str!("../mii/mii_setup.rs").contains("if !(0x48..=0x4a).contains(&self.kind)"));
         let panel = include_str!("clip_panel.rs").split("#[cfg(test)]").next().unwrap();
-        assert!(panel.contains("saved_namer(recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials), recording.recorded_fighter)"));
+        assert!(panel.contains("Namer::recorded(recording.recorded_fighter.or_else("));
+        assert!(panel.contains("PUBLISHED.player(), recording.start.fighter_kind, recording.mii.as_ref().map(|mii| mii.tokens().specials)"));
         assert!(!panel.contains("recorded_identity("));
     }
 
