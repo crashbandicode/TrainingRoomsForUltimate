@@ -2,7 +2,8 @@
 
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
 where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
-`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8 and rc.9 (rc.7, rc.10 and rc.11 have none); rc.12's,
+`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8, rc.9 and [rc.15](RELEASE-NOTES-rc15.md)
+(rc.7, rc.10 and rc.11 have none); rc.12's,
 rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-RELEASE.md](CURRENT-RELEASE.md) and
 [Status](#status).
 
@@ -453,10 +454,14 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The current release is **rc.15**, **an internal candidate, untested on hardware**: [Current release](CURRENT-RELEASE.md) says what it adds,
-how to install it and what is known not to work. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was
-built from: from rc.14 the version number is the release's own name, the same as its tag. Builds before it kept the
-version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
+The current release is **rc.15**. Its newest build is install 4 (`a945b0c1`, on the test console's card since
+2026-11-25): **installed and read back, tested in Eden in part, with the operator's reports from the console on
+record**.
+[Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
+[the rc.15 release notes](RELEASE-NOTES-rc15.md) list installs 1 to 4, and [Install evidence](EVIDENCE-rc15-installs.md)
+names the runs behind each claim. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was built from, so
+the commit tells the rc.15 builds apart: from rc.14 the version number is the release's own name, the same as its tag.
+Builds before it kept the version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
 
 [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
 2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,
@@ -484,7 +489,7 @@ pilot and imgui_smash.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (an internal candidate, untested on hardware).
+[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (tested in Eden in part; the operator's reports from the console are in the [install evidence](EVIDENCE-rc15-installs.md)).
 
 ## Build
 
