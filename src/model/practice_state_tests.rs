@@ -96,9 +96,9 @@ fn the_practice_snapshot_carries_the_cpu_view() {
         snapshot(Some(Game::GuardEdge), fields, [0; CPU_ENTRIES], &mut wire);
         wire
     };
-    for view in ["in_view", "magnifier"] {
-        assert!(wire(view).lines().any(|line| line == format!("wizard.cpu={view}")), "{view}");
+    for (view, text) in [(CpuView::InView, "in_view"), (CpuView::Magnifier, "magnifier")] {
+        assert!(wire(view).lines().any(|line| line == format!("wizard.cpu={text}")), "{text}");
     }
-    assert!(!wire("").contains("wizard.cpu"));
+    assert!(!wire(CpuView::NotHeld).contains("wizard.cpu"));
 }
 }
