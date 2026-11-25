@@ -90,8 +90,16 @@ impl Clip {
     }
 
     pub fn text(self) -> String {
-        format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={}",
-            self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running))
+        let mut line = format!("clip ctx={} total={} in={} out={} cursor={} playing={} handle={} running={} target={} marks={} mark=",
+            self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running),
+            self.target, self.marks);
+        let _ = match self.mark {
+            Some((start, Some(end))) => write!(line, "{start}-{end}"),
+            Some((start, None)) => write!(line, "{start}-none"),
+            None => line.write_str("none"),
+        };
+        let _ = write!(line, " move=\"{}\"", self.text.as_str());
+        line
     }
 }
 

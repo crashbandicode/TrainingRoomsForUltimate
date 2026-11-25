@@ -258,7 +258,7 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview, or leaves when not previewing. |
 
-Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save.
+Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a Replay window capture the strip also names where the preview plays (CPU).
 
 **Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
 
