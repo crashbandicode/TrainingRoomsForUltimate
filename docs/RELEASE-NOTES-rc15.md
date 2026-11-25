@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -26,8 +26,8 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Next build (not installed yet)
 
-The build after install 4. Its name is expected to be rc.16. The first part below is merged; the second is still in
-work. The merged changes passed host tests and builds. Targeted Eden checks of stage geometry are listed in
+The build after install 4. Its name is expected to be rc.16. Everything planned for it is merged; nothing is still
+in work. The merged changes passed host tests and builds. Targeted Eden checks of stage geometry are listed in
 [Install evidence](EVIDENCE-rc15-installs.md#the-next-build); they do not replace a smoke test of the finished build.
 
 **How this build is tested:** one short Eden smoke boot on the finished build (each new item started once, no crash
@@ -121,14 +121,26 @@ and the expected log lines), then the operator's full test on the console.
   than 10 units can be missed.
 - More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise).
 
+#### A save's placement is changed with the crosshair (merged 2026-11-25)
+
+- **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
+  game: both fighters stand at the save's spots, you move them with the crosshair, and A or + writes the new spots
+  into the save. It has five pages: Where, Spot, State, Percent and Preview.
+- It opens from the Recording page, from a save's, a macro's or a chain's own screen, and with X on a save in the
+  pop-up. For a macro it changes the macro's start save.
+- When macros share the start save, the picker asks whether to change it for all of them or to copy it. The new
+  **Shared start save** option can answer ahead: Prompt, Always change or Always copy.
+- A fighter switched to Off stage stays where it is when the spot is in open air or under the stage. When the spot
+  is over the stage or inside it, the fighter goes to the open air beside the nearest ledge, and the crosshair then
+  moves freely.
+- Only what you changed is saved. A macro's own file is never changed: a macro given an offset in an earlier build
+  keeps it until you clear it with the Offset row of its own screen.
+- More: [Recording › Change placement](menu/recording.md#change-placement) and
+  [the guide](guide/recording.md#change-placement-and-the-replay-window).
+
 ### In work
 
-Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
-
-- **In work: placement's Off stage switch.** A fighter switched to Off stage whose spot is not off stage goes beside
-  the nearest ledge that has open air. The crosshair then moves freely.
-- **In work: placement on the crosshair.** Changing where a save state puts the fighters uses the crosshair, on the
-  save state itself.
+Nothing planned for this build is still in work.
 
 ## Install 4
 
@@ -301,7 +313,7 @@ tool's, not TrainingRooms'.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
   took a second or more to start. A change for that wait is merged for the next build; it has not been timed in a
   game. They also asked for placement changes and a Delete for replay captures; the Delete is merged for the next
-  build, and placement is in work.
+  build, and so is a new way to change placement.
 
 ## Install 3
 
