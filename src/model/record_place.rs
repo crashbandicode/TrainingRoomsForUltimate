@@ -2353,6 +2353,27 @@ mod tests {
         assert!(open.contains("scene::current().is_some()") && open.contains("engine.asked.as_deref()"));
     }
 
+    /// Operator 2026-11-25, PC2: the Recording › Replays row "opens the SAME picker (no key grid)". The row is an
+    /// action: the menu closes and the host is asked for the picker on the active macro's start save. The picker
+    /// opens only with both practice fighters there and no record, playback or load in progress.
+    #[test]
+    fn the_replays_row_opens_the_same_picker() {
+        let table = include_str!("menu/table.rs");
+        assert!(table.contains("r(REPLAYS, \"Change placement\", \"\", Control::Editor(Editor::EditPlacement),"));
+        assert!(!table.contains("\"Edit placement\""));
+        let menu = include_str!("menu/mod.rs");
+        let arm = menu.split("Editor::EditPlacement => {").nth(1).unwrap().split("return;").next().unwrap();
+        assert!(arm.contains("self.recording.ask_active_placement();") && arm.contains("self.closed = true;"));
+        let screens = include_str!("recording_menu.rs");
+        let ask = screens.split("pub fn ask_active_placement(&mut self) {").nth(1).unwrap().split("\n    }").next().unwrap();
+        assert!(ask.contains("self.last_effect = Effect::ChangeActivePlacement;"));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        let open = host.split("fn place_open(").nth(1).unwrap().split("\n}").next().unwrap();
+        for fact in ["fact_practice_enabled()", "fact_fighters_present()", "recording_or_playback()", "save_states::is_loading()"] {
+            assert!(open.find(fact).unwrap() < open.find("record_place::open_save(").unwrap(), "{fact}");
+        }
+    }
+
     #[test]
     fn a_shared_start_save_asks_change_or_copy() {
         use crate::model::chords::logical::{A, B, DPAD_DOWN, DPAD_UP, PLUS, X};

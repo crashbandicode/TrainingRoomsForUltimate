@@ -257,7 +257,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     }
     let replay = ROWS.iter().position(|r| matches!(r.control, Control::Editor(Editor::ReplayWindow))).expect("the Replay window row");
     let macros: Vec<&str> = ROWS.iter().filter(|r| r.group == ROWS[replay].group).map(|r| r.title).collect();
-    assert_eq!(macros, ["Ask before switching fighter", "Edit placement", "Replay window", "Replay capture"], "Replays keeps the capture rows");
+    assert_eq!(macros, ["Ask before switching fighter", "Change placement", "Replay window", "Replay capture"], "Replays keeps the capture rows");
     assert_eq!(GROUPS[7].title, "Setup library");
     assert_eq!(GROUPS[7].page, Page::Saves);
     let setups: Vec<&str> = ROWS.iter().filter(|r| r.group == 7).map(|r| r.title).collect();
