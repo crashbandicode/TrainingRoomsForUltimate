@@ -2,7 +2,9 @@
 
 Save where both fighters are, then load to return to that spot. The options are on the [Saves](../menu/saves.md) page.
 
-<!-- CLIP: tut-save-load.mp4 | ZL + D-pad Down saves → Mario walks away and hits the CPU → ZL + D-pad Up puts both back at 0% -->
+<video src="../media/tut-save-load.mp4" autoplay muted loop playsinline controls></video>
+
+*ZL + D-pad Down saves beside the CPU; two jabs take it to 4.9%; ZL + D-pad Up puts both fighters back at 0%. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](../media/tut-save-load.mp4)
 
 ## Saving and loading
 
