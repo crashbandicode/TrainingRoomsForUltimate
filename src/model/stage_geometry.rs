@@ -7,6 +7,7 @@ use super::tech::Vec2;
 
 /// True when the line is a placement floor.
 pub fn is_placement_floor(flags: u32, normal_y: f32, platforms: bool) -> bool {
+    // Classify one-way platforms before using the solid floor bit.
     if flags & 0x2000 != 0 {
         platforms && flags & 0x0300 == 0 && normal_y > 0.0
     } else {
