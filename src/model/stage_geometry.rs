@@ -376,15 +376,31 @@ pub fn nearest_ledge(stage: &mut impl Probe, blast: [f32; 4], at: Point) -> Resu
             }
             from = top;
             let Some(floor) = floor else {
+                if best.is_some_and(|(_, nearest)| (x - at[0]) * dir >= nearest) {
+                    break;
+                }
                 x += dir * COLUMN;
                 continue;
             };
             let end = run_end(stage, bottom, floor, right_side)?;
-            if let Some(found) = open_ledge(stage, blast, end, dir)? {
-                let distance = (found.at[0] - at[0]).hypot(found.at[1] - at[1]);
-                if best.is_none_or(|(_, nearest)| distance < nearest) {
+            // The starting run is searched in both directions. In a later run
+            // the ledge facing back into the gap may be the closest one.
+            let near = if x == start {
+                None
+            } else {
+                Some((run_end(stage, bottom, floor, !right_side)?, -dir))
+            };
+            for (point, facing) in near.into_iter().chain([(end, dir)]) {
+                let distance = (point[0] - at[0]).hypot(point[1] - at[1]);
+                if best.is_some_and(|(_, nearest)| distance >= nearest) {
+                    continue;
+                }
+                if let Some(found) = open_ledge(stage, blast, point, facing)? {
                     best = Some((found, distance));
                 }
+            }
+            // No point farther along this scan can beat the best straight-line distance.
+            if best.is_some_and(|(_, nearest)| (end[0] - at[0]) * dir >= nearest) {
                 break;
             }
             let next = end[0] + dir;

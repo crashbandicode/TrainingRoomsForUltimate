@@ -379,16 +379,16 @@ fn a_fighters_own_start_is_used_only_where_the_rule_calls_it_open_air() {
         asked.push(point);
         classify(&mut Copied(&lines), TRAINING_BLAST, point) == Ok(Place::Open)
     });
-    for side in 0..2 {
-        assert!(near(by_rule.default_cpu(island, side), own[side]), "{side}: {:?}", by_rule.default_cpu(island, side));
-        assert!(asked.iter().any(|&point| near(Some(point), own[side])), "{side}: the rule was asked about the point");
+    for (side, &own) in own.iter().enumerate() {
+        assert!(near(by_rule.default_cpu(island, side), own), "{side}: {:?}", by_rule.default_cpu(island, side));
+        assert!(asked.iter().any(|&point| near(Some(point), own)), "{side}: the rule was asked about the point");
     }
     assert!(near(Some(by_rule.setup.cpu), own[0]));
     // Where the rule does not call the point open air, the default is the rule's spot, whatever the inset says.
     assert!(island.off_stage(own[0]).is_some() && island.off_stage(own[1]).is_some(), "the older test takes both");
     let refused = wizard(&mut |_| false);
-    for side in 0..2 {
-        assert_eq!(refused.default_cpu(island, side), Some(spots[side]), "{side}");
+    for (side, &spot) in spots.iter().enumerate() {
+        assert_eq!(refused.default_cpu(island, side), Some(spot), "{side}");
     }
     assert_eq!(refused.setup.cpu, spots[0]);
     // The drill asks the rule on its frame.

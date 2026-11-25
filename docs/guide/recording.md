@@ -80,6 +80,8 @@ Controls › Button chords ([Controls](controls.md)).
 
 - **Play** gives the side one recorded frame per game frame, in order, and warps to the start save once when its switch
   is On. A macro recorded on one side plays on either. With no active macro, the chord does nothing.
+- [Playback delay](../menu/recording.md#playback-delay) can hold the first input after placement, once per Play;
+  it defaults to None.
 - **Both Play chords can run at once:** Player 1 and the CPU play together. A chain's own macros play one after
   another.
 - **Your chord buttons don't reach the game** while you hold them, so pressing Record or Play never makes Player 1

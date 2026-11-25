@@ -1889,3 +1889,5 @@ The manually extracted `src/runtime/diag_log.rs` (the logging.rs range documente
 Menu-polish slider and pop-up code was written in this repository; no code was copied from the fork or upstream.
 
 Preview-stop and pop-up chord-hint code was written in this repository; nothing was copied from the fork or upstream. The carried `clip_panel.rs` was changed through the pkg4 manifest.
+
+Playback-immediate code was written in this repository; nothing was copied from the fork or upstream. The carried `replay_capture.rs` was changed through the pkg4 manifest.

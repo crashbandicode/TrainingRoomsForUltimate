@@ -478,6 +478,8 @@ more than one piece of ground, such as the Training stage, stand on the piece yo
 - Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side:
   **Y** (the other side) does nothing there. On the Training stage the long floor has its left ledge only, and the
   island has both.
+- The default CPU start on a side is halfway across the open air beside that ledge and halfway down to the bottom
+  blast line. A fighter with a default start of its own keeps it only where that point is in open air.
 - Juggler needs no ledge. Its CPU spot can be over the stage (the default is above you) or in open air beside it.
 - Every point you confirm with **A** on the CPU page is checked against the stage one frame later.
 - A start you set up is used again by **Start** only on the floor it was made on. On another floor Start opens the

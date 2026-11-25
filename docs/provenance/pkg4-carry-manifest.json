@@ -4481,7 +4481,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "7178f6cca9c0150d17e5b4ee668bfc5e1105ff86626b0bb83c5b20edabb0ab6f",
+   "dest_sha256": "4dafde3542c76ae3953b8e3f15e3cb96abf02f09d1f752672b50bcead507141a",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5372,6 +5372,21 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n",
      "new": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n        BrowserEffect::Delete(id) => {\n            delete_recording(&id);\n            let (rows, skipped) = browser_rows();\n            let listed = BROWSER.lock().unwrap().as_mut().is_some_and(|b| b.revision == revision && b.ui.relist(rows, skipped));\n            if !listed {\n                close_editor_revision(false, Some(revision));\n            }\n        }\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "        if play { apply_action(ClipAction::TogglePlay); }\n",
+     "new": "        if play { apply_action_as(ClipAction::TogglePlay, true); }\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "fn apply_action(action: ClipAction) {\n",
+     "new": "fn apply_action(action: ClipAction) { apply_action_as(action, false); }\n\nfn apply_action_as(action: ClipAction, playback: bool) {\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n",
+     "new": "                if playback {\n                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());\n                } else {\n                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n                }\n"
     }
    ]
   },
