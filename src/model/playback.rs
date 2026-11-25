@@ -116,6 +116,15 @@ impl Book {
         self.recordings.insert(id.into(), recording);
     }
 
+    pub fn remove_recording(&mut self, id: &str) {
+        self.recordings.remove(id);
+    }
+
+    pub fn missing_recording_save(&self, id: &str) -> bool {
+        self.recordings.get(id).and_then(|recording| recording.start_save.as_deref())
+            .is_some_and(|save| !self.saves.contains(save))
+    }
+
     pub fn add_chain(&mut self, id: impl Into<String>, chain: Chain) {
         self.chains.insert(id.into(), chain);
     }

@@ -1667,6 +1667,9 @@ the new outcome names are `not_counted_p1_ko`, `not_counted_no_return` and `p1_k
 
 ### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
 
+*Changed 2026-11-25: Guard the Edge gets an option to start the CPU under the stage; see "Off stage, found from the
+stage's own lines" at the end of this file.*
+
 The operator, 2026-11-22, verbatim: "does it make more sense for it to use the same crosshair as the [Break the Targets]
 instead of picking a quadrant? would save code and be simpler". This replaces the four start areas the operator chose
 on 2026-11-20 (Q1 of the Guard the Edge design).
@@ -2025,6 +2028,66 @@ while the preview is running; the key line reads `B back` during the approximate
 ruling, 2026-11-25 15:11:54Z). The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended
 after review by rv-hit-streak at 14:36:00Z.
 
+## Off stage, found from the stage's own lines (2026-11-25): decided (operator)
+
+The operator reported on 2026-11-25 (about 16:00Z) that the Training stage's tracing is off when placement decides
+where off stage is: "Training is odd in that it has a wall on the left side, a battlefield like stage in the center,
+and then a long ledge on the right so 'off stage' is actually only in the battlefield spot."
+
+**What was found** (lane training-offstage; `artifacts/phase23/training-stage-tracing/FINDINGS.md`):
+
+- The Training stage is three separate solids. Guard the Edge, Juggler and the eggs Off stage zone took "the stage" to
+  be the one solid under the middle of the camera, which there is the long floor on the right.
+- Its right end (x 620) is past the blast line (x 500), so Guard the Edge and Juggler made no stage and did not start.
+- The eggs Off stage zone reached into the island. Placement's Off stage used no stage shape at all.
+
+![The Training stage's collision](decisions/training-stage-offstage/training-01-outline.png)
+
+![Where off stage fell on the Training stage before](decisions/training-stage-offstage/training-03-off-stage-today.png)
+
+**The rule.** No stage is named and no table is kept; everything is read from the stage's lines and the blast lines.
+
+- A point is **off stage** when it is inside the blast lines, not inside a solid, and nothing to stand on is beneath
+  it down to the bottom blast line. **Open** has no solid above it; **under** has one (below the island, below
+  Battlefield).
+- A **ledge with open air** is the end of a solid floor with open off stage beside it.
+- The **default spot** beside a ledge is the middle of the open air next to it.
+
+![The rule on the Training stage](decisions/training-stage-offstage/training-04-off-stage-proposed.png)
+
+![Battlefield, before and with the rule](decisions/training-stage-offstage/battlefield-05-today-and-proposed.png)
+
+**The three choices put to the operator** (review page
+[decisions/training-stage-offstage/README.md](decisions/training-stage-offstage/README.md)):
+
+| | Choice | A | B |
+| --- | --- | --- | --- |
+| T1 | Placement, when a fighter is switched to Off stage | It goes to the default spot of the nearest ledge with open air; the crosshair then moves freely | Off stage accepts only off-stage points |
+| T2 | Under a solid | Placement accepts it; Guard the Edge keeps refusing it | No feature accepts it |
+| T3 | Guard the Edge, Juggler and the eggs Off stage zone | Move them to the same rule in a later build | Placement only |
+
+**The operator's answer**, 2026-11-25 about 17:05Z (relayed by tr-primary-2, inbox 17:06:54Z), verbatim: "T1 A, T2
+guard the edge should have the option of doing understage because, for example, Pikachu is able to recover depending
+on the circumstances. Along with this we should add the option in guard the edge for the cpu having burned their jump
+already, T3 this build. this seems like a much better design so I'd rather wait for it to be implemented. I can do the
+full test as before, you do a lightweight smoke test as mentioned earlier."
+
+**Decided:**
+
+- **T1: A.** A fighter switched to Off stage whose spot is not off stage goes to the default spot of the nearest ledge
+  with open air. The crosshair then stays free. Placement accepts under.
+- **T2: neither option as written.** Guard the Edge gets an option to start the CPU under the stage, Off by default.
+  This reverses GJ2's "Over or under the stage, A is refused" (2026-11-22, above; `docs/RESTRICTIONS.md`
+  `edge-juggle-start-over-stage`) for under while the option is On. Over the stage stays refused, and Juggler keeps
+  refusing under.
+- **Added by the same answer:** a Guard the Edge option for the CPU having already used its midair jumps. The default
+  keeps the jumps.
+- **T3: this build, not a later one.** Guard the Edge, Juggler and the eggs Off stage zone move to the rule in the same
+  build as placement. The build waits for it.
+- **Testing:** the operator does the full test; the lanes do one light smoke boot.
+
+Who builds what is in tr-primary-2's inbox post of 17:06:54Z. The rule lives in the stage-geometry module
+(`artifacts/phase23/stage-geometry/DESIGN.md`).
 ## Change placement: the crosshair, on the save itself (2026-11-25): decided (operator)
 
 The operator, 2026-11-25 about 14:40Z (relayed by tr-primary-2, inbox 14:40:44Z), verbatim:
