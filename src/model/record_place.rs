@@ -2329,13 +2329,15 @@ mod tests {
         // are both done, for this stage, form and Training session, with no Training reset since.
         let floors = tech.split("pub(super) unsafe fn floors(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(floors.contains("VIEW.try_lock()?") && !floors.contains(".lock()"));
-        assert!(floors.contains("STALE.swap(false") && floors.contains("view.surfaces.epoch() != Some(epoch)"));
+        assert!(floors.contains("RESET.fetch_and(!RESET_OUTLINE") && floors.contains("stale || view.surfaces.epoch() != Some(epoch)"));
         assert!(floors.find("view.discovery.walked(&view.surfaces)").unwrap() < floors.find("Some(SurfaceKind::Floor)").unwrap());
         // The walk's native calls stay Tech practice's own: the picker stops at its gate, before anything else.
         let gate = floors.find("if !super::tech_adapter::tech_ready() {\n        return Some(0);").unwrap();
         assert!(gate < floors.find("VIEW.try_lock()").unwrap());
+        // A Training reset marks the outline stale in the byte Tech's own reset already has: no static is added.
         let reset = tech.split("pub fn reset() {").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(reset.contains("STALE.store(true"));
+        assert!(reset.contains("RESET.store(RESET_RUN | RESET_OUTLINE"));
+        assert_eq!(tech.matches("\nstatic ").count(), 16);
     }
 
     #[test]

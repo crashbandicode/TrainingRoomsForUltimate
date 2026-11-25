@@ -32,7 +32,7 @@ use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
 use hos_lock::{Mailbox, Mutex, Published};
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::OnceLock;
 
 const NOTICE: u8 = 0x32;
@@ -40,9 +40,11 @@ static CONFIG: Published<Option<Config>> = Published::new(None);
 static OPEN: AtomicBool = AtomicBool::new(false);
 static START: AtomicBool = AtomicBool::new(false);
 static EDIT: AtomicBool = AtomicBool::new(false);
-static RESET: AtomicBool = AtomicBool::new(false);
-/// A Training reset has passed since the outline in `VIEW` was traced: the game may have rebuilt its collision.
-static STALE: AtomicBool = AtomicBool::new(false);
+/// Training resets not answered yet, as two bits of one byte: `RESET_RUN` for the running Tech session, and
+/// `RESET_OUTLINE` since the outline in `VIEW` was traced (the game may have rebuilt its collision).
+static RESET: AtomicU8 = AtomicU8::new(0);
+const RESET_RUN: u8 = 1;
+const RESET_OUTLINE: u8 = 2;
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static WIZARD_REQUEST: AtomicBool = AtomicBool::new(false);
@@ -161,8 +163,7 @@ pub fn starting() -> bool {
     START.load(Ordering::Acquire)
 }
 pub fn reset() {
-    RESET.store(true, Ordering::Release);
-    STALE.store(true, Ordering::Release);
+    RESET.store(RESET_RUN | RESET_OUTLINE, Ordering::Release);
 }
 pub fn running() -> bool {
     RUNNING.load(Ordering::Acquire)
@@ -436,7 +437,8 @@ pub(super) unsafe fn floors(
         return Some(0);
     };
     let epoch = StageEpoch { stage, form, training };
-    if STALE.swap(false, Ordering::AcqRel) || view.surfaces.epoch() != Some(epoch) {
+    let stale = RESET.fetch_and(!RESET_OUTLINE, Ordering::AcqRel) & RESET_OUTLINE != 0;
+    if stale || view.surfaces.epoch() != Some(epoch) {
         view.surfaces = Surfaces::EMPTY;
         Surfaces::bind(&mut view.surfaces, epoch);
         view.discovery = Discovery::NEW;
@@ -659,7 +661,7 @@ pub unsafe fn frame(fighter: usize) {
     let mut camera = config.camera;
     with_practice_frame(&mut view, open, |slot, view| {
         if stop {
-            RESET.store(false, Ordering::Release);
+            RESET.fetch_and(!RESET_RUN, Ordering::Release);
             view.start = false;
             if let Some(run) = slot.as_mut() {
                 run.controller.stop(&mut run.adapter);
@@ -735,7 +737,7 @@ pub unsafe fn frame(fighter: usize) {
             form,
             training: identity,
         };
-        let reset = RESET.swap(false, Ordering::AcqRel);
+        let reset = RESET.fetch_and(!RESET_RUN, Ordering::AcqRel) & RESET_RUN != 0;
         let requested = START.swap(false, Ordering::AcqRel);
         if requested {
             view.cancelled = false;
@@ -788,7 +790,7 @@ pub unsafe fn frame(fighter: usize) {
             run.planning_failed = false;
             published::WIZARDS.set_up(Kind::TechPlacing, false);
             view.discovery = Discovery::NEW;
-            STALE.store(false, Ordering::Release);
+            RESET.fetch_and(!RESET_OUTLINE, Ordering::Release);
             run.discovery_failed = false;
             view.preview_params = None;
             view.picker.enter(
