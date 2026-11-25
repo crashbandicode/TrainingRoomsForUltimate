@@ -47,11 +47,12 @@ pub(super) unsafe fn frame(fighter: usize) {
     }
     let at = [natives::pos_x(p1), natives::pos_y(p1)];
     let (blast, stage) = (super::tech_surfaces::training_blast_bounds(), RayProbe::new(p1));
+    let read = [blast.is_some(), stage.is_some()];
     let (Some(blast), Some(mut stage)) = (blast, stage) else {
         if fresh(1, [0.0; 4]) {
             diagnostic(format_args!(
                 "[StageGeometry] probe unavailable stage={} p1=({:.3},{:.3}) blast={} ray={}",
-                natives::stage_id(), at[0], at[1], blast.is_some(), stage.is_some()
+                natives::stage_id(), at[0], at[1], read[0], read[1]
             ));
         }
         return;
