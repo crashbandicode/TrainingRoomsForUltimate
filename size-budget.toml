@@ -3129,3 +3129,11 @@ ceiling = 204627
 date = "2026-11-25"
 reason = "Stage geometry on main d6eb6c63: one ray, the off-stage rule and its ray read (Part 1, 1b and the rule): measured 204627 (tools/sloc.py tree), 460 above 204167."
 approved_by = "tr-primary-2 2026-11-25 17:38:48Z (one entry at the measured value on the final head)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 204896
+date = "2026-11-25"
+reason = "The eggs Off stage zone on the off-stage rule, on stage geometry 204627: the stage read through the rule's probe, each ledge's open air, the stage's other lines copied in the zone's columns, a spot and a move asked off stage, and the Outer step's stop. Measured 204896 (tools/sloc.py tree), 269 above 204627."
+approved_by = "tr-primary-2 2026-11-25 19:21:22Z (one entry at the measured value of the final head, on top of stage geometry's)"
