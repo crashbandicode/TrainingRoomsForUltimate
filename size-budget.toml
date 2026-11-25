@@ -3089,3 +3089,11 @@ ceiling = 203585
 date = "2026-11-25"
 reason = "The drill takes the Training reset from the chord on its own poll, carried through Input Delay in its record: a reset chord alone leaves no result and starts no load at any hold length. Measured 203585 on the card head 0d28433d (203532): +53."
 approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command; a raise up to the +60 review-fix rule)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203989
+date = "2026-11-25"
+reason = "Mark variants: a replay-editor mark keeps and names its move variant and angle; a take, a Vault capture and a capture written for the Recordings list keep the fighter they were recorded on (recorded_fighter), read where every take start is posted and once per captured entry. Measured 203989 on the final head (remote-gate size step)."
+approved_by = "tr-primary-2 2026-11-25 13:43:24Z (the item, operator 13:30Z) with the rulings of 13:54:02Z, 14:33:53Z, 14:41:51Z and 14:51:40Z that grew its scope; no line number was approved in advance, so the measured growth is flagged in the READY post."
