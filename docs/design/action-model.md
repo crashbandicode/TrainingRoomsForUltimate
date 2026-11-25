@@ -160,15 +160,27 @@ side) left nothing to grade. The rule now also measures the special's own travel
   `MOVED` from where the special began; a special that stands still keeps nothing.
 - **The stick kept with it** is the one held for the most frames of that travel, by eight-way direction, as its
   newest sample; neutral when no direction was held longest (a tie goes to a direction).
+- **Entry velocity** is the displacement between the two unstopped positions immediately *before* the special
+  starts, with X relative to the fighter's facing. The preceding position supplies the magnitude of the change
+  between the last two velocities. Both velocity and change are stored to 1/256 of a unit. A missing third position
+  gives no timing allowance; a missing velocity is unknown, not zero. Aim parts have no entry.
 - **Handed over** as `Late::travel` with part 0 and `Late::press`, the press that began the special, on the frame the
   travel ends. The capture attaches it to that press's event (a Special press or a C-stick event), in the same
   four-entry table. When the table is full an aim's travel takes the place of the last one kept on a press; a press's
   travel never takes an aim's.
 - **Graded in input drills,** when the reference's and the attempt's press both carry one: the path as for an aim
   part (`Mark::Path`, "S1 Special path off"). Then, only when some path point is more than `STEER_FLOOR` (2 units)
-  apart, the stick's eight-way direction (`Mark::Steer`, "S1 Special steer wrong"), and with *Match angle and
+  apart **and** both entries are comparable, grade the stick's eight-way direction (`Mark::Steer`, "S1 Special
+  steer wrong"), and with *Match angle and
   deflection* On its angle and deflection ("S1 Special angle 12 off", "S1 Special deflection 30% low"). Inside the
-  floor the stick is not compared: a special that ignores the stick, or momentum carried into it, is no fault.
+  floor or with incomparable or unknown entry, the stick is not compared. A steered special at incomparable entry speed
+  gets no steering, angle or deflection fault; a path outside the independent wide-path tolerance still says path off.
+- Entries compare up to an inclusive vector distance of 1/16 unit/frame plus the larger observed entry change
+  times the selected On-time tolerance in frames. Either entry can be the later one in an accelerating fall. A
+  zero-frame tolerance or two constant-speed approaches keep the original 1/16 threshold.
+- The optional JSON pair `entry_x`, `entry_y` uses game units/frame. An old press path without them retains the path
+  comparison but does not grade the stick. `entry_change` is absent when zero. One axis without the other, change
+  without the pair, bad types, or unrepresentable values are refused.
 - The last step of a drill waits for the special to end when the drill keeps any travel, as it does for an aim.
 
 ## The runtime reads
@@ -221,9 +233,9 @@ selected version and name.
 - A drill keeps four travels in all, aim parts before the travels kept on presses; hit-combo links keep none.
 - A special's own travel is told apart from a steered one only beyond `STEER_FLOOR`; path points are whole units. The
   floor and what counts as steered were set from one fighter's sampled casts (Mario's up special) and not flown.
-- Momentum carried into an aerial special moves its own travel too. Beyond the floor with another stick held, or
-  beyond the steering tolerance, it reads as a fault.
-- Every stored combo carries the 96-byte travel table, also where no travel can occur.
+- A different approach can move the path outside the wide-path tolerance even when the stick is not comparable.
+  The result then reports the path, not wrong steering.
+- Every stored combo carries the 120-byte travel table, also where no travel can occur (four 30-byte details).
 - The numeric tolerances are defaults to tune in hand tests and a roster sweep.
 - A recording take spanning a Training reset is unchanged.
 
@@ -262,7 +274,7 @@ selected version and name.
   `a_steered_part_is_graded_on_its_path_within_the_tolerance`, `a_short_warp_fails_a_long_warp_drill`,
   `the_angle_and_deflection_toggle_grades_the_stick`, `the_toggle_row_reads_its_setting_and_is_off_by_default`,
   `a_travel_that_ends_after_its_step_was_graded_amends_the_grade`, `aim_details_round_trip_in_optional_keys`,
-  `a_drill_keeps_details_for_its_first_four_aims`, `the_travel_table_is_packed_into_96_bytes_a_combo`,
+  `a_drill_keeps_details_for_its_first_four_aims`, `the_travel_table_is_packed_into_120_bytes_a_combo`,
   `a_later_links_first_move_borrows_its_travel_arrows`, `a_failed_stick_angle_shows_the_difference_that_was_graded`.
 - A special's own travel: `a_specials_own_travel_is_measured_from_its_start_to_its_end`,
   `a_special_that_does_not_move_has_no_own_travel`, `the_own_travel_ends_where_the_first_aim_part_begins`,

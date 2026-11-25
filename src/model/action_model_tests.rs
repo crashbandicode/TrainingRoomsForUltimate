@@ -766,6 +766,7 @@ fn kirbys_angled_tilt_still_saves_as_version_two() {
 fn travel(end: (i8, i8), stick: (u16, u8)) -> action::Travel {
     let (x, y) = (f32::from(end.0), f32::from(end.1));
     action::Travel {
+        entry: action::Entry::UNKNOWN,
         stick: Some(stick),
         heading: ((y.atan2(x).to_degrees().rem_euclid(360.0) * 10.0).round() as u16) % 3600,
         distance: (x.hypot(y) * 10.0).round() as u16,
@@ -874,16 +875,16 @@ fn a_failed_stick_angle_shows_the_difference_that_was_graded() {
     }
 }
 
-/// The travel table's static cost: an entry is packed into 24 bytes, so the table adds 96 bytes to a combo, which
+/// The travel table's static cost: an entry is packed into 30 bytes, so the table adds 120 bytes to a combo, which
 /// was 2,000 bytes without it. A separate combo type without the table for the hit capture was measured and cost
 /// more code than the data it saved (`833913b3`), so every combo carries the table.
 #[test]
-fn the_travel_table_is_packed_into_96_bytes_a_combo() {
+fn the_travel_table_is_packed_into_120_bytes_a_combo() {
     use core::mem::size_of;
     let (entry, combo) = (size_of::<Detail>(), size_of::<Combo>());
     println!("TRAVEL_LAYOUT Travel={} Detail={entry} table={} Combo={combo} Helper={} InputCapture={}",
         size_of::<action::Travel>(), DETAILS * entry, size_of::<Helper>(), size_of::<InputCapture>());
-    assert_eq!((entry, DETAILS * entry), (24, 96), "a travel detail and a combo's table");
+    assert_eq!((entry, DETAILS * entry), (30, 120), "a travel detail and a combo's table");
     assert_eq!(combo, 2000 + DETAILS * entry, "a combo is its links and its table");
 }
 
@@ -1219,6 +1220,92 @@ fn carried_momentum_inside_the_floor_is_not_a_steer_fault() {
     };
     assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, false).clean);
     assert!(attempted_cast(recorded_cast(STRAIGHT_CAST), carried, true).clean);
+}
+
+/// Use five airborne approach frames, so entry velocity is observed before the move and is not inferred from
+/// its kick or rise. The fixed diagonal trajectory models Wizard's Foot; the rise uses the Mario fixture above.
+fn airborne_cast(target: Option<Combo>, kick: bool, cast: Cast, speed: (f32, f32), toggle: bool) -> (Combo, Option<Summary>) {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    let mut helper = Helper::new();
+    helper.set_target(target);
+    let mut result = None;
+    for f in -5..75 {
+        let (mut p, mut inputs) = if f < 0 { (standing(), MappedInputs::NEUTRAL) } else { cast_frame(cast, f as u32) };
+        if kick {
+            if p.attack.is_some() { p.attack = Some(Move::DownSpecial); p.status = 0x1df; }
+            if (0..3).contains(&f) { inputs.lstick_y = -60; } // Down B, short of a separate fast-fall edge.
+        }
+        let (x, y) = if kick { let n = (f - 1).clamp(0, 34) as f32; (n, -n) } else { p.pos.unwrap_or_default() };
+        p.pos = Some((x + f as f32 * speed.0, 100.0 + y + f as f32 * speed.1));
+        p.airborne = true;
+        tracker.step(p, standing(), inputs);
+        capture.step_late(tracker.snaps().last().unwrap(), tracker.late());
+        if target.is_some() {
+            let out = helper.step(&tracker, Settings { match_stick: toggle, ..Settings::factory() });
+            if out.resolved.is_some() { result = out.resolved; }
+        }
+    }
+    (capture.combo, result)
+}
+
+#[test]
+fn entry_motion_does_not_turn_an_airborne_fixed_kick_into_a_steer() {
+    let saved = airborne_cast(None, true, STRAIGHT_CAST, (0.25, 0.0), false).0;
+    let held = Cast { stick: UP_LEFT, ..STRAIGHT_CAST };
+    for speed in [(0.375, 0.0), (0.25, -0.125)] {
+        for toggle in [false, true] {
+            let (actual, result) = airborne_cast(Some(saved), true, held, speed, toggle);
+            let endpoint = |combo: Combo| combo.travel(0, 0).unwrap().path[7];
+            let ((x, y), (a, b)) = (endpoint(saved), endpoint(actual));
+            assert!(f32::from(x - a).hypot(f32::from(y - b)) > 2.0);
+            assert!(result.unwrap().clean, "fixed kick: {speed:?}, {toggle}, {result:?}");
+        }
+    }
+}
+
+#[test]
+fn entry_motion_on_a_steer_must_match_to_judge_the_stick() {
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, 0.0), false).0;
+    for toggle in [false, true] {
+        let run = |vx| airborne_cast(Some(saved), false, STRAIGHT_CAST, (vx, 0.0), toggle).1.unwrap();
+        assert_eq!(run(0.25).fault, Some((0, Reason::Steer)), "matching entry still grades the steer");
+        assert_eq!(run(0.3125).fault, Some((0, Reason::Steer)), "at the inclusive velocity tolerance");
+        assert!(run(0.31640625).clean, "one recorded velocity unit past the tolerance");
+        assert!(run(0.375).clean, "different entry cannot establish a steering error");
+    }
+}
+
+#[test]
+fn entry_motion_round_trips_and_old_press_paths_do_not_grade_the_stick() {
+    use crate::model::combo_record::ComboRecord;
+    let saved = airborne_cast(None, false, STEERED_CAST, (0.25, -0.125), false).0;
+    let record = ComboRecord::new("Air".into(), saved, None);
+    let mut value = serde_json::to_value(&record).unwrap();
+    let read: ComboRecord = serde_json::from_value(value.clone()).unwrap();
+    let run = |target| airborne_cast(Some(target), false, STRAIGHT_CAST, (0.25, -0.125), true).1.unwrap();
+    assert_eq!(run(read.combo).fault, Some((0, Reason::Steer)));
+    let mut falling = value.clone();
+    let press = &mut falling["input_steps"][0]["events"][0];
+    press["entry_y"] = serde_json::json!(-0.25);
+    assert!(run(serde_json::from_value::<ComboRecord>(falling.clone()).unwrap().combo).clean);
+    falling["input_steps"][0]["events"][0]["entry_change"] = serde_json::json!(0.125);
+    let accelerated: ComboRecord = serde_json::from_value(falling).unwrap();
+    assert_eq!(accelerated.combo.travel(0, 0).unwrap().entry.change(), 0.125);
+    assert_eq!(run(accelerated.combo).fault, Some((0, Reason::Steer)));
+    let press = value["input_steps"][0]["events"][0].as_object_mut().unwrap();
+    assert_eq!(press.remove("entry_x"), Some(serde_json::json!(0.25)));
+    assert_eq!(press.remove("entry_y"), Some(serde_json::json!(-0.125)));
+    for (x, y) in [(serde_json::json!(0), None), (serde_json::json!(false), Some(0)), (serde_json::json!(128), Some(0))] {
+        let mut bad = value.clone();
+        let press = &mut bad["input_steps"][0]["events"][0];
+        press["entry_x"] = x;
+        if let Some(y) = y { press["entry_y"] = serde_json::json!(y); }
+        assert!(serde_json::from_value::<ComboRecord>(bad).is_err());
+    }
+    let legacy: ComboRecord = serde_json::from_value(value).unwrap();
+    assert!(legacy.combo.travel(0, 0).is_some());
+    assert!(run(legacy.combo).clean);
 }
 
 /// EXPECTED RED. What the press keeps: the path of the special's own travel and the stick most held during it. A
