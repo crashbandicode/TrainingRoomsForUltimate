@@ -102,7 +102,7 @@ Each link:
 | `window` | no (`null`) | The combo window, `[first, last]`: the frames on which the follow-up's press would still have made a true combo. |
 | `steps` | yes when `events` is absent, else the press subset | The presses of the follow-up, oldest first, at most 4. A file with no `events` is graded on these presses. A newer file still writes them so an older build can open it. |
 | `events` | no | The input events of the follow-up, oldest first, at most 12: presses, releases, the C-stick, stick flicks and special directions. When this field is present, the combo is graded on it. |
-| `from_shown`, `to_shown` | no | Description objects for both moves. Both must be present to describe the link. Members: `move` for `grab`, `throw` or `final_smash`; `of` for the continued move; `angle` for `up` or `down`; `variant` for a number from 0 to 31. An empty object is valid. |
+| `from_shown`, `to_shown` | no | Description objects for both moves. Both must be present to describe the link. Members: `move` for `grab`, `throw`, `final_smash`, `ledge_attack`, `getup_attack` or `trip_attack`; `of` for the continued move; `angle` for `up` or `down`; `variant` for a number from 0 to 31. An empty object is valid. |
 | `spot` | no | The spot the follow-up's hit landed: `"sweet"`, `"sour"` or `"late"`. A link with no `spot`, or any other word, has no spot and always matches. It is compared only when Recording › Options › [Match sweet/sour spot](../menu/recording.md#match-sweet-sour-spot) is On. |
 | `drift` | no | The held direction between the events, facing-relative. Shown only. It is not graded. |
 
@@ -133,8 +133,8 @@ on which Player 1 could act. Every link starts again at its own A₁.
 `down_smash`, `aerial`, `neutral_special`, `side_special`, `up_special`, `down_special`, `other`. These are kinds of
 move, not one fighter's moves, so a combo recorded on one fighter can be practised on any other. All aerials are
 `aerial`; a newer file's event direction tells a forward air from a neutral air, relative to the facing. An older file's `aim` still uses `side` for both left and right.
-The writer puts `grab`, `throw` and `final_smash` in a description's `move` and writes `other` in `from` or `to`,
-so earlier builds can read those fields.
+The writer puts `grab`, `throw`, `final_smash`, `ledge_attack`, `getup_attack` and `trip_attack` in a description's
+`move` and writes `other` in `from` or `to`, so earlier builds can read those fields.
 
 ### Reading rules
 

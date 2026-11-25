@@ -454,7 +454,7 @@ fn parse_description(value: &Value, mv: Move, key: &'static str) -> Result<Actio
         None => mv,
         Some(value) => {
             let found = value.as_str().and_then(move_of).ok_or(key)?;
-            if mv != Move::Other || !matches!(found, Move::Grab | Move::Throw | Move::FinalSmash) { return Err(key); }
+            if mv != Move::Other || found.legacy() == found { return Err(key); }
             found
         }
     };
@@ -477,7 +477,7 @@ fn parse_description(value: &Value, mv: Move, key: &'static str) -> Result<Actio
 
 fn description_value(desc: ActionDesc) -> Value {
     let mut object = Map::new();
-    if matches!(desc.mv, Move::Grab | Move::Throw | Move::FinalSmash) {
+    if desc.mv.legacy() != desc.mv {
         object.insert("move".into(), json!(key_of(&MOVES, desc.mv)));
     }
     if let Some(of) = desc.of {
@@ -543,7 +543,7 @@ fn event_value(event: Event, hold: Option<u32>) -> Value {
     value
 }
 
-const MOVES: [(Move, &str); 17] = [
+const MOVES: [(Move, &str); 20] = [
     (Move::Jab, "jab"),
     (Move::DashAttack, "dash_attack"),
     (Move::SideTilt, "side_tilt"),
@@ -561,6 +561,9 @@ const MOVES: [(Move, &str); 17] = [
     (Move::Grab, "grab"),
     (Move::Throw, "throw"),
     (Move::FinalSmash, "final_smash"),
+    (Move::LedgeAttack, "ledge_attack"),
+    (Move::GetupAttack, "getup_attack"),
+    (Move::TripAttack, "trip_attack"),
 ];
 const BUTTONS: [(Button, &str); 5] = [
     (Button::Attack, "attack"),

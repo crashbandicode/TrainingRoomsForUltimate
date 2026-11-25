@@ -68,8 +68,10 @@ and angle, not variant or parts; otherwise it compares legacy moves.
 
 `Action` stores the tracker action state. At opening its origin is the newest press at most `INPUT_LOOKBACK` (15)
 frames earlier; a hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to
-Grab, Throw to Throw and exactly Final to Final Smash. A throw changes a grab's move without opening a new action.
-`Move::legacy` maps those three kinds to `Other`.
+Grab, Throw to Throw and exactly Final to Final Smash. It maps `CLIFF_ATTACK`, `DOWN_STAND_ATTACK` and
+`SLIP_STAND_ATTACK` to Ledge attack, Getup attack and Trip attack. Each opens its own action from a wait, even one
+that is not actionable, when the tracked move is different. A throw changes a grab's move without opening a new
+action. `Move::legacy` maps these six kinds to `Other`; the lane's colours are unchanged.
 
 ## The outcome rule
 
@@ -189,3 +191,7 @@ selected version and name.
   `the_design_tolerances_are_the_stated_defaults`, `stick_flicks_inside_any_special_are_not_events`,
   `any_fighters_special_can_aim`, `no_fighter_table_is_left`,
   `the_runtime_reads_the_angle_and_the_travel_behind_their_gates`.
+- Edge attacks: `the_edge_attack_statuses_are_the_games`, `an_edge_attack_opens_its_own_action_at_its_press`,
+  `an_edge_attack_keeps_its_move_one_frame_past_its_end`, `an_edge_attack_links_on_both_sides_and_reads_alike`,
+  `the_grader_tells_an_edge_attack_from_another_move`, `edge_attacks_round_trip_in_files_and_in_the_packed_link`,
+  `an_old_file_grades_an_edge_attack_as_before`, `an_edge_attack_step_is_decided_when_its_action_opens`.

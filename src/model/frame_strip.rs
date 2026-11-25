@@ -77,6 +77,9 @@ pub enum Move {
     Grab,
     Throw,
     FinalSmash,
+    LedgeAttack,
+    GetupAttack,
+    TripAttack,
     /// A fighter's own attack status, or one this list does not name.
     Other,
 }
@@ -100,6 +103,9 @@ impl Move {
             Move::Grab => "Grab",
             Move::Throw => "Throw",
             Move::FinalSmash => "Final Smash",
+            Move::LedgeAttack => "Ledge attack",
+            Move::GetupAttack => "Getup attack",
+            Move::TripAttack => "Trip attack",
             Move::Other => "Move",
         }
     }
@@ -107,7 +113,8 @@ impl Move {
     /// The move understood by older combo files.
     pub const fn legacy(self) -> Move {
         match self {
-            Move::Grab | Move::Throw | Move::FinalSmash => Move::Other,
+            Move::Grab | Move::Throw | Move::FinalSmash
+            | Move::LedgeAttack | Move::GetupAttack | Move::TripAttack => Move::Other,
             _ => self,
         }
     }
@@ -157,7 +164,7 @@ pub struct Sample {
     pub active: bool,
     /// P1 only: the status is an attack, and which.
     pub attack: Option<Move>,
-    /// P1 only: the status is a grab, a throw or the Final Smash (`ids::Table::named`).
+    /// P1 only: a named non-attack status (`ids::Table::named_move`).
     pub named: Option<Move>,
     /// P1 only: the animation's hash40; 0 when it was not read.
     pub motion: u64,
@@ -756,8 +763,10 @@ impl Tracker {
         let p1_busy = !p1.actionable && !p1.hitstun && !p1.shieldstun;
         // A grab or the Final Smash that follows another move with no actionable frame between is a new action; a
         // throw continues its grab.
+        // A ledge, get-up or trip attack starts from a wait that may not count as actionable: it opens its own action.
+        let edge = matches!(p1.named, Some(Move::LedgeAttack | Move::GetupAttack | Move::TripAttack));
         let named = p1.named.is_some_and(|m| {
-            m != self.action.mv && self.action.mv != Move::Other && !(m == Move::Throw && self.action.mv == Move::Grab)
+            m != self.action.mv && (edge || self.action.mv != Move::Other) && !(m == Move::Throw && self.action.mv == Move::Grab)
         });
         let restarted = named || p1.attack.is_some_and(|m| {
             (m != self.action.mv && self.action.mv != Move::Other)
@@ -1093,6 +1102,9 @@ pub mod ids {
         Catch = "FIGHTER_STATUS_KIND_CATCH",
         CatchAttack = "FIGHTER_STATUS_KIND_CATCH_ATTACK",
         Throw = "FIGHTER_STATUS_KIND_THROW",
+        CliffAttack = "FIGHTER_STATUS_KIND_CLIFF_ATTACK",
+        DownStandAttack = "FIGHTER_STATUS_KIND_DOWN_STAND_ATTACK",
+        SlipStandAttack = "FIGHTER_STATUS_KIND_SLIP_STAND_ATTACK",
         SpecialN = "FIGHTER_STATUS_KIND_SPECIAL_N",
         SpecialS = "FIGHTER_STATUS_KIND_SPECIAL_S",
         SpecialHi = "FIGHTER_STATUS_KIND_SPECIAL_HI",
@@ -1117,6 +1129,9 @@ pub mod ids {
             if self.within(C::Catch, C::CatchAttack, status) { Some(Move::Grab) }
             else if self.is(C::Throw, status) { Some(Move::Throw) }
             else if self.is(C::Final, status) { Some(Move::FinalSmash) }
+            else if self.is(C::CliffAttack, status) { Some(Move::LedgeAttack) }
+            else if self.is(C::DownStandAttack, status) { Some(Move::GetupAttack) }
+            else if self.is(C::SlipStandAttack, status) { Some(Move::TripAttack) }
             else { None }
         }
 
