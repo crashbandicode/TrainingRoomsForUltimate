@@ -231,6 +231,9 @@ enum Plays {
 }
 
 struct Loaded {
+    /// The selection's library id. No shipped code reads it since the placement grid went (operator 2026-11-25,
+    /// PC6 A); the tests tell by it which selection is loaded.
+    #[cfg(test)]
     id: Option<String>,
     recording: MacroRecording,
     plays: Plays,
@@ -807,12 +810,17 @@ impl MacroUi {
 
     fn install(
         &mut self,
-        id: Option<String>,
+        _id: Option<String>,
         recording: MacroRecording,
         cpu_kind: Option<i32>,
     ) -> Result<Effect, MacroError> {
         let kind = recording.start.fighter_kind;
-        self.loaded = Some(Loaded { id, recording, plays: Plays::Recorded });
+        self.loaded = Some(Loaded {
+            #[cfg(test)]
+            id: _id,
+            recording,
+            plays: Plays::Recorded,
+        });
         self.screen = Screen::Closed;
         self.picked = None;
         self.playback_on = false;
@@ -942,11 +950,16 @@ impl MacroUi {
     /// and the file's recorded fighter and Mii are untouched.
     fn install_current(
         &mut self,
-        id: Option<String>,
+        _id: Option<String>,
         recording: MacroRecording,
         cpu_kind: Option<i32>,
     ) -> Effect {
-        self.loaded = Some(Loaded { id, recording, plays: Plays::Current });
+        self.loaded = Some(Loaded {
+            #[cfg(test)]
+            id: _id,
+            recording,
+            plays: Plays::Current,
+        });
         self.screen = Screen::Closed;
         self.picked = None;
         self.playback_on = false;
