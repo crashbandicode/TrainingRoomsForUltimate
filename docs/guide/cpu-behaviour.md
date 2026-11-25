@@ -1,236 +1,126 @@
 # CPU behaviour
 
-The [CPU page](../menu/cpu.md) tells the training CPU what to do. This guide shows how its rows work together: what
-makes the CPU act, which row it picks from, how the direction chips and the delays are read, and what each of the 30
-actions does.
+The [CPU page](../menu/cpu.md) controls the training CPU. Its settings also apply to the first practice partner in a
+waiting room with [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On. Ice Climbers' Popo and Nana
+follow them separately; they do not control Player 1, even with [Player 1 control](../menu/cpu.md#player-1-control) On.
 
-## Where the settings apply
-
-- The CPU in Training. With Ice Climbers, Popo and Nana each follow the settings on their own.
-- In a waiting room with [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On, the first training
-  partner. ([CPU Level](../menu/cpu.md#cpu-level) sets every partner.)
-- Never Player 1, even when an AI plays Player 1 (see [Player 1 control](../menu/cpu.md#player-1-control)).
+<!-- CLIP: tut-cpu-shield.mp4 | CPU › Shield set to Hold → Mario jabs the CPU → it keeps its shield up -->
+*Clip coming.*
 
 ## Mash and Followup
 
-[Mash](../menu/cpu.md#mash) is the CPU's main reaction, and [Followup](../menu/cpu.md#followup) is what comes right
-after it.
+<!-- CLIP: tut-cpu-mash.mp4 | CPU › Mash set to Jab → Mario jabs the CPU → the CPU answers out of hitstun -->
+*Clip coming.*
 
-![A situation starts: an override with actions is used, otherwise Mash if its trigger is ticked; the first action and the Followup are picked together](../diagrams/cpu-action-flow.png)
+[Mash](../menu/cpu.md#mash) sets the CPU's first reaction; [Followup](../menu/cpu.md#followup) sets what comes next.
+When a situation starts, the CPU picks both actions at once, at random from their ticked choices. It performs each as
+soon as it can. A new situation replaces an action still waiting.
 
-- The CPU holds at most two actions: the first one and its follow-up. Both are picked at the same moment, when a
-  situation starts: the first from Mash (or from an override), the follow-up from Followup.
-- It presses the first action as soon as the game lets it, for example the first frame after hitstun. Once that
-  action has started, the follow-up comes next, again as soon as it can.
-- With several actions ticked, the pick is random and each has the same chance. The CPU picks once when a situation
-  starts, not on every frame of it, and a new situation replaces anything still waiting. The general triggers
-  (Grounded, Airborne, the distances, Always) pick again once the last action is done: see
-  [Mash Triggers](#mash-triggers).
-- The rows under Attacks & Movement are picked along with the action: [Attack Angle](../menu/cpu.md#attack-angle) for
-  an angled attack; [Full Hop](../menu/cpu.md#full-hop), [Falling Aerials](../menu/cpu.md#falling-aerials) and
-  [Aerial Delay](../menu/cpu.md#aerial-delay) for an aerial; [Fast Fall](../menu/cpu.md#fast-fall) for the fall
-  after it.
-- Emptying both Mash and Mash Triggers makes the CPU drop anything it was still about to do.
+For example, tick Jump in Mash, Air Dodge in Followup and Hitstun in Mash Triggers: after you hit it, the CPU jumps
+when it can, then air dodges. Attack Angle, Full Hop, Falling Aerials, Aerial Delay and Fast Fall also affect the
+chosen action. Emptying both Mash and Mash Triggers drops any action still waiting.
 
-Example: Mash has Jump and Neutral Air, Followup has Air Dodge, and Mash Triggers has Hitstun. You jab the CPU. On
-the first frame it can act, it jumps or does a neutral air (one of the two at random), then air dodges.
 ## Mash Triggers
 
-[Mash Triggers](../menu/cpu.md#mash-triggers) are the situations in which the CPU uses Mash. Each one:
+[Mash Triggers](../menu/cpu.md#mash-triggers) choose when Mash fires:
 
-| Trigger | The CPU mashes |
+| Trigger | When |
 | --- | --- |
-| Hitstun | as soon as it can act after a hit (tumble is separate) |
-| Tumble | as soon as it can act after a hard launch |
-| Shieldstun | out of shield, once OoS Offset and Reaction Time allow |
-| Parry | after it parries |
-| Footstool | after you footstool it |
-| Ledge Trump | after you take the ledge from it |
-| Landing | when it lands |
-| Clatter | as soon as it is free from a grab, a bury or another hold |
-| Ledge Option | right after its ledge option from [Ledge Options](../menu/cpu.md#ledge-options) |
-| Tech Option | after it techs or gets up |
-| Mistech Option | after it gets up from a missed tech |
-| Grounded | when it is on the ground |
-| Airborne | when it is in the air |
-| Distance: Close | when you are within 16 units of it |
-| Distance: Mid | when you are within 37 units (Close included) |
-| Distance: Far | when you are within 64 units (Close and Mid included) |
-| Always | at any time |
+| Hitstun / Tumble | After a hit / a hard launch; Hitstun does not include tumble. |
+| Shieldstun / Parry | Out of shield / after a parry. |
+| Footstool / Ledge Trump / Landing | After that event. |
+| Clatter | After escape from a grab, bury or other hold. |
+| Ledge Option / Tech Option / Mistech Option | After its ledge option, tech or getup, or missed-tech getup. |
+| Grounded / Airborne | While on the ground / in the air. |
+| Distance: Close / Mid / Far | Within 16 / 37 / 64 units; the ranges overlap. |
+| Always | At any time. |
 
-How they combine:
-
-- When several apply at once, the first in this order counts: a tech or getup (Tech Option), Clatter, Tumble,
-  Hitstun, Parry, Footstool, Ledge Trump, Landing, then the general ones (Grounded, Airborne, the distances, Always).
-- While the CPU is in one of the first eight, only that one counts. With Hitstun unticked, Always doesn't fire during
-  hitstun; Hitstun doesn't fire during tumble.
-- Grounded, Airborne, the distances and Always work as one situation, and they repeat: while any of them holds, the CPU
-  mashes, and once that action and its Followup are done it mashes again. A CPU on Always with Spot Dodge keeps
-  spot-dodging. The other situations pick once each time they start.
-- Shieldstun, Ledge Option and Mistech Option are moments: the CPU mashes right then.
-- After a throw, the CPU always does its Mash action, whatever is ticked here.
+Tech/getup, Clatter, Tumble, Hitstun, Parry, Footstool, Ledge Trump and Landing take priority, in that order, over
+general triggers. Grounded, Airborne, distance and Always repeat after both actions finish; the other situations pick
+once when they begin. Shieldstun, Ledge Option and Mistech Option fire at their own moments. After a throw the CPU
+uses Mash regardless of the triggers.
 
 ## Situation overrides
 
-[Situation overrides](../menu/cpu.md#situation-overrides) give one situation its own actions. When a situation has an
-override, the CPU picks from it instead of Mash. Followup still follows.
+[Situation overrides](../menu/cpu.md#situation-overrides) replace Mash for their situation; Followup still follows.
+An override works even with its trigger unticked, except Shieldstun needs the Shieldstun trigger. The four ledge
+overrides follow the chosen [Ledge Option](../menu/cpu.md#ledge-options); if that list is empty, the game controls the
+ledge instead.
 
-| Situation | Override used | Otherwise Mash, if this trigger is ticked |
-| --- | --- | --- |
-| Hitstun | Hitstun | Hitstun |
-| Tumble | Tumble | Tumble |
-| Parry | Parry | Parry |
-| Footstool | Footstool | Footstool |
-| Ledge trump | Ledge Trump | Ledge Trump |
-| Landing | Landing | Landing |
-| Grabbed, buried or held | Clatter | Clatter |
-| A tech or a getup | Tech Action | Tech Option; after a missed tech, Mistech Option too |
-| Out of shield | Shieldstun (only with Shieldstun ticked) | Shieldstun |
-| After a ledge getup | Ledge Neutral Getup, Ledge Roll, Ledge Jump or Ledge Attack | Ledge Option |
-| After a throw | none | always Mash |
-| Grounded, airborne, near you, always | none | Grounded, Airborne, the distances, Always |
-
-- An override works even when its trigger is unticked. Shieldstun is the exception: it needs the Shieldstun trigger.
-- The four ledge overrides follow the ledge option the CPU took from Ledge Options. With Ledge Options empty, the game
-  runs the ledge and they aren't used.
-
-Example: Mash has Jump, Mash Triggers keeps its defaults (Hitstun, Shieldstun, Tumble, Clatter), and the Hitstun
-override has Up Special. Out of shield, out of tumble and out of a grab, the CPU jumps; out of hitstun, it does Up
-Special.
+For example, set Mash to Jump and the Hitstun override to Up Special: the CPU uses Up Special after hitstun, but
+Jump in the other triggered situations.
 
 ## The 30 actions
 
-Mash, Followup and every override offer the same 30 actions.
+Mash, Followup and the overrides use the same actions:
 
 | Action | What the CPU does |
 | --- | --- |
-| Air Dodge | An air dodge in the air (Airdodge Direction aims it after a hit). On the ground, it shields. |
-| Jump | A jump, or a double jump in the air. Full Hop picks a full or a short hop. |
-| Shield | Shields, on the ground only; in the air it waits until it lands. |
-| Spot Dodge | A spot dodge, also out of shield. |
-| Roll Forwards, Roll Backwards | A roll, also out of shield. |
-| Neutral Air, Forward Air, Back Air, Up Air, Down Air | The aerial; from the ground it jumps first. |
-| Neutral Special, Side Special, Up Special, Down Special | The special move. |
-| Forward Smash, Up Smash, Down Smash | The smash attack. Attack Angle angles the forward smash. |
-| Jab | A jab, on the ground only; in the air it waits until it lands. |
-| Forward Tilt, Up Tilt, Down Tilt | The tilt attack. Attack Angle angles the forward tilt. |
-| Grab | A grab, also out of shield. [Throw](../menu/cpu.md#throw) decides what follows. |
-| Dash | A dash. |
-| Dash Attack | A dash, then a dash attack. |
-| Playback Slot 1 to 5 | See below. |
+| Air Dodge | Air dodge; on the ground, shield. |
+| Jump | Jump or double jump; Full Hop chooses full or short. |
+| Shield | Shield on the ground; wait to land in the air. |
+| Spot Dodge | Spot dodge, including out of shield. |
+| Roll Forwards, Roll Backwards | Roll, including out of shield. |
+| Neutral Air, Forward Air, Back Air, Up Air, Down Air | Aerial; jump first if grounded. |
+| Neutral Special, Side Special, Up Special, Down Special | Special move. |
+| Forward Smash, Up Smash, Down Smash | Smash attack; Attack Angle can angle the forward smash. |
+| Jab | Jab on the ground; wait to land in the air. |
+| Forward Tilt, Up Tilt, Down Tilt | Tilt attack; Attack Angle can angle the forward tilt. |
+| Grab | Grab, including out of shield; Throw chooses what follows. |
+| Dash | Dash. |
+| Dash Attack | Dash, then attack. |
+| Playback Slot 1 to 5 | See [Recording](../menu/recording.md#a-file-s-own-screen). |
 
 ### The Playback Slot actions
 
-Playback Slot 1 to 5 are in Mash, Followup, the overrides and [Ledge Options](../menu/cpu.md#ledge-options). Each one
-plays the recording held in one of five numbered recording slots, starting from where the CPU is.
+See [Recording](../menu/recording.md#a-file-s-own-screen) for the five playback-slot actions.
 
-- **Fill a slot** from the library: on a macro's page (Recording page, MACROS, A), set **Playback slot** to Slot 1 to
-  5. One macro per slot; the slots are kept with the library, so they are back after a restart.
-- **Length:** a slot holds up to 600 frames (10 s). Crop a longer macro first.
-- **Playing:** the CPU plays the macro once, mirrored to the way it faces. In Mash, Followup and the overrides,
-  Recording › Options › [Hitstun timing](../menu/recording.md#hitstun-timing) decides when a slot starts after the CPU
-  is hit.
-- **An empty slot** shows "This Playback Slot is empty: pick its macro on the Recording page" and the CPU skips that
-  action; its follow-up still comes.
-
-![A macro's own screen: Playback slot Right sets Slot 1; then Fox's forward smash hits the CPU and the CPU plays the macro](../media/rc14-playback-slot.gif)<br>
-*Macro 1's own screen: Playback slot reads None, Right sets Slot 1, and the menu closes. With the CPU's Mash on Playback Slot 1 (set beforehand), Fox's forward smash hits the CPU (Mario, 17.6%) and the CPU plays the macro, "Input Recording: Playback" on screen. Eden, rc.14 (untested on hardware).*
-
-<!-- CAPTURE-REQUEST v10-playback-slot: the clip above shows a named macro assigned with Playback slot and the CPU replaying it after a hit; still to shoot is the empty slot's notice ("This Playback Slot is empty: pick its macro on the Recording page"). See artifacts/docs4/CAPTURE-REQUESTS.md. -->
-To play a macro on demand instead, set it active for the CPU and press Play on CPU (ZR + D-pad Up): see
-[Set active, and the Play chords](recording.md#set-active-and-the-play-chords).
+![A macro assigned to Playback Slot 1 and played by the CPU](../media/rc14-playback-slot.gif)
+*A macro is assigned to Playback Slot 1 and played by the CPU.*
 
 ## Direction chips
 
-[Airdodge Direction](../menu/cpu.md#airdodge-direction), [DI Direction](../menu/cpu.md#di-direction),
-[SDI Direction](../menu/cpu.md#sdi-direction) and [Shield Tilt](../menu/cpu.md#shield-tilt) use the same grid of
-chips:
+<!-- CLIP: tut-cpu-di.mp4 | DI Direction Left, then Right → the same smash at the same damage sends the CPU to different places -->
+*Clip coming.*
 
-```text
-Up In     Up        Up Out     Left
-In        Neutral   Out        Right
-Down In   Down      Down Out
-```
+[DI Direction](../menu/cpu.md#di-direction), [SDI Direction](../menu/cpu.md#sdi-direction),
+[Airdodge Direction](../menu/cpu.md#airdodge-direction) and [Shield Tilt](../menu/cpu.md#shield-tilt) use a grid.
+In points toward you and Out away from you; Left and Right are fixed screen directions. Neutral is the stick at rest.
 
-- In points toward you and Out away from you, whichever side of the CPU you stand on. The grid always draws In on the
-  left.
-- Left and Right are fixed screen directions, whatever the positions.
-- Neutral is the stick at rest: no DI or SDI that time, an air dodge in place, an untilted shield.
-- The DI grid shows the game's DI line on each chip, and the SDI grid the game's SDI streak.
+Each A on a chip adds weight from x1 to x5; the sixth clears it. The CPU picks by weight. Y clears the focused chip;
+ZL selects all or clears all. Shield Tilt selects only one. DI is picked per hit; Airdodge Direction per hit in the
+air. SDI is picked at reset or a setting change and kept until the next pick. Shield Tilt is read at reset or a setting change.
+SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength).
+The help line can read "Selected: Up x3, In x1".
 
-Weights: each A on a chip adds one weight, from x1 to x5, and a sixth press clears it. The CPU picks between the
-selected chips by weight. Y clears the focused chip; ZL selects every chip or clears them all. The help line lists the
-picks, such as "Selected: Up x3, In x1". Shield Tilt takes one chip only: A selects it and clears the others.
-
-![With Up x3 and In x1 the CPU picks Up three times out of four](../diagrams/chip-weights.png)
-| Row | When the direction is picked |
-| --- | --- |
-| DI Direction | for each hit, held for that hitstun |
-| Airdodge Direction | for each hit in the air, held for that hitstun |
-| SDI Direction | at each reset and right after you change the row; kept for every hit until then |
-| Shield Tilt | read at each reset and right after you change the row |
-
-SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength), which is None at first.
-
-![Ledge Delay open with the Min and Max handles set and the tick values greyed, labelled](../media/rc13-menu-control-range.png)<br>
-*A delay row with its range set: the Min and Max handles are in use and the checklist half is greyed. Eden, rc.13 (untested on hardware).*
-
-
-![DI Direction from nothing picked to Up x1, then SDI Direction the same: the picked chip lights at full strength, the others stay dim](../media/rc13-di-sdi-chips.gif)<br>*The DI and SDI direction grids. Eden, rc.13 (untested on hardware).*
+![DI and SDI direction grids, each with Up selected](../media/rc13-di-sdi-chips.gif)
+*The DI and SDI direction grids.*
 
 ## Delay rows
 
-Seven rows take a delay. Each holds either ticked values or a range.
-
-| Row | Values | With nothing set | A new value is picked |
+| Row | Values | Nothing set | Picked |
 | --- | --- | --- | --- |
-| [Ledge Delay](../menu/cpu.md#ledge-delay) | 0 to 300 frames, steps of 10 | no wait | for each ledge grab |
-| [Throw Delay](../menu/cpu.md#throw-delay) | 0 to 150 frames, steps of 5 | it throws at once | for each grab |
-| [Pummel Delay](../menu/cpu.md#pummel-delay) | 0 to 150 frames, steps of 5 | no pummels | for each grab |
-| [Aerial Delay](../menu/cpu.md#aerial-delay) | 0 to 30 frames | no wait | with each aerial action |
-| [Fast Fall Delay](../menu/cpu.md#fast-fall-delay) | 0 to 30 frames | it fast falls at once | as each fall starts |
-| [OoS Offset](../menu/cpu.md#oos-offset) | 0 to 30 hits | it acts after the first hit | when it stands or is hit |
-| [Reaction Time](../menu/cpu.md#reaction-time) | 0 to 30 frames | no wait | at each hit on its shield |
+| Ledge Delay | 0–300 frames, step 10 | No wait | Each ledge grab |
+| Throw Delay | 0–150 frames, step 5 | Throws at once | Each grab |
+| Pummel Delay | 0–150 frames, step 5 | No pummels | Each grab |
+| Aerial Delay | 0–30 frames | No wait | Each aerial action |
+| Fast Fall Delay | 0–30 frames | Fast falls at once | Each fall |
+| OoS Offset | 0–30 hits | Acts after the first hit | When it stands or is hit |
+| Reaction Time | 0–30 frames | No wait | Each shield hit |
 
-The frames are game frames at every [game speed](game-speed.md): Fast Fall Delay 30 waits 30 game frames at 1/4 too,
-2 seconds instead of half a second. OoS Offset counts hits, so the speed doesn't change it.
+Press A on a delay row. Tick values with A, or move to Min and Max and press A to move a handle. Left/Right move one
+step and Up/Down ten. The CPU picks randomly from the ticked values or the range; only one method can hold a value.
+Y clears it. Delays use game frames at every game speed; OoS Offset counts hits.
 
-A on the row opens the delay pop-up. It has two ways to set the delay:
-
-- **Tick values.** A ticks or unticks the value under the cursor; Left/Right step a column; ZL ticks every value. The
-  CPU picks one of the ticked values at random, each with the same chance. A ticked 0 counts as a choice: for Pummel
-  Delay it means pummel at once.
-- **Set a range.** Move down past the values to Min and Max. A picks a handle up (a new range starts at 0 - 0),
-  Left/Right move it one step, Up/Down ten steps, and A puts it down. Min can't pass Max. The CPU picks any step from
-  Min to Max, each with the same chance; Min equal to Max is a fixed delay.
-
-Only one of the two can hold a value. While values are ticked, the range is greyed ("Values are ticked: clear them
-first (Y)"); while a range is set, the values are greyed ("A range is set: clear it first (Y)"). Y clears whichever
-is set. On the page, the row reads "none", a count such as "3 selected", or a range such as "10 - 40".
-
-![Ledge Delay open on its tick values: 10, 30 and 60 ticked ("3 ticked"), the cursor on 0, the Range half greyed and "not set"](../media/rc13-delay-ticks.png)<br>
-*Ledge Delay open on its tick values, labelled: three ticked, the cursor on 0, the Range half greyed. Eden, rc.13 (untested on hardware).*
+![Ledge Delay with its Min and Max handles set and the tick values greyed](../media/rc13-menu-control-range.png)
+*A delay range set; the checklist is greyed.*
 
 ## Recordings and the CPU settings
 
-Two rows on the [Recording page](../menu/recording.md) decide what happens while a recording plays on the CPU:
-
-- [Mash interrupts playback](../menu/recording.md#mash-interrupts-playback) (On at first): when a mash triggers, the
-  recording stops and the CPU mashes. Off: the recording plays to its end.
-- [Settings override playback](../menu/recording.md#settings-override-playback) (advanced, Off at first): while it is
-  Off, the recording wins over DI Direction, SDI Direction, Airdodge Direction, Tech Options, Mistech Options and
-  Throw. On: those settings act during the recording too.
-
-The shield, the ledge options, Attack Angle, the aerial rows, Full Hop and Fast Fall always wait while a recording
-plays.
+See [Recording options](../menu/recording.md#options) for how recordings and CPU settings interact.
 
 ## What a reset does
 
-L+R+A (while [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) is On) and loading a save state reset Training.
-For the CPU this means:
-
-- anything it was about to do is dropped;
-- a new SDI direction is picked, and Shield Tilt is read again;
-- the next ledge grab and the next grab pick new delays.
-
-Changing Ledge Options while the CPU hangs on the ledge, or Throw while it holds you, also makes it pick again at once.
+L+R+A with [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) On, or loading a save state, drops pending CPU
+actions, picks SDI again and reads Shield Tilt again. The next ledge grab and grab pick new delays. Changing Ledge
+Options while the CPU hangs, or Throw while it holds you, also makes it pick again.
