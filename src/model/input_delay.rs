@@ -31,6 +31,14 @@ impl MappedInputs {
     pub const NEUTRAL: MappedInputs = MappedInputs { buttons: 0, lstick_x: 0, lstick_y: 0, rstick_x: 0, rstick_y: 0 };
 }
 
+/// `record` as the delay queue keeps it: Player 1's reset command of the same poll rides in its buttons
+/// (`frame_strip::RESET_COMMAND`), so it leaves the delay with its own record and is dropped with it.
+pub const fn with_reset_command(record: MappedInputs, _commanded: bool) -> MappedInputs { record }
+
+/// A record out of the delay queue: the record the game gets, never with the command bit, and whether it
+/// carried the command.
+pub const fn split_reset_command(record: MappedInputs) -> (MappedInputs, bool) { (record, false) }
+
 /// P1's physical sticks, read from the game's raw `Controller` (SPEC-input-04 §3.1), in the record's stick unit. The
 /// mapped record is not the physical stick: on the first frames of a C-stick attack the game writes the C-stick's
 /// direction into the record's left stick and leaves its right stick 0 (Eden `rc5-opus-cstick1`, 2026-11-08). The
@@ -395,6 +403,33 @@ mod tests {
         assert!(q.is_empty());
     }
 
+    fn a_reset_command_rides_the_delay_with_its_record() {
+        let bit = crate::model::frame_strip::RESET_COMMAND;
+        for (before, after, clear) in [
+            (0, 0, false), (1, 1, false), (5, 5, false), (40, 40, false),
+            (MAX_READS, MAX_READS, false), (5, 2, false), (2, 5, false), (5, 5, true),
+        ] {
+            let mut queue = DelayQueue::new();
+            for poll in 0..300 {
+                if clear && poll == 23 { queue.clear(Clear::TrainingReset); }
+                let held = (20..24).contains(&poll);
+                let record = MappedInputs { buttons: if held { 1 } else { 0 },
+                    lstick_x: if held { poll as i8 } else { 0 }, ..MappedInputs::NEUTRAL };
+                let delay = if poll < 22 { before } else { after };
+                let out = queue.step(delay, with_reset_command(record, held));
+                let (clean, command) = split_reset_command(out);
+                assert_eq!(command, clean.buttons == 1, "before={before} after={after} clear={clear} poll={poll}");
+                assert_eq!(clean.buttons & bit, 0, "before={before} after={after} clear={clear} poll={poll}");
+                if clear && poll >= 23 {
+                    assert!(!(command && (20..=22).contains(&clean.lstick_x)), "poll={poll} record={clean:?}");
+                }
+            }
+        }
+        let record = MappedInputs { buttons: bit | 1, ..MappedInputs::NEUTRAL };
+        assert_eq!(with_reset_command(record, false).buttons, 1);
+        assert_eq!(split_reset_command(MappedInputs::NEUTRAL), (MappedInputs::NEUTRAL, false));
+    }
+
     fn left(x: i8) -> Sticks {
         Sticks { lx: x, ..Sticks::NEUTRAL }
     }
@@ -442,6 +477,7 @@ mod tests {
             ("the_strip_hides_while_the_waiting_rooms_menu_is_open", the_strip_hides_while_the_waiting_rooms_menu_is_open as fn()),
             ("a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates", a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates as fn()),
             ("an_owner_empties_the_queue", an_owner_empties_the_queue as fn()),
+            ("a_reset_command_rides_the_delay_with_its_record", a_reset_command_rides_the_delay_with_its_record as fn()),
             ("the_physical_sticks_come_out_with_their_own_record", the_physical_sticks_come_out_with_their_own_record as fn()),
             ("raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused", raw_axes_are_record_units_and_a_value_that_is_not_a_stick_is_refused as fn()),
             ("the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise", the_display_reads_the_played_frame_and_keeps_the_physical_sticks_otherwise as fn()),

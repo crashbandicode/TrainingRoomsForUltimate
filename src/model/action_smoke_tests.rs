@@ -615,16 +615,33 @@ fn command_step(tracker: &mut Tracker, helper: &mut Helper, sample: Sample, butt
 
 #[test]
 fn a_reset_command_alone_leaves_no_result_on_any_frame() {
+    let mut two = InputCapture::new();
+    for (frame, buttons) in [(0, A), (2, 0), (30, B), (32, 0)] {
+        two.step(Snap { buttons, ..Snap::empty(frame) });
+    }
+    for event in two.combo.links[0].as_mut().unwrap().events.iter_mut().flatten() {
+        if event.kind == Kind::Release(Button::Attack) { event.kind = Kind::LetGo(Button::Attack); }
+    }
     for tolerance in [0, 1, 2] {
-        for (button, x, y, hold) in [(A, 60, 60, 2), (B, 0, 60, 3)] {
+        for (reference, button, x, y, hold, two_step) in [
+            (target(A, 60, 60, 2), A, 60, 60, 2, false),
+            (target(B, 0, 60, 3), B, 0, 60, 3, false),
+            (two.combo, A, 0, 0, 2, true),
+        ] {
             for count in [0, 2, RESULTS] {
                 for held in [1, 4, 8, 40, 90] {
                     let settings = Settings { load_after: true, tolerance, ..Settings::factory() };
                     let mut tracker = Tracker::new();
                     let mut helper = Helper::new();
-                    helper.set_target(Some(target(button, x, y, hold)));
+                    helper.set_target(Some(reference));
                     for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
-                    for _ in 0..count { clean_attempt(&mut tracker, &mut helper, button, x, y, hold); }
+                    for _ in 0..count {
+                        clean_attempt(&mut tracker, &mut helper, button, x, y, hold);
+                        if two_step {
+                            for _ in 0..2 { command_step(&mut tracker, &mut helper, standing(), 0, Settings::factory()); }
+                            clean_attempt(&mut tracker, &mut helper, B, 0, 0, 2);
+                        }
+                    }
                     let before = helper.results().copied().collect::<Vec<_>>();
                     let stats = (helper.streak(), helper.best());
                     for f in 0..held.max(8) + 30 {
@@ -633,7 +650,7 @@ fn a_reset_command_alone_leaves_no_result_on_any_frame() {
                         let sample = if f < 8 { active(Move::Jab, 0x27) } else { standing() };
                         let out = command_step(&mut tracker, &mut helper, sample, buttons, settings);
                         assert!(out.resolved.is_none() && out.link.is_none() && !out.load,
-                            "tolerance={tolerance} button={button} count={count} held={held} frame={f} out={out:?}");
+                            "tolerance={tolerance} button={button} two_step={two_step} count={count} held={held} frame={f} out={out:?}");
                         assert_eq!(helper.results().copied().collect::<Vec<_>>(), before,
                             "tolerance={tolerance} button={button} count={count} held={held} frame={f}");
                         assert_eq!((helper.streak(), helper.best()), stats,
@@ -648,39 +665,41 @@ fn a_reset_command_alone_leaves_no_result_on_any_frame() {
 
 #[test]
 fn a_reset_command_under_input_delay_leaves_no_result_on_any_frame() {
-    use crate::model::input_delay::{Clear, DelayQueue};
-    use crate::model::lra_reset::{command_at, command_history};
-    for delay in [0, 3, 5] {
-        for held in [4, 40] {
-            let settings = Settings { load_after: true, tolerance: 1, ..Settings::factory() };
-            let mut tracker = Tracker::new();
-            let mut helper = Helper::new();
-            helper.set_target(Some(target(B, 0, 60, 3)));
-            for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
-            for _ in 0..2 { clean_attempt(&mut tracker, &mut helper, B, 0, 60, 3); }
-            let before = helper.results().copied().collect::<Vec<_>>();
-            let stats = (helper.streak(), helper.best());
-            let mut queue = DelayQueue::new();
-            let mut history = 0;
-            for f in 0..held.max(8) + usize::from(delay) + 30 {
-                if f == 8 {
-                    tracker.clear();
-                    queue.clear(Clear::TrainingReset);
-                }
-                let raw_held = f < held;
-                let record = MappedInputs { buttons: if raw_held { RESET } else { 0 }, ..MappedInputs::NEUTRAL };
-                let mut delayed = queue.step(delay, record);
-                history = command_history(history, raw_held);
-                if command_at(history, delay) { delayed.buttons |= COMMAND; }
-                let sample = if f >= usize::from(delay) && f < 8 { active(Move::Jab, 0x27) } else { standing() };
-                let out = command_step(&mut tracker, &mut helper, sample, delayed.buttons, settings);
-                assert!(out.resolved.is_none() && out.link.is_none() && !out.load,
-                    "delay={delay} held={held} frame={f} out={out:?} buttons={:#x}", delayed.buttons);
-                assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "delay={delay} held={held} frame={f}");
-                assert_eq!((helper.streak(), helper.best()), stats, "delay={delay} held={held} frame={f}");
+    use crate::model::input_delay::{split_reset_command, with_reset_command, Clear, DelayQueue};
+    for (delay, held, lowered) in [
+        (0, 4, false), (0, 40, false), (3, 4, false), (3, 40, false),
+        (5, 4, false), (5, 40, false), (5, 4, true),
+    ] {
+        let settings = Settings { load_after: true, tolerance: 1, ..Settings::factory() };
+        let mut tracker = Tracker::new();
+        let mut helper = Helper::new();
+        helper.set_target(Some(target(B, 0, 60, 3)));
+        for _ in 0..10 { command_step(&mut tracker, &mut helper, standing(), 0, settings); }
+        for _ in 0..2 { clean_attempt(&mut tracker, &mut helper, B, 0, 60, 3); }
+        let before = helper.results().copied().collect::<Vec<_>>();
+        let stats = (helper.streak(), helper.best());
+        let mut queue = DelayQueue::new();
+        let mut reached = false;
+        for f in 0..held.max(8) + usize::from(delay) + 30 {
+            if f == 8 {
+                tracker.clear();
+                queue.clear(Clear::TrainingReset);
             }
-            assert!(helper.attempt().is_none(), "delay={delay} held={held}");
+            let raw_held = f < held;
+            let record = MappedInputs { buttons: if raw_held { RESET } else { 0 }, ..MappedInputs::NEUTRAL };
+            let now_delay = if lowered && f >= 2 { 2 } else { delay };
+            let delayed = queue.step(now_delay, with_reset_command(record, raw_held));
+            let (mut delayed, command) = split_reset_command(delayed);
+            if command { delayed.buttons |= COMMAND; }
+            reached |= delayed.buttons & RESET != 0;
+            let sample = if reached && f < 8 { active(Move::Jab, 0x27) } else { standing() };
+            let out = command_step(&mut tracker, &mut helper, sample, delayed.buttons, settings);
+            assert!(out.resolved.is_none() && out.link.is_none() && !out.load,
+                "delay={delay} held={held} lowered={lowered} frame={f} out={out:?} buttons={:#x}", delayed.buttons);
+            assert_eq!(helper.results().copied().collect::<Vec<_>>(), before, "delay={delay} held={held} lowered={lowered} frame={f}");
+            assert_eq!((helper.streak(), helper.best()), stats, "delay={delay} held={held} lowered={lowered} frame={f}");
         }
+        assert!(helper.attempt().is_none(), "delay={delay} held={held} lowered={lowered}");
     }
 }
 
@@ -811,13 +830,14 @@ fn the_reset_command_is_no_button() {
 }
 
 #[test]
-fn the_poll_stores_the_command_with_its_record() {
-    let source = include_str!("../runtime/features/input_display.rs");
-    let poll = source.split("pub unsafe fn on_p1_poll(").nth(1).unwrap().split("\n}").next().unwrap();
-    let store = poll.find("INPUTS.store(").unwrap();
-    assert!(poll.find("lra_reset::command_history(").is_some_and(|at| at < store));
-    assert!(poll.find("lra_reset::command_at(").is_some_and(|at| at < store));
-    let sample = source.split("pub unsafe fn sample_frame(").nth(1).unwrap().split("\n}").next().unwrap();
-    assert!(sample.contains("physical_inputs.buttons & RESET_COMMAND"));
+fn the_poll_carries_the_command_through_the_delay() {
+    let delay = include_str!("../runtime/features/input_delay.rs");
+    let apply = delay.split("fn apply()").nth(1).unwrap().split("\n}").next().unwrap();
+    let poll = apply.split("adapter.poll_with(").nth(1).unwrap().split(");").next().unwrap();
+    assert!(poll.contains("with_reset_command("));
+    assert!(apply.find("split_reset_command(record)").unwrap() < apply.find("unsafe { *out = record }").unwrap());
+    assert!(apply.contains("input_display::on_p1_poll(controller, &record, sticks, command)"));
+    let display = include_str!("../runtime/features/input_display.rs");
+    assert!(display.contains("physical_inputs.buttons & RESET_COMMAND"));
 }
 }
