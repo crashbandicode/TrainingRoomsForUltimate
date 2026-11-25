@@ -28,7 +28,7 @@ pub struct PreviewTail { ended: Option<u64> }
 impl PreviewTail {
     pub const fn new() -> Self { Self { ended: None } }
     pub fn restart(&mut self) { self.ended = None; }
-    pub fn ended(&self) -> bool { false }
+    pub fn ended(&self) -> bool { self.ended.is_some() }
     /// `running`: the playback still has frames. `frame`: the game's frame number. True once the tail has passed.
     pub fn over(&mut self, running: bool, frame: u64) -> bool {
         if running {
@@ -718,7 +718,14 @@ impl ClipEditor {
                     Err(error) => ClipEffect::Error(error),
                 };
             }
-            ClipAction::Cancel => { self.pause(); return ClipEffect::Close; }
+            ClipAction::Cancel => {
+                if self.playing {
+                    self.pause();
+                    self.window.seek(self.window.start());
+                    return ClipEffect::StopPreview;
+                }
+                return ClipEffect::Close;
+            }
         }
         ClipEffect::StopPreview
     }

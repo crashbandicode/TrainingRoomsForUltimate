@@ -866,8 +866,20 @@ fn group_rows(menu: &Menu, g: usize, pilot: bool) -> usize {
 /// Rows of one section the twelve row panes can show under a header.
 const SECTION_ROWS: usize = 4;
 
-pub fn chord_hint(_record: super::menu::chord::Chord, _player: super::menu::chord::Chord, _cpu: super::menu::chord::Chord) -> String {
-    String::new()
+pub fn chord_hint(record: super::menu::chord::Chord, player: super::menu::chord::Chord, cpu: super::menu::chord::Chord) -> String {
+    let pane = p::spec(p::IDX_HELP);
+    let p::Kind::Text { font, chars, .. } = pane.kind else {
+        return "Record and Play chords: Display & Controls > Button chords".into();
+    };
+    let fits = |text: &str| {
+        let units = text.encode_utf16().count();
+        units <= usize::from(chars) && units as f32 * font.0 * 0.56 <= pane.w
+    };
+    let full = format!("Record {record}   Play on Player 1 {player}   Play on CPU {cpu}");
+    if fits(&full) { return full; }
+    let short = format!("Record {record}   P1 {player}   CPU {cpu}");
+    if fits(&short) { return short; }
+    "Record and Play chords: Display & Controls > Button chords".into()
 }
 
 fn paint_recording(menu: &Menu, frame: &mut Frame) {
@@ -927,9 +939,10 @@ fn paint_recording(menu: &Menu, frame: &mut Frame) {
     }
     let lines = if popup { Vec::new() } else { rec.connections(face, group) };
     if popup {
-        // The r8 pop-up has no help panel: the page row's help under it described a row the pop-up does not show.
         frame.help[0].clear();
         frame.help[1].clear();
+        let chord = |id| super::menu::chord::Chord::from_row(menu.settings().menu.get(id).unwrap_or(&[]));
+        let _ = frame.help[0].write_str(&chord_hint(chord("input_record"), chord("play_player"), chord("input_playback")));
         if rec.popup_accepts_place_first() {
             let on = menu.settings().menu.get("recording_place").and_then(|row| row.first()).copied().unwrap_or(0) != 0;
             let _ = write!(frame.help[1], "Y place first · {}", if on { "On" } else { "Off" });

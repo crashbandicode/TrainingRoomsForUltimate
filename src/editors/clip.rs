@@ -19,7 +19,12 @@ const CHORD: &str = "ZL";
 
 pub const PREVIEW_STOP_HINT: &str = "B stop preview";
 
-pub fn stop_hint(_frame: &mut Frame, _running: bool) {}
+pub fn stop_hint(frame: &mut Frame, running: bool) {
+    if running {
+        frame.hint.clear();
+        let _ = frame.hint.write_str(PREVIEW_STOP_HINT);
+    }
+}
 
 fn handle_code(handle: Handle) -> u8 {
     match handle {

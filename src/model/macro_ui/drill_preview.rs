@@ -92,6 +92,7 @@ mod tests {
         for branch in [strip, editor] {
             assert!(branch.contains("stop_hint(") && branch.contains("preview_running()"));
         }
+        assert!(editor.contains("view.playing &&"));
         assert!(!worker.contains("\"X or B: stop.\""));
     }
 
@@ -110,9 +111,16 @@ mod tests {
         let source = include_str!("../../runtime/macros/replay_capture.rs");
         let service = source.split("pub fn service_reload()").nth(1).unwrap()
             .split("pub fn preview_failed(").next().unwrap();
-        let tail_block = service.split("TAIL.lock().unwrap()").nth(1).unwrap();
-        assert!(tail_block.matches(".ended()").count() >= 2);
-        assert!(tail_block.contains("MENU_RECEIVED_INPUT"));
+        assert!(service.contains("TAIL.lock().unwrap().over(rr_host::preview_running()"));
+        let worker = include_str!("../../runtime/ui/worker.rs");
+        let watching = worker.split("fn watching(&self)").nth(1).unwrap().split("\n    }").next().unwrap();
+        assert!(watching.contains("self.phase != Phase::Menu"));
+        let run = worker.split("fn run()").nth(1).unwrap().split("\n}\n").next().unwrap();
+        assert!(run.contains("sync_panels(&mut session);"));
+        assert!(run.contains("session.watching()") && run.contains("WAKE.wait(Some(POLL))"));
+        let sync = worker.split("fn sync_panels(s: &mut Session)").nth(1).unwrap().split("\n}\n").next().unwrap();
+        assert!(sync.contains("if open || s.phase == Phase::Clip || s.phase == Phase::Prompt"));
+        assert!(sync.contains("publish_frame(s);"));
     }
 
     #[test]
