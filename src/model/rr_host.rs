@@ -6405,6 +6405,38 @@ mod tests {
         assert!(include_str!("../runtime/features/input_display.rs").contains("frame_strip::acting("));
     }
 
+    #[test]
+    fn a_tap_then_x_before_service_retires_the_old_preview_before_restarting() {
+        let _hold = hold();
+        for (old, next) in [(Role::Player, Role::Cpu), (Role::Cpu, Role::Player)] {
+            reset_host();
+            let root = scratch("preview-restart");
+            let tick = || service_at(&root, &none(), "2026-11-25", state(8), state(7));
+            let clip = |buttons: u32| MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0),
+                vec![InputFrame { buttons, ..InputFrame::default() }; 8]).unwrap();
+            let take = |role| if role == Role::Player { take_player_frame() } else { take_cpu_frame() };
+            request_clip_preview(clip(11), old);
+            assert_eq!(tick().home, Some(HomeWarp::Start { air: false, player: old == Role::Player }));
+            assert!(land_pair([state(8), state(7)], false));
+            tick();
+            assert_eq!(take(old).unwrap().buttons, 11);
+            // Two controller events can be drained before the recording worker services its requests.
+            stop_preview();
+            request_clip_preview(clip(23), next);
+            assert_eq!(tick().home, Some(HomeWarp::Return), "lost the stop on {old:?}");
+            assert!(take(old).is_none() && take(next).is_none());
+            assert_eq!(tick().home, None, "start overtook the unfinished return");
+            assert!(land_pair([state(8), state(7)], false));
+            let mut home = tick().home;
+            if home.is_none() { home = tick().home; }
+            assert_eq!(home, Some(HomeWarp::Start { air: false, player: next == Role::Player }));
+            assert!(land_pair([state(8), state(7)], false));
+            tick();
+            assert_eq!(take(next).unwrap().buttons, 23);
+            assert!(take(old).is_none(), "old fighter still got a frame");
+        }
+    }
+
     fn a_vault_clip_previews_on_player_one_or_the_cpu() {
         let _hold = hold();
         for role in [Role::Player, Role::Cpu] {
