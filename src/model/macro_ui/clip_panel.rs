@@ -243,6 +243,22 @@ impl TargetTap {
     }
 }
 
+impl TargetTap {
+    /// The pad's own button set, once per Player 1 input (a GameCube pad's Z arrives as the ZR bit).
+    pub fn zr_tap(&mut self, held: crate::model::chords::Buttons) -> bool {
+        let _ = held;
+        false
+    }
+}
+
+impl ClipView {
+    /// The role a preview plays on and is fed through.
+    pub fn play_role(&self) -> crate::engine::library::Role {
+        let _ = self.target;
+        crate::engine::library::Role::Cpu
+    }
+}
+
 /// The same editor changes units and offered actions with its source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipContext { Replay { fighters: bool }, Macro { player: bool }, Combo { unit: UnitKind } }

@@ -1245,7 +1245,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "2fad87e5f681d866a6f1ac41178c2a568e7021f7dec382390cf2b7816e061f1e",
+   "dest_sha256": "d4a985298b6f87e8b74ce0cf8d5f9a233bfbfbe40e1f8210f9cdf89d8f65fc97",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1641,6 +1641,11 @@
     {
      "old": "use crate::engine::macro_ui::macro_panel::Pad;\nuse crate::model::combo_record::UnitKind;",
      "new": "use crate::engine::macro_ui::macro_panel::Pad;\nuse crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        tap\n    }",
+     "new": "        tap\n    }\n}\n\nimpl TargetTap {\n    /// The pad's own button set, once per Player 1 input (a GameCube pad's Z arrives as the ZR bit).\n    pub fn zr_tap(&mut self, held: crate::model::chords::Buttons) -> bool {\n        let _ = held;\n        false\n    }\n}\n\nimpl ClipView {\n    /// The role a preview plays on and is fed through.\n    pub fn play_role(&self) -> crate::engine::library::Role {\n        let _ = self.target;\n        crate::engine::library::Role::Cpu\n    }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

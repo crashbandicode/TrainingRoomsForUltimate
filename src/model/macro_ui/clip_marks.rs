@@ -702,6 +702,82 @@ mod tests {
         assert!(bridge_clip(&vault.view(), None, false).text().contains(" target=p1 "));
     }
 
+    /// tr-primary-2 02:31:21Z, the Vault seam: a capture's preview plays on the editor's play target. The Recordings
+    /// screen's "Plays on" seeds it, a ZR tap swaps it, and the bridge, the strip and the preview request follow.
+    fn a_vault_capture_takes_the_zr_tap_and_previews_on_the_chosen_fighter() {
+        use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
+        use crate::model::chords::{bit, logical, logical_set, Buttons, STYLE_GAMECUBE};
+        use clip_panel::TargetTap;
+        let track = |entry: i32| ReplayTrack { entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
+            input: InputFrame { buttons: i + 1, ..InputFrame::default() }, start: StartState::neutral(entry + 7, 0, 1.0),
+            x: 0.0, y: 0.0 }).collect() };
+        let capture = || ReplaySession { tracks: vec![track(0), track(1)], truncated: false, breaks: Vec::new() };
+        let mut editor = ClipEditor::new(capture(), vec![0]).unwrap();
+        let mut tap = TargetTap::new();
+        let mut press = |editor: &mut ClipEditor, samples: &[u32]| {
+            let mut effect = None;
+            for &bits in samples {
+                if tap.zr_tap(Buttons(bits)) { effect = Some(editor.on_action(ClipAction::SwapTarget)); }
+            }
+            effect
+        };
+        let line = |editor: &ClipEditor| bridge_clip(&editor.view(), None, false).text();
+        assert_eq!((editor.view().target, editor.view().play_role()), (Some(false), Role::Cpu));
+        assert!(line(&editor).contains("ctx=replay") && line(&editor).contains(" target=cpu "));
+        let controls = clip_panel::clip_help(&editor.view(), "ZL or ZR", "ZL", 0).controls;
+        assert_eq!(controls, "D-pad Up/Down: fighter. ZR Player/CPU. X preview. Y snap. A save. B close.");
+        // A tap swaps the target; X then previews the capture's kept inputs for Player 1.
+        assert!(matches!(press(&mut editor, &[bit::ZR, bit::ZR, 0]), Some(ClipEffect::None)));
+        assert_eq!((editor.view().target, editor.view().play_role()), (Some(true), Role::Player));
+        assert!(line(&editor).contains(" target=p1 "));
+        let ClipEffect::Preview(preview) = editor.on_action(ClipAction::TogglePlay) else { panic!("a capture previews its own clip") };
+        assert_eq!(preview.frames.len(), 40);
+        // The playhead follows the frames the play role took, as for a saved macro.
+        editor.preview_cursor(12);
+        assert_eq!(editor.view().cursor, 11);
+        // A tap mid-preview stops it; the next X plays on the other fighter.
+        assert!(matches!(press(&mut editor, &[bit::ZR, 0]), Some(ClipEffect::StopPreview)));
+        assert!(!editor.view().playing);
+        assert_eq!(editor.view().play_role(), Role::Cpu);
+        assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        editor.on_action(ClipAction::TogglePlay);
+        // Held with a direction it is the coarse scrub, and D-pad Up/Down still pick the captured player.
+        assert!(press(&mut editor, &[bit::ZR, bit::ZR | bit::DPAD_LEFT, bit::ZR, 0]).is_none());
+        assert!(press(&mut editor, &[bit::ZR, bit::ZR | bit::L_UP, 0]).is_none());
+        editor.set_play_target(true);
+        let before = editor.view().entry;
+        editor.on_action(ClipAction::NextFighter);
+        assert_ne!(editor.view().entry, before);
+        assert_eq!(editor.view().target, Some(true));
+        // The strip names the captured side and the target once.
+        let mut frame = crate::model::frame::Frame::new();
+        crate::editors::clip::clip_frame(&editor.view(), "CPU Fox", 0, &mut frame);
+        assert_eq!(String::from_utf16_lossy(frame.rows[1].label.units()), "Fighter: CPU Fox · plays on Player 1");
+        // A GameCube pad: its Z arrives as the raw ZR bit (the editor's modifier there). The same rule holds, and the
+        // full presses of L and R, which pick the handles, are no tap.
+        assert_eq!(logical_set(STYLE_GAMECUBE, bit::ZR), 1 << logical::R);
+        let mut gamecube = ClipEditor::new(capture(), vec![0]).unwrap();
+        assert!(press(&mut gamecube, &[bit::ZR, 0]).is_some());
+        assert_eq!(gamecube.view().target, Some(true));
+        for samples in [&[bit::ZR, bit::ZR | bit::L_LEFT, bit::ZR, 0][..], &[bit::ZR | bit::DPAD_RIGHT, 0],
+            &[bit::R | bit::REAL_DIGITAL_R, 0], &[bit::L | bit::REAL_DIGITAL_L, 0], &[bit::ZR, bit::ZR | bit::REAL_DIGITAL_R, 0]] {
+            assert!(press(&mut gamecube, samples).is_none(), "{samples:x?}");
+        }
+        assert_eq!(gamecube.view().target, Some(true));
+        // The adapter: one play target for the preview request, the fed cursor, Make and the label; "Plays on" seeds it.
+        let adapter = include_str!("../../runtime/macros/replay_capture.rs");
+        for wanted in ["TARGET_TAP.lock().unwrap().zr_tap(held)", "clip_view().is_some_and(|v| v.target.is_some())",
+            "request_clip_preview(*recording, clip_play_role())", "editor.set_play_target(request.player);",
+            "let role = before.play_role();", "editor_label(view.entry, &fighter)",
+            "map_or(Role::Cpu, |editor| editor.view().play_role())"] {
+            assert!(adapter.contains(wanted), "missing {wanted}");
+        }
+        for stale in ["is_some_and(|request| request.player)", "if request.player { crate::engine::library::Role::Player }",
+            "matches!(v.context, ClipContext::Macro { .. })) {\n        on_action(ClipAction::SwapTarget)"] {
+            assert!(!adapter.contains(stale), "stale {stale}");
+        }
+    }
+
     fn the_timeline_draws_move_marks() {
         let editor = ClipEditor::macro_file(recording(), true).unwrap();
         let view = editor.view();
@@ -949,6 +1025,7 @@ mod tests {
             ("marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to", marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to),
             ("a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames", a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames),
             ("a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text", a_clip_line_names_the_play_target_the_marks_and_a_bounded_quoted_move_text),
+            ("a_vault_capture_takes_the_zr_tap_and_previews_on_the_chosen_fighter", a_vault_capture_takes_the_zr_tap_and_previews_on_the_chosen_fighter),
             ("the_timeline_draws_move_marks", the_timeline_draws_move_marks),
             ("an_empty_recording_has_no_marks", an_empty_recording_has_no_marks),
             ("the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs", the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs),
