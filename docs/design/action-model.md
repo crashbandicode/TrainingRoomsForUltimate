@@ -84,7 +84,8 @@ The ledge, get-up and trip attack animations use `Normal` numbers 26, 27 and 28 
 `LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of`
 (0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five
 for variant. Follow-up parts come from its aim events. If both links are described, wrong-move compares move, `of`
-and angle, not variant or parts; otherwise it compares legacy moves.
+and angle, not variant or parts. Otherwise it compares the follow-up endpoints: a reference `other` matches any
+move older files called `other`; a named reference matches only that move.
 
 `Action` stores the tracker action state. At opening its origin is the newest press at most `INPUT_LOOKBACK` (15)
 frames earlier; a hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to
