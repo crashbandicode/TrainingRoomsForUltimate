@@ -2897,3 +2897,11 @@ ceiling = 200432
 date = "2026-11-25"
 reason = "Merge 6 review: name an aim continuation from the tracked cast even when its press is a middle title input. Measured 200432, 29 above ff1d46e2."
 approved_by = "tr-primary-2 ruling 2026-11-24 22:47:32Z (the line ceiling is approved at the measured value at READY)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200810
+date = "2026-11-25"
+reason = "Install 4 merge 6 folded on smoke fix 1: drill steps store and show their move (310) with the review correction for a later aim part (29). Measured 200810 on the folded tree, 339 above the measured install-4 head bdfe4213 (200471)."
+approved_by = "tr-primary-2 rulings 2026-11-24 22:47:32Z and 2026-11-25 02:07:42Z (the merge-6 ceiling at the measured value, +310) and the standing rule of 2026-11-24 21:46:20Z (a reviewer fix up to +60 lines: +29)."
