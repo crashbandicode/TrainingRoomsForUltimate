@@ -112,7 +112,7 @@ pub struct ClipHelp {
 pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipHelp {
     let controls = format!("{}{}Y snap. A save. B close.",
         if view.context.fighters() { "D-pad Up/Down: fighter. " }
-        else if matches!(view.context, ClipContext::Macro { .. }) { "D-pad Up/Down: plays on CPU or Player 1. " }
+        else if matches!(view.context, ClipContext::Macro { .. }) { "ZR Player/CPU. " }
         else { "" },
         if view.context.preview() { "X preview. " } else { "" });
     let (primary, follow) = match view.handle {
@@ -231,8 +231,15 @@ impl TargetTap {
 
     /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.
     pub fn poll(&mut self, zr: bool, other: bool) -> bool {
-        let _ = (zr, other);
-        false
+        if zr {
+            self.clean = if self.down { self.clean && !other } else { !other };
+            self.down = true;
+            return false;
+        }
+        let tap = self.down && self.clean && !other;
+        self.down = false;
+        self.clean = false;
+        tap
     }
 }
 
@@ -553,11 +560,12 @@ impl ClipEditor {
     }
 
     pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {
-        if self.file.is_some() && matches!(action, ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
+        if self.file.is_some() && matches!(action,
+            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
             return ClipEffect::None;
         }
         if matches!(self.file, Some(FileSource::Combo(_)))
-            && matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::SwapTarget) {
+            && matches!(action, ClipAction::SwapTarget) {
             return ClipEffect::None;
         }
         if !self.context().preview() && matches!(action, ClipAction::TogglePlay | ClipAction::Restart) {
@@ -628,9 +636,6 @@ impl ClipEditor {
             }
             ClipAction::Restart => { return self.start_preview(); }
             ClipAction::PreviousFighter | ClipAction::NextFighter => {
-                if matches!(self.file, Some(FileSource::Macro { .. })) {
-                    return self.apply_action(ClipAction::SwapTarget);
-                }
                 let count = self.session.tracks.len();
                 let offset = if matches!(action, ClipAction::PreviousFighter) { count - 1 } else { 1 };
                 self.set_track((self.track + offset) % count);

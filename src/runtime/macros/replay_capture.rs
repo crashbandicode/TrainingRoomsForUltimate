@@ -31,6 +31,7 @@ static BROWSER: Mutex<Option<Browser>> = Mutex::new(None);
 static REVISION: AtomicU64 = AtomicU64::new(1);
 static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
 static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));
+static TARGET_TAP: Mutex<crate::engine::macro_ui::clip_panel::TargetTap> = Mutex::new(crate::engine::macro_ui::clip_panel::TargetTap::new());
 static RELOAD: Mutex<Option<Reload>> = Mutex::new(None);
 static FAILED_SELECTION: AtomicU64 = AtomicU64::new(0);
 static CLOSE_ARM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -989,13 +990,18 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         if controller.just_down.b() { cancel_reload(); }
         return;
     }
-    if let Some(view) = clip_view().filter(|v| v.playing) {
-        if controller.just_down.x() || controller.just_down.b() {
-            on_action(ClipAction::TogglePlay);
-        } else if matches!(view.context, crate::engine::macro_ui::clip_panel::ClipContext::Macro { .. })
-            && (controller.just_down.dpad_up() || controller.just_down.dpad_down()) {
-            on_action(ClipAction::SwapTarget);
-        }
+    let held = controller.current_buttons;
+    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()
+        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()
+        || held.l_left() || held.l_right() || held.r_left() || held.r_right();
+    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).
+    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)
+        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {
+        on_action(ClipAction::SwapTarget);
+        return;
+    }
+    if clip_view().is_some_and(|v| v.playing) {
+        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
         return;
     }
     let p = controller.just_down;

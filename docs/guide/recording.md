@@ -233,7 +233,7 @@ Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](..
 - The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
 - A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
 - A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame. Move marks recorded with the take stay with the frames they belong to.
-- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. Up/Down swaps the preview between the CPU and Player 1. The strip stays up and its playhead follows the inputs; X or B stops it early.
+- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. A ZR tap swaps the preview between the CPU and Player 1. The strip stays up and its playhead follows the inputs; X or B stops it early.
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 
