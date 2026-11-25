@@ -991,11 +991,8 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         return;
     }
     let held = controller.current_buttons;
-    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()
-        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()
-        || held.l_left() || held.l_right() || held.r_left() || held.r_right();
     // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).
-    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)
+    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())
         && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {
         on_action(ClipAction::SwapTarget);
         return;

@@ -3926,7 +3926,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "962d09741f2022a3670eb270e6a51d75e4c9694aa15281c3271b4b039af37045",
+   "dest_sha256": "17c6ed893076570543cc46ad306d53655f6e0198ad803de83109b3a443ea2183",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4586,6 +4586,16 @@
     {
      "old": "    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)",
      "new": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)",
+     "new": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    let held = controller.current_buttons;\n    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()\n        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()\n        || held.l_left() || held.l_right() || held.r_left() || held.r_right();\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).",
+     "new": "    let held = controller.current_buttons;\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

@@ -486,7 +486,22 @@ mod tests {
         let controls = clip_panel::clip_help(&editor.view(), "ZL or ZR", "ZL", 0).controls;
         assert!(controls.starts_with("ZR Player/CPU. X preview. Y snap."), "{controls}");
         let adapter = include_str!("../../runtime/macros/replay_capture.rs");
-        assert!(adapter.contains("TARGET_TAP.lock().unwrap().tapped("));
+        assert!(adapter.contains("TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())"));
+        // rv-preview-vis 01:28:15Z: the pad's own button set. Any other bit, a stick's Up or Down included, spoils the tap.
+        use crate::model::chords::{bit, Buttons};
+        let tapped = |samples: &[u32]| {
+            let mut tap = TargetTap::new();
+            samples.iter().fold(false, |hit, &bits| tap.tapped(Buttons(bits).zr(), Buttons(bits).other_than_zr()) || hit)
+        };
+        assert!(tapped(&[bit::ZR, bit::ZR, 0]));
+        for other in [bit::L_UP, bit::L_DOWN, bit::R_UP, bit::R_DOWN, bit::L_LEFT, bit::R_RIGHT, bit::DPAD_UP, bit::DPAD_LEFT,
+            bit::A, bit::X, bit::L, bit::ZL, bit::STICK_L, bit::STICK_R, bit::PLUS, bit::MINUS, bit::LEFT_SL, bit::RIGHT_SR,
+            bit::REAL_DIGITAL_L, bit::REAL_DIGITAL_R] {
+            for samples in [&[bit::ZR, bit::ZR | other, 0][..], &[bit::ZR | other, 0], &[bit::ZR, bit::ZR | other, bit::ZR, 0],
+                &[other, bit::ZR | other, bit::ZR, 0], &[bit::ZR, other]] {
+                assert!(!tapped(samples), "{other:#x} {samples:x?}");
+            }
+        }
         assert!(!adapter.contains("controller.just_down.dpad_up() || controller.just_down.dpad_down()"));
     }
 
@@ -559,6 +574,20 @@ mod tests {
         assert_eq!(ends, vec![(10, Some(30)), (30, Some(55)), (90, None)]);
         let mut editor = ClipEditor::macro_file(twice, true).unwrap();
         assert_eq!(editor.view().mark_count, 3);
+        // rv-preview-vis 01:10:02Z: the two Jabs touch. At 29 the playhead is in the first, at 30 in the second.
+        editor.on_action(ClipAction::Nudge(29));
+        assert_eq!((editor.view().cursor, editor.view().near), (29, Some((10, Some(30)))));
+        editor.on_action(ClipAction::Nudge(1));
+        assert_eq!((editor.view().cursor, editor.view().near), (30, Some((30, Some(55)))));
+        assert!(bridge_clip(&editor.view(), None, false).text().contains(" cursor=30 "));
+        assert!(bridge_clip(&editor.view(), None, false).text().contains(" marks=3 mark=30-55 "));
+        let open = [ActionMark { start: 10, end: Some(30), mv: None }, ActionMark { start: 30, end: None, mv: None }];
+        let mut touching = recording();
+        touching.frames[30].buttons = 1;
+        touching.actions = open.to_vec();
+        let touching = Marks::from_recording(&touching);
+        assert!(touching.recorded());
+        assert_eq!((touching.nearest(29), touching.nearest(30)), (Some((10, Some(30))), Some((30, None))));
         set_out(&mut editor, 35);
         editor.on_action(ClipAction::Snap);
         assert_eq!(editor.view().end, 30);
