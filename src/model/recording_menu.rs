@@ -3896,25 +3896,66 @@ mod tests {
         assert_eq!(rows[5].title, "Make drill…", "the six rows before it are as they were");
     }
 
-    fn deleting_a_recording_removes_its_row_and_posts_the_file_delete() {
-        let mut screens = screens();
-        enter_recordings(&mut screens);
+    fn two_recordings() -> Vec<RecordingFile> {
         let mut other = vault_file(vault_sides());
         other.id = "previous".into();
         other.name = "Other".into();
-        screens.set_recordings(vec![vault_file(vault_sides()), other]);
+        vec![vault_file(vault_sides()), other]
+    }
+
+    fn names(screens: &RecordingScreens) -> Vec<String> {
+        screens.section(Face::Page, SAVES_MACROS, 1).rows.into_iter().map(|row| row.name).collect()
+    }
+
+    fn deleting_a_recording_removes_its_row_and_posts_the_file_delete() {
+        let mut screens = screens();
+        enter_recordings(&mut screens);
+        screens.set_recordings(two_recordings());
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert!(screens.file_open());
         screens.set_file_cursor(6);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert_eq!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, id: "saved:01".into() });
         assert!(!screens.file_open(), "one A: the screen closes, nothing is asked");
-        let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
-        assert_eq!(rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(), ["Other"]);
+        // The list is not this screen's to change: it waits for what storage holds after the delete.
+        assert_eq!(names(&screens), ["Reading recordings…"]);
+        screens.set_recordings(two_recordings().split_off(1));
+        assert_eq!(names(&screens), ["Other"]);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         screens.set_file_cursor(6);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert_eq!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, id: "previous".into() });
+    }
+
+    fn a_delete_that_fails_leaves_the_recording_listed() {
+        let mut screens = screens();
+        enter_recordings(&mut screens);
+        screens.set_recordings(two_recordings());
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert!(matches!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, .. }));
+        // The host could not remove it: its listing still has both, and so does the page.
+        screens.set_recordings(two_recordings());
+        assert_eq!(names(&screens), ["Replay", "Other"]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.file_rows()[0].value, "P1 · Mario", "and it opens as before");
+    }
+
+    fn deleting_a_recording_leaves_the_picks_of_other_files_alone() {
+        let mut screens = screens();
+        enter_recordings(&mut screens);
+        // A capture whose id reads like a macro's: the delete is the capture's alone.
+        let mut same = vault_file(vault_sides());
+        same.id = "nair".into();
+        screens.set_recordings(vec![same]);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        screens.set_file_cursor(6);
+        screens.handle_page(Button::A, true, SAVES_MACROS);
+        assert_eq!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, id: "nair".into() });
+        assert_eq!(screens.active[0].as_deref(), Some("nair"), "the active macro of that id stays active");
+        assert_eq!(screens.bound.as_deref(), Some("corner"));
+        assert!(screens.macro_by_id("nair").is_some(), "and stays in the catalog");
     }
 
     fn b_on_a_recording_screen_deletes_nothing() {
@@ -3933,8 +3974,8 @@ mod tests {
         screens.set_file_cursor(6);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert!(matches!(screens.take_effect(), Effect::DeleteFile { kind: FileKind::Capture, .. }));
-        let rows = screens.section(Face::Page, SAVES_MACROS, 1).rows;
-        assert_eq!(rows.iter().map(|row| row.name.as_str()).collect::<Vec<_>>(), ["No recordings yet"]);
+        screens.set_recordings(Vec::new());
+        assert_eq!(names(&screens), ["No recordings yet"]);
         screens.handle_page(Button::A, true, SAVES_MACROS);
         assert_eq!(screens.take_effect(), Effect::None);
         assert!(!screens.file_open());
@@ -4342,6 +4383,8 @@ mod tests {
             ("the_recordings_list_names_each_recording_with_its_sides_and_length", the_recordings_list_names_each_recording_with_its_sides_and_length as fn()),
             ("a_recording_screen_ends_with_delete_as_a_macros_does", a_recording_screen_ends_with_delete_as_a_macros_does as fn()),
             ("deleting_a_recording_removes_its_row_and_posts_the_file_delete", deleting_a_recording_removes_its_row_and_posts_the_file_delete as fn()),
+            ("a_delete_that_fails_leaves_the_recording_listed", a_delete_that_fails_leaves_the_recording_listed as fn()),
+            ("deleting_a_recording_leaves_the_picks_of_other_files_alone", deleting_a_recording_leaves_the_picks_of_other_files_alone as fn()),
             ("b_on_a_recording_screen_deletes_nothing", b_on_a_recording_screen_deletes_nothing as fn()),
             ("deleting_the_last_recording_shows_no_recordings_yet", deleting_the_last_recording_shows_no_recordings_yet as fn()),
             ("the_popup_lists_no_recordings", the_popup_lists_no_recordings as fn()),

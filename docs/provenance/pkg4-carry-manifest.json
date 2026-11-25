@@ -1240,7 +1240,7 @@
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "a88f903794461f19c728c9a7e978498801951de620dafaeebe7bbb03edf4a652",
+   "dest_sha256": "734fe7ad0087334255681c1213617f6f2c034206ad16148b16af4b42a52fde63",
    "edits": [
     {
      "table_tests": true,
@@ -1282,6 +1282,41 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "        crate::test_table::run(&[\n",
      "new": "        crate::test_table::run(&[\n            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n            (\"deleting_the_last_capture_closes_the_replay_window\", deleting_the_last_capture_closes_the_replay_window as fn()),\n            (\"y_deletes_in_training_and_in_a_waiting_room\", y_deletes_in_training_and_in_a_waiting_room as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        Some(view)\n",
+     "new": "        Some(view)\n    }\n\n    /// After a delete: the list as storage has it now. False when nothing is left and the window closed.\n    pub fn relist(&mut self, _rows: Vec<LibraryRow>, _skipped: usize) -> bool {\n        true\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n        // The effect carries the highlighted row's own id. The list is rebuilt from what storage holds afterwards.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n        assert!(browser.relist(vec![LibraryRow { id: \"saved:500\".into(), label: \"Replay500f\".into() }], 0));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n    fn a_delete_that_fails_leaves_the_capture_in_the_replay_window() {\n        let mut browser = browser();\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:500\".into()));\n        // Storage still has both.\n        assert!(browser.relist(vec![\n            LibraryRow { id: \"saved:500\".into(), label: \"Replay500f\".into() },\n            LibraryRow { id: \"saved:other\".into(), label: \"Other capture\".into() },\n        ], 0));\n        let view = browser.view().unwrap();\n        assert!(view.labels.iter().any(|label| label.contains(\"Replay500f\")));\n        assert!(view.labels.iter().any(|label| label.contains(\"Other capture\")));\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n        assert!(!browser.relist(Vec::new(), 0));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert!(chosen.pending());\n",
+     "new": "        assert!(chosen.pending());\n        assert_eq!(chosen.tick(true, true), Effect::Open(\"saved:500\".into()));\n        assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None, \"nor while it opens\");\n        // B closes and deletes nothing.\n        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n",
+     "new": "            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n            (\"a_delete_that_fails_leaves_the_capture_in_the_replay_window\", a_delete_that_fails_leaves_the_capture_in_the_replay_window as fn()),\n"
     }
    ]
   },
