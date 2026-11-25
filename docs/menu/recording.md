@@ -291,7 +291,7 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 - An older macro and a Replay window capture show a tick for every press, C-stick input or flick that starts a move. Their ends and names appear as a preview plays past them.
 - With [Move names](#move-names) On, a mark reads as the combo and drill lists do: "Jab 1", "Jab 2", "Forward tilt ↑", "Forward air", "Dash grab", and a special by the fighter's own name. A grab that throws reads as the throw. A jab that runs into a rapid jab without restarting reads "Rapid jab". An older take has no forms, so its jab reads "Jab" and its side tilt "Forward tilt".
 - With Move names Off, every mark keeps its short name: "Jab", "Side tilt", "Neutral B".
-- A take stores which fighter it was recorded on, not that fighter's special names. Its specials take the fighter's own names only while Player 1 is that fighter; otherwise they read "Neutral special", "Side special" and so on.
+- A take stores which fighter it was recorded on, not that fighter's special names. Its specials take the fighter's own names only while Player 1 is that fighter; otherwise they read "Neutral special", "Side special" and so on. A Mii's specials are named by the selection saved with the take, and by those common names when the take saved none.
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
 

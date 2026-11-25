@@ -65,8 +65,9 @@ pub const MII_KINDS: core::ops::RangeInclusive<i32> = 0x48..=0x4a;
 /// table, so the live Player 1 serves when it is that kind. For a Mii that is the take's stored selection, and no
 /// identity (the common names) when the take stored none.
 pub fn take_identity(live: Option<(i32, FighterId)>, kind: i32, mii: Option<[u8; 4]>) -> Option<FighterId> {
-    let _ = mii;
-    live.filter(|(live, _)| *live == kind).map(|(_, id)| id)
+    let (_, id) = live.filter(|(live, _)| *live == kind)?;
+    if !MII_KINDS.contains(&kind) { return Some(id); }
+    mii.map(|specials| FighterId { specials, ..id })
 }
 
 fn angle_key(angle: Angle) -> &'static str {
