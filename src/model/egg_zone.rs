@@ -402,6 +402,18 @@ impl Stage {
                 .segments()
                 .iter()
                 .all(|&s| !crosses([from, to], s) && s.into_iter().all(|p| clear_of([from, to], p)))
+            && self.way_off_stage(from, to)
+    }
+
+    /// Whether a move stays off stage on its way: a point every target width along it, each asked as a spot is. A
+    /// probe never meets another solid's wall, so a long move between two walls crosses no copied line.
+    fn way_off_stage(&self, from: Point, to: Point) -> bool {
+        let [dx, dy] = difference(to, from);
+        let steps = (dx.hypot(dy) / DIAMETER) as usize;
+        (1..=steps).all(|k| {
+            let t = k as f32 / (steps + 1) as f32;
+            self.off_stage([from[0] + dx * t, from[1] + dy * t])
+        })
     }
 
     /// Where a target can appear, for the editor's sample pictures: up to five spots a side (`side as usize * 5 + row`,
