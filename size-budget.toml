@@ -2889,3 +2889,11 @@ ceiling = 200672
 date = "2026-11-25"
 reason = "Vault review: label the second input source CPU and route the opening fighter question through its panel. Measured 200672, 15 above the submitted 962ad694 and 844 above merge 4b."
 approved_by = "tr-primary-2 2026-11-25 00:48:43Z (final measured value through +900), 02:16:35Z (review correction)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201835
+date = "2026-11-25"
+reason = "Trial fold of the replay editor pin 42be97a3 (201006 approved, on merge 3D) and the Vault recordings line aaecc259 (200672 approved, on merge 4b), with the Vault play-target seam. Measured 201835 on 178a48b2 (remote-gate size step). The integrator writes the merged number on the install 4 head."
+approved_by = "tr-primary-2 2026-11-25 01:35:06Z (editor at 201006), 2026-11-25 02:44:33Z (Vault merge ordered) and 02:31:21Z (the seam, about 15 lines, ordered); the folded value is flagged in the seam post for f9-fix."
