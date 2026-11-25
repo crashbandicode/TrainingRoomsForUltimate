@@ -4,12 +4,15 @@
 use super::chords::logical as key;
 use super::edge_juggle::perfect::{Outline, Point, Segment};
 use super::eggs::RADIUS;
-use super::stage_geometry::{floor_run, Met, Probe, Unread};
+use super::stage_geometry::{classify, floor_run, open_air_end, Copied, Met, Probe, Unread, INSIDE, SLACK};
 
 const EDGE_MARGIN: f32 = 8.0;
 const BOTTOM_MARGIN: f32 = 24.0;
 const DIAMETER: f32 = 2.0 * RADIUS;
 const DEFAULT: [u8; 4] = [128, 128, 255, 128];
+const LINES: usize = 16;
+const COLUMN: f32 = 10.0;
+const STEP: f32 = 0.1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -27,6 +30,9 @@ pub struct Stage {
     blast: [f32; 4],
     ledges: [Point; 2],
     outline: Outline,
+    air: [f32; 2],
+    main: u8,
+    solid: u8,
     available: [bool; 2],
 }
 
@@ -93,46 +99,144 @@ pub fn blast_rect([left, right, top, bottom]: [f32; 4]) -> [Point; 2] {
     [[left, bottom], [right, top]]
 }
 
+struct Others<'a, P> {
+    stage: &'a mut P,
+    main: &'a Outline,
+}
+
+impl<P: Probe> Probe for Others<'_, P> {
+    fn first(&mut self, [x, mut y]: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread> {
+        let direction = if to < y { -1.0 } else { 1.0 };
+        for _ in 0..64 {
+            let Some(line) = self.stage.first([x, y], to, platforms)? else { return Ok(None) };
+            let [a, b] = line.ends;
+            if !self.main.segments().iter().any(|&s| s == [a, b] || s == [b, a]) {
+                return Ok(Some(line));
+            }
+            y = line.height(x).ok_or(Unread)? + direction * STEP;
+            if (to - y) * direction <= 0.0 { return Ok(None); }
+        }
+        Err(Unread)
+    }
+}
+
 impl Stage {
-    pub fn new(id: i32, blast: [f32; 4], ledges: [Point; 2], outline: Outline,
-        _air: [Option<f32>; 2], _others: &[Met]) -> Option<Self> {
+    pub fn new(id: i32, blast: [f32; 4], ledges: [Point; 2], mut outline: Outline,
+        air: [Option<f32>; 2], others: &[Met]) -> Option<Self> {
         let [left, right, top, bottom] = blast;
         let [[lx, ly], [rx, ry]] = ledges;
-        let available = [
+        let room = [
             left + EDGE_MARGIN + DIAMETER <= lx && lx <= right - EDGE_MARGIN,
             left + EDGE_MARGIN <= rx && rx + EDGE_MARGIN + DIAMETER <= right,
         ];
+        let available = std::array::from_fn(|i| {
+            room[i] && air[i].is_some_and(|end| end.is_finite()
+                && (end - ledges[i][0]) * [-1.0, 1.0][i] >= DIAMETER)
+        });
         let enough_room = available.contains(&true)
             && lx < rx
             && top - EDGE_MARGIN - DIAMETER >= bottom + BOTTOM_MARGIN;
-        (enough_room
+        if !(enough_room
             && blast
                 .into_iter()
                 .chain(ledges.into_iter().flatten())
                 .all(f32::is_finite)
             && [ly, ry].into_iter().all(|y| (bottom..=top).contains(&y))
             && !outline.segments().is_empty()
+            && outline.segments().len() <= u8::MAX as usize
             && outline
                 .segments()
                 .iter()
                 .flatten()
                 .flatten()
-                .all(|v| v.is_finite()))
-        .then_some(Self {
+                .all(|v| v.is_finite())) {
+            return None;
+        }
+        let main = outline.segments().len();
+        let mut solid = main;
+        let mut kept = 0;
+        for through in [false, true] {
+            for &line in others {
+                let [a, b] = line.ends;
+                if !a.into_iter().chain(b).all(f32::is_finite) { return None; }
+                if line.through != through || a[0] == b[0] || (line.through && !line.stand) {
+                    continue;
+                }
+                if outline.segments().iter().any(|&s| s == [a, b] || s == [b, a]) {
+                    continue;
+                }
+                if kept == LINES || outline.segments().len() == 64 { return None; }
+                let left_first = line.through || line.stand;
+                let ends = if (a[0] < b[0]) == left_first { [a, b] } else { [b, a] };
+                outline.add(ends);
+                kept += 1;
+            }
+            if !through { solid = outline.segments().len(); }
+        }
+        Some(Self {
             id,
             blast,
             ledges,
             outline,
+            air: std::array::from_fn(|i| if available[i] { air[i].unwrap_or(ledges[i][0]) } else { ledges[i][0] }),
+            main: main as u8,
+            solid: solid as u8,
             available,
         })
     }
 
     pub fn read(id: i32, blast: [f32; 4], camera: [f32; 4], outline: Outline,
         stage: &mut impl Probe) -> Result<Option<Self>, Unread> {
+        if !blast.into_iter().chain(camera).all(f32::is_finite) { return Ok(None); }
         let Some(run) = floor_run(stage, blast, [camera[0].midpoint(camera[1]), camera[2]])? else {
             return Ok(None);
         };
-        Ok(Self::new(id, blast, run.ends, outline, [None; 2], &[]))
+        let mut others = Others { stage, main: &outline };
+        let mut air = [None; 2];
+        for (i, ledge) in run.ledges.into_iter().enumerate() {
+            if let Some(ledge) = ledge {
+                air[i] = Some(open_air_end(&mut others, blast, ledge)?);
+            }
+        }
+        let Some(bare) = Self::new(id, blast, run.ends, outline, air, &[]) else {
+            return Ok(None);
+        };
+        let empty = Met { ends: [[0.0; 2]; 2], stand: false, through: false };
+        let mut lines = [empty; LINES + 1];
+        let mut count = 0;
+        for i in 0..2 {
+            if !bare.available[i] { continue; }
+            let dir = [-1.0, 1.0][i];
+            let ledge = run.ends[i][0];
+            for outward in [true, false] {
+                let step = if outward { dir * COLUMN } else { -dir * COLUMN };
+                let mut x = ledge + step;
+                let end = if outward { bare.air[i] } else { bare.inner_limit()[i] };
+                while if outward { (end - x) * dir > 0.0 } else { (x - end) * dir >= 0.0 } {
+                    let start = if outward {
+                        Some(blast[2] - INSIDE)
+                    } else {
+                        bare.main_segments().iter().filter_map(|&s| column_at(x, s))
+                            .map(|[low, _]| low).reduce(f32::min).map(|low| low - SLACK)
+                    };
+                    if let Some(mut y) = start {
+                        while y > blast[3] {
+                            let Some(line) = others.first([x, y], blast[3], true)? else { break };
+                            let Some(height) = line.height(x) else { break };
+                            let [a, b] = line.ends;
+                            if !lines[..count].iter().any(|s| s.ends == [a, b] || s.ends == [b, a]) {
+                                lines[count] = line;
+                                count += 1;
+                                if count > LINES { return Ok(None); }
+                            }
+                            y = height - STEP;
+                        }
+                    }
+                    x += step;
+                }
+            }
+        }
+        Ok(Self::new(id, blast, run.ends, outline, air, &lines[..count]))
     }
 
     pub fn id(&self) -> i32 {
@@ -157,6 +261,10 @@ impl Stage {
 
     pub fn outline(&self) -> &Outline {
         &self.outline
+    }
+
+    fn main_segments(&self) -> &[Segment] {
+        &self.outline.segments()[..usize::from(self.main)]
     }
 
     pub fn inner_limit(&self) -> [f32; 2] {
@@ -194,10 +302,9 @@ impl Stage {
             }
             let direction = [-1.0, 1.0][i];
             let ledge = ledges[i];
-            let distance = (self.blast[i] - ledge).abs() - EDGE_MARGIN;
-            let outer_default = (distance * 0.35).max(DIAMETER);
             let inside = limits[i] + (ledge - limits[i]) * (f32::from(inner) / 255.0);
-            let outside = ledge + direction * value(outer, [DIAMETER, outer_default, distance]);
+            let reach = (self.air[i] - ledge) * direction;
+            let outside = ledge + direction * value(outer, self.outer_range(i)).min(reach);
             Some(if side == Side::Left {
                 [outside, inside]
             } else {
@@ -210,14 +317,18 @@ impl Stage {
         }
     }
 
+    fn outer_range(&self, i: usize) -> [f32; 3] {
+        let distance = (self.blast[i] - self.ledges[i][0]).abs() - EDGE_MARGIN;
+        [DIAMETER, (distance * 0.35).max(DIAMETER), distance]
+    }
+
     /// A probe with no segment below it is above the playable main stage even
     /// when its disc misses the actual surface. Inboard off-stage air is underneath.
     pub fn under_main(&self, [x, y]: Point) -> bool {
         let [left, right] = self.main_span();
         (left..=right).contains(&x)
             && self
-                .outline
-                .segments()
+                .main_segments()
                 .iter()
                 .all(|s| column_at(x, *s).is_none_or(|[lo, _]| y < lo))
     }
@@ -225,8 +336,7 @@ impl Stage {
     // A contour can protrude past a ledge farther down, even when the
     // point is comfortably clear of every boundary segment.
     fn inside_main(&self, [x, y]: Point) -> bool {
-        self.outline
-            .segments()
+        self.main_segments()
             .iter()
             .fold(false, |inside, &[[ax, ay], [bx, by]]| {
                 inside ^ (((ay > y) != (by > y)) && x < ax + (bx - ax) * ((y - ay) / (by - ay)))
@@ -236,8 +346,7 @@ impl Stage {
     /// Membership of the exact world segment in the main solid component.
     /// Caller checks the line is a native, non-passable floor first.
     pub fn supports(&self, segment @ [a, b]: Segment) -> bool {
-        self.outline
-            .segments()
+        self.main_segments()
             .iter()
             .any(|&s| s == segment || s == [b, a])
     }
@@ -254,7 +363,24 @@ impl Stage {
             } else {
                 self.under_main(at)
             })
+            && self.off_stage(at)
             && self.outline.segments().iter().all(|&s| clear_of(s, at))
+    }
+
+    fn off_stage(&self, at: Point) -> bool {
+        let empty = Met { ends: [[0.0; 2]; 2], stand: false, through: false };
+        let mut lines = [empty; LINES];
+        let main = usize::from(self.main);
+        let solid = usize::from(self.solid);
+        let segments = self.outline.segments();
+        let count = segments.len() - main;
+        for (i, &ends) in segments[main..].iter().enumerate() {
+            let through = main + i >= solid;
+            lines[i] = Met { ends, stand: through || ends[0][0] < ends[1][0], through };
+        }
+        [at, [at[0] - RADIUS, at[1]], [at[0] + RADIUS, at[1]]]
+            .into_iter().all(|p| matches!(classify(&mut Copied(&lines[..count]), self.blast, p),
+                Ok(place) if place.off_stage(true)))
     }
 
     /// Endpoints alone miss a thin wall when a path moves quickly. Test the
@@ -551,7 +677,16 @@ impl Wizard {
         }
         // Move a few bins per poll, so even on wide stages a stick tap moves
         // visibly. Outer and inner pairs use one bin across unequal sides.
-        let mut bin = self.bins[i].saturating_add_signed((axis * 4.0).round() as i8);
+        let delta = (axis * 4.0).round() as i8;
+        let mut bin = self.bins[i].saturating_add_signed(delta);
+        if i == 3 {
+            let cap = (0..2).filter(|&side| stage.available[side])
+                .map(|side| {
+                    let reach = (stage.air[side] - stage.ledges[side][0]) * [-1.0, 1.0][side];
+                    bin_ceiling(stage.outer_range(side), reach)
+                }).max().unwrap_or(255);
+            bin = self.bins[i].min(cap).saturating_add_signed(delta).min(cap);
+        }
         if i < 2 {
             let [bottom, top] = self.zone(stage).vertical();
             let [top_range, bottom_range] = stage.vertical_ranges();
