@@ -147,6 +147,9 @@ fn core04_unknown_keys_kept_on_rewrite() {
                 } else if key == "hitbox_vis" {
                     // rc.14: the two-option row comes back as the checklist (`legend::migrate`, `legend_old_hitbox_vis_migrates`).
                     assert_eq!(after.get(key).and_then(Value::as_array).map(Vec::len), Some(7), "{snapshot}.{key}");
+                } else if key == "recording_crop" && value.as_array().is_some_and(|row| row.len() == 2) {
+                    let expected = if value[0] == 1 { json!([0, 1, 0, 0]) } else { json!([0, 0, 0, 1]) };
+                    assert_eq!(after.get(key), Some(&expected), "{snapshot}.{key}");
                 } else {
                     assert_eq!(after.get(key), Some(value), "{snapshot}.{key}");
                 }

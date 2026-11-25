@@ -1,4 +1,4 @@
-use crate::engine::{frame_queue, library, macros, playback, rr_runtime};
+use crate::engine::{library, macros, playback, rr_runtime};
 use crate::model::combo::{Aim, Combo, Event, LinkRec};
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::frame_strip::{Button as InputButton, Move, Verdict};
@@ -688,10 +688,18 @@ fn bridge_reports_the_indicator_the_hud_drew() {
         let stamp = playback_indicator_stamp(100, drawn);
         assert_eq!(playback_indicator(stamp, 100, 50), expected);
         assert_eq!(playback_indicator(stamp, 151, 50), "");
+        let mut text = String::new();
+        let view = View { playback_indicator: playback_indicator(stamp, 100, 50), ..View::default() };
+        assert!(snapshot(&view, &mut text));
+        assert!(text.contains(&format!("playback.indicator=\"{expected}\"\n")));
     }
     let hidden = playback_indicator_stamp(100, [false; 2]);
     assert_eq!(playback_indicator(hidden, 100, 50), "");
     let mut text = String::new();
     assert!(snapshot(&View::default(), &mut text));
     assert!(text.contains("playback.indicator=\"\""));
+    let worker = include_str!("../src/runtime/ui/worker.rs");
+    assert!(worker.contains("recording_indicator: crate::runtime::bridge_state::recording_indicator(now),\n            playback_indicator: crate::runtime::bridge_state::playback_indicator(now),"));
+    let runtime = include_str!("../src/runtime/bridge_state.rs");
+    assert!(runtime.contains("m::playback_indicator(PLAYBACK_INDICATOR.load(Ordering::Relaxed), now_ms, SCENE_FRESH_MS)"));
 }

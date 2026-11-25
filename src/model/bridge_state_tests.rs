@@ -67,6 +67,7 @@ fn the_snapshot_is_fixed_order_with_schema_ack_and_focus_first_and_rows_last() {
         "recording.page.role=\"\"",
         "recording.capture.role=\"\"",
         "recording.indicator=\"\"",
+        "playback.indicator=\"\"",
         "strip.aims=\"\"",
         "list=\"rows/22\"",
         "list.count=2",
@@ -139,7 +140,7 @@ fn strip_aims_reports_the_marks_drawn_on_the_last_pass() {
     for (aims, expected) in [([Some(4), Some(0)], "L R"), ([Some(2), None], "U"), ([None; 2], "")] {
         let mut out = String::new();
         assert!(snapshot(&View { strip_aims: aims, ..View::default() }, &mut out));
-        assert!(out.contains(&format!("\nrecording.indicator=\"\"\nstrip.aims=\"{expected}\"\n")));
+        assert!(out.contains(&format!("\nrecording.indicator=\"\"\nplayback.indicator=\"\"\nstrip.aims=\"{expected}\"\n")));
     }
 }
 
