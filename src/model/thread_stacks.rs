@@ -128,7 +128,8 @@ pub const THREADS: [ThreadStack; 19] = [
     // diag ELF (gate 178a48b2). Required and allocated stay 90,112 B.
     // The same fold on the install 4 head with the editor and the drill-step moves (cdfbd917): 56,720 B (release) and
     // 56,688 B (diag, gate 2c679acb); the larger is recorded.
-    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_720, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
+    // Trim and Vault fold: 56,864 B release and 56,864 B diag in ELFs d3d74eaa.
+    row(ThreadId::Menu, c"tr-menu", 88 * KIB, 56_864, 57_648, "Eden st-02..st-12, f6-37/sh-01/ui18-02/p4c02, final-surface-cov-4e336da4 cov-crop", "ui::worker::run"),
     // returns parked layout archives to the pool after their grace
     row(ThreadId::Archive, c"tr-archive", 28 * KIB, 3_216, 7_840, "Eden st-02..st-12, f6-37/sh-01", "ui::archive::prepare::{closure#2}"),
     // ARCropolis read ABI includes a 131904-byte decoder frame. The qualified
