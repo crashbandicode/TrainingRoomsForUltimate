@@ -87,8 +87,11 @@ See [Recording](../menu/recording.md#a-file-s-own-screen) for the five playback-
 [Airdodge Direction](../menu/cpu.md#airdodge-direction) and [Shield Tilt](../menu/cpu.md#shield-tilt) use a grid.
 In points toward you and Out away from you; Left and Right are fixed screen directions. Neutral is the stick at rest.
 
-Each A on a chip adds weight from x1 to x5; the sixth clears it. The CPU picks by weight. Y clears the focused chip;
-ZL selects all or clears all. Shield Tilt selects only one. DI is picked per hit; Airdodge Direction per hit in the
+For DI, SDI and Airdodge Direction, each A on a chip adds weight from x1 to x5; the sixth clears it. The CPU picks
+by weight. Y clears the focused chip; ZL selects all or clears all.
+
+Shield Tilt takes one direction instead. Press A to select it, or A again to turn it off. Y or ZL clears the
+selection even if the cursor is on a different chip. DI is picked per hit; Airdodge Direction per hit in the
 air. SDI is picked at reset or a setting change and kept until the next pick. Shield Tilt is read at reset or a setting change.
 SDI also needs [SDI Strength](../menu/cpu.md#sdi-strength).
 The help line can read "Selected: Up x3, In x1".

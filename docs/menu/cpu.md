@@ -12,7 +12,7 @@ change, A open, X save your current settings as your defaults, Y reset the focus
 in [the docs index](../README.md).
 
 **Start here:** [CPU behaviour](../guide/cpu-behaviour.md) shows how the settings combine.
-[Mash](../guide/cpu-behaviour.md#mash-and-followup) · [Shield](../guide/cpu-behaviour.md#cpu-behaviour) ·
+[Mash](../guide/cpu-behaviour.md#mash-and-followup) · [Shield](#shield) ·
 [DI](../guide/cpu-behaviour.md#direction-chips)
 
 ## Reactions
@@ -449,11 +449,14 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 Lets the game's CPU play Player 1 for you. This group shows one of two things. If the separate CPU pilot plugin is
 installed, it shows only the P1 control row. Without it, it shows P1 CPU Control and P1 CPU Level.
 
+The same Record rule applies to both pilots. On **install 4**, Record is refused while the AI plays Player 1.
+In the **next build**, Record captures Player 1's inputs as the game receives them, including the AI's inputs.
+Play on Player 1 is still refused while the AI drives that fighter.
+
 ### P1 control
 
 Shown only when the CPU pilot plugin is installed. The row reads "CPU pilot plugin": the pilot drives Player 1, and
 you set it on its own page (Online Deluxe's CPU Pilot page), not here.
-Record can capture the pilot's inputs while it plays; Play on Player 1 is refused while the pilot drives Player 1.
 
 - **Values:** none: the row is read-only.
 - **How:** nothing to change here; it tells you the pilot is in charge of Player 1.
@@ -463,8 +466,7 @@ Record can capture the pilot's inputs while it plays; Play on Player 1 is refuse
 ### P1 CPU Control
 
 Shown only when the CPU pilot plugin is not installed. On: the game's CPU AI plays Player 1 in Training once you close
-the menu. It waits while a menu is open or a recording is played, and keeps playing while a recording is made: that
-recording holds its inputs. While it plays, Play on Player 1 is refused.
+the menu. It waits while a menu is open or a recording is played.
 
 - **Values:** On, Off.
 - **Default:** Off: you play Player 1.
