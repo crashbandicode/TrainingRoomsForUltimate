@@ -657,6 +657,8 @@ pub static ROWS: [Row; 171] = [
       "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
     r(OPTIONS, "Show playback indicator", "playback_indicator", TOGGLE,
       "On: show which role is playing a recording.\nOff: hide the playback indicator."),
+    r(OPTIONS, "Playback delay", "playback_delay", Control::Dropdown(&o::PLAYBACK_DELAY),
+      "Frames to wait after the fighters are placed, before\na played recording's first input. 60 frames is one second."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

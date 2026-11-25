@@ -288,4 +288,5 @@ pub static DEFS: [Def; COUNT] = [
     row!("link_history", Single, 2, [0]),
     row!("move_names", Single, 2, [1]),
     row!("playback_indicator", Single, 2, [0]),
+    row!("playback_delay", Single, 8, [0]),
 ];

@@ -57,6 +57,7 @@ fn recording(name: &str, len: usize) -> MacroRecording {
 struct Fixture {
     root: PathBuf,
     active: String,
+    ids: Vec<String>,
     save: String,
     pair: [SavedState; 2],
 }
@@ -83,7 +84,7 @@ fn fixture(with_save: bool, loops: LoopCount, frame_counts: &[usize]) -> Fixture
     index.set_loop(Role::Player, loops);
     index.set_loop(Role::Cpu, loops);
     index.save(&root).unwrap();
-    Fixture { root, active: ids[0].clone(), save, pair }
+    Fixture { root, active: ids[0].clone(), ids, save, pair }
 }
 
 fn small(with_save: bool) -> Fixture {
@@ -176,6 +177,7 @@ fn a_play_start_reads_only_what_it_starts() {
 fn an_idle_pass_reads_nothing_from_the_card() {
     let _guard = HostGuard::new();
     let f = small(false);
+    // The first tick runs migration and is not measured.
     tick(&f.root);
     let before = counts();
     tick(&f.root);
@@ -426,6 +428,41 @@ fn an_active_chain_reads_its_steps_and_first_start_save() {
 }
 
 #[test]
+fn a_chain_switch_decides_its_warp_not_macro_ones_own_switch() {
+    let _guard = HostGuard::new();
+    let f = small(true);
+    warm(&f, true);
+    let library = Library::new(f.root.join(MACROS_DIR));
+    let mut recording = library.load(&f.active).unwrap();
+    recording.set_start_save_on(false);
+    library.overwrite(&f.active, &recording).unwrap();
+    chord(Role::Player);
+    assert!(tick(&f.root).warp.is_none());
+    chord(Role::Player);
+    tick(&f.root);
+    let chains = Store::<Chain>::new(f.root.join(MACROS_DIR));
+    let mut chain = Chain::new("Chain", vec![f.active.clone()]).unwrap();
+    let id = chains.save_new(&chain).unwrap();
+    let mut index = RecordingIndex::load(&f.root).unwrap();
+    index.set_active(Role::Player, Some(&id), 3).unwrap();
+    index.save(&f.root).unwrap();
+    chord(Role::Player);
+    let start = tick(&f.root);
+    assert_eq!(start.warp.as_deref(), Some(f.save.as_str()));
+    assert_eq!(start.warp_pair, Some(f.pair.clone()));
+    host::warp_landed();
+    let before = counts();
+    tick(&f.root);
+    assert_eq!(difference(before, counts()), (0, 0));
+    chord(Role::Player);
+    tick(&f.root);
+    chain.set_start_save_on(false);
+    chains.overwrite(&id, &chain).unwrap();
+    chord(Role::Player);
+    assert!(tick(&f.root).warp.is_none());
+}
+
+#[test]
 fn held_files_play_the_same_frames_as_a_fresh_read() {
     let _guard = HostGuard::new();
     let f = small(false);
@@ -673,9 +710,22 @@ fn playback_delay_is_one_path_for_training_and_the_waiting_room() {
 #[test]
 fn the_held_files_heap_is_reported() {
     let _guard = HostGuard::new();
-    for both in [false, true] {
+    for (both, shared) in [(false, false), (true, false), (true, true)] {
         host::reset_host();
         let f = fixture(true, LoopCount::Finite(1), &SESSION_FRAMES);
+        let player = &f.ids[21];
+        let cpu = if shared { player } else { &f.ids[20] };
+        let library = Library::new(f.root.join(MACROS_DIR));
+        for id in [player, cpu] {
+            let mut recording = library.load(id).unwrap();
+            recording.set_start_save(Some(&f.save)).unwrap();
+            library.overwrite(id, &recording).unwrap();
+        }
+        let mut index = RecordingIndex::load(&f.root).unwrap();
+        index.set_active(Role::Player, Some(player), 30).unwrap();
+        index.set_active(Role::Cpu, Some(cpu), 31).unwrap();
+        index.save(&f.root).unwrap();
+        tick(&f.root);
         chord(Role::Player);
         tick(&f.root);
         host::warp_landed();
@@ -686,11 +736,13 @@ fn the_held_files_heap_is_reported() {
             host::warp_landed();
             tick(&f.root);
         }
+        let live = host::playback_roles();
+        assert_eq!(live, [true, both]);
         let measured = crate::cache_drop_bytes(host::drop_cached_book);
         assert!(measured.is_some(), "a held book exists");
         let (heap, inline) = measured.unwrap();
         let bytes = heap + inline;
-        writeln!(std::io::stdout(), "held files: {heap} heap + {inline} inline = {bytes} bytes ({})", if both { "two roles" } else { "one role" }).unwrap();
+        writeln!(std::io::stdout(), "held files: {heap} heap + {inline} inline = {bytes} bytes; player {player} 214 frames, cpu {} {}, roles {live:?}", if both { cpu } else { "-" }, if both { if shared { 214 } else { 201 } } else { 0 }).unwrap();
         assert!(bytes < 256 * 1024);
     }
 }
