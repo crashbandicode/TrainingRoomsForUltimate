@@ -1195,7 +1195,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "3576af68b7f92d9b9fcf6c807c2164181ffc939514bfa1d7d7a6cedf0dc28111",
+   "dest_sha256": "f428bdb8aeacd9aef368c83631fb39158663431096206c0418e99d8b118ba83b",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1621,6 +1621,31 @@
     {
      "old": "        held && pressed && !released\n    }",
      "new": "        held && pressed && !released\n    }\n}\n\n/// ZR pressed and released with no other button or direction in between: the Player 1 / CPU toggle. ZR held with a\n/// direction is the coarse scrub and never a tap.\n#[derive(Default)]\npub struct TargetTap { down: bool, clean: bool }\n\nimpl TargetTap {\n    pub const fn new() -> Self { Self { down: false, clean: false } }\n\n    /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.\n    pub fn poll(&mut self, zr: bool, other: bool) -> bool {\n        let _ = (zr, other);\n        false\n    }",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                if matches!(self.file, Some(FileSource::Macro { .. })) {\n                    return self.apply_action(ClipAction::SwapTarget);\n                }\n                let count = self.session.tracks.len();",
+     "new": "            ClipAction::PreviousFighter | ClipAction::NextFighter => {\n                let count = self.session.tracks.len();",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "            && matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::SwapTarget) {",
+     "new": "            && matches!(action, ClipAction::SwapTarget) {",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        if self.file.is_some() && matches!(action, ClipAction::ToggleCapture | ClipAction::UseLeadIn) {",
+     "new": "        if self.file.is_some() && matches!(action,\n            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        let _ = (zr, other);\n        false",
+     "new": "        if zr {\n            self.clean = if self.down { self.clean && !other } else { !other };\n            self.down = true;\n            return false;\n        }\n        let tap = self.down && self.clean && !other;\n        self.down = false;\n        self.clean = false;\n        tap",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"D-pad Up/Down: plays on CPU or Player 1. \" }",
+     "new": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
@@ -3896,7 +3921,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "3f287c76d6116ffb9c4e3cd62dbdc5ce018f337db1a0091471796417c442b94a",
+   "dest_sha256": "8b7648115543edcc0ddaeddb722f2f9083b6988e87dc2011957cb8e9de4b0e1f",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4541,6 +4566,16 @@
     {
      "old": "use smash::lib::lua_const::*;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};",
      "new": "use smash::lib::lua_const::*;\nuse crate::engine::library::Role;\nuse crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    if let Some(view) = clip_view().filter(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() {\n            on_action(ClipAction::TogglePlay);\n        } else if matches!(view.context, crate::engine::macro_ui::clip_panel::ClipContext::Macro { .. })\n            && (controller.just_down.dpad_up() || controller.just_down.dpad_down()) {\n            on_action(ClipAction::SwapTarget);\n        }",
+     "new": "    let held = controller.current_buttons;\n    let other = held.a() || held.b() || held.x() || held.y() || held.l() || held.r() || held.zl()\n        || held.dpad_left() || held.dpad_right() || held.dpad_up() || held.dpad_down()\n        || held.l_left() || held.l_right() || held.r_left() || held.r_right();\n    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).\n    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)\n        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {\n        on_action(ClipAction::SwapTarget);\n        return;\n    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
+     "new": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic TARGET_TAP: Mutex<crate::engine::macro_ui::clip_panel::TargetTap> = Mutex::new(crate::engine::macro_ui::clip_panel::TargetTap::new());\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
