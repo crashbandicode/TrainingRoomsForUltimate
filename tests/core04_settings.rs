@@ -362,8 +362,8 @@ fn old_whole_percent_file_loads_and_saves_without_doubling() {
         (cpu, json!([0, 150, 0, 1]), Reason::ElementAboveMax),
         (player, json!([0, 255, 0, 1]), Reason::ElementAboveMax),
         (cpu, json!([12, 12, 1, 0]), Reason::BadSliderRange),
-        (cpu, json!([1, 2, 3]), Reason::BadSliderLength),
-        (cpu, json!([5]), Reason::BadSliderLength),
+        (cpu, json!([1, 2, 3]), Reason::BadDamageRangeLength),
+        (cpu, json!([5]), Reason::BadDamageRangeLength),
     ] {
         let (_, def) = settings::def(id).unwrap();
         assert_eq!(settings::parse_row(def, &value), Err(reason.clone()), "{id} {value}");

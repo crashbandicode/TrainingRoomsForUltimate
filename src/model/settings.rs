@@ -133,8 +133,10 @@ pub enum Reason {
     ElementNotAByte,
     /// An element is above the row's largest value.
     ElementAboveMax,
-    /// A slider array does not have exactly two elements.
+    /// A plain slider or nonempty delay range does not have exactly two elements.
     BadSliderLength,
+    /// A damage range is neither a pair of whole percents nor a pair with both half flags.
+    BadDamageRangeLength,
     /// A slider's `lower` is above its `upper`.
     BadSliderRange,
     /// A stage id or its array of four normalized Off-stage zone coordinates.
@@ -154,6 +156,7 @@ impl fmt::Display for Reason {
             Reason::ElementNotAByte => f.write_str("element is not an integer 0..=255"),
             Reason::ElementAboveMax => f.write_str("element above the row's largest value"),
             Reason::BadSliderLength => f.write_str("slider needs exactly two elements"),
+            Reason::BadDamageRangeLength => f.write_str("damage range needs two or four elements"),
             Reason::BadSliderRange => f.write_str("slider range is not lower <= upper"),
             Reason::BadEggZone => f.write_str("expected a native stage id and four byte coordinates"),
             Reason::UnknownId => f.write_str("no such setting"),
@@ -168,7 +171,7 @@ pub fn parse_row(def: &Def, value: &Value) -> Result<Vec<u8>, Reason> {
         return Err(Reason::NotAnArray);
     };
     if matches!(def.kind, Kind::HalfSlider { .. }) && !matches!(items.len(), 2 | 4) {
-        return Err(Reason::BadSliderLength);
+        return Err(Reason::BadDamageRangeLength);
     }
     let mut elements = Vec::with_capacity(items.len());
     for (index, item) in items.iter().enumerate() {
