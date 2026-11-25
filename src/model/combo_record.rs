@@ -603,7 +603,7 @@ fn parse_description(value: &Value, mv: Move, key: &'static str, step: bool) -> 
 
 fn description_value(desc: ActionDesc) -> Value {
     let mut object = Map::new();
-    if desc.mv.legacy() != desc.mv {
+    if desc.mv == Move::FinalSmash {
         object.insert("move".into(), json!(key_of(&MOVES, desc.mv)));
     }
     if let Some(of) = desc.of {
@@ -781,8 +781,9 @@ fn value_of<T: Copy>(table: &[(T, &'static str)], key: &str) -> Option<T> {
     table.iter().find(|(_, k)| *k == key).map(|(v, _)| *v)
 }
 
+/// A link endpoint's move key; Final Smash remains `other`.
 pub fn move_key(m: Move) -> &'static str {
-    key_of(&MOVES, m.legacy())
+    key_of(&MOVES, if m == Move::FinalSmash { Move::Other } else { m })
 }
 /// The full move key for a description or a take mark.
 pub fn full_move_key(m: Move) -> &'static str {
@@ -792,8 +793,8 @@ pub(crate) fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
 }
 fn endpoint_move(key: &str) -> Option<Move> {
-    // A move older files call other belongs in the description, not a bare from or to.
-    move_of(key).filter(|m| m.legacy() == *m)
+    // Final Smash belongs in the description, not a bare from or to.
+    move_of(key).filter(|m| *m != Move::FinalSmash)
 }
 fn button_key(b: Button) -> &'static str {
     key_of(&BUTTONS, b)

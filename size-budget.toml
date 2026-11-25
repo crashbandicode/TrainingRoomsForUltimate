@@ -3093,7 +3093,23 @@ approved_by = "tr-primary-2 ruling 2026-11-25 06:12:02Z (GO on fix/reset-command
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 203989
+ceiling = 203599
 date = "2026-11-25"
-reason = "Mark variants: a replay-editor mark keeps and names its move variant and angle; a take, a Vault capture and a capture written for the Recordings list keep the fighter they were recorded on (recorded_fighter), read where every take start is posted and once per captured entry. Measured 203989 on the final head (remote-gate size step)."
+reason = "Combo files name grab, throw and the ledge, get-up and trip attacks in a link's from and to: the reader takes both forms, and a named endpoint without descriptions is compared by its name. Measured 203599 on main a945b0c1 (203585): +14."
+approved_by = "tr-primary-2 ruling 2026-11-25 14:34:17Z (line budget +14 for feat/named-grab-throw-keys)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203649
+date = "2026-11-25"
+reason = "Preview stop and the Recording pop-up's configured chord line on main 76c00df3: measured 203649 (tools/sloc.py tree), 50 above 203599."
+approved_by = "tr-primary-2 standing rule of 2026-11-24 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 204053
+date = "2026-11-25"
+reason = "Mark variants: a replay-editor mark keeps and names its move variant and angle; a take, a Vault capture and a capture written for the Recordings list keep the fighter they were recorded on (recorded_fighter), read where every take start is posted and once per captured entry. Measured 204053 on the head merged with main d807f1e4 (203649): +404, the same growth as on a945b0c1 (203989 against 203585)."
 approved_by = "tr-primary-2 2026-11-25 13:43:24Z (the item, operator 13:30Z) with the rulings of 13:54:02Z, 14:33:53Z, 14:41:51Z and 14:51:40Z that grew its scope; no line number was approved in advance, so the measured growth is flagged in the READY post."
