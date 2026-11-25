@@ -218,6 +218,7 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) {
 pub fn service() {
     // The boxes the frame emptied (a named load, a bound save) come back here to be dropped: the game never frees one.
     super::states::reap_posts();
+    super::record_place::reap();
     let root = Path::new(crate::model::storage::ROOT);
     if !root.is_dir() {
         let _ = std::fs::create_dir_all(root);
@@ -257,17 +258,15 @@ pub fn service() {
     apply(&tick);
 }
 
-/// Change placement: the picker confirmed a placement on a save, and the worker writes the file. While the picker
-/// still waits for that visit the written pair loads once, as Play's warp loads a start save. A write that failed
-/// goes back to the picker, which puts both fighters back and says so.
+/// Change placement: the picker confirmed a placement on a save, and the worker writes the file and answers the
+/// visit: the written pair, or that the write failed. The picker takes the answer only while that visit still waits;
+/// it then starts the pair's one load itself, or puts both fighters back and says so.
 fn place_commit(root: &Path) {
     let Some(commit) = super::record_place::take_commit() else { return };
     match rr_host::commit_placement(root, commit) {
-        rr_host::Placed::Refused { ticket } => super::record_place::save_failed(ticket),
+        rr_host::Placed::Refused { ticket } => super::record_place::post_placed(ticket, None),
         rr_host::Placed::Saved { ticket, pair, notice } => {
-            if super::record_place::waiting(ticket) {
-                super::states::request_named_load(*pair);
-            }
+            super::record_place::post_placed(ticket, Some(*pair));
             super::notices::upsert(NOTICE_ID, "Change placement", &notice, 240, NOTICE_COLOR);
         }
     }

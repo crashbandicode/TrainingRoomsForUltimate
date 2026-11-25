@@ -320,14 +320,6 @@ pub const fn release(leave: Leave, same_body: bool, loading: bool) -> Release {
     }
 }
 
-/// A finished save belongs to the picker that asked for it. `waiting`: that picker's ticket, while it still waits.
-pub const fn accepts(waiting: Option<u32>, ticket: u32) -> bool {
-    match waiting {
-        Some(open) => open == ticket,
-        None => false,
-    }
-}
-
 /// The worker's answer to a confirmed placement: the visit it belongs to, and the written pair to load once.
 /// `None`: the save could not be written.
 pub struct Answer {
@@ -339,8 +331,7 @@ pub struct Answer {
 /// is the worker's to drop). An answer for any other visit is given back unread, so a visit that ended gets no
 /// load and the next visit does not inherit one. Game thread, one taker at a time; no allocation and no free.
 pub fn take_answer(posted: &BoxHandoff<Answer>, ticket: u32) -> Option<Option<[SavedState; 2]>> {
-    let _ = (posted, ticket);
-    None
+    posted.take(|answer| (answer.ticket == ticket).then(|| answer.pair.take())).flatten()
 }
 
 /// How far a spot may go: on stage the camera's range, off stage up to 1 unit inside the blast line (Guard the

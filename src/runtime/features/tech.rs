@@ -9,6 +9,7 @@ use crate::model::btt::{self as model, Pad, LOOKS};
 use crate::model::chords::{field, Sample};
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::rng::Rng;
+use crate::model::floor_hop::Floor;
 use crate::model::panes::EggLook;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
@@ -19,7 +20,7 @@ use crate::model::tech::{
     practice_state::{self as state, View as StateView},
     session::{Bests, Length, Phase, Session},
     solver,
-    surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces},
+    surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, MAX_LINES},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
     Vec2,
 };
@@ -40,6 +41,8 @@ static OPEN: AtomicBool = AtomicBool::new(false);
 static START: AtomicBool = AtomicBool::new(false);
 static EDIT: AtomicBool = AtomicBool::new(false);
 static RESET: AtomicBool = AtomicBool::new(false);
+/// A Training reset has passed since the outline in `VIEW` was traced: the game may have rebuilt its collision.
+static STALE: AtomicBool = AtomicBool::new(false);
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static WIZARD_REQUEST: AtomicBool = AtomicBool::new(false);
@@ -53,6 +56,8 @@ static OUTCOMES: Mailbox<Outcome, 4> = Mailbox::new();
 struct ViewState {
     picker: Picker,
     surfaces: Surfaces,
+    /// The walk that fills `surfaces`: with it the lines say whether they are all there.
+    discovery: Discovery,
     range: Option<[f32; 4]>,
     start: bool,
     wizard: Option<Wizard>,
@@ -64,6 +69,7 @@ struct ViewState {
 static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
     picker: Picker::EMPTY,
     surfaces: Surfaces::EMPTY,
+    discovery: Discovery::NEW,
     range: None,
     start: false,
     wizard: None,
@@ -85,7 +91,6 @@ struct Practice {
     reroll: bool,
     sampled: Option<(Setup, picker::Spot, [f32; 2])>,
     approximate: bool,
-    discovery: Discovery,
     discovery_failed: bool,
     epoch: Option<StageEpoch>,
     fighter_kind: i32,
@@ -157,6 +162,7 @@ pub fn starting() -> bool {
 }
 pub fn reset() {
     RESET.store(true, Ordering::Release);
+    STALE.store(true, Ordering::Release);
 }
 pub fn running() -> bool {
     RUNNING.load(Ordering::Acquire)
@@ -407,6 +413,51 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
         view.preview_blocked == Some(false),
     )
 }
+/// The stage's traced floors for the placement picker's step between floors, from the one outline Tech practice
+/// traces: no second copy is kept. The picker is open only while no practice game runs, so Tech is not walking
+/// the outline then. When it is not done for this stage, form and Training session, or a Training reset has passed
+/// since it was traced, the picker walks it here, one step a frame; Tech traces again at its next Start, as it
+/// always does. `found`: the picker's own note of how its walk went. Returns the floors written, 0 until the walk
+/// is done; `None` when the outline or the receipt is in use this frame, which is never waited for.
+pub(super) unsafe fn floors(
+    p1: usize,
+    (stage, form): (i32, u32),
+    range: [f32; 4],
+    found: &mut Found,
+    out: &mut [Floor; MAX_LINES],
+) -> Option<usize> {
+    let mut view = VIEW.try_lock()?;
+    let view = &mut *view;
+    let Some(training) = super::cpu::tech_player_receipt().ok()? else {
+        return Some(0);
+    };
+    let epoch = StageEpoch { stage, form, training };
+    if STALE.swap(false, Ordering::AcqRel) || view.surfaces.epoch() != Some(epoch) {
+        view.surfaces = Surfaces::EMPTY;
+        Surfaces::bind(&mut view.surfaces, epoch);
+        view.discovery = Discovery::NEW;
+        *found = Found::More;
+    }
+    *found = if view.discovery.done(&view.surfaces) {
+        Found::Done
+    } else if *found == Found::Failed {
+        Found::Failed
+    } else {
+        match NativeSource::new(p1) {
+            Some(mut source) => view.discovery.step(&mut source, range, &mut view.surfaces),
+            None => Found::Failed,
+        }
+    };
+    if *found != Found::Done {
+        return Some(0);
+    }
+    let mut count = 0;
+    for line in view.surfaces.lines().filter(|line| line.kind() == Some(SurfaceKind::Floor)) {
+        out[count] = line.ends.map(|end| [end.x, end.y]);
+        count += 1;
+    }
+    Some(count)
+}
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
 /// Only the non-hook heartbeat may call this, after guarded game-table resolution.
@@ -492,7 +543,7 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
         *draws = MaterialDraws::default();
     }
     run.recovering = true;
-    run.discovery = Discovery::NEW;
+    view.discovery = Discovery::NEW;
     view.surfaces.discard();
     view.picker.selected = None;
     view.picker.hovered = None;
@@ -521,7 +572,7 @@ fn with_practice_frame(
                         StateView::Paused
                     } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
                         StateView::Failed
-                    } else if !run.discovery.done(&view.surfaces) {
+                    } else if !view.discovery.done(&view.surfaces) {
                         StateView::Discovering
                     } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
                         StateView::Wizard(wizard, view.preview_blocked)
@@ -559,6 +610,7 @@ pub unsafe fn frame(fighter: usize) {
         {
             view.picker.enter(-1, Vec2::default());
             view.surfaces = Surfaces::EMPTY;
+            view.discovery = Discovery::NEW;
             view.range = None;
             view.start = false;
             view.wizard = None;
@@ -631,7 +683,6 @@ pub unsafe fn frame(fighter: usize) {
                 reroll: true,
                 sampled: None,
                 approximate: false,
-                discovery: Discovery::NEW,
                 discovery_failed: false,
                 epoch: None,
                 fighter_kind,
@@ -732,7 +783,8 @@ pub unsafe fn frame(fighter: usize) {
             run.pending = false;
             run.planning_failed = false;
             published::WIZARDS.set_up(Kind::TechPlacing, false);
-            run.discovery = Discovery::NEW;
+            view.discovery = Discovery::NEW;
+            STALE.store(false, Ordering::Release);
             run.discovery_failed = false;
             view.preview_params = None;
             view.picker.enter(
@@ -773,7 +825,7 @@ pub unsafe fn frame(fighter: usize) {
             return;
         };
         view.range = Some(range);
-        match run.discovery.step(&mut source, range, &mut view.surfaces) {
+        match view.discovery.step(&mut source, range, &mut view.surfaces) {
             Found::Done => {}
             Found::More => {
                 notice(run, Some("Finding stage surfaces…"));

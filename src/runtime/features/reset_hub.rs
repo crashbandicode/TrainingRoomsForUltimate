@@ -70,7 +70,6 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         crate::runtime::features::parry::reset();
         crate::runtime::features::edge_juggle::restart();
         crate::runtime::features::egg_zone::reset();
-        crate::runtime::features::record_place::retrace();
     }
     result
 }
