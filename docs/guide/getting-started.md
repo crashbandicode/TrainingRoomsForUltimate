@@ -34,7 +34,7 @@ Try these three first:
 | Try | Buttons | More |
 | --- | --- | --- |
 | Save where you stand, then come back to it | ZL + D-pad Down saves, ZL + D-pad Up loads | [Save states](save-states.md) |
-| See the boxes that hit and hurt | Display & Controls › Hitbox Visualization, then A | [Hitbox Visualization](../menu/display-and-controls.md#hitbox-visualization) |
+| See the boxes that hit and hurt | Open Display & Controls › Hitbox Visualization with A. Tick Hitboxes and Hurtboxes with A, back out with B, then attack. | [Hitbox Visualization](../menu/display-and-controls.md#hitbox-visualization) |
 | Slow the game down | Hold R + D-pad Up, then Left or Right | [Game speed](game-speed.md) |
 
 ## The pages

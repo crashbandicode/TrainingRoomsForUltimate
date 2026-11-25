@@ -18,8 +18,9 @@ on its page's own doc: [CPU](../menu/cpu.md), [Saves](../menu/saves.md), [Record
 
 - The menu opens in Training, and in a waiting room while Fighters & Stages ›
   [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On. It doesn't open over the game's pause menu.
-- While it is open, your buttons go to the menu and the CPU stands frozen. Your own fighter is not frozen, and a
-  preview, save-state load, recording or macro that is playing goes on. A CPU fighter change waits until it closes.
+- While it is open, your buttons go to the menu. Player 1 is not frozen. The CPU normally stands still, but not
+  during a preview, save-state load, recording or macro playback. A macro queued for Player 1 also lifts the hold.
+  A CPU fighter change waits until the menu closes.
 - If the menu is closed for you (a match starts, or you leave Training), the changes from that visit are not kept.
 - It reopens where you left it: the same page and row, and a list you left open.
 
