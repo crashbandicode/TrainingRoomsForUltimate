@@ -1435,6 +1435,9 @@ pub fn set_playback_indicator(on: bool) {
 #[cfg(test)]
 pub fn set_playback_delay(_frames: u16) {}
 
+#[cfg(test)]
+pub fn drop_cached_book() -> Option<usize> { None }
+
 pub fn playback_indicator_enabled() -> bool {
     PLAYBACK_INDICATOR.load(Ordering::Acquire)
 }
@@ -4177,6 +4180,38 @@ mod tests {
         on_chords(false, false, true);
         tick(&root);
         assert_eq!(cpu_controller(take_cpu_frame).unwrap().buttons, 1, "a new Play starts normally");
+    }
+
+    #[test]
+    fn parry_practice_delays_its_first_pass_only() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-delay");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 2];
+        let mut recording = super::super::macros::MacroRecording::new("Fireball", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        set_playback_delay(10);
+        on_chords(false, false, true);
+        assert_eq!(service_at(&root, &none(), "2026-11-18", state(8), state(7)).warp.as_deref(), Some(save_id.as_str()));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        for _ in 0..10 { assert_eq!(take_cpu_frame(), None); }
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        assert_eq!(service_at(&root, &none(), "2026-11-18", state(8), state(7)).warp.as_deref(), Some(save_id.as_str()));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        reset_host();
     }
 
     /// Parry practice (DESIGN rev 2 §2.3): each Loop pass is one play-once run warped to the macro's start save, and

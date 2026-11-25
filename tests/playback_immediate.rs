@@ -150,7 +150,7 @@ fn assert_delay(role: Role, frames: u16) {
 }
 
 #[test]
-fn a_play_pass_reads_nothing_from_the_card() {
+fn a_play_start_reads_only_what_it_starts() {
     let _guard = HostGuard::new();
     let f = session(true);
     warm(&f, true);
@@ -169,7 +169,39 @@ fn a_play_pass_reads_nothing_from_the_card() {
         tick(&f.root);
         passes.push(difference(before, counts()));
     }
-    assert_eq!(passes, vec![(0, 0); 5], "file reads, listings: chord, after restore, running passes");
+    assert_eq!(passes, vec![(3, 0), (0, 0), (0, 0), (0, 0), (0, 0)], "file reads, listings: chord, after restore, running passes");
+}
+
+#[test]
+fn an_idle_pass_reads_nothing_from_the_card() {
+    let _guard = HostGuard::new();
+    let f = small(false);
+    tick(&f.root);
+    let before = counts();
+    tick(&f.root);
+    assert_eq!(difference(before, counts()), (0, 0), "idle before Play");
+    chord(Role::Player);
+    tick(&f.root);
+    while poll(Role::Player).is_some() {}
+    tick(&f.root);
+    let before = counts();
+    tick(&f.root);
+    assert_eq!(difference(before, counts()), (0, 0), "idle after Play");
+}
+
+#[test]
+fn the_reads_at_a_start_do_not_grow_with_the_library() {
+    let _guard = HostGuard::new();
+    let mut results = Vec::new();
+    for f in [small(true), session(true)] {
+        host::reset_host();
+        warm(&f, true);
+        let before = counts();
+        chord(Role::Player);
+        tick(&f.root);
+        results.push(difference(before, counts()));
+    }
+    assert_eq!(results[0], results[1]);
 }
 
 #[test]
@@ -232,43 +264,169 @@ fn the_start_save_is_posted_without_a_card_read() {
     let reads = difference(before, counts());
     assert_eq!(started.warp.as_deref(), Some(f.save.as_str()));
     assert_eq!(started.warp_pair, Some(f.pair), "the worker supplies the restored pair; card reads/listings {reads:?}");
-    assert_eq!(reads, (0, 0));
+    assert_eq!(reads, (3, 0));
     let source = include_str!("../src/runtime/features/recording_host.rs");
     assert!(source.contains("tick.warp_pair"));
     assert!(source.contains("request_named_load"));
 }
 
 #[test]
-fn the_library_is_reread_after_a_catalog_or_index_change() {
+fn a_library_write_while_a_macro_plays_is_read_on_the_next_pass() {
+    let _guard = HostGuard::new();
+    let f = session(false);
+    warm(&f, false);
+    chord(Role::Player);
+    tick(&f.root);
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(1));
+    let library = Library::new(f.root.join(MACROS_DIR));
+    library.save_new(&recording("Added", 7)).unwrap();
+    let before_catalog = counts();
+    tick(&f.root);
+    let catalog_reads = difference(before_catalog, counts());
+    assert!(catalog_reads.0 > 0 && catalog_reads.1 == 0, "catalog change must reload held files: {catalog_reads:?}");
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(2));
+    let before_stable = counts();
+    tick(&f.root);
+    assert_eq!(difference(before_stable, counts()), (0, 0));
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(3));
+}
+
+#[test]
+fn a_same_size_rewrite_outside_the_mod_is_played_by_the_next_start() {
+    let _guard = HostGuard::new();
+    let f = small(true);
+    warm(&f, true);
+    let versions = (store::catalog_generation(), store::index_generation());
+    let macro_path = f.root.join(MACROS_DIR).join(format!("{}.json", f.active));
+    let mut bytes = std::fs::read(&macro_path).unwrap();
+    let macro_len = bytes.len();
+    let needle = b"\"buttons\":1";
+    let at = bytes.windows(needle.len()).position(|part| part == needle).unwrap();
+    bytes[at + needle.len() - 1] = b'9';
+    std::fs::write(&macro_path, &bytes).unwrap();
+    assert_eq!(std::fs::metadata(&macro_path).unwrap().len(), macro_len as u64);
+    let save_path = f.root.join(SAVES_DIR).join(format!("{}.json", f.save));
+    let old = std::fs::read(&save_path).unwrap();
+    let mut value: serde_json::Value = serde_json::from_slice(&old).unwrap();
+    value["player"]["x"] = serde_json::json!(9.0);
+    let changed = serde_json::to_vec(&value).unwrap();
+    assert_eq!(old.len(), changed.len());
+    assert_eq!(old.iter().zip(&changed).filter(|(a, b)| a != b).count(), 1);
+    std::fs::write(&save_path, &changed).unwrap();
+    assert_eq!((store::catalog_generation(), store::index_generation()), versions);
+    chord(Role::Player);
+    let start = tick(&f.root);
+    let mut pair = f.pair.clone();
+    pair[0].x = 9.0;
+    assert_eq!(start.warp_pair, Some(pair));
+    host::warp_landed();
+    tick(&f.root);
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(9));
+}
+
+#[test]
+fn an_index_replaced_outside_the_mod_is_followed_by_the_next_start() {
+    let _guard = HostGuard::new();
+    let f = small(false);
+    let mut other = recording("Other", 2);
+    other.frames[0].buttons = 67;
+    let id = Library::new(f.root.join(MACROS_DIR)).save_new(&other).unwrap();
+    warm(&f, false);
+    let mut index = RecordingIndex::load(&f.root).unwrap();
+    index.set_active(Role::Player, Some(&id), 4).unwrap();
+    let versions = (store::catalog_generation(), store::index_generation());
+    std::fs::write(f.root.join(crate::engine::library::INDEX_FILE), serde_json::to_vec(&index).unwrap()).unwrap();
+    assert_eq!((store::catalog_generation(), store::index_generation()), versions);
+    chord(Role::Player);
+    tick(&f.root);
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(67));
+}
+
+#[test]
+fn a_rewritten_active_start_save_is_used_by_the_next_play() {
+    let _guard = HostGuard::new();
+    let f = session(true);
+    warm(&f, true);
+    let saves = Store::<NamedSave>::new(f.root.join(SAVES_DIR));
+    let mut changed = saves.load(&f.save).unwrap();
+    changed.player.x = 42.0;
+    changed.cpu.x = -21.0;
+    saves.overwrite(&f.save, &changed).unwrap();
+    chord(Role::Player);
+    let next = tick(&f.root);
+    assert_eq!(next.warp.as_deref(), Some(f.save.as_str()));
+    assert_eq!(next.warp_pair, Some([changed.player, changed.cpu]));
+}
+
+#[test]
+fn a_deleted_active_start_save_is_not_warped_to_on_the_next_play() {
+    let _guard = HostGuard::new();
+    let f = session(true);
+    warm(&f, true);
+    Store::<NamedSave>::new(f.root.join(SAVES_DIR)).delete(&f.save).unwrap();
+    chord(Role::Player);
+    let next = tick(&f.root);
+    assert!(next.warp.is_none());
+    assert!(next.warp_pair.is_none());
+    assert!(next.notices.contains(&crate::engine::rr_runtime::MISSING_START_SAVE));
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(1));
+}
+
+#[test]
+fn rewritten_active_macro_frames_are_used_by_the_next_play() {
     let _guard = HostGuard::new();
     let f = session(false);
     warm(&f, false);
     let library = Library::new(f.root.join(MACROS_DIR));
-    let new_id = library.save_new(&recording("Added", 7)).unwrap();
-    let before_catalog = counts();
-    host::request_preview(&new_id, Role::Player, 0, 7);
+    let mut changed = library.load(&f.active).unwrap();
+    changed.frames[0].buttons = 91;
+    changed.frames[1].buttons = 92;
+    library.overwrite(&f.active, &changed).unwrap();
+    chord(Role::Player);
     tick(&f.root);
-    let catalog_reads = difference(before_catalog, counts());
-    assert_eq!(poll(Role::Player).map(|f| f.buttons), Some(1));
-    assert!(catalog_reads.0 > 0 && catalog_reads.1 > 0, "catalog change must rebuild: {catalog_reads:?}");
-    host::stop_preview();
-    tick(&f.root);
-    let mut index = RecordingIndex::load(&f.root).unwrap();
-    index.set_active(Role::Cpu, Some(&new_id), 2).unwrap();
-    index.save(&f.root).unwrap();
-    let before_index = counts();
-    chord(Role::Cpu);
-    tick(&f.root);
-    let index_reads = difference(before_index, counts());
-    assert!(index_reads.0 > 0 && index_reads.1 > 0, "index change must rebuild: {index_reads:?}");
-    assert_eq!(poll(Role::Cpu).map(|f| f.buttons), Some(1));
-    let before_stable = counts();
-    tick(&f.root);
-    assert_eq!(difference(before_stable, counts()), (0, 0), "unchanged generations after both rebuilds");
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(91));
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(92));
 }
 
 #[test]
-fn a_cached_library_plays_the_same_frames_as_a_fresh_one() {
+fn changed_active_and_loop_are_used_by_the_next_play() {
+    let _guard = HostGuard::new();
+    let f = session(false);
+    warm(&f, false);
+    let mut changed = recording("Other", 2);
+    changed.frames[0].buttons = 71;
+    changed.frames[1].buttons = 72;
+    let id = Library::new(f.root.join(MACROS_DIR)).save_new(&changed).unwrap();
+    let mut index = RecordingIndex::load(&f.root).unwrap();
+    index.set_active(Role::Player, Some(&id), 3).unwrap();
+    index.set_loop(Role::Player, LoopCount::Finite(2));
+    index.save(&f.root).unwrap();
+    chord(Role::Player);
+    tick(&f.root);
+    let frames: Vec<_> = (0..4).map(|_| poll(Role::Player).unwrap().buttons).collect();
+    assert_eq!(frames, [71, 72, 71, 72]);
+}
+
+#[test]
+fn an_active_chain_reads_its_steps_and_first_start_save() {
+    let _guard = HostGuard::new();
+    let f = small(true);
+    let chain = Chain::new("Chain", vec![f.active.clone()]).unwrap();
+    let id = Store::<Chain>::new(f.root.join(MACROS_DIR)).save_new(&chain).unwrap();
+    let mut index = RecordingIndex::load(&f.root).unwrap();
+    index.set_active(Role::Player, Some(&id), 3).unwrap();
+    index.save(&f.root).unwrap();
+    warm(&f, true);
+    let before = counts();
+    chord(Role::Player);
+    let next = tick(&f.root);
+    assert_eq!(next.warp.as_deref(), Some(f.save.as_str()));
+    assert_eq!(next.warp_pair, Some(f.pair));
+    assert_eq!(difference(before, counts()), (5, 0));
+}
+
+#[test]
+fn held_files_play_the_same_frames_as_a_fresh_read() {
     let _guard = HostGuard::new();
     let f = small(false);
     let rec = Library::new(f.root.join(MACROS_DIR)).load(&f.active).unwrap();
@@ -285,7 +443,7 @@ fn a_cached_library_plays_the_same_frames_as_a_fresh_one() {
 }
 
 #[test]
-fn a_vault_playback_and_a_preview_read_nothing_from_the_card() {
+fn a_vault_playback_and_a_preview_read_only_what_they_start() {
     let _guard = HostGuard::new();
     let f = session(false);
     warm(&f, false);
@@ -308,7 +466,7 @@ fn a_vault_playback_and_a_preview_read_nothing_from_the_card() {
     assert_eq!(poll(Role::Player).map(|f| f.buttons), Some(1));
     assert_eq!([
         difference(before, clip_start), difference(clip_start, clip_resume), difference(before_preview, preview_start),
-    ], [(0, 0); 3], "file reads, listings: Vault start/resume and editor preview");
+    ], [(1, 0), (0, 0), (2, 0)], "file reads, listings: Vault start/resume and editor preview");
 }
 
 #[test]
@@ -392,7 +550,9 @@ fn playback_delay_applies_to_player_cpu_and_vault_playback() {
     tick(&f.root);
     host::set_playback_delay(10);
     chord(Role::Player);
-    assert_eq!(host::playback_roles(), [true, false], "indicator starts with the chord");
+    assert_eq!(host::playback_roles(), [false, false]);
+    tick(&f.root);
+    assert_eq!(host::playback_roles(), [true, false], "indicator starts with the worker pass");
     let source = include_str!("../src/runtime/macros/replay_capture.rs");
     assert!(source.contains("request_clip_playback("), "Vault Play back must carry its origin through the runtime");
 }
@@ -511,27 +671,75 @@ fn playback_delay_is_one_path_for_training_and_the_waiting_room() {
 }
 
 #[test]
-fn the_cached_library_heap_is_reported() {
+fn the_held_files_heap_is_reported() {
     let _guard = HostGuard::new();
-    let f = fixture(true, LoopCount::Finite(1), &SESSION_FRAMES);
+    for both in [false, true] {
+        host::reset_host();
+        let f = fixture(true, LoopCount::Finite(1), &SESSION_FRAMES);
+        chord(Role::Player);
+        tick(&f.root);
+        host::warp_landed();
+        tick(&f.root);
+        if both {
+            chord(Role::Cpu);
+            tick(&f.root);
+            host::warp_landed();
+            tick(&f.root);
+        }
+        let measured = crate::cache_drop_bytes(host::drop_cached_book);
+        assert!(measured.is_some(), "a held book exists");
+        let (heap, inline) = measured.unwrap();
+        let bytes = heap + inline;
+        writeln!(std::io::stdout(), "held files: {heap} heap + {inline} inline = {bytes} bytes ({})", if both { "two roles" } else { "one role" }).unwrap();
+        assert!(bytes < 256 * 1024);
+    }
+}
+
+#[test]
+fn player_one_is_neutral_during_its_own_delay() {
+    let _guard = HostGuard::new();
+    let f = small(false);
+    tick(&f.root);
+    delayed_chord(&f, Role::Player, 10, false);
+    let pressed = crate::model::input_delay::MappedInputs { buttons: 3, lstick_x: 80, ..Default::default() };
+    for _ in 0..10 {
+        let mut out = pressed;
+        assert!(!unsafe { host::on_player_poll(&mut out) });
+        assert_eq!(out, crate::model::input_delay::MappedInputs::default());
+    }
+    let mut out = pressed;
+    assert!(unsafe { host::on_player_poll(&mut out) });
+    assert_eq!(out.buttons, 1);
+    host::reset_host();
+    let f = small(false);
+    tick(&f.root);
+    delayed_chord(&f, Role::Cpu, 10, false);
+    for _ in 0..10 {
+        let mut out = pressed;
+        assert!(!unsafe { host::on_player_poll(&mut out) });
+        assert_eq!(out, pressed);
+        assert_eq!(poll(Role::Cpu), None);
+    }
+}
+
+#[test]
+fn the_start_speed_waits_for_the_first_input_after_the_delay() {
+    let _guard = HostGuard::new();
+    let f = small(true);
     let library = Library::new(f.root.join(MACROS_DIR));
-    let mut book = Book::new(RecordingIndex::load(&f.root).unwrap());
-    let mut bytes = core::mem::size_of::<Book>();
-    for entry in library.list().unwrap().entries {
-        let rec = library.load(&entry.id).unwrap();
-        bytes += core::mem::size_of::<MacroRecording>() + entry.id.capacity()
-            + rec.name.capacity() + rec.game_version.capacity()
-            + rec.start_save.as_ref().map_or(0, String::capacity)
-            + rec.frames.capacity() * core::mem::size_of::<InputFrame>();
-        book.add_recording(entry.id, rec);
+    let mut rec = library.load(&f.active).unwrap();
+    rec.start.speed_x = 1.25;
+    rec.start.speed_y = -0.5;
+    library.overwrite(&f.active, &rec).unwrap();
+    tick(&f.root);
+    delayed_chord(&f, Role::Player, 10, true);
+    let mut out = crate::model::input_delay::MappedInputs::default();
+    for _ in 0..10 {
+        assert!(!unsafe { host::on_player_poll(&mut out) });
     }
-    let saves = Store::<NamedSave>::new(f.root.join(SAVES_DIR));
-    for entry in saves.list().unwrap().entries {
-        let save = saves.load(&entry.id).unwrap();
-        bytes += core::mem::size_of::<NamedSave>() + save.name.capacity() + entry.id.capacity();
-        book.add_save(entry.id);
-    }
-    writeln!(std::io::stdout(), "synthetic cached Book and ten saves: {bytes} bytes; frames {}", SESSION_FRAMES.iter().sum::<usize>()).unwrap();
-    assert!(bytes < 256 * 1024, "synthetic cached Book and saves: {bytes} bytes");
-    std::hint::black_box(book);
+    assert!(unsafe { host::on_player_poll(&mut out) });
+    assert_eq!(host::take_start_speed(Role::Player).map(|speed| speed.speed), Some((1.25, -0.5)));
+    let source = include_str!("../src/runtime/features/recording_host.rs");
+    let player = source.split("pub unsafe fn on_player_poll(").nth(1).unwrap().split("\n}").next().unwrap();
+    assert!(player.contains("if rr_host::on_player_poll(out)") && player.contains("apply_start_speed("));
 }
