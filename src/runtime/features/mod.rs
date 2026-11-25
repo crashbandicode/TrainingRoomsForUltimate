@@ -24,6 +24,8 @@ pub mod practice;
 pub mod edge_juggle;
 mod placement;
 mod stage_geometry;
+#[cfg(feature = "diag")]
+mod stage_probe;
 pub(super) mod egg_zone;
 pub mod recorder;
 pub mod record_place;
