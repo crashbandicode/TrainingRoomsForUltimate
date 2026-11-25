@@ -71,7 +71,7 @@ extern "C" fn on_init(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5:
         crate::runtime::features::edge_juggle::restart();
         crate::runtime::features::egg_zone::reset();
         #[cfg(feature = "diag")]
-        super::stage_geometry::diag_probe_rearm();
+        super::stage_probe::rearm();
     }
     result
 }
