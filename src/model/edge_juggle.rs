@@ -45,8 +45,10 @@ impl Drill {
         }
     }
 
-    /// The Edge recovery start is already airborne, so only aerial jumps are restored.
-    pub const fn placed_jump_count(self) -> i32 {
+    /// The Edge recovery start is already airborne, so only aerial jumps are restored. With the jumps `used`, the
+    /// counter starts at the fighter's own `max` (its `jump_count_max`), so no midair jump is left.
+    pub const fn placed_jump_count(self, used: bool, max: i32) -> i32 {
+        let _ = (used, max);
         match self {
             Self::GuardEdge => 1,
             Self::Juggler => 0,
@@ -857,6 +859,53 @@ impl Stage {
     pub fn default_juggle(self, p1: [f32; 2]) -> [f32; 2] {
         [p1[0], p1[1].midpoint(self.camera[2])]
     }
+
+    /// The class of a start point. `solid` is the closed outline of the stage's solid.
+    pub fn start_class(self, point: [f32; 2], solid: &[perfect::Segment]) -> StartClass {
+        let _ = solid;
+        if self.edge_cursor(point) != Some(point) {
+            StartClass::Outside
+        } else if self.off_stage(point).is_some() {
+            StartClass::Open
+        } else {
+            StartClass::Over
+        }
+    }
+
+    /// Whether a start kept for this stage is still one Start may use without the wizard.
+    pub fn keeps_start(self, drill: Drill, cpu: [f32; 2], options: StartOptions) -> bool {
+        let _ = (drill, cpu, options);
+        true
+    }
+}
+
+/// Guard the Edge's two start options (the menu rows `edge_under` and `edge_jumps`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StartOptions {
+    pub under: bool,
+    pub jumps_used: bool,
+}
+
+impl StartOptions {
+    pub fn read(snapshot: &crate::model::settings::Snapshot) -> Self {
+        let _ = snapshot;
+        Self::default()
+    }
+
+    /// Names the options in the drill's bridge state (`under=`, `jumps=`); Juggler has neither.
+    pub fn describe(self, drill: Drill, fields: &mut Fields) {
+        let _ = (drill, fields);
+    }
+}
+
+/// Where a start point lies: beside the stage, under it, over it, in its solid, or outside the blast lines.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartClass {
+    Open,
+    Under,
+    Over,
+    Solid,
+    Outside,
 }
 
 fn clamp_point([x, y]: [f32; 2], [left, right, top, bottom]: [f32; 4]) -> Option<[f32; 2]> {
@@ -1113,6 +1162,21 @@ impl Wizard {
 
     pub fn accepts_cpu(&self, stage: Stage) -> bool {
         self.drill == Drill::Juggler || stage.off_stage(self.setup.cpu).is_some()
+    }
+
+    /// Whether A takes a CPU start of this class.
+    pub fn accepts_class(&self, class: StartClass, options: StartOptions) -> bool {
+        let _ = options;
+        self.drill == Drill::Juggler || class == StartClass::Open
+    }
+
+    /// A on the CPU page, once the point's class is known: an accepted point goes on to the next page.
+    pub fn confirm_cpu(&mut self, class: StartClass, options: StartOptions) -> bool {
+        let accepted = self.step == WizardStep::Cpu && self.accepts_class(class, options);
+        if accepted {
+            self.advance();
+        }
+        accepted
     }
 
     /// The Player page keeps its cursor over a floor: a move with none under it is undone.
@@ -1487,9 +1551,9 @@ mod tests {
         // Stock jump_count_max includes the ground jump. The verified Sheik,
         // Pit and Meta Knight starts have one, three and five aerial jumps.
         for (native_max, reference_reserve) in [(2, 1), (4, 3), (6, 5)] {
-            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(), reference_reserve);
+            assert_eq!(native_max - Drill::GuardEdge.placed_jump_count(false, native_max), reference_reserve);
         }
-        assert_eq!(Drill::Juggler.placed_jump_count(), 0);
+        assert_eq!(Drill::Juggler.placed_jump_count(false, 2), 0);
     }
 
     #[test]

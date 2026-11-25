@@ -1710,7 +1710,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
     ).unwrap_or(-facing);
     placement::lift(bodies.cpu, setup.cpu, cpu_facing);
-    natives::set_int(bodies.cpu, drill.placed_jump_count(), jump_count);
+    natives::set_int(bodies.cpu, drill.placed_jump_count(false, 0), jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
     placement::fall(bodies.cpu);

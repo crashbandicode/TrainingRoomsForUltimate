@@ -129,6 +129,27 @@ fn bridge_game_lists_match_in_training_and_waiting_rooms() {
 }
 
 #[test]
+fn guard_the_edge_lists_its_two_start_options() {
+    assert_eq!(titles(table::EDGE), ["Start", "CPU fighter and mode", "Reaction", "Set up…", "Under the stage", "CPU percent",
+        "CPU midair jumps", "Attempts", "Zoom landing window"]);
+    let under = &ROWS[row("Under the stage", table::EDGE)];
+    assert_eq!(under.id, "edge_under");
+    assert!(matches!(under.control, Control::Toggle));
+    assert_eq!(under.help, "Off (default): the CPU start must be beside the stage.\nOn: A also takes a point under the stage.");
+    let jumps = &ROWS[row("CPU midair jumps", table::EDGE)];
+    assert_eq!(jumps.id, "edge_jumps");
+    assert!(matches!(jumps.control, Control::Dropdown(["Kept", "Used"])));
+    assert_eq!(jumps.help, "Kept (default): the CPU starts with its midair jumps.\nUsed: it starts with every midair jump already spent.");
+    for r in [under, jumps] {
+        let (a, b) = r.help_lines();
+        assert!(!b.is_empty() && a.chars().count() <= 67 && b.chars().count() <= 67, "{}", r.title);
+    }
+    // Both are Guard the Edge's: Juggler has neither.
+    assert!(ROWS.iter().all(|r| r.group != table::JUGGLE || !matches!(r.id, "edge_under" | "edge_jumps")));
+    assert_eq!(ROWS.iter().filter(|r| matches!(r.id, "edge_under" | "edge_jumps")).count(), 2);
+}
+
+#[test]
 fn bridge_dropdown_and_slider_follow_the_active_screen() {
     use crate::model::bridge_state::{list_view, ListView};
     let mut m = opened(Game::GuardEdge);

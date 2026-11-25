@@ -295,4 +295,146 @@ fn wizard_notice_fits_its_buffer() {
     assert!(write!(preview, "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start").is_ok());
     assert_eq!(Body::copied(preview.as_str()).as_str(), preview.as_str());
 }
+
+/// A Battlefield-like solid: the floor between the ledges and an underside that slopes in to (0, -40).
+const SOLID: [perfect::Segment; 5] = [
+    [[-80.0, 0.0], [80.0, 0.0]], [[80.0, 0.0], [60.0, -20.0]], [[60.0, -20.0], [0.0, -40.0]],
+    [[0.0, -40.0], [-60.0, -20.0]], [[-60.0, -20.0], [-80.0, 0.0]],
+];
+const UNDER_ON: StartOptions = StartOptions { under: true, jumps_used: false };
+const OFF: StartOptions = StartOptions { under: false, jumps_used: false };
+
+#[test]
+fn a_start_point_is_classed_from_the_stage_and_its_outline() {
+    use StartClass::{Open, Outside, Over, Solid, Under};
+    let stage = stage();
+    for (point, class) in [
+        ([-120.0, -30.0], Open), ([120.0, 10.0], Open),
+        ([0.0, -60.0], Under), ([-70.0, -30.0], Under),
+        ([0.0, -20.0], Solid), ([-70.0, -5.0], Solid),
+        ([0.0, 30.0], Over),
+        // Inside the 1-unit band beside a ledge, with nothing above: not beside the stage and not under it.
+        ([-80.5, -50.0], Over),
+        ([0.0, -139.5], Outside), ([-229.5, 0.0], Outside), ([f32::NAN, 0.0], Outside),
+    ] {
+        assert_eq!(stage.start_class(point, &SOLID), class, "{point:?}");
+    }
+    // Without an outline nothing is known to be above the point.
+    assert_eq!(stage.start_class([0.0, -60.0], &[]), Over);
+}
+
+#[test]
+fn the_under_option_accepts_a_start_under_the_stage() {
+    let edge = wizard(Drill::GuardEdge, None);
+    assert!(edge.accepts_class(StartClass::Under, UNDER_ON));
+    let mut under = edge;
+    assert!(under.confirm_cpu(StartClass::Under, UNDER_ON));
+    assert_eq!(under.step, WizardStep::Player);
+    for class in [StartClass::Solid, StartClass::Over, StartClass::Outside] {
+        let mut refused = edge;
+        assert!(!refused.confirm_cpu(class, UNDER_ON), "{class:?}");
+        assert_eq!(refused.step, WizardStep::Cpu, "{class:?}");
+    }
+    for options in [UNDER_ON, OFF] {
+        let mut beside = edge;
+        assert!(beside.confirm_cpu(StartClass::Open, options));
+        assert_eq!(beside.step, WizardStep::Player);
+    }
+    // Only the CPU page is confirmed this way.
+    let mut player = under;
+    assert!(!player.confirm_cpu(StartClass::Under, UNDER_ON));
+    assert_eq!(player.step, WizardStep::Player);
+}
+
+#[test]
+fn with_under_off_a_start_under_the_stage_is_refused_as_before() {
+    let mut edge = wizard(Drill::GuardEdge, None);
+    assert!(!edge.accepts_class(StartClass::Under, OFF));
+    assert!(!edge.confirm_cpu(StartClass::Under, OFF));
+    assert_eq!(edge.step, WizardStep::Cpu);
+    edge.setup.cpu = [0.0, -60.0];
+    assert!(!edge.accepts_cpu(stage()));
+    assert_eq!(StartOptions::default(), OFF);
+}
+
+#[test]
+fn a_kept_start_under_the_stage_needs_the_option() {
+    let stage = stage();
+    assert!(!stage.keeps_start(Drill::GuardEdge, [0.0, -60.0], OFF));
+    assert!(stage.keeps_start(Drill::GuardEdge, [0.0, -60.0], UNDER_ON));
+    for options in [OFF, UNDER_ON] {
+        assert!(stage.keeps_start(Drill::GuardEdge, [-120.0, -30.0], options));
+        for point in [[0.0, -60.0], [0.0, 30.0], [-120.0, -30.0]] {
+            assert!(stage.keeps_start(Drill::Juggler, point, options));
+        }
+    }
+}
+
+#[test]
+fn used_jumps_spend_every_midair_jump_of_the_fighter() {
+    // `max` is the fighter's own `jump_count_max`, which counts the ground jump: 2 for most, 3 and 6 for the
+    // fighters with two and five midair jumps.
+    for max in [2, 3, 6] {
+        assert_eq!(Drill::GuardEdge.placed_jump_count(true, max), max);
+        assert_eq!(Drill::GuardEdge.placed_jump_count(false, max), 1);
+    }
+    // A count that cannot be read keeps the jumps.
+    for max in [1, 0, -1] {
+        assert_eq!(Drill::GuardEdge.placed_jump_count(true, max), 1);
+        assert_eq!(Drill::GuardEdge.placed_jump_count(false, max), 1);
+    }
+}
+
+#[test]
+fn juggler_ignores_the_two_start_options() {
+    use crate::model::practice_state::Fields;
+    let juggle = wizard(Drill::Juggler, None);
+    for used in [false, true] {
+        for max in [-1, 0, 2, 6] {
+            assert_eq!(Drill::Juggler.placed_jump_count(used, max), 0);
+        }
+        for under in [false, true] {
+            let options = StartOptions { under, jumps_used: used };
+            for class in [StartClass::Open, StartClass::Under, StartClass::Over, StartClass::Solid, StartClass::Outside] {
+                assert!(juggle.accepts_class(class, options), "{class:?}");
+            }
+            let mut fields = Fields::default();
+            options.describe(Drill::Juggler, &mut fields);
+            assert_eq!((fields.under, fields.jumps), ("", ""));
+        }
+    }
+}
+
+#[test]
+fn the_drill_state_names_the_two_start_options() {
+    use crate::model::practice_games::Game;
+    use crate::model::practice_state::{snapshot, Fields, CPU_ENTRIES};
+    let wire = |options: StartOptions| {
+        let mut fields = Fields { phase: "live", ..Fields::default() };
+        options.describe(Drill::GuardEdge, &mut fields);
+        let mut wire = String::new();
+        snapshot(Some(Game::GuardEdge), fields, [0; CPU_ENTRIES], &mut wire);
+        wire
+    };
+    let has = |wire: &str, line: &str| wire.lines().any(|l| l == line);
+    let set = wire(StartOptions { under: true, jumps_used: true });
+    assert!(has(&set, "under=on") && has(&set, "jumps=used"), "{set}");
+    let default = wire(StartOptions::default());
+    assert!(has(&default, "under=off") && has(&default, "jumps=kept"), "{default}");
+}
+
+#[test]
+fn the_start_options_read_no_scene() {
+    // Training and a waiting room run the same poll, frame and placement: the options come from the one published
+    // setting, the point's class from the one outline read, and the jump count from the one write.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    assert_eq!(runtime.matches("StartOptions::read(snapshot)").count(), 1);
+    assert_eq!(runtime.matches("drill.placed_jump_count(options.jumps_used, ").count(), 1);
+    assert_eq!(runtime.matches("wizard.confirm_cpu(class, run.options)").count(), 1);
+    assert_eq!(runtime.matches("stage.keeps_start(drill, setup.cpu, config.options)").count(), 1);
+    let body = |name: &str| runtime.split_once(name).unwrap().1.split_once("\n}").unwrap().0;
+    for code in [body("unsafe fn try_place("), body("unsafe fn start_class(")] {
+        assert!(!code.contains("practice_scene") && !code.contains("Scene::") && !code.contains("LOBBY"));
+    }
+}
 }
