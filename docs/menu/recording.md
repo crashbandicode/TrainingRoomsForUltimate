@@ -80,10 +80,16 @@ the number of files, such as "Save states & Macros (7)".
 
 2026-11-24. **RECORDINGS >** is the first row of MACROS on the Recording page, in either view. It opens the latest and
 previous Vault captures and saved captures, with their fighter sides and length; B returns to MACROS. A capture's
-screen has **Inputs from**, **Plays on**, **Play back**, **Make macro…**, **Make combo…**, and **Make drill…**.
+screen has **Inputs from**, **Plays on**, **Play back**, **Make macro…**, **Make combo…**, **Make drill…**, and
+**Delete**.
 Choose the recorded side and whether the inputs play on Player 1 or the CPU. Play back opens the clip editor and
 starts its preview. Make macro saves the selected clip as that role's active macro. Make combo plays it on that role
 to capture a combo, or an input drill when no hit is made. Make drill always saves an input drill and its take.
+
+2026-11-25. **Delete** removes the capture at once, without asking, as it does for a macro. A saved capture's files go
+from the card; a Vault capture is dropped for this boot. Macros, combos and drills you already made from it stay, and
+the game's own replay in the Vault is untouched. If the delete cannot start, the capture stays in the list as it was;
+it is never left there half-deleted. Not yet seen in a game.
 
 In the waiting room an opening first lets the CPU finish what it is doing. Until then the row reads
 **Waiting for the CPU…** and only B acts: it cancels the opening and leaves the screen up. If the CPU is still busy
@@ -102,7 +108,7 @@ don't turn the page while a file's screen is open.
 | --- | --- |
 | Save state | Bind to Save / Load, Duplicate, Rename, Delete |
 | Macro | Start save (only if it has one), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
-| Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill… |
+| Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill…, Delete |
 | Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
 | Input drill | Drill, Made from (only if made from a macro or chain), Rename, Trim, Crop, Delete |
@@ -267,6 +273,9 @@ More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-
 Turns part of a saved match into a macro. It lists the captures you have: "Latest Vault capture" and "Previous Vault
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
 its name and its length in frames ("(partial)" if it ended early).
+
+2026-11-25. Y deletes the capture under the cursor, at once and without asking; the list stays open and the cursor
+returns to its first row. Deleting the last one closes the window. Not yet seen in a game.
 
 Pick one with A. If the CPU isn't the fighter it was recorded on, Fighter Mismatch may ask first
 ([Ask before switching fighter](#ask-before-switching-fighter)). Then the menu closes and the clip editor takes the

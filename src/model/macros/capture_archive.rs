@@ -344,6 +344,38 @@ impl CaptureArchive {
         }
     }
 
+    /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.
+    /// All or nothing for what the list shows: the folder leaves the list by one rename to a fresh name the list
+    /// ignores, and comes back if the plain file cannot go. An error before that changed nothing; an error after it
+    /// leaves what could not be removed under that name, never a broken row.
+    pub fn delete(&self, id: &str) -> io::Result<bool> {
+        decode_file_id(id).map_err(invalid_data)?;
+        let plain = self.capture_path(id);
+        if self.shared_cache_path(id)?.is_none() {
+            return remove_if_there(&plain);
+        }
+        let dir = self.dir.join(format!("{id}.smd"));
+        // A name nothing has: a leftover of an earlier delete is not this one's to touch.
+        let mut names = (0..64).map(|n| self.dir.join(format!(".{id}.smd-{n}.del")));
+        let gone = loop {
+            let name = names.next().ok_or_else(|| invalid_data("too many unfinished capture deletes"))?;
+            if file_type_if_exists(&name)?.is_none() {
+                break name;
+            }
+        };
+        fs::rename(&dir, &gone)?;
+        if let Err(err) = remove_if_there(&plain) {
+            // The folder hid that file: without it the plain file would be listed alone. Put the folder back.
+            fs::rename(&gone, &dir)?;
+            return Err(err);
+        }
+        for item in fs::read_dir(&gone)? {
+            fs::remove_file(item?.path())?;
+        }
+        fs::remove_dir(gone)?;
+        Ok(true)
+    }
+
     fn capture_path(&self, id: &str) -> PathBuf {
         self.dir.join(format!("{id}.tmrc"))
     }
@@ -647,6 +679,14 @@ fn ensure_existing_identity(
         ));
     }
     Ok(())
+}
+
+fn remove_if_there(path: &Path) -> io::Result<bool> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(true),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
+    }
 }
 
 fn file_type_if_exists(path: &Path) -> io::Result<Option<FileType>> {
@@ -1213,10 +1253,59 @@ mod tests {
         assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);
     }
 
+    fn delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let plain = archive.save("plain", "Plain", "13.0.5", &two_sides()).unwrap();
+        let kept = archive.save("kept", "Kept", "13.0.5", &two_sides()).unwrap();
+        let bundle = encode_file_id("bundle");
+        let dir = temp.0.join(format!("{bundle}.smd"));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(CaptureArchive::new(&dir).save("bundle", "Bundle", "13.0.5", &two_sides()).unwrap(), bundle);
+        fs::write(dir.join("manifest.json"), b"{}").unwrap();
+        fs::write(dir.join("timeline.jsonl"), b"\n").unwrap();
+        // An older plain file of the same id beside the folder: the list shows the folder, the delete takes both.
+        fs::copy(dir.join(format!("{bundle}.tmrc")), temp.0.join(format!("{bundle}.tmrc"))).unwrap();
+        assert_eq!(archive.list().unwrap().entries.len(), 3);
+
+        assert!(archive.delete(&bundle).unwrap());
+        assert!(!dir.exists() && !temp.0.join(format!("{bundle}.tmrc")).exists());
+        assert!(archive.delete(&plain).unwrap());
+        let listing = archive.list().unwrap();
+        assert_eq!(listing.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);
+        assert!(listing.skipped.is_empty());
+        let left: Vec<_> = fs::read_dir(&temp.0).unwrap().map(|item| item.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(left, [format!("{kept}.tmrc")], "nothing is left behind, and the other capture is untouched");
+
+        assert!(!archive.delete(&plain).unwrap(), "already gone");
+        assert!(archive.delete("../kept").is_err(), "only a capture id names a file");
+        assert!(archive.delete(&format!("{kept}.tmrc")).is_err());
+        assert!(archive.load(&kept).is_ok());
+        assert!(!CaptureArchive::new(temp.0.join("absent")).delete(&kept).unwrap(), "no folder yet: nothing to delete");
+    }
+
+    fn a_delete_that_fails_after_it_commits_never_lists_a_broken_capture() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let id = encode_file_id("bundle");
+        let dir = temp.0.join(format!("{id}.smd"));
+        fs::create_dir_all(dir.join("not-a-file")).unwrap();
+        CaptureArchive::new(&dir).save("bundle", "Bundle", "13.0.5", &two_sides()).unwrap();
+        fs::copy(dir.join(format!("{id}.tmrc")), temp.0.join(format!("{id}.tmrc"))).unwrap();
+        assert!(archive.delete(&id).is_err(), "a folder inside is not this module's to remove");
+        let listed = archive.list().unwrap();
+        assert!(listed.entries.is_empty() && listed.skipped.is_empty(), "the capture left the list whole, not half");
+        assert!(!dir.exists() && !temp.0.join(format!("{id}.tmrc")).exists());
+        assert!(temp.0.join(format!(".{id}.smd-0.del")).join("not-a-file").is_dir(), "the rest waits under a name the list ignores");
+        assert!(!archive.delete(&id).unwrap(), "nothing of that id is listed any more");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
+            ("a_delete_that_fails_after_it_commits_never_lists_a_broken_capture", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),
             ("a_capture_file_with_no_new_key_reads_back_both_sides", a_capture_file_with_no_new_key_reads_back_both_sides as fn()),
             ("a_capture_being_written_is_not_listed_until_it_is_committed", a_capture_being_written_is_not_listed_until_it_is_committed as fn()),

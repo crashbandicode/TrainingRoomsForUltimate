@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "8ac01983b1297429c973cc0c2bd5e1e4c7edf746c0d0a11bbe80aa068f64ed96",
+   "dest_sha256": "4601a70b187fcf57acdd382de6d99a49a36cfbac2b7297e2ff45caef379c95ce",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -172,6 +172,81 @@
      "reason": "Vault Recordings: select capture inputs and playback role through the existing editor",
      "old": "                    sides: Vec::new(),\n",
      "new": "                    sides,\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "                Err(err)\n            }\n        }\n",
+     "new": "                Err(err)\n            }\n        }\n    }\n\n    /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.\n    pub fn delete(&self, _id: &str) -> io::Result<bool> {\n        Ok(false)\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n",
+     "new": "        assert_eq!(listed[0].sides, [(0, 7), (1, 8)]);\n    }\n\n    fn delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let plain = archive.save(\"plain\", \"Plain\", \"13.0.5\", &two_sides()).unwrap();\n        let kept = archive.save(\"kept\", \"Kept\", \"13.0.5\", &two_sides()).unwrap();\n        let bundle = encode_file_id(\"bundle\");\n        let dir = temp.0.join(format!(\"{bundle}.smd\"));\n        fs::create_dir_all(&dir).unwrap();\n        assert_eq!(CaptureArchive::new(&dir).save(\"bundle\", \"Bundle\", \"13.0.5\", &two_sides()).unwrap(), bundle);\n        fs::write(dir.join(\"manifest.json\"), b\"{}\").unwrap();\n        fs::write(dir.join(\"timeline.jsonl\"), b\"\\n\").unwrap();\n        // An older plain file of the same id beside the folder: the list shows the folder, the delete takes both.\n        fs::copy(dir.join(format!(\"{bundle}.tmrc\")), temp.0.join(format!(\"{bundle}.tmrc\"))).unwrap();\n        assert_eq!(archive.list().unwrap().entries.len(), 3);\n\n        assert!(archive.delete(&bundle).unwrap());\n        assert!(!dir.exists() && !temp.0.join(format!(\"{bundle}.tmrc\")).exists());\n        assert!(archive.delete(&plain).unwrap());\n        let listing = archive.list().unwrap();\n        assert_eq!(listing.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);\n        assert!(listing.skipped.is_empty());\n        let left: Vec<_> = fs::read_dir(&temp.0).unwrap().map(|item| item.unwrap().file_name().to_string_lossy().into_owned()).collect();\n        assert_eq!(left, [format!(\"{kept}.tmrc\")], \"nothing is left behind, and the other capture is untouched\");\n\n        assert!(!archive.delete(&plain).unwrap(), \"already gone\");\n        assert!(archive.delete(\"../kept\").is_err(), \"only a capture id names a file\");\n        assert!(archive.delete(&format!(\"{kept}.tmrc\")).is_err());\n        assert!(archive.load(&kept).is_ok());\n        assert!(!CaptureArchive::new(temp.0.join(\"absent\")).delete(&kept).unwrap(), \"no folder yet: nothing to delete\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    pub fn delete(&self, _id: &str) -> io::Result<bool> {\n        Ok(false)\n",
+     "new": "    /// An error leaves a capture that still lists and opens, so the delete can be tried again.\n    pub fn delete(&self, id: &str) -> io::Result<bool> {\n        decode_file_id(id).map_err(invalid_data)?;\n        // The plain file first: a folder of the same id hides it, and it must not come back when the folder goes.\n        let plain = remove_if_there(&self.capture_path(id))?;\n        let Some(cache) = self.shared_cache_path(id)? else { return Ok(plain) };\n        let dir = self.dir.join(format!(\"{id}.smd\"));\n        // The editor's file last: the list and the editor read only that one.\n        for item in fs::read_dir(&dir)? {\n            let path = item?.path();\n            if path != cache {\n                fs::remove_file(path)?;\n            }\n        }\n        remove_if_there(&cache)?;\n        fs::remove_dir(dir)?;\n        Ok(true)\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        ));\n    }\n    Ok(())\n",
+     "new": "        ));\n    }\n    Ok(())\n}\n\nfn remove_if_there(path: &Path) -> io::Result<bool> {\n    match fs::remove_file(path) {\n        Ok(()) => Ok(true),\n        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),\n        Err(err) => Err(err),\n    }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert!(!CaptureArchive::new(temp.0.join(\"absent\")).delete(&kept).unwrap(), \"no folder yet: nothing to delete\");\n    }\n\n",
+     "new": "        assert!(!CaptureArchive::new(temp.0.join(\"absent\")).delete(&kept).unwrap(), \"no folder yet: nothing to delete\");\n    }\n\n    fn a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens() {\n        let temp = TestDir::new();\n        let archive = CaptureArchive::new(&temp.0);\n        let id = encode_file_id(\"bundle\");\n        let dir = temp.0.join(format!(\"{id}.smd\"));\n        fs::create_dir_all(dir.join(\"not-a-file\")).unwrap();\n        CaptureArchive::new(&dir).save(\"bundle\", \"Bundle\", \"13.0.5\", &two_sides()).unwrap();\n        fs::copy(dir.join(format!(\"{id}.tmrc\")), temp.0.join(format!(\"{id}.tmrc\"))).unwrap();\n        assert!(archive.delete(&id).is_err(), \"a folder inside is not this module's to remove\");\n        let listed = archive.list().unwrap();\n        assert_eq!(listed.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [id.as_str()]);\n        assert!(listed.skipped.is_empty());\n        assert!(archive.load(&id).is_ok(), \"it still opens\");\n        // Once the obstacle is gone the same delete finishes.\n        fs::remove_dir(dir.join(\"not-a-file\")).unwrap();\n        assert!(archive.delete(&id).unwrap());\n        assert!(archive.list().unwrap().entries.is_empty() && !dir.exists());\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n",
+     "new": "            (\"delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them\", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),\n            (\"a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens\", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    fn a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens() {\n",
+     "new": "    fn a_delete_that_fails_after_it_commits_never_lists_a_broken_capture() {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(listed.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [id.as_str()]);\n        assert!(listed.skipped.is_empty());\n        assert!(archive.load(&id).is_ok(), \"it still opens\");\n        // Once the obstacle is gone the same delete finishes.\n        fs::remove_dir(dir.join(\"not-a-file\")).unwrap();\n        assert!(archive.delete(&id).unwrap());\n        assert!(archive.list().unwrap().entries.is_empty() && !dir.exists());\n",
+     "new": "        assert!(listed.entries.is_empty() && listed.skipped.is_empty(), \"the capture left the list whole, not half\");\n        assert!(!dir.exists() && !temp.0.join(format!(\"{id}.tmrc\")).exists());\n        assert!(temp.0.join(format!(\".{id}.smd-0.del\")).join(\"not-a-file\").is_dir(), \"the rest waits under a name the list ignores\");\n        assert!(!archive.delete(&id).unwrap(), \"nothing of that id is listed any more\");\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens\", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),\n",
+     "new": "            (\"a_delete_that_fails_after_it_commits_never_lists_a_broken_capture\", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    /// An error leaves a capture that still lists and opens, so the delete can be tried again.\n",
+     "new": "    /// All or nothing for what the list shows: the folder leaves the list by one rename to a fresh name the list\n    /// ignores, and comes back if the plain file cannot go. An error before that changed nothing; an error after it\n    /// leaves what could not be removed under that name, never a broken row.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // The plain file first: a folder of the same id hides it, and it must not come back when the folder goes.\n        let plain = remove_if_there(&self.capture_path(id))?;\n        let Some(cache) = self.shared_cache_path(id)? else { return Ok(plain) };\n",
+     "new": "        let plain = self.capture_path(id);\n        if self.shared_cache_path(id)?.is_none() {\n            return remove_if_there(&plain);\n        }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // The editor's file last: the list and the editor read only that one.\n        for item in fs::read_dir(&dir)? {\n            let path = item?.path();\n            if path != cache {\n                fs::remove_file(path)?;\n",
+     "new": "        // A name nothing has: a leftover of an earlier delete is not this one's to touch.\n        let mut names = (0..64).map(|n| self.dir.join(format!(\".{id}.smd-{n}.del\")));\n        let gone = loop {\n            let name = names.next().ok_or_else(|| invalid_data(\"too many unfinished capture deletes\"))?;\n            if file_type_if_exists(&name)?.is_none() {\n                break name;\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "                break name;\n            }\n",
+     "new": "                break name;\n            }\n        };\n        fs::rename(&dir, &gone)?;\n        if let Err(err) = remove_if_there(&plain) {\n            // The folder hid that file: without it the plain file would be listed alone. Put the folder back.\n            fs::rename(&gone, &dir)?;\n            return Err(err);\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        remove_if_there(&cache)?;\n        fs::remove_dir(dir)?;\n",
+     "new": "        for item in fs::read_dir(&gone)? {\n            fs::remove_file(item?.path())?;\n        }\n        fs::remove_dir(gone)?;\n"
     }
    ]
   },
@@ -672,7 +747,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "5ce6e7fce63a9f73f353189dabb6c63638adb1914994e48304301142ccc2a811",
+   "dest_sha256": "55df5b1971f1f7ba35cf800b5b68de347b592917446e04f81aed5fae990a08f0",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -794,6 +869,26 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n",
+     "new": "        ] }], truncated: false, first_counter: Some(123), breaks: Vec::new() }\n    }\n\n    fn bytes_in(dir: &Path) -> BTreeMap<String, Vec<u8>> {\n        fs::read_dir(dir).unwrap().map(|item| {\n            let item = item.unwrap();\n            (item.file_name().to_string_lossy().into_owned(), fs::read(item.path()).unwrap())\n        }).collect()\n    }\n\n    /// A real saved bundle with an older plain file of the same id beside it. The folder that holds the captures\n    /// cannot be changed, so the delete cannot start: every byte stays and the shared archive still loads.\n    fn a_delete_that_cannot_start_changes_nothing_in_a_real_bundle() {\n        use std::os::unix::fs::PermissionsExt;\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let twin = f.0.join(format!(\"{id}.tmrc\"));\n        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        assert!(before.len() >= 3, \"the manifest, the timeline and the editor's file\");\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(f.0.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o755)).unwrap();\n        if !locked {\n            return; // a process that may write anywhere: nothing to show here\n        }\n        assert!(result.is_err());\n        assert_eq!(bytes_in(&dir), before);\n        assert_eq!(fs::read(&twin).unwrap(), twin_before);\n        assert!(f.load().is_ok(), \"the shared archive loads\");\n        assert_eq!(archive.list().unwrap().entries.len(), 1);\n        assert!(archive.delete(&id).unwrap(), \"the same delete then finishes\");\n        assert!(!dir.exists() && !twin.exists() && archive.list().unwrap().entries.is_empty());\n    }\n\n    /// The same bundle, whose own files cannot be removed. Either nothing changed, or the capture left the list in one\n    /// step with its twin and what could not be removed is whole under a name the list ignores. Another delete's\n    /// leftover is never touched.\n    fn a_delete_is_all_or_nothing_for_a_real_bundle() {\n        use std::os::unix::fs::PermissionsExt;\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let twin = f.0.join(format!(\"{id}.tmrc\"));\n        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let foreign = f.0.join(format!(\".{id}.smd-0.del\"));\n        fs::create_dir(&foreign).unwrap();\n        fs::write(foreign.join(\"keep\"), b\"kept\").unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(dir.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        let moved = f.0.join(format!(\".{id}.smd-1.del\"));\n        for path in [&dir, &moved] {\n            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));\n        }\n        if !locked {\n            return; // a process that may write anywhere: nothing to show here\n        }\n        assert!(result.is_err());\n        let listed = archive.list().unwrap();\n        assert!(listed.skipped.is_empty(), \"never a broken row\");\n        if listed.entries.is_empty() {\n            assert!(!dir.exists() && !twin.exists(), \"gone from the list, and the twin with it\");\n            assert_eq!(bytes_in(&moved), before, \"what could not be removed is whole, under a name the list ignores\");\n        } else {\n            assert_eq!(bytes_in(&dir), before, \"or nothing changed\");\n            assert_eq!(fs::read(&twin).unwrap(), twin_before, \"the twin included\");\n            assert!(f.load().is_ok(), \"and the shared archive loads\");\n        }\n        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n",
+     "new": "            (\"a_sudden_death_break_round_trips_with_its_gap_and_true_counters\", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),\n            (\"a_delete_that_cannot_start_changes_nothing_in_a_real_bundle\", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),\n            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n",
+     "new": "        assert_eq!(fs::read(foreign.join(\"keep\")).unwrap(), b\"kept\", \"another delete's leftover is not this one's\");\n    }\n\n    /// The same bundle, whose plain file of the same id cannot go (a folder has its name). The bundle comes back under\n    /// its own name: every byte as it was, the shared archive loads, it is listed once and nothing is left over.\n    fn a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back() {\n        let f = Fixture::new();\n        let dir = f.publish(&session());\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let before = bytes_in(&dir);\n        fs::create_dir(f.0.join(format!(\"{id}.tmrc\"))).unwrap();\n        assert!(archive.delete(&id).is_err());\n        assert_eq!(bytes_in(&dir), before);\n        assert!(f.load().is_ok(), \"the shared archive loads\");\n        let listed = archive.list().unwrap();\n        assert!(listed.entries.len() == 1 && listed.skipped.is_empty());\n        assert!(!f.0.join(format!(\".{id}.smd-0.del\")).exists(), \"nothing is left under the other name\");\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n",
+     "new": "            (\"a_delete_is_all_or_nothing_for_a_real_bundle\", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),\n            (\"a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back\", a_delete_that_cannot_remove_the_plain_file_puts_the_real_bundle_back as fn()),\n"
     }
    ]
   },
@@ -1225,7 +1320,7 @@
    "dest": "src/model/macro_ui/clip_browser.rs",
    "crate": "tui",
    "src_sha256": "65a095c11c1d2a7eade83f0f3039677736d22257620ddee0d8bf06d33b3b9543",
-   "dest_sha256": "dc39bb3a2302fc5ab0883f654232717e5927104f9b440946ef7994107485e666",
+   "dest_sha256": "2fb32dfbc2d0eabc29309fb4843cd9cf148e3af59c55ee1b8abfd714854b65e7",
    "edits": [
     {
      "table_tests": true,
@@ -1252,6 +1347,106 @@
       ]
      ],
      "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "pub enum Effect { None, Open(String), Close, TimedOut, Notify(String) }\n",
+     "new": "pub enum Effect { None, Open(String), Close, TimedOut, Notify(String), Delete(String) }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(waiting.tick(true, true), Effect::Open(\"saved:other\".into()));\n    }\n\n",
+     "new": "        assert_eq!(waiting.tick(true, true), Effect::Open(\"saved:other\".into()));\n    }\n\n    fn y_deletes_the_highlighted_capture_and_keeps_the_list_open() {\n        let mut browser = browser();\n        assert_eq!(browser.view().unwrap().footer, \"A loads, Y deletes, B closes.\");\n        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n        let view = browser.view().expect(\"the list stays open\");\n        assert_eq!(view.title, \"Replay Captures\");\n        assert!(view.labels.iter().any(|label| label.contains(\"Replay500f\")));\n        assert!(!view.labels.iter().any(|label| label.contains(\"Other capture\")));\n        assert_eq!(view.footer, \"A loads, Y deletes, B closes.\");\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n    fn deleting_the_last_capture_closes_the_replay_window() {\n        let mut browser = ClipBrowser::new(vec![LibraryRow { id: \"latest\".into(), label: \"Latest Vault capture\".into() }], 0);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n        assert!(browser.view().is_none());\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::None);\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::None);\n    }\n\n    fn y_deletes_in_training_and_in_a_waiting_room() {\n        for waiting in [false, true] {\n            let mut browser = browser();\n            assert_eq!(browser.on_pad(Pad::Extra, waiting), Effect::Delete(\"saved:500\".into()));\n            assert!(!browser.pending());\n        }\n        // A capture already chosen in a waiting room is opening: Y does nothing until B.\n        let mut chosen = browser();\n        assert_eq!(chosen.on_pad(Pad::Confirm, true), Effect::None);\n        assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None);\n        assert!(chosen.pending());\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n            (\"deleting_the_last_capture_closes_the_replay_window\", deleting_the_last_capture_closes_the_replay_window as fn()),\n            (\"y_deletes_in_training_and_in_a_waiting_room\", y_deletes_in_training_and_in_a_waiting_room as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        Some(view)\n",
+     "new": "        Some(view)\n    }\n\n    /// After a delete: the list as storage has it now. False when nothing is left and the window closed.\n    pub fn relist(&mut self, _rows: Vec<LibraryRow>, _skipped: usize) -> bool {\n        true\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Right, false), Effect::None);\n        // The effect carries the highlighted row's own id. The list is rebuilt from what storage holds afterwards.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:other\".into()));\n        assert!(browser.relist(vec![LibraryRow { id: \"saved:500\".into(), label: \"Replay500f\".into() }], 0));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n    fn a_delete_that_fails_leaves_the_capture_in_the_replay_window() {\n        let mut browser = browser();\n        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"saved:500\".into()));\n        // Storage still has both.\n        assert!(browser.relist(vec![\n            LibraryRow { id: \"saved:500\".into(), label: \"Replay500f\".into() },\n            LibraryRow { id: \"saved:other\".into(), label: \"Other capture\".into() },\n        ], 0));\n        let view = browser.view().unwrap();\n        assert!(view.labels.iter().any(|label| label.contains(\"Replay500f\")));\n        assert!(view.labels.iter().any(|label| label.contains(\"Other capture\")));\n        assert_eq!(browser.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n    }\n\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n",
+     "new": "        assert_eq!(browser.on_pad(Pad::Extra, false), Effect::Delete(\"latest\".into()));\n        assert!(!browser.relist(Vec::new(), 0));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert!(chosen.pending());\n",
+     "new": "        assert!(chosen.pending());\n        assert_eq!(chosen.tick(true, true), Effect::Open(\"saved:500\".into()));\n        assert_eq!(chosen.on_pad(Pad::Extra, true), Effect::None, \"nor while it opens\");\n        // B closes and deletes nothing.\n        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n",
+     "new": "            (\"y_deletes_the_highlighted_capture_and_keeps_the_list_open\", y_deletes_the_highlighted_capture_and_keeps_the_list_open as fn()),\n            (\"a_delete_that_fails_leaves_the_capture_in_the_replay_window\", a_delete_that_fails_leaves_the_capture_in_the_replay_window as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        ui.open_library(rows, skipped);\n",
+     "new": "        ui.open_library_forward(rows, skipped, \"Named Library\", Some(\"deletes\".into()));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    pub fn relist(&mut self, _rows: Vec<LibraryRow>, _skipped: usize) -> bool {\n",
+     "new": "    pub fn relist(&mut self, rows: Vec<LibraryRow>, skipped: usize) -> bool {\n        if rows.is_empty() {\n            self.selection = Selection::Closed;\n            return false;\n        }\n        self.ui.open_library_forward(rows, skipped, \"Named Library\", Some(\"deletes\".into()));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "                Effect::Open(id)\n            }\n",
+     "new": "                Effect::Open(id)\n            }\n            // Y: the row's own id. The runtime deletes, then calls `relist`.\n            MenuEffect::Alternate { id } => Effect::Delete(id),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser.view().unwrap().footer, \"A loads, Y deletes, B closes.\");\n",
+     "new": "        assert!(browser.view().unwrap().footer.ends_with(\"A loads, Y deletes, B closes.\"));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(view.footer, \"A loads, Y deletes, B closes.\");\n",
+     "new": "        assert!(view.footer.ends_with(\"A loads, Y deletes, B closes.\"));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        if !matches!(self.selection, Selection::Browsing) { return Effect::None; }\n",
+     "new": "        // X would hand the row to a rename and close the list: this window has none.\n        if !matches!(self.selection, Selection::Browsing) || matches!(pad, Pad::Rename) { return Effect::None; }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            MenuEffect::Choose(id) if waiting => {\n",
+     "new": "            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } if waiting => {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "            MenuEffect::Choose(id) => {\n",
+     "new": "            MenuEffect::Choose(id) | MenuEffect::ForwardChoose { id } => {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // B closes and deletes nothing.\n",
+     "new": "        // B closes and deletes nothing. X does nothing, and the list stays.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n",
+     "new": "        assert_eq!(browser().on_pad(Pad::Back, false), Effect::Close);\n        let mut listed = browser();\n        assert_eq!(listed.on_pad(Pad::Rename, false), Effect::None);\n        assert!(listed.view().is_some());\n        assert_eq!(listed.on_pad(Pad::Confirm, false), Effect::Open(\"saved:500\".into()));\n"
     }
    ]
   },
@@ -4001,7 +4196,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "75334d4f4a97769f17b748dd32ef4ef741cb38fb93d7f660b03c8fe3f4ffeccb",
+   "dest_sha256": "40351844202bb1e1894844452dd775d67ab990dea6e2689fc3fe51328f2b1d09",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4847,6 +5042,26 @@
      "old": "                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };",
      "new": "                let role = clip_play_role();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "fn open_browser(expected_revision: Option<u64>) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n",
+     "new": "fn open_browser(expected_revision: Option<u64>) {\n    if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_ready_go() || !crate::runtime::ui::facts::fact_fighters_present()\n        || crate::runtime::lobby::training::recording_or_playback()\n        || crate::runtime::macros::save_states::is_loading()\n        || crate::runtime::roster::character_roster::busy() || crate::engine::rr_host::previewing() || loading()\n    {\n        notify(\"Open the replay window in idle practice\".into());\n        return;\n    }\n    let (rows, skipped) = browser_rows();\n    if rows.is_empty() {\n        notify(\"Save a replay with match capture on, or play one in Vault first\".into());\n        return;\n    }\n    {\n        let mut browser = BROWSER.lock().unwrap();\n        // A refusal may rescan the library, but must not reopen after Cancel or\n        // interruption while that I/O was in flight.\n        if expected_revision.is_some_and(|revision|\n            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }\n        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }\n        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),\n            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n}\n\n/// The Replay window's rows as storage has them now, and how many files were skipped.\nfn browser_rows() -> (Vec<LibraryRow>, usize) {\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    }\n    if rows.is_empty() {\n        notify(\"Save a replay with match capture on, or play one in Vault first\".into());\n        return;\n",
+     "new": "    }\n    (rows, skipped)\n}\n\n/// Deletes one capture: a Vault capture of this boot from memory, a saved one from the card. A failure is reported and\n/// leaves it in storage; the caller lists again afterwards.\npub fn delete_recording(id: &str) {\n    let deleted = match id {\n        \"latest\" | \"previous\" => {\n            CAPTURE.lock().unwrap().forget(id == \"latest\");\n            Ok(true)\n        }\n        _ => id.strip_prefix(\"saved:\").ok_or_else(|| \"Unknown replay capture\".to_owned())\n            .and_then(|id| crate::runtime::macros::replay_store::archive().delete(id).map_err(|error| error.to_string())),\n    };\n    if let Err(error) = deleted {\n        notify(format!(\"Saved capture library: {error}\"));\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        notify(format!(\"Saved capture library: {error}\"));\n    }\n    {\n        let mut browser = BROWSER.lock().unwrap();\n        // A refusal may rescan the library, but must not reopen after Cancel or\n        // interruption while that I/O was in flight.\n        if expected_revision.is_some_and(|revision|\n            !browser.as_ref().is_some_and(|b| b.revision == revision && b.ui.opening())) { return; }\n        if crate::runtime::macros::named_macros::suspended() || !crate::runtime::ui::facts::fact_practice_enabled() { return; }\n        *browser = Some(Browser { ui: ClipBrowser::new(rows, skipped),\n            revision: REVISION.fetch_add(1, Ordering::Relaxed) + 1, request: None });\n    }\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n",
+     "new": "        notify(format!(\"Saved capture library: {error}\"));\n    }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n",
+     "new": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n        BrowserEffect::Delete(id) => {\n            delete_recording(&id);\n            let (rows, skipped) = browser_rows();\n            let listed = BROWSER.lock().unwrap().as_mut().is_some_and(|b| b.revision == revision && b.ui.relist(rows, skipped));\n            if !listed {\n                close_editor_revision(false, Some(revision));\n            }\n        }\n"
     }
    ]
   },

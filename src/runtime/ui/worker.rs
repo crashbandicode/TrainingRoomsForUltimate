@@ -879,6 +879,11 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
         Effect::PreviewDrill { source, frames, trim } => start_drill_preview(&source, frames, trim),
+        // A capture: deleted here, then listed again from storage, so the page shows what is really left.
+        Effect::DeleteFile { kind: crate::model::recording_menu::FileKind::Capture, id } => {
+            crate::runtime::macros::replay_capture::delete_recording(&id);
+            menu.recording_mut().set_recordings(crate::runtime::macros::replay_capture::recordings());
+        }
         effect => rr_host::post_effect_at(effect, Some(version)),
     }
 }
