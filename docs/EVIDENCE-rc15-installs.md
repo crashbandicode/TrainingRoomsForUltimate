@@ -182,8 +182,9 @@ merged head `afd4ce01` or of any placement or playback feature. Receipts:
 and `current-184745.log` in the same directory (lines 375-379).
 
 The plan was one short Eden smoke run on the finished build, then the operator's full test on the console (inbox
-17:06:54Z, tr-primary-2). The smoke run is below; the build was installed nine minutes after it ended. The operator's
-test has not happened.
+17:06:54Z, tr-primary-2). The build was installed nine minutes after the first Eden boot ended. A later Eden boot
+checked the waiting room. The operator reported the clip-editor refusal on the console; no full hardware verdict
+is on record.
 
 ### The Eden smoke boot of the finished build
 

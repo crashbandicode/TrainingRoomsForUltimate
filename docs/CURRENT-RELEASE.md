@@ -95,7 +95,8 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Install 5 has had little play on the console:** one report is on record. Its Eden check was one short smoke boot:
+- **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
+  parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
   starts; the start has not been timed in a game.
