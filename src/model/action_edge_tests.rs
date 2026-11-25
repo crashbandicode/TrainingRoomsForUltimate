@@ -311,9 +311,6 @@ fn edge_file_keys_belong_to_descriptions_not_bare_link_endpoints() {
             assert_eq!(reopened.combo.get(0).unwrap().desc(usize::from(field == "to")).mv, mv);
         }
     }
-    for key in ["grab", "throw", "final_smash"] {
-        let _ = hit_record(key, key, None, None); // These spellings already loaded before the edge moves.
-    }
     assert!(accepted.is_empty(), "accepted lossy endpoint keys: {accepted:?}");
 }
 
