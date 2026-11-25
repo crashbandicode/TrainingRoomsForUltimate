@@ -345,22 +345,34 @@ impl CaptureArchive {
     }
 
     /// Removes a capture: its `.smd` folder with all in it and a plain file of the same id. `Ok(false)`: none was there.
-    /// An error leaves a capture that still lists and opens, so the delete can be tried again.
+    /// All or nothing for what the list shows: the folder leaves the list by one rename to a fresh name the list
+    /// ignores, and comes back if the plain file cannot go. An error before that changed nothing; an error after it
+    /// leaves what could not be removed under that name, never a broken row.
     pub fn delete(&self, id: &str) -> io::Result<bool> {
         decode_file_id(id).map_err(invalid_data)?;
-        // The plain file first: a folder of the same id hides it, and it must not come back when the folder goes.
-        let plain = remove_if_there(&self.capture_path(id))?;
-        let Some(cache) = self.shared_cache_path(id)? else { return Ok(plain) };
-        let dir = self.dir.join(format!("{id}.smd"));
-        // The editor's file last: the list and the editor read only that one.
-        for item in fs::read_dir(&dir)? {
-            let path = item?.path();
-            if path != cache {
-                fs::remove_file(path)?;
-            }
+        let plain = self.capture_path(id);
+        if self.shared_cache_path(id)?.is_none() {
+            return remove_if_there(&plain);
         }
-        remove_if_there(&cache)?;
-        fs::remove_dir(dir)?;
+        let dir = self.dir.join(format!("{id}.smd"));
+        // A name nothing has: a leftover of an earlier delete is not this one's to touch.
+        let mut names = (0..64).map(|n| self.dir.join(format!(".{id}.smd-{n}.del")));
+        let gone = loop {
+            let name = names.next().ok_or_else(|| invalid_data("too many unfinished capture deletes"))?;
+            if file_type_if_exists(&name)?.is_none() {
+                break name;
+            }
+        };
+        fs::rename(&dir, &gone)?;
+        if let Err(err) = remove_if_there(&plain) {
+            // The folder hid that file: without it the plain file would be listed alone. Put the folder back.
+            fs::rename(&gone, &dir)?;
+            return Err(err);
+        }
+        for item in fs::read_dir(&gone)? {
+            fs::remove_file(item?.path())?;
+        }
+        fs::remove_dir(gone)?;
         Ok(true)
     }
 

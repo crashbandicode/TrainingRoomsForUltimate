@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "c2e8ae172d0bfe861ae617acd9f6d34ff0f678571c41377012226fa6daa98e50",
+   "dest_sha256": "4601a70b187fcf57acdd382de6d99a49a36cfbac2b7297e2ff45caef379c95ce",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -222,6 +222,31 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "            (\"a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens\", a_delete_that_cannot_finish_leaves_a_capture_that_lists_and_opens as fn()),\n",
      "new": "            (\"a_delete_that_fails_after_it_commits_never_lists_a_broken_capture\", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "    /// An error leaves a capture that still lists and opens, so the delete can be tried again.\n",
+     "new": "    /// All or nothing for what the list shows: the folder leaves the list by one rename to a fresh name the list\n    /// ignores, and comes back if the plain file cannot go. An error before that changed nothing; an error after it\n    /// leaves what could not be removed under that name, never a broken row.\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // The plain file first: a folder of the same id hides it, and it must not come back when the folder goes.\n        let plain = remove_if_there(&self.capture_path(id))?;\n        let Some(cache) = self.shared_cache_path(id)? else { return Ok(plain) };\n",
+     "new": "        let plain = self.capture_path(id);\n        if self.shared_cache_path(id)?.is_none() {\n            return remove_if_there(&plain);\n        }\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        // The editor's file last: the list and the editor read only that one.\n        for item in fs::read_dir(&dir)? {\n            let path = item?.path();\n            if path != cache {\n                fs::remove_file(path)?;\n",
+     "new": "        // A name nothing has: a leftover of an earlier delete is not this one's to touch.\n        let mut names = (0..64).map(|n| self.dir.join(format!(\".{id}.smd-{n}.del\")));\n        let gone = loop {\n            let name = names.next().ok_or_else(|| invalid_data(\"too many unfinished capture deletes\"))?;\n            if file_type_if_exists(&name)?.is_none() {\n                break name;\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "                break name;\n            }\n",
+     "new": "                break name;\n            }\n        };\n        fs::rename(&dir, &gone)?;\n        if let Err(err) = remove_if_there(&plain) {\n            // The folder hid that file: without it the plain file would be listed alone. Put the folder back.\n            fs::rename(&gone, &dir)?;\n            return Err(err);\n"
+    },
+    {
+     "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
+     "old": "        remove_if_there(&cache)?;\n        fs::remove_dir(dir)?;\n",
+     "new": "        for item in fs::read_dir(&gone)? {\n            fs::remove_file(item?.path())?;\n        }\n        fs::remove_dir(gone)?;\n"
     }
    ]
   },

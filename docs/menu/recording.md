@@ -88,8 +88,8 @@ to capture a combo, or an input drill when no hit is made. Make drill always sav
 
 2026-11-25. **Delete** removes the capture at once, without asking, as it does for a macro. A saved capture's files go
 from the card; a Vault capture is dropped for this boot. Macros, combos and drills you already made from it stay, and
-the game's own replay in the Vault is untouched. If the card cannot remove it, the capture stays in the list. Not yet
-seen in a game.
+the game's own replay in the Vault is untouched. If the delete cannot start, the capture stays in the list as it was;
+it is never left there half-deleted. Not yet seen in a game.
 
 In the waiting room an opening first lets the CPU finish what it is doing. Until then the row reads
 **Waiting for the CPU…** and only B acts: it cancels the opening and leaves the screen up. If the CPU is still busy
