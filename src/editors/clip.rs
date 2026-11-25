@@ -17,6 +17,10 @@ const FPS: f32 = 60.0;
 const COARSE: &str = "ZL or ZR";
 const CHORD: &str = "ZL";
 
+pub const PREVIEW_STOP_HINT: &str = "B stop preview";
+
+pub fn stop_hint(_frame: &mut Frame, _running: bool) {}
+
 fn handle_code(handle: Handle) -> u8 {
     match handle {
         Handle::Playhead => 0,
@@ -118,6 +122,22 @@ mod tests {
         assert!(f.help[1].string_lossy().contains("45 frames per tick"), "{:?}", f.help[1]);
     }
 
+    fn preview_hint_shows_only_while_a_preview_plays() {
+        let mut v = view();
+        let mut f = Frame::new();
+        v.playing = true;
+        clip_frame(&v, "Pikachu", 0, &mut f);
+        stop_hint(&mut f, true);
+        assert_eq!(f.hint.string_lossy(), "B stop preview");
+        for playing in [true, false] {
+            v.playing = playing;
+            clip_frame(&v, "Pikachu", 0, &mut f);
+            stop_hint(&mut f, false);
+            let hint = f.hint.string_lossy();
+            assert!(hint.contains("B close.") && !hint.contains("stop preview"), "{hint}");
+        }
+    }
+
     /// rc.14 recfix (Eden rc.13 still `p2-replay-editor`): the editor is drawn alone, with no tab row ("the title and breadcrumb,
     /// a few lines, the help texts, the timeline"). It builds on the page's frame, so it must give back its tab slots: the
     /// renderer drew the red active-tab box with no names when a frame still named a tab, or left the last one's box up.
@@ -135,6 +155,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("preview_hint_shows_only_while_a_preview_plays", preview_hint_shows_only_while_a_preview_plays as fn()),
             ("the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn", the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn as fn()),
             ("a_preview_refusal_shows_in_the_frame", a_preview_refusal_shows_in_the_frame as fn()),
             ("a_held_scrub_names_its_speed", a_held_scrub_names_its_speed as fn()),

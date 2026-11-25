@@ -1260,7 +1260,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "c54cc886d59c75dcb9165c1b618e915a10823b0b2b3926f5997eedb11a8ae876",
+   "dest_sha256": "72a913099ab06d1b5b6d265948bd565bc84ddc0f7878647e277cfc2deb055a57",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1677,6 +1677,26 @@
      "old": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }\n        else { \"\" },",
      "new": "    let controls = format!(\"{}{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" } else { \"\" },\n        if view.target.is_some() { \"ZR Player/CPU. \" } else { \"\" },",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): tests first, B stops a playing preview without closing the editor",
+     "old": "    pub fn restart(&mut self) { self.ended = None; }\n",
+     "new": "    pub fn restart(&mut self) { self.ended = None; }\n    pub fn ended(&self) -> bool { false }\n"
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): tests first, B stops a playing preview without closing the editor",
+     "old": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n",
+     "new": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            e.on_action(ClipAction::SelectIn);\n            e.on_action(ClipAction::Nudge(2));\n            for pad in [Pad::Back, Pad::Extra] {\n                assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n                e.preview_cursor(4);\n                assert!(e.view().playing);\n                let action = e.action_for_pad(pad).unwrap();\n                assert!(matches!(e.on_action(action), ClipEffect::StopPreview));\n                assert!(!e.view().playing);\n                assert_eq!(e.view().cursor, e.view().start);\n            }\n        }\n    }\n\n    fn a_second_b_leaves_the_editor() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::Close));\n        }\n    }\n\n"
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): tests first, B stops a playing preview without closing the editor",
+     "old": "        assert!(matches!(e.on_action(cancel), ClipEffect::Close));\n",
+     "new": "        assert!(matches!(e.on_action(cancel), ClipEffect::StopPreview));\n"
+    },
+    {
+     "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): tests first, B stops a playing preview without closing the editor",
+     "old": "        crate::test_table::run(&[\n",
+     "new": "        crate::test_table::run(&[\n            (\"b_stops_a_clip_preview_without_leaving\", b_stops_a_clip_preview_without_leaving as fn()),\n            (\"a_second_b_leaves_the_editor\", a_second_b_leaves_the_editor as fn()),\n"
     }
    ]
   },

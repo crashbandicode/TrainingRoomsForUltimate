@@ -866,6 +866,10 @@ fn group_rows(menu: &Menu, g: usize, pilot: bool) -> usize {
 /// Rows of one section the twelve row panes can show under a header.
 const SECTION_ROWS: usize = 4;
 
+pub fn chord_hint(_record: super::menu::chord::Chord, _player: super::menu::chord::Chord, _cpu: super::menu::chord::Chord) -> String {
+    String::new()
+}
+
 fn paint_recording(menu: &Menu, frame: &mut Frame) {
     use super::menu::table::{Page, COMBOS_SEQ, SAVES_MACROS};
     use super::recording_menu::Face;
@@ -1250,6 +1254,89 @@ mod tests {
         menu
     }
 
+    fn popup_with_settings(settings: Settings, waiting_room: bool) -> Menu {
+        let mut menu = Menu::new(settings, Env { waiting_room, ..Env::default() });
+        menu.recording_mut().toggle_popup();
+        menu
+    }
+
+    fn popup_chords(settings: &Settings) -> [crate::model::menu::chord::Chord; 3] {
+        use crate::model::menu::chord::Chord;
+        ["input_record", "play_player", "input_playback"].map(|id| Chord::from_row(settings.menu.get(id).unwrap()))
+    }
+
+    fn popup_shows_the_configured_record_and_play_chords() {
+        let settings = Settings::factory();
+        let [record, player, cpu] = popup_chords(&settings);
+        let expected = format!("Record {record}   Play on Player 1 {player}   Play on CPU {cpu}");
+        assert_eq!(expected, "Record ZR + D-pad Down   Play on Player 1 ZR + D-pad Left   Play on CPU ZR + D-pad Up");
+        for waiting_room in [false, true] {
+            let mut menu = popup_with_settings(settings.clone(), waiting_room);
+            let mut frame = Frame::new();
+            page_frame(&menu, &mut frame);
+            assert_eq!(frame.help[0].string_lossy(), expected);
+            assert_eq!(frame.help[1].string_lossy(), "Y place first · Off");
+            menu.recording_mut().press_popup(Button::ZR);
+            page_frame(&menu, &mut frame);
+            assert_eq!(frame.help[0].string_lossy(), expected);
+            assert_eq!(frame.help[1].string_lossy(), "Y place first · Off");
+            menu.recording_mut().toggle_popup();
+            page_frame(&menu, &mut frame);
+            assert_ne!(frame.help[0].string_lossy(), expected);
+        }
+    }
+
+    fn popup_chord_hint_follows_a_rebound_chord() {
+        use crate::model::menu::chord::Chord;
+        let mut settings = Settings::factory();
+        let [old, player, cpu] = popup_chords(&settings);
+        let rebound = Chord((1 << 0) | (1 << 3));
+        assert_ne!(old, rebound);
+        for record in [rebound, Chord::NONE] {
+            settings.menu.set("input_record", &record.to_row()).unwrap();
+            let menu = popup_with_settings(settings.clone(), false);
+            let mut frame = Frame::new();
+            page_frame(&menu, &mut frame);
+            let expected = format!("Record {record}   Play on Player 1 {player}   Play on CPU {cpu}");
+            assert_eq!(frame.help[0].string_lossy(), expected);
+            if record == Chord::NONE { assert!(expected.starts_with("Record disabled")); }
+        }
+    }
+
+    fn popup_chord_hint_fits_its_line() {
+        use super::super::panes::{spec, Kind, IDX_HELP};
+        use crate::model::menu::chord::Chord;
+        let pane = spec(IDX_HELP);
+        let Kind::Text { font, chars, .. } = pane.kind else { panic!("help is a text pane") };
+        let fits = |text: &str| {
+            let units = text.encode_utf16().count();
+            units <= usize::from(chars) && units as f32 * font.0 * 0.56 <= pane.w
+        };
+        let chord = |buttons: &[u8]| Chord(buttons.iter().fold(0u16, |mask, &bit| mask | (1u16 << bit)));
+        let factory = popup_chords(&Settings::factory());
+        let review = [chord(&[9, 13, 14, 15]), chord(&[10, 13, 14, 15]), chord(&[11, 13, 14, 15])];
+        let longest = [chord(&[10, 11, 14, 15]); 3];
+        let short_form = [chord(&[0, 1, 14, 15]); 3];
+        for (chords, form) in [(factory, 1), (review, 3), (longest, 3), (short_form, 2)] {
+            let [record, player, cpu] = chords;
+            let full = format!("Record {record}   Play on Player 1 {player}   Play on CPU {cpu}");
+            let short = format!("Record {record}   P1 {player}   CPU {cpu}");
+            let pointer = "Record and Play chords: Display & Controls > Button chords".to_owned();
+            let expected = if fits(&full) { &full } else if fits(&short) { &short } else { &pointer };
+            assert_eq!(if fits(&full) { 1 } else if fits(&short) { 2 } else { 3 }, form);
+            assert!(fits(expected));
+            let mut settings = Settings::factory();
+            for (id, chord) in ["input_record", "play_player", "input_playback"].into_iter().zip(chords) {
+                settings.menu.set(id, &chord.to_row()).unwrap();
+            }
+            let menu = popup_with_settings(settings, false);
+            let mut frame = Frame::new();
+            page_frame(&menu, &mut frame);
+            assert_eq!(chord_hint(record, player, cpu), *expected);
+            assert_eq!(frame.help[0].string_lossy(), *expected);
+        }
+    }
+
     #[test]
     fn the_popup_y_flips_place_first() {
         use crate::model::menu::table::SAVES_MACROS;
@@ -1550,6 +1637,9 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("popup_shows_the_configured_record_and_play_chords", popup_shows_the_configured_record_and_play_chords as fn()),
+            ("popup_chord_hint_follows_a_rebound_chord", popup_chord_hint_follows_a_rebound_chord as fn()),
+            ("popup_chord_hint_fits_its_line", popup_chord_hint_fits_its_line as fn()),
             ("the_recording_page_shows_its_role_like_the_popup", the_recording_page_shows_its_role_like_the_popup as fn()),
             ("popup_frame_shows_the_zr_cap", popup_frame_shows_the_zr_cap as fn()),
             ("a_file_screen_keeps_the_role_tabs_without_the_zr_cap", a_file_screen_keeps_the_role_tabs_without_the_zr_cap as fn()),
