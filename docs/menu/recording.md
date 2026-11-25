@@ -107,7 +107,7 @@ don't turn the page while a file's screen is open.
 | File | Rows |
 | --- | --- |
 | Save state | Bind to Save / Load, Change placement, Duplicate, Rename, Delete |
-| Macro | Start save and Change placement (only if it has a start save), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
+| Macro | Start save, Change placement and Momentum (only if it has a start save), Offset (only if it also has an offset), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
 | Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill…, Delete |
 | Chain | Start save and Change placement (only if its first macro has a start save), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
@@ -120,6 +120,8 @@ don't turn the page while a file's screen is open.
 | Change placement | Closes the menu and opens the [placement picker](#change-placement) on this save: a macro's start save, or the start save of a chain's first macro. |
 | Duplicate | Makes a copy named Save N. |
 | Start save | On warps both fighters to the macro's start save once, before it plays. Off plays it from where the fighters are. |
+| Momentum | Keep recorded speed (the default) gives the side that plays the speed it had when Record started, on its first input after the warp to the start save. Start at rest starts it standing. Left, Right or A flips it; it is kept in the macro's file. |
+| Offset | Only on a macro that still has a start offset from Edit placement, the offset editor of earlier builds. It shows the offset, such as X -40, and Play adds it to the side that plays, on top of the start save's spot. A clears it and changes nothing else in the file; Left/Right do nothing. |
 | Set active | On makes this the active macro of the view you're in, replacing the one before. Off clears it. |
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
@@ -288,7 +290,8 @@ visit keeps the save's own values.
 - **What is saved:** only what you changed, for the fighter you changed: its spot, its start state, its damage. With
   nothing changed the file is not written. The save then loads once, so both fighters end on the saved spots. A
   macro's own file is never changed: a macro that was given an offset in an earlier build keeps it, and Play still
-  adds it on top of the save's spot.
+  adds it on top of the save's spot until you clear it with the Offset row of the macro's
+  [own screen](#a-file-s-own-screen).
 
 Host tests only; not yet seen in a game.
 

@@ -399,9 +399,12 @@ Break the Targets crosshair, and A or + writes the save. The pages and keys are 
   files open as they are and load as before.
 - **A macro's own offset:** earlier builds had Edit placement, which stored an offset in the macro file. Such a macro
   keeps its offset: Play adds it to the playing side on top of the save's spot. Change placement never changes a
-  macro file.
-- **Momentum** is kept in the macro file as before: "Keep recorded speed", the default, gives the side the speed it
-  had when Record started, on its first input after the warp; "Start at rest" starts it from standstill.
+  macro file. The macro's own screen shows the offset in an Offset row, and A there clears it; a cleared offset
+  cannot be set again, so move the save instead.
+- **Momentum** is a row of the macro's own screen, kept in the macro file as before. Keep recorded speed, the
+  default, gives the side the speed it had when Record started, on its first input after the warp; Start at rest
+  starts it from standstill. Both rows are there only for a macro with a start save, because they apply with the
+  warp to it.
 
 Host tests only; not yet seen in a game.
 
