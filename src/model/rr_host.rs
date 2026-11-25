@@ -269,7 +269,7 @@ fn save_input(root: &Path, source: &str, activate: bool, spans: &[Span], tick: &
     let recorded_on = start.map(|s| super::rr_runtime::fighter_name(s.poses[0].fighter_kind)).filter(|s| !s.is_empty());
     let fighter = posted.and_then(|p| p.owner.fighter());
     // F10: a directly recorded drill owns the macro file holding its take.
-    let kept = if activate { keep_drill_take(root, start, spans) } else { None };
+    let kept = if activate { keep_drill_take(root, start, spans, fighter) } else { None };
     let saved = match kept {
         Some(kept) => super::rr_runtime::save_drill_with_take(root, &take.combo, recorded_on, fighter, kept, unix_now()),
         None => save_made_combo(root, &take.combo, source, recorded_on, fighter, unix_now()),
@@ -288,7 +288,7 @@ fn save_input(root: &Path, source: &str, activate: bool, spans: &[Span], tick: &
 
 /// The frames of a direct drill take as a macro (`save_drill_take`), with the start the Record chord posted. `None`
 /// when nothing could be kept: the drill is saved all the same, without a preview.
-fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span]) -> Option<String> {
+fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span], fighter: Option<crate::model::move_names::FighterId>) -> Option<String> {
     let (_, frames) = taken_frames();
     let state = start.map_or_else(StartState::default, |s| StartState {
         situation: s.poses[0].situation_kind,
@@ -296,7 +296,7 @@ fn keep_drill_take(root: &Path, start: Option<RecordStart>, spans: &[Span]) -> O
         speed_y: s.speeds[0].1,
         ..StartState::neutral(s.poses[0].fighter_kind, 0, s.poses[0].lr)
     });
-    super::rr_runtime::save_drill_take(root, frames, state, record_trim(), unix_now(), spans).ok().flatten()
+    super::rr_runtime::save_drill_take_of(root, frames, state, record_trim(), unix_now(), spans, fighter).ok().flatten()
 }
 
 static RECORD_EDGE: AtomicU8 = AtomicU8::new(0);
@@ -433,11 +433,13 @@ struct PostedStart {
     seq: u64,
     start: RecordStart,
     owner: CaptureOwner,
+    /// The CPU's fighter, for a CPU-role take.
+    cpu: CaptureOwner,
 }
 
 /// One game-thread writer (chord or placement poll), one recording-worker reader.
 static RECORD_STARTS: hos_lock::TripleBuffer<PostedStart> =
-    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN });
+    hos_lock::TripleBuffer::new(PostedStart { seq: 0, start: RecordStart::EMPTY, owner: CaptureOwner::UNKNOWN, cpu: CaptureOwner::UNKNOWN });
 static START_SEQ: AtomicU64 = AtomicU64::new(0);
 static START_USED: AtomicU64 = AtomicU64::new(0);
 /// Per role (Player, CPU): the start speed a Play's warp owes the run's first input (`take_start_speed`).
@@ -1102,9 +1104,22 @@ pub fn note_record_start(start: RecordStart) {
     post_record_start(start, fighter);
 }
 
+/// Reads a role's live fighter identity on the game thread. The runtime installs it once; set once, read without a lock.
+static FIGHTER_READER: std::sync::OnceLock<fn(Role) -> Option<crate::model::move_names::FighterId>> = std::sync::OnceLock::new();
+pub fn set_fighter_reader(reader: fn(Role) -> Option<crate::model::move_names::FighterId>) {
+    let _ = FIGHTER_READER.set(reader);
+}
+fn read_fighter(role: Role) -> Option<crate::model::move_names::FighterId> {
+    FIGHTER_READER.get().and_then(|reader| reader(role))
+}
+
+/// Every take start is posted here: the Record chord, and placement Ready through `note_record_start`. Each role's
+/// fighter identity is read here, so every take carries the one of the role that recorded it.
 pub fn post_record_start(start: RecordStart, fighter: Option<crate::model::move_names::FighterId>) {
     let seq = START_SEQ.fetch_add(1, Ordering::AcqRel) + 1;
-    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter) });
+    let fighter = fighter.or_else(|| read_fighter(Role::Player));
+    RECORD_STARTS.write(PostedStart { seq, start, owner: CaptureOwner::new(start.poses[0].fighter_kind, fighter),
+        cpu: CaptureOwner::new(start.poses[1].fighter_kind, read_fighter(Role::Cpu)) });
 }
 
 fn take_record_start() -> Option<PostedStart> {
@@ -1315,7 +1330,9 @@ pub fn service_at(
         // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
         // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
         // stands in, at rest, as before.
-        let (player, cpu, speeds) = match take_record_start().map(|p| p.start) {
+        let posted = take_record_start();
+        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+        let (player, cpu, speeds) = match posted.map(|p| p.start) {
             Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
             None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
         };
@@ -2298,6 +2315,11 @@ pub fn delete_file(root: &Path, kind: crate::model::recording_menu::FileKind, id
         FileKind::Chain => Store::<Chain>::new(root.join(MACROS_DIR)).delete(id).is_ok(),
         FileKind::Combo => super::rr_runtime::delete_combo(root, id),
         FileKind::Sequence => Store::<Sequence>::new(root.join(SEQUENCES_DIR)).delete(id).is_ok(),
+        // A saved capture's files. Captures are in no index, so nothing else is touched.
+        FileKind::Capture => {
+            return id.strip_prefix("saved:")
+                .is_some_and(|id| super::macros::CaptureArchive::new(root.join("replay_captures")).delete(id).unwrap_or(false));
+        }
     };
     if !deleted {
         return false;
@@ -3948,6 +3970,42 @@ mod tests {
         assert_eq!(write.stick_x, playback_controller(stored).stick_x);
     }
 
+    /// A take with the role set to CPU while an AI writes Player 1's record: the record the poll is handed drives the
+    /// CPU and fills the take, and Player 1 is left neutral, as for a human.
+    fn a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("ai-cpu-take");
+        cpu_menu_role();
+        on_chords(true, false, false);
+        cpu_role_after_chord();
+        let _ = service_at(&root, &none(), "2026-11-25", state(13), state(7));
+        for _ in 0..crate::model::recording::LOCKOUT_FRAMES {
+            assert!(drive_cpu(1).is_none());
+        }
+        let given = [(42u32, 80i8, -30i8), (7, -100, 100), (36_872, 0, 0)];
+        for (index, (buttons, x, y)) in given.into_iter().enumerate() {
+            let input = MappedInputs { buttons, lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL };
+            let mut player = input;
+            assert!(cpu_role_poll(&mut player));
+            assert_eq!(player, MappedInputs::NEUTRAL, "Player 1 stands neutral");
+            let write = cpu_role_control().write.expect("the CPU is driven");
+            let expected = playback_controller(to_frame(input));
+            assert_eq!((write.buttons, write.stick_x), (expected.buttons, expected.stick_x));
+            assert_eq!(unpack(CAP_FRAMES[index].load(Ordering::Acquire)), to_frame(input));
+        }
+        assert_eq!(CAP_LEN.load(Ordering::Acquire), 3);
+        on_chords(true, false, false);
+        cpu_role_after_chord();
+        let _ = service_at(&root, &none(), "2026-11-25", state(13), state(7));
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let stored: Vec<_> = saved.frames.iter().map(|f| (f.buttons, f.lstick_x, f.lstick_y)).collect();
+        assert_eq!(stored, given);
+    }
+
     fn cpu_role_lockout_or_standby_press_is_not_stored() {
         let _hold = hold();
         reset_host();
@@ -5198,6 +5256,33 @@ mod tests {
         assert!(names.iter().any(|name| name == "Combo 1"), "{names:?}");
     }
 
+    /// A take of Player 1 holds the records its polls were handed, whoever wrote them (the pad, a pilot), unchanged and
+    /// in order; the poll leaves the record as it was; the stop saves the take.
+    fn a_player_take_stores_the_record_the_poll_was_given() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("ai-take");
+        player_menu_role();
+        on_chords(true, false, false);
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let given = [(4u32, 90i8, -20i8), (0, 0, 0), (36_872, -127, 127), (1, 5, 0)];
+        for (buttons, x, y) in given {
+            let mut out = MappedInputs { buttons, lstick_x: x, lstick_y: y, ..MappedInputs::NEUTRAL };
+            assert!(!unsafe { on_player_poll(&mut out) }, "nothing is injected during a take");
+            assert_eq!((out.buttons, out.lstick_x, out.lstick_y), (buttons, x, y), "the record is left as given");
+        }
+        assert_eq!(captured_frames(), 4);
+        on_chords(true, false, false);
+        let stop = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert!(stop.diags.iter().any(|line| line == "screen=recording role=player recording=0"));
+        assert!(!taking());
+        let macros = Library::new(root.join(MACROS_DIR));
+        let listed = macros.list().unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        let saved = macros.load(&listed.entries[0].id).unwrap();
+        let stored: Vec<_> = saved.frames.iter().map(|f| (f.buttons, f.lstick_x, f.lstick_y)).collect();
+        assert_eq!(stored, given);
+    }
     fn a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced() {
         let _hold = hold();
         reset_host();
@@ -5924,6 +6009,71 @@ mod tests {
         StartPose { fighter_kind: kind, situation_kind: 0, x, y: 0.0, percent: 0.0, lr, start_state: PlacementStartState::Standard }
     }
 
+    /// tr-primary-2 14:33:53Z and 14:51:40Z: a take keeps the fighter of the role that recorded it, read where every take
+    /// start is posted: the Record chord, and placement Ready through `note_record_start`.
+    #[test]
+    fn a_take_keeps_the_fighter_of_the_role_that_recorded_it() {
+        use crate::model::move_names::FighterId;
+        static WHO: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+        fn reader(role: Role) -> Option<FighterId> {
+            let chara = WHO[role_index(role)].load(Ordering::Acquire);
+            (chara != 0).then_some(FighterId { chara, specials: [0, 1, 2, 0] })
+        }
+        let _hold = hold();
+        set_fighter_reader(reader);
+        let who = |chara| FighterId { chara, specials: [0, 1, 2, 0] };
+        let saved = |root: &Path| {
+            let macros = Library::new(root.join(MACROS_DIR));
+            let id = macros.list().unwrap().entries[0].id.clone();
+            let json: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join(MACROS_DIR).join(format!("{id}.json"))).unwrap()).unwrap();
+            (macros.load(&id).unwrap().recorded_fighter, json.get("recorded_fighter").cloned())
+        };
+        let take = |tag: &str, role: Role, side: u8, post: &dyn Fn(RecordStart)| {
+            reset_host();
+            let root = scratch(tag);
+            set_record_role(role);
+            post(RecordStart { poses: [pose(0, 0.0, 1.0), pose(8, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] });
+            on_chords(true, false, false);
+            push_capture(side, InputFrame { buttons: 513, ..InputFrame::default() });
+            on_chords(true, false, false);
+            let _ = service_at(&root, &none(), "2026-11-25", live_pose(0).saved(), live_pose(1).saved());
+            saved(&root)
+        };
+        WHO[0].store(0xa1, Ordering::Release);
+        WHO[1].store(0xb2, Ordering::Release);
+        // Placement Ready starts a CPU-role take through `note_record_start`: the CPU's identity, in the combo file's key.
+        let (fighter, key) = take("rec-fighter-cpu", Role::Cpu, ROLE_CPU, &note_record_start);
+        assert_eq!(fighter, Some(who(0xb2)));
+        assert_eq!(key, Some(serde_json::json!({"ui_chara": "b2", "specials": [0, 1, 2, 0]})));
+        // A Player take: the identity the chord read, and the reader's when the caller had none.
+        let given = FighterId { chara: 0xc3, specials: [0; 4] };
+        assert_eq!(take("rec-fighter-p1", Role::Player, ROLE_PLAYER, &|start| post_record_start(start, Some(given))).0, Some(given));
+        assert_eq!(take("rec-fighter-p1-read", Role::Player, ROLE_PLAYER, &|start| post_record_start(start, None)).0, Some(who(0xa1)));
+        // A directly recorded drill's take is Player 1's.
+        reset_host();
+        let root = scratch("rec-fighter-drill");
+        set_record_role(Role::Player);
+        set_record_trim(crate::model::trim::Trim::Off);
+        post_effect(Effect::RecordDrill);
+        post_record_start(RecordStart { poses: [pose(0, 0.0, 1.0), pose(8, 5.0, -1.0)], speeds: [(0.0, 0.0); 2] }, None);
+        on_chords(true, false, false);
+        for (f, b) in [1, 0].into_iter().enumerate() {
+            let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
+            unsafe { on_player_poll(&mut input); }
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
+        }
+        on_chords(true, false, false);
+        service_at(&root, &none(), "2026-11-25", state(0), state(8));
+        set_record_trim(crate::model::trim::Trim::End);
+        assert!(take_saved_drill().is_some());
+        assert_eq!(saved(&root).0, Some(who(0xa1)));
+        // No identity to read: the take has no key, as a take saved before it existed.
+        WHO[0].store(0, Ordering::Release);
+        WHO[1].store(0, Ordering::Release);
+        assert_eq!(take("rec-fighter-none", Role::Cpu, ROLE_CPU, &note_record_start), (None, None));
+        reset_host();
+    }
+
     #[test]
     fn a_record_start_is_posted_without_a_lock() {
         let source = include_str!("rr_host.rs");
@@ -6390,6 +6540,7 @@ mod tests {
         use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
         let track = |entry: i32, base: u32| ReplayTrack {
+            fighter: None,
             entry, quantized_analog: false,
             frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
@@ -6422,6 +6573,65 @@ mod tests {
             }
         }
         received
+    }
+
+    fn capture_session() -> crate::engine::macros::ReplaySession {
+        use crate::engine::macros::{ReplayFrame, ReplaySession, ReplayTrack};
+        let track = |entry: i32, base: u32| ReplayTrack {
+            fighter: None,
+            entry, quantized_analog: false,
+            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+                start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
+        };
+        ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() }
+    }
+
+    fn the_host_deletes_a_saved_capture_through_the_file_delete() {
+        use crate::model::recording_menu::FileKind;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("capture-delete");
+        // The folder the runtime's archive reads (`replay_store::archive`).
+        assert!(include_str!("../runtime/macros/replay_store.rs").contains("\"{}/replay_captures\""));
+        let archive = crate::engine::macros::CaptureArchive::new(root.join("replay_captures"));
+        let id = archive.save("native", "Match", "13.0.5", &capture_session()).unwrap();
+        let kept = archive.save("other", "Other", "13.0.5", &capture_session()).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Capture, id: format!("saved:{id}") });
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let left = archive.list().unwrap().entries;
+        assert_eq!(left.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), [kept.as_str()]);
+        // A Vault capture of this boot has no file, and a bare id is not a saved capture's: nothing is removed.
+        for id in ["latest".to_owned(), "previous".to_owned(), kept.clone()] {
+            post_effect(Effect::DeleteFile { kind: FileKind::Capture, id });
+            service_at(&root, &none(), "2026-11-25", state(8), state(7));
+            assert_eq!(archive.list().unwrap().entries.len(), 1);
+        }
+    }
+
+    fn a_macro_made_from_a_capture_outlives_its_delete() {
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::model::recording_menu::{FileKind, Make};
+        let _hold = hold();
+        reset_host();
+        let root = scratch("capture-made");
+        let archive = crate::engine::macros::CaptureArchive::new(root.join("replay_captures"));
+        let id = archive.save("native", "Match", "13.0.5", &capture_session()).unwrap();
+        let mut editor = ClipEditor::new(archive.load(&id).unwrap().session, vec![0]).unwrap();
+        assert!(editor.select_entry(0));
+        let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected exported clip") };
+        let made = super::super::rr_runtime::generate(&root, *recording, "From capture", Make::Macro, Role::Player, 1).unwrap();
+        let super::super::rr_runtime::Generated::Macro(made) = made else { panic!("expected a macro") };
+        // One pass first: the host's own first pass settles the index (its migration mark).
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let before = RecordingIndex::load(&root).unwrap();
+        post_effect(Effect::DeleteFile { kind: FileKind::Capture, id: format!("saved:{id}") });
+        service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert!(archive.list().unwrap().entries.is_empty(), "the capture is gone");
+        assert_eq!(RecordingIndex::load(&root).unwrap(), before, "captures are not in the index: the delete changes nothing in it");
+        let kept = Library::new(root.join(MACROS_DIR)).load(&made).unwrap();
+        assert_eq!(kept.name, "From capture");
+        assert_eq!(kept.frames.iter().map(|frame| frame.buttons).collect::<Vec<_>>(), [1, 2, 3]);
+        assert_eq!(RecordingIndex::load(&root).unwrap().active(Role::Player), Some(made.as_str()), "and it is still the active pick");
     }
 
     fn each_source_and_target_makes_a_combo_on_that_role() {
@@ -6607,6 +6817,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("an_owed_slot_does_not_show_the_playback_indicator", an_owed_slot_does_not_show_the_playback_indicator as fn()),
+            ("the_host_deletes_a_saved_capture_through_the_file_delete", the_host_deletes_a_saved_capture_through_the_file_delete as fn()),
+            ("a_macro_made_from_a_capture_outlives_its_delete", a_macro_made_from_a_capture_outlives_its_delete as fn()),
             ("each_source_and_target_makes_a_combo_on_that_role", each_source_and_target_makes_a_combo_on_that_role as fn()),
             ("each_source_and_target_makes_a_drill_on_that_role", each_source_and_target_makes_a_drill_on_that_role as fn()),
             ("make_drill_saves_a_drill_even_when_the_pass_hits", make_drill_saves_a_drill_even_when_the_pass_hits as fn()),
@@ -6687,6 +6899,8 @@ mod tests {
             ("direct_drill_overflow_saves_nothing_and_reopening_cancels_arm",direct_drill_overflow_saves_nothing_and_reopening_cancels_arm as fn()),
             ("make_combo_no_hit_saves_input_drill_not_previous_exchange", make_combo_no_hit_saves_input_drill_not_previous_exchange as fn()),
             ("save_last_combo_writes_the_latest_exchange_names_it_and_drills_it", save_last_combo_writes_the_latest_exchange_names_it_and_drills_it as fn()),
+            ("a_player_take_stores_the_record_the_poll_was_given", a_player_take_stores_the_record_the_poll_was_given as fn()),
+            ("a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral", a_cpu_role_take_forwards_the_given_record_to_the_cpu_and_leaves_player_one_neutral as fn()),
             ("a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced", a_take_is_busy_from_its_record_edge_until_its_stop_is_serviced as fn()),
             ("mismatch_holds_playback_until_keep_or_switch", mismatch_holds_playback_until_keep_or_switch as fn()),
             ("an_answered_mismatch_wakes_the_service_gate_and_plays", an_answered_mismatch_wakes_the_service_gate_and_plays as fn()),

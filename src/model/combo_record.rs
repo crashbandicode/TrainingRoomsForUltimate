@@ -245,7 +245,7 @@ impl ComboRecord {
     }
 
     fn to_value(&self) -> Value {
-        let identity = self.fighter.map(|f| json!({"ui_chara": format!("{:x}", f.chara & 0xff_ffff_ffff), "specials": f.specials}));
+        let identity = self.fighter.map(fighter_value);
         let version = match (self.combo.input_only, self.combo.has_aim()) {
             (false, false) => SCHEMA_VERSION,
             (true, false) => 2,
@@ -420,6 +420,25 @@ fn recorded_fighter(value: &Value) -> Option<super::move_names::FighterId> {
     Some(super::move_names::FighterId { chara, specials })
 }
 
+pub(crate) fn fighter_value(fighter: super::move_names::FighterId) -> Value {
+    json!({"ui_chara": format!("{:x}", fighter.chara & 0xff_ffff_ffff), "specials": fighter.specials})
+}
+
+/// The `recorded_fighter` key of a combo file, for the other files that store the same identity.
+pub mod fighter_key {
+    use super::super::move_names::FighterId;
+
+    pub fn serialize<S: serde::Serializer>(fighter: &Option<FighterId>, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&fighter.map(super::fighter_value), serializer)
+    }
+
+    /// A key of the wrong shape reads as no identity: the file still loads.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<FighterId>, D::Error> {
+        let value: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+        Ok(super::recorded_fighter(&value))
+    }
+}
+
 fn int(object: &Map<String, Value>, key: &'static str) -> Result<i32, &'static str> {
     object
         .get(key)
@@ -584,7 +603,7 @@ fn parse_description(value: &Value, mv: Move, key: &'static str, step: bool) -> 
 
 fn description_value(desc: ActionDesc) -> Value {
     let mut object = Map::new();
-    if desc.mv.legacy() != desc.mv {
+    if desc.mv == Move::FinalSmash {
         object.insert("move".into(), json!(key_of(&MOVES, desc.mv)));
     }
     if let Some(of) = desc.of {
@@ -762,8 +781,9 @@ fn value_of<T: Copy>(table: &[(T, &'static str)], key: &str) -> Option<T> {
     table.iter().find(|(_, k)| *k == key).map(|(v, _)| *v)
 }
 
+/// A link endpoint's move key; Final Smash remains `other`.
 pub fn move_key(m: Move) -> &'static str {
-    key_of(&MOVES, m.legacy())
+    key_of(&MOVES, if m == Move::FinalSmash { Move::Other } else { m })
 }
 /// The full move key for a description or a take mark.
 pub fn full_move_key(m: Move) -> &'static str {
@@ -773,8 +793,8 @@ pub(crate) fn move_of(key: &str) -> Option<Move> {
     value_of(&MOVES, key)
 }
 fn endpoint_move(key: &str) -> Option<Move> {
-    // A move older files call other belongs in the description, not a bare from or to.
-    move_of(key).filter(|m| m.legacy() == *m)
+    // Final Smash belongs in the description, not a bare from or to.
+    move_of(key).filter(|m| *m != Move::FinalSmash)
 }
 fn button_key(b: Button) -> &'static str {
     key_of(&BUTTONS, b)

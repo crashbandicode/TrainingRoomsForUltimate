@@ -177,8 +177,8 @@ The rows also read `combos/*.json` and the HUD.
 ## 9. Interplay with the CPU pilot
 
 The strip reads P1's mapped inputs after the standalone CPU pilot writes them (`input_delay` callers run after the
-mapping function and the pilot's hook), so a pilot-driven P1 is graded like a player. B4-1 refuses only the input
-recorder (numbered slots and named macros) while the pilot drives P1; *Save last combo* is not a recording and is not
+mapping function and the pilot's hook), so a pilot-driven P1 is graded like a player. B4-1 refused only the input
+recorder (numbered slots and named macros) while the pilot drives P1, until 2026-11-25, when Record was allowed; *Save last combo* is not a recording and is not
 refused. Whether it should be is an open design question (§10).
 
 ## 10. Open

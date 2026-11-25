@@ -113,13 +113,23 @@ impl Placement {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ActionMark {
     pub start: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<u32>,
     #[serde(rename = "move", default, skip_serializing_if = "Option::is_none")]
     pub mv: Option<String>,
+    /// The move's variant as a combo link's description stores it (`move_names::Normal`); 0 is none and is not written.
+    #[serde(default, skip_serializing_if = "is_no_variant")]
+    pub variant: u8,
+    /// A side tilt's or side smash's angle, `up` or `down`, as a combo link's description stores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angle: Option<String>,
+}
+
+fn is_no_variant(variant: &u8) -> bool {
+    *variant == 0
 }
 
 /// A named, versioned, portable CPU macro.
@@ -138,6 +148,10 @@ pub struct MacroRecording {
     pub trim: crate::model::trim::Trim,
     #[serde(default, deserialize_with = "lenient_actions", skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<ActionMark>,
+    /// The fighter the take was recorded on, as a combo file's `recorded_fighter` stores it: its specials are named by
+    /// it whoever Player 1 is. Absent in a take saved before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::model::combo_record::fighter_key")]
+    pub recorded_fighter: Option<crate::model::move_names::FighterId>,
     /// Save id this macro starts from. Absent means the file never had one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_save: Option<String>,
@@ -165,6 +179,7 @@ impl MacroRecording {
             frames,
             trim: crate::model::trim::Trim::Off,
             actions: Vec::new(),
+            recorded_fighter: None,
             start_save: None,
             start_save_on: true,
         };
