@@ -3105,3 +3105,11 @@ ceiling = 203649
 date = "2026-11-25"
 reason = "Preview stop and the Recording pop-up's configured chord line on main 76c00df3: measured 203649 (tools/sloc.py tree), 50 above 203599."
 approved_by = "tr-primary-2 standing rule of 2026-11-24 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)"
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 203763
+date = "2026-11-25"
+reason = "Replay captures can be deleted: a Delete row on the screen of a recording and Y in the Replay window, the archive delete, the Vault capture drop and the lists rebuilt from storage. The archive delete is all or nothing for what the list shows. Measured 203763 on main d807f1e4 (203649): +114."
+approved_by = "tr-primary-2 ruling 2026-11-25 15:04:02Z (feat/capture-delete DESIGN accepted; line budget up to +130)."
