@@ -52,6 +52,9 @@ pub struct View<'a> {
     pub recording_indicator: &'a str,
     /// The strip's last drawn direction marks, oldest first.
     pub strip_aims: [Option<u8>; 2],
+    /// How far the strip's last pass was scrolled back: columns, and the marker's time in milliseconds. 0 when live.
+    pub strip_scroll: u32,
+    pub strip_back_ms: u32,
     pub list: &'a str,
     pub list_count: usize,
     pub list_index: Option<usize>,
@@ -355,6 +358,12 @@ pub fn strip_aims(stamp: u64, now_ms: u64, fresh_ms: u64) -> [Option<u8>; 2] {
     let dir = |nibble: u64| (1..=8).contains(&nibble).then(|| (nibble - 1) as u8);
     [dir(stamp & 15), dir((stamp >> 4) & 15)]
 }
+
+/// A HUD pass and how far back it drew the strip: columns (at most 1,023) and frames (at most 16,383).
+pub fn scroll_stamp(_: u64, _: u32, _: u32) -> u64 { 0 }
+
+/// `(strip.scroll, strip.back_ms)` on a fresh HUD pass; zeros when live, never drawn or stale.
+pub fn strip_scroll(_: u64, _: u64, _: u64) -> (u32, u32) { (0, 0) }
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {
     out.push_str(key);

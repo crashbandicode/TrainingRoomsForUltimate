@@ -85,4 +85,13 @@ fn the_scroll_runs_on_the_one_practice_poll() {
     let scroll = display.split("pub fn on_scroll(").nth(1).unwrap().split("\n}\n").next().unwrap();
     assert!(!scroll.contains("scene::"));
 }
+
+#[test]
+fn the_hud_pass_tells_the_bridge_how_far_back_it_drew() {
+    let hud = include_str!("../runtime/features/hud_draw.rs");
+    assert!(hud.contains("note_strip_scroll(scroll)"));
+    assert!(hud.contains("note_strip_scroll((0, 0))"));
+    let worker = include_str!("../runtime/ui/worker.rs");
+    assert!(worker.contains("bridge_state::strip_scroll(now)"));
+}
 }

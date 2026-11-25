@@ -46,6 +46,19 @@ fn the_history_keeps_ten_seconds_of_columns_and_no_more() {
 }
 
 #[test]
+fn the_history_tells_how_many_columns_back_a_view_is() {
+    let mut tracker = Tracker::new();
+    let mut back = Back::new();
+    assert_eq!(back.columns_back(5), 0);
+    busy(&mut tracker, &mut back, 700);
+    assert_eq!(back.columns_back(685), 15);
+    assert_eq!(back.columns_back(700), 0);
+    assert_eq!(back.columns_back(100), 540);
+    assert_eq!(back.columns_back(0), 0);
+    assert_eq!(back.columns_back(701), 0);
+}
+
+#[test]
 fn a_missed_frame_is_caught_up() {
     let mut tracker = Tracker::new();
     let mut back = Back::new();

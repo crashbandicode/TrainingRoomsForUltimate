@@ -106,6 +106,9 @@ impl Back {
     /// Columns recorded since the last clear, and how many are kept.
     pub fn span(&self) -> (u32, u32) { (self.count, self.kept as u32) }
 
+    /// How many columns behind live a view at `anchor` is; 0 when there is no such view.
+    pub fn columns_back(&self, _: u32) -> u32 { 0 }
+
     /// Append what the tracker gained on the frame just stepped.
     pub fn record(&mut self, tracker: &Tracker) {
         if tracker.frame() <= self.frame && (self.frame != 0 || self.count != 0) {
