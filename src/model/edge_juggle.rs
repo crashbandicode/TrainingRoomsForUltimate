@@ -1188,11 +1188,10 @@ impl Wizard {
 
     /// The setup Start uses without the wizard. A kept one is reused only on the floor run it was made on (the
     /// saved ends are compared), and a CPU start that A confirmed under the stage only while that option is On.
-    /// Nothing is read again. `None`: Start opens the wizard at this run's defaults.
+    /// The place A confirmed decides; nothing is read or measured again. `None`: Start opens the wizard at this
+    /// run's defaults.
     pub fn kept_setup(&self, stage: Stage, kept: Kept, options: StartOptions) -> Option<Setup> {
-        let taken = self.drill == Drill::Juggler
-            || options.under
-            || !kept.under && stage.off_stage(kept.setup.cpu).is_some();
+        let taken = self.drill == Drill::Juggler || !kept.under || options.under;
         (kept.run == stage.ledges && taken).then(|| self.remembered(stage, kept.setup, kept.unmoved))
     }
 
