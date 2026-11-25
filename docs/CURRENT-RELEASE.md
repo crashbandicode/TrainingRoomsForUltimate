@@ -18,7 +18,7 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
   drill was played through, no placement was saved, no second player joined a room, and most of the build's other
   new items were not touched.
 - **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
-  with "In is mid-action" after a snap to the move start. The cause is being traced. It is a report of what they
+  with "In is mid-action" after a snap to the move start; Known issues below has the way round. It is a report of what they
   saw, not a test of the build; the reports on the earlier builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
@@ -95,6 +95,10 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
+- **The clip editor can keep refusing with "In is mid-action" after a snap.** With In selected, Y alone moves the
+  handle to a mark but does not make it a move start, so X and A are still refused. The way round: with In
+  selected, hold ZL or ZR and press Y, then X. Reported by the operator on install 5 and reproduced by a host test;
+  install 4 has the same code. A fix is written and not merged.
 - **Install 5 has had little play on the console:** one report is on record. Its Eden check was one short smoke boot:
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play

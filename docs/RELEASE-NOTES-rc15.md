@@ -151,8 +151,9 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
   Edge opened its set-up. No second player joined, and nothing was played.
   [Install evidence](EVIDENCE-rc15-installs.md#the-waiting-room-boot)
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
-  showing after a snap to the move start, so the clip could not be previewed or saved. The cause is being traced;
-  no fix is merged. No other report on this build is on record.
+  showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
+  Y alone does not make In a move start. Until a fix is in a build, hold ZL or ZR and press Y with In selected,
+  then X. A fix is written and not merged. No other report on this build is on record.
 
 ## Install 4
 
