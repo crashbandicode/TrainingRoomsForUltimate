@@ -440,8 +440,13 @@ pub unsafe fn sample_frame(player: usize) {
         None
     };
     if let Some((run, index, s)) = watched {
-        rr_host::watch_feed(run, index, !s.actionable && !s.hitstun && !s.shieldstun,
-            ids.attack(s.status).or(ids.named_move(s.status)));
+        rr_host::watch_feed(run, index, crate::engine::macro_ui::clip_marks::Seen {
+            busy: !s.actionable && !s.hitstun && !s.shieldstun,
+            mv: ids.attack(s.status).or(ids.named_move(s.status)),
+            status: s.status,
+            motion_frame: s.motion_frame,
+            stop: s.stop,
+        });
     }
     if !sampling && !input_drill {
         skip_frame(true);

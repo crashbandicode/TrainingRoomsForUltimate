@@ -11,7 +11,7 @@ use super::library::{
     StartSaveState, Use, MACROS_DIR, SAVES_DIR, SEQUENCES_DIR,
 };
 use super::frame_queue::FrameQueue;
-use super::macro_ui::clip_marks::{Span, Watch, WATCH_SPANS};
+use super::macro_ui::clip_marks::{Seen, Span, Watch, WATCH_SPANS};
 use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
@@ -22,7 +22,7 @@ use super::rr_runtime::{
 };
 use crate::model::action::Late;
 use crate::model::combo::{CaptureOwner, Combo, InputCapture};
-use crate::model::frame_strip::{Move, Snap};
+use crate::model::frame_strip::Snap;
 use crate::model::combo_record::{ComboLibrary, ComboRecord};
 use crate::model::cpu::playback::PlaybackState;
 use crate::model::input_delay::MappedInputs;
@@ -597,9 +597,9 @@ pub fn preview_role() -> Option<Role> {
     }
 }
 
-pub fn watch_feed(run: u32, index: u32, busy: bool, mv: Option<Move>) {
+pub fn watch_feed(run: u32, index: u32, seen: Seen) {
     if let Some(mut watch) = ACTION_WATCH.try_lock() {
-        watch.feed(run, index, busy, mv);
+        watch.feed(run, index, seen);
     }
 }
 

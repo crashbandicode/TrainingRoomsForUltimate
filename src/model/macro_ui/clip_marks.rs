@@ -30,12 +30,26 @@ pub struct Marks {
     recorded: bool,
 }
 
+/// One frame of the watched fighter, as the frame strip sampled it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Seen {
+    /// It cannot act and is not in hitstun or shieldstun.
+    pub busy: bool,
+    pub mv: Option<Move>,
+    pub status: i32,
+    pub motion_frame: f32,
+    /// In hitstop: its animation does not advance.
+    pub stop: bool,
+}
+
 pub struct Watch {
     run: u32,
     spans: [Span; WATCH_SPANS],
     len: usize,
     open: bool,
     last: Option<u32>,
+    status: i32,
+    motion_frame: f32,
 }
 impl Default for Watch {
     fn default() -> Self {
@@ -45,26 +59,40 @@ impl Default for Watch {
 impl Watch {
     pub const fn new() -> Self {
         Self { run: 0, spans: [Span { start: 0, end: None, mv: None }; WATCH_SPANS],
-            len: 0, open: false, last: None }
+            len: 0, open: false, last: None, status: 0, motion_frame: 0.0 }
     }
-    pub fn feed(&mut self, run: u32, index: u32, busy: bool, mv: Option<Move>) {
+    /// A move that starts while the fighter is still busy is its own span, as the tracker counts it: another move, or
+    /// the same status with its animation back at an earlier frame. A throw continues its grab.
+    pub fn feed(&mut self, run: u32, index: u32, seen: Seen) {
         if self.run != run || self.last.is_some_and(|last| index < last) {
             *self = Self::new();
             self.run = run;
         }
         self.last = Some(index);
-        if busy {
+        if seen.busy && self.open {
+            let current = self.spans[self.len - 1].mv;
+            let another = matches!((current, seen.mv), (Some(was), Some(now))
+                if was != now && was != Move::Other && !(was == Move::Grab && now == Move::Throw));
+            let again = seen.mv.is_some() && seen.status == self.status && seen.motion_frame < self.motion_frame && !seen.stop;
+            if another || again {
+                self.spans[self.len - 1].end = Some(index);
+                self.open = false;
+            }
+        }
+        if seen.busy {
             if !self.open && self.len < WATCH_SPANS {
-                self.spans[self.len] = Span { start: index, end: None, mv };
+                self.spans[self.len] = Span { start: index, end: None, mv: seen.mv };
                 self.len += 1;
                 self.open = true;
             } else if self.open && self.spans[self.len - 1].mv.is_none() {
-                self.spans[self.len - 1].mv = mv;
+                self.spans[self.len - 1].mv = seen.mv;
             }
         } else if self.open {
             self.spans[self.len - 1].end = Some(index);
             self.open = false;
         }
+        self.status = seen.status;
+        self.motion_frame = seen.motion_frame;
     }
     pub fn run(&self) -> u32 { self.run }
     pub fn spans(&self) -> &[Span] { &self.spans[..self.len] }
@@ -430,9 +458,10 @@ mod tests {
 
     fn a_watched_action_gives_its_start_end_and_name() {
         let mut watch = Watch::new();
-        watch.feed(3, 12, true, None);
-        watch.feed(3, 13, true, Some(Move::Jab));
-        watch.feed(3, 40, false, None);
+        let busy = |mv| Seen { busy: true, mv, ..Seen::default() };
+        watch.feed(3, 12, busy(None));
+        watch.feed(3, 13, busy(Some(Move::Jab)));
+        watch.feed(3, 40, Seen::default());
         assert_eq!(watch.run(), 3);
         assert_eq!(watch.spans(), &spans()[..1]);
         let mut marks = Marks::from_inputs(inputs().into_iter());
@@ -440,11 +469,52 @@ mod tests {
         assert_eq!((marks.list()[0].start, marks.list()[0].end, marks.list()[0].name.as_str()), (10, Some(40), "Jab"));
         marks.watch(0, watch.spans());
         assert_eq!(marks.list().len(), 2);
-        watch.feed(4, 0, true, Some(Move::SideTilt));
+        watch.feed(4, 0, busy(Some(Move::SideTilt)));
         assert_eq!(watch.spans().len(), 1);
-        for frame in 1..100 { watch.feed(4, frame, frame % 2 == 0, None); }
+        for frame in 1..100 { watch.feed(4, frame, Seen { busy: frame % 2 == 0, ..Seen::default() }); }
         assert_eq!(watch.spans().len(), WATCH_SPANS);
         assert_eq!(watch.spans()[0].mv, Some(Move::SideTilt));
+    }
+
+    /// rv-preview-vis 23:49:00Z: a second Jab that starts while the fighter is still busy (the same status, its animation
+    /// back at frame 0) is its own move; one continuous Jab is one.
+    fn a_move_restarted_while_busy_is_its_own_recorded_mark() {
+        let jab = |motion_frame: f32| Seen { busy: true, mv: Some(Move::Jab), status: 0x27, motion_frame, stop: false };
+        let take = |restart: bool| {
+            let mut watch = Watch::new();
+            for index in 12..55u32 {
+                let frame = if restart && index >= 30 { index - 30 } else { index - 12 };
+                watch.feed(CAPTURE_RUN, index, jab(frame as f32));
+            }
+            watch.feed(CAPTURE_RUN, 55, Seen::default());
+            let root = scratch(if restart { "restart" } else { "continuous" });
+            let id = save_capture(&root, &inputs(), watch.spans(), false);
+            Library::new(root.join("macros")).load(&id).unwrap()
+        };
+        let twice = take(true);
+        let ends: Vec<_> = twice.actions.iter().map(|mark| (mark.start, mark.end)).collect();
+        assert_eq!(ends, vec![(10, Some(30)), (30, Some(55)), (90, None)]);
+        let mut editor = ClipEditor::macro_file(twice, true).unwrap();
+        assert_eq!(editor.view().mark_count, 3);
+        set_out(&mut editor, 35);
+        editor.on_action(ClipAction::Snap);
+        assert_eq!(editor.view().end, 30);
+        editor.on_action(ClipAction::Nudge(20));
+        editor.on_action(ClipAction::Snap);
+        assert_eq!(editor.view().end, 55);
+        let once = take(false);
+        let ends: Vec<_> = once.actions.iter().map(|mark| (mark.start, mark.end)).collect();
+        assert_eq!(ends, vec![(10, Some(55)), (90, None)]);
+        let mut hitstop = Watch::new();
+        hitstop.feed(1, 12, jab(5.0));
+        hitstop.feed(1, 13, Seen { stop: true, ..jab(4.0) });
+        assert_eq!(hitstop.spans().len(), 1);
+        let mut grab = Watch::new();
+        grab.feed(1, 12, Seen { mv: Some(Move::Grab), ..jab(0.0) });
+        grab.feed(1, 20, Seen { mv: Some(Move::Throw), status: 0x40, ..jab(0.0) });
+        assert_eq!(grab.spans().len(), 1);
+        grab.feed(1, 30, Seen { mv: Some(Move::UpTilt), status: 0x29, ..jab(0.0) });
+        assert_eq!(grab.spans().len(), 2);
     }
 
     fn the_timeline_draws_move_marks() {
@@ -682,6 +752,7 @@ mod tests {
             ("the_carried_fork_hunks_are_listed_with_commit_file_and_lines", the_carried_fork_hunks_are_listed_with_commit_file_and_lines),
             ("originating_inputs_mark_move_starts_for_any_fighter", originating_inputs_mark_move_starts_for_any_fighter),
             ("a_watched_action_gives_its_start_end_and_name", a_watched_action_gives_its_start_end_and_name),
+            ("a_move_restarted_while_busy_is_its_own_recorded_mark", a_move_restarted_while_busy_is_its_own_recorded_mark),
             ("the_timeline_draws_move_marks", the_timeline_draws_move_marks),
             ("an_empty_recording_has_no_marks", an_empty_recording_has_no_marks),
             ("the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs", the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs),
