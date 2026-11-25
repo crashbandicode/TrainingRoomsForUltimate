@@ -846,7 +846,7 @@ pub(crate) fn cpu_controller(take_frame: impl FnOnce() -> Option<InputFrame>) ->
         return None;
     }
     // Sample ownership before the pop: the worker can enqueue the tail and end the run concurrently.
-    let running = RUN_CPU.load(Ordering::Acquire);
+    let running = role_playing(Role::Cpu);
     take_frame().map(|frame| {
         slot_stop();
         playback_controller(frame)
