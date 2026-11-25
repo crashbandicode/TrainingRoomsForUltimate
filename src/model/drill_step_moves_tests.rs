@@ -724,6 +724,37 @@ fn an_aimed_specials_steps_show_their_arrows() {
 }
 
 #[test]
+fn a_second_zip_names_its_cast_even_when_the_first_step_no_longer_titles_it() {
+    let mut tracker = Tracker::new();
+    let mut capture = InputCapture::new();
+    tick(&mut tracker, &mut capture, idle(), MappedInputs { buttons: 4, ..MappedInputs::NEUTRAL });
+    for frame in 0..18 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::UpSpecial, None),
+            MappedInputs { buttons: if frame < 3 { 2 } else { 0 }, lstick_y: 127, ..MappedInputs::NEUTRAL });
+    }
+    for frame in 0..5 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((-11.0 * frame as f32, 0.0))),
+            MappedInputs { lstick_x: -100, ..MappedInputs::NEUTRAL });
+    }
+    for frame in 0..9 {
+        tick(&mut tracker, &mut capture, Sample { pos: Some((-44.0, 0.0)), ..zip_sample(Move::Other, None) },
+            MappedInputs { buttons: if frame == 3 { 8 } else { 0 }, lstick_x: 100, ..MappedInputs::NEUTRAL });
+    }
+    for frame in 0..5 {
+        tick(&mut tracker, &mut capture, zip_sample(Move::Other, Some((-44.0 + 9.9 * frame as f32, 0.0))),
+            MappedInputs { lstick_x: 100, ..MappedInputs::NEUTRAL });
+    }
+    let combo = capture.combo;
+    assert_eq!(combo.len(), 2);
+    assert!(combo.get(0).unwrap().events().any(|e| e.kind == Kind::Aim(1) && e.dir == Dir::Back));
+    assert_eq!(combo.get(1).unwrap().events().next().map(|e| (e.kind, e.dir)), Some((Kind::Aim(2), Dir::Forward)));
+    assert_eq!(bar(combo)[0], "1 Jump > Shield \u{2192}");
+    assert_eq!(bar(combo)[1], "2 Up B \u{2192}");
+    let value = serde_json::to_value(ComboRecord::new("Drill".into(), combo, None)).unwrap();
+    assert!(value["input_steps"][1].get("from_shown").is_some());
+}
+
+#[test]
 fn an_angled_tilts_step_keeps_its_arrow_after_it_ends() {
     let mut tracker = Tracker::new();
     let mut capture = InputCapture::new();
