@@ -658,7 +658,7 @@ pub fn session_clear() {
 }
 
 pub fn on_scroll(event: crate::model::strip_scroll::ScrollEvent, open: bool) {
-    SCROLL.poll(event, open);
+    SCROLL.publish_selection(event, open);
 }
 
 fn clear_live_strip(tracker: &mut Tracker) {

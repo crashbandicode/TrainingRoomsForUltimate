@@ -150,7 +150,7 @@ fn scrollback_review_each_timeline_reset_invalidates_the_published_cursor() {
         tracker.step(Sample::default(), Sample::default(), MappedInputs::NEUTRAL);
         cursor.record(&mut back, &tracker);
     }
-    cursor.poll(ScrollEvent::Opened(Dir::Back), true);
+    cursor.publish_selection(ScrollEvent::Opened(Dir::Back), true);
     assert_eq!(cursor.anchor(), 85);
     tracker.clear();
     cursor.clear();
@@ -162,9 +162,9 @@ fn scrollback_review_each_timeline_reset_invalidates_the_published_cursor() {
         tracker.step(Sample::default(), Sample::default(), MappedInputs::NEUTRAL);
         cursor.record(&mut back, &tracker);
     }
-    cursor.poll(ScrollEvent::Held, true);
+    cursor.publish_selection(ScrollEvent::Held, true);
     assert_eq!(cursor.anchor(), 0, "the former column 85 exists again, but the view stays live");
-    cursor.poll(ScrollEvent::Step(Dir::Back), true);
+    cursor.publish_selection(ScrollEvent::Step(Dir::Back), true);
     assert_eq!(cursor.anchor(), 75);
 }
 }

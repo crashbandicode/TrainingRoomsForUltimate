@@ -120,7 +120,7 @@ impl Cursor {
         }
     }
 
-    pub fn poll(&self, event: ScrollEvent, open: bool) {
+    pub fn publish_selection(&self, event: ScrollEvent, open: bool) {
         let _ = self.0.fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
             let anchor = state as u32;
             let count = (state >> 32) as u32;
