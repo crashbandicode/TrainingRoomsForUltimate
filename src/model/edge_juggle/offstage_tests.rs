@@ -335,4 +335,40 @@ fn a_kept_start_confirmed_in_open_air_is_reused_whatever_its_inset() {
     let on_island = Wizard::new(Drill::GuardEdge, island, island_p1, 100, (308, 0), None).unwrap();
     assert_eq!(on_island.kept_setup(island, kept, OFF), None);
 }
+
+/// tr-primary-2 2026-11-25 19:25Z: a fighter's own default start is used only where the rule calls its point open
+/// air; the older inset from the run's ends does not decide it.
+#[test]
+fn a_fighters_own_start_is_used_only_where_the_rule_calls_it_open_air() {
+    let lines = training();
+    let (island, p1) = on_training(Drill::GuardEdge, [-250.0, 0.024]).unwrap();
+    let wizard = |open: &mut dyn FnMut(Point) -> bool| {
+        Wizard::on(Drill::GuardEdge, island, p1, 100, (3, 0), Some(perfect::diddy::KIND), open).unwrap()
+    };
+    // Diddy's own start, 14 out from the ledge and 30 down, on each side of the island.
+    let own = [[-344.0, -29.986], [-156.0, -29.986]];
+    let spots = [island.spot(0).unwrap(), island.spot(1).unwrap()];
+    // The rule on the Training stage's lines calls both open air: the fighter's own start is the default.
+    let mut asked = Vec::new();
+    let by_rule = wizard(&mut |point| {
+        asked.push(point);
+        classify(&mut Copied(&lines), TRAINING_BLAST, point) == Ok(Place::Open)
+    });
+    for side in 0..2 {
+        assert!(near(by_rule.default_cpu(island, side), own[side]), "{side}: {:?}", by_rule.default_cpu(island, side));
+        assert!(asked.iter().any(|&point| near(Some(point), own[side])), "{side}: the rule was asked about the point");
+    }
+    assert!(near(Some(by_rule.setup.cpu), own[0]));
+    // Where the rule does not call the point open air, the default is the rule's spot, whatever the inset says.
+    assert!(island.off_stage(own[0]).is_some() && island.off_stage(own[1]).is_some(), "the older test takes both");
+    let refused = wizard(&mut |_| false);
+    for side in 0..2 {
+        assert_eq!(refused.default_cpu(island, side), Some(spots[side]), "{side}");
+    }
+    assert_eq!(refused.setup.cpu, spots[0]);
+    // The drill asks the rule on its frame.
+    let runtime = include_str!("../../runtime/features/edge_juggle.rs");
+    assert!(runtime.contains("geometry::classify(&mut probe, stage.blast(), point) == Ok(geometry::Place::Open)"));
+    assert!(!runtime.contains("Wizard::new("));
+}
 }

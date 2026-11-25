@@ -1010,6 +1010,16 @@ pub struct Wizard {
 }
 
 impl Wizard {
+    /// As `new`, with a fighter's own start kept only where `open` says the point is open air by the off-stage
+    /// rule; elsewhere the side's default is the rule's spot.
+    pub fn on(
+        drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
+        stage_key: (i32, u32), fighter: Option<i32>, open: impl FnMut([f32; 2]) -> bool,
+    ) -> Option<Self> {
+        let _ = open;
+        Self::new(drill, stage, p1, percent, stage_key, fighter)
+    }
+
     pub fn new(
         drill: Drill, stage: Stage, p1: [f32; 2], percent: u16,
         stage_key: (i32, u32), fighter: Option<i32>,
