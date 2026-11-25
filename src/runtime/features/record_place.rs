@@ -479,7 +479,7 @@ pub unsafe fn poll(controller: usize, sample: Sample, block: bool) -> bool {
             if let (Some(count), StartKind::Record { .. }) = (start.orders.count, &start.kind) {
                 let mut text = FixedPath::<224>::new();
                 let _ = record_place::write_ready(count, &mut text);
-                post_text(&mut start.notice, text);
+                post_text(&mut start.notice, "Recording", text);
             }
             if start.orders.live {
                 HOLDING.store(false, Ordering::Release);
