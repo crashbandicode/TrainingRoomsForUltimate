@@ -492,7 +492,9 @@ mod tests {
         use crate::model::chords::{bit, Buttons};
         let tapped = |samples: &[u32]| {
             let mut tap = TargetTap::new();
-            samples.iter().fold(false, |hit, &bits| tap.tapped(Buttons(bits).zr(), Buttons(bits).other_than_zr()) || hit)
+            let mut hit = false;
+            for &bits in samples { hit |= tap.tapped(Buttons(bits).zr(), Buttons(bits).other_than_zr()); }
+            hit
         };
         assert!(tapped(&[bit::ZR, bit::ZR, 0]));
         for other in [bit::L_UP, bit::L_DOWN, bit::R_UP, bit::R_DOWN, bit::L_LEFT, bit::R_RIGHT, bit::DPAD_UP, bit::DPAD_LEFT,
@@ -576,12 +578,14 @@ mod tests {
         let mut editor = ClipEditor::macro_file(twice, true).unwrap();
         assert_eq!(editor.view().mark_count, 3);
         // rv-preview-vis 01:10:02Z: the two Jabs touch. At 29 the playhead is in the first, at 30 in the second.
-        editor.on_action(ClipAction::Nudge(29));
+        editor.on_action(ClipAction::TogglePlay);
+        editor.preview_cursor(30);
         assert_eq!((editor.view().cursor, editor.view().near), (29, Some((10, Some(30)))));
-        editor.on_action(ClipAction::Nudge(1));
+        editor.preview_cursor(31);
         assert_eq!((editor.view().cursor, editor.view().near), (30, Some((30, Some(55)))));
         assert!(bridge_clip(&editor.view(), None, false).text().contains(" cursor=30 "));
         assert!(bridge_clip(&editor.view(), None, false).text().contains(" marks=3 mark=30-55 "));
+        editor.on_action(ClipAction::TogglePlay);
         let open = [ActionMark { start: 10, end: Some(30), mv: None }, ActionMark { start: 30, end: None, mv: None }];
         let mut touching = recording();
         touching.frames[30].buttons = 1;
