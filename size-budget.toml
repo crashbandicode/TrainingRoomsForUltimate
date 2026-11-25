@@ -2865,3 +2865,11 @@ ceiling = 200589
 date = "2026-11-25"
 reason = "Record-time trim keeps a known move end at the retained boundary for macros and drill takes. Measured +8 over replay editor fcb07e24; +761 over merge 4b."
 approved_by = "tr-primary-2 2026-11-24 23:45:23Z (review fixes at the measured value through +900) and 00:12:53Z (record-time trim)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201006
+date = "2026-11-25"
+reason = "Replay editor folded on merge 3D (74f9f21e, 200093) with the reviewer trim fix: the bridge clip line (target, marks, nearest mark, move text, the drill strip), the play target owned by the editor for every source and the ZR tap toggle, with their tests. Measured 201006 (remote-gate size step, dae6dfd6): +913 on merge 3D."
+approved_by = "tr-primary-2 2026-11-24 23:45:23Z (the editor, measured, up to +900) and 2026-11-25 00:31:58Z (the bridge line: lines approved at the measured value); the 13 lines above +900 are flagged in the READY post."

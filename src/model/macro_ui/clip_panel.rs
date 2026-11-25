@@ -230,7 +230,7 @@ impl TargetTap {
     pub const fn new() -> Self { Self { down: false, clean: false } }
 
     /// Poll once per Player 1 input. `other`: any other button or direction is held. True on the release of a tap.
-    pub fn poll(&mut self, zr: bool, other: bool) -> bool {
+    pub fn tapped(&mut self, zr: bool, other: bool) -> bool {
         if zr {
             self.clean = if self.down { self.clean && !other } else { !other };
             self.down = true;

@@ -453,7 +453,7 @@ mod tests {
         use clip_panel::TargetTap;
         let press = |tap: &mut TargetTap, editor: &mut ClipEditor, samples: &[(bool, bool)]| {
             for &(zr, other) in samples {
-                if tap.poll(zr, other) { editor.on_action(ClipAction::SwapTarget); }
+                if tap.tapped(zr, other) { editor.on_action(ClipAction::SwapTarget); }
             }
         };
         let target = |editor: &ClipEditor| bridge_clip(&editor.view(), None, false).text();
@@ -486,7 +486,7 @@ mod tests {
         let controls = clip_panel::clip_help(&editor.view(), "ZL or ZR", "ZL", 0).controls;
         assert!(controls.starts_with("ZR Player/CPU. X preview. Y snap."), "{controls}");
         let adapter = include_str!("../../runtime/macros/replay_capture.rs");
-        assert!(adapter.contains("TARGET_TAP.lock().unwrap().poll("));
+        assert!(adapter.contains("TARGET_TAP.lock().unwrap().tapped("));
         assert!(!adapter.contains("controller.just_down.dpad_up() || controller.just_down.dpad_down()"));
     }
 

@@ -1195,7 +1195,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "f428bdb8aeacd9aef368c83631fb39158663431096206c0418e99d8b118ba83b",
+   "dest_sha256": "3d1e1b3fa714457a62669faad9d558bb0200b3ed97aed3497f4d6d0fd07e705c",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1646,6 +1646,11 @@
     {
      "old": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"D-pad Up/Down: plays on CPU or Player 1. \" }",
      "new": "        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    pub fn poll(&mut self, zr: bool, other: bool) -> bool {",
+     "new": "    pub fn tapped(&mut self, zr: bool, other: bool) -> bool {",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
@@ -3921,7 +3926,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "8b7648115543edcc0ddaeddb722f2f9083b6988e87dc2011957cb8e9de4b0e1f",
+   "dest_sha256": "962d09741f2022a3670eb270e6a51d75e4c9694aa15281c3271b4b039af37045",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4576,6 +4581,11 @@
     {
      "old": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
      "new": "static HOLD: Mutex<(i32, u32, bool)> = Mutex::new((0, 0, false));\nstatic TARGET_TAP: Mutex<crate::engine::macro_ui::clip_panel::TargetTap> = Mutex::new(crate::engine::macro_ui::clip_panel::TargetTap::new());\nstatic RELOAD: Mutex<Option<Reload>> = Mutex::new(None);",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    if TARGET_TAP.lock().unwrap().poll(held.zr(), other)",
+     "new": "    if TARGET_TAP.lock().unwrap().tapped(held.zr(), other)",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
