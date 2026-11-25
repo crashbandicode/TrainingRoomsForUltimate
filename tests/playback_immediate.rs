@@ -265,7 +265,7 @@ fn the_start_save_is_posted_without_a_card_read() {
     let started = tick(&f.root);
     let reads = difference(before, counts());
     assert_eq!(started.warp.as_deref(), Some(f.save.as_str()));
-    assert_eq!(started.warp_pair, Some(f.pair), "the worker supplies the restored pair; card reads/listings {reads:?}");
+    assert_eq!(started.warp_pair.map(|pair| *pair), Some(f.pair), "the worker supplies the restored pair; card reads/listings {reads:?}");
     assert_eq!(reads, (3, 0));
     let source = include_str!("../src/runtime/features/recording_host.rs");
     assert!(source.contains("tick.warp_pair"));
@@ -346,7 +346,7 @@ fn a_same_size_rewrite_outside_the_mod_is_played_by_the_next_start() {
     let start = tick(&f.root);
     let mut pair = f.pair.clone();
     pair[0].x = 9.0;
-    assert_eq!(start.warp_pair, Some(pair));
+    assert_eq!(start.warp_pair.map(|pair| *pair), Some(pair));
     host::warp_landed();
     tick(&f.root);
     assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(9));
@@ -383,7 +383,7 @@ fn a_rewritten_active_start_save_is_used_by_the_next_play() {
     chord(Role::Player);
     let next = tick(&f.root);
     assert_eq!(next.warp.as_deref(), Some(f.save.as_str()));
-    assert_eq!(next.warp_pair, Some([changed.player, changed.cpu]));
+    assert_eq!(next.warp_pair.map(|pair| *pair), Some([changed.player, changed.cpu]));
 }
 
 #[test]
@@ -520,7 +520,7 @@ fn an_active_chain_reads_its_steps_and_first_start_save() {
     chord(Role::Player);
     let next = tick(&f.root);
     assert_eq!(next.warp.as_deref(), Some(f.save.as_str()));
-    assert_eq!(next.warp_pair, Some(f.pair));
+    assert_eq!(next.warp_pair.map(|pair| *pair), Some(f.pair));
     assert_eq!(difference(before, counts()), (5, 0));
 }
 
@@ -546,7 +546,7 @@ fn a_chain_switch_decides_its_warp_not_macro_ones_own_switch() {
     chord(Role::Player);
     let start = tick(&f.root);
     assert_eq!(start.warp.as_deref(), Some(f.save.as_str()));
-    assert_eq!(start.warp_pair, Some(f.pair.clone()));
+    assert_eq!(start.warp_pair.map(|pair| *pair), Some(f.pair.clone()));
     host::warp_landed();
     let before = counts();
     tick(&f.root);

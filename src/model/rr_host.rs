@@ -406,7 +406,7 @@ fn parry_next_pass(start: impl FnOnce()) {
 static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
 static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
-static BOOK: Mutex<Option<HeldBook>> = Mutex::new(None);
+static BOOK: Mutex<Option<Box<HeldBook>>> = Mutex::new(None);
 type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 static PREVIEW: AtomicU8 = AtomicU8::new(0);
@@ -534,7 +534,7 @@ pub enum HomeWarp {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
-    pub warp_pair: Option<[SavedState; 2]>,
+    pub warp_pair: Option<Box<[SavedState; 2]>>,
     /// A Vault clip's preview: the game keeps both fighters as Save reads them when it first starts and loads that pair at the start and for the return.
     pub home: Option<HomeWarp>,
     /// The playing role and the placement of the file that warps (`warp_pair`).
@@ -1377,52 +1377,20 @@ pub fn service_at(
     if !busy {
         return tick;
     }
-    // The worker serves the game thread's flags on its next pass.
-    let mut starts = [play_player, play_cpu];
-    if lock(&ANSWER).is_some() {
-        if let Some(role) = *lock(&HELD) { starts[role_index(role)] = true; }
-    }
-    let preview = lock(&PREVIEW_ASK).start.as_ref().map(|start| (start.role, start.source.clone()));
-    let make = lock(&MAKE_ASK).as_ref().map(|ask| (ask.role, ask.source.clone()));
-    let menu_make = lock(&MENU_EFFECT).as_ref().and_then(|(_, effect)| match effect {
-        Effect::MakeCombo { source, .. } => Some((Role::Player, source.clone())),
-        _ => None,
-    });
-    for (role, _) in [&menu_make, &make, &preview].into_iter().flatten() {
-        starts[role_index(*role)] = true;
-    }
     let mut held = lock(&BOOK);
-    if held_needs_read(held.as_ref(), root, starts) {
-        let in_use = [
-            starts[0] || role_playing(Role::Player),
-            starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
-        ];
-        let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
-        for role in [Role::Player, Role::Cpu] {
-            let slot = role_index(role);
-            if starts[slot] || !in_use[slot] { sources[slot] = None; }
-        }
-        for (role, source) in [menu_make, make, preview].into_iter().flatten() {
-            sources[role_index(role)] = Some(Source { id: source, active: false });
-        }
-        match read_held(root, sources, in_use, starts) {
-            Ok(next) => *held = Some(next),
-            Err(()) => {
-                // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
-                retire_preview_run();
-                take_preview_refusal(&mut tick);
-                PREVIEW.store(0, Ordering::Release);
-                *lock(&PREVIEW_ASK) = PreviewRequests::default();
-                drop_preview_home();
-                return tick;
-            }
-        }
+    if !refresh_held(&mut held, root, [play_player, play_cpu]) {
+        // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
+        retire_preview_run();
+        take_preview_refusal(&mut tick);
+        PREVIEW.store(0, Ordering::Release);
+        *lock(&PREVIEW_ASK) = PreviewRequests::default();
+        drop_preview_home();
+        return tick;
     }
-    let held = held.as_mut().expect("held book");
+    let held = held.as_mut().expect("held book").as_mut();
     held.book.remove_recording(CLIP_ID);
     if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { held.book.add_recording(CLIP_ID, clip.clone()); }
     let book = &held.book;
-    let sources = &mut held.sources;
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     // restriction: parry-mash-ignored
@@ -1458,7 +1426,7 @@ pub fn service_at(
     parry_next_pass(|| {
         play_role_with(root, machine, book, Role::Cpu, &mut tick, true);
         if machine.playing(Role::Cpu) {
-            sources[role_index(Role::Cpu)] = book.index.active(Role::Cpu)
+            held.sources[role_index(Role::Cpu)] = book.index.active(Role::Cpu)
                 .map(|id| Source { id: id.to_owned(), active: true });
         }
     });
@@ -1471,8 +1439,7 @@ pub fn service_at(
     drive_preview(machine, book, &mut tick);
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
-    tick.warp_pair = tick.warp.as_deref().and_then(|id| held.saves.iter().find(|(save, _)| save == id))
-        .map(|(_, save)| warp_pair(save.clone(), tick.warp_place));
+    hold_warp_pair(held, &mut tick);
     tick
 }
 
@@ -2696,6 +2663,49 @@ fn read_held(root: &Path, mut sources: [Option<Source>; 2], roles: [bool; 2], st
 /// Reload on a start, a root or mod-write generation change, or when no value is held.
 fn held_needs_read(held: Option<&HeldBook>, root: &Path, starts: [bool; 2]) -> bool {
     held.is_none_or(|held| held.root != root || held.version != recording_version() || starts[0] || starts[1])
+}
+
+/// Reads the held files again when a role starts, the root changes, the mod wrote the library, or nothing is held.
+/// Kept out of line: the reader's locals (the book being built, a loaded macro, chain and save) must not sit in
+/// `service_at`'s frame, which is on the menu worker's deepest path (`thread_stacks`).
+#[inline(never)]
+fn refresh_held(held: &mut Option<Box<HeldBook>>, root: &Path, chords: [bool; 2]) -> bool {
+    let mut starts = chords;
+    if lock(&ANSWER).is_some() {
+        if let Some(role) = *lock(&HELD) { starts[role_index(role)] = true; }
+    }
+    let preview = lock(&PREVIEW_ASK).start.as_ref().map(|start| (start.role, start.source.clone()));
+    let make = lock(&MAKE_ASK).as_ref().map(|ask| (ask.role, ask.source.clone()));
+    let menu_make = lock(&MENU_EFFECT).as_ref().and_then(|(_, effect)| match effect {
+        Effect::MakeCombo { source, .. } => Some((Role::Player, source.clone())),
+        _ => None,
+    });
+    for (role, _) in [&menu_make, &make, &preview].into_iter().flatten() {
+        starts[role_index(*role)] = true;
+    }
+    if !held_needs_read(held.as_deref(), root, starts) { return true; }
+    let in_use = [
+        starts[0] || role_playing(Role::Player),
+        starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
+    ];
+    let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
+    for role in [Role::Player, Role::Cpu] {
+        let slot = role_index(role);
+        if starts[slot] || !in_use[slot] { sources[slot] = None; }
+    }
+    for (role, source) in [menu_make, make, preview].into_iter().flatten() {
+        sources[role_index(role)] = Some(Source { id: source, active: false });
+    }
+    match read_held(root, sources, in_use, starts) {
+        Ok(next) => { *held = Some(Box::new(next)); true }
+        Err(()) => false,
+    }
+}
+
+#[inline(never)]
+fn hold_warp_pair(held: &HeldBook, tick: &mut Tick) {
+    tick.warp_pair = tick.warp.as_deref().and_then(|id| held.saves.iter().find(|(save, _)| save == id))
+        .map(|(_, save)| Box::new(warp_pair(save.clone(), tick.warp_place)));
 }
 
 fn load_book(root: &Path) -> Result<Book, ()> {

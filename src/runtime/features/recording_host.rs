@@ -376,7 +376,7 @@ fn apply(tick: &Tick) {
     }
     if let Some(id) = &tick.warp {
         if let Some(pair) = tick.warp_pair.clone() {
-            super::states::request_named_load(pair);
+            super::states::request_named_load(*pair);
         } else {
             let root = std::path::Path::new(crate::model::storage::ROOT);
             let saves = crate::model::store::Store::<crate::engine::library::NamedSave>::new(
