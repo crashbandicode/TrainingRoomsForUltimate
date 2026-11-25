@@ -223,6 +223,8 @@ pub fn snapshot(view: &View<'_>, out: &mut String) -> bool {
         }
     }
     out.push_str("\"\n");
+    let _ = writeln!(out, "strip.scroll={}", view.strip_scroll);
+    let _ = writeln!(out, "strip.back_ms={}", view.strip_back_ms);
     push_str(out, "list", view.list);
     let _ = writeln!(out, "list.count={}", view.list_count);
     let _ = writeln!(out, "list.index={}", view.list_index.map_or(-1, |index| index as i64));
@@ -360,10 +362,16 @@ pub fn strip_aims(stamp: u64, now_ms: u64, fresh_ms: u64) -> [Option<u8>; 2] {
 }
 
 /// A HUD pass and how far back it drew the strip: columns (at most 1,023) and frames (at most 16,383).
-pub fn scroll_stamp(_: u64, _: u32, _: u32) -> u64 { 0 }
+pub fn scroll_stamp(now_ms: u64, columns: u32, frames: u32) -> u64 {
+    (now_ms << 24) | (u64::from(columns.min(1023)) << 14) | u64::from(frames.min(16_383))
+}
 
 /// `(strip.scroll, strip.back_ms)` on a fresh HUD pass; zeros when live, never drawn or stale.
-pub fn strip_scroll(_: u64, _: u64, _: u64) -> (u32, u32) { (0, 0) }
+pub fn strip_scroll(stamp: u64, now_ms: u64, fresh_ms: u64) -> (u32, u32) {
+    if stamp == 0 || now_ms.saturating_sub(stamp >> 24) > fresh_ms { return (0, 0); }
+    let (columns, frames) = (((stamp >> 14) & 1023) as u32, (stamp & 16_383) as u32);
+    (columns, frames * 1000 / 60)
+}
 
 pub(crate) fn push_str(out: &mut String, key: &str, value: &str) {
     out.push_str(key);

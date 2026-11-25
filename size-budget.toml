@@ -2825,3 +2825,11 @@ ceiling = 200254
 date = "2026-11-25"
 reason = "Merge 7: the frame strip's scrollback (hold R3, D-pad Left or Right): the hold, the ten seconds of history, the view the HUD draws from it. Measured 200254 (tools/sloc.py tree), 426 above install 4 merge 4b 4905ec89 (199828)."
 approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the line ceiling is approved at the measured value), on the operator's request relayed at 23:23:39Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200312
+date = "2026-11-25"
+reason = "Merge 7: the bridge publishes the frame strip's scroll state (strip.scroll, strip.back_ms) from the HUD pass that drew it. Measured 200312 (tools/sloc.py tree), 58 above the scrollback's 200254."
+approved_by = "tr-primary-2 2026-11-25 00:45:38Z (the scroll state as a bridge field on feat/strip-scrollback; lines approved at the measured value)."

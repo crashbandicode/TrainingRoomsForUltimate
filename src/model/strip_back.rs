@@ -106,8 +106,18 @@ impl Back {
     /// Columns recorded since the last clear, and how many are kept.
     pub fn span(&self) -> (u32, u32) { (self.count, self.kept as u32) }
 
+    /// The column a view at `anchor` shows as its newest, clamped to the oldest full window.
+    fn shown(&self, anchor: u32) -> Option<u32> {
+        if self.count == 0 || anchor == 0 || anchor > self.count { return None; }
+        let first_kept = self.count.saturating_sub(self.kept as u32) + 1;
+        let oldest_view = first_kept.saturating_add((WINDOW - 1) as u32).min(self.count);
+        Some(anchor.max(oldest_view))
+    }
+
     /// How many columns behind live a view at `anchor` is; 0 when there is no such view.
-    pub fn columns_back(&self, _: u32) -> u32 { 0 }
+    pub fn columns_back(&self, anchor: u32) -> u32 {
+        self.shown(anchor).map_or(0, |shown| self.count - shown)
+    }
 
     /// Append what the tracker gained on the frame just stepped.
     pub fn record(&mut self, tracker: &Tracker) {
@@ -147,8 +157,7 @@ impl Back {
         if self.count == 0 || anchor == 0 || anchor > self.count || tracker.frame() < self.frame { return None; }
         let live_newest = tracker.newest()?;
         let first_kept = self.count.saturating_sub(self.kept as u32) + 1;
-        let oldest_view = first_kept.saturating_add((WINDOW - 1) as u32).min(self.count);
-        let anchor = anchor.max(oldest_view);
+        let anchor = self.shown(anchor)?;
         let first = anchor.saturating_sub((WINDOW - 1) as u32).max(first_kept);
         let len = (anchor - first + 1) as usize;
         let start = (self.head + COLUMNS - self.kept + (first - first_kept) as usize) % COLUMNS;

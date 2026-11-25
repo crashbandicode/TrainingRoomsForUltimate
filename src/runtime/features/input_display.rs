@@ -699,10 +699,14 @@ pub fn hud_tick(
     cells: bool,
     labels: [bool; 2],
     mut apply: impl FnMut(usize, &Look, Changed),
-) -> (bool, [Option<u8>; 2]) {
+) -> (bool, [Option<u8>; 2], (u32, u32)) {
     let mut tracker = *TRACKER.lock();
     let anchor = SCROLL.load(Ordering::Acquire);
-    let back = if anchor != 0 { BACK.lock().rewind(&mut tracker, anchor) } else { None };
+    let (back, columns) = if anchor != 0 {
+        let kept = BACK.lock();
+        let back = kept.rewind(&mut tracker, anchor);
+        (back, if back.is_some() { kept.columns_back(anchor) } else { 0 })
+    } else { (None, 0) };
     let (_, history) = RENDERER.lock().draw_with_spec(
         &tracker, StripDraw { shown, back, spots: draw_settings.spots, parry, history_enabled: draw_settings.link_history, cells, spec: &C },
         |local, look, changed| {
@@ -716,5 +720,5 @@ pub fn hud_tick(
         },
     );
     let aims = if shown { crate::model::frame_strip_plan::aims_drawn(&tracker, labels) } else { [None; 2] };
-    (history, aims)
+    (history, aims, if shown { (columns, back.unwrap_or(0)) } else { (0, 0) })
 }
