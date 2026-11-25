@@ -48,8 +48,8 @@ impl Drill {
     /// The Edge recovery start is already airborne, so only aerial jumps are restored. With the jumps `used`, the
     /// counter starts at the fighter's own `max` (its `jump_count_max`), so no midair jump is left.
     pub const fn placed_jump_count(self, used: bool, max: i32) -> i32 {
-        let _ = (used, max);
         match self {
+            Self::GuardEdge if used && max > 1 => max,
             Self::GuardEdge => 1,
             Self::Juggler => 0,
         }
@@ -860,22 +860,34 @@ impl Stage {
         [p1[0], p1[1].midpoint(self.camera[2])]
     }
 
-    /// The class of a start point. `solid` is the closed outline of the stage's solid.
+    /// The class of a start point. `solid` is the closed outline of the stage's solid: a point is in it when a
+    /// ray from the point to the right crosses an odd number of its lines, and under it when it is not in it and
+    /// one of its lines is straight above.
     pub fn start_class(self, point: [f32; 2], solid: &[perfect::Segment]) -> StartClass {
-        let _ = solid;
+        let [x, y] = point;
+        let crossed = solid.iter().filter(|[[ax, ay], [bx, by]]| {
+            (*ay > y) != (*by > y) && x < ax + (y - ay) / (by - ay) * (bx - ax)
+        });
+        let above = |[[ax, ay], [bx, by]]: &perfect::Segment| {
+            (*ax > x) != (*bx > x) && ay + (x - ax) / (bx - ax) * (by - ay) > y
+        };
         if self.edge_cursor(point) != Some(point) {
             StartClass::Outside
         } else if self.off_stage(point).is_some() {
             StartClass::Open
+        } else if crossed.count() % 2 == 1 {
+            StartClass::Solid
+        } else if solid.iter().any(above) {
+            StartClass::Under
         } else {
             StartClass::Over
         }
     }
 
-    /// Whether a start kept for this stage is still one Start may use without the wizard.
+    /// Whether a start kept for this stage is still one Start may use without the wizard: a Guard the Edge start
+    /// that is not beside the stage was accepted as one under it, and needs that option.
     pub fn keeps_start(self, drill: Drill, cpu: [f32; 2], options: StartOptions) -> bool {
-        let _ = (drill, cpu, options);
-        true
+        drill == Drill::Juggler || options.under || self.off_stage(cpu).is_some()
     }
 }
 
@@ -888,13 +900,16 @@ pub struct StartOptions {
 
 impl StartOptions {
     pub fn read(snapshot: &crate::model::settings::Snapshot) -> Self {
-        let _ = snapshot;
-        Self::default()
+        let select = |id| crate::model::tech_settings::selected(snapshot, id);
+        Self { under: select("edge_under") == 0, jumps_used: select("edge_jumps") == 1 }
     }
 
     /// Names the options in the drill's bridge state (`under=`, `jumps=`); Juggler has neither.
     pub fn describe(self, drill: Drill, fields: &mut Fields) {
-        let _ = (drill, fields);
+        if drill == Drill::GuardEdge {
+            fields.under = if self.under { "on" } else { "off" };
+            fields.jumps = if self.jumps_used { "used" } else { "kept" };
+        }
     }
 }
 
@@ -1166,8 +1181,7 @@ impl Wizard {
 
     /// Whether A takes a CPU start of this class.
     pub fn accepts_class(&self, class: StartClass, options: StartOptions) -> bool {
-        let _ = options;
-        self.drill == Drill::Juggler || class == StartClass::Open
+        self.drill == Drill::Juggler || class == StartClass::Open || options.under && class == StartClass::Under
     }
 
     /// A on the CPU page, once the point's class is known: an accepted point goes on to the next page.

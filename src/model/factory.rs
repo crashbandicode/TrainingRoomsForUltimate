@@ -276,6 +276,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("juggle_reaction", Single, 3, [1]),
     row!("juggle_reaction_frames", Single, 30, [11]),
     row!("edge_cpu_percent", Single, 301, [100]),
+    row!("edge_under", Single, 2, [1]),
+    row!("edge_jumps", Single, 2, [0]),
     row!("edge_attempts", Single, 3, [0]),
     row!("juggle_attempts", Single, 3, [0]),
 

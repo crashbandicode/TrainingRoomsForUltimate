@@ -26,7 +26,7 @@ use crate::model::edge_juggle::perfect::{
 use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
 use crate::model::edge_juggle::{
     CpuObject, Drill, Observation, Outcome, Phase, PlacedPlayer, Placement, PlacementAction, PlacementFrame,
-    Reaction, Session, Setup, Stage, Wizard, WizardStep,
+    Reaction, Session, Setup, Stage, StartClass, StartOptions, Wizard, WizardStep,
 };
 
 #[path = "edge_juggle/zoom.rs"]
@@ -78,6 +78,7 @@ struct Config {
     juggle_limit: Option<u16>,
     opponent: [Opponent; 2],
     reaction: [Reaction; 2],
+    options: StartOptions,
 }
 static CONFIG: Published<Config> = Published::new(Config {
     edge_percent: 100,
@@ -85,6 +86,7 @@ static CONFIG: Published<Config> = Published::new(Config {
     juggle_limit: Some(10),
     opponent: [Opponent::DEFAULT; 2],
     reaction: [Reaction::Human; 2],
+    options: StartOptions { under: false, jumps_used: false },
 });
 static INSTALLED: AtomicBool = AtomicBool::new(false);
 static P1_BUTTONS: AtomicU32 = AtomicU32::new(0);
@@ -126,6 +128,10 @@ struct Run {
     wizard: Option<Wizard>,
     defaults: Setup,
     confirm_player: bool,
+    /// Guard the Edge's start options, as they were at Start.
+    options: StartOptions,
+    /// A was pressed on a CPU point that is not beside the stage; the next fighter frame classes it.
+    confirm_cpu: bool,
     /// How the picker shows the CPU point this frame (`crosshair::cpu_view`).
     cpu_view: &'static str,
     setup: Setup,
@@ -250,6 +256,7 @@ pub fn publish(snapshot: &Snapshot) {
             let rows = drill.difficulty_rows();
             Reaction::from_settings(select(rows.reaction), select(rows.frames))
         }),
+        options: StartOptions::read(snapshot),
     });
 }
 
@@ -1512,6 +1519,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
 
     if key_down(key::B) {
         run.confirm_player = false;
+        run.confirm_cpu = false;
         if !wizard.back() {
             practice::finish(run.drill.game());
             published::WIZARDS.set_up(Kind::DrillStart, false);
@@ -1526,10 +1534,12 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
             wizard.back_to_defaults(run.defaults);
         }
         run.confirm_player = false;
+        run.confirm_cpu = false;
         return true;
     }
     if key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
         wizard.set_side_default(run.stage, true);
+        run.confirm_cpu = false;
         return true;
     }
     match wizard.step {
@@ -1544,6 +1554,10 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
     }
     if key_down(key::A) || wizard.step == WizardStep::Preview && key_down(key::PLUS) {
         if wizard.step == WizardStep::Cpu && !wizard.accepts_cpu(run.stage) {
+            if run.options.under {
+                run.confirm_cpu = true;
+                return true;
+            }
             notices::refuse("Pick a point off the stage"); // restriction: edge-juggle-start-over-stage
             return true;
         }
@@ -1601,6 +1615,15 @@ unsafe fn setup_stage(p1: usize) -> Option<(Stage, [f32; 2])> {
     let (ledges, start) = stage_floor(&ray, bounds)?;
     let blast = super::tech_surfaces::training_blast_bounds()?;
     Some((Stage::new(blast, bounds, ledges)?, start))
+}
+
+/// The class of a CPU start from the solid's outline of this frame; over the stage when it cannot be read.
+unsafe fn start_class(p1: usize, stage: Stage, point: [f32; 2]) -> StartClass {
+    let outline = || {
+        let (midpoint, limits) = perfect::outline_probe(natives::camera_limit_range()?, stage.blast())?;
+        super::tech_surfaces::training_outline(&FloorRay::new(p1)?, midpoint, limits)
+    };
+    outline().map_or(StartClass::Over, |(outline, _)| stage.start_class(point, outline.segments()))
 }
 
 unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -> Option<[f32; 2]> {
@@ -1664,7 +1687,7 @@ unsafe fn on_start(p1: usize, [x, y]: [f32; 2]) -> Option<bool> {
     Some(floor.height(x)? == y)
 }
 
-unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup) -> Option<[f32; 2]> {
+unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup, options: StartOptions) -> Option<[f32; 2]> {
     let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
         return None;
     };
@@ -1710,7 +1733,8 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
         drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
     ).unwrap_or(-facing);
     placement::lift(bodies.cpu, setup.cpu, cpu_facing);
-    natives::set_int(bodies.cpu, drill.placed_jump_count(false, 0), jump_count);
+    let jump_max = if options.jumps_used { state::get_param_int(bodies.cpu, crate::model::hash40::hash40("jump_count_max"), 0) } else { 0 };
+    natives::set_int(bodies.cpu, drill.placed_jump_count(options.jumps_used, jump_max), jump_count);
     state::heal(bodies.cpu, -damage);
     state::add_damage(bodies.cpu, f32::from(setup.percent));
     placement::fall(bodies.cpu);
@@ -1734,6 +1758,7 @@ fn report_drill_state(capture: PracticeCapture, run: &Run, best: Option<u32>, be
                 Placement::Airborne => "airborne",
             };
         }
+        run.options.describe(run.drill, &mut fields);
         fields
     });
 }
@@ -1993,6 +2018,7 @@ pub unsafe fn frame(fighter: usize) {
         };
         let last = engine.kept[drill as usize]
             .filter(|(stage, ..)| *stage == stage_key)
+            .filter(|(_, setup, _)| stage.keeps_start(drill, setup.cpu, config.options))
             .map(|(_, setup, unmoved)| wizard.remembered(stage, setup, unmoved));
         let editing = start == 2 || last.is_none();
         let mut setup = last.unwrap_or(wizard.setup);
@@ -2012,6 +2038,8 @@ pub unsafe fn frame(fighter: usize) {
             setup,
             defaults: wizard.setup,
             confirm_player: false,
+            options: config.options,
+            confirm_cpu: false,
             cpu_view: "",
             rounds: Session::new(drill, limit),
             body,
@@ -2116,6 +2144,12 @@ pub unsafe fn frame(fighter: usize) {
                 notices::refuse("Pick a point above a floor"); // restriction: edge-juggle-player-no-floor
             }
         }
+        if std::mem::take(&mut run.confirm_cpu) && wizard.step == WizardStep::Cpu {
+            let class = start_class(p1, run.stage, wizard.setup.cpu);
+            if !wizard.confirm_cpu(class, run.options) {
+                notices::refuse("Pick a point off the stage"); // restriction: edge-juggle-start-over-stage
+            }
+        }
         run.cpu_view = hold_preview(preview, held_cpu, body, wizard.setup.cpu);
         post_notice(capture, run, best_time(bests, key), best_time(streaks, key));
         return;
@@ -2202,7 +2236,7 @@ pub unsafe fn frame(fighter: usize) {
                 // rows the start cannot be judged, so it is not watched.
                 use crate::model::sites_pkg2 as sites;
                 let watch = placed_player(p1).watch() && game::granted(sites::POS_X_OFFSET) && game::granted(sites::POS_Y_OFFSET);
-                if let Some(at) = try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup) {
+                if let Some(at) = try_place(&Bodies { p1, cpu }, drill, run.stage_key, run.stage, run.setup, run.options) {
                     run.settle = watch.then_some(at);
                     run.placement = Placement::Airborne;
                 }

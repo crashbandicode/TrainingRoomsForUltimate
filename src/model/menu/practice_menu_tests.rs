@@ -107,7 +107,7 @@ fn bridge_page_list_counts_only_cursor_stops_and_writes_drawn_values() {
 fn bridge_game_lists_match_in_training_and_waiting_rooms() {
     use crate::model::bridge_state::list_view;
     for (game, group, count, want) in [
-        (Game::GuardEdge, table::EDGE, 7, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "CPU percent", "Attempts", "Zoom landing window"][..]),
+        (Game::GuardEdge, table::EDGE, 9, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "Under the stage", "CPU percent", "CPU midair jumps", "Attempts", "Zoom landing window"][..]),
         (Game::Juggler, table::JUGGLE, 6, &["Start", "CPU fighter and mode", "Reaction", "Set up…", "Attempts", "Zoom landing window"][..]),
     ] {
         for waiting_room in [false, true] {
@@ -153,8 +153,8 @@ fn guard_the_edge_lists_its_two_start_options() {
 fn bridge_dropdown_and_slider_follow_the_active_screen() {
     use crate::model::bridge_state::{list_view, ListView};
     let mut m = opened(Game::GuardEdge);
-    for _ in 0..5 { m.press(Button::Down); }
-    let row = m.sub_rows(table::EDGE).nth(5).unwrap();
+    for _ in 0..7 { m.press(Button::Down); }
+    let row = m.sub_rows(table::EDGE).nth(7).unwrap();
     let before = list_view(&m).value;
     m.press(Button::Right);
     let after = list_view(&m).value;

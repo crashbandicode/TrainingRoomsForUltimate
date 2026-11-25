@@ -450,8 +450,28 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 Guard the Edge's setup has three pages: CPU start, Player 1 start, then Preview. Move the crosshair with the stick
 (2 units a frame at full tilt) or D-pad (1 unit a press). The CPU start must be off the stage; **A** refuses a point
-over or under it. On the CPU page, **X** restores that side's default and **Y** picks the other side's default.
-Player 1's crosshair chooses a point on the main floor.
+over the stage or in it, and a point under it unless **Under the stage** is On. On the CPU page, **X** restores that
+side's default and **Y** picks the other side's default. Player 1's crosshair chooses a point on the main floor.
+
+2026-11-25. Two rows on the Guard the Edge page change how the CPU starts. Both apply at the next Start.
+
+- **Under the stage** (Off by default). On: **A** on the CPU page also takes a point under the stage. Such a point is
+  checked one frame after the press. A point over the stage, in it or outside the blast lines is still refused. A start
+  under the stage that you set up is used again by Start only while the row is On; with it Off, Start opens the setup
+  at the default start.
+- **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with all its midair jumps already spent.
+  The number comes from the fighter's own jump count, so there is no list of fighters. Perfect mode plans its recovery
+  without them.
+
+Known limits:
+
+- A point just under the stage can put the fighter's upper body inside the stage. What the game does with such a start
+  is not known.
+- Perfect mode's route from under the stage is not established; it was built for starts beside the stage.
+- Whether a fighter's own moves give the jumps back after the start is not known. A second resource, such as a float,
+  is not touched.
+
+Not yet seen in a game.
 
 While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
 is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
