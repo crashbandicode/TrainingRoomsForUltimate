@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler on any floor, the eggs' off-stage zone |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -87,18 +87,42 @@ and the expected log lines), then the operator's full test on the console.
   what you hold instead of nothing. It is one frame at most, at the start.
 - More: [Playback delay](menu/recording.md#playback-delay).
 
+#### Guard the Edge and Juggler start from the floor you stand on (merged 2026-11-25)
+
+- Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with more than
+  one piece of ground, such as the Training stage, stand on the piece you want and choose Start.
+- Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side.
+  Juggler needs no ledge: its CPU spot is over the stage or in open air beside it.
+- When a start cannot happen, a message says why and the row reads Start again: "The stage could not be read",
+  "Stand on the stage to start this drill", "This floor has no ledge to guard", or, on Juggler's CPU page, "Pick a
+  point over the stage or beside it". In an Eden check before this change, Start on the Training stage did nothing
+  and the menu read Running ([Install evidence](EVIDENCE-rc15-installs.md#the-next-build)).
+- A start you set up is used again only on the floor it was made on.
+- More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
+
+#### Two Guard the Edge options (merged 2026-11-25)
+
+- **Under the stage** (Off by default). On: the CPU's start can also be a point under the stage.
+- **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with its midair jumps already spent.
+- Known limits: a point just under the stage can put the fighter's upper body inside the stage; Perfect mode's route
+  from under the stage is not established; whether a fighter's own moves give the jumps back is not known.
+- More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
+
+#### Eggs-ercise's off-stage zone follows the stage (merged 2026-11-25)
+
+- Each zone lies beside a ledge of the stage's main floor that has open air next to it, so a stage can have two
+  zones, one or none. The zone's outer edge stops where that open air ends. On the Training stage the one zone is
+  the gap between the long floor and the island.
+- A target appears only in the air off stage: never inside another part of the stage, and never above a floor or a
+  platform.
+- Known limits: a platform that moves after the stage is read is not followed, and a piece of the stage narrower
+  than 10 units can be missed.
+- More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise).
+
 ### In work
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
 
-- **In work: Guard the Edge and Juggler start on the Training stage.** Both use the floor you stand on to find its
-  ledges. Guard the Edge uses a ledge with open air beside it. Juggler keeps its above-floor start with the CPU over
-  Player 1; an open gap is also allowed, but not a spot under the stage or inside solid ground. A floor with no
-  open ledge shows a message.
-- **In work: two Guard the Edge options.** One starts the CPU under the stage. The other starts the CPU with its
-  midair jumps already used. Both are Off by default, which is how the drill works today.
-- **In work: Eggs-ercise's Off stage zone stays out of solid ground.** Spots that are not off stage are dropped, and
-  the zone stops at the next solid.
 - **In work: placement's Off stage switch.** A fighter switched to Off stage whose spot is not off stage goes beside
   the nearest ledge that has open air. The crosshair then moves freely.
 - **In work: placement on the crosshair.** Changing where a save state puts the fighters uses the crosshair, on the

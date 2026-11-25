@@ -155,8 +155,9 @@ Merges after `a945b0c1` are listed in the release notes. The Gate column names t
 documentation merges that followed it. These receipts are host tests and builds, not gameplay tests.
 
 On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
-**before** the off-stage changes. Guard the Edge and Juggler did not start there. This was not a test of the proposed
-fix or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
+**before** the off-stage changes. Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running"
+(`out/p05/ally-173401-786500-p05-open.png` in the run's folder). This was not a test of the fix,
+which merged later as `7e6ff810` and is host-tested only, or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
 17:39:04Z report from training-offstage.
 
 A later Eden probe (`sg-probe-yoga-01`, diagnostic `0f39ec04`) read the Training stage's long floor and Battlefield.
@@ -177,3 +178,5 @@ operator's full test on the console (inbox 17:06:54Z, tr-primary-2). Neither is 
 | The clip editor's marks name the form of a move | `c51f4d81` | `gate-c51f4d81` |
 | Stage geometry: one floor ray for every reader and the off-stage rule (no change in play intended) | `afd4ce01` | `gate-afd4ce01` |
 | Playback starts without reading the library; Playback delay | `445d1100` | `gate-2d140506` (one gate for this merge and the two docs merges after it) |
+| Guard the Edge and Juggler start from the floor the player stands on; two Guard the Edge options | `7e6ff810` | `gate-f9b81e42` (one gate for this merge, the next row and a docs merge) |
+| Eggs-ercise's off-stage zone follows the stage | `1c6a71e5` | `gate-f9b81e42` |
