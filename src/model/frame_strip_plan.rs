@@ -275,6 +275,7 @@ struct Run {
 /// The tracker laid out once per tick: runs, the frames on screen and their slots.
 struct Content<'a> {
     spec: &'a StripSpec,
+    back: Option<u32>,
     history: bool,
     fold_link: bool,
     cells: bool,
@@ -337,7 +338,7 @@ impl<'a> Content<'a> {
                 }
             }
         }
-        Self { spec: &draw.spec.strip, history, fold_link: !draw.history_enabled, cells: draw.cells, tracker,
+        Self { spec: &draw.spec.strip, back: draw.back, history, fold_link: !draw.history_enabled, cells: draw.cells, tracker,
             aims: aims_shown(tracker), frames, sticks, first_slot, runs, spots: draw.spots, parry: draw.parry }
     }
 
@@ -394,7 +395,7 @@ impl<'a> Content<'a> {
             i if (BRACKET..BRACKET + 6).contains(&i) => self.bracket((i - BRACKET) / 3, Some((i - BRACKET) % 3)),
             i if (BRACKET_TEXT..BRACKET_TEXT + 2).contains(&i) => self.bracket(i - BRACKET_TEXT, None),
             NOW => Look::paint(self.spec.now(0), MUTED),
-            NOW_TEXT => Look::label(self.spec.now(1), Text::new("now"), MUTED),
+            NOW_TEXT => Look::label(self.spec.now(1), self.back.map_or_else(|| Text::new("now"), back_text), MUTED),
             i if (READ_LABEL..READ_LABEL + 3).contains(&i) => {
                 let n = i - READ_LABEL;
                 let names = if self.parry.is_some() { ["ADVANTAGE", "PARRY", "SET"] } else { ["ADVANTAGE", "LINK", "INPUT"] };
@@ -785,8 +786,10 @@ impl Renderer {
     }
 }
 
-pub fn back_text(_: u32) -> Text {
-    Text::new("now")
+pub fn back_text(frames: u32) -> Text {
+    let mut text = Text::EMPTY;
+    let _ = write!(text, "-{}.{} s", frames / 60, frames % 60 * 10 / 60);
+    text
 }
 
 #[cfg(test)]

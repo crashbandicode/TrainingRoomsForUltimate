@@ -2817,3 +2817,11 @@ ceiling = 199828
 date = "2026-11-24"
 reason = "Merge 4b: a combo file's links are read straight into the record, which takes the menu worker's deepest stack path from 57,728 to 53,888 B. Measured 199828 (tools/sloc.py tree), 4 above merge 4's 199824."
 approved_by = "tr-primary-2 2026-11-24 23:01:06Z (merge 4b, owner f15-lobby) and its standing rule of 21:46:20Z (a lead's fix may raise its branch's ceiling to the measured value, up to +60)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200254
+date = "2026-11-25"
+reason = "Merge 7: the frame strip's scrollback (hold R3, D-pad Left or Right): the hold, the ten seconds of history, the view the HUD draws from it. Measured 200254 (tools/sloc.py tree), 426 above install 4 merge 4b 4905ec89 (199828)."
+approved_by = "tr-primary-2 2026-11-24 23:35:52Z (merge 7 design accepted: the line ceiling is approved at the measured value), on the operator's request relayed at 23:23:39Z."

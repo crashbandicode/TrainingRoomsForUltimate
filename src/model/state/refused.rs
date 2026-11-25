@@ -29,6 +29,7 @@ pub enum Refused {
     Owner,
     /// The game speed pop-up is open: the press steered it.
     SpeedHold,
+    /// The input display is scrolled back: the press steered it.
     StripScroll,
     /// Online Deluxe's open page acts on this chord's D-pad (a chord rebound onto a button Deluxe uses).
     DeluxeRows,

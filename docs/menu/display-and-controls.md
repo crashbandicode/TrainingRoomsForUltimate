@@ -312,6 +312,9 @@ A chord is "hold one button and press the others".
 | Input display | R + D-pad Down | Turns the frame strip on or off. |
 | Game speed | R + D-pad Up | Hold it, then D-pad Left or Right changes the speed. |
 
+**Scroll the input display:** hold R3 (right stick click) and press D-pad Left or Right to move back or forward.
+Let go of R3 to return to the present. This chord is fixed, not a row in the editor.
+
 ![L + D-pad Down (lit on the pad) first saves nothing; in the chord editor Save State Save is changed from ZL + D-pad Down to L + D-pad Down, which then saves. A caption names the chord](../media/rc11-button-chords.gif)
 
 - **Values:** any button, or several, for each row; or disabled (an empty chord does nothing)

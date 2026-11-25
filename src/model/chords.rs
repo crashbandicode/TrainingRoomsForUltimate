@@ -197,6 +197,7 @@ pub struct Sample {
     /// Online Deluxe's window shows a page with rows (`model::deluxe_overlay::rows_page_visible`): they move with D-pad
     /// Up/Down and change with ZR + Left/Right. Its Performance and Debug views have none.
     pub overlay: bool,
+    /// The input display is drawn, so the scroll may open.
     pub strip: bool,
 }
 
@@ -396,13 +397,16 @@ pub struct Detector {
     /// rc.8: the game speed hold and what the last poll did to it.
     hold: Hold,
     hold_event: HoldEvent,
+    scroll: super::strip_scroll::Scroll,
+    scroll_event: super::strip_scroll::ScrollEvent,
     /// rc.12: the Save or Load press this poll did not raise, and why (`take_refused`).
     refused: Option<(Action, Refused)>,
 }
 
 impl Detector {
     pub const fn new() -> Self {
-        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle, refused: None }
+        Self { pending: 0, swallow: 0, hidden: 0, hold: Hold::new(), hold_event: HoldEvent::Idle,
+            scroll: super::strip_scroll::Scroll::new(), scroll_event: super::strip_scroll::ScrollEvent::Idle, refused: None }
     }
 
     /// The Save or Load press the last poll did not raise, and why; once (rc.12, "no silent no-ops").
@@ -416,11 +420,11 @@ impl Detector {
     }
 
     pub fn scroll_event(&self) -> super::strip_scroll::ScrollEvent {
-        super::strip_scroll::ScrollEvent::Idle
+        self.scroll_event
     }
 
     pub fn scroll_open(&self) -> bool {
-        false
+        self.scroll.is_open()
     }
 
     /// The logical buttons this poll keeps from the game: those of a chord that passed, from the poll it passed until
@@ -450,11 +454,14 @@ impl Detector {
     /// (SPEC-input-04 §5.3). Returns the set of chords that passed this poll as a bit set of
     /// `Request`s for the runtime's diagnostics.
     pub fn poll(&mut self, chords: &ChordSet, sample: Sample, blocked: bool) -> u16 {
+        let was_scrolling = self.scroll.is_open();
         let was_open = self.hold.is_open();
-        self.hold_event = self.hold.poll(chords.game_speed, sample, blocked);
+        self.hold_event = self.hold.poll(chords.game_speed, sample, blocked || was_scrolling);
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
         self.refused = None;
         if blocked {
             self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::Owner));
+            self.scroll_event = self.scroll.poll(sample, true, false);
             self.hold_back(0, sample);
             return 0;
         }
@@ -464,6 +471,12 @@ impl Detector {
         if was_open || self.hold.is_open() {
             self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::SpeedHold));
             self.hold_back(self.hold.hidden(), sample);
+            return 0;
+        }
+        if was_scrolling {
+            self.refused = save_or_load_press(chords, sample).map(|action| (action, Refused::StripScroll));
+            self.scroll_event = self.scroll.poll(sample, false, false);
+            self.hold_back(self.scroll.hidden(), sample);
             return 0;
         }
         let mut passed = 0u16;
@@ -497,6 +510,10 @@ impl Detector {
                 self.pending |= request.bit();
                 passed |= request.bit();
             }
+        }
+        if fired == 0 {
+            self.scroll_event = self.scroll.poll(sample, false, sample.strip);
+            fired |= self.scroll.hidden();
         }
         self.hold_back(fired, sample);
         let open = chords.shortcuts.passes(|b| sample.held & (1 << b) != 0, |b| sample.pressed & (1 << b) != 0);
@@ -556,6 +573,8 @@ impl Detector {
         (self.swallow, self.hidden) = (0, 0);
         let open = self.hold.is_open();
         self.hold.clear();
+        self.scroll.clear();
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
         open
     }
 
@@ -565,6 +584,8 @@ impl Detector {
         self.pending = 0;
         self.hold.clear();
         self.hold_event = HoldEvent::Idle;
+        self.scroll.clear();
+        self.scroll_event = super::strip_scroll::ScrollEvent::Idle;
     }
 }
 
