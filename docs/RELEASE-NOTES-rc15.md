@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -59,6 +59,16 @@ in a game: each merge passed the host tests and builds only.
   window. It is removed at once, without asking, as a macro is.
 - Macros, combos and drills already made from it stay. The game's own replay in the Vault is untouched.
 - More: [Recording › Recordings](menu/recording.md#recordings).
+
+### The clip editor's marks name the form of a move (merged 2026-11-25)
+
+- A move mark on the editor's timeline keeps which form of the move it was: the first, second or third jab, the
+  rapid jab or its finisher, which aerial, grab or throw, and a side tilt or smash aimed up or down.
+- With Move names On, a mark reads as the combo and drill lists do, for example Jab 1, Jab 2 or Forward air. A take
+  saved before this has no forms: its jab reads Jab.
+- A take, and each fighter of a replay capture, stores the fighter it was recorded on, so its specials keep that
+  fighter's own names whoever Player 1 is.
+- More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
 
 ## Install 4
 

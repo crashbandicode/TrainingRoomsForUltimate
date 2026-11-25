@@ -134,3 +134,4 @@ Merges after `a945b0c1` are listed in the release notes. Each merged head passed
 | Named grab, throw and edge-attack keys | `76c00df3` | `gate-76c00df3` |
 | Preview stop and the pop-up's chord line | `d807f1e4` | `gate-d807f1e4` |
 | Delete for replay captures | `3fd708bc` | `gate-3fd708bc` |
+| The clip editor's marks name the form of a move | `c51f4d81` | `gate-c51f4d81` |
