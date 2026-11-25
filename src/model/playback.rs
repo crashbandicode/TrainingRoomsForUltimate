@@ -175,13 +175,8 @@ impl Book {
         self.recordings.get(id).map(|recording| recording.start)
     }
 
-    pub fn drill_preview_range(&self, id: &str, frames: core::ops::Range<usize>) -> core::ops::Range<usize> {
-        match self.recordings.get(id) {
-            Some(recording) if crate::model::combo_record::is_drill_take_name(&recording.name)
-                && frames.start == 0 && frames.end == recording.frames.len() =>
-                    recording.trim.window(&recording.frames),
-            _ => frames,
-        }
+    pub fn drill_preview_range(&self, id: &str, end: usize, trim: crate::model::trim::Trim) -> core::ops::Range<usize> {
+        self.recordings.get(id).map_or(0..0, |take| trim.window(&take.frames[..end.min(take.frames.len())]))
     }
 
     pub fn add_save(&mut self, id: impl Into<String>) {

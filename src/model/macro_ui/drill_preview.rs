@@ -87,12 +87,12 @@ mod tests {
             let start = source.find(name).unwrap_or_else(|| panic!("missing {name}"));
             &source[start..start + source[start..].find("\n}\n").expect("end of function")]
         };
-        assert!(worker.contains("Effect::PreviewDrill { source, frames } => start_drill_preview(&source, frames)"), "the effect starts the preview");
+        assert!(worker.contains("Effect::PreviewDrill { source, frames, trim } => start_drill_preview(&source, frames, trim)"), "the effect starts the preview");
         let start = body(worker, "fn start_drill_preview(");
         assert!(start.contains("replay_capture::capture_ready()"));
-        assert!(start.contains("|| !crate::engine::rr_host::request_drill_preview(source, frames)"));
+        assert!(start.contains("|| !crate::engine::rr_host::request_drill_preview(source, frames, trim)"));
         assert!(!start.contains("rr_host::request_preview("));
-        let request = start.find("request_drill_preview(source, frames)").unwrap();
+        let request = start.find("request_drill_preview(source, frames, trim)").unwrap();
         let stop = start[request..].find("return;").unwrap() + request;
         let hide = start.find("PREVIEW_HIDES.store(true, Ordering::Release)").unwrap();
         assert!(request < stop && stop < hide);

@@ -32,6 +32,7 @@ use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SL
 use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
+use crate::model::trim::Trim;
 
 const ROLE_PLAYER: u8 = 1;
 const ROLE_CPU: u8 = 2;
@@ -474,8 +475,13 @@ struct Resident {
     tape: Tape,
 }
 
+enum PreviewWindow {
+    Exact(core::ops::Range<usize>),
+    Drill { frames: u32, trim: Trim },
+}
+
 enum PreviewAsk {
-    Start { source: String, role: Role, frames: core::ops::Range<usize> },
+    Start { source: String, role: Role, window: PreviewWindow },
     Stop,
 }
 
@@ -543,25 +549,28 @@ pub fn migrated() -> bool {
 /// The clip editor's preview of a saved macro: frames `start..end` of `source` play once on `role` through the role's
 /// Play queue, warped to the macro's start save. Running from this call until the run ends or `stop_preview`.
 pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
-    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: source.to_owned(), role, frames: start as usize..end as usize });
+    queue_preview(source, role, PreviewWindow::Exact(start as usize..end as usize));
+}
+
+fn queue_preview(source: &str, role: Role, window: PreviewWindow) {
+    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: source.to_owned(), role, window });
     PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
 }
 
 /// F10: a drill's take previews on Player 1 (`request_preview`), unless Player 1 has a Play queued or running:
 /// that run is not replaced. True when the preview was asked for.
-pub fn request_drill_preview(source: &str, frames: u32) -> bool {
+pub fn request_drill_preview(source: &str, frames: u32, trim: Trim) -> bool {
     if player_playback_blocks_preview() {
         return false;
     }
-    request_preview(source, Role::Player, 0, frames);
+    queue_preview(source, Role::Player, PreviewWindow::Drill { frames, trim });
     true
 }
 
 pub fn request_clip_preview(recording: MacroRecording) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
-    *lock(&PREVIEW_ASK) = Some(PreviewAsk::Start { source: CLIP_ID.to_owned(), role: Role::Cpu, frames: 0..len });
-    PREVIEW.store(ROLE_CPU, Ordering::Release);
+    queue_preview(CLIP_ID, Role::Cpu, PreviewWindow::Exact(0..len));
 }
 
 /// A Vault clip's preview has the fighters away from where it found them until the return lands.
@@ -2176,12 +2185,11 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             note_slots_changed(false);
         }
         Effect::SetTrim { id, kind: FileKind::Combo, trim } => {
-            if let Ok(file) = ComboLibrary::new(root.join("combos")).load(&id) {
+            let drills = ComboLibrary::new(root.join("combos"));
+            if let Ok(mut file) = drills.load(&id) {
                 if file.combo.input_only {
-                    if let Some(take) = file.take {
-                        rename::<MacroRecording>(root, MACROS_DIR, &take, |file| file.trim = trim);
-                    }
-                    rename::<ComboRecord>(root, "combos", &id, |file| file.trim = trim);
+                    file.trim = trim;
+                    let _ = drills.overwrite(&id, &file);
                 }
             }
         }
@@ -2355,8 +2363,11 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
         _ => None,
     };
     match ask {
-        Some(PreviewAsk::Start { source, role, frames }) => {
-            let frames = book.drill_preview_range(&source, frames);
+        Some(PreviewAsk::Start { source, role, window }) => {
+            let frames = match window {
+                PreviewWindow::Exact(frames) => frames,
+                PreviewWindow::Drill { frames, trim } => book.drill_preview_range(&source, frames as usize, trim),
+            };
             let owed = if source == CLIP_ID {
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
@@ -4549,20 +4560,20 @@ mod tests {
             StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1,
         ).unwrap().unwrap();
         on_chords(false, true, false);
-        assert!(!request_drill_preview(&take, 1), "a queued Play also blocks the preview");
+        assert!(!request_drill_preview(&take, 1, Trim::Off), "a queued Play also blocks the preview");
         tick(&root);
         tick(&root);
         tick(&root);
         assert!(RUN_PLAYER.load(Ordering::Acquire));
         assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[0]));
-        assert!(!request_drill_preview(&take, 1));
+        assert!(!request_drill_preview(&take, 1, Trim::Off));
         assert!(!preview_running());
         tick(&root);
         assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(file[1]));
         on_chords(false, true, false);
         tick(&root);
         assert!(!player_playback_blocks_preview());
-        assert!(request_drill_preview(&take, 1));
+        assert!(request_drill_preview(&take, 1, Trim::Off));
         assert!(preview_running());
     }
 
@@ -4824,7 +4835,7 @@ mod tests {
         let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1).unwrap().unwrap();
         let (mut seen, mut lines, mut frame) = (FedSeen::default(), Vec::new(), 100);
 
-        assert!(request_drill_preview(&take, N));
+        assert!(request_drill_preview(&take, N, Trim::Off));
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let run1 = fed_run(Role::Player).unwrap().0;
         assert_eq!(fed_run(Role::Player), Some((run1, 0)));
@@ -4839,7 +4850,7 @@ mod tests {
         assert_eq!(fed_poll(&mut seen, &mut lines, &mut frame, false), None);
         assert_eq!(fed_frames(Role::Player), N);
 
-        assert!(request_drill_preview(&take, N));
+        assert!(request_drill_preview(&take, N, Trim::Off));
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let run2 = fed_run(Role::Player).unwrap().0;
         assert_eq!(run2, run1 + 1);
@@ -4920,7 +4931,7 @@ mod tests {
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
             let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1).unwrap().unwrap();
-            assert!(request_drill_preview(&take, 80));
+            assert!(request_drill_preview(&take, 80, Trim::Off));
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert_eq!(take_player_frame().unwrap().buttons, 1);
             assert!(preview_running());

@@ -428,7 +428,7 @@ fn file_trim_row_cycles_and_is_saved() {
             assert_eq!(actual, expected);
             if kind == FileKind::Macro { assert_eq!(host::take_slots_dirty(), Some(false)); }
             if drill {
-                assert_eq!(macros.load(&take_id).unwrap().trim, expected);
+                assert_eq!(macros.load(&take_id).unwrap().trim, Trim::Off, "the choice belongs to the drill");
             }
         }
         let reopened = open_file(&root.0, group, name, drill);
@@ -504,9 +504,9 @@ fn drill_preview_uses_the_takes_trim() {
     let _host = HostGuard::new();
     let root = Scratch::new();
     let macros = Library::new(root.0.join(MACROS_DIR));
-    let id = macros.save_new(&recording("Drill take 0000000000000002", &[0, 1, 2, 0], Trim::Both)).unwrap();
+    let id = macros.save_new(&recording("Drill take 0000000000000002", &[0, 1, 2, 0], Trim::Off)).unwrap();
     tick(&root.0);
-    assert!(host::request_drill_preview(&id, 4));
+    assert!(host::request_drill_preview(&id, 4, Trim::Both));
     let mut played = Vec::new();
     for _ in 0..5 {
         tick(&root.0);
@@ -552,8 +552,8 @@ fn play_selected_drill(root: &Path, name: &str) -> Vec<u32> {
     let items = screens.section(Face::Page, COMBOS_SEQ, 1).rows;
     screens.set_cursor(Face::Page, COMBOS_SEQ, 1, items.iter().position(|row| row.name == name).unwrap());
     screens.handle_page(Button::X, true, COMBOS_SEQ);
-    let Effect::PreviewDrill { source, frames } = screens.take_effect() else { panic!("missing X preview") };
-    assert!(host::request_drill_preview(&source, frames));
+    let Effect::PreviewDrill { source, frames, trim } = screens.take_effect() else { panic!("missing X preview") };
+    assert!(host::request_drill_preview(&source, frames, trim));
     played_preview(root)
 }
 

@@ -17,6 +17,7 @@ use crate::model::menu::input::Button;
 use crate::model::menu::table::Editor;
 use crate::model::menu::{Env, Menu, Screen};
 use crate::model::settings::{EggZones, Settings};
+use crate::model::trim::Trim;
 use crate::model::ui_events::{Event, Packet, Ring};
 use crate::model::screens::{fighter_question_frame, frame_of, panel_frame};
 use crate::runtime::diag_log::diagnostic;
@@ -860,16 +861,16 @@ fn post_recording_effect(menu: &mut Menu, observed: Option<(u64, u64)>) {
         Effect::OpenCrop { source, combo, player } => {
             crate::runtime::macros::replay_capture::open_file_editor(&source, combo, player);
         }
-        Effect::PreviewDrill { source, frames } => start_drill_preview(&source, frames),
+        Effect::PreviewDrill { source, frames, trim } => start_drill_preview(&source, frames, trim),
         effect => rr_host::post_effect_at(effect, Some(version)),
     }
 }
 
 /// F10: X on a drill row. The take plays once on Player 1 through the Recording player, behind the gate the Crop
 /// preview uses. The menu stays open and keeps Player 1's pad; it is not drawn until the preview ends.
-fn start_drill_preview(source: &str, frames: u32) {
+fn start_drill_preview(source: &str, frames: u32, trim: Trim) {
     if !crate::runtime::macros::replay_capture::capture_ready()
-        || !crate::engine::rr_host::request_drill_preview(source, frames) {
+        || !crate::engine::rr_host::request_drill_preview(source, frames, trim) {
         return;
     }
     PREVIEW_HIDES.store(true, Ordering::Release);

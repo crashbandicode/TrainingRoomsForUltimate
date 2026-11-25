@@ -136,7 +136,7 @@ pub enum Effect {
     MakeCombo { source: String, chain: bool },
     OpenCrop { source: String, combo: bool, player: bool },
     /// X on a drill that kept its take (F10): the host previews frames `0..frames` of macro `source` on Player 1.
-    PreviewDrill { source: String, frames: u32 },
+    PreviewDrill { source: String, frames: u32, trim: super::trim::Trim },
     DuplicateSave { source: String },
     DeleteSave { source: String },
     /// A chain the menu just named. The host writes it; the local row is what the menu test sees first.
@@ -1739,10 +1739,11 @@ impl RecordingScreens {
     }
 
     /// The take the focused drill row can preview (F10).
-    fn drill_take(&self, face: Face, group: u8) -> Option<(String, u32)> {
+    fn drill_take(&self, face: Face, group: u8) -> Option<(String, u32, super::trim::Trim)> {
         let item = self.focused(face, group).filter(|item| item.kind == ItemKind::Combo)?;
         let drill = self.combo_by_id(&item.id).filter(|file| file.input_only)?;
-        self.playable(drill)
+        let (source, frames) = self.playable(drill)?;
+        Some((source, frames, self.drill_trims.get(&drill.id).copied().unwrap_or_default()))
     }
 
     /// The drill's owned take, when it has frames.
@@ -1752,8 +1753,8 @@ impl RecordingScreens {
 
     /// X on a drill row: post its preview. False when the row has no take to play.
     fn preview_drill(&mut self, face: Face, group: u8) -> bool {
-        let Some((source, frames)) = self.drill_take(face, group) else { return false };
-        self.last_effect = Effect::PreviewDrill { source, frames };
+        let Some((source, frames, trim)) = self.drill_take(face, group) else { return false };
+        self.last_effect = Effect::PreviewDrill { source, frames, trim };
         true
     }
 
@@ -3799,7 +3800,7 @@ mod tests {
             } else {
                 assert!(screens.press_popup_outcome(Button::X));
             }
-            assert_eq!(screens.take_effect(), Effect::PreviewDrill { source: "t1".into(), frames: 25 });
+            assert_eq!(screens.take_effect(), Effect::PreviewDrill { source: "t1".into(), frames: 25, trim: super::super::trim::Trim::Off });
             for id in ["d-made", "d-old", "d-gone", "d-chain", "d-lost", "d-fake", "d-bare", ""] {
                 focus(&mut screens, id);
                 if !id.is_empty() {
