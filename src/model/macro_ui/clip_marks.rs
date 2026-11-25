@@ -197,12 +197,13 @@ impl Marks {
     }
     pub fn list(&self) -> &[Mark] { &self.list }
 
-    /// The mark `at` lies in, else the one whose start or known end is nearest.
+    /// The mark `at` lies in or starts on, else the one whose start or known end is nearest. An end is exclusive, so of
+    /// two marks that touch the later one owns the frame between them.
     pub fn nearest(&self, at: u32) -> Option<(u32, Option<u32>)> {
         self.list.iter().min_by_key(|mark| {
             let inside = mark.start <= at && mark.end.is_some_and(|end| at < end);
             let away = mark.end.map_or(u32::MAX, |end| end.abs_diff(at)).min(mark.start.abs_diff(at));
-            (if inside { 0 } else { away }, mark.start)
+            (!(inside || mark.start == at), away, mark.start)
         }).map(|mark| (mark.start, mark.end))
     }
 
