@@ -201,7 +201,7 @@ as one input; stick flicks appear in the title only without a button or C-stick 
 
 On a drill row, X previews its recorded inputs on Player 1. While the take plays, the strip's key line reads
 `B stop preview`. B or X stops it and drops the rest of its frames; the page or pop-up returns. After the last frame
-the result stays on screen for about a second with an empty key line; B or X returns to the page or pop-up at once,
+the result stays on screen for about a second and the key line reads `B back`; B or X returns to the page or pop-up at once,
 or it returns after the tail.
 
 The new drill becomes the helper's grading target; its bar counts steps and timing, with no TRUE verdict. To make one from a macro or chain, choose **Make combo**: a pass with no hits makes a drill. On a drill's own screen, **A** on **Crop** opens the same editor as a macro, with whole-step handles; **A** names and saves a new drill and keeps the original. Empty names use Drill N. **B** leaves, and there is no X preview.
@@ -287,7 +287,7 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
-a second with an empty key line; B or X ends that tail without closing the editor, and the usual keys return.
+a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
 
 Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a capture the strip names the captured side and where the preview plays.
 

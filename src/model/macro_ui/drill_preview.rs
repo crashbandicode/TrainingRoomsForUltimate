@@ -84,6 +84,7 @@ mod tests {
     #[test]
     fn the_drill_strip_shows_the_same_stop_hint() {
         assert_eq!(crate::editors::clip::PREVIEW_STOP_HINT, "B stop preview");
+        assert_eq!(crate::editors::clip::PREVIEW_BACK_HINT, "B back");
         let worker = include_str!("../../runtime/ui/worker.rs");
         let publish = worker.split("fn publish_frame(s: &Session)").nth(1).unwrap();
         let strip = publish.split("if !flow::frame_needs_menu(s.phase)").next().unwrap();
@@ -91,6 +92,7 @@ mod tests {
             .split("let Some(menu)").next().unwrap();
         assert!(strip.contains("stop_hint(&mut next, true,") && strip.contains("preview_running()"));
         assert!(editor.contains("stop_hint(&mut next, view.playing,") && editor.contains("preview_running()"));
+        assert!(!worker.contains("\"B back\"") && !worker.contains("\"B stop preview\""));
         assert!(!worker.contains(concat!("X or B:", " stop.")));
     }
 
