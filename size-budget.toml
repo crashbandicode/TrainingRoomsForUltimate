@@ -3167,5 +3167,5 @@ scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 206192
 date = "2026-11-25"
-reason = "The clip editor after a snap (operator, install 5: Y kept leaving In on a mid-action frame, so X and A refused), on main 58c9ccb5 (206166): +26. ClipEditor::move_at is the lead-in rule taken out of its arm so Y and ZL/ZR + Y share it; Y on a captures In takes the move at a mid-action mark; a refused preview keeps the selected handle. One file, src/model/macro_ui/clip_panel.rs."
+reason = "The clip editor after a snap (operator, install 5: Y kept leaving In on a mid-action frame, so X and A refused), on main 58c9ccb5 (206166): +26. ClipEditor::move_at is the lead-in rule taken out of its arm so Y and ZL/ZR + Y share it; Y on the In handle of a capture takes the move at a mid-action mark; a refused preview keeps the selected handle. One file, src/model/macro_ui/clip_panel.rs."
 approved_by = "tr-primary-2 2026-11-25 23:50:36Z (approved at 206,192, +26: an operator-hit defect, and the fix makes Y do what the guide already says)."
