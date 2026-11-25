@@ -89,6 +89,42 @@ pub(super) unsafe fn stage_floor(ray: &FloorRay, camera: [f32; 4]) -> Option<(pe
     crate::model::stage_geometry::main_floor(|x, limits, platforms| ray.floor(x, limits, platforms), camera)
 }
 
+use crate::model::stage_geometry::{is_placement_floor, Met, Point, Probe, Unread};
+
+impl FloorRay {
+    /// The first line of any kind from `from` straight down or up to the height `to`, copied as world geometry.
+    unsafe fn first(&self, [x, y]: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread> {
+        if ![x, y, to].into_iter().all(f32::is_finite) || to == y {
+            return Err(Unread);
+        }
+        let mut hit = RayPoint([0.; 4]);
+        let line = cast(self.cast, self.accessor, [x, y], [0., to - y], platforms, &mut hit);
+        if line == 0 {
+            return Ok(None);
+        }
+        let flags = ((line + 0xc4) as *const u32).read();
+        let normal_y = ((line + 0xa4) as *const f32).read();
+        let vertices = ((line + 0x88) as *const [usize; 2]).read();
+        if !normal_y.is_finite() || vertices.contains(&0) {
+            return Err(Unread);
+        }
+        let ends = vertices.map(|ptr| ((ptr + 0x10) as *const [f32; 2]).read());
+        Ok(Some(Met { ends, stand: is_placement_floor(flags, normal_y, true), through: flags & 0x2000 != 0 }))
+    }
+}
+
+/// The stage for this pass of Player 1's frame, read by the placement ray. Never kept across frames.
+pub(super) struct RayProbe(FloorRay);
+impl RayProbe {
+    pub(super) unsafe fn new(p1: usize) -> Option<Self> { FloorRay::new(p1).map(Self) }
+}
+impl Probe for RayProbe {
+    fn first(&mut self, from: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread> {
+        // SAFETY: built on this pass from the live Player 1 (`new`'s contract).
+        unsafe { self.0.first(from, to, platforms) }
+    }
+}
+
 struct FrameOutlineReader;
 impl FrameOutlineReader {
     fn frame_read_line(&mut self, id: usize) -> Option<Line> {
@@ -147,11 +183,8 @@ impl Source for FrameOutlineReader {
     }
 }
 
-/// Copy one closed outline in the current native Training frame. The returned
-/// geometry has no raw line identities or borrowed native pointers.
-pub(super) unsafe fn training_outline(
-    ray: &FloorRay, x: f32, limits: [f32; 2],
-) -> Option<(crate::model::edge_juggle::perfect::Outline, Option<[[f32; 2]; 2]>)> {
+/// One closed outline walked in the current native frame, into the caller's `walk`.
+unsafe fn closed_walk(ray: &FloorRay, x: f32, limits: [f32; 2], walk: &mut Surfaces) -> Option<()> {
     use crate::model::tech::surface::{Walk, MAX_LINES};
     if !super::tech_surfaces::guarded() || !game::granted(0x15cbc60) {
         return None;
@@ -162,14 +195,101 @@ pub(super) unsafe fn training_outline(
     if line.kind() != Some(Kind::Floor) || line.passable {
         return None;
     }
-    let mut walk = Surfaces::EMPTY;
     walk.begin(seed, 0);
     for _ in 0..MAX_LINES {
         match walk.step(&mut reader) {
             Walk::More => {}
-            Walk::Closed => return Some(crate::model::stage_geometry::outline_of(&walk)),
+            Walk::Closed => return Some(()),
             _ => return None,
         }
     }
     None
+}
+
+/// Copy one closed outline in the current native Training frame. The returned
+/// geometry has no raw line identities or borrowed native pointers.
+pub(super) unsafe fn training_outline(
+    ray: &FloorRay, x: f32, limits: [f32; 2],
+) -> Option<(crate::model::edge_juggle::perfect::Outline, Option<[[f32; 2]; 2]>)> {
+    let mut walk = Surfaces::EMPTY;
+    closed_walk(ray, x, limits, &mut walk)?;
+    Some(crate::model::stage_geometry::outline_of(&walk))
+}
+
+/// The closed outline of the solid under a column, line by line as the rule sees it. It stores nothing.
+pub(super) unsafe fn solid(ray: &FloorRay, x: f32, limits: [f32; 2], each: impl FnMut(Met)) -> Option<()> {
+    let mut walk = Surfaces::EMPTY;
+    closed_walk(ray, x, limits, &mut walk)?;
+    walk.lines().map(crate::model::stage_geometry::met).for_each(each);
+    Some(())
+}
+
+#[cfg(feature = "diag")]
+static PROBE_LAST: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+#[cfg(feature = "diag")]
+static PROBE_TICK: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// Diag only: after a Training reset the probe logs again where Player 1 then stands.
+#[cfg(feature = "diag")]
+pub(super) fn diag_probe_rearm() {
+    PROBE_LAST.store(0, core::sync::atomic::Ordering::Release);
+}
+
+/// Diag only (tr-primary-2, 2026-11-25 17:15:18Z): shows on a game how the ray reads "a solid above". In native
+/// Training, whenever Player 1 stands on another floor run than the one last logged (looked at every 30 frames),
+/// and again after a Training reset: the run, one upward cast and `classify` at three points taken from it, and
+/// one cast started inside the solid.
+#[cfg(feature = "diag")]
+pub(super) unsafe fn diag_probe(fighter: usize) {
+    use crate::model::stage_geometry::{classify, floor_run};
+    use crate::model::sites_pkg2 as sites;
+    use crate::runtime::diag_log::diagnostic;
+    use crate::runtime::game::natives;
+    use core::sync::atomic::Ordering;
+    if fighter == 0 || !crate::runtime::scene::is_native_training()
+        || PROBE_TICK.fetch_add(1, Ordering::Relaxed) % 30 != 0
+    {
+        return;
+    }
+    if ![sites::POS_X_OFFSET, sites::POS_Y_OFFSET, sites::SITUATION_KIND_OFFSET, sites::STAGE_ID_CALL_OFFSET,
+        crate::model::sites_pkg4::FIGHTER_MANAGER_GET_ENTRY_OFFSET].into_iter().all(game::granted)
+    {
+        return;
+    }
+    let p1 = natives::fighter_accessor(fighter);
+    if p1 == 0 || natives::module_accessor(0) != Some(p1) || !natives::is_grounded(p1) {
+        return;
+    }
+    let (Some(blast), Some(mut stage)) = (super::tech_surfaces::training_blast_bounds(), RayProbe::new(p1)) else {
+        return;
+    };
+    let at = [natives::pos_x(p1), natives::pos_y(p1)];
+    let Ok(Some(run)) = floor_run(&mut stage, blast, at) else { return };
+    let [left, right] = run.ends;
+    let key = [left[0], left[1], right[0], right[1]]
+        .into_iter()
+        .fold(0x9e37_79b9_u64, |key, value| key.rotate_left(17) ^ u64::from(value.to_bits())) | 1;
+    if PROBE_LAST.swap(key, Ordering::AcqRel) == key {
+        return;
+    }
+    let [_, _, top, bottom] = blast;
+    let middle = [left[0].midpoint(right[0]), left[1].midpoint(right[1])];
+    diagnostic(format_args!(
+        "[StageGeometry] probe stage={} p1=({:.3},{:.3}) run=({:.3},{:.3})..({:.3},{:.3}) ledges={:?}",
+        natives::stage_id(), at[0], at[1], left[0], left[1], right[0], right[1], run.ledges
+    ));
+    for (name, sample) in [
+        ("under", [middle[0], middle[1].midpoint(bottom + 1.0)]),
+        ("beside", [left[0] - 1.0, left[1] - 1.0]),
+        ("over", [middle[0], middle[1] + 20.0]),
+    ] {
+        let up = stage.first(sample, top, false);
+        let class = classify(&mut stage, blast, sample);
+        diagnostic(format_args!(
+            "[StageGeometry] probe sample={name} at=({:.3},{:.3}) up={up:?} class={class:?}",
+            sample[0], sample[1]
+        ));
+    }
+    let back = stage.first([middle[0], middle[1] - 0.5], bottom, false);
+    diagnostic(format_args!("[StageGeometry] probe back={back:?}"));
 }
