@@ -2849,3 +2849,19 @@ ceiling = 200093
 date = "2026-11-25"
 reason = "Merge 3D integrated on the install 4 head 4905ec89 (merge 4b): the steering line 19d26f8e with the entry-velocity fix 2d4d6e39 (200089), the wider stick counters 8d7fcd2d and the two 3C edge controls cef3e7aa. Measured 200093 (tools/sloc.py tree): 200089 plus the 4 lines of merge 4b."
 approved_by = "tr-primary-2 ruling 2026-11-24 23:31:00Z (the 3D line ceiling is approved at the final measured value) and its standing rule of 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200218
+date = "2026-11-25"
+reason = "Menu polish on the install 4 head 74f9f21e (merge 3D): half-percent damage ranges, quickening slider controls and the Recording pop-up's ZR role key. Measured 200218 (tools/sloc.py tree), 125 above merge 3D's 200093."
+approved_by = "tr-primary-2 2026-11-24 23:57:04Z (menu-polish order: the line ceiling is approved at the measured value), restated 2026-11-25 00:08:17Z and its standing rule of 2026-11-24 17:59:40Z (the merged ceiling is written at the measured merged value)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 200220
+date = "2026-11-25"
+reason = "Menu polish review: distinguish damage-range recovery advice from the two-element slider error. Measured 200220, two implementation lines above f3480a2f."
+approved_by = "tr-primary-2 2026-11-24 23:57:04Z and 2026-11-25 00:08:17Z (menu-polish ceiling at the measured value)."

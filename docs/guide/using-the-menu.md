@@ -75,10 +75,13 @@ Each row has one kind of control. A list, checklist or editor has its own footer
 | Number | Left / Right step it and stop at the ends. A opens the list. |
 | Checklist (shows how many are ticked) | A opens it. A ticks or unticks, ZL ticks all (or none when all are ticked), B goes back. On most CPU rows, with several ticked the CPU picks one at random each time; the help line says when every ticked entry counts instead (Mash Triggers, Buffs on load). |
 | Checklist and range (the delay rows) | A opens it. Tick values, or move past them to the Min and Max handles instead. Only one of the two can hold a value (the other is greyed); Y clears the one in use. Handles: [Delay rows](cpu-behaviour.md#delay-rows). |
-| Slider (the damage ranges) | Left / Right choose the lower or the upper handle, A picks it up, Up / Down move it by 10, Left / Right by 1, A puts it down. The lower stays at or below the upper. Greyed unless the list above reads Random Value. |
+| Slider (damage and Tech ranges) | A opens on Min; Up / Down choose Min or Max, A edits it. Up raises and Down lowers by one step per tap; a hold speeds up. A or B puts the handle down, then B goes back. Left / Right do nothing. Min stays at or below Max. Damage steps are 0.5%; Tech ranges use their own steps. Damage ranges are greyed unless the list above reads Random Value. |
 | Direction chips | A grid of directions around the opponent. The D-pad moves, each A adds one to a chip's weight (up to 5, then it clears), Y clears a chip, ZL selects all or none. A heavier chip is picked more often. Shield Tilt takes one chip only. [Direction chips](cpu-behaviour.md#direction-chips) explains the grid. |
 | Editor (a summary and `>`) | A opens a screen of its own, such as a portrait grid, a stage list, a library or the chord editor. |
 | Info | Read-only text. |
+
+The slider footer reads `Up/Down Min or Max   A edit   B back`; while editing it reads
+`Up/Down change   hold to speed up   A or B done`. Holding a damage handle from 0 reaches 150% in about three seconds.
 
 ![The DI Direction grid with Up x3 and In x1 set: the focused row in the breadcrumb, the weights on the chips, the help line and the footer keys, labelled](../media/rc13-menu-control-chips.png)<br>
 *The DI Direction grid with Up x3 and In x1, labelled: the focused row, the weights, the help line and the footer keys. Eden, rc.13 (untested on hardware).*

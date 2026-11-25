@@ -1885,3 +1885,5 @@ The release watch now waits for both, and never counts passes:
 ## 2026-11-16: approved bounded events log
 
 The manually extracted `src/runtime/diag_log.rs` (the logging.rs range documented above; not a pkg4/pkg6 manifest destination) now calls the same extracted rotation primitive in `runtime/log_file.rs` as both events writers. The original remove-previous/rename-current/create-current algorithm and `storage::should_rotate` boundary remain unchanged. `report_failure` retains its exact uptime/error format and no-sync behavior; `install::write_text` retains Skyline output and sync_data. Events serialization is separate with only DIAGNOSTICS→EVENTS lock order, no recursive error logging. Existing oversized legacy events are preserved as the previous generation until its next replacement, not silently truncated. No frozen fork/source hash changed. New shared helper/runtime declarations/lib test inclusion are clean-room code; none of these paths has a carry-manifest destination. Parent owns host gates and final acceptance.
+
+Menu-polish slider and pop-up code was written in this repository; no code was copied from the fork or upstream.

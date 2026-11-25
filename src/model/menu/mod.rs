@@ -229,7 +229,7 @@ pub enum RowValue {
     Checklist { ticked: usize, total: usize },
     /// A delay row: nothing set, `n selected`, or `min - max`.
     Delay(DelayView),
-    Slider { lower: u8, upper: u8 },
+    Slider { lower: u16, upper: u16 },
     /// The lit chips of a direction grid, bit `i` for array index `i` (the nine dots of the row).
     Chips(u16),
     /// A menu shortcut's chord.
@@ -463,6 +463,10 @@ pub struct Menu {
     practice_cpu_pop: Option<usize>,
     /// The last press reached an arm that does nothing (`press` returns false).
     ignored: bool,
+    /// Repeat bits for this poll: bit 0 Up, bit 1 Down.
+    repeats: u8,
+    /// Last handle direction (true raises) and number of presses in that hold.
+    slider_run: (bool, u8),
 }
 
 /// The roster press that asks the roster editor to put Mash out's cursor on the saved choice's chip (the open; no cell).
@@ -477,8 +481,17 @@ pub struct MashoutPop {
     pub grab: usize,
 }
 
-const SLIDER_SLOW: u8 = 1;
-const SLIDER_FAST: u8 = 10;
+/// Steps per hold: presses 1–2: 1, 3–6: 2, 7–12: 4, 13–22: 10, then 20.
+/// With the adapter's quickening repeats, 0–150% takes 168 polls, about 2.8 seconds.
+const fn slider_step(run: u8) -> u16 {
+    match run {
+        0..=2 => 1,
+        3..=6 => 2,
+        7..=12 => 4,
+        13..=22 => 10,
+        _ => 20,
+    }
+}
 /// Faster step of a handle in a delay range, in option steps.
 const RANGE_FAST: usize = 10;
 
@@ -532,6 +545,8 @@ impl Menu {
             mashout_pop: None,
             practice_cpu_pop: None,
             ignored: false,
+            repeats: 0,
+            slider_run: (false, 0),
         };
         menu.recording.set_roles(menu.settings.recording_roles());
         menu.sync();
@@ -552,6 +567,8 @@ impl Menu {
         self.place_first = None;
         self.mashout_pop = None;
         self.practice_cpu_pop = None;
+        self.repeats = 0;
+        self.slider_run = (false, 0);
         self.sync();
     }
 
@@ -893,7 +910,14 @@ impl Menu {
                     },
                 })
             }
-            Control::Slider => RowValue::Slider { lower: array.first().copied().unwrap_or(0), upper: array.get(1).copied().unwrap_or(0) },
+            Control::Slider => {
+                let (lower, upper) = if settings::is_half_slider(row.id) {
+                    settings::half_ends(array)
+                } else {
+                    (u16::from(array.first().copied().unwrap_or(0)), u16::from(array.get(1).copied().unwrap_or(0)))
+                };
+                RowValue::Slider { lower, upper }
+            }
             Control::DirectionGrid { .. } => {
                 RowValue::Chips(array.iter().enumerate().fold(0u16, |mask, (i, v)| mask | (u16::from(*v != 0) << i)))
             }
@@ -1243,6 +1267,11 @@ impl Menu {
         self.press_outcome(button);
     }
 
+    /// Repeat bits for the current physical poll.
+    pub fn note_repeats(&mut self, repeats: u8) {
+        self.repeats = repeats;
+    }
+
     /// `press`, reporting whether the arm that took it acted (true, a same-focus action included) or does nothing (false:
     /// the bridge state's `ack.result=ignored`).
     pub fn press_outcome(&mut self, button: Button) -> bool {
@@ -1252,16 +1281,21 @@ impl Menu {
     }
 
     fn dispatch(&mut self, button: Button) {
-        if matches!(self.screen(), Some(Screen::ChordEntry { .. })) && self.chord_capture != ChordCapture::Preview {
-            self.ignored = true;
-            return;
-        }
         // A jump that reaches a screen without jumps (the screen changed under a held ZL) is the plain direction.
         let button = match button {
             Button::JumpUp if !self.takes_jumps() => Button::Up,
             Button::JumpDown if !self.takes_jumps() => Button::Down,
             other => other,
         };
+        if self.recording.popup_open() || !matches!((self.screen(), button),
+            (Some(Screen::Slider { state: SliderState::LowerSelected | SliderState::UpperSelected, .. }), Button::Up | Button::Down))
+        {
+            self.slider_run = (false, 0);
+        }
+        if matches!(self.screen(), Some(Screen::ChordEntry { .. })) && self.chord_capture != ChordCapture::Preview {
+            self.ignored = true;
+            return;
+        }
         if self.recording.popup_open() {
             if button == Button::Y && self.recording.popup_accepts_place_first() {
                 let on = self.toggle_by_id("recording_place");
@@ -1920,22 +1954,23 @@ impl Menu {
 
     fn press_slider(&mut self, button: Button, row: usize, state: SliderState) {
         let id = ROWS[row].id;
-        let Some((_, settings::Def { kind: settings::Kind::Slider { max }, .. })) = settings::def(id) else { return };
-        let [lower, upper] = match self.get(id) {
-            [lo, hi] => [*lo, *hi],
+        let Some((_, def)) = settings::def(id) else { return };
+        let (half, top) = match def.kind {
+            settings::Kind::HalfSlider { max } => (true, u16::from(max) * 2),
+            settings::Kind::Slider { max } => (false, u16::from(super::tech_settings::scale(id).map_or(max, |s| s.max))),
             _ => return,
+        };
+        let (lower, upper) = if half {
+            settings::half_ends(self.get(id))
+        } else {
+            match self.get(id) {
+                [lo, hi] => (u16::from(*lo), u16::from(*hi)),
+                _ => return,
+            }
         };
         let selected = matches!(state, SliderState::LowerSelected | SliderState::UpperSelected);
         let lower_handle = matches!(state, SliderState::LowerHover | SliderState::LowerSelected);
         let screen = |state: SliderState| Screen::Slider { row, state };
-        let adjust = |delta: i16| -> [u8; 2] {
-            let apply = |v: u8, lo: i16, hi: i16| (i16::from(v) + delta).clamp(lo, hi) as u8;
-            if lower_handle {
-                [apply(lower, 0, i16::from(upper)), upper]
-            } else {
-                [lower, apply(upper, i16::from(lower), i16::from(super::tech_settings::scale(id).map_or(*max, |s| s.max)))]
-            }
-        };
         match button {
             Button::A => self.top(screen(match state {
                 SliderState::LowerHover => SliderState::LowerSelected,
@@ -1950,11 +1985,29 @@ impl Menu {
                     self.stack.pop();
                 }
             }
-            Button::Up if selected => self.put(id, &adjust(i16::from(SLIDER_FAST))),
-            Button::Down if selected => self.put(id, &adjust(-i16::from(SLIDER_FAST))),
-            Button::Right if selected => self.put(id, &adjust(i16::from(SLIDER_SLOW))),
-            Button::Left if selected => self.put(id, &adjust(-i16::from(SLIDER_SLOW))),
-            Button::Left | Button::Right if !selected => self.top(screen(if lower_handle {
+            Button::Up | Button::Down if selected => {
+                let raising = button == Button::Up;
+                let bit = if raising { 1 } else { 2 };
+                let repeat = self.repeats & bit != 0;
+                self.repeats &= !bit;
+                let run = if repeat && self.slider_run.0 == raising {
+                    self.slider_run.1.saturating_add(1)
+                } else { 1 };
+                self.slider_run = (raising, run);
+                let step = slider_step(run);
+                let value = if lower_handle { lower } else { upper };
+                let next = if raising { (value / step + 1) * step }
+                    else { value.saturating_sub(1) / step * step };
+                let (lower, upper) = if lower_handle { (next.min(upper), upper) }
+                    else { (lower, next.clamp(lower, top)) };
+                if half {
+                    let (values, len) = settings::half_row(lower, upper);
+                    self.put(id, &values[..len]);
+                } else {
+                    self.put(id, &[lower as u8, upper as u8]);
+                }
+            }
+            Button::Up | Button::Down if !selected => self.top(screen(if lower_handle {
                 SliderState::UpperHover
             } else {
                 SliderState::LowerHover
@@ -2422,6 +2475,10 @@ mod picker_divider_tests;
 #[cfg(test)]
 #[path = "navigation_tests.rs"]
 mod navigation_tests;
+
+#[cfg(test)]
+#[path = "slider_tests.rs"]
+mod slider_tests;
 
 #[cfg(test)]
 #[path = "practice_menu_tests.rs"]

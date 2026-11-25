@@ -36,8 +36,8 @@ pub struct DeathWarp<'a> {
     pub mirroring: crate::model::state::settings::Mirroring,
     pub damage_player: crate::model::state::settings::DamageMode,
     pub damage_cpu: crate::model::state::settings::DamageMode,
-    pub limits_player: (u8, u8),
-    pub limits_cpu: (u8, u8),
+    pub limits_player: (u16, u16),
+    pub limits_cpu: (u16, u16),
     pub buffs: crate::model::state::settings::Buffs,
 }
 

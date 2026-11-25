@@ -250,19 +250,17 @@ pub const ROLE_CAP: f32 = 40.0;
 pub const ROLE_CAP_ZR: f32 = 56.0;
 pub const ROLE_CAP_X: [f32; 2] = [ROLE_X - ROLE_TAB_W - 40.0, ROLE_X + ROLE_TAB_W + 40.0];
 
-/// Key caps beside the role tabs: L/R in the pop-up, ZR on the page, none while a file or picker owns the buttons.
+/// Key caps beside the role tabs: ZR, or none while a file or picker owns the buttons.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RoleKeys {
     #[default]
     None,
-    LR,
     ZR,
 }
 
 pub const fn role_caps(keys: RoleKeys) -> [Option<(&'static [u16], f32)>; 2] {
     match keys {
         RoleKeys::None => [None, None],
-        RoleKeys::LR => [Some((&[76], ROLE_CAP)), Some((&[82], ROLE_CAP))],
         RoleKeys::ZR => [None, Some((&[90, 82], ROLE_CAP_ZR))],
     }
 }
@@ -404,7 +402,7 @@ pub const IDX_CONN_PILL: usize = IDX_CONN_BOX + 4 * CONN_BOXES;
 pub const IDX_CONN_PILL_TEXT: usize = IDX_CONN_PILL + CONN_BOXES;
 pub const CONN_TREE: usize = CONN_BOXES;
 pub const IDX_CONN_TREE: usize = IDX_CONN_PILL_TEXT + CONN_BOXES;
-/// The r8 title's L/R role tabs: their plate, the lit half, "Player" and "CPU", and the L and R key caps.
+/// The r8 title's role tabs: their plate, the lit half, "Player" and "CPU", and the key caps.
 pub const IDX_ROLE_BG: usize = IDX_CONN_TREE + CONN_TREE;
 pub const IDX_ROLE_HI: usize = IDX_ROLE_BG + 1;
 pub const IDX_ROLE: usize = IDX_ROLE_HI + 1;
@@ -1102,9 +1100,8 @@ mod role_tests {
 
     fn role_caps_reuse_the_two_cap_panes() {
         assert_eq!(role_caps(RoleKeys::None), [None, None]);
-        assert_eq!(role_caps(RoleKeys::LR), [Some((&[76][..], ROLE_CAP)), Some((&[82][..], ROLE_CAP))]);
         assert_eq!(role_caps(RoleKeys::ZR), [None, Some((&[90, 82][..], ROLE_CAP_ZR))]);
-        for keys in [RoleKeys::None, RoleKeys::LR, RoleKeys::ZR] {
+        for keys in [RoleKeys::None, RoleKeys::ZR] {
             for (i, cap) in role_caps(keys).iter().enumerate() {
                 let Kind::Text { chars, .. } = spec(IDX_ROLE_KEY + i).kind else { panic!("key pane is text") };
                 assert_eq!(chars, 2);

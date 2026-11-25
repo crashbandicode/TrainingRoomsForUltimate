@@ -73,9 +73,11 @@ pub struct StateSettings {
     pub autoload: bool,
     pub respawn_invincibility: bool,
     pub damage_player: DamageMode,
-    pub limits_player: (u8, u8),
+    /// Player damage range in half percents.
+    pub limits_player: (u16, u16),
     pub damage_cpu: DamageMode,
-    pub limits_cpu: (u8, u8),
+    /// CPU damage range in half percents.
+    pub limits_cpu: (u16, u16),
     pub buffs: Buffs,
 }
 
@@ -89,9 +91,9 @@ impl Default for StateSettings {
             autoload: false,
             respawn_invincibility: false,
             damage_player: DamageMode::Default,
-            limits_player: (0, 150),
+            limits_player: (0, 300),
             damage_cpu: DamageMode::Default,
-            limits_cpu: (0, 150),
+            limits_cpu: (0, 300),
             buffs: Buffs(0),
         }
     }
@@ -118,10 +120,10 @@ fn damage(row: Option<&[u8]>) -> DamageMode {
     }
 }
 
-fn limits(row: Option<&[u8]>) -> (u8, u8) {
+fn limits(row: Option<&[u8]>) -> (u16, u16) {
     match row {
-        Some(&[lower, upper]) => (lower, upper),
-        _ => (0, 150),
+        Some(row) => super::super::settings::half_ends(row),
+        None => (0, 300),
     }
 }
 

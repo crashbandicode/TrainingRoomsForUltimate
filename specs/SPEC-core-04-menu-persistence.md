@@ -30,7 +30,9 @@ The player's menu choices and their saved defaults survive a restart: they are w
   - `OnOff` is `[on, off]`: On = `[1,0]`, Off = `[0,1]`.
   - `BoolFlag` is `[true, false]`.
   - Button chords (`ButtonConfig`) are 16 elements in the order A, B, X, Y, L, R, ZL, ZR, DPad Up, DPad Down, DPad Left, DPad Right, Plus, Minus, LStick, RStick; the default save chord is ZL + DPad Down = `[0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0]`.
-  - Sliders are two elements `[lower, upper]` (`DamagePercent`: default `[0, 150]`).
+  - Sliders are `[lower, upper]` (`DamagePercent`: default `[0, 150]`). A damage range uses whole percents in those
+    two elements, or `[lower, upper, lower half, upper half]` when an end has a half percent; each flag is 0 or 1.
+    Whole ends are written in the two-element form. Files from earlier builds load unchanged.
 - The settings object contains one entry per setting id; ids are the stable keys of SPEC-core-02 §2.7 (`mash_state`, `hud`, …). Upstream wrote the two snapshots as flat objects (the struct's field names); the order of keys follows the struct, which the reader must not depend on.
 - Upstream's encoding came from its `byteflags` crate (one byte per flag, serialized as a sequence). The clean room defines the same wire shape with its own types; a fixture file in the test tree pins it (Q1 on an exact byte-for-byte sample).
 
@@ -95,7 +97,7 @@ This spec *is* the persistence spec: file `sd:/ultimate/TrainingRooms/settings.j
 
 | Requirement | Host test (planned name) | Eden row (planned label) | Evidence file |
 | --- | --- | --- | --- |
-| Wire shape: every setting an array in declaration order; OnOff `[1,0]`/`[0,1]`; sliders `[lower, upper]`; chord bit order | `core04_wire_shape_fixture` (fixture file pinned) | `core04-E1` read the file after a close | `docs/EDEN-RESULTS.md` |
+| Wire shape: every setting an array in declaration order; OnOff `[1,0]`/`[0,1]`; slider ends and optional damage half flags; chord bit order | `core04_wire_shape_fixture` (fixture file pinned) | `core04-E1` read the file after a close | `docs/EDEN-RESULTS.md` |
 | Factory file round trip; defaults snapshot independent of settings | `core04_roundtrip_factory`, `core04_defaults_independent` | `core04-E2` X then restart then reset | — |
 | Unknown keys ignored on load and kept on rewrite; retired keys dropped | `core04_unknown_keys_ignored` | — | — |
 | Missing keys take defaults (every field) | `core04_missing_keys_default` | `core04-E3` older file | — |
