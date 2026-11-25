@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler on any floor, the eggs' off-stage zone |
+| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -93,10 +93,12 @@ and the expected log lines), then the operator's full test on the console.
   one piece of ground, such as the Training stage, stand on the piece you want and choose Start.
 - Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side.
   Juggler needs no ledge: its CPU spot is over the stage or in open air beside it.
-- When a start cannot happen, a message says why and the row reads Start again: "The stage could not be read",
-  "Stand on the stage to start this drill", "This floor has no ledge to guard", or, on Juggler's CPU page, "Pick a
-  point over the stage or beside it". In an Eden check before this change, Start on the Training stage did nothing
-  and the menu read Running ([Install evidence](EVIDENCE-rc15-installs.md#the-next-build)).
+- When Start cannot begin the drill, the row returns to Start and a message explains why: "The stage could not
+  be read", "Stand on the stage to start this drill" or "This floor has no ledge to guard". Before this change,
+  the Training stage check left the menu showing Running even though neither drill began
+  ([Install evidence](EVIDENCE-rc15-installs.md#the-next-build)).
+- In Juggler's setup, "Pick a point over the stage or beside it" means the CPU spot was refused. Stay on the
+  CPU page, move the crosshair and press **A** again.
 - A start you set up is used again only on the floor it was made on.
 - More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
 

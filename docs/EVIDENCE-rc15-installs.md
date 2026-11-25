@@ -156,7 +156,8 @@ documentation merges that followed it. These receipts are host tests and builds,
 
 On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
 **before** the off-stage changes. Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running"
-(`out/p05/ally-173401-786500-p05-open.png` in the run's folder). This was not a test of the fix,
+(`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png`
+for Juggler in the run's folder). This was not a test of the fix,
 which merged later as `7e6ff810` and is host-tested only, or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
 17:39:04Z report from training-offstage.
 
