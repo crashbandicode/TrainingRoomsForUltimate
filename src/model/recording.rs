@@ -228,6 +228,21 @@ pub fn play_player_chord(play_player: bool, p1_driven_by_ai: impl FnOnce() -> bo
     }
 }
 
+/// What the recorder is doing, for TrainingRooms' own P1 CPU Control (the fallback pilot).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecorderUse {
+    Idle,
+    /// A take is open, or its Record edge is still to be serviced.
+    Take,
+    /// A Playback Slot run.
+    Playback,
+}
+
+/// Whether the fallback pilot stands down now: Player 1's pad goes back to the player and its AI does not think.
+pub const fn fallback_waits(menu: bool, recorder: RecorderUse) -> bool {
+    menu || !matches!(recorder, RecorderUse::Idle)
+}
+
 /// The refusal's notice, worded as Record's (`RecordRefusal::P1DrivenByAi`).
 pub const PLAY_PLAYER_AI_REFUSAL: &str = "P1 is controlled by an AI: Play on Player 1 is off";
 

@@ -437,21 +437,29 @@ fn r2_5_mash_interrupt_stops_a_running_playback_only_when_enabled() {
     assert!(control.is_none());
 }
 
-/// B4 (decided 2026-11-01, SPEC-input-01 question 7 / SPEC-cpu-01 question 7): while an AI — the pilot or
-/// the fallback — drives P1, Record is refused with a notice and nothing is recorded. The AI fact is
-/// checked first, ahead of the missing-fighter and save-state reasons, and the notice names it.
+/// Record's refusals as a start asks them. `ai` is whether an AI drives Player 1.
+fn start(ai: bool, present: bool, loading: bool) -> Option<RecordRefusal> {
+    record_refusal(ai, present, loading)
+}
+
+fn body<'a>(source: &'a str, name: &str) -> &'a str {
+    let start = source.find(name).unwrap_or_else(|| panic!("missing {name}"));
+    &source[start..start + source[start..].find("\n}\n").expect("end of function")]
+}
+
+/// Operator 2026-11-25 (reverses B4 of 2026-11-01 for Record): an AI driving P1 does not refuse Record. The other two
+/// reasons are asked as before, in the same order, and Record's AI notice is gone; Play on Player 1's stays.
 #[test]
-fn record_refused_when_p1_ai() {
-    assert_eq!(record_refusal(true, true, false), Some(RecordRefusal::P1DrivenByAi));
-    assert_eq!(
-        record_refusal(true, false, true),
-        Some(RecordRefusal::P1DrivenByAi),
-        "the AI fact is checked first"
-    );
-    assert_eq!(record_refusal(false, true, true), Some(RecordRefusal::SaveStateLoading));
-    assert_eq!(record_refusal(false, false, false), Some(RecordRefusal::FightersMissing));
-    assert_eq!(record_refusal(false, true, false), None, "a human-driven P1 records");
-    assert_eq!(RecordRefusal::P1DrivenByAi.text(), "P1 is controlled by an AI: recording is off");
+fn record_starts_while_an_ai_drives_p1() {
+    assert_eq!(start(true, true, false), None, "an AI-driven P1 records");
+    assert_eq!(start(true, true, true), Some(RecordRefusal::SaveStateLoading));
+    assert_eq!(start(true, false, true), Some(RecordRefusal::FightersMissing), "the missing fighter is asked first");
+    assert_eq!(start(false, true, true), Some(RecordRefusal::SaveStateLoading));
+    assert_eq!(start(false, false, false), Some(RecordRefusal::FightersMissing));
+    assert_eq!(start(false, true, false), None, "a human-driven P1 records");
+    let model = include_str!("../src/model/recording.rs");
+    assert!(!model.contains("recording is off"), "Record's AI notice is gone");
+    assert!(model.contains("P1 is controlled by an AI: Play on Player 1 is off"), "Play on Player 1's stays");
 }
 
 /// Stand-ins for the standalone pilot's `ssbu_cpu_pilot_state_v1` (ssbu-cpu-pilot `src/runtime.rs:526-538`): the same
@@ -468,18 +476,16 @@ unsafe extern "C" fn pilot_inactive(_: *mut PilotStateV1) -> bool {
     false
 }
 
-/// B4-1 (`artifacts/phase23/LANE-SURFACE-REPORT.md` "B4-1 root cause"): the standalone pilot arms P1 without flipping
-/// `is_operation_cpu(0)`, so the refusal reads its export. Armed: refused with the existing notice. Unarmed, inactive or
-/// absent: P1 records.
+/// The standalone pilot arms P1 without flipping `is_operation_cpu(0)`, so the AI fact reads its export (B4-1). Armed,
+/// unarmed, inactive or absent: Record starts. The fact itself still answers, for Play on Player 1 and Quick Reset.
 #[test]
-fn record_refused_while_the_standalone_pilot_drives_p1() {
-    let refusal = |export: Option<PilotStateExport>| record_refusal(unsafe { p1_driven_by_ai(false, false, export) }, true, false);
-    assert_eq!(refusal(Some(pilot_armed_l3)), Some(RecordRefusal::P1DrivenByAi));
-    assert_eq!(refusal(Some(pilot_armed_l3)).map(RecordRefusal::text), Some("P1 is controlled by an AI: recording is off"));
-    assert_eq!(refusal(Some(pilot_unarmed)), None, "an unarmed pilot leaves P1 to the player: it records");
-    assert_eq!(refusal(Some(pilot_inactive)), None, "an inactive export (false) is not an AI");
+fn record_starts_while_the_standalone_pilot_drives_p1() {
+    let refusal = |export: Option<PilotStateExport>| start(unsafe { p1_driven_by_ai(false, false, export) }, true, false);
+    assert_eq!(refusal(Some(pilot_armed_l3)), None, "the armed pilot's P1 records");
+    assert_eq!(refusal(Some(pilot_unarmed)), None);
+    assert_eq!(refusal(Some(pilot_inactive)), None);
     assert_eq!(refusal(None), None, "no pilot on the card: it records");
-    // The game's own operator flag still refuses on its own (a CPU-operated entry 0).
+    assert!(unsafe { p1_driven_by_ai(false, false, Some(pilot_armed_l3)) }, "the fact still says an AI drives P1");
     assert!(unsafe { p1_driven_by_ai(true, false, None) });
     // The declared ABI: 24 bytes, `armed_level` at offset 8, `last_input` at 16 (the pilot's #[repr(C)] struct).
     assert_eq!(std::mem::size_of::<PilotStateV1>(), 24);
@@ -487,22 +493,20 @@ fn record_refused_while_the_standalone_pilot_drives_p1() {
     assert_eq!(std::mem::offset_of!(PilotStateV1, last_input), 16);
 }
 
-/// R7 (rc.8): since `0bb2bea3` the Record chord goes to the recording worker, which toggles a capture, and nothing asked B4
-/// any more. A chord that would start a capture now asks the same refusals as every other record start; a chord that stops a
-/// running capture (started before the pilot armed) still stops it, without asking.
+/// The Record chord toggles the worker's capture. With an AI on P1 a chord starts one, and the next chord stops it
+/// without asking anything, as it always did.
 #[test]
-fn a_record_chord_that_starts_a_capture_is_refused_while_an_ai_drives_p1() {
-    let pilot = |export: PilotStateExport| move || record_refusal(unsafe { p1_driven_by_ai(false, false, Some(export)) }, true, false);
-    assert_eq!(record_chord(true, false, pilot(pilot_armed_l3)), Err(RecordRefusal::P1DrivenByAi));
-    assert_eq!(
-        record_chord(true, false, pilot(pilot_armed_l3)).map_err(RecordRefusal::text),
-        Err("P1 is controlled by an AI: recording is off")
-    );
-    assert_eq!(record_chord(true, false, pilot(pilot_unarmed)), Ok(true), "an unarmed pilot leaves P1 to the player");
-    assert_eq!(record_chord(true, false, pilot(pilot_inactive)), Ok(true), "an inactive export is not an AI");
+fn a_record_chord_starts_and_stops_a_capture_while_an_ai_drives_p1() {
+    let pilot = |export: PilotStateExport| move || start(unsafe { p1_driven_by_ai(false, false, Some(export)) }, true, false);
+    assert_eq!(record_chord(true, false, pilot(pilot_armed_l3)), Ok(true), "an armed pilot: the capture starts");
+    assert_eq!(record_chord(true, false, pilot(pilot_unarmed)), Ok(true));
+    assert_eq!(record_chord(true, false, pilot(pilot_inactive)), Ok(true));
     assert_eq!(record_chord(true, true, || panic!("a stop asks no refusal")), Ok(true), "a running capture stops");
     assert_eq!(record_chord(false, false, || panic!("no chord asks no refusal")), Ok(false));
     assert_eq!(record_chord(false, true, || panic!("no chord asks no refusal")), Ok(false));
+    // The reasons that remain still refuse a start, AI or not.
+    assert_eq!(record_chord(true, false, || start(true, true, true)), Err(RecordRefusal::SaveStateLoading));
+    assert_eq!(record_chord(true, false, || start(true, false, false)), Err(RecordRefusal::FightersMissing));
 }
 
 /// rc.9 C14 (`PLUGIN-SHORTCUT-CONFLICTS.md`): Play on Player 1 writes P1's input, as the standalone pilot does while it
@@ -518,36 +522,81 @@ fn play_on_player_1_is_refused_while_an_ai_drives_p1() {
     assert_eq!(play_player_chord(false, || panic!("no chord asks nothing")), Ok(false));
 }
 
-/// rc.14 recfix (Eden rc.13 `g5-rc13-xps-1`, gif-lane-5): TR's own P1 CPU Control (the fallback pilot) arms the AI and hands
-/// back its decision as P1's mapped input, leaving `is_operation_cpu(0)` false ("No operation-CPU change persists",
-/// `cpu_pilot.rs`), so B4 never saw it: Record started and Play on Player 1 played while it drove P1. The fallback's own
-/// answer (it is emitting P1's input now) refuses both, with the standalone pilot's notices. Paused for a menu or a recording,
-/// or Off, it is not emitting: P1 records and plays. A running capture still stops without asking.
+/// TR's own P1 CPU Control (the fallback pilot) hands its decision back as P1's mapped input and leaves
+/// `is_operation_cpu(0)` false, so it answers for itself. While it drives P1, Record starts and Play on Player 1 is refused.
 #[test]
-fn record_and_play_on_player_1_are_refused_while_the_fallback_drives_p1() {
+fn record_starts_and_play_on_player_1_is_refused_while_the_fallback_drives_p1() {
     let driven = |fallback: bool| move || unsafe { p1_driven_by_ai(false, fallback, None) };
-    let record = |fallback: bool| record_chord(true, false, || record_refusal(driven(fallback)(), true, false));
-    assert_eq!(record(true), Err(RecordRefusal::P1DrivenByAi));
-    assert_eq!(record(true).map_err(RecordRefusal::text), Err("P1 is controlled by an AI: recording is off"));
+    let record = |fallback: bool| record_chord(true, false, || start(driven(fallback)(), true, false));
+    assert_eq!(record(true), Ok(true), "the fallback drives P1: Record starts");
     assert_eq!(record(false), Ok(true), "the fallback Off or paused: P1 records");
     assert_eq!(play_player_chord(true, driven(true)), Err("P1 is controlled by an AI: Play on Player 1 is off"));
     assert_eq!(play_player_chord(true, driven(false)), Ok(true), "the fallback Off or paused: Play on Player 1 plays");
     assert_eq!(record_chord(true, true, || panic!("a stop asks no refusal")), Ok(true), "a running capture stops");
-    // The other two answers still refuse on their own, whatever the fallback says.
     assert!(unsafe { p1_driven_by_ai(true, false, None) });
     assert!(unsafe { p1_driven_by_ai(false, false, Some(pilot_armed_l3)) });
     assert!(!unsafe { p1_driven_by_ai(false, false, Some(pilot_unarmed)) });
 }
 
-/// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts (the
-/// numbered and named starts ask the same function).
+/// The fallback pilot stood down for the whole of a take, so a take would have held the player's pad, not the AI's.
+/// It now plays through a take and still stands down for a menu or a Playback Slot run.
+#[test]
+fn the_fallback_keeps_driving_p1_through_a_take_and_waits_for_a_playback() {
+    assert!(!fallback_waits(false, RecorderUse::Take), "a take: the fallback keeps driving P1");
+    assert!(fallback_waits(false, RecorderUse::Playback), "a Playback Slot run: it waits");
+    assert!(!fallback_waits(false, RecorderUse::Idle));
+    for recorder in [RecorderUse::Idle, RecorderUse::Take, RecorderUse::Playback] {
+        assert!(fallback_waits(true, recorder), "a menu: it waits, whatever the recorder does");
+    }
+    let busy = body(include_str!("../src/runtime/p1/cpu_pilot.rs"), "fn menu_busy() -> bool {");
+    assert!(busy.contains("fallback_waits("), "the pilot asks the model");
+    assert!(!busy.contains("recording_or_playback()"), "a take no longer counts as busy");
+    assert!(busy.contains("rr_host::slot_running()") && busy.contains("rr_host::taking()"), "atomics only: hooks call this");
+}
+
+/// A take of Player 1 stores the record the recorder is handed. That is after the game mapped the pad (the standalone
+/// pilot's hook has written by then), after the input delay and after the fallback wrote its pad: what the fighter acts on.
+#[test]
+fn the_recorder_reads_player_ones_record_after_the_pilot_wrote_it() {
+    let poll = include_str!("../src/runtime/features/input_delay.rs");
+    let delay = poll.find("adapter.poll_with(").expect("the input delay");
+    let fallback = poll.find("crate::runtime::p1::input(slot as i32, out)").expect("the fallback's write");
+    let recorder = poll.find("recorder::on_p1_poll(out);").expect("the recorder's read");
+    assert!(delay < fallback && fallback < recorder, "delay, then the fallback, then the recorder");
+    let host = body(include_str!("../src/model/rr_host.rs"), "pub unsafe fn on_player_poll(");
+    assert!(host.contains("push_capture(ROLE_PLAYER, to_frame(*out));"), "the take stores that record");
+}
+
+/// One start for every entry point: the Record chord (the pop-up and Record drill arm a take the chord starts). It asks
+/// no scene, so Training and the waiting room answer alike, and no AI fact. Vault and match captures never asked one.
+#[test]
+fn a_record_start_asks_no_scene_and_no_ai_fact() {
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    let refusal = body(recorder, "unsafe fn record_refusal() -> Option<RecordRefusal> {");
+    assert!(!refusal.contains("p1_driven_by_ai"), "Record does not ask who drives P1");
+    for scene in ["is_training", "waiting_scene", "fact_scene"] {
+        assert!(!refusal.contains(scene), "no scene is asked: {scene}");
+    }
+    assert!(refusal.contains("natives::fighter_entry(0) != 0") && refusal.contains("states::is_loading()"));
+    let chord = body(recorder, "unsafe fn chord_step(body: Body) {");
+    assert_eq!(chord.matches("record_chord(").count(), 1, "one start");
+    assert!(chord.contains("play_player_chord(") && chord.contains("p1_driven_by_ai("), "Play on Player 1 still asks");
+    for capture in [include_str!("../src/runtime/macros/live_replay.rs"), include_str!("../src/runtime/macros/replay_capture.rs")] {
+        assert!(!capture.contains("p1_driven_by_ai"), "the Vault and match captures never asked");
+    }
+    let quick = include_str!("../src/runtime/features/states/quick_reset.rs");
+    assert!(quick.contains("p1_driven_by_ai("), "Quick Reset still asks");
+}
+
+/// R7: a starting Record chord answers exactly as `record_refusal` does, over every combination of its live facts, and
+/// the AI fact changes none of them.
 #[test]
 fn a_starting_record_chord_answers_as_record_refusal() {
     for ai in [false, true] {
         for present in [false, true] {
             for loading in [false, true] {
-                let expected = record_refusal(ai, present, loading);
-                let chord = record_chord(true, false, || record_refusal(ai, present, loading));
+                let expected = start(false, present, loading);
+                let chord = record_chord(true, false, || start(ai, present, loading));
                 assert_eq!(chord.err(), expected, "ai={ai} present={present} loading={loading}");
                 assert_eq!(chord.ok(), expected.is_none().then_some(true));
             }
