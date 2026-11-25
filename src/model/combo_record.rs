@@ -9,7 +9,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Map, Value};
 
-use super::action::{self, ActionDesc, Travel};
+use super::action::{self, ActionDesc, Entry, Travel};
 use super::combo::{Aim, Combo, Dir, Event, Flick, Kind, LinkRec, LEGACY_STEPS, LINKS, STEPS};
 use super::frame_strip::{Angle, Button, Move, Verdict};
 use super::spots::Spot;
@@ -370,9 +370,10 @@ impl ComboRecord {
             for (link, value) in links.iter().enumerate() {
                 let events = value.get("events").and_then(Value::as_array).ok_or("events")?;
                 for (index, value) in events.iter().enumerate() {
-                    if matches!(combo.get(link).and_then(|link| link.events[index]), Some(Event { kind: Kind::Aim(_), .. }))
-                        && value.get("path").is_some()
-                    {
+                    // An aim part's travel, or on the press that began a special that special's own.
+                    let kept = matches!(combo.get(link).and_then(|link| link.events[index]).map(|event| event.kind),
+                        Some(Kind::Aim(_) | Kind::Press(Button::Special) | Kind::CStick));
+                    if kept && value.get("path").is_some() {
                         let travel = parse_travel(value.as_object().ok_or("event")?)?;
                         combo.attach_travel(link, index, travel);
                     }
@@ -637,7 +638,16 @@ fn parse_travel(event: &Map<String, Value>) -> Result<Travel, &'static str> {
             Some((angle, deflection.round() as u8))
         }
     };
-    Ok(Travel { stick, heading, distance, path })
+    let entry = match (event.get("entry_x"), event.get("entry_y")) {
+        (None, None) if !event.contains_key("entry_change") => Entry::UNKNOWN,
+        (Some(x), Some(y)) => {
+            let change = event.get("entry_change").map_or(Ok(0.0), |v| v.as_f64().ok_or("entry_change"))?;
+            Entry::of(x.as_f64().ok_or("entry_x")?, y.as_f64().ok_or("entry_y")?)
+                .and_then(|entry| entry.with_change(change)).ok_or("entry velocity")?
+        }
+        _ => return Err("entry velocity"),
+    };
+    Ok(Travel { entry, stick, heading, distance, path })
 }
 
 fn events_value(link: &LinkRec, holds: &[Option<u32>; STEPS], travels: Option<&[Option<Travel>; STEPS]>) -> Vec<Value> {
@@ -661,17 +671,20 @@ fn event_value(event: Event, hold: Option<u32>, travel: Option<Travel>, input: b
         }
         Kind::Flick(flick) => value["flick"] = json!(key_of(&FLICKS, flick)),
         Kind::CStick => {}
-        Kind::Aim(part) => {
-            value["part"] = json!(part);
-            if let Some(travel) = travel {
-                if let Some((angle, deflection)) = travel.stick {
-                    value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
-                }
-                value["heading"] = json!(f64::from(travel.heading) / 10.0);
-                value["distance"] = json!(f64::from(travel.distance) / 10.0);
-                value["path"] = json!(travel.path);
-            }
+        Kind::Aim(part) => value["part"] = json!(part),
+    }
+    if let Some(travel) = travel {
+        if let Some((x, y)) = travel.entry.units() {
+            value["entry_x"] = json!(x);
+            value["entry_y"] = json!(y);
+            if travel.entry.change() != 0.0 { value["entry_change"] = json!(travel.entry.change()); }
         }
+        if let Some((angle, deflection)) = travel.stick {
+            value["stick"] = json!({"angle": f64::from(angle) / 10.0, "deflection": deflection});
+        }
+        value["heading"] = json!(f64::from(travel.heading) / 10.0);
+        value["distance"] = json!(f64::from(travel.distance) / 10.0);
+        value["path"] = json!(travel.path);
     }
     value
 }
