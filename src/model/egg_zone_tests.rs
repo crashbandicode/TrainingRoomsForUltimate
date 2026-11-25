@@ -1,6 +1,6 @@
 use super::chords::logical as key;
 use super::edge_juggle::perfect::Outline;
-use super::egg_zone::{crop_window, CropRect, CropView, Outcome, Side, Stage, Step, Wizard};
+use super::egg_zone::{crop_window, CropRect, CropView, LayoutCrop, Outcome, Side, Stage, Step, Wizard};
 
 fn stage(blast: [f32; 4], points: &[[f32; 2]]) -> Stage {
     let mut outline = Outline::new();
@@ -188,6 +188,24 @@ fn crop_inset() -> CropView {
         sides: [Some([720.0, 760.0]), Some([840.0, 880.0])],
         limits: [780.0, 820.0],
     }
+}
+
+#[test]
+fn crop_window_is_taken_once_by_the_layout_that_drew_it() {
+    let mut slot = None;
+    let owner = 0x1234_5680usize;
+    let other = owner + 0x100;
+    let rects = crop_window(crop_world(), Some(crop_inset()), Step::Outer);
+    LayoutCrop::publish(&mut slot, owner, rects);
+    assert_eq!(LayoutCrop::take(&mut slot, other), None);
+    assert_eq!(LayoutCrop::take(&mut slot, owner), Some(rects));
+    assert_eq!(LayoutCrop::take(&mut slot, owner), None);
+
+    let without_inset = crop_window(crop_world(), None, Step::Preview);
+    LayoutCrop::publish(&mut slot, owner, rects);
+    LayoutCrop::publish(&mut slot, other, without_inset);
+    assert_eq!(LayoutCrop::take(&mut slot, owner), None);
+    assert_eq!(LayoutCrop::take(&mut slot, other), Some(without_inset));
 }
 
 #[test]

@@ -513,6 +513,25 @@ pub struct CropView {
 /// Five dims, two limits, eight edges and four handle rectangles, then ten inset rectangles.
 pub const CROP_RECTS: usize = 29;
 
+pub struct LayoutCrop {
+    owner: u8,
+    rects: [Option<CropRect>; CROP_RECTS],
+}
+
+impl LayoutCrop {
+    pub fn publish(slot: &mut Option<Self>, layout: usize, rects: [Option<CropRect>; CROP_RECTS]) {
+        if let Ok(owner) = u8::try_from(layout) {
+            *slot = Some(Self { owner, rects });
+        }
+    }
+
+    pub fn take(slot: &mut Option<Self>, layout: usize) -> Option<[Option<CropRect>; CROP_RECTS]> {
+        let owner = u8::try_from(layout).ok()?;
+        if slot.as_ref()?.owner != owner { return None; }
+        Some(slot.take()?.rects)
+    }
+}
+
 const CROP_X: [f32; 2] = [-960.0, 960.0];
 const CROP_Y: [f32; 2] = [-540.0, 540.0];
 const CROP_DIM: [u8; 4] = [10, 15, 27, 140];
