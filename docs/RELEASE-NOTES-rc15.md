@@ -4,12 +4,12 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
-Four of these builds were installed on the project's test console one after another, and are called install 1 to 4.
+Five of these builds were installed on the project's test console one after another, and are called install 1 to 5.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
+| [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
 | [Install 2](#install-2) | 2026-11-24 | `71158421` | Fixes to Recording, the practice games and the menu |
@@ -24,34 +24,19 @@ What "tested" means in these notes:
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
 
-## Next build (not installed yet)
+## Install 5
 
-The build after install 4. Its name is expected to be rc.16. Everything planned for it is merged; nothing is still
-in work. The merged changes passed host tests and builds.
+Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its footer reads
+`0.2.0-rc.15 · rc15 b7a382e4`. It holds the ten changes below, all merged on 2026-11-25.
 
-**How this build is tested:** one short Eden smoke boot on the finished build, then the operator's full test on the
-console.
-
-- **The smoke boot ran on 2026-11-25** on build `b7a382e4`, with no crash. Nine of its ten checks passed.
-  Guard the Edge and Juggler opened their set-up on the Training stage. Guard the Edge was also checked from the
-  island and on Battlefield. Eggs-ercise had one off-stage zone in the Training stage's gap;
-  the recording picker's Off stage switch moved Player 1 beside the ledge;
-  a take played on Player 1; and the clip editor opened and previewed. The waiting-room check was not run, because
-  the test's own route failed.
-- **It is a short check, not a play test.** No drill was played through, and most of the other new items were not
-  touched. What ran and what did not: [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build).
-- **The operator's test on the console has not happened.** It includes the waiting room.
-
-### Merged
-
-#### Record works while an AI plays Player 1 (merged 2026-11-25)
+### Record works while an AI plays Player 1
 
 - With the CPU pilot plugin, or TrainingRooms' own Player 1 control, playing Player 1, Record now starts. The take
   holds Player 1's inputs as the game receives them, the AI's included.
 - Before, Record was refused. Play on Player 1 and L + R + A are still refused while an AI plays Player 1.
 - More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1).
 
-#### Grabs, throws and edge attacks are named in combo files (merged 2026-11-25)
+### Grabs, throws and edge attacks are named in combo files
 
 - A combo file now writes `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack` by name in a link's
   `from` and `to`.
@@ -59,7 +44,7 @@ console.
   are not affected, and this build still reads older files.
 - More: [Combo files › The format](guide/combos.md#the-format).
 
-#### B stops a preview, and the pop-up shows its chords (merged 2026-11-25)
+### B stops a preview, and the pop-up shows its chords
 
 - While any preview plays, the key line reads `B stop preview`. B or X stops it and drops the rest of its frames.
 - After the last frame the result stays for about a second and the key line reads `B back`.
@@ -68,14 +53,14 @@ console.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and
   [The Recording pop-up](menu/recording.md#the-recording-pop-up).
 
-#### Delete for replay captures (merged 2026-11-25)
+### Delete for replay captures
 
 - A capture's screen under RECORDINGS has a **Delete** row, and Y deletes the capture under the cursor in the Replay
   window. It is removed at once, without asking, as a macro is.
 - Macros, combos and drills already made from it stay. The game's own replay in the Vault is untouched.
 - More: [Recording › Recordings](menu/recording.md#recordings).
 
-#### The clip editor's marks name the form of a move (merged 2026-11-25)
+### The clip editor's marks name the form of a move
 
 - A move mark on the editor's timeline keeps which form of the move it was: the first, second or third jab, the
   rapid jab or its finisher, which aerial, grab or throw, and a side tilt or smash aimed up or down.
@@ -85,7 +70,7 @@ console.
   fighter's own names whoever Player 1 is.
 - More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
 
-#### Playback starts without reading the library (merged 2026-11-25)
+### Playback starts without reading the library
 
 - Play no longer reads the whole recording library before it starts. It reads the index, the file each side plays
   and its start save, and nothing while a macro plays. How long a start now takes has not been measured in a game.
@@ -96,7 +81,7 @@ console.
   what you hold instead of nothing. It is one frame at most, at the start.
 - More: [Playback delay](menu/recording.md#playback-delay).
 
-#### Guard the Edge and Juggler start from the floor you stand on (merged 2026-11-25)
+### Guard the Edge and Juggler start from the floor you stand on
 
 - Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with more than
   one piece of ground, such as the Training stage, stand on the piece you want and choose Start.
@@ -105,13 +90,13 @@ console.
 - When Start cannot begin the drill, the row returns to Start and a message explains why: "The stage could not
   be read", "Stand on the stage to start this drill" or "This floor has no ledge to guard". Before this change,
   the Training stage check left the menu showing Running even though neither drill began
-  ([Install evidence](EVIDENCE-rc15-installs.md#the-next-build)).
+  ([Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)).
 - In Juggler's setup, "Pick a point over the stage or beside it" means the CPU spot was refused. Stay on the
   CPU page, move the crosshair and press **A** again.
 - A start you set up is used again only on the floor it was made on.
 - More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
 
-#### Two Guard the Edge options (merged 2026-11-25)
+### Two Guard the Edge options
 
 - **Under the stage** (Off by default). On: the CPU's start can also be a point under the stage.
 - **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with its midair jumps already spent.
@@ -119,7 +104,7 @@ console.
   from under the stage is not established; whether a fighter's own moves give the jumps back is not known.
 - More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
 
-#### Eggs-ercise's off-stage zone follows the stage (merged 2026-11-25)
+### Eggs-ercise's off-stage zone follows the stage
 
 - Each zone lies beside a ledge of the stage's main floor that has open air next to it, so a stage can have two
   zones, one or none. The zone's outer edge stops where that open air ends. On the Training stage the one zone is
@@ -130,7 +115,7 @@ console.
   than 10 units can be missed.
 - More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise).
 
-#### A save's placement is changed with the crosshair (merged 2026-11-25)
+### A save's placement is changed with the crosshair
 
 - **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
   game: move the fighters with the crosshair. The five pages are Where, Spot, State, Percent and Preview.
@@ -149,9 +134,21 @@ console.
 - More: [Recording › Change placement](menu/recording.md#change-placement) and
   [the guide](guide/recording.md#change-placement-and-the-replay-window).
 
-### In work
+### Tested
 
-Nothing planned for this build is still in work.
+- **Installed:** yes, and read back. Only TrainingRooms' file changed on the card; the other 20 plugins are
+  byte-identical.
+- **Tested in Eden** (2026-11-25, on this exact build): one short smoke boot, with no crash. Nine of its ten checks
+  passed. Guard the Edge and Juggler opened their set-up on the Training stage. Guard the Edge was also checked from
+  the island and on Battlefield. Eggs-ercise had one off-stage zone in the Training stage's gap; the recording
+  picker's Off stage switch moved Player 1 beside the ledge; a take played on Player 1; and the clip editor opened
+  and previewed.
+- **It was a short check, not a play test.** Neither drill was played through, no placement was saved or loaded,
+  and most of the other new items were not touched. What ran and what did not:
+  [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build).
+- **The waiting room** was not run in that boot, because the test's own route failed. A second boot for it was
+  ordered and is under way; its result is not in yet.
+- **The operator reported:** nothing yet. The build has not been played on the console.
 
 ## Install 4
 
@@ -322,9 +319,8 @@ tool's, not TrainingRooms'.
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
-  took a second or more to start. A change for that wait is merged for the next build; it has not been timed in a
-  game. They also asked for placement changes and a Delete for replay captures; the Delete is merged for the next
-  build, and so is a new way to change placement.
+  took a second or more to start. Install 5 changes how Play starts; the start has not been timed in a game. They
+  also asked for placement changes and a Delete for replay captures; both are in install 5.
 
 ## Install 3
 

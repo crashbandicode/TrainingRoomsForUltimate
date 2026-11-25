@@ -7,16 +7,17 @@
 
 Current release: rc.15
 
-Status: **rc.15, whose newest build is install 4** (commit `a945b0c1`, installed on the project's test console on
+Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed on the project's test console on
 2026-11-25).
 
 - **Installed:** the file on the card was read back and matches the build.
-- **Tested in Eden, in part:** the final session checked drill grading, Trim, the clip editor and scroll-back in
-  Training on `a9131331`. The reset-chord and Load-after retests passed on `a945b0c1`. The Quick Play match tested
-  Online Deluxe's fonts, not TrainingRooms' waiting-room or Quick Play changes.
-- **On the console:** the operator reported on install 4 twice on 2026-11-25: the move names Jab 1 and Jab 2 are
-  fine, and playback took a second or more to start. These are reports of what they saw, not a list of
-  passes.
+- **Tested in Eden, in part:** a short smoke boot on this exact build ran with no crash. Guard the Edge and Juggler
+  opened their set-up on the Training stage, and Guard the Edge also from the island and on Battlefield. Eggs-ercise
+  had its off-stage zone, the recording picker's Off stage switch moved a fighter, a take played and the clip editor
+  previewed. Neither drill was played through, no placement was saved, the waiting room was not run, and most of
+  the build's other new items were not touched.
+- **On the console:** not played yet. Install 5 went on the card at 23:06 and no report is on record. The operator's
+  reports on the earlier builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -30,6 +31,7 @@ Open the menu (B + D-pad Up) and read the end of the key hints at the foot of th
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
+| `b7a382e4` | Install 5 | 2026-11-25 |
 | `a945b0c1` | Install 4 | 2026-11-25 |
 | `e7667f26` | Install 3 | 2026-11-24 |
 | `71158421` | Install 2 | 2026-11-24 |
@@ -41,8 +43,23 @@ More: [Getting started › Which build you have](guide/getting-started.md#which-
 
 ## What's new in rc.15
 
-Install 4 (2026-11-25), in short. The full list, and installs 1 to 3, are in the
-[rc.15 release notes](RELEASE-NOTES-rc15.md).
+Install 5 (2026-11-25), in short. The full list, and installs 1 to 4, are in the
+[rc.15 release notes](RELEASE-NOTES-rc15.md#install-5).
+
+- **Record works while an AI plays Player 1.**
+  [When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1)
+- **Delete for replay captures.** [Recordings](menu/recording.md#recordings)
+- **Play starts without reading the whole library,** and has a Playback delay option.
+  [Playback delay](menu/recording.md#playback-delay)
+- **Change placement:** move where a save state puts the fighters, with the crosshair, on the save itself.
+  [Change placement](menu/recording.md#change-placement)
+- **Guard the Edge and Juggler start from the floor you stand on,** and Guard the Edge has two new options.
+  [Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler)
+- **Eggs-ercise's off-stage zone follows the stage.** [Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise)
+- **B stops a preview,** the pop-up shows its chords, the editor's marks name the form of a move, and grabs, throws
+  and edge attacks are named in combo files. [rc.15 release notes](RELEASE-NOTES-rc15.md#install-5)
+
+From install 4 (2026-11-25):
 
 - **Drills and combos read moves the same way for every fighter.** A step is one action: its release, hold, special
   directions and travel belong to it. [How a combo is graded](guide/recording.md#how-a-combo-is-graded)
@@ -76,9 +93,11 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Playback is slow to start.** Playback took a second or more to start (the operator's report on install 4). A
-  change for that wait is merged for the next build; it has not been timed in a game.
-- **Not covered by the final Eden session:** the editor in the waiting room; the Quick Play practice pick, new pick
+- **Install 5 has not been played on the console.** Its Eden check was one short smoke boot:
+  [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
+- **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
+  starts; the start has not been timed in a game.
+- **Not covered by install 4's final Eden session, nor by install 5's smoke boot:** the editor in the waiting room; the Quick Play practice pick, new pick
   and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
   attacks; the Trim setting's migration; and the CPU's playback indicator.
   [Install evidence](EVIDENCE-rc15-installs.md#install-4-a945b0c1)
