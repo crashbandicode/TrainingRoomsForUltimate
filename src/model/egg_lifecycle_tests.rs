@@ -344,7 +344,7 @@ fn training_offstage_draws_and_counts_each_path_on_the_real_recovery_side() {
         outline.add([corners[index], corners[(index + 1) % corners.len()]]);
     }
     let stage = Stage::new(308, [-589.9998, 500.0, 360.00015, -137.85207],
-                           [corners[0], corners[1]], outline).unwrap();
+                           [corners[0], corners[1]], outline, [Some(-589.9998), Some(500.0)], &[]).unwrap();
     let zone = stage.resolve(None);
     let clear = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
     for path in [1, 2, 4, 8, 16, 31] {
@@ -378,7 +378,8 @@ fn offstage_spawns_without_view_and_sweeps_motion_in_its_original_side() {
     for index in 0..hull.len() {
         outline.add([hull[index], hull[(index + 1) % hull.len()]]);
     }
-    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline).unwrap();
+    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline,
+        [Some(-145.0), Some(140.0)], &[]).unwrap();
     let zone = stage.resolve(None);
     let clearance = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
 
@@ -727,7 +728,8 @@ fn off_stage_galaxian(p1: [f32; 2]) -> Run {
     for index in 0..hull.len() {
         outline.add([hull[index], hull[(index + 1) % hull.len()]]);
     }
-    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline).unwrap();
+    let stage = Stage::new(0, [-145.0, 140.0, 125.0, -100.0], [hull[0], hull[1]], outline,
+        [Some(-145.0), Some(140.0)], &[]).unwrap();
     let zone = stage.resolve(Some([64, 0, 220, 173]));
     let clearance = |zone: &Zone, side, from, to| stage.allows_move(zone, side, from, to);
     let mut run = Run::IDLE;
