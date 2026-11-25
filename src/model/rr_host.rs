@@ -1688,7 +1688,8 @@ fn copy_placed(root: &Path, saves: &Store<NamedSave>, placed: &NamedSave, relink
     if let Some(recording) = relink {
         let macros = Library::new(root.join(MACROS_DIR));
         let linked = macros.load(recording).ok().and_then(|mut file| {
-            file.set_start_save(Some(&id)).ok()?;
+            // Relink the store-issued id without enabling a standalone start the chain's first macro had disabled.
+            file.start_save = Some(id.clone());
             macros.overwrite(recording, &file).ok()
         });
         if linked.is_none() {
