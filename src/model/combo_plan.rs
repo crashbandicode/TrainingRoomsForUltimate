@@ -35,11 +35,11 @@ pub fn verdict_text(verdict: Verdict) -> Text {
 pub fn event_label(kind: Kind) -> &'static str {
     match kind {
         Kind::Press(button) => button_name(button),
-        Kind::Release(Button::Attack) => "Attack release",
-        Kind::Release(Button::Special) => "Special release",
-        Kind::Release(Button::Jump) => "Jump release",
-        Kind::Release(Button::Shield) => "Shield release",
-        Kind::Release(Button::Grab) => "Grab release",
+        Kind::Release(Button::Attack) | Kind::LetGo(Button::Attack) => "Attack release",
+        Kind::Release(Button::Special) | Kind::LetGo(Button::Special) => "Special release",
+        Kind::Release(Button::Jump) | Kind::LetGo(Button::Jump) => "Jump release",
+        Kind::Release(Button::Shield) | Kind::LetGo(Button::Shield) => "Shield release",
+        Kind::Release(Button::Grab) | Kind::LetGo(Button::Grab) => "Grab release",
         Kind::CStick => "C-stick",
         Kind::Flick(Flick::FastFall) => "fast-fall",
         Kind::Flick(Flick::Dash) => "dash",

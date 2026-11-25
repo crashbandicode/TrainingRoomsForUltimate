@@ -60,6 +60,8 @@ pub struct Late {
     /// An action opened or a side attack's angle changed: the originating press (`None` if unseen) and the angle
     /// (`Some(None)` for a level side attack).
     pub open: Option<(Option<u32>, Option<Option<Angle>>)>,
+    /// A status change and the origin of the action whose status changed.
+    pub turned: Option<Option<u32>>,
     /// The part that ended on this frame and its measured travel. Part 0 is the special's own travel.
     pub travel: Option<(u8, Travel)>,
     /// With part 0: the press that began that special.
@@ -67,7 +69,7 @@ pub struct Late {
 }
 
 impl Late {
-    pub const NONE: Late = Late { open: None, travel: None, press: 0 };
+    pub const NONE: Late = Late { open: None, turned: None, travel: None, press: 0 };
 }
 
 /// Facing-relative entry velocity, in 1/256 game units per unstopped frame. Unknown is distinct from standing still.

@@ -98,7 +98,7 @@ fn take_posted_name(name: &mut Short) {
     }
 }
 
-fn settings() -> Settings {
+pub(super) fn settings() -> Settings {
     published::live().map_or(Settings::factory(), |live| live.combo)
 }
 

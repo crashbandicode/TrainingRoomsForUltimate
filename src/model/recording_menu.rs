@@ -2315,7 +2315,7 @@ fn event_token(event: super::combo::Event) -> String {
         Kind::Press(Button::Special) => with_dir(event.dir, "B"),
         Kind::Press(Button::Shield) => "shield".to_string(),
         Kind::Press(Button::Grab) => "grab".to_string(),
-        Kind::Release(_) => "release".to_string(),
+        Kind::Release(_) | Kind::LetGo(_) => "release".to_string(),
         Kind::CStick => with_dir(event.dir, "c-stick"),
         Kind::Flick(Flick::FastFall) => with_dir(event.dir, "flick"),
         Kind::Flick(Flick::Dash) => with_dir(event.dir, "dash"),

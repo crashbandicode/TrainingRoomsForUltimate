@@ -130,7 +130,12 @@ fn an_active_special_can_still_supply_a_nonfinal_steps_aim() {
 
 #[test]
 fn waiting_for_direction_does_not_extend_a_button_deadline() {
-    let target = captured(Some(4), Some(0), true, false, true);
+    let mut target = captured(Some(4), Some(0), true, false, true);
+    for link in target.links[..target.len].iter_mut().flatten() {
+        for event in link.events.iter_mut().flatten() {
+            if let Kind::Release(button) = event.kind { event.kind = Kind::LetGo(button); }
+        }
+    }
     let mut helper = Helper::new();
     helper.set_target(Some(target));
     for frame in 0..=17 {

@@ -230,7 +230,7 @@ fn begin_input(mode: u8) {
     INPUT_MODE.fetch_and(!mode, Ordering::AcqRel); INPUT_POLLS[at].store(0, Ordering::Release);
     INPUT_EPOCH[at].fetch_add(1, Ordering::AcqRel); INPUT_MODE.fetch_or(mode, Ordering::Release);
 }
-pub fn observe_input(snap: Snap, late: Late, contact: bool) {
+pub fn observe_input(snap: Snap, late: Late, window: u8, contact: bool) {
     if !input_observation_wanted() { return; }
     let mut state = INPUT_STATE.lock();
     for (at, take) in state.iter_mut().enumerate() {
@@ -238,7 +238,7 @@ pub fn observe_input(snap: Snap, late: Late, contact: bool) {
         let epoch = INPUT_EPOCH[at].load(Ordering::Acquire); let polls = INPUT_POLLS[at].load(Ordering::Acquire);
         if polls == 0 { continue; }
         if take.epoch != epoch { *take = InputTake { epoch, ..InputTake::EMPTY }; }
-        if take.polls != polls { take.capture.step_late(snap, late); take.polls = polls; }
+        if take.polls != polls { take.capture.set_window(window); take.capture.step_late(snap, late); take.polls = polls; }
         take.contact |= contact; INPUT_RESULT[at].write(*take);
     }
 }
@@ -2645,6 +2645,33 @@ mod tests {
         dir
     }
 
+    #[test]
+    fn the_recording_host_passes_its_selected_reaction_window() {
+        use crate::model::combo::Kind;
+        use crate::model::frame_strip::Button;
+        let _hold = hold();
+        for (delay, window, expected) in [
+            (1, 0, Kind::Release(Button::Attack)), (1, 1, Kind::LetGo(Button::Attack)),
+            (2, 1, Kind::Release(Button::Attack)), (2, 2, Kind::LetGo(Button::Attack)),
+        ] {
+            reset_host();
+            CAP_ROLE.store(ROLE_PLAYER, Ordering::Release);
+            begin_input(2);
+            for frame in 1..=6 {
+                let mut mapped = MappedInputs { buttons: if frame < 3 { 1 } else { 0 }, ..MappedInputs::NEUTRAL };
+                unsafe { on_player_poll(&mut mapped); }
+                let late = if frame == 3 + delay { Late { turned: Some(Some(1)), ..Late::NONE } }
+                    else { Late::NONE };
+                observe_input(Snap { buttons: mapped.buttons, ..Snap::empty(frame) }, late, window, false);
+            }
+            let take = converted_input(2).unwrap();
+            let release = take.capture.combo.links().flat_map(crate::model::combo::LinkRec::events)
+                .find(|event| matches!(event.kind, Kind::Release(_) | Kind::LetGo(_))).unwrap();
+            assert_eq!(release.kind, expected, "delay {delay}, window {window}");
+        }
+        reset_host();
+    }
+
     fn state(kind: i32) -> SavedState {
         let mut state = SavedState::never_saved();
         state.fighter_kind = kind;
@@ -4691,7 +4718,7 @@ mod tests {
         assert_eq!(input.buttons,3);
         // A completed poll is acknowledged by the guarded fighter observation before the worker converts it.
         let pending=service_at(&root,&none(),"2026-11-15",state(8),state(7)); assert!(pending.diags.iter().all(|l| !l.contains("saved=")));
-        observe_input(Snap { buttons:input.buttons, facing:-1, ..Snap::empty(1) },Late::NONE,false);
+        observe_input(Snap { buttons:input.buttons, facing:-1, ..Snap::empty(1) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         set_strip_sample((4,Some(sample_combo()), CaptureOwner::UNKNOWN));
         let done=service_at(&root,&none(),"2026-11-15",state(8),state(7));
         assert!(!done.notices.contains(&EMPTY_COMBO));
@@ -4704,7 +4731,7 @@ mod tests {
     fn a_direct_drill_keeps_its_take_as_a_macro_without_a_save_or_role_change() {
         let _hold=hold(); reset_host(); let root=scratch("direct-drill"); set_record_role(Role::Cpu); set_record_trim(false);
         post_effect(Effect::RecordDrill); note_record_start(RecordStart { poses:[pose(0,0.0,1.0),pose(7,5.0,-1.0)], speeds:[(0.0,0.0);2] }); on_chords(true,false,false); assert_eq!(capture_role(),ROLE_PLAYER);
-        for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },Late::NONE,false); }
+        for (f,b) in [1,0].into_iter().enumerate() { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:b, facing:1,..Snap::empty(f as u32+1) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false); }
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7)); set_record_trim(true);
         let id=take_saved_drill().unwrap(); assert!(take_saved_drill().is_none());
         assert_eq!(RecordingIndex::load(&root).unwrap().drill().unwrap().id,id);
@@ -4737,7 +4764,7 @@ mod tests {
         for (f, b) in [1, 0].into_iter().enumerate() {
             let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
             unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, false);
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
@@ -4913,7 +4940,7 @@ mod tests {
         for (f, b) in [1, 0].into_iter().enumerate() {
             let mut input = MappedInputs { buttons: b, ..MappedInputs::NEUTRAL };
             unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, false);
+            observe_input(Snap { buttons: b, facing: 1, ..Snap::empty(f as u32 + 1) }, Late::NONE, crate::model::combo::Settings::factory().tolerance, false);
         }
         on_chords(true, false, false);
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
@@ -4944,14 +4971,14 @@ mod tests {
         for b in [4,0] { let mut input=MappedInputs { buttons:b,..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); } }
         post_effect(Effect::MakeCombo { source:source.clone(),chain:false });
         service_at(&root,&none(),"2026-11-15",state(8),state(7));
-        let mut input=MappedInputs::NEUTRAL; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:input.buttons,facing:1,..Snap::empty(3) },Late::NONE,false);
+        let mut input=MappedInputs::NEUTRAL; unsafe { on_player_poll(&mut input); } observe_input(Snap { buttons:input.buttons,facing:1,..Snap::empty(3) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7));
         let lib=Library::new(root.join(MACROS_DIR)); let saved=lib.list().unwrap().entries.into_iter().find(|e| e.id!=source).unwrap();
         assert_eq!(lib.load(&saved.id).unwrap().frames.iter().map(|f|f.buttons).collect::<Vec<_>>(),vec![4,0,3]);
         assert_eq!(ComboLibrary::new(root.join("combos")).list().unwrap().entries.len(),1);
         reset_host(); post_effect(Effect::RecordDrill); on_chords(true,false,false);
         let mut mapped=MappedInputs { buttons:crate::model::frame_strip::CSTICK_ON,lstick_x:127,rstick_x:127,..MappedInputs::NEUTRAL };
-        unsafe { on_player_poll(&mut mapped); } observe_input(Snap { buttons:mapped.buttons,rstick_x:127,facing:1,..Snap::empty(10) },Late::NONE,false);
+        unsafe { on_player_poll(&mut mapped); } observe_input(Snap { buttons:mapped.buttons,rstick_x:127,facing:1,..Snap::empty(10) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         on_chords(true,false,false); service_at(&root,&none(),"2026-11-15",state(8),state(7));
         let drill=ComboLibrary::new(root.join("combos")).load(&take_saved_drill().unwrap()).unwrap();
         let events=drill.combo.get(0).unwrap().events().collect::<Vec<_>>(); assert_eq!(events.len(),1); assert_eq!(events[0].kind,crate::model::combo::Kind::CStick);
@@ -4964,7 +4991,7 @@ mod tests {
         post_effect(Effect::RecordDrill); on_chords(true,false,false);
         for f in 0..=crate::model::combo::LINKS*crate::model::combo::STEPS {
             let mut input=MappedInputs { buttons:if f%2==0 {1} else {0},..MappedInputs::NEUTRAL }; unsafe { on_player_poll(&mut input); }
-            observe_input(Snap { buttons:input.buttons, facing:1,..Snap::empty(f as u32) },Late::NONE,false);
+            observe_input(Snap { buttons:input.buttons, facing:1,..Snap::empty(f as u32) },Late::NONE,crate::model::combo::Settings::factory().tolerance,false);
         }
         on_chords(true,false,false); let done=service_at(&root,&none(),"2026-11-15",state(8),state(7)); assert!(done.notices.contains(&DRILL_CAPACITY));
         assert!(ComboLibrary::new(root.join("combos")).list().unwrap().entries.is_empty()); assert!(!input_observation_wanted());
