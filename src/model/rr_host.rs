@@ -2624,9 +2624,9 @@ fn read_held(root: &Path, sources: [Option<String>; 2], roles: [bool; 2]) -> Res
                 recordings.insert(id.to_owned(), recording);
             } else if let Ok(chain) = chain_store.load(id) {
                 for step in &chain.recordings {
-                    if !recordings.contains_key(step) {
+                    if let std::collections::btree_map::Entry::Vacant(entry) = recordings.entry(step.clone()) {
                         if let Ok(recording) = library.load(step) {
-                            recordings.insert(step.clone(), recording);
+                            entry.insert(recording);
                         }
                     }
                 }
@@ -2644,11 +2644,10 @@ fn read_held(root: &Path, sources: [Option<String>; 2], roles: [bool; 2]) -> Res
     let mut seen = BTreeSet::new();
     for first in firsts {
         let Some(save) = recordings.get(&first).and_then(|recording| recording.start_save.as_deref()) else { continue };
-        if seen.insert(save.to_owned()) {
-            if let Ok(named) = save_store.load(save) {
-                book.add_save(save);
-                saves.push((save.to_owned(), named));
-            }
+        if !seen.insert(save.to_owned()) { continue; }
+        if let Ok(named) = save_store.load(save) {
+            book.add_save(save);
+            saves.push((save.to_owned(), named));
         }
     }
     for (id, recording) in recordings { book.add_recording(id, recording); }
@@ -2658,7 +2657,7 @@ fn read_held(root: &Path, sources: [Option<String>; 2], roles: [bool; 2]) -> Res
 
 /// Reload on a start, a root or mod-write generation change, or when no value is held.
 fn held_needs_read(held: Option<&HeldBook>, root: &Path, starts: [bool; 2]) -> bool {
-    held.is_none_or(|held| held.root != root || held.version != recording_version() || starts.into_iter().any(|start| start))
+    held.is_none_or(|held| held.root != root || held.version != recording_version() || starts[0] || starts[1])
 }
 
 fn load_book(root: &Path) -> Result<Book, ()> {

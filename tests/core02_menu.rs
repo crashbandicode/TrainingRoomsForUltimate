@@ -251,7 +251,7 @@ fn layout_row_counts_match_the_rc_freeze() {
     // rc15/mashout-grid-picker: Mash out's State, Attacker move and Grab type are one picker row (146 → 144).
     // Eggs spawn area adds one existing-group setting row (144 → 145).
     // Spacing grader adds one Display & Controls row (145 → 146).
-    assert_eq!(ROWS.len(), 171);
+    assert_eq!(ROWS.len(), 172);
     for editor in [Editor::SetupSave, Editor::SetupSaveHere, Editor::SetupLibrary, Editor::EditPlacement, Editor::ReplayWindow] {
         assert_eq!(ROWS.iter().filter(|r| matches!(r.control, Control::Editor(e) if e == editor)).count(), 1, "{editor:?}");
     }
