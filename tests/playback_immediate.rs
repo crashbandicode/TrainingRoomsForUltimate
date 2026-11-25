@@ -173,6 +173,24 @@ fn a_play_pass_reads_nothing_from_the_card() {
 }
 
 #[test]
+fn first_play_after_an_idle_worker_pass_has_no_card_reads() {
+    let _guard = HostGuard::new();
+    let f = session(true);
+    tick(&f.root);
+    let before = counts();
+    chord(Role::Player);
+    let start = tick(&f.root);
+    assert_eq!(start.warp.as_deref(), Some(f.save.as_str()));
+    assert_eq!(start.warp_pair, Some(f.pair));
+    assert_eq!(difference(before, counts()), (0, 0));
+    host::warp_landed();
+    let before = counts();
+    tick(&f.root);
+    assert_eq!(difference(before, counts()), (0, 0));
+    assert_eq!(poll(Role::Player).map(|frame| frame.buttons), Some(1));
+}
+
+#[test]
 fn a_playing_run_reads_nothing_from_the_card_per_pass() {
     let _guard = HostGuard::new();
     let f = session(false);

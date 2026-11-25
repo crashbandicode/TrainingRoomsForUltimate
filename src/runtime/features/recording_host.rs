@@ -249,6 +249,7 @@ pub fn service() {
     }
     sync_bound(root);
     sync_slots(root);
+    rr_host::warm_book(root);
     if !rr_host::pending() {
         return;
     }

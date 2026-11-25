@@ -1361,15 +1361,9 @@ pub fn service_at(
         || playing()
         || PARRY_PASSES.load(Ordering::Acquire) > 0
         || waiting_work();
-    if !busy {
-        return tick;
-    }
     let mut cached = lock(&BOOK);
-    let version = recording_version();
-    if cached.as_ref().is_none_or(|cache| cache.root.as_path() != root || cache.version != version) {
-        *cached = None;
-        *cached = load_cached_book(root, version).ok();
-    }
+    refresh_cached_book(root, &mut cached);
+    if !busy { return tick; }
     let Some(cache) = cached.as_mut() else {
         // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
         retire_preview_run();
@@ -2653,6 +2647,18 @@ fn load_cached_book(root: &Path, version: (u64, u64)) -> Result<CachedBook, ()> 
         store.load(save_id).ok().map(|save| (save_id.to_owned(), save))
     });
     Ok(CachedBook { root: root.to_path_buf(), version, book, saves })
+}
+
+fn refresh_cached_book(root: &Path, cached: &mut Option<CachedBook>) {
+    let version = recording_version();
+    if cached.as_ref().is_none_or(|cache| cache.root.as_path() != root || cache.version != version) {
+        *cached = None;
+        *cached = load_cached_book(root, version).ok();
+    }
+}
+
+pub fn warm_book(root: &Path) {
+    refresh_cached_book(root, &mut lock(&BOOK));
 }
 
 fn taken_frames() -> (Role, Vec<InputFrame>) {
