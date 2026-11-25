@@ -281,6 +281,18 @@ fn place_commit(root: &Path) {
 /// Change placement: hand the save the worker read to the placement picker, as the picker shows a save.
 fn place_open(open: &rr_host::PlaceOpen) {
     use crate::model::record_place::{saved_fighter, Who};
+    // As the Recording panels: both practice fighters are there, and no record, playback or load is in progress.
+    let wait = if !crate::runtime::ui::facts::fact_practice_enabled() || !crate::runtime::ui::facts::fact_fighters_present() {
+        Some("Wait for both practice fighters")
+    } else if crate::runtime::lobby::training::recording_or_playback() || crate::runtime::macros::save_states::is_loading() {
+        Some("Finish the current practice action first")
+    } else {
+        None
+    };
+    if let Some(text) = wait {
+        super::notices::upsert(NOTICE_ID, "Change placement", text, 240, NOTICE_COLOR);
+        return;
+    }
     let [p1, cpu] = [saved_fighter(&open.pair[0]), saved_fighter(&open.pair[1])];
     super::record_place::open_save(super::record_place::SaveOpen {
         ticket: 0,

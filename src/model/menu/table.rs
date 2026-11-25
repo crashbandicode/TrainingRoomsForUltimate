@@ -384,8 +384,8 @@ pub static ROWS: [Row; 171] = [
     // Recording > Replays. The library groups above have no rows (revision 8.2).
     r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
       "On: a replay, macro, chain or combo drill on another fighter\nasks first. Off: the fighter you have stays, without asking."),
-    r(REPLAYS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
-      "Moves where the active macro starts after its warp,\nfor the side the Recording pop-up is set to."),
+    r(REPLAYS, "Change placement", "", Control::Editor(Editor::EditPlacement),
+      "Places both fighters of the active macro's start save\non the live game, for the side of the Recording pop-up."),
     r(REPLAYS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
       "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(REPLAYS, "Replay capture", "", Control::ReplayCapture,
