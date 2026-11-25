@@ -440,21 +440,24 @@ pub unsafe fn sample_frame(player: usize) {
     let cpu = sample(cpu, &ids, order[0] == 1, spots);
     let watched = if take != 0 {
         let fed = rr_host::captured_frames();
-        (fed > 0).then(|| (rr_host::CAPTURE_RUN, fed - 1, if take == 1 { &p1 } else { &cpu }))
+        (fed > 0).then(|| (rr_host::CAPTURE_RUN, fed - 1, if take == 1 { (&p1, player) } else { (&cpu, cpu_accessor) }))
     } else if let Some(role) = preview {
         rr_host::fed_run(role).and_then(|(run, fed)| {
-            (fed > 0).then(|| (run, fed - 1, if role == Role::Player { &p1 } else { &cpu }))
+            (fed > 0).then(|| (run, fed - 1, if role == Role::Player { (&p1, player) } else { (&cpu, cpu_accessor) }))
         })
     } else {
         None
     };
-    if let Some((run, index, s)) = watched {
+    if let Some((run, index, (s, accessor))) = watched {
+        let mv = ids.attack(s.status).or(ids.named_move(s.status));
         rr_host::watch_feed(run, index, crate::engine::macro_ui::clip_marks::Seen {
             busy: !s.actionable && !s.hitstun && !s.shieldstun,
-            mv: ids.attack(s.status).or(ids.named_move(s.status)),
+            mv,
             status: s.status,
             motion_frame: s.motion_frame,
             stop: s.stop,
+            // SAFETY: `accessor` is the watched fighter's live accessor of this frame.
+            motion: crate::engine::macro_ui::clip_marks::watched_motion(s.motion, mv.is_some(), || unsafe { p1_motion(accessor) }),
         });
     }
     if !sampling && !input_drill {

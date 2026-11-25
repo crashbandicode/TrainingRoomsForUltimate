@@ -196,6 +196,7 @@ impl CaptureArchive {
                 frames.push(frame);
             }
             tracks.push(ReplayTrack {
+                fighter: track_header.recorded_fighter,
                 entry: track_header.entry,
                 frames,
                 quantized_analog: track_header.quantized_analog,
@@ -295,6 +296,7 @@ impl CaptureArchive {
                     entry: track.entry,
                     frames: track.frames.len() as u32,
                     quantized_analog: track.quantized_analog,
+                    recorded_fighter: track.fighter,
                 })
                 .collect(),
         };
@@ -411,6 +413,9 @@ struct TrackHeader {
     entry: i32,
     frames: u32,
     quantized_analog: bool,
+    /// The entry's fighter identity, in a combo file's key; absent in a capture written before it was read.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::model::combo_record::fighter_key")]
+    recorded_fighter: Option<crate::model::move_names::FighterId>,
 }
 
 #[derive(Deserialize)]
@@ -921,11 +926,13 @@ mod tests {
         ReplaySession {
             tracks: vec![
                 ReplayTrack {
+                    fighter: None,
                     entry: 3,
                     frames: vec![first, second],
                     quantized_analog: true,
                 },
                 ReplayTrack {
+                    fighter: None,
                     entry: 0,
                     frames: vec![first],
                     quantized_analog: false,
@@ -1199,8 +1206,8 @@ mod tests {
             start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,
         };
         ReplaySession { tracks: vec![
-            ReplayTrack { entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },
-            ReplayTrack { entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },
+            ReplayTrack { fighter: None, entry: 0, frames: vec![frame(1, 7), frame(2, 7)], quantized_analog: false },
+            ReplayTrack { fighter: None, entry: 1, frames: vec![frame(101, 8), frame(102, 8)], quantized_analog: false },
         ], truncated: false, breaks: Vec::new() }
     }
 
@@ -1243,6 +1250,7 @@ mod tests {
             game_version: "13.0.5".into(), miis: None, truncated: false, breaks: Vec::new(),
             tracks: session.tracks.iter().map(|track| TrackHeader {
                 entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,
+                recorded_fighter: track.fighter,
             }).collect() };
         let staged = write_capture_temp(&temp.0, &id, &serde_json::to_vec(&header).unwrap(), &session).unwrap();
         assert!(archive.list().unwrap().entries.is_empty());
