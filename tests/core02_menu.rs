@@ -480,9 +480,9 @@ fn core02_slider_states() {
         other => panic!("{other:?}"),
     };
     assert_eq!(state(&m), SliderState::LowerHover);
-    m.press(Button::Right);
-    assert_eq!(state(&m), SliderState::UpperHover, "Left / Right switch the hovered handle");
-    m.press(Button::Left);
+    m.press(Button::Down);
+    assert_eq!(state(&m), SliderState::UpperHover, "Up / Down switch the hovered handle");
+    m.press(Button::Up);
     assert_eq!(state(&m), SliderState::LowerHover);
     m.press(Button::A);
     assert_eq!(state(&m), SliderState::LowerSelected);
@@ -501,31 +501,31 @@ fn core02_slider_clamp_steps() {
     goto(&mut m, "save_damage_limits_player");
     m.press(Button::A);
     m.press(Button::A); // lower selected
-    // Raising the lower handle: +1 slow, +10 fast, never past the upper handle.
-    press(&mut m, &[Button::Right]);
-    assert_eq!(get(&m, "save_damage_limits_player"), [1, 150]);
+    // A tap moves half a percent.
     press(&mut m, &[Button::Up]);
-    assert_eq!(get(&m, "save_damage_limits_player"), [11, 150]);
+    assert_eq!(get(&m, "save_damage_limits_player"), [0, 150, 1, 0]);
+    press(&mut m, &[Button::Up]);
+    assert_eq!(get(&m, "save_damage_limits_player"), [1, 150]);
     press(&mut m, &[Button::Down, Button::Down]);
     assert_eq!(get(&m, "save_damage_limits_player"), [0, 150], "clamped at the minimum");
     // Lower the upper handle to zero, then check its cap.
-    press(&mut m, &[Button::A, Button::Right, Button::A]);
-    for _ in 0..15 {
+    press(&mut m, &[Button::A, Button::Down, Button::A]);
+    for _ in 0..300 {
         m.press(Button::Down);
     }
     assert_eq!(get(&m, "save_damage_limits_player"), [0, 0], "the upper handle stops at the lower one");
-    for _ in 0..26 {
+    for _ in 0..510 {
         m.press(Button::Up);
     }
     assert_eq!(get(&m, "save_damage_limits_player"), [0, 255], "and at the maximum");
-    m.press(Button::Left);
-    assert_eq!(get(&m, "save_damage_limits_player"), [0, 254]);
+    m.press(Button::Down);
+    assert_eq!(get(&m, "save_damage_limits_player"), [0, 254, 0, 1]);
     // Lower handle again: it cannot pass the upper one.
-    press(&mut m, &[Button::A, Button::Left, Button::A]);
-    for _ in 0..26 {
+    press(&mut m, &[Button::A, Button::Up, Button::A]);
+    for _ in 0..510 {
         m.press(Button::Up);
     }
-    assert_eq!(get(&m, "save_damage_limits_player"), [254, 254]);
+    assert_eq!(get(&m, "save_damage_limits_player"), [254, 254, 1, 1]);
 }
 
 #[test]
@@ -537,28 +537,29 @@ fn ice114_damage_cap_menu_and_commit() {
     let mut m = menu();
     set(&mut m, "save_damage_player", &[0, 0, 1]);
     let row_index = goto(&mut m, row);
-    press(&mut m, &[Button::A, Button::Right, Button::A]);
-    for _ in 0..10 {
+    press(&mut m, &[Button::A, Button::Down, Button::A]);
+    for _ in 0..208 {
         m.press(Button::Up);
-    }
-    for _ in 0..4 {
-        m.press(Button::Right);
     }
     let mut frame = Frame::new();
     frame_of(&m, &mut frame, |_| "");
     assert_eq!(frame.rows[1].value.string_lossy(), "254%");
-    press(&mut m, &[Button::Right, Button::Right, Button::Up]);
+    m.press(Button::Up);
+    frame_of(&m, &mut frame, |_| "");
+    assert_eq!(frame.rows[1].value.string_lossy(), "254.5%");
+    press(&mut m, &[Button::Up, Button::Up]);
     frame_of(&m, &mut frame, |_| "");
     assert_eq!(frame.rows[1].value.string_lossy(), "255%");
 
-    press(&mut m, &[Button::A, Button::Left, Button::A]);
-    for _ in 0..26 {
+    press(&mut m, &[Button::A, Button::Up, Button::A]);
+    for _ in 0..510 {
         m.press(Button::Up);
     }
     frame_of(&m, &mut frame, |_| "");
     assert_eq!(frame.rows[0].value.string_lossy(), "255%");
     press(&mut m, &[Button::B, Button::B]);
-    assert_eq!(m.value(row_index), RowValue::Slider { lower: 255, upper: 255 });
+    let RowValue::Slider { lower, upper } = m.value(row_index) else { panic!("slider"); };
+    assert_eq!((u32::from(lower), u32::from(upper)), (510, 510));
 
     m.save_defaults();
     press(&mut m, &[Button::A, Button::A, Button::Down, Button::B, Button::B]);
@@ -572,10 +573,11 @@ fn ice114_damage_cap_menu_and_commit() {
 
     set(&mut m, "save_damage_cpu", &[0, 0, 1]);
     let cpu = goto(&mut m, "save_damage_limits_cpu");
-    press(&mut m, &[Button::A, Button::Right, Button::A, Button::Right, Button::Up]);
+    press(&mut m, &[Button::A, Button::Down, Button::A, Button::Up]);
     frame_of(&m, &mut frame, |_| "");
     assert_eq!(frame.rows[1].value.string_lossy(), "150%");
-    assert_eq!(m.value(cpu), RowValue::Slider { lower: 0, upper: 150 });
+    let RowValue::Slider { lower, upper } = m.value(cpu) else { panic!("slider"); };
+    assert_eq!((u32::from(lower), u32::from(upper)), (0, 300));
 }
 
 // ---- greyed rows ---------------------------------------------------------------------------------
