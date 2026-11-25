@@ -2,6 +2,7 @@ use super::btt;
 use super::chords::logical;
 use super::cpu::ids::C;
 use super::crosshair::{Crosshair, Marks};
+use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
 use super::state::record::StartState;
 
@@ -404,6 +405,7 @@ pub struct Wizard {
     ledge: [bool; 2],
     home: Option<[f32; 2]>,
     cross: Crosshair,
+    hop: floor_hop::Hop,
     was: u16,
     repeat: u8,
 }
@@ -412,7 +414,7 @@ impl Wizard {
     pub fn new(defaults: Setup, remembered: Option<Setup>) -> Self {
         let setup = remembered.unwrap_or(defaults);
         Self { page: Page::Where, edit: Who::P1, setup, defaults, mode: Mode::Record, ledge: [false; 2], home: None,
-            cross: Crosshair::new(setup[0].at), was: 0, repeat: 0 }
+            cross: Crosshair::new(setup[0].at), hop: floor_hop::Hop::new(), was: 0, repeat: 0 }
     }
 
     /// Opened on a save state: its spots are the defaults (X puts them back). `ledge`: saved hanging on a ledge.
@@ -429,34 +431,32 @@ impl Wizard {
         self.mode
     }
 
-    /// Which fighters differ from what the wizard opened with, by value: the place or the spot. A fighter moved and
-    /// brought back, or reset with X, is not edited.
+    /// Which fighters differ from what the wizard opened with, by value. A fighter moved and brought back, or reset
+    /// with X, is not edited.
     pub fn edited(&self) -> [bool; 2] {
-        [0, 1].map(|i| self.setup[i].place != self.defaults[i].place || self.setup[i].at != self.defaults[i].at)
+        self.edits().map(Edits::any)
     }
 
     /// What differs, field by field: a save is rewritten only in these.
     pub fn edits(&self) -> [Edits; 2] {
-        [Edits::default(); 2]
+        [0, 1].map(|i| {
+            let (now, was) = (self.setup[i], self.defaults[i]);
+            Edits {
+                spot: now.place != was.place || now.at != was.at,
+                state: now.state != was.state,
+                percent: now.percent != was.percent,
+            }
+        })
     }
 
-    /// `step` with the traced floor lines of the stage (Tech practice's surface walk). With floors, an on-stage
-    /// fighter rides them: Left / Right along its floor, Up / Down to the floor above or below. Without (the walk is
-    /// not finished), the fighter stands on the floor under a free crosshair.
-    pub fn step_on(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
-        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, floors: &[super::floor_hop::Floor]) -> Outcome
-    {
-        let _ = floors;
-        self.step(pad, fit, floor)
-    }
-
-    /// A fighter saved hanging on a ledge reads so until it is edited.
+    /// A fighter saved hanging on a ledge reads so until its place or spot is edited.
     fn on_ledge(&self, i: usize) -> bool {
-        self.ledge[i] && !self.edited()[i]
+        self.ledge[i] && !self.edits()[i].spot
     }
 
     /// On stage / off stage for the edited fighter. Off: the spot stays. On: the floor under it, else `home`, else
-    /// nothing changes. A Record start cannot keep a state of the other place; a save's state is the worker's rule.
+    /// nothing changes. A Record start begins Standard at the new place. A save keeps its state unless that state
+    /// cannot exist there (a missed tech or a trip in the air; a tumble, helpless or footstool start on a floor).
     fn toggle_place(&mut self, at: [f32; 2], floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, home: Option<[f32; 2]>) {
         let fighter = &mut self.setup[self.edit.index()];
         let (place, at) = match fighter.place {
@@ -467,7 +467,8 @@ impl Wizard {
             },
         };
         (fighter.place, fighter.at) = (place, at);
-        if self.mode == Mode::Record {
+        let impossible = fighter.state.grounded().is_some_and(|grounded| grounded != (place == Place::OnStage));
+        if self.mode == Mode::Record || impossible {
             fighter.state = StartState::Standard;
         }
     }
@@ -476,8 +477,19 @@ impl Wizard {
         self.cross.at
     }
 
+    /// `step_on` before the stage's floors are traced.
     pub fn step(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
         floor: impl Fn([f32; 2]) -> Option<[f32; 2]>) -> Outcome
+    {
+        self.step_on(pad, fit, floor, &[])
+    }
+
+    /// One frame of the pad. `floors`: the traced floor lines of the stage (Tech practice's surface walk). With
+    /// them an on-stage fighter rides the floors: Left / Right along its floor, Up / Down to the floor above or
+    /// below (operator 2026-11-25, PC1 B). Without (the walk is not finished, or the fighter stands on a floor it
+    /// did not trace), the fighter stands on the floor under a free crosshair.
+    pub fn step_on(&mut self, pad: &btt::Pad, fit: impl Fn([f32; 2]) -> Option<[f32; 2]>,
+        floor: impl Fn([f32; 2]) -> Option<[f32; 2]>, floors: &[floor_hop::Floor]) -> Outcome
     {
         let was = self.was;
         self.was = pad.held;
@@ -499,7 +511,6 @@ impl Wizard {
                     self.cross.jump(self.setup[self.edit.index()].at);
                     Page::Spot
                 }
-                Page::Spot if self.mode == Mode::Save => return Outcome::Start,
                 Page::Spot => Page::State,
                 Page::State => Page::Percent,
                 Page::Percent => Page::Preview,
@@ -538,6 +549,19 @@ impl Wizard {
             return Outcome::Open;
         }
         match self.page {
+            Page::Spot if self.setup[i].place == Place::OnStage && floor_hop::on(floors, self.setup[i].at) => {
+                // The cursor is the fighter, on a traced floor. The vertical part of the pad is the hop's alone.
+                let at = self.setup[i].at;
+                let up = self.hop.vertical(pad);
+                let vertical = (1u16 << logical::DPAD_UP) | (1u16 << logical::DPAD_DOWN);
+                let level = btt::Pad { stick: [pad.stick[0], 0.0], held: pad.held & !vertical, ..*pad };
+                self.cross.at = at;
+                self.cross.step(&level, |to| fit(to).map(|to| floor_hop::along(floors, at, to[0] - at[0])));
+                if let Some(to) = floor_hop::hop(floors, self.cross.at, up > 0).filter(|_| up != 0) {
+                    self.cross.at = to;
+                }
+                self.setup[i].at = self.cross.at;
+            }
             Page::Spot => {
                 let moved = self.cross.step(pad, fit);
                 if self.setup[i].place == Place::OffStage {
@@ -551,7 +575,8 @@ impl Wizard {
             }
             Page::State => {
                 let direction = i32::from(pressed(logical::DPAD_RIGHT)) - i32::from(pressed(logical::DPAD_LEFT));
-                if direction != 0 {
+                // A fighter that reads Ledge keeps its saved state: only its spot takes it off the ledge.
+                if direction != 0 && !self.on_ledge(i) {
                     let states: &[StartState] = match self.setup[i].place {
                         Place::OnStage => &[StartState::Standard, StartState::MissedTechUp, StartState::Trip],
                         Place::OffStage => &[StartState::Standard, StartState::Tumble, StartState::Helpless, StartState::Footstool],
@@ -603,8 +628,10 @@ impl Wizard {
             Page::Percent => (4, "Percent"), Page::Preview => (5, "Preview"),
         };
         let save = self.mode == Mode::Save;
+        // What X and + do, in the words of each use: a save goes back to its saved values and is saved.
+        let (reset, plus) = if save { ("X as saved", "+ save") } else { ("X defaults", "+ start") };
         if save {
-            writeln!(out, "{name} · {number}/2 {title}")?;
+            writeln!(out, "{name} · {number}/5 {title}")?;
         } else {
             writeln!(out, "Record ({}) · {number}/5 {title}", recorded.name())?;
         }
@@ -631,17 +658,16 @@ impl Wizard {
             writeln!(out)?;
         }
         match self.page {
-            Page::Where if save => write!(out, "L / R fighter · ← → on / off stage · A next\nX as saved · + save · B cancel"),
-            Page::Where => write!(out, "L / R fighter · ← → on / off stage · A next\nX defaults · + start · B cancel"),
-            Page::Spot if save => write!(out, "Stick or D-pad move · L / R fighter · A save\nX as saved · Y on / off stage · B back"),
-            Page::Spot => write!(out, "Stick or D-pad move · L / R fighter · A next\nX defaults · Y on / off stage · B back · + start"),
+            Page::Where => write!(out, "L / R fighter · ← → on / off stage · A next\n{reset} · {plus} · B cancel"),
+            Page::Spot if save => write!(out, "Stick or D-pad move · L / R fighter · A next\n{reset} · Y on / off stage · {plus} · B back"),
+            Page::Spot => write!(out, "Stick or D-pad move · L / R fighter · A next\n{reset} · Y on / off stage · B back · {plus}"),
             Page::State => {
                 let face = matches!(self.setup[self.edit.index()].state, StartState::MissedTechUp | StartState::MissedTechDown);
-                let x = if face { "X face up / down" } else { "X defaults" };
-                write!(out, "L / R fighter · ← → change · {x} · A next · B back · + start")
+                let x = if face { "X face up / down" } else { reset };
+                write!(out, "L / R fighter · ← → change · {x} · A next · B back · {plus}")
             }
-            Page::Percent => write!(out, "L / R fighter · ← → 1 · ↑ ↓ 10 · A next · B back · X defaults · + start"),
-            Page::Preview => write!(out, "A / + start · B back"),
+            Page::Percent => write!(out, "L / R fighter · ← → 1 · ↑ ↓ 10 · A next · B back · {reset} · {plus}"),
+            Page::Preview => write!(out, "A / {plus} · B back"),
         }
     }
 

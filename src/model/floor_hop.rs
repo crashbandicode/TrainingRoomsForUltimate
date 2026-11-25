@@ -12,29 +12,76 @@ pub const HOP_TILT: f32 = 0.7;
 /// The stick has to come back under this before it can ask again.
 pub const HOP_REST: f32 = 0.3;
 
+/// How far a point may be from a floor's height and still stand on it.
+const ON: f32 = 0.5;
+/// Two floors share an end point when their ends are this close.
+const JOIN: f32 = 0.05;
+
 /// The floor's height at `x`, when the floor spans it.
-pub fn height(floor: Floor, x: f32) -> Option<f32> {
-    let _ = (floor, x);
-    None
+pub fn height([a, b]: Floor, x: f32) -> Option<f32> {
+    let (left, right) = if a[0] <= b[0] { (a, b) } else { (b, a) };
+    if right[0] - left[0] < JOIN || x < left[0] || x > right[0] {
+        return None;
+    }
+    Some(left[1] + (right[1] - left[1]) * (x - left[0]) / (right[0] - left[0]))
 }
 
 /// The floor point a fighter at `at` stands on: the highest floor at or below it (one unit of slack above).
 pub fn under(floors: &[Floor], at: [f32; 2]) -> Option<[f32; 2]> {
-    let _ = (floors, at);
-    None
+    floors.iter().filter_map(|&floor| height(floor, at[0])).filter(|&y| y <= at[1] + 1.0)
+        .max_by(f32::total_cmp).map(|y| [at[0], y])
+}
+
+/// The floor `at` stands on: the nearest in height, within `ON`.
+fn standing(floors: &[Floor], at: [f32; 2]) -> Option<usize> {
+    floors.iter().enumerate()
+        .filter_map(|(i, &floor)| height(floor, at[0]).map(|y| (i, (y - at[1]).abs())))
+        .filter(|&(_, off)| off <= ON)
+        .min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
+}
+
+/// `at` is on one of the floors.
+pub fn on(floors: &[Floor], at: [f32; 2]) -> bool {
+    standing(floors, at).is_some()
 }
 
 /// `at` moved `dx` along its floor. At the floor's end it goes on along a floor that shares that end point;
-/// otherwise it stops there.
+/// otherwise it stops there. A point that does not move is not touched, so standing still changes nothing.
 pub fn along(floors: &[Floor], at: [f32; 2], dx: f32) -> [f32; 2] {
-    let _ = (floors, dx);
+    if dx == 0.0 {
+        return at;
+    }
+    let Some(mut on) = standing(floors, at) else { return at };
+    let x = at[0] + dx;
+    // Each pass either lands on the floor or crosses one shared end, so the floors bound the walk.
+    for _ in 0..floors.len() {
+        if let Some(y) = height(floors[on], x) {
+            return [x, y];
+        }
+        let [a, b] = floors[on];
+        let end = if (a[0] < b[0]) == (dx < 0.0) { a } else { b };
+        let next = floors.iter().enumerate().position(|(i, &[p, q])| {
+            let joined = |e: [f32; 2]| (e[0] - end[0]).abs() <= JOIN && (e[1] - end[1]).abs() <= JOIN;
+            let beyond = |e: [f32; 2]| if dx < 0.0 { e[0] < end[0] - JOIN } else { e[0] > end[0] + JOIN };
+            i != on && (joined(p) && beyond(q) || joined(q) && beyond(p))
+        });
+        match next {
+            Some(next) => on = next,
+            None => return end,
+        }
+    }
     at
 }
 
 /// The nearest floor above (`up`) or below `at`, at the same x. `None`: there is no further floor.
 pub fn hop(floors: &[Floor], at: [f32; 2], up: bool) -> Option<[f32; 2]> {
-    let _ = (floors, at, up);
-    None
+    let heights = floors.iter().filter_map(|&floor| height(floor, at[0]));
+    let y = if up {
+        heights.filter(|&y| y > at[1] + ON).min_by(f32::total_cmp)
+    } else {
+        heights.filter(|&y| y < at[1] - ON).max_by(f32::total_cmp)
+    };
+    y.map(|y| [at[0], y])
 }
 
 /// Which way a pad asks to change floor: a D-pad Up / Down press, or one flick of the stick past `HOP_TILT` that is
@@ -51,8 +98,17 @@ impl Hop {
 
     /// `1` up, `-1` down, `0` stay.
     pub fn vertical(&mut self, pad: &Pad) -> i8 {
-        let _ = (pad, DPAD_UP, DPAD_DOWN, self.spent);
-        0
+        let pressed = |key: u8| i8::from(pad.pressed & (1u16 << key) != 0);
+        let [x, y] = pad.stick;
+        if y.abs() < HOP_REST {
+            self.spent = false;
+        }
+        let flick = !self.spent && y.abs() >= HOP_TILT && y.abs() > x.abs();
+        if flick {
+            self.spent = true;
+            return if y > 0.0 { 1 } else { -1 };
+        }
+        pressed(DPAD_UP) - pressed(DPAD_DOWN)
     }
 }
 
@@ -125,6 +181,10 @@ mod tests {
         assert_eq!(along(&floors, [89.0, 14.5], 2.0), [90.0, 15.0]);
         // A point on no floor stays where it is.
         assert_eq!(along(&floors, [-25.0, 12.0], 2.0), [-25.0, 12.0]);
+        assert!(on(&floors, [-25.0, 30.25]) && !on(&floors, [-25.0, 12.0]));
+        // Standing still is not a move: a spot a hair off its floor is not snapped, so a save is not edited by it.
+        assert_eq!(along(&floors, [-25.0, 30.25], 0.0), [-25.0, 30.25]);
+        assert_eq!(along(&floors, [-25.0, 30.25], 1.0), [-24.0, 30.0]);
     }
 
     #[test]
