@@ -550,8 +550,8 @@ pub struct Tick {
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
-    /// Change placement: the save the placement picker opens on.
-    pub place: Option<PlaceOpen>,
+    /// The full save pair is needed only on a picker open, not on every recording tick's stack.
+    pub place: Option<Box<PlaceOpen>>,
 }
 
 /// The existing Fighter Mismatch screen, named for the wrapper that opens it.
@@ -1667,10 +1667,10 @@ pub enum Placed {
 
 /// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
 #[inline(never)]
-fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<PlaceOpen> {
+fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<Box<PlaceOpen>> {
     let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save).ok()?;
     let shared = Shared { macros: macros_starting_from(root, &save), from_macro: relink.is_some() };
-    Some(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared })
+    Some(Box::new(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared }))
 }
 
 /// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
@@ -6329,13 +6329,13 @@ mod tests {
             edit: Role::Cpu,
             shared: Shared { macros: 2, from_macro: true },
         };
-        assert_eq!(tick.place, Some(open.clone()));
+        assert_eq!(tick.place.as_deref(), Some(&open));
         post_effect(Effect::ChangePlacement { save: save.clone(), relink: None });
         let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
-        assert_eq!(tick.place, Some(PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
         post_effect(Effect::ChangePlacement { save: save.clone(), relink: Some(macros[1].clone()) });
         let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
-        assert_eq!(tick.place, Some(PlaceOpen { relink: Some(macros[1].clone()), ..open }));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: Some(macros[1].clone()), ..open }));
         post_effect(Effect::ChangePlacement { save: "no-such-save".into(), relink: None });
         assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
     }
