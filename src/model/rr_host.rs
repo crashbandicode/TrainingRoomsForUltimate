@@ -1,7 +1,7 @@
 //! Recording worker decisions the host can run. The Switch wrapper performs the notices,
 //! the save-restore request, and the keyboard offer this module names.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -18,8 +18,10 @@ use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
     push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
-    KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
+    KeyboardOffer, EMPTY_COMBO,
 };
+#[cfg(test)]
+use super::rr_runtime::{Tape, READ_WINDOW, RESIDENT_FRAMES};
 use crate::model::action::Late;
 use crate::model::combo::{CaptureOwner, Combo, InputCapture};
 use crate::model::frame_strip::Snap;
@@ -405,6 +407,8 @@ fn parry_next_pass(start: impl FnOnce()) {
 static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
 static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
+static BOOK: Mutex<Option<CachedBook>> = Mutex::new(None);
+#[cfg(test)]
 static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
 type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
@@ -484,10 +488,26 @@ pub fn request_make(ask: MakeAsk) { *lock(&MAKE_ASK) = Some(ask); }
 pub fn make_actor_cpu() -> bool { MAKE_ROLE.load(Ordering::Acquire) == ROLE_CPU }
 pub fn make_cpu_inputs() -> MappedInputs { to_mapped(unpack(MAKE_CPU_FRAME.load(Ordering::Acquire))) }
 
+#[cfg(test)]
 struct Resident {
     id: String,
     frames: Vec<InputFrame>,
     tape: Tape,
+}
+
+struct CachedBook {
+    root: PathBuf,
+    version: (u64, u64),
+    book: Book,
+    saves: [Option<(String, NamedSave)>; 2],
+}
+
+#[cfg(test)]
+pub(crate) fn drop_cached_book() -> Option<usize> {
+    let cache = lock(&BOOK).take()?;
+    let inline = std::mem::size_of_val(&cache);
+    drop(cache);
+    Some(inline)
 }
 
 enum PreviewWindow {
@@ -522,7 +542,6 @@ pub enum HomeWarp {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
-    #[cfg(test)]
     pub warp_pair: Option<[SavedState; 2]>,
     /// A Vault clip's preview: the game keeps both fighters as Save reads them when it first starts and loads that pair at the start and for the return.
     pub home: Option<HomeWarp>,
@@ -1345,7 +1364,13 @@ pub fn service_at(
     if !busy {
         return tick;
     }
-    let Ok(mut book) = load_book(root) else {
+    let mut cached = lock(&BOOK);
+    let version = recording_version();
+    if cached.as_ref().is_none_or(|cache| cache.root.as_path() != root || cache.version != version) {
+        *cached = None;
+        *cached = load_cached_book(root, version).ok();
+    }
+    let Some(cache) = cached.as_mut() else {
         // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
         retire_preview_run();
         take_preview_refusal(&mut tick);
@@ -1354,7 +1379,20 @@ pub fn service_at(
         drop_preview_home();
         return tick;
     };
-    if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { book.add_recording(CLIP_ID, clip.clone()); }
+    cache.book.remove_recording(CLIP_ID);
+    if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { cache.book.add_recording(CLIP_ID, clip.clone()); }
+    if (play_player || play_cpu) && !cache.book.index.chord_notice_seen() {
+        let mut updated = cache.book.index.clone();
+        if let Some(text) = chord_notice(&mut updated) {
+            if updated.save_at(root, Some(cache.version)).unwrap_or(false) {
+                cache.book.index = updated;
+                cache.version.1 = cache.version.1.wrapping_add(1);
+                tick.notices.push(text);
+                tick.diags.push("screen=notice kind=chord-once".to_string());
+            }
+        }
+    }
+    let book = &cache.book;
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     // restriction: parry-mash-ignored
@@ -1378,25 +1416,29 @@ pub fn service_at(
     }
     release_held(&mut play_player, &mut play_cpu);
     if play_player {
-        play_role(root, machine, &book, Role::Player, &mut tick);
+        play_role(root, machine, book, Role::Player, &mut tick);
     } else if RUN_PLAYER.load(Ordering::Acquire) {
-        step_role(root, machine, &book, Role::Player);
+        step_role(root, machine, book, Role::Player);
     }
     if play_cpu {
-        play_role(root, machine, &book, Role::Cpu, &mut tick);
+        play_role(root, machine, book, Role::Cpu, &mut tick);
     } else if RUN_CPU.load(Ordering::Acquire) {
-        step_role(root, machine, &book, Role::Cpu);
+        step_role(root, machine, book, Role::Cpu);
     }
-    parry_next_pass(|| play_role_with(root, machine, &book, Role::Cpu, &mut tick, true));
+    parry_next_pass(|| play_role_with(root, machine, book, Role::Cpu, &mut tick, true));
     if menu_pending() {
-        apply_menu(root, machine, &book, &mut tick);
+        apply_menu(root, machine, book, &mut tick);
     }
     if let Some(ask) = lock(&MAKE_ASK).take() {
-        begin_make(root, machine, &book, ask, &mut tick);
+        begin_make(root, machine, book, ask, &mut tick);
     }
-    drive_preview(root, machine, &book, &mut tick);
+    drive_preview(root, machine, book, &mut tick);
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
+    if let Some(id) = tick.warp.as_deref() {
+        tick.warp_pair = cache.saves.iter().flatten().find(|(save_id, _)| save_id == id)
+            .map(|(_, save)| warp_pair(save.clone(), tick.warp_place));
+    }
     tick
 }
 
@@ -1952,7 +1994,7 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
 }
 
 fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick, next: bool) {
-    show_chord_notice(root, tick);
+    if !book.index.chord_notice_seen() { show_chord_notice(root, tick); }
     if let Some(ask) = mismatch_for(book, role) {
         // Ask before switching fighter Off (operator 2026-11-13, TR6): the current fighter stays, as Keep, unasked.
         let asking = ASK_FIGHTER.load(Ordering::Acquire);
@@ -2063,7 +2105,7 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
 
 /// Fill the role's queue ahead of its hook, in file order. The hook takes one frame per game frame, so a
 /// late or doubled worker tick neither drops nor repeats one.
-fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
+fn step_role(_root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     if WARP_HOLD.load(Ordering::Acquire) {
         return;
     }
@@ -2071,7 +2113,7 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     // fill the queue (Astra 09:48Z).
     while run_flag(role).load(Ordering::Acquire) && role_frames(role).room() > 0 {
         match drive_step(machine, role, book) {
-            Some(played) => publish(role, resident_frame(root, &played)),
+            Some(played) => publish(role, played.frame),
             None => {
                 run_flag(role).store(false, Ordering::Release);
                 return;
@@ -2080,6 +2122,7 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     }
 }
 
+#[cfg(test)]
 fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
     if played.frame_index < RESIDENT_FRAMES {
         return played.frame;
@@ -2134,22 +2177,11 @@ fn drop_frames(role: Role) {
     owe_start_speed(role, None);
 }
 
-fn note_missing_start(root: &Path, book: &Book, role: Role, tick: &mut Tick) {
+fn note_missing_start(_root: &Path, book: &Book, role: Role, tick: &mut Tick) {
     let Some(id) = book.index.active(role) else {
         return;
     };
-    let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(id) else {
-        return;
-    };
-    let Some(save) = recording.start_save.as_deref() else {
-        return;
-    };
-    if Store::<NamedSave>::new(root.join(SAVES_DIR))
-        .load(save)
-        .is_ok()
-    {
-        return;
-    }
+    if !book.missing_recording_save(id) { return; }
     if let Some(text) = start_save_notice(StartSaveState::Deleted) {
         tick.notices.push(text);
         tick.diags
@@ -2612,6 +2644,17 @@ fn load_book(root: &Path) -> Result<Book, ()> {
     Ok(book)
 }
 
+fn load_cached_book(root: &Path, version: (u64, u64)) -> Result<CachedBook, ()> {
+    let book = load_book(root)?;
+    let store = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let saves = [Role::Player, Role::Cpu].map(|role| {
+        let id = book.index.active(role)?;
+        let StartLink::Linked(save_id) = book.start_link(id) else { return None };
+        store.load(save_id).ok().map(|save| (save_id.to_owned(), save))
+    });
+    Ok(CachedBook { root: root.to_path_buf(), version, book, saves })
+}
+
 fn taken_frames() -> (Role, Vec<InputFrame>) {
     let role = if LAST_ROLE.load(Ordering::Acquire) == ROLE_CPU {
         Role::Cpu
@@ -2736,6 +2779,7 @@ pub(crate) fn reset_host() {
     RUN_PLAYER.store(false, Ordering::Release);
     RUN_CPU.store(false, Ordering::Release);
     *lock(&MACHINE) = None;
+    *lock(&BOOK) = None;
     *lock(&RESIDENT) = None;
     *lock(&MENU_EFFECT) = None;
     PREVIEW.store(0, Ordering::Release);
