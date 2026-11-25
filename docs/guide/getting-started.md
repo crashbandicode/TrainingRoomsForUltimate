@@ -11,8 +11,9 @@ Which release is current and what is new: [Current release](../CURRENT-RELEASE.m
 
 1. You need a Switch with Super Smash Bros. Ultimate **13.0.5** and Skyline set up for the game. On any other game
    version the plugin installs nothing.
-2. Copy `libtraining_rooms.nro`, `libnro_hook.nro` and `libparam_hook.nro` into
-   `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/` on the SD card.
+2. Copy `libtraining_rooms.nro` and `libnro_hook.nro` into
+   `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/` on the SD card. The hook enables the CPU's DI,
+   tech and out-of-shield options. Its usual companion, `libparam_hook.nro`, is optional for TrainingRooms.
 3. Remove `libtraining_modpack.nro` from that folder if it is there. The two can't run together.
 4. Start the game and open Training.
 

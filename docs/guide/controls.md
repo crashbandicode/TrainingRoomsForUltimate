@@ -38,8 +38,10 @@ buttons while you hold them, and chords don't fire while a menu is open.
 4. A keeps it, B cancels, Y empties it, which turns that action off.
 5. Close the menu. The new chord works from then on.
 
-Two rows may share a chord; both actions then happen. Y on the Button chords row puts all ten back to your saved
-defaults.
+Choose an unused chord if you want it to do just one thing. The clip uses ZL + D-pad Left, which is also Cycle CPU
+by default. Change or clear Cycle CPU first if you want that chord only to save. If you share a chord with Game
+speed, opening the speed control handles that press for speed alone. Y on the Button chords row restores all ten
+saved defaults.
 
 ## Opening the menu
 
