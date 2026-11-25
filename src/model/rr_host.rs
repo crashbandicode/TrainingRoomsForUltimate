@@ -3722,7 +3722,7 @@ mod tests {
     fn cpu_menu_role() {
         let mut screens = crate::model::recording_menu::RecordingScreens::new();
         screens.toggle_popup();
-        screens.press_popup(crate::model::menu::input::Button::R);
+        screens.press_popup(crate::model::menu::input::Button::ZR);
         assert_eq!(screens.selection().record_role, ViewRole::Cpu);
         publish_menu_role(screens.selection().record_role);
     }
@@ -3730,7 +3730,8 @@ mod tests {
     fn player_menu_role() {
         let mut screens = crate::model::recording_menu::RecordingScreens::new();
         screens.toggle_popup();
-        screens.press_popup(crate::model::menu::input::Button::L);
+        screens.press_popup(crate::model::menu::input::Button::ZR);
+        screens.press_popup(crate::model::menu::input::Button::ZR);
         assert_eq!(screens.selection().record_role, ViewRole::Player);
         publish_menu_role(screens.selection().record_role);
     }
