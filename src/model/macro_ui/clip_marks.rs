@@ -517,6 +517,65 @@ mod tests {
         assert_eq!(grab.spans().len(), 2);
     }
 
+    /// tr-primary-2's edge: a move on the take's first frame and one on its last are recorded, reloaded, drawn and snapped to.
+    fn marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to() {
+        let mut frames = vec![InputFrame::default(); 200];
+        frames[0].buttons = 1;
+        frames[199].buttons = 2;
+        let root = scratch("edges");
+        let spans = [Span { start: 0, end: Some(30), mv: Some(Move::Jab) }, Span { start: 199, end: None, mv: None }];
+        let id = save_capture(&root, &frames, &spans, false);
+        let loaded = Library::new(root.join("macros")).load(&id).unwrap();
+        assert_eq!(loaded.actions.iter().map(|mark| (mark.start, mark.end)).collect::<Vec<_>>(), vec![(0, Some(30)), (199, None)]);
+        let mut editor = ClipEditor::macro_file(loaded.clone(), true).unwrap();
+        let view = editor.view();
+        assert_eq!((view.mark_count, view.marks[0].0, view.marks[1].0), (2, 0, 1592));
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(3));
+        editor.on_action(ClipAction::Snap);
+        assert_eq!(editor.view().start, 0);
+        assert!(editor.view().move_text.starts_with("Start of"), "{}", editor.view().move_text);
+        set_out(&mut editor, 195);
+        editor.on_action(ClipAction::Snap);
+        assert_eq!(editor.view().end, 200);
+        let mut ended = loaded;
+        ended.actions[1].end = Some(200);
+        assert_eq!(Marks::from_recording(&ended).list()[1].end, Some(200));
+        ended.actions[1].end = Some(201);
+        assert!(!Marks::from_recording(&ended).recorded());
+    }
+
+    /// tr-primary-2's edge: In or Out cutting through a move, and a snap whose target lies across the other handle.
+    fn a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames() {
+        let jab = Some(move_key(Move::Jab).to_owned());
+        let crop = |editor: &mut ClipEditor| {
+            let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("crop") };
+            saved.actions
+        };
+        let mut out_cuts = ClipEditor::macro_file(recorded(), true).unwrap();
+        set_out(&mut out_cuts, 30);
+        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: None, mv: jab.clone() }]);
+        out_cuts.on_action(ClipAction::Snap);
+        assert_eq!(out_cuts.view().end, 40);
+        assert_eq!(crop(&mut out_cuts), vec![ActionMark { start: 10, end: Some(40), mv: jab.clone() }]);
+        let mut in_cuts = ClipEditor::macro_file(recorded(), true).unwrap();
+        in_cuts.on_action(ClipAction::SelectIn);
+        in_cuts.on_action(ClipAction::Nudge(20));
+        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 70, end: None, mv: None }]);
+        in_cuts.on_action(ClipAction::Snap);
+        assert_eq!(in_cuts.view().start, 10);
+        assert_eq!(crop(&mut in_cuts), vec![ActionMark { start: 0, end: Some(30), mv: jab }, ActionMark { start: 80, end: None, mv: None }]);
+        let mut crossing = ClipEditor::macro_file(recorded(), true).unwrap();
+        crossing.on_action(ClipAction::SelectIn);
+        crossing.on_action(ClipAction::Nudge(95));
+        set_out(&mut crossing, 96);
+        crossing.on_action(ClipAction::Snap);
+        assert_eq!((crossing.view().start, crossing.view().end), (95, 96));
+        crossing.on_action(ClipAction::SelectIn);
+        crossing.on_action(ClipAction::Snap);
+        assert_eq!((crossing.view().start, crossing.view().end), (90, 96));
+    }
+
     fn the_timeline_draws_move_marks() {
         let editor = ClipEditor::macro_file(recording(), true).unwrap();
         let view = editor.view();
@@ -753,6 +812,8 @@ mod tests {
             ("originating_inputs_mark_move_starts_for_any_fighter", originating_inputs_mark_move_starts_for_any_fighter),
             ("a_watched_action_gives_its_start_end_and_name", a_watched_action_gives_its_start_end_and_name),
             ("a_move_restarted_while_busy_is_its_own_recorded_mark", a_move_restarted_while_busy_is_its_own_recorded_mark),
+            ("marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to", marks_at_frame_0_and_at_the_last_frame_are_kept_and_snapped_to),
+            ("a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames", a_crop_or_a_snap_across_a_mark_keeps_the_marks_true_to_the_frames),
             ("the_timeline_draws_move_marks", the_timeline_draws_move_marks),
             ("an_empty_recording_has_no_marks", an_empty_recording_has_no_marks),
             ("the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs", the_preview_watch_reads_the_previewing_fighter_only_while_a_preview_runs),
