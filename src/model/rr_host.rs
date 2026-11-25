@@ -1617,11 +1617,13 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
     pair
 }
 
-/// Change placement: a save the placement picker is asked to open on, as the worker read it. `ticket` names the
-/// visit; the picker hands it back with what it confirmed (`commit_placement`).
+/// Change placement: a save the placement picker is asked to open on, as the worker read it. `save` is its file,
+/// `relink` the macro a copy is linked to (the macro whose screen asked, a chain's macro 1); the picker hands both
+/// back with what it confirmed (`commit_placement`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlaceOpen {
-    pub ticket: u32,
+    pub save: String,
+    pub relink: Option<String>,
     pub name: String,
     pub pair: [SavedState; 2],
     /// The fighter the picker edits first.
@@ -1640,8 +1642,8 @@ pub enum Placed {
 }
 
 /// The picker confirmed a placement on the save its visit opened: the worker writes it.
-pub fn commit_placement(root: &Path, commit: Commit) -> Placed {
-    let _ = root;
+pub fn commit_placement(root: &Path, save: &str, relink: Option<&str>, commit: Commit) -> Placed {
+    let _ = (root, save, relink);
     Placed::Refused { ticket: commit.ticket }
 }
 

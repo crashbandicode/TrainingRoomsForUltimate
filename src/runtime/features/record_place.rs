@@ -1,11 +1,10 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-use hos_lock::{Mailbox, Mutex};
+use hos_lock::Mutex;
 
 use super::tech_surfaces::{self, Found};
 use super::{cpu::konst, notices, placement, practice, recorder, states};
 use crate::engine::{library::Role, rr_host};
-use crate::model::box_handoff::BoxHandoff;
 use crate::model::btt::Pad;
 use crate::model::chords::{field, logical as key, Sample};
 use crate::model::cpu::ids::{C, UNRESOLVED};
@@ -31,12 +30,14 @@ const OPEN_RECORD: u8 = 1;
 const OPEN_SAVE: u8 = 2;
 type Stage = (i32, u32);
 
-/// A save the worker asks the picker to open on (`open_save`): the worker's ticket for the visit, the save's name,
-/// its two halves as the wizard shows them, and the macros that start from it.
-#[derive(Clone, Copy)]
+/// A save the worker asks the picker to open on (`open_save`): the visit's ticket (given there), the save's file,
+/// the macro a copy is linked to, the save's name as the notice shows it, its two halves as the wizard shows them,
+/// and the macros that start from it.
 pub(crate) struct SaveOpen {
     pub ticket: u32,
-    pub name: FixedPath<48>,
+    pub save: String,
+    pub relink: Option<String>,
+    pub name: String,
     pub saved: Setup,
     pub ledge: [bool; 2],
     pub edit: Who,
@@ -44,12 +45,6 @@ pub(crate) struct SaveOpen {
     pub rule: SharedStart,
 }
 
-/// The save asked for, and the worker's answer to a confirmed placement: the worker allocates and drops the boxes,
-/// Player 1's frame takes what is in them and never frees. The newest post wins.
-static OPENS: BoxHandoff<SaveOpen> = BoxHandoff::new();
-static PLACED: BoxHandoff<Answer> = BoxHandoff::new();
-/// The placement the picker confirmed, for the worker that writes the save. No lock and no wait on either side.
-static COMMITS: Mailbox<Commit, 1> = Mailbox::new();
 static OPEN: AtomicU8 = AtomicU8::new(0);
 static PAGES: AtomicBool = AtomicBool::new(false);
 static HOLDING: AtomicBool = AtomicBool::new(false);
@@ -73,6 +68,13 @@ struct Engine {
     waited: u8,
     /// How the open picker's walk of the stage's floors went (`tech::floors`).
     traced: Found,
+    /// The save asked for and the worker's answer to a confirmed placement. The recording worker puts both here,
+    /// replaces them and drops them; a fighter frame only reads them and moves the answer's pair out, and never
+    /// empties or drops either. No static is added for them.
+    asked: Option<Box<SaveOpen>>,
+    answer: Option<Box<Answer>>,
+    /// Counts the visits to a save: each one's ticket.
+    visits: u32,
 }
 
 enum Session {
@@ -90,12 +92,28 @@ enum Session {
     Start(Start),
 }
 
-/// A visit to a save: the worker's ticket, the save's name, and the frames since its save was asked for.
+/// A visit to a save: its ticket, the frames since its save was asked for, and whether the worker has taken it.
 #[derive(Clone, Copy)]
 struct Visit {
     ticket: u32,
-    name: FixedPath<48>,
     saving: Option<u16>,
+    sent: bool,
+}
+
+/// The engine for the recording worker: tried a few times, never waited for. A fighter frame only ever tries
+/// this lock too, so the worker holding it for a moment costs that frame its step at most.
+fn worker_engine() -> Option<hos_lock::MutexGuard<'static, Engine>> {
+    (0..64).find_map(|_| {
+        ENGINE.try_lock().or_else(|| {
+            std::thread::yield_now();
+            None
+        })
+    })
+}
+
+/// The name of the save the visit `ticket` is on, as the worker gave it.
+fn save_name(engine: &Engine, ticket: u32) -> &str {
+    engine.asked.as_deref().filter(|open| open.ticket == ticket).map_or("", |open| open.name.as_str())
 }
 
 struct Start {
@@ -127,6 +145,9 @@ static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     watch: None,
     waited: 0,
     traced: Found::More,
+    asked: None,
+    answer: None,
+    visits: 0,
 });
 
 struct Publishing(hos_lock::MutexGuard<'static, Engine>);
@@ -259,33 +280,48 @@ pub(super) fn open() {
     }
 }
 
-/// Change placement: the worker asks the picker to open on a save it read. Worker thread.
+/// Change placement: the worker asks the picker to open on a save it read, and the visit gets its ticket. The save
+/// asked for before goes back to the worker here, which drops it. Worker thread.
 pub(crate) fn open_save(open: SaveOpen) {
-    if INSTALLED.load(Ordering::Acquire) && may_open() {
-        // An answer no visit took is dropped here: the new visit starts with none posted.
-        PLACED.post(None);
-        OPENS.post(Some(Box::new(open)));
-        OPEN.store(OPEN_SAVE, Ordering::Release);
+    if !INSTALLED.load(Ordering::Acquire) || !may_open() {
+        return;
     }
+    let mut open = Box::new(open);
+    let Some(mut engine) = worker_engine() else { return };
+    engine.visits = engine.visits.wrapping_add(1).max(1);
+    open.ticket = engine.visits;
+    let old = core::mem::replace(&mut engine.asked, Some(open));
+    drop(engine);
+    drop(old);
+    OPEN.store(OPEN_SAVE, Ordering::Release);
 }
 
-/// A placement the picker confirmed, for the worker that writes the save. Worker thread: it is the one reader.
-pub(crate) fn take_commit() -> Option<Commit> {
-    let mut newest = None;
-    COMMITS.drain(|commit| newest = Some(commit));
-    newest
+/// A placement the picker confirmed and no worker pass has taken yet, with the save's file and the macro a copy is
+/// linked to. Worker thread; a pass that finds the engine in use comes back on the next.
+pub(crate) fn take_commit() -> Option<(Commit, String, Option<String>)> {
+    if !PAGES.load(Ordering::Acquire) {
+        return None;
+    }
+    let mut engine = ENGINE.try_lock()?;
+    let engine = &mut *engine;
+    let Some(Session::Pages { wizard, stage, save: Some(visit), .. }) = &mut engine.session else { return None };
+    if visit.saving.is_none() || visit.sent {
+        return None;
+    }
+    let open = engine.asked.as_deref().filter(|open| open.ticket == visit.ticket)?;
+    visit.sent = true;
+    Some((wizard.commit(visit.ticket, stage.0), open.save.clone(), open.relink.clone()))
 }
 
 /// The worker's answer for the visit `ticket`: the pair it wrote, to load once, or `None` when the save could not
-/// be written. The picker takes it only while that visit still waits. Worker thread.
+/// be written. The picker takes it only while that visit still waits. The answer before it is dropped here.
+/// Worker thread.
 pub(crate) fn post_placed(ticket: u32, pair: Option<[SavedState; 2]>) {
-    PLACED.post(Some(Box::new(Answer { ticket, pair })));
-}
-
-/// The recording worker, each pass: drop the boxes the game emptied.
-pub(crate) fn reap() {
-    OPENS.reap();
-    PLACED.reap();
+    let answer = Some(Box::new(Answer { ticket, pair }));
+    let Some(mut engine) = worker_engine() else { return };
+    let old = core::mem::replace(&mut engine.answer, answer);
+    drop(engine);
+    drop(old);
 }
 
 pub fn wizard_active() -> bool {
@@ -671,24 +707,23 @@ pub unsafe fn frame(fighter: usize) {
                     OPEN.store(OPEN_SAVE, Ordering::Release);
                 } else {
                     engine.waited = 0;
-                    OPENS.discard();
                 }
             } else if let (Some(cpu), Some(stage), Some(camera)) = (cpu, stage(), natives::camera_limit_range()) {
                 engine.waited = 0;
                 let blast = tech_surfaces::training_blast_bounds();
                 let reach = |place| record_place::reach(place, camera, blast);
-                // A Record start drops a save still posted: it was asked for before this press.
-                let open = OPENS.take(|open| *open).filter(|_| asked == OPEN_SAVE);
+                // The save asked for is read where the worker put it. A Record start does not look at it.
+                let open = engine.asked.as_deref().filter(|_| asked == OPEN_SAVE)
+                    .map(|open| (open.ticket, open.saved, open.ledge, open.edit, open.shared, open.rule));
                 let opened = match open {
-                    Some(open) => {
+                    Some((ticket, saved, ledge, edit, shared, rule)) => {
                         // A save's spots are shown fitted to this stage; the file keeps its own until one is edited.
-                        let fitted = open.saved.map(|fighter| fit(fighter.at, reach(fighter.place)).map(|at| Fighter { at, ..fighter }));
-                        let visit = Visit { ticket: open.ticket, name: open.name, saving: None };
+                        let fitted = saved.map(|fighter| fit(fighter.at, reach(fighter.place)).map(|at| Fighter { at, ..fighter }));
+                        let visit = Visit { ticket, saving: None, sent: false };
                         match fitted {
-                            [Some(first), Some(second)] => Some((
-                                Wizard::for_save([first, second], open.ledge, open.edit).sharing(open.shared, open.rule),
-                                Some(visit),
-                            )),
+                            [Some(first), Some(second)] => {
+                                Some((Wizard::for_save([first, second], ledge, edit).sharing(shared, rule), Some(visit)))
+                            }
                             _ => None,
                         }
                     }
@@ -742,9 +777,8 @@ pub unsafe fn frame(fighter: usize) {
                     // The save is with the worker: both fighters wait at their spots for its answer. An answer
                     // for another visit is given back unread; one that comes after this visit ended is never taken.
                     pad.pressed = 0;
-                    let answer = record_place::take_answer(&PLACED, ticket);
+                    let answer = record_place::take_answer(&mut engine.answer, ticket);
                     if answer.is_some() || late {
-                        let name = save.map_or(FixedPath::new(), |visit| visit.name);
                         engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
                         match answer {
                             Some(Some(pair)) => {
@@ -755,9 +789,9 @@ pub unsafe fn frame(fighter: usize) {
                             }
                             Some(None) => {
                                 // Not written: both fighters go back, as for B, and the notice says so.
-                                leave(&mut engine, Leave::Cancel);
                                 let mut text = FixedPath::<224>::new();
-                                let _ = record_place::write_not_saved(name.as_str(), &mut text);
+                                let _ = record_place::write_not_saved(save_name(&engine, ticket), &mut text);
+                                leave(&mut engine, Leave::Cancel);
                                 notices::post_body("Input Recording", Body::copied(text.as_str()), 120, DEFAULT_COLOR); // restriction: place-save-write
                             }
                             None => leave(&mut engine, Leave::Other),
@@ -785,12 +819,10 @@ pub unsafe fn frame(fighter: usize) {
                         }
                         Outcome::Start => match &mut save {
                             Some(visit) => {
-                                // A save: the worker writes the file and answers. A press it has no room for is
-                                // dropped, and the picker stays open.
-                                if COMMITS.post(wizard.commit(visit.ticket, stage.0)) {
-                                    visit.saving = Some(0);
-                                    crate::runtime::ui::worker::wake();
-                                }
+                                // A save: the worker takes the placement on its next pass, writes the file and
+                                // answers.
+                                (visit.saving, visit.sent) = (Some(0), false);
+                                crate::runtime::ui::worker::wake();
                             }
                             None => {
                                 // A Record start places both fighters itself: a body held asleep is woken for it.
@@ -809,7 +841,7 @@ pub unsafe fn frame(fighter: usize) {
                         Outcome::Open => {
                             let mut text = FixedPath::<224>::new();
                             let (header, name) = match &save {
-                                Some(visit) => ("Change placement", visit.name.as_str()),
+                                Some(visit) => ("Change placement", save_name(&engine, visit.ticket)),
                                 None => ("Recording", ""),
                             };
                             let _ = wizard.write_text(recorded, name, &mut text);

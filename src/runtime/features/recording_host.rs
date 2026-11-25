@@ -218,7 +218,6 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) {
 pub fn service() {
     // The boxes the frame emptied (a named load, a bound save) come back here to be dropped: the game never frees one.
     super::states::reap_posts();
-    super::record_place::reap();
     let root = Path::new(crate::model::storage::ROOT);
     if !root.is_dir() {
         let _ = std::fs::create_dir_all(root);
@@ -262,8 +261,8 @@ pub fn service() {
 /// visit: the written pair, or that the write failed. The picker takes the answer only while that visit still waits;
 /// it then starts the pair's one load itself, or puts both fighters back and says so.
 fn place_commit(root: &Path) {
-    let Some(commit) = super::record_place::take_commit() else { return };
-    match rr_host::commit_placement(root, commit) {
+    let Some((commit, save, relink)) = super::record_place::take_commit() else { return };
+    match rr_host::commit_placement(root, &save, relink.as_deref(), commit) {
         rr_host::Placed::Refused { ticket } => super::record_place::post_placed(ticket, None),
         rr_host::Placed::Saved { ticket, pair, notice } => {
             super::record_place::post_placed(ticket, Some(*pair));
@@ -275,14 +274,12 @@ fn place_commit(root: &Path) {
 /// Change placement: hand the save the worker read to the placement picker, as the picker shows a save.
 fn place_open(open: &rr_host::PlaceOpen) {
     use crate::model::record_place::{saved_fighter, Who};
-    use core::fmt::Write as _;
     let [p1, cpu] = [saved_fighter(&open.pair[0]), saved_fighter(&open.pair[1])];
-    let mut name = crate::model::storage::FixedPath::<48>::new();
-    // A name that does not fit is cut at the buffer.
-    let _ = open.name.chars().try_for_each(|c| name.write_char(c));
     super::record_place::open_save(super::record_place::SaveOpen {
-        ticket: open.ticket,
-        name,
+        ticket: 0,
+        save: open.save.clone(),
+        relink: open.relink.clone(),
+        name: open.name.clone(),
         saved: [p1.0, cpu.0],
         ledge: [p1.1, cpu.1],
         edit: if open.edit == crate::engine::library::Role::Cpu { Who::Cpu } else { Who::P1 },

@@ -1,4 +1,3 @@
-use super::box_handoff::BoxHandoff;
 use super::btt;
 use super::chords::logical;
 use super::cpu::ids::C;
@@ -327,11 +326,13 @@ pub struct Answer {
     pub pair: Option<[SavedState; 2]>,
 }
 
-/// The posted answer, for the visit `ticket` that still waits for it: its pair, moved out of the box (what stays
-/// is the worker's to drop). An answer for any other visit is given back unread, so a visit that ended gets no
-/// load and the next visit does not inherit one. Game thread, one taker at a time; no allocation and no free.
-pub fn take_answer(posted: &BoxHandoff<Answer>, ticket: u32) -> Option<Option<[SavedState; 2]>> {
-    posted.take(|answer| (answer.ticket == ticket).then(|| answer.pair.take())).flatten()
+/// The posted answer, for the visit `ticket` that still waits for it: its pair, moved out of the box, which stays
+/// where it is for the worker to drop, marked as taken. An answer for any other visit is left unread, so a visit
+/// that ended gets no load and the next visit does not inherit one. A fighter frame; no allocation and no free.
+pub fn take_answer(posted: &mut Option<Box<Answer>>, ticket: u32) -> Option<Option<[SavedState; 2]>> {
+    let answer = posted.as_deref_mut().filter(|answer| ticket != 0 && answer.ticket == ticket)?;
+    answer.ticket = 0;
+    Some(answer.pair.take())
 }
 
 /// How far a spot may go: on stage the camera's range, off stage up to 1 unit inside the blast line (Guard the
@@ -2164,21 +2165,23 @@ mod tests {
     /// only then is the answer taken on a fighter frame.
     #[test]
     fn a_late_completion_for_a_dropped_ticket_is_discarded() {
-        let posted = crate::model::box_handoff::BoxHandoff::new();
-        assert_eq!(take_answer(&posted, 4), None, "nothing posted");
+        let mut posted = None;
+        assert_eq!(take_answer(&mut posted, 4), None, "nothing posted");
         // Visit 4's pair is posted; visit 4 was left and visit 5 waits now. It does not inherit the old result,
-        // and the old answer is gone: no later frame can load it.
-        posted.post(Some(answer(4, Some(-30.0))));
-        assert_eq!(take_answer(&posted, 5), None);
-        assert!(!posted.pending());
-        // The visit that still waits takes its own pair, once.
-        posted.post(Some(answer(5, Some(12.0))));
-        let pair = take_answer(&posted, 5).unwrap().unwrap();
+        // and no visit can ever take it: visit 4 is over, and no later visit has its ticket.
+        posted = Some(answer(4, Some(-30.0)));
+        assert_eq!(take_answer(&mut posted, 5), None);
+        assert_eq!(take_answer(&mut posted, 0), None);
+        assert!(posted.as_ref().is_some_and(|left| left.ticket == 4 && left.pair.is_some()), "left for the worker to drop");
+        // The visit that still waits takes its own pair, once; the box stays for the worker, emptied.
+        posted = Some(answer(5, Some(12.0)));
+        let pair = take_answer(&mut posted, 5).unwrap().unwrap();
         assert_eq!((pair[0].x, pair[0].fighter_kind), (12.0, 4));
-        assert_eq!(take_answer(&posted, 5), None);
+        assert_eq!(take_answer(&mut posted, 5), None);
+        assert!(posted.as_ref().is_some_and(|left| left.pair.is_none()));
         // A save that could not be written is an answer with no pair.
-        posted.post(Some(answer(6, None)));
-        assert_eq!(take_answer(&posted, 6), Some(None));
+        posted = Some(answer(6, None));
+        assert_eq!(take_answer(&mut posted, 6), Some(None));
         // The load is started by the picker that waits, on Player 1's frame: the worker posts the answer and never
         // asks for the load itself, so a pair a Play posted for its warp is never replaced by a placement.
         let host = include_str!("../runtime/features/recording_host.rs");
@@ -2186,7 +2189,7 @@ mod tests {
         assert!(commit.contains("record_place::post_placed(") && !commit.contains("request_named_load("));
         let place = include_str!("../runtime/features/record_place.rs");
         let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
-        assert!(frame.find("record_place::take_answer(&PLACED, ticket)").unwrap() < frame.find("states::begin_placed(").unwrap());
+        assert!(frame.find("record_place::take_answer(&mut engine.answer, ticket)").unwrap() < frame.find("states::begin_placed(").unwrap());
         assert_eq!(place.matches("states::begin_placed(").count(), 1);
     }
 
@@ -2197,26 +2200,35 @@ mod tests {
         assert_eq!(text, "Not saved · Jab start could not be written");
         let place = include_str!("../runtime/features/record_place.rs");
         // The worker's answer has no pair: the picker that still waits for that visit puts the fighters back.
-        let failed = place.split("record_place::take_answer(&PLACED, ticket)").nth(1).unwrap()
-            .split("leave(&mut engine, Leave::Cancel);").nth(1).unwrap();
-        let said = failed.split("return;").next().unwrap();
-        assert!(said.contains("record_place::write_not_saved(") && said.contains("// restriction: place-save-write"));
+        let failed = place.split("record_place::take_answer(&mut engine.answer, ticket)").nth(1).unwrap()
+            .split("Some(None) => {").nth(1).unwrap().split("return;").next().unwrap();
+        assert!(failed.find("record_place::write_not_saved(").unwrap() < failed.find("leave(&mut engine, Leave::Cancel);").unwrap());
+        assert!(failed.contains("// restriction: place-save-write"));
         let host = include_str!("../runtime/features/recording_host.rs");
         let commit = host.split("fn place_commit(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(commit.contains("Placed::Refused { ticket } => super::record_place::post_placed(ticket, None)"));
     }
 
-    /// tr-primary-2 2026-11-25 16:48:42Z: flat BSS, and "on stage reuses the tracing stage". The picker keeps no
-    /// outline and no walk of its own. What it hands the worker and takes from it crosses in three small cells.
+    /// tr-primary-2 2026-11-25 16:48:42Z and 17:50Z: flat BSS, and "on stage reuses the tracing stage". The picker
+    /// keeps no outline and no walk of its own, and adds no static: what it hands the worker and takes from it
+    /// lies in its engine, where the worker puts, replaces and drops it and a fighter frame only reads it.
     #[test]
     fn the_picker_keeps_no_outline_of_its_own() {
         let place = include_str!("../runtime/features/record_place.rs");
-        for gone in ["Surfaces", "Discovery", "NativeSource", "AtomicU32"] {
+        for gone in ["Surfaces", "Discovery", "NativeSource", "AtomicU32", "Mailbox", "BoxHandoff"] {
             assert!(!place.contains(gone), "{gone}");
         }
-        assert_eq!(place.matches("BoxHandoff::new()").count(), 2);
-        assert!(place.contains("static COMMITS: Mailbox<Commit, 1>") && place.matches("Mailbox<").count() == 1);
-        assert_eq!(place.matches("\nstatic ").count(), 15);
+        // The statics of `main` `a945b0c1`, and no more.
+        assert_eq!(place.matches("\nstatic ").count(), 12);
+        // Each box has one writer, a worker function; no fighter frame empties or drops one.
+        assert_eq!(place.matches("&mut engine.asked").count() + place.matches("engine.asked = ").count(), 1);
+        assert_eq!(place.matches("core::mem::replace(&mut engine.answer").count() + place.matches("engine.answer = ").count(), 1);
+        for worker in ["pub(crate) fn open_save(", "pub(crate) fn post_placed("] {
+            let body = place.split(worker).nth(1).unwrap().split("\n}").next().unwrap();
+            assert!(body.contains("worker_engine()") && body.contains("core::mem::replace(") && body.contains("drop(old);"));
+            assert!(body.find("drop(engine);").unwrap() < body.find("drop(old);").unwrap(), "dropped outside the lock");
+        }
+        assert!(!place.contains("ENGINE.lock()"));
         let tech = include_str!("../runtime/features/tech.rs");
         let view = tech.split("struct ViewState {").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(view.contains("surfaces: Surfaces,") && view.contains("discovery: Discovery,"));
@@ -2319,8 +2331,9 @@ mod tests {
         assert!(floors.contains("VIEW.try_lock()?") && !floors.contains(".lock()"));
         assert!(floors.contains("STALE.swap(false") && floors.contains("view.surfaces.epoch() != Some(epoch)"));
         assert!(floors.find("view.discovery.walked(&view.surfaces)").unwrap() < floors.find("Some(SurfaceKind::Floor)").unwrap());
-        // The walk's native calls stay Tech practice's own: the picker stops at its gate.
-        assert!(floors.trim_start().starts_with(") -> Option<usize> {\n    if !super::tech_adapter::tech_ready() {\n        return Some(0);"));
+        // The walk's native calls stay Tech practice's own: the picker stops at its gate, before anything else.
+        let gate = floors.find("if !super::tech_adapter::tech_ready() {\n        return Some(0);").unwrap();
+        assert!(gate < floors.find("VIEW.try_lock()").unwrap());
         let reset = tech.split("pub fn reset() {").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(reset.contains("STALE.store(true"));
     }
@@ -2331,7 +2344,7 @@ mod tests {
         assert!(!place.contains("is_native_training") && !place.contains("lobby_active"));
         let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
         let open = frame.split("OPEN.swap(0").nth(1).unwrap();
-        assert!(open.contains("scene::current().is_some()") && open.contains("OPENS.take("));
+        assert!(open.contains("scene::current().is_some()") && open.contains("engine.asked.as_deref()"));
     }
 
     #[test]
