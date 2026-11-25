@@ -74,9 +74,9 @@ impl Place {
 
 /// Where the next cast starts to pass a line met at `height` on the way to `to`: the game's ray accepts a line 1e-5
 /// of its length behind its origin (`tech::discovery::Rays`).
-fn past(height: f32, to: f32) -> f32 {
+fn past(height: f32, to: f32, down: bool) -> f32 {
     let reach = 1e-5 * (to - height).abs();
-    if to < height { (height - reach).next_down() } else { (height + reach).next_up() }
+    if down { (height - reach).next_down() } else { (height + reach).next_up() }
 }
 
 /// The lines of one column from `from` toward `to`, nearest first, until `each` says stop.
@@ -94,7 +94,7 @@ fn column(
         if !each(line, height) {
             return Ok(());
         }
-        let next = past(height, to);
+        let next = past(height, to, down);
         if next == y || (next < y) != down {
             return Err(Unread);
         }
@@ -141,7 +141,7 @@ pub fn classify(stage: &mut impl Probe, blast: [f32; 4], at: Point) -> Result<Pl
             return Ok(if height <= y + SLACK { Place::OverStage } else { Place::Solid });
         }
         if height <= start {
-            start = past(height, bottom);
+            start = past(height, bottom, true);
         }
     }
     let mut over = false;
@@ -433,6 +433,21 @@ mod tests {
                 assert_eq!(actual.ends, [[-10., 0.], [10., 2.]]);
             }
         }
+    }
+
+    #[test]
+    fn a_line_at_the_end_of_a_column_is_passed_once() {
+        let blast = [-100., 100., 100., -100.];
+        let floor = [(line([[-10., 5.], [10., 5.]], true, false), true)];
+        each(&floor, |stage| {
+            assert_eq!(classify(stage, blast, [0., 5.]), Ok(Place::OverStage));
+            assert_eq!(classify(stage, blast, [0., 4.999]), Ok(Place::OverStage));
+        });
+        let underside = [(line([[-10., 5.], [10., 5.]], false, false), false)];
+        each(&underside, |stage| {
+            assert!(classify(stage, blast, [0., 5.]).is_ok());
+            assert_eq!(classify(stage, blast, [0., 4.]), Ok(Place::Under));
+        });
     }
 
     #[test]
