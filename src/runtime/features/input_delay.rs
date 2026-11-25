@@ -126,6 +126,7 @@ fn apply() {
     let raw = pending.controller(&NativeTls);
     // SAFETY: `raw` is the live Controller of this mapping call or 0; `out` is the record the game just wrote.
     let sticks = unsafe { raw_sticks(raw) }.unwrap_or(Sticks::of_record(unsafe { *out }));
+    // SAFETY: as above.
     let commanded = unsafe { reset_commanded(raw) };
     // Input Delay counts game frames: the queue is that many frames of reads at the game's speed now.
     let delay = crate::runtime::features::game_speed::current().reads(published::input_delay());
@@ -164,6 +165,9 @@ fn apply() {
     }
 }
 
+/// Player 1 commands the game's own Training reset on this poll: its chord on the raw controller (the plugin's
+/// Quick Reset chord), in native Training with L+R+A Reset On. The game's predicate is asked on a chord poll only.
+///
 /// # Safety
 /// `controller` is 0 or the live Controller of this mapping call.
 unsafe fn reset_commanded(controller: usize) -> bool {

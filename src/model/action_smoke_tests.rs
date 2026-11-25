@@ -644,6 +644,12 @@ fn a_reset_command_alone_leaves_no_result_on_any_frame() {
                     }
                     let before = helper.results().copied().collect::<Vec<_>>();
                     let stats = (helper.streak(), helper.best());
+                    assert_eq!(before.len(), count,
+                        "tolerance={tolerance} button={button} x={x} y={y} hold={hold} two_step={two_step} count={count} held={held}");
+                    assert!(before.iter().all(|result| result.clean),
+                        "tolerance={tolerance} button={button} x={x} y={y} hold={hold} two_step={two_step} count={count} held={held} before={before:?}");
+                    assert_eq!(stats.0, count as u16,
+                        "tolerance={tolerance} button={button} x={x} y={y} hold={hold} two_step={two_step} count={count} held={held}");
                     for f in 0..held.max(8) + 30 {
                         if f == 8 { tracker.clear(); }
                         let buttons = if f < held { RESET | COMMAND } else { 0 };
@@ -837,6 +843,11 @@ fn the_poll_carries_the_command_through_the_delay() {
     assert!(poll.contains("with_reset_command("));
     assert!(apply.find("split_reset_command(record)").unwrap() < apply.find("unsafe { *out = record }").unwrap());
     assert!(apply.contains("input_display::on_p1_poll(controller, &record, sticks, command)"));
+    let commanded = delay.split("unsafe fn reset_commanded(").nth(1).unwrap().split("\n}").next().unwrap();
+    let chord = commanded.find("QuickReset::chord_held(raw)").unwrap();
+    let setting = commanded.find("published::lra_reset()").unwrap();
+    let training = commanded.find("scene::is_native_training()").unwrap();
+    assert!(chord < setting && setting < training);
     let display = include_str!("../runtime/features/input_display.rs");
     assert!(display.contains("physical_inputs.buttons & RESET_COMMAND"));
 }
