@@ -1273,6 +1273,35 @@ pub fn today() -> String {
     }
 }
 
+/// A macro stop and an input-drill stop are alternatives. The drill's deep
+/// save path must not reserve the macro capture, spans and two saved fighters.
+#[inline(never)]
+fn save_stopped_macro(root: &Path, player: SavedState, cpu: SavedState, tick: &mut Tick) {
+    let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { "cpu" } else { "player" };
+    tick.diags.push(format!("screen=recording role={role_now} recording=0"));
+    let (spans, count) = take_capture_spans();
+    let (role, frames) = taken_frames();
+    let mut capture = Capture::idle();
+    toggle_record(&mut capture, role);
+    for frame in frames {
+        push_frame(&mut capture, role, frame);
+    }
+    capture.set_spans(&spans[..count]);
+    // The Record chord owns the start pose and speed. Host callers without
+    // a posted start use the two live poses, at rest.
+    let posted = take_record_start();
+    capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+    let (player, cpu, speeds) = match posted.map(|p| p.start) {
+        Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
+        None => (player, cpu, [(0.0, 0.0); 2]),
+    };
+    if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim()) {
+        if let Some(text) = stop.notice() {
+            tick.notices.push(text);
+        }
+    }
+}
+
 pub fn service_at(
     root: &Path,
     slots: &[Option<LegacySlot>; 5],
@@ -1335,36 +1364,7 @@ pub fn service_at(
         let (spans, count) = take_capture_spans();
         save_input(root, "", true, &spans[..count], &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
-        let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
-            "cpu"
-        } else {
-            "player"
-        };
-        tick.diags
-            .push(format!("screen=recording role={role_now} recording=0"));
-        let (spans, count) = take_capture_spans();
-        let (role, frames) = taken_frames();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, role);
-        for frame in frames {
-            push_frame(&mut capture, role, frame);
-        }
-        capture.set_spans(&spans[..count]);
-        // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
-        // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
-        // stands in, at rest, as before.
-        let posted = take_record_start();
-        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
-        let (player, cpu, speeds) = match posted.map(|p| p.start) {
-            Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
-            None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
-        };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim())
-        {
-            if let Some(text) = stop.notice() {
-                tick.notices.push(text);
-            }
-        }
+        save_stopped_macro(root, player, cpu, &mut tick);
     }
     // A drill question and a finished Make combo are work even when no chord is waiting.
     let busy = play_player
