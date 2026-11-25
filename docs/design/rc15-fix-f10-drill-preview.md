@@ -10,7 +10,7 @@
 | The one Recording player plays frames `start..end` of a MACRO FILE on a role through that role's Play queue: `rr_host::request_preview(source, role, start, end)` → `Playback::play_range`. It finds the file among the macros on the card. `stop_preview()` drops the rest; `preview_running()` says whether it still plays | `model/rr_host.rs`, `model/playback.rs` (F7) |
 | Player 1's played frame is written into its mapped record after the menu's owner made the real pad neutral, so a macro plays on Player 1 under an open menu (Make combo already does) | `runtime/features/input_delay.rs`, `recorder::on_p1_poll` |
 | X is free on combo and drill rows: on the page and in the pop-up it only cycles the loop in MACROS | `recording_menu.rs` `handle_page`, `press_popup_outcome` |
-| The Crop preview: X starts it, the page is not drawn while it plays, only X or B act (they stop it), the page returns 60 frames after the last input | `replay_capture.rs` `on_input`, `clip_panel.rs` `PreviewTail`, `hides_page` |
+| The Crop preview: X starts it; X or B stops it, and a ZR tap switches the target and stops it. The editor stays open, and its tail lasts 60 frames after the last input | `replay_capture.rs` `on_input`, `clip_panel.rs` `PreviewTail`, `hides_page` |
 
 So a drill has nothing the player could play unless its take's frames are kept where the player reads, and the player reads macro files.
 
@@ -31,7 +31,7 @@ When `+ Record drill…` stops and the drill is saved, the take's frames are sav
 - **A drill without a take** (recorded before this build, a crop, or one Make combo made) shows `Re-record to preview` as the first line of its CONNECTIONS text, and X does nothing on it. A made drill's source macro can still be played as a macro.
 - **Button:** X, the Crop and Replay preview's button. X in MACROS still cycles the loop; context decides.
 - **What plays:** `rr_host::request_drill_preview(take id, frames)` asks `request_preview` for the whole take once on Player 1 through the Play queue, from where the fighters stand (a take has no start save). No playback code is added.
-- **While it plays:** the menu (or the pop-up) stays open and keeps Player 1's pad, and is not drawn. Only X and B act: they stop the preview, and the page returns once the player has dropped the rest of the take (the same worker pass in practice), so no frame of the take is handed to Player 1 behind a shown page. Without a press the page returns 60 frames after the last input, on the same row.
+- **While it plays:** the menu (or the pop-up) stays open and keeps Player 1's pad, and is not drawn. The strip's key line reads `B stop preview`. Only X and B act: they stop the preview, and the page returns once the player has dropped the rest of the take (the same worker pass in practice), so no frame of the take is handed to Player 1 behind a shown page. Without a press the page returns 60 frames after the last input, on the same row.
 - **Not started** (nothing happens) while the shared preview gate says no: practice not ready, a load in flight, a take open, a Play queued or running on Player 1 (it is not replaced), or another preview running.
 - **Hint:** the footer of a previewable drill row names it. Page: `A open   X preview   ZR role   L/R page   B close`. Pop-up: `A drill   X preview   Left/Right section   ZL/L/R tab   ZR role   ZL+Up/Down page   B close`.
 - **Bridge:** one line added to `tr.menu/1`, `recording.preview` = `drill` while the preview hides the menu, else empty.

@@ -1990,3 +1990,14 @@ adapter reaches 150% from 0 at poll 168.
 
 This reverses SPEC-core-02's slider keys and increments (Left / Right handles, ±1 and ±10) and the r8 pop-up's L and R
 role keys (primary 2026-11-08 15:55Z).
+
+## Preview stop and Recording chord hints (2026-11-25)
+
+Decided by the operator on 2026-11-25 (relayed by tr-primary-2, inbox 14:29:24Z): the five preview entry points share
+B as the stop key and `B stop preview` as their hint. B stops and drops the remaining frames without closing the
+editor; a second B closes it. X also stops, and an editor ZR tap switches target and stops a preview.
+
+The Recording pop-up's first help line shows the configured Record and Play chords. It uses the full names when they
+fit the pane's UTF-16 capacity and width, then P1 and CPU, then a pointer to the chords screen. The hint shows only
+while the preview is running. The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended
+after review by rv-hit-streak at 14:36:00Z.
