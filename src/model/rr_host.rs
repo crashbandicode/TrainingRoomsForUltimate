@@ -522,6 +522,8 @@ pub enum HomeWarp {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
+    #[cfg(test)]
+    pub warp_pair: Option<[SavedState; 2]>,
     /// A Vault clip's preview: the game keeps both fighters as Save reads them when it first starts and loads that pair at the start and for the return.
     pub home: Option<HomeWarp>,
     /// The playing role and the placement of the file that warps (`warp_pair`).
@@ -589,6 +591,11 @@ pub fn request_clip_preview(recording: MacroRecording, role: Role) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
     queue_preview(PreviewStart { source: CLIP_ID.to_owned(), role, window: PreviewWindow::Exact(0..len) });
+}
+
+#[cfg(test)]
+pub fn request_clip_playback(recording: MacroRecording, role: Role) {
+    request_clip_preview(recording, role);
 }
 
 /// A Vault clip's preview has the fighters away from where it found them until the return lands.
@@ -1424,6 +1431,9 @@ fn record_trim() -> crate::model::trim::Trim {
 pub fn set_playback_indicator(on: bool) {
     PLAYBACK_INDICATOR.store(on, Ordering::Release);
 }
+
+#[cfg(test)]
+pub fn set_playback_delay(_frames: u16) {}
 
 pub fn playback_indicator_enabled() -> bool {
     PLAYBACK_INDICATOR.load(Ordering::Acquire)
@@ -2688,7 +2698,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 #[cfg(test)]
-fn reset_host() {
+pub(crate) fn reset_host() {
     slot_stop();
     for tape in &SLOT_TAPES {
         // SAFETY: host tests serialize the single publisher.

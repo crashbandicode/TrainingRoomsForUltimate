@@ -46,6 +46,8 @@ pub enum HitstunTiming {
 pub struct RecorderSettings {
     pub trim: super::trim::Trim,
     pub indicator: bool,
+    #[cfg(test)]
+    pub delay: u16,
     pub place: bool,
     pub hitstun: HitstunTiming,
     pub mash_interrupt: bool,
@@ -56,6 +58,8 @@ impl RecorderSettings {
         Self {
             trim: super::trim::Trim::End,
             indicator: true,
+            #[cfg(test)]
+            delay: 0,
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
             mash_interrupt: true,
@@ -70,6 +74,8 @@ impl RecorderSettings {
         Self {
             trim,
             indicator: on("playback_indicator"),
+            #[cfg(test)]
+            delay: 0,
             place: on("recording_place"),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,
