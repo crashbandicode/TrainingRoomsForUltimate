@@ -110,10 +110,9 @@ pub struct ClipHelp {
 
 /// Button text for the step the crop editor is actually on.
 pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipHelp {
-    let controls = format!("{}{}Y snap. A save. B close.",
-        if view.context.fighters() { "D-pad Up/Down: fighter. " }
-        else if matches!(view.context, ClipContext::Macro { .. }) { "ZR Player/CPU. " }
-        else { "" },
+    let controls = format!("{}{}{}Y snap. A save. B close.",
+        if view.context.fighters() { "D-pad Up/Down: fighter. " } else { "" },
+        if view.target.is_some() { "ZR Player/CPU. " } else { "" },
         if view.context.preview() { "X preview. " } else { "" });
     let (primary, follow) = match view.handle {
         Handle::Out => (
@@ -246,16 +245,14 @@ impl TargetTap {
 impl TargetTap {
     /// The pad's own button set, once per Player 1 input (a GameCube pad's Z arrives as the ZR bit).
     pub fn zr_tap(&mut self, held: crate::model::chords::Buttons) -> bool {
-        let _ = held;
-        false
+        self.tapped(held.zr(), held.other_than_zr())
     }
 }
 
 impl ClipView {
     /// The role a preview plays on and is fed through.
     pub fn play_role(&self) -> crate::engine::library::Role {
-        let _ = self.target;
-        crate::engine::library::Role::Cpu
+        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }
     }
 }
 

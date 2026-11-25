@@ -487,7 +487,7 @@ mod tests {
         let controls = clip_panel::clip_help(&editor.view(), "ZL or ZR", "ZL", 0).controls;
         assert!(controls.starts_with("ZR Player/CPU. X preview. Y snap."), "{controls}");
         let adapter = include_str!("../../runtime/macros/replay_capture.rs");
-        assert!(adapter.contains("TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())"));
+        assert!(adapter.contains("TARGET_TAP.lock().unwrap().zr_tap(held)"));
         // rv-preview-vis 01:28:15Z: the pad's own button set. Any other bit, a stick's Up or Down included, spoils the tap.
         use crate::model::chords::{bit, Buttons};
         let tapped = |samples: &[u32]| {
@@ -768,7 +768,7 @@ mod tests {
         let adapter = include_str!("../../runtime/macros/replay_capture.rs");
         for wanted in ["TARGET_TAP.lock().unwrap().zr_tap(held)", "clip_view().is_some_and(|v| v.target.is_some())",
             "request_clip_preview(*recording, clip_play_role())", "editor.set_play_target(request.player);",
-            "let role = before.play_role();", "editor_label(view.entry, &fighter)",
+            "let role = before.play_role();", "editor_label(view.entry, &fighter),",
             "map_or(Role::Cpu, |editor| editor.view().play_role())"] {
             assert!(adapter.contains(wanted), "missing {wanted}");
         }

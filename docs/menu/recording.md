@@ -266,16 +266,16 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | Key | What it does |
 | --- | --- |
 | Up/Down | On a capture with two sides, pick whose inputs to take. Nothing for a saved file. |
-| ZR | A tap (pressed and released with nothing else) swaps where a macro's preview plays: the CPU or Player 1, as ZR does on the Recording page. The strip reads "Plays on CPU" or "Plays on Player 1". During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
+| ZR | A tap (pressed and released with nothing else) swaps where the preview of a macro or a capture plays: the CPU or Player 1, as ZR does on the Recording page. The strip names it ("Plays on CPU", or after a capture's fighter "plays on Player 1"). A recording opened from its own screen starts on its Plays on choice, and Make uses the target the strip shows. During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
 | L / R | L picks the start and R the end. After a preview or save, pick a handle again before moving it. |
 | Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. |
 | Y | Snaps the selected handle to the nearest move: In to a move's start, Out to a move's end. A move whose end is not known offers the next move's start, or the end of the take. Pick a handle with L or R first. |
 | ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
-| X | Previews the kept part: a Replay window capture on the CPU, or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early. Not offered for combos or drills. |
+| X | Previews the kept part: a capture on the CPU (or on Player 1 after a ZR tap, or when its Plays on says so), or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview, or leaves when not previewing. |
 
-Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a Replay window capture the strip also names where the preview plays (CPU).
+Crop on a macro, combo or drill opens this same editor. A one-side file has no fighter-selection row. Combos and drills have no preview button. The frame strip and helper bar step aside until you leave the editor, including after preview or save. On a capture the strip names the captured side and where the preview plays.
 
 **Move marks.** A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
 

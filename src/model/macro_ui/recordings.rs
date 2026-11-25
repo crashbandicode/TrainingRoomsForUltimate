@@ -33,8 +33,9 @@ pub fn rows(latest: Option<&ReplaySession>, previous: Option<&ReplaySession>, sa
     files
 }
 
-pub fn editor_label(entry: i32, fighter: &str, player: bool) -> String {
-    format!("{} {fighter} · plays on {}", capture_side_label(entry), if player { "Player 1" } else { "CPU" })
+/// The captured side as the editor's strip names it; the strip adds where it plays (`editors::clip`).
+pub fn editor_label(entry: i32, fighter: &str) -> String {
+    format!("{} {fighter}", capture_side_label(entry))
 }
 
 pub fn open_one(id: &str, waiting: bool) -> (ClipBrowser, clip_browser::Effect) {
@@ -84,9 +85,19 @@ mod tests {
     }
 
     fn a_captured_side_is_named_independently_of_the_play_target() {
-        assert_eq!(editor_label(0, "Fox", false), "P1 Fox · plays on CPU");
-        assert_eq!(editor_label(1, "Fox", true), "CPU Fox · plays on Player 1");
-        assert_eq!(editor_label(2, "Fox", true), "P3 Fox · plays on Player 1");
+        assert_eq!(editor_label(0, "Fox"), "P1 Fox");
+        assert_eq!(editor_label(1, "Fox"), "CPU Fox");
+        assert_eq!(editor_label(2, "Fox"), "P3 Fox");
+        let session = |entry: i32| ReplaySession { tracks: vec![ReplayTrack { entry, frames: vec![ReplayFrame {
+            input: InputFrame::default(), start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0 }], quantized_analog: false }],
+            truncated: false, breaks: Vec::new() };
+        let mut editor = ClipEditor::new(session(1), vec![0]).unwrap();
+        for (player, target) in [(false, "CPU"), (true, "Player 1")] {
+            editor.set_play_target(player);
+            let mut frame = crate::model::frame::Frame::new();
+            crate::editors::clip::clip_frame(&editor.view(), &editor_label(editor.view().entry, "Fox"), 0, &mut frame);
+            assert_eq!(String::from_utf16_lossy(frame.rows[1].label.units()), format!("Fighter: CPU Fox · plays on {target}"));
+        }
     }
 
     fn legacy_capture_sources_are_selected_by_entry_not_file_order_or_fighter() {

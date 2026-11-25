@@ -1245,7 +1245,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "d4a985298b6f87e8b74ce0cf8d5f9a233bfbfbe40e1f8210f9cdf89d8f65fc97",
+   "dest_sha256": "c54cc886d59c75dcb9165c1b618e915a10823b0b2b3926f5997eedb11a8ae876",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -1646,6 +1646,21 @@
     {
      "old": "        tap\n    }",
      "new": "        tap\n    }\n}\n\nimpl TargetTap {\n    /// The pad's own button set, once per Player 1 input (a GameCube pad's Z arrives as the ZR bit).\n    pub fn zr_tap(&mut self, held: crate::model::chords::Buttons) -> bool {\n        let _ = held;\n        false\n    }\n}\n\nimpl ClipView {\n    /// The role a preview plays on and is fed through.\n    pub fn play_role(&self) -> crate::engine::library::Role {\n        let _ = self.target;\n        crate::engine::library::Role::Cpu\n    }",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        let _ = self.target;\n        crate::engine::library::Role::Cpu",
+     "new": "        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        let _ = held;\n        false",
+     "new": "        self.tapped(held.zr(), held.other_than_zr())",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    let controls = format!(\"{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" }\n        else if matches!(view.context, ClipContext::Macro { .. }) { \"ZR Player/CPU. \" }\n        else { \"\" },",
+     "new": "    let controls = format!(\"{}{}{}Y snap. A save. B close.\",\n        if view.context.fighters() { \"D-pad Up/Down: fighter. \" } else { \"\" },\n        if view.target.is_some() { \"ZR Player/CPU. \" } else { \"\" },",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]
@@ -3921,7 +3936,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "b6966e234f96d4e60f30224b59528d5458a306de66740f5149b2fe61b8f53d10",
+   "dest_sha256": "75334d4f4a97769f17b748dd32ef4ef741cb38fb93d7f660b03c8fe3f4ffeccb",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -4731,6 +4746,41 @@
     {
      "old": "use smash::lib::lua_const::*;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};",
      "new": "use smash::lib::lua_const::*;\nuse crate::engine::library::Role;\nuse crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).\n    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())\n        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {",
+     "new": "    if TARGET_TAP.lock().unwrap().zr_tap(held)\n        && clip_view().is_some_and(|v| v.target.is_some()) {",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "            let role = match before.context {\n                ClipContext::Macro { player: true } => Role::Player,\n                _ => Role::Cpu,\n            };",
+     "new": "            let role = before.play_role();",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),",
+     "new": "        Some(_) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter),",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "pub fn clip_play_role() -> crate::engine::library::Role {\n    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {\n        crate::engine::library::Role::Player\n    } else { crate::engine::library::Role::Cpu }",
+     "new": "/// The fighter a preview plays on: the editor's play target (a ZR tap swaps it; a recording's Plays on seeds it).\npub fn clip_play_role() -> Role {\n    EDITOR.lock().unwrap().as_ref().map_or(Role::Cpu, |editor| editor.view().play_role())",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "        let player = editor.request.is_some_and(|request| request.player);",
+     "new": "        let player = editor.plays_on_player() == Some(true);",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n            } else {",
+     "new": "                if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }\n                editor.set_play_target(request.player);\n            } else {",
+     "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };",
+     "new": "                let role = clip_play_role();",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
     }
    ]

@@ -340,7 +340,7 @@ fn service_file_name() {
             let request = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request);
             if let (Some(request), crate::engine::rr_runtime::ClipFile::Macro(recording)) = (request, &file) {
                 let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-                let role = if request.player { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu };
+                let role = clip_play_role();
                 match crate::engine::rr_runtime::generate(std::path::Path::new(crate::model::storage::ROOT), (**recording).clone(), &name, request.make, role, at) {
                     Ok(crate::engine::rr_runtime::Generated::Macro(id)) => crate::runtime::diag_log::diagnostic(format_args!("[ClipEditor] saved_new={id}")),
                     Ok(crate::engine::rr_runtime::Generated::Pass(ask)) => { close_editor(); crate::engine::rr_host::request_make(ask); }
@@ -428,6 +428,7 @@ fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Res
             let request = browser.as_ref().and_then(|b| b.request);
             if let Some(request) = request {
                 if !editor.select_entry(i32::from(request.entry)) { return Err(crate::engine::rr_runtime::EMPTY_RECORDING.into()); }
+                editor.set_play_target(request.player);
             } else {
                 editor.select_kind(current);
             }
@@ -466,7 +467,7 @@ fn gate_selection(action: Option<ClipAction>, current: Option<i32>) -> bool {
     let (gate, recorded, unresolved, player) = {
         let editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_ref() else { return false; };
-        let player = editor.request.is_some_and(|request| request.player);
+        let player = editor.plays_on_player() == Some(true);
         if !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }) { return false; }
         let (entry, kind, previous) = match action {
             Some(action) => match editor.peek_selection(action) { Some(candidate) => candidate, None => return false },
@@ -862,16 +863,15 @@ pub fn clip_view() -> Option<ClipView> {
     EDITOR.lock().unwrap().as_ref().map(|editor|editor.view())
 }
 
-pub fn clip_play_role() -> crate::engine::library::Role {
-    if EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request).is_some_and(|request| request.player) {
-        crate::engine::library::Role::Player
-    } else { crate::engine::library::Role::Cpu }
+/// The fighter a preview plays on: the editor's play target (a ZR tap swaps it; a recording's Plays on seeds it).
+pub fn clip_play_role() -> Role {
+    EDITOR.lock().unwrap().as_ref().map_or(Role::Cpu, |editor| editor.view().play_role())
 }
 
 pub fn clip_fighter_label(view: &ClipView) -> String {
     let fighter = kind_label(view.fighter_kind);
     match EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.request) {
-        Some(request) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter, request.player),
+        Some(_) => crate::engine::macro_ui::recordings::editor_label(view.entry, &fighter),
         None => fighter,
     }
 }
@@ -894,10 +894,7 @@ pub fn worker_preview_notices() {
     if let Some(editor) = EDITOR.lock().unwrap().as_mut() {
         let before = editor.view();
         if before.playing {
-            let role = match before.context {
-                ClipContext::Macro { player: true } => Role::Player,
-                _ => Role::Cpu,
-            };
+            let role = before.play_role();
             editor.preview_cursor(rr_host::fed_frames(role));
             let mut spans = [Span::default(); WATCH_SPANS];
             let (run, count) = rr_host::watch_copy(&mut spans);
@@ -1099,9 +1096,8 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         return;
     }
     let held = controller.current_buttons;
-    // A Vault capture's preview takes a play role once the Recordings line supplies it (`request_clip_preview`).
-    if TARGET_TAP.lock().unwrap().tapped(held.zr(), held.other_than_zr())
-        && clip_view().is_some_and(|v| matches!(v.context, ClipContext::Macro { .. })) {
+    if TARGET_TAP.lock().unwrap().zr_tap(held)
+        && clip_view().is_some_and(|v| v.target.is_some()) {
         on_action(ClipAction::SwapTarget);
         return;
     }
