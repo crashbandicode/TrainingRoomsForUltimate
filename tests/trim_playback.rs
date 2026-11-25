@@ -532,6 +532,75 @@ fn drill_preview_uses_the_takes_trim() {
     assert_eq!(played, [0, 1, 2, 0]);
 }
 
+fn played_preview(root: &Path) -> Vec<u32> {
+    let mut out = Vec::new();
+    for _ in 0..12 {
+        tick(root);
+        if let Some(frame) = host::take_player_frame() { out.push(frame.buttons); }
+    }
+    assert!(!host::preview_running());
+    out
+}
+
+fn play_selected_drill(root: &Path, name: &str) -> Vec<u32> {
+    let mut cache = rr_runtime::CatalogCache::new(root);
+    cache.want(0);
+    while cache.step() {}
+    let mut screens = RecordingScreens::new();
+    rr_runtime::apply_catalog(cache.ready(0).unwrap(), &RecordingIndex::load(root).unwrap(), &mut screens);
+    open(&mut screens, COMBOS_SEQ, 1, "DRILLS >");
+    let items = screens.section(Face::Page, COMBOS_SEQ, 1).rows;
+    screens.set_cursor(Face::Page, COMBOS_SEQ, 1, items.iter().position(|row| row.name == name).unwrap());
+    screens.handle_page(Button::X, true, COMBOS_SEQ);
+    let Effect::PreviewDrill { source, frames } = screens.take_effect() else { panic!("missing X preview") };
+    assert!(host::request_drill_preview(&source, frames));
+    played_preview(root)
+}
+
+#[test]
+fn rv_trim_shared_take_uses_the_selected_drills_setting() {
+    let _host = HostGuard::new();
+    let root = Scratch::new();
+    let macros = Library::new(root.0.join(MACROS_DIR));
+    let take = macros.save_new(&recording("Drill take 0000000000000002", &[0, 1, 2, 0], Trim::Off)).unwrap();
+    let drills = ComboLibrary::new(root.0.join("combos"));
+    let a = drills.save_new(&combo(true, "First").with_take(&take)).unwrap();
+    let b = drills.save_new(&combo(true, "Second").with_take(&take)).unwrap();
+    tick(&root.0);
+    for (id, trim) in [(a, Trim::Start), (b, Trim::End)] {
+        host::post_effect(Effect::SetTrim { id, kind: FileKind::Combo, trim });
+        tick(&root.0);
+    }
+    assert_eq!(play_selected_drill(&root.0, "First"), [1, 2, 0]);
+    assert_eq!(play_selected_drill(&root.0, "Second"), [0, 1, 2]);
+    assert_eq!(macros.load(&take).unwrap().trim, Trim::Off);
+}
+
+#[test]
+fn rv_trim_drill_does_not_modify_referenced_macro() {
+    let _host = HostGuard::new();
+    let root = Scratch::new();
+    let macros = Library::new(root.0.join(MACROS_DIR));
+    let take = macros.save_new(&recording("Ordinary macro", &[0, 1, 0], Trim::Off)).unwrap();
+    let id = ComboLibrary::new(root.0.join("combos")).save_new(&combo(true, "Copied").with_take(&take)).unwrap();
+    let path = root.0.join(MACROS_DIR).join(format!("{take}.json"));
+    let before = std::fs::read(&path).unwrap();
+    host::post_effect(Effect::SetTrim { id, kind: FileKind::Combo, trim: Trim::Both });
+    tick(&root.0);
+    assert!(std::fs::read(path).unwrap() == before, "changing a drill rewrote an unrelated macro");
+}
+
+#[test]
+fn rv_trim_full_editor_preview_ignores_take_like_name() {
+    let _host = HostGuard::new();
+    let root = Scratch::new();
+    let id = Library::new(root.0.join(MACROS_DIR))
+        .save_new(&recording("Drill take 0000000000000002", &[0, 1, 2, 0], Trim::Both)).unwrap();
+    tick(&root.0);
+    host::request_preview(&id, Role::Player, 0, 4);
+    assert_eq!(played_preview(&root.0), [0, 1, 2, 0]);
+}
+
 #[test]
 fn playback_indicator_shows_the_playing_role() {
     for (playing, text, color) in [
