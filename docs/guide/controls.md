@@ -1,150 +1,82 @@
 # Controls
 
-Most of what TrainingRooms does while you practise is on a chord: hold one button and press the others. This page lists
-every chord, its default and where to change it, then the fixed buttons, the GameCube controller and the cases where a
-chord is held back.
+Use and change the button chords for practice. They work in Training and in the waiting rooms.
 
-![R + D-pad Down turns the input display off, then on again](../media/rc8-input-display-chord.gif)
+<!-- CLIP: tut-controls-change-chord.mp4 | Save State Save reads ZL + D-pad Down → Button chords, X, hold ZL + D-pad Left → the new chord saves -->
 
-## How chords work
-
-- Hold one button of the chord, then press the others. A chord fires once per press; holding it doesn't repeat.
-- Chords work in Training, and in a waiting room while Fighters & Stages ›
-  [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On.
-- They don't fire while a menu is open: this one, the game's pause menu, or the waiting room's own menu.
-- The game doesn't see a chord's buttons while you hold them, so the ZR of a chord doesn't make you shield.
-- [Input Delay](../menu/display-and-controls.md#input-delay) never delays a chord.
+A chord is "hold one button, then press the others". It fires once per press. The game doesn't see a chord's
+buttons while you hold them, and chords don't fire while a menu is open.
 
 ## The chords
 
-| Default | What it does | Read more |
+| Action | Default | Change it at |
 | --- | --- | --- |
-| ZL + D-pad Down | Save State Save: saves a save state. | [Save states](save-states.md) |
-| ZL + D-pad Up | Save State Load: loads it. | [Save states](save-states.md) |
-| ZR + D-pad Down | Record: starts or stops a recording. | [Recording](recording.md) |
-| ZR + D-pad Up | Play on CPU: plays the CPU's active recording, or stops it. | [Recording](recording.md) |
-| ZR + D-pad Left | Play on Player 1: plays your active recording, or stops it. | [Recording](recording.md) |
-| ZR + D-pad Right | Recording pop-up: opens it; B closes it (chords do nothing while it is open). | [The pop-up](recording.md#the-pop-up) |
-| ZL + D-pad Right | Cycle Player: your next fighter. | [Fighter cycles](fighter-cycles.md) |
-| ZL + D-pad Left | Cycle CPU: the CPU's next fighter. | [Fighter cycles](fighter-cycles.md) |
-| R + D-pad Down | Input display: turns the frame strip on or off. | [Frame strip](frame-strip.md) |
-| R + D-pad Up, held | Game speed: D-pad Left or Right changes the speed. | [Game speed](game-speed.md) |
-| B + D-pad Up | Opens the menu. Fixed. | [Opening the menu](#opening-the-menu) |
-| Minus | Opens the menu (Menu shortcut 1). | [Opening the menu](#opening-the-menu) |
+| Save State Save | ZL + D-pad Down | Button chords |
+| Save State Load | ZL + D-pad Up | Button chords |
+| Record | ZR + D-pad Down | Button chords |
+| Play on CPU | ZR + D-pad Up | Button chords |
+| Play on Player 1 | ZR + D-pad Left | Button chords |
+| Recording pop-up | ZR + D-pad Right | Button chords |
+| Cycle Player | ZL + D-pad Right | Button chords |
+| Cycle CPU | ZL + D-pad Left | Button chords |
+| Input display | R + D-pad Down | Button chords |
+| Game speed | Hold R + D-pad Up, then Left / Right | Button chords |
+| Open the menu | Minus | Menu shortcut 1 |
+| Open the menu | Disabled | Menu shortcut 2 |
 
-The first ten are the rows of Display & Controls › [Button chords](../menu/display-and-controls.md#button-chords),
-named as in the table. Some need a setting first:
-
-- Save and load need Saves › Save States On. It is On by default.
-- Cycle Player needs Fighters & Stages › [Player Swapping](../menu/fighters-and-stages.md#player-swapping) On. It is Off
-  by default. Cycle CPU always works.
-
-A refused Save or Load shows in front of a standing notice, which returns afterward.
+- Save and Load need Saves › Save States On (the default).
+- Cycle Player needs Fighters & Stages › [Player Swapping](../menu/fighters-and-stages.md#player-swapping) On. It is
+  Off at first. Cycle CPU always works.
 
 ## Changing a chord
 
-1. Open Display & Controls › Button chords and press A.
-2. Choose a row and press A.
-3. Press X, then let go of every button.
-4. Hold the new chord: hold one button and press the others. Let go of everything to see it.
-5. A keeps it. B cancels. Y empties it, which turns that action off (the row reads "disabled").
-6. Close the menu. The new chord works from then on.
+1. Open **Display & Controls › Button chords** with A, choose a row and press A.
+2. Press X, then let go of every button.
+3. Hold the new chord and let go.
+4. A keeps it, B cancels, Y empties it, which turns that action off.
+5. Close the menu. The new chord works from then on.
 
-![L + D-pad Down first saves nothing; in the chord editor Save State Save is changed from ZL + D-pad Down to L + D-pad Down, which then saves](../media/rc11-button-chords.gif)
-
-The editor doesn't stop two rows from sharing a chord. If they do, both actions happen. Y on the Button chords row
-(on the page, not inside the editor) puts all ten back to your saved defaults.
+Two rows may share a chord; both actions then happen. Y on the Button chords row puts all ten back to your saved
+defaults.
 
 ## Opening the menu
 
-- **B + D-pad Up** always opens the menu (the Permanent shortcut row). It can't be changed or turned off.
-- **Menu shortcut 1** is Minus by default. **Menu shortcut 2** is disabled by default. Change them at Display & Controls
-  › [Menu shortcut 1](../menu/display-and-controls.md#menu-shortcut-1) and
-  [Menu shortcut 2](../menu/display-and-controls.md#menu-shortcut-2), with the same steps as a chord. A change works at
-  once.
-- A shortcut can't be B + D-pad Up, or the chord the other shortcut already has.
-- If a shortcut includes Plus, that press doesn't also open the game's pause menu.
-
-The shortcuts are kept in a small file you can also edit by hand: see [Editing the shortcuts file](#editing-the-shortcuts-file).
+- **B + D-pad Up** always opens the menu. It can't be changed or turned off.
+- **Menu shortcut 1** (Minus) and **Menu shortcut 2** (disabled) are changed on Display & Controls with the same
+  steps as a chord. A change works at once. A shortcut can't be B + D-pad Up or the other shortcut's chord.
+- The two shortcuts are kept in `sd:/ultimate/TrainingRooms/button_config.ini`, which you can also edit while the
+  game is closed, for example `shortcut_2=ZL + DPAD_UP`. Names: A, B, X, Y, L, R, ZL, ZR, DPAD_UP, DPAD_DOWN,
+  DPAD_LEFT, DPAD_RIGHT, Plus, Minus, Left Stick Press, Right Stick Press; `disabled` turns a shortcut off.
 
 ## Fixed buttons
 
-These can't be changed in the chord editor.
-
-- **B + D-pad Up** opens the menu.
-- **Kirby hats:** hold Special (B) with the left stick at rest and click the left stick: your Kirby takes the next hat
-  in Fighters & Stages › [Kirby Hats](../menu/fighters-and-stages.md#kirby-hats). Click the right stick instead for
-  the CPU's Kirby. More: [Fighter cycles](fighter-cycles.md).
-- **L + R + A** resets. In Training it is the game's own reset. In a waiting room it puts both practice fighters back
-  where they first stood. It can only be turned on or off, at Display & Controls ›
-  [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset) (On by default).
+| Buttons | What they do |
+| --- | --- |
+| B + D-pad Up | Opens the menu. |
+| L + R + A | Reset. In Training it is the game's own reset; in a waiting room it puts both practice fighters back. Turn it on or off at Display & Controls › [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset). |
+| Hold B, click the left stick | Your Kirby takes the next hat. The left stick must be at rest. |
+| Hold B, click the right stick | The CPU's Kirby takes the next hat. |
+| Hold R3, D-pad Left / Right | Scrolls the input display back and forward. Let go of R3 to return to now. |
 
 ## GameCube controller
 
-On a GameCube controller the plugin reads these buttons in place of the Switch ones:
+GameCube L is ZL, GameCube R is ZR, and GameCube Z is R. There is no Switch L and no Minus, so open the menu with
+B + D-pad Up; a chord that uses L or Minus can't be pressed. In the menu, Z turns the page and L + Up / Down jumps
+between sections.
 
-| Switch button | GameCube |
-| --- | --- |
-| ZL | L |
-| ZR | R |
-| R | Z |
-| L, Minus | none: it has no L button and no Minus |
-
-| Default chord | On a GameCube controller |
-| --- | --- |
-| Save, Load | L + D-pad Down / Up |
-| Record, Play, Recording pop-up | R + D-pad |
-| Cycle Player | L + D-pad Right |
-| Cycle CPU | L + D-pad Left |
-| Input display | Z + D-pad Down |
-| Game speed | Z + D-pad Up |
-
-- Minus doesn't exist, so open the menu with B + D-pad Up. A chord that uses the L button or Minus can't be pressed.
-- In the menu, Z turns the page. There is no button to turn back, but the pages wrap around. L + Up / Down jumps
-  between sections.
 ## Online Deluxe
 
-With the Online Deluxe plugin installed, some chords are held back so its own buttons work:
+With Online Deluxe installed, some chords wait so its own buttons work:
 
-| While | These chords wait |
-| --- | --- |
-| Its window shows a settings page that uses a D-pad button | A chord on that button: D-pad Up or Down with none of ZL, ZR, R and L held, or D-pad Left or Right with ZR held (and not ZL). The press goes to Online Deluxe. |
-| L is held | The Input display and Game speed chords, because Online Deluxe's L + R + D-pad Down contains R + D-pad Down. A chord of yours that uses L itself is not affected. |
-| Both triggers are held on a GameCube controller (Online Deluxe's L + R there) | Chords with ZL or ZR, Input display and Game speed. |
+- While its window shows a settings page that uses a D-pad button, a chord on that button waits. Of the defaults,
+  only Play on Player 1 and the Recording pop-up are affected.
+- While L is held, Input display and Game speed wait, unless your chord uses L itself.
+- On a GameCube controller, holding both triggers holds back Input display, Game speed and chords with one trigger.
 
-- Of the default chords, only ZR + Left (Play on Player 1) and ZR + Right (Recording pop-up) wait on a settings page.
-  Save and Load, Record, Playback, the cycles and Input display work beside the open page. Its Performance and Debug
-  views don't hold any back.
-- B + D-pad Up and your menu shortcuts still open this menu.
 ## When the CPU pilot plays Player 1
 
-While an AI plays Player 1 (the CPU pilot), these are refused with a notice:
-
-- Play on Player 1: "P1 is controlled by an AI: Play on Player 1 is off".
-- L + R + A in a waiting room: "P1 is controlled by an AI: Quick Reset is off".
-
-Record works then: the recording holds Player 1's inputs as the game receives them, the AI's included (changed
-2026-11-25; not yet seen in a game).
-
+While an AI plays Player 1 (the CPU pilot), Play on Player 1 and, in a waiting room, L + R + A are refused with a
+notice. Record works: the recording holds Player 1's inputs as the game receives them, the AI's included.
 More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
 
-![The notice "P1 is controlled by an AI: Play on Player 1 is off" on screen while the CPU pilot plays Player 1, whose tag reads CPU Lv3](../media/rc13-pilot-play-refusal.png)<br>
-*While the CPU pilot plays Player 1, Play on Player 1 shows "P1 is controlled by an AI: Play on Player 1 is off". Eden, rc.13 (untested on hardware).*
-
-## Editing the shortcuts file
-
-The two shortcuts are kept in `sd:/ultimate/TrainingRooms/button_config.ini`, not with the other settings. The menu
-writes it, so *Reset page to defaults* leaves them alone. If the file can't be written, a notice says "Could not save
-button_config.ini" and the change lasts until you close the game. You can also edit the file while the game is closed;
-it is read when the game starts:
-
-```ini
-# B + DPad Up is always available. The menu edits this file; a change applies at once.
-[menu]
-shortcut_1=Minus
-shortcut_2=disabled
-```
-
-Join buttons with `+`, as in `shortcut_2=ZL + DPAD_UP`. The names are A, B, X, Y, L, R, ZL, ZR, DPAD_UP, DPAD_DOWN,
-DPAD_LEFT, DPAD_RIGHT, Plus, Minus, Left Stick Press and Right Stick Press. `disabled` (or `none`) turns a shortcut off.
-A value that can't be read falls back to that shortcut's default.
+More: [Display & Controls](../menu/display-and-controls.md), [Using the menu](using-the-menu.md).
