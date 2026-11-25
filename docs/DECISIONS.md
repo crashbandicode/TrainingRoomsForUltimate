@@ -2136,9 +2136,11 @@ allow you to always copy or always change for all. default is prompt; PC6 A"
 
 **What a save writes** (design review by rv-edge-juggle-sol, 2026-11-25 15:19:35Z; accepted by tr-primary-2 15:23:38Z):
 
-- Only the save file, and in it only what you edited, field by field: a fighter's spot and place, its start state,
-  its damage. With nothing edited no file is written.
-- No macro file is touched. A macro's offset stays its own, and Play still adds it on top of the save's spot.
+- Change writes the edited fields of the save: a fighter's spot and place, its start state, its damage. With
+  nothing edited, nothing is written or copied.
+- Copy writes a new save. From a macro, it changes that macro's start-save link; from a chain, it changes the
+  first macro's link. Copy from the save itself changes no macro link. In all cases the picker leaves macro
+  inputs, Momentum and offsets alone. Play still adds the macro's own offset on top of the save's spot.
 - If the file cannot be written the picker says `Not saved · {save} could not be written` and puts both fighters
   back (`docs/RESTRICTIONS.md`, `place-save-write`).
 

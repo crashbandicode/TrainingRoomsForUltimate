@@ -392,14 +392,15 @@ Break the Targets crosshair, and A or + writes the save. The pages and keys are 
   starts off stage and not above a floor. From there the crosshair is free. The stage's shape is read from its own
   lines, so the Training stage's two gaps beside the island count, and the long floor that runs out through the
   blast line has no ledge on that side.
-- **Several macros, one start save:** a save that macros start from moves for all of them. The picker asks first
-  whether to change it for all or to copy it; Recording › Options ›
-  [Shared start save](../menu/recording.md#shared-start-save) answers ahead.
+- **Change or copy:** if at least one macro starts from the save, the picker normally asks whether to change it
+  for all its users or copy it. From a macro, Copy points that macro to the new save; from a chain, it points the
+  first macro there. From the save itself, Copy leaves all macro links alone. Recording › Options ›
+  [Shared start save](../menu/recording.md#shared-start-save) can answer ahead.
 - **Only what you changed is written.** The other fighter, and everything else in the file, stays as saved. Old save
   files open as they are and load as before.
 - **A macro's own offset:** earlier builds had Edit placement, which stored an offset in the macro file. Such a macro
-  keeps its offset: Play adds it to the playing side on top of the save's spot. Change placement never changes a
-  macro file. The macro's own screen shows the offset in an Offset row, and A there clears it; a cleared offset
+  keeps its offset: Play adds it to the playing side on top of the save's spot. Copy leaves the offset and Momentum
+  alone. The macro's own screen shows the offset in an Offset row, and A there clears it; a cleared offset
   cannot be set again, so move the save instead.
 - **Momentum** is a row of the macro's own screen, kept in the macro file as before. Keep recorded speed, the
   default, gives the side the speed it had when Record started, on its first input after the warp; Start at rest

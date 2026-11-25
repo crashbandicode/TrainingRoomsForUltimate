@@ -124,17 +124,19 @@ and the expected log lines), then the operator's full test on the console.
 #### A save's placement is changed with the crosshair (merged 2026-11-25)
 
 - **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
-  game: both fighters stand at the save's spots, you move them with the crosshair, and A or + writes the new spots
-  into the save. It has five pages: Where, Spot, State, Percent and Preview.
+  game: move the fighters with the crosshair. The five pages are Where, Spot, State, Percent and Preview.
+  Press A on Preview to save, or + to save from any page.
 - It opens from the Recording page, from a save's, a macro's or a chain's own screen, and with X on a save in the
   pop-up. For a macro it changes the macro's start save.
-- When macros share the start save, the picker asks whether to change it for all of them or to copy it. The new
-  **Shared start save** option can answer ahead: Prompt, Always change or Always copy.
+- If at least one macro starts from the save, the picker normally asks whether to change it or make a copy.
+  Copy from a macro changes its start-save link to the copy; for a chain, only its first macro gets that link.
+  Copy from the save itself leaves all macro links alone. **Shared start save** can answer ahead: Always change
+  or Always copy instead of Prompt.
 - A fighter switched to Off stage stays where it is when the spot is in open air or under the stage. When the spot
   is over the stage or inside it, the fighter goes to the open air beside the nearest ledge, and the crosshair then
   moves freely.
-- Only what you changed is saved. A macro's own file is never changed: a macro given an offset in an earlier build
-  keeps it until you clear it with the Offset row of its own screen.
+- The picker preserves each macro's inputs, Momentum and offset. A macro with an offset from an earlier build
+  keeps it until you clear it with the Offset row on the macro's own screen.
 - More: [Recording › Change placement](menu/recording.md#change-placement) and
   [the guide](guide/recording.md#change-placement-and-the-replay-window).
 
