@@ -498,7 +498,7 @@ fn crosses([a, b]: Segment, [c, d]: Segment) -> bool {
 }
 
 /// One flat rectangle of the crop window, in canvas units (1920 x 1080, origin at the centre, y up): centre and size.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CropRect { pub x: f32, pub y: f32, pub w: f32, pub h: f32, pub color: [u8; 4] }
 
 /// One view of the zones, the world view or the inset, in canvas units: `vertical` is [bottom, top],
@@ -512,6 +512,32 @@ pub struct CropView {
 
 /// Five dims, two limits, eight edges and four handle rectangles, then ten inset rectangles.
 pub const CROP_RECTS: usize = 29;
+
+/// One UI pass's crop window. Share a presence mask across rectangles, not bits of the layout address.
+pub struct LayoutCrop {
+    owner: usize,
+    present: u32,
+    rects: [CropRect; CROP_RECTS],
+}
+
+const _: () = assert!(CROP_RECTS <= u32::BITS as usize);
+
+impl LayoutCrop {
+    pub fn publish(slot: &mut Option<Self>, layout: usize, rects: [Option<CropRect>; CROP_RECTS]) {
+        let mut present = 0;
+        let rects = std::array::from_fn(|i| match rects[i] {
+            Some(rect) => { present |= 1 << i; rect }
+            None => CropRect::default(),
+        });
+        *slot = Some(Self { owner: layout, present, rects });
+    }
+
+    pub fn take(slot: &mut Option<Self>, layout: usize) -> Option<[Option<CropRect>; CROP_RECTS]> {
+        if slot.as_ref()?.owner != layout { return None; }
+        let crop = slot.take()?;
+        Some(std::array::from_fn(|i| (crop.present & (1 << i) != 0).then_some(crop.rects[i])))
+    }
+}
 
 const CROP_X: [f32; 2] = [-960.0, 960.0];
 const CROP_Y: [f32; 2] = [-540.0, 540.0];
