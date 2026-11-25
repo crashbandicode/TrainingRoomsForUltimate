@@ -444,6 +444,43 @@ fn a_changed_active_file_does_not_end_the_run_that_plays() {
 }
 
 #[test]
+fn parry_passes_follow_a_changed_active_file_without_cutting_the_current_pass() {
+    let _guard = HostGuard::new();
+    let f = fixture(false, LoopCount::Finite(2), &[72, 180, 5]);
+    let library = Library::new(f.root.join(MACROS_DIR));
+    let mut next = library.load(&f.ids[1]).unwrap();
+    for frame in &mut next.frames { frame.buttons = 42; }
+    library.overwrite(&f.ids[1], &next).unwrap();
+    tick(&f.root);
+    host::set_parry(true);
+    chord(Role::Cpu);
+    tick(&f.root);
+    for frame in 0..10 {
+        assert_eq!(poll(Role::Cpu).map(|f| f.buttons), Some((frame % 7 + 1) as u32));
+    }
+    RecordingIndex::update(&f.root, |index| {
+        index.set_active(Role::Cpu, Some(&f.ids[1]), 3)?;
+        Ok(true)
+    }).unwrap();
+    for frame in 10..72 {
+        tick(&f.root);
+        assert_eq!(poll(Role::Cpu).map(|f| f.buttons), Some((frame % 7 + 1) as u32));
+    }
+    tick(&f.root);
+    assert_eq!(poll(Role::Cpu).map(|f| f.buttons), Some(42));
+    RecordingIndex::update(&f.root, |index| {
+        index.set_active(Role::Cpu, Some(&f.ids[2]), 4)?;
+        Ok(true)
+    }).unwrap();
+    for _ in 1..180 {
+        tick(&f.root);
+        assert_eq!(poll(Role::Cpu).map(|f| f.buttons), Some(42));
+    }
+    tick(&f.root);
+    assert_eq!(poll(Role::Cpu), None);
+}
+
+#[test]
 fn an_active_chain_reads_its_steps_and_first_start_save() {
     let _guard = HostGuard::new();
     let f = small(true);

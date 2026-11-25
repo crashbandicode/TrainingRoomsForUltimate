@@ -485,15 +485,20 @@ pub fn request_make(ask: MakeAsk) { *lock(&MAKE_ASK) = Some(ask); }
 pub fn make_actor_cpu() -> bool { MAKE_ROLE.load(Ordering::Acquire) == ROLE_CPU }
 pub fn make_cpu_inputs() -> MappedInputs { to_mapped(unpack(MAKE_CPU_FRAME.load(Ordering::Acquire))) }
 
-/// What the worker keeps of the card between passes: the index and the file each playing role plays, with its start
-/// save. Read again at every start, so a card changed under the mod is what plays; a running playback reads nothing.
+/// What the worker keeps between passes: the index and each playing file with its start save. Read again at every
+/// start and after an in-mod write; ordinary playback passes do not read the held files.
 struct HeldBook {
     root: PathBuf,
     version: (u64, u64),
     book: Book,
     saves: Vec<(String, NamedSave)>,
-    sources: [Option<String>; 2],
+    sources: [Option<Source>; 2],
 }
+
+/// What a role's run plays: the file it started on, and whether the run follows the role's active file (a chord's run
+/// does; a preview or Make combo plays the one file it named).
+#[derive(Clone)]
+struct Source { id: String, active: bool }
 
 enum PreviewWindow {
     Exact(core::ops::Range<usize>),
@@ -1368,20 +1373,24 @@ pub fn service_at(
     });
     let mut held = lock(&BOOK);
     let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
+    let in_use = [
+        starts[0] || role_playing(Role::Player),
+        starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
+    ];
     for role in [Role::Player, Role::Cpu] {
         let slot = role_index(role);
-        if starts[slot] || !role_playing(role) { sources[slot] = None; }
+        if starts[slot] || !in_use[slot] { sources[slot] = None; }
     }
     for (role, source) in [menu_make, make, preview].into_iter().flatten() {
         starts[role_index(role)] = true;
-        sources[role_index(role)] = Some(source);
+        sources[role_index(role)] = Some(Source { id: source, active: false });
     }
     let in_use = [
         starts[0] || role_playing(Role::Player),
         starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
     ];
     if held_needs_read(held.as_ref(), root, starts) {
-        match read_held(root, sources, in_use) {
+        match read_held(root, sources, in_use, starts) {
             Ok(next) => *held = Some(next),
             Err(()) => {
                 // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
@@ -1398,6 +1407,7 @@ pub fn service_at(
     held.book.remove_recording(CLIP_ID);
     if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { held.book.add_recording(CLIP_ID, clip.clone()); }
     let book = &held.book;
+    let sources = &mut held.sources;
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     // restriction: parry-mash-ignored
@@ -1430,7 +1440,13 @@ pub fn service_at(
     } else if RUN_CPU.load(Ordering::Acquire) {
         step_role(machine, book, Role::Cpu);
     }
-    parry_next_pass(|| play_role_with(root, machine, book, Role::Cpu, &mut tick, true));
+    parry_next_pass(|| {
+        play_role_with(root, machine, book, Role::Cpu, &mut tick, true);
+        if machine.playing(Role::Cpu) {
+            sources[role_index(Role::Cpu)] = book.index.active(Role::Cpu)
+                .map(|id| Source { id: id.to_owned(), active: true });
+        }
+    });
     if menu_pending() {
         apply_menu(root, machine, book, &mut tick);
     }
@@ -2605,7 +2621,7 @@ pub fn parry_use(root: &Path, id: &str, count: LoopCount) -> Result<(), String> 
     }).map(|_| ()).map_err(|e| e.to_string())
 }
 
-fn read_held(root: &Path, sources: [Option<String>; 2], roles: [bool; 2]) -> Result<HeldBook, ()> {
+fn read_held(root: &Path, mut sources: [Option<Source>; 2], roles: [bool; 2], starts: [bool; 2]) -> Result<HeldBook, ()> {
     let version = recording_version();
     let index = RecordingIndex::load(root).map_err(|_| ())?;
     let library = Library::new(root.join(MACROS_DIR));
@@ -2614,29 +2630,36 @@ fn read_held(root: &Path, sources: [Option<String>; 2], roles: [bool; 2]) -> Res
     let mut recordings = BTreeMap::<String, MacroRecording>::new();
     let mut chains = BTreeMap::<String, Chain>::new();
     let mut firsts = Vec::<String>::new();
+    let mut seen_files = BTreeSet::new();
     for role in [Role::Player, Role::Cpu] {
         let slot = role_index(role);
         if !roles[slot] { continue; }
-        let Some(id) = sources[slot].as_deref().or_else(|| index.active(role)) else { continue };
-        if id == CLIP_ID { continue; }
-        if !recordings.contains_key(id) && !chains.contains_key(id) {
-            if let Ok(recording) = library.load(id) {
-                recordings.insert(id.to_owned(), recording);
-            } else if let Ok(chain) = chain_store.load(id) {
-                for step in &chain.recordings {
-                    if let std::collections::btree_map::Entry::Vacant(entry) = recordings.entry(step.clone()) {
-                        if let Ok(recording) = library.load(step) {
-                            entry.insert(recording);
+        if starts[slot] && sources[slot].is_none() {
+            sources[slot] = index.active(role).map(|id| Source { id: id.to_owned(), active: true });
+        }
+        let source = sources[slot].as_ref();
+        let current = source.is_none_or(|source| source.active).then_some(index.active(role)).flatten();
+        for id in [source.map(|source| source.id.as_str()), current].into_iter().flatten() {
+            if id == CLIP_ID || !seen_files.insert(id.to_owned()) { continue; }
+            if !recordings.contains_key(id) && !chains.contains_key(id) {
+                if let Ok(recording) = library.load(id) {
+                    recordings.insert(id.to_owned(), recording);
+                } else if let Ok(chain) = chain_store.load(id) {
+                    for step in &chain.recordings {
+                        if let std::collections::btree_map::Entry::Vacant(entry) = recordings.entry(step.clone()) {
+                            if let Ok(recording) = library.load(step) {
+                                entry.insert(recording);
+                            }
                         }
                     }
+                    chains.insert(id.to_owned(), chain);
                 }
-                chains.insert(id.to_owned(), chain);
             }
-        }
-        if let Some(chain) = chains.get(id) {
-            if let Some(first) = chain.recordings.first() { firsts.push(first.clone()); }
-        } else {
-            firsts.push(id.to_owned());
+            if let Some(chain) = chains.get(id) {
+                if let Some(first) = chain.recordings.first() { firsts.push(first.clone()); }
+            } else {
+                firsts.push(id.to_owned());
+            }
         }
     }
     let mut book = Book::new(index);
