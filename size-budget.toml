@@ -2897,3 +2897,11 @@ ceiling = 201835
 date = "2026-11-25"
 reason = "Trial fold of the replay editor pin 42be97a3 (201006 approved, on merge 3D) and the Vault recordings line aaecc259 (200672 approved, on merge 4b), with the Vault play-target seam. Measured 201835 on 178a48b2 (remote-gate size step). The integrator writes the merged number on the install 4 head."
 approved_by = "tr-primary-2 2026-11-25 01:35:06Z (editor at 201006), 2026-11-25 02:44:33Z (Vault merge ordered) and 02:31:21Z (the seam, about 15 lines, ordered); the folded value is flagged in the seam post for f9-fix."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 201846
+date = "2026-11-25"
+reason = "Preview restart: preserve the old role's stop and the requested start across a Vault home return. Measured 201846, +11 on 4b5ab0d5."
+approved_by = "tr-primary-2 standing rule 2026-11-24 21:46:20Z for measured fixes through +60."
