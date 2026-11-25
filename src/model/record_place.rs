@@ -2880,3 +2880,36 @@ mod tests {
 #[cfg(test)]
 #[path = "record_place/switch_tests.rs"]
 mod switch_tests;
+
+#[cfg(test)]
+mod name_page_tests {
+    lib_unit_tests! {
+    use crate::engine::macro_ui::macro_panel::{Effect, MacroUi};
+    use crate::engine::macros::{InputFrame, MacroRecording, MomentumMode, Placement, StartState};
+
+    #[test]
+    fn native_macro_naming_has_no_place_action_and_keeps_the_existing_offset() {
+        let mut file = MacroRecording::new("Original", "13.0.5", StartState::neutral(8, 0, 1.0),
+            vec![InputFrame { buttons: 1, ..InputFrame::default() }]).unwrap();
+        file.set_placement(Placement { delta_x: -7.5, delta_y: 2.0, momentum: MomentumMode::AtRest }).unwrap();
+        let mut ui = MacroUi::new();
+        ui.restore_draft(file.clone());
+        let view = ui.native_name_view().unwrap();
+        assert!(view.footer.contains("A: system keyboard") && view.footer.contains("B: return"));
+        assert!(!view.footer.contains("Y:"), "unavailable action offered: {}", view.footer);
+        let Effect::Save(renamed) = ui.confirm_native_name("Renamed".into()) else { panic!("expected a saved draft") };
+        assert_eq!(renamed.placement, file.placement);
+        assert_eq!(renamed.frames, file.frames);
+        assert_eq!(renamed.name, "Renamed");
+    }
+
+    #[test]
+    fn native_name_input_does_not_dispatch_y_to_the_old_place_page() {
+        let bridge = include_str!("../runtime/macros/named_macros.rs");
+        let name_input = bridge.split_once("if lock_read(&UI).name_prompt().is_some() {").unwrap().1
+            .split_once("assign(&menu::MENU_RECEIVED_INPUT").unwrap().0;
+        assert!(name_input.contains("Pad::Confirm") && name_input.contains("Pad::Back"));
+        assert!(!name_input.contains("Pad::Extra"), "the native name dialog still handles Y");
+    }
+    }
+}
