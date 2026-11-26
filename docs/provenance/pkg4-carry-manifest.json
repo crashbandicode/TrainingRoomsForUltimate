@@ -1725,7 +1725,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "05ae682b67d5ce9dfdabe79c13b259e70bf30f55dda7de593689d51164d1c0cc",
+   "dest_sha256": "1df64b763bbf6e4f46c91eb09ffbaf481fa8c4bd55bb2019bb262151cd6adc05",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2417,6 +2417,11 @@
      "old": "            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter]),",
      "new": "            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter])\n                .filter(|frame| frame.start.fighter_kind >= 0),",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                frames.iter().enumerate()",
+     "new": "                frames.iter().take(scrub_track::POSITION_FRAMES).enumerate()",
+     "reason": "Scrub positions (2026-11-26 02:03:28Z): retain two minutes of positions per new macro, keeping the original inputs."
     }
    ]
   },
