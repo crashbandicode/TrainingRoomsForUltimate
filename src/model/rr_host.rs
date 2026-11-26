@@ -1689,7 +1689,7 @@ fn macros_starting_from(root: &Path, save: &str) -> u8 {
     let count = folder
         .flatten()
         .filter_map(|item| item.file_name().to_str().and_then(|name| name.strip_suffix(".json")).map(str::to_owned))
-        .filter(|id| library.load_played(id).is_ok_and(|file| file.start_save.as_deref() == Some(save)))
+        .filter(|id| library.load(id).is_ok_and(|file| file.start_save.as_deref() == Some(save)))
         .count();
     u8::try_from(count).unwrap_or(u8::MAX)
 }
@@ -2712,12 +2712,12 @@ fn read_held(root: &Path, mut sources: [Option<Source>; 2], roles: [bool; 2], st
         for id in [source.map(|source| source.id.as_str()), current].into_iter().flatten() {
             if id == CLIP_ID || !seen_files.insert(id.to_owned()) { continue; }
             if !recordings.contains_key(id) && !chains.contains_key(id) {
-                if let Ok(recording) = library.load_played(id) {
+                if let Ok(recording) = library.load(id) {
                     recordings.insert(id.to_owned(), recording);
                 } else if let Ok(chain) = chain_store.load(id) {
                     for step in &chain.recordings {
                         if let std::collections::btree_map::Entry::Vacant(entry) = recordings.entry(step.clone()) {
-                            if let Ok(recording) = library.load_played(step) {
+                            if let Ok(recording) = library.load(step) {
                                 entry.insert(recording);
                             }
                         }
@@ -2802,7 +2802,7 @@ fn load_book(root: &Path) -> Result<Book, ()> {
     let macros = Library::new(root.join(MACROS_DIR));
     if let Ok(list) = macros.list() {
         for entry in list.entries {
-            if let Ok(recording) = macros.load_played(&entry.id) {
+            if let Ok(recording) = macros.load(&entry.id) {
                 book.add_recording(entry.id, recording);
             }
         }

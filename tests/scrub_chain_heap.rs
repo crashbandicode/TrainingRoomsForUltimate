@@ -7,8 +7,8 @@ use std::{env, fs, io::Write, process::Command};
 const STEPS: usize = 6;
 const FRAMES: usize = 7_200;
 
-/// tr-primary-2 2026-11-26 02:30:57Z: playback never needs positions, so a chain's start must not build its steps'
-/// tracks. Six distinct tracked steps of two minutes each, started through the host's own service tick.
+/// tr-primary-2 2026-11-26 02:30:57Z and 03:06:35Z: playback never needs positions, so a chain's start must not
+/// read its steps' positions files. Six distinct tracked steps of two minutes each, started through the host's own service tick.
 #[test]
 fn a_chain_start_does_not_build_the_steps_position_tracks() {
     const TEST: &str = "scrub_chain_heap::a_chain_start_does_not_build_the_steps_position_tracks";
@@ -48,6 +48,7 @@ fn a_chain_start_does_not_build_the_steps_position_tracks() {
     }
     let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
     let before = heap_bytes();
+    let reads = crate::engine::macros::positions::reads();
     host::reset_host();
     let tick = || host::service_at(&root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
     tick();
@@ -61,9 +62,10 @@ fn a_chain_start_does_not_build_the_steps_position_tracks() {
         after.largest).unwrap();
     assert!(started || first.is_some(), "the chain did not start");
     assert!(peak < tracks / 2, "the chain start built position tracks: peak {peak} B against {tracks} B of tracks");
-    // The files keep their tracks: a whole load, as the editor's, still reads one.
+    assert_eq!(crate::engine::macros::positions::reads(), reads, "a chain start opens no positions file");
+    // The positions are beside the macros: playback's load has none, the editor's load reads them.
     let last = fs::read_to_string(root.join("last-step")).unwrap();
-    assert_eq!(library.load(&last).unwrap().track.map(|track| track.len()), Some(FRAMES));
-    assert_eq!(library.load_played(&last).map(|rec| (rec.frames.len(), rec.track.is_none(), rec.name)).unwrap(), (FRAMES, true, format!("Step {}", STEPS - 1)));
+    assert_eq!(library.load(&last).map(|rec| (rec.frames.len(), rec.track.is_none())).unwrap(), (FRAMES, true));
+    assert_eq!(library.load_edited(&last).unwrap().track.map(|track| track.len()), Some(FRAMES));
     host::reset_host();
 }

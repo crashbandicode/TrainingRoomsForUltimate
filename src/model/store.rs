@@ -125,6 +125,11 @@ pub trait Record: Serialize + DeserializeOwned {
     fn read_summary(_id: &str, _reader: &mut dyn Read) -> serde_json::Result<Result<Self::Summary, Self::Error>> {
         unreachable!("only a streaming record supplies a header reader")
     }
+    /// A record with a file of its own beside the record's (a macro's positions): before the record is written under
+    /// `id`, after it is in place, and after it is deleted. Default: nothing.
+    fn before_write(&self, _dir: &Path, _id: &str) {}
+    fn after_write(&self, _dir: &Path, _id: &str) {}
+    fn after_delete(_dir: &Path, _id: &str) {}
     /// Everything the store requires before it writes or accepts a file.
     fn validate(&self) -> Result<(), Self::Error>;
     /// Display name: its slug seeds new ids and it orders listings.
@@ -346,18 +351,6 @@ impl<R: Record> Store<R> {
             })
             .map_err(lift::<R>)?;
         data.record::<R>(id)
-    }
-
-    /// Loads the record with this id through `read`, which decodes the file its own way (a large record that leaves a
-    /// payload out). The id check, the size limit and the missing-file error are `load`'s.
-    pub fn load_with(&self, id: &str, read: impl FnOnce(&mut dyn Read) -> serde_json::Result<Result<R, R::Error>>) -> Result<R, R::Error> {
-        check_id::<R>(id).map_err(lift::<R>)?;
-        payload_read().map_err(lift::<R>)?;
-        let (len, mut file) = fs::File::open(self.file(id, "json"))
-            .and_then(|file| Ok((file.metadata()?.len(), file)))
-            .map_err(|err| lift::<R>(if err.kind() == io::ErrorKind::NotFound { StoreError::NotFound(id.to_owned()) } else { err.into() }))?;
-        check_len(len, R::MAX_FILE_BYTES).map_err(lift::<R>)?;
-        streamed::<R, _>(&mut file, len, read).map_err(|err| lift::<R>(err.into()))?
     }
 
     /// Saves as a brand-new file and returns its id. The id comes from the
@@ -761,7 +754,7 @@ pub fn write_replace(path: &Path, bytes: &[u8]) -> io::Result<()> {
     replace_with(path, |tmp| write_synced(tmp, bytes))
 }
 
-fn replace_with<T>(path: &Path, write: impl FnOnce(&Path) -> io::Result<T>) -> io::Result<T> {
+pub(crate) fn replace_with<T>(path: &Path, write: impl FnOnce(&Path) -> io::Result<T>) -> io::Result<T> {
     let tmp = with_suffix(path, ".tmp");
     let result = write(&tmp).and_then(|value| replace_file(&tmp, path).map(|()| value));
     if result.is_err() {

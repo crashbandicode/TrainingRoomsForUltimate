@@ -51,7 +51,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
         let id = fs::read_to_string(root.join("measured")).unwrap();
         let library = Library::new(&folder);
         let before = heap_bytes();
-        let mut rec = library.load(&id).unwrap();
+        let mut rec = library.load_edited(&id).unwrap();
         let load_peak = heap_bytes().peak - before.live;
         assert_eq!(rec.track.as_ref().unwrap().len(), MAX_FRAMES);
         rec.name.push_str(" revised");
@@ -92,7 +92,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let RecordStop::Saved { id, .. } = stop else { panic!("maximum take was not saved") };
 
     // Reopen via the store, not just serde. Everything from here is outside the measured save peak.
-    let rec = Library::new(&folder).load(&id).unwrap();
+    let rec = Library::new(&folder).load_edited(&id).unwrap();
     assert_eq!(rec.frames.len(), MAX_FRAMES);
     let stored = rec.track.as_ref().unwrap();
     assert_eq!(stored.len(), MAX_FRAMES);
@@ -106,6 +106,16 @@ fn a_maximum_take_serializes_without_a_second_track() {
     writeln!(std::io::stderr(), "SCRUB_SAVE frames={MAX_FRAMES} track={track_bytes} json={} json_capacity={} peak_above_idle={peak} serializer_scratch={scratch}",
         bytes.len(), encoded.capacity()).unwrap();
     assert!(scratch < 4096, "serializing to a nonallocating writer requested {scratch} bytes");
+    let timed = Instant::now();
+    crate::engine::macros::positions::write(&folder, "timing", &rec.frames, stored).unwrap();
+    let write_us = timed.elapsed().as_micros();
+    let timed = Instant::now();
+    let read = crate::engine::macros::positions::read(&folder, "timing", &rec.frames).map(|track| track.len());
+    let read_us = timed.elapsed().as_micros();
+    let sidecar = fs::metadata(crate::engine::macros::positions::path(&folder, "timing")).unwrap().len();
+    crate::engine::macros::positions::remove(&folder, "timing");
+    writeln!(std::io::stderr(), "SCRUB_SIDECAR frames={MAX_FRAMES} bytes={sidecar} write_us={write_us} read_us={read_us}").unwrap();
+    assert_eq!((read, sidecar), (Some(MAX_FRAMES), 32 + 72 * MAX_FRAMES as u64));
     fs::write(root.join("measured"), id).unwrap();
     // At drain the packed recording blocks and decoded track briefly coexist; not two whole tracks plus JSON.
     assert!(peak < 7 * 1024 * 1024, "saving still buffered the entire JSON file");

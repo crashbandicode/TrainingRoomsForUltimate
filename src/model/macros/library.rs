@@ -18,7 +18,7 @@
 use crate::model::store::{Record, Store, StoreError, MAX_FILE_BYTES};
 
 use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};
-use super::recording::{Placement, TRACK_SCHEMA_VERSION};
+use super::recording::Placement;
 use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};
 
 /// The store's own failures become the macro crate's error, variant for variant (the carried code matches on `MacroError`).
@@ -85,26 +85,20 @@ impl<'de> Visitor<'de> for MacroHeader {
 /// the presence of the key; the rows' shape and values are checked when the macro is opened whole.
 fn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {
     let mut de = serde_json::Deserializer::from_reader(reader);
-    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;
+    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.
+    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;
     de.end()?;
     Ok(rec.validate_header().and_then(|()| {
-        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }
         rec.validate_frame_count()?;
         Ok(rec)
     }))
 }
 
 impl Store<MacroRecording> {
-    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not
-    /// built. Crop and the clip editor load the whole file (`load`).
-    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {
-        self.load_with(id, |reader| {
-            Ok(read_header(reader)?.map(|mut rec| {
-                // The file's version names its track; the played copy has none.
-                rec.set_track(None);
-                rec
-            }))
-        })
+    /// Loads a macro for the clip editor: the macro, and its positions when the file beside it binds it
+    /// (`positions`). Playback, the list and every other load read the macro only (`load`).
+    pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {
+        self.load(id)
     }
 }
 
@@ -114,7 +108,7 @@ pub type Library = Store<MacroRecording>;
 impl Record for MacroRecording {
     type Error = MacroError;
     type Summary = MacroEntry;
-    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];
+    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
     const STREAM_READ: bool = true;
     fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {

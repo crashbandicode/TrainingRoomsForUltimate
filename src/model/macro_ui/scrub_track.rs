@@ -744,8 +744,12 @@ mod tests {
             (0..frames as u32).map(|i| InputFrame { buttons: i, ..InputFrame::default() }).collect()).unwrap();
         recording.set_track(Some(track));
         recording.validate().expect("a shorter track is valid");
-        let back: MacroRecording = serde_json::from_str(&serde_json::to_string(&recording).unwrap()).unwrap();
-        assert_eq!((back.frames.len(), back.track.as_ref().map(Vec::len), back.schema_version), (frames, Some(TAKE_CHUNK), 3));
+        let dir = std::env::temp_dir().join(format!("tr-scrub-short-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let library = crate::engine::macros::Library::new(&dir);
+        let id = library.save_new(&recording).unwrap();
+        let back = library.load_edited(&id).unwrap();
+        assert_eq!((back.frames.len(), back.track.as_ref().map(Vec::len), back.schema_version), (frames, Some(TAKE_CHUNK), 1));
         // In the editor a frame with its state holds the fighters; past the track's end nobody is held.
         let mut editor = ClipEditor::macro_file(back, true).unwrap();
         editor.on_action(ClipAction::SelectIn);
@@ -755,14 +759,15 @@ mod tests {
         assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Positions end here.");
         editor.on_action(ClipAction::Nudge(-5));
         assert!(matches!(editor.scrub(), (Ask::Group { .. }, Pos::Held)), "Out - 1 is the track's last frame");
-        // A crop wholly past the track's end is still a take of the new format whose positions ran out: version 3
-        // with an empty track, not an old file. Reopened, it holds nobody and says so.
+        // A crop wholly past the track's end is still a take whose positions ran out, not an old macro: its
+        // positions file has no rows. Reopened, it holds nobody and says so.
         let mut tail = recording.clone();
         tail.keep(TAKE_CHUNK + 1..frames);
-        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 3));
+        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 1));
         tail.validate().expect("an empty track is valid");
-        let tail: MacroRecording = serde_json::from_str(&serde_json::to_string(&tail).unwrap()).unwrap();
-        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 3));
+        let tail = library.load_edited(&library.save_new(&tail).unwrap()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 1), "a positions file with no rows");
         let mut reopened = ClipEditor::macro_file(tail, false).unwrap();
         for action in [ClipAction::SelectIn, ClipAction::SelectOut] {
             reopened.on_action(action);
@@ -777,25 +782,15 @@ mod tests {
     }
 
     #[test]
-    fn a_track_is_saved_as_version_three_and_old_files_are_unchanged() {
+    fn a_takes_positions_fit_its_frames_and_stay_out_of_its_file() {
         let old = recording(false);
-        let old_json = serde_json::to_string(&old).unwrap();
-        assert!(!old_json.contains("track") && old_json.contains("\"schema_version\":1"), "{old_json}");
         let new = recording(true);
-        assert_eq!(new.schema_version, 3);
         new.validate().unwrap();
-        let json = serde_json::to_string(&new).unwrap();
-        let back: MacroRecording = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, new);
-        // Per frame: two rows of nine numbers.
-        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert_eq!(value["track"].as_array().map(Vec::len), Some(10));
-        assert_eq!(value["track"][0].as_array().map(Vec::len), Some(2));
-        assert_eq!(value["track"][0][0].as_array().map(Vec::len), Some(9));
-        // The version and the track go together, one finite state per frame.
-        let broken: [fn(&mut MacroRecording); 4] = [
-            |recording| recording.schema_version = 1,
-            |recording| recording.track = None,
+        // The macro's file is the same with and without positions: versions 1 and 2 only, no key.
+        assert_eq!((new.schema_version, serde_json::to_string(&new).unwrap()), (1, serde_json::to_string(&old).unwrap()));
+        let back: MacroRecording = serde_json::from_str(&serde_json::to_string(&new).unwrap()).unwrap();
+        assert_eq!(back, old);
+        let broken: [fn(&mut MacroRecording); 2] = [
             |recording| { let extra = recording.track.as_ref().unwrap()[0]; recording.track.as_mut().unwrap().push(extra); },
             |recording| recording.track.as_mut().unwrap()[0][1].x = f32::NAN,
         ];
@@ -804,13 +799,9 @@ mod tests {
             edit(&mut bad);
             assert!(bad.validate().is_err(), "edit {index}");
         }
-        let mut bad = old.clone();
-        bad.schema_version = 3;
-        assert!(bad.validate().is_err(), "version 3 without a track");
-        // Without its track the file is the old file, byte for byte.
-        let mut dropped = new.clone();
-        dropped.set_track(None);
-        assert_eq!(serde_json::to_string(&dropped).unwrap(), old_json);
+        let mut version = new.clone();
+        version.schema_version = 3;
+        assert!(version.validate().is_err(), "there is no version 3");
     }
 
     #[test]
@@ -842,11 +833,15 @@ mod tests {
         editor.on_action(ClipAction::Nudge(-1));
         // In 2, Out 9: seven frames, saved with A.
         let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("expected an export") };
-        assert_eq!((saved.frames.len(), saved.schema_version), (7, 3));
+        assert_eq!((saved.frames.len(), saved.schema_version), (7, 1));
         assert_eq!(saved.track, Some((2..9).map(|i| [state(0, i), state(1, i)]).collect()));
         saved.validate().unwrap();
         // Reopened from its file, it scrubs both bodies at the capture's spacing, with no preview.
-        let file: MacroRecording = serde_json::from_str(&serde_json::to_string(&*saved).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("tr-scrub-capture-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let library = crate::engine::macros::Library::new(&dir);
+        let file = library.load_edited(&library.save_new(&saved).unwrap()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
         let mut reopened = ClipEditor::macro_file(file, false).unwrap();
         reopened.on_action(ClipAction::SelectOut);
         let block = Block::new();

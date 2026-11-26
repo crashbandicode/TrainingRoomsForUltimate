@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 pub const SCHEMA_VERSION: u32 = 1;
 /// Exact Mii macros must refuse on older readers that would discard their identity.
 pub const MII_SCHEMA_VERSION: u32 = 2;
-/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.
-pub const TRACK_SCHEMA_VERSION: u32 = 3;
 /// Gameplay frame rate assumed when the caller does not supply one.
 pub const DEFAULT_FPS: u32 = 60;
 /// Longest macro accepted: 10 minutes of gameplay at 60 fps.
@@ -162,67 +160,10 @@ pub struct MacroRecording {
     pub start_save_on: bool,
     /// Where both fighters were on each frame, as a match capture keeps it (`ReplayFrame` with no input): the
     /// recorded fighter first, then the other one. One entry per frame from the first; shorter than the frames when
-    /// recording ran out of memory for it; none in a file recorded before it was kept.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "track_rows")]
+    /// recording ran out of memory for it. It is never in the macro's own file: the library keeps it beside it
+    /// (`positions`), and only the clip editor's load reads it back.
+    #[serde(skip)]
     pub track: Option<Vec<[super::ReplayFrame; 2]>>,
-}
-
-/// The track in a file: per frame, each fighter's kind, costume, facing, situation, status, speed x, speed y, x and y.
-mod track_rows {
-    use super::super::ReplayFrame;
-    use super::{InputFrame, StartState};
-    use serde::{ser::SerializeSeq, Deserialize};
-
-    type Row = (i32, u32, f32, i32, i32, f32, f32, f32, f32);
-
-    fn row(frame: &ReplayFrame) -> Row {
-        let start = frame.start;
-        (start.fighter_kind, start.costume, start.facing, start.situation, start.status, start.speed_x, start.speed_y, frame.x, frame.y)
-    }
-
-    fn frame(row: Row) -> ReplayFrame {
-        ReplayFrame {
-            input: InputFrame::default(),
-            start: StartState { fighter_kind: row.0, costume: row.1, facing: row.2, situation: row.3, status: row.4, speed_x: row.5, speed_y: row.6 },
-            x: row.7,
-            y: row.8,
-        }
-    }
-
-    pub fn serialize<S: serde::Serializer>(track: &Option<Vec<[ReplayFrame; 2]>>, serializer: S) -> Result<S::Ok, S::Error> {
-        let Some(track) = track else { return serializer.serialize_none() };
-        let mut seq = serializer.serialize_seq(Some(track.len()))?;
-        for [first, second] in track {
-            seq.serialize_element(&[row(first), row(second)])?;
-        }
-        seq.end()
-    }
-
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
-        #[derive(Deserialize)]
-        struct Rows(#[serde(deserialize_with = "read_pairs")] Vec<[ReplayFrame; 2]>);
-        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))
-    }
-
-    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {
-        struct Pairs;
-        impl<'de> serde::de::Visitor<'de> for Pairs {
-            type Value = Vec<[ReplayFrame; 2]>;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("a sequence") }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                let mut pairs = Vec::new();
-                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {
-                    let len = pairs.len();
-                    if len == pairs.capacity() && len < super::MAX_FRAMES {
-                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));
-                    }
-                    pairs.push([frame(a), frame(b)]);
-                }
-                Ok(pairs)
-            }
-        }
-        deserializer.deserialize_seq(Pairs)
-    }
 }
 
 impl MacroRecording {
@@ -256,18 +197,18 @@ impl MacroRecording {
     /// Checks everything `Library` requires before it writes or accepts a file.
     pub fn validate(&self) -> Result<(), MacroError> {
         self.validate_header()?;
-        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,
-        // for a crop past its end), every number finite.
-        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()
+        // The positions a take carries: an entry per frame from the first, as far as they go (not at all, for a crop
+        // past their end), every number finite.
+        let fits = self.track.as_ref().is_none_or(|track| track.len() <= self.frames.len()
             && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
-        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
+        if !fits {
             return Err(MacroError::InvalidTrack);
         }
         self.validate_frame_count()
     }
 
     pub(super) fn validate_header(&self) -> Result<(), MacroError> {
-        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) {
+        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION) {
             return Err(MacroError::UnsupportedVersion {
                 found: self.schema_version,
             });
@@ -284,9 +225,8 @@ impl MacroRecording {
         self.start.validate()?;
         match (self.schema_version, self.mii) {
             (SCHEMA_VERSION, None) => {},
-            (MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION, Some(configuration))
+            (MII_SCHEMA_VERSION, Some(configuration))
                 if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},
-            (TRACK_SCHEMA_VERSION, None) => {},
             _ => return Err(MacroError::InvalidMii("schema, fighter class and exact configuration disagree")),
         }
         self.placement.validate()
@@ -312,17 +252,12 @@ impl MacroRecording {
             return Err(MacroError::InvalidMii("configuration belongs to a different fighter class"));
         }
         self.mii = Some(configuration);
-        self.schema_version = self.schema_version.max(MII_SCHEMA_VERSION);
+        self.schema_version = MII_SCHEMA_VERSION;
         Ok(())
     }
 
-    /// Attach the position track a take recorded (one entry per frame), or drop it: the file's version follows.
+    /// Attach the positions a take recorded (one entry per frame from the first), or drop them.
     pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {
-        self.schema_version = match (&track, self.mii) {
-            (Some(_), _) => TRACK_SCHEMA_VERSION,
-            (None, Some(_)) => MII_SCHEMA_VERSION,
-            (None, None) => SCHEMA_VERSION,
-        };
         self.track = track;
     }
 
@@ -441,7 +376,7 @@ pub enum MacroError {
     UnsupportedVersion {
         found: u32,
     },
-    /// The position track is not one finite entry per frame, or the file's version does not match its presence.
+    /// A take's positions are longer than its frames, or hold a number that is not finite.
     InvalidTrack,
     InvalidName(&'static str),
     InvalidGameVersion(&'static str),
@@ -472,9 +407,9 @@ impl fmt::Display for MacroError {
         match self {
             Self::UnsupportedVersion { found } => write!(
                 f,
-                "unsupported schema version {found} (supported: {SCHEMA_VERSION} to {TRACK_SCHEMA_VERSION})"
+                "unsupported schema version {found} (supported: {SCHEMA_VERSION} and {MII_SCHEMA_VERSION})"
             ),
-            Self::InvalidTrack => f.write_str("the position track does not match the frames"),
+            Self::InvalidTrack => f.write_str("the positions do not match the frames"),
             Self::InvalidName(why) => write!(f, "invalid name: {why}"),
             Self::InvalidGameVersion(why) => write!(f, "invalid game version: {why}"),
             Self::InvalidMii(why) => write!(f, "Mii macro unavailable: {why}"),

@@ -259,7 +259,7 @@ fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
         ("empty.json", Vec::new()),
         (
             "future.json",
-            edited_json(|v| v["schema_version"] = json!(4)),
+            edited_json(|v| v["schema_version"] = json!(3)),
         ),
         (
             "overflow.json",
@@ -301,7 +301,7 @@ fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
             .as_str()
     };
     assert!(
-        reason("future.json").contains("unsupported schema version 4"),
+        reason("future.json").contains("unsupported schema version 3"),
         "{}",
         reason("future.json")
     );
@@ -346,13 +346,13 @@ fn load_reports_the_specific_failure() {
     let lib = Library::new(tmp.path());
     fs::write(
         tmp.path().join("future.json"),
-        edited_json(|v| v["schema_version"] = json!(4)),
+        edited_json(|v| v["schema_version"] = json!(3)),
     )
     .unwrap();
-    // A version-4 file whose layout this crate cannot parse is still a version error.
+    // A version-3 file whose layout this crate cannot parse is still a version error.
     fs::write(
         tmp.path().join("shape.json"),
-        br#"{"schema_version":4,"frames":"packed"}"#,
+        br#"{"schema_version":3,"frames":"packed"}"#,
     )
     .unwrap();
     fs::write(
@@ -364,28 +364,17 @@ fn load_reports_the_specific_failure() {
 
     assert!(matches!(
         lib.load("future"),
-        Err(MacroError::UnsupportedVersion { found: 4 })
+        Err(MacroError::UnsupportedVersion { found: 3 })
     ));
     assert!(matches!(
         lib.load("shape"),
-        Err(MacroError::UnsupportedVersion { found: 4 })
+        Err(MacroError::UnsupportedVersion { found: 3 })
     ));
     assert!(matches!(
         lib.load("big"),
         Err(MacroError::FileTooLarge { .. })
     ));
     assert!(matches!(lib.load("garbage"), Err(MacroError::Parse(_))));
-    let tracked = |short_row: bool| edited_json(|v| {
-        v["schema_version"] = json!(3);
-        v["track"] = json!([[[8, 2, -1, 3, 17, 1, 0, 40, 5], [18, 0, 1, 0, 0, 0, 0, -20, 7]]]);
-        if short_row { v["track"][0][1].as_array_mut().unwrap().pop(); }
-    });
-    let path = tmp.path().join("tracked.json");
-    fs::write(&path, tracked(false)).unwrap();
-    assert_eq!(lib.load("tracked").unwrap().track.unwrap()[0][1].y, 7.0);
-    fs::write(&path, tracked(true)).unwrap();
-    let err = lib.load("tracked").unwrap_err();
-    assert!(matches!(err, MacroError::Parse(_)), "short v3 track row: {err}");
     assert!(matches!(lib.load("nothing"), Err(MacroError::NotFound(ref id)) if id == "nothing"));
 }
 
