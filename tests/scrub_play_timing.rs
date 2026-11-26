@@ -11,7 +11,8 @@ const SIBLING: &str = "cpu7 ";
 
 /// The operator's question (2026-11-26 03:02:02Z): is Play slower with positions? Host timings of the Play chord's
 /// service tick up to the first injected input, of a selection load and of a chain start, for a 3 s, a 30 s and a
-/// 36,000-input macro. It asserts only that each run starts; the numbers are read from its output.
+/// 36,000-input macro. The numbers are read from its output.
+/// A trackless, generation-armed Play also reports its first cold sample separately from twenty warm samples.
 ///
 /// The same file runs on `main` (tr-primary-2 04:35:21Z, 04:58:43Z): there the lines marked head-only are dropped
 /// and the lines marked main-only are switched on, so both sides have the same files in the folder (a positions
@@ -50,6 +51,11 @@ fn play_start_timings() {
     };
     let ids: Vec<String> = (0..3).map(|step| make(format!("Timing {frames} {step}"))).collect();
     let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new(format!("Chain {frames}"), ids.clone()).unwrap()).unwrap();
+    let inputs = (0..frames).map(|i| InputFrame { buttons: (i % 7 + 1) as u32, ..InputFrame::default() }).collect();
+    let plain = MacroRecording::new(format!("Armed {frames}"), "13.0.5", StartState::neutral(8, 0, 1.0), inputs).unwrap();
+    let armed_id = library.save_new(&plain).unwrap();
+    assert!(!root.join(MACROS_DIR).join(format!("{armed_id}.pos")).exists());
+    let armed_json = fs::metadata(root.join(MACROS_DIR).join(format!("{armed_id}.json"))).unwrap().len();
     let json = fs::metadata(root.join(MACROS_DIR).join(format!("{}.json", ids[0]))).unwrap().len();
     let pos = fs::metadata(root.join(MACROS_DIR).join(format!("{}.pos", ids[0]))).unwrap().len();
     assert_eq!(pos, 40 + 72 * frames as u64, "both sides have the same positions file beside each macro");
@@ -59,6 +65,36 @@ fn play_start_timings() {
     report("load", frames, json, || { assert_eq!(library.load(&ids[0]).unwrap().frames.len(), frames); });
     report("play", frames, json, || start(&root, &ids[0]));
     report("chain3", frames, json, || start(&root, &chain));
+    assert!(!host::play_allocated(), "no sampler table before the first eligible Play"); // head-only
+    let mut times = Vec::with_capacity(RUNS);
+    let mut armed = Vec::with_capacity(RUNS);
+    for _ in 0..RUNS {
+        let began = Instant::now();
+        TIMED.with(|timed| timed.set(None));
+        start_armed(&root, &armed_id);
+        times.push(TIMED.with(|timed| timed.take()).unwrap_or(began).elapsed().as_micros());
+        armed.push(ARMED.with(|armed| armed.get()));
+    }
+    let cold = times[0];
+    eprintln!("PLAY_TIMING what=play_armed_cold frames={frames} json_bytes={armed_json} runs=1 pinned={} median_us={cold} min_us={cold} max_us={cold} first_us={cold}",
+        env::var("TR_SCRUB_TIMING_PINNED").unwrap_or_default());
+    let first = times[1];
+    let mut warm = times[1..].to_vec();
+    warm.sort_unstable();
+    let median = (warm[warm.len() / 2 - 1] + warm[warm.len() / 2]) / 2;
+    eprintln!("PLAY_TIMING what=play_armed frames={frames} json_bytes={armed_json} runs={} pinned={} median_us={} min_us={} max_us={} first_us={first}",
+        warm.len(), env::var("TR_SCRUB_TIMING_PINNED").unwrap_or_default(), median, warm[0], warm[warm.len() - 1]);
+    assert!(armed.iter().all(|armed| *armed) && host::play_sampling(), "every sample armed generation"); // head-only
+    host::on_chords(false, true, false);
+    let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
+    for _ in 0..2 {
+        host::play_track_service(&root); // head-only
+        host::service_at(&root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
+    }
+    let armed_inputs = library.load(&armed_id).unwrap().frames;
+    assert_eq!(armed_inputs.len(), frames);
+    assert_eq!(crate::engine::macros::positions::source(&root.join(MACROS_DIR), &armed_id, &armed_inputs), Some(crate::engine::macros::positions::Source::Generated)); // head-only
+    assert_eq!(crate::engine::macros::positions::read(&root.join(MACROS_DIR), &armed_id, &armed_inputs).map(|rows| rows.len()), Some(1)); // head-only
     host_state("end", frames);
 }
 
@@ -96,8 +132,26 @@ fn start(root: &Path, id: &str) {
     assert_eq!(host::take_player_frame().map(|frame| frame.buttons), Some(1), "the first input after the chord");
 }
 
+fn start_armed(root: &Path, id: &str) {
+    let mut index = RecordingIndex::load(root).unwrap();
+    index.set_active(Role::Player, Some(id), 1).unwrap();
+    index.set_loop(Role::Player, LoopCount::Finite(1));
+    index.save(root).unwrap();
+    host::reset_host();
+    host::set_role_fighter(Role::Player, 8);
+    let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
+    let tick = || host::service_at(root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
+    tick();
+    TIMED.with(|timed| timed.set(Some(Instant::now())));
+    host::on_chords(false, true, false);
+    tick();
+    ARMED.with(|armed| armed.set(host::play_sampling())); // head-only
+    assert_eq!(host::take_player_frame().map(|frame| frame.buttons), Some(1), "the first input after the chord");
+}
+
 thread_local! {
     static TIMED: core::cell::Cell<Option<Instant>> = const { core::cell::Cell::new(None) };
+    static ARMED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Run `what` `RUNS` times and print the median and the fastest, in microseconds. `start` restarts the clock at its

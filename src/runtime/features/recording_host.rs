@@ -43,17 +43,21 @@ pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, pl
     rr_host::on_chords(record, play_player, play_cpu);
 }
 
-/// A take starts: both fighters' state now, read with the capture's sampler, so the take's first frame has it. The
-/// fighter frames sample only while a take records.
+/// A take starts: both fighters' state now, read with the capture's sampler, so the take's first frame has it.
 ///
 /// # Safety
 /// Game thread; `cpu` was resolved this frame.
 pub(super) unsafe fn seed_take_track(cpu: Option<super::recorder::Body>) {
+    seed_both(cpu, |slot, frame| crate::engine::macro_ui::scrub_track::TAKE.seed(slot, frame));
+}
+
+unsafe fn seed_both(cpu: Option<super::recorder::Body>, store: impl Fn(usize, Option<crate::engine::macros::ReplayFrame>)) {
     for (slot, body) in [super::recorder::body_of(0), cpu].into_iter().enumerate() {
-        if let Some(body) = body {
+        let frame = body.map(|body| {
             let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-            crate::engine::macro_ui::scrub_track::TAKE.live(slot, &crate::runtime::macros::replay_capture::state(module));
-        }
+            crate::runtime::macros::replay_capture::state(module)
+        });
+        store(slot, frame);
     }
 }
 
@@ -227,7 +231,7 @@ pub unsafe fn cpu_role_poll(out: *mut MappedInputs) -> bool {
 
 /// The CPU run's frame for this game frame (the AI epilogue, game thread); its first one after a warp gets the start speed.
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    let frame = rr_host::take_cpu_frame();
+    let frame = rr_host::take_cpu_frame_seeded(|| unsafe { seed_both(super::recorder::cpu_body(), rr_host::play_seed); });
     if frame.is_some() {
         // SAFETY: called from the AI epilogue on the game thread (`recorder::host_cpu`).
         unsafe {
@@ -241,7 +245,7 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
-    if rr_host::on_player_poll(out) {
+    if rr_host::on_player_poll_seeded(out, || seed_both(super::recorder::cpu_body(), rr_host::play_seed)) {
         observe_start(crate::engine::library::Role::Player);
         apply_start_speed(crate::engine::library::Role::Player);
     }
@@ -273,6 +277,7 @@ pub fn service() {
     if player.fighter_kind >= 0 {
         rr_host::set_fighter_label(&fighter_label(player.fighter_kind));
     }
+    rr_host::play_track_service(root);
     // Migration first. Nothing records into the old numbered slots any more (rc.12 TR2), so it finds them empty.
     if !rr_host::migrated() {
         let tick = rr_host::service_at(root, &Default::default(), &rr_host::today(), player, cpu);

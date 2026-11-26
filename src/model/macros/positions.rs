@@ -65,6 +65,10 @@ impl Binding {
     }
 }
 
+pub(crate) fn same_inputs(id: &str, played: &[InputFrame], current: &[InputFrame]) -> bool {
+    played.len() == current.len() && Binding::of(id, played) == Binding::of(id, current)
+}
+
 fn header(binding: Binding, frames: u32, source: Source) -> [u8; HEADER] {
     let mut out = [0u8; HEADER];
     out[..4].copy_from_slice(&MAGIC);
@@ -129,12 +133,16 @@ fn bound(file: &mut fs::File, id: &str, inputs: &[InputFrame]) -> Option<(usize,
 
 /// Whether the positions file of `id` is there and binds these inputs. Only its header is read.
 pub fn binds(dir: &Path, id: &str, inputs: &[InputFrame]) -> bool {
+    #[cfg(test)]
+    HEADS.with(|heads| heads.set(heads.get() + 1));
     fs::File::open(path(dir, id)).ok().and_then(|mut file| bound(&mut file, id, inputs)).is_some()
 }
 
 /// Write the positions of the macro `id`, whose inputs are `inputs`: to `<id>.pos.tmp`, synced, then put in place.
 /// Entries past the inputs are left out.
 pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame; 2]], source: Source) -> io::Result<()> {
+    #[cfg(test)]
+    WRITES.with(|writes| writes.set(writes.get() + 1));
     #[cfg(test)]
     if FAIL_WRITE.with(|fail| fail.get()) {
         return Err(io::Error::from(io::ErrorKind::Interrupted));
@@ -162,26 +170,47 @@ pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFr
 }
 
 pub(super) fn read_with_source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, Vec<[ReplayFrame; 2]>)> {
+    let mut track = Vec::new();
+    let (source, _) = scan(dir, id, inputs, Some(&mut track))?;
+    Some((source, track))
+}
+
+/// Validate the same rows Crop would read, without collecting a second track on the playback worker.
+pub fn check(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, u32)> {
+    scan(dir, id, inputs, None)
+}
+
+fn scan(dir: &Path, id: &str, inputs: &[InputFrame], mut track: Option<&mut Vec<[ReplayFrame; 2]>>) -> Option<(Source, u32)> {
     #[cfg(test)]
     READS.with(|reads| reads.set(reads.get() + 1));
     let mut file = fs::File::open(path(dir, id)).ok()?;
     let (frames, source) = bound(&mut file, id, inputs)?;
-    let mut track = Vec::new();
-    track.try_reserve_exact(frames).ok()?;
+    if let Some(out) = &mut track { out.try_reserve_exact(frames).ok()?; }
     let mut buffer = vec![0u8; CHUNK_FRAMES.min(frames) * FRAME];
-    while track.len() < frames {
-        let count = (frames - track.len()).min(CHUNK_FRAMES);
+    for start in (0..frames).step_by(CHUNK_FRAMES) {
+        let count = (frames - start).min(CHUNK_FRAMES);
         file.read_exact(&mut buffer[..count * FRAME]).ok()?;
         for bytes in buffer[..count * FRAME].as_chunks::<FRAME>().0 {
-            track.push([get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?]);
+            let pair = [get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?];
+            if let Some(out) = &mut track { out.push(pair); }
         }
     }
-    Some((source, track))
+    Some((source, frames as u32))
 }
 
 /// Where the positions file of `id` came from, when it binds these inputs. Only its header is read.
 pub fn source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Source> {
+    #[cfg(test)]
+    HEADS.with(|heads| heads.set(heads.get() + 1));
     fs::File::open(path(dir, id)).ok().and_then(|mut file| bound(&mut file, id, inputs)).map(|(_, source)| source)
+}
+
+/// The source and the frame count of the positions file of `id`, when it binds these inputs. Only its header is read.
+pub fn kept(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, u32)> {
+    #[cfg(test)]
+    HEADS.with(|heads| heads.set(heads.get() + 1));
+    fs::File::open(path(dir, id)).ok().and_then(|mut file| bound(&mut file, id, inputs))
+        .map(|(frames, source)| (source, frames as u32))
 }
 
 /// Best-effort cleanup after deleting the macro or abandoning a sidecar write.
@@ -204,6 +233,8 @@ pub(super) fn invalidate(dir: &Path, id: &str) -> io::Result<()> {
 #[cfg(test)]
 thread_local! {
     static READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static HEADS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static WRITES: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static FAIL_WRITE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
     static FAIL_UNLINK: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
@@ -213,6 +244,12 @@ thread_local! {
 pub fn reads() -> usize {
     READS.with(|reads| reads.get())
 }
+
+#[cfg(test)]
+pub fn heads() -> usize { HEADS.with(|heads| heads.get()) }
+
+#[cfg(test)]
+pub fn writes() -> usize { WRITES.with(|writes| writes.get()) }
 
 /// Make this thread's next positions writes fail (tests: a save interrupted after the macro is in place).
 #[cfg(test)]

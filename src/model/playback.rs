@@ -164,6 +164,24 @@ impl Book {
         self.chains.contains_key(id)
     }
 
+    pub fn plays_from_zero(&self, id: &str) -> bool {
+        !self.is_chain(id) && self.recordings.get(id).is_some_and(|recording|
+            !matches!(recording.trim, crate::model::trim::Trim::Start | crate::model::trim::Trim::Both)
+                || recording.frames.first().is_some_and(|frame| !crate::model::trim::neutral_frame(frame)))
+    }
+
+    pub fn frame_count(&self, id: &str) -> Option<usize> {
+        self.recordings.get(id).map(|recording| recording.frames.len())
+    }
+
+    pub(crate) fn inputs(&self, id: &str) -> Option<&[InputFrame]> {
+        self.recordings.get(id).map(|recording| recording.frames.as_slice())
+    }
+
+    pub(crate) fn take_inputs(&mut self, id: &str) -> Option<Vec<InputFrame>> {
+        self.recordings.get_mut(id).map(|recording| std::mem::take(&mut recording.frames))
+    }
+
     /// A chain's macro 1 (whose start save the chain warps to); `None` for anything else.
     pub fn first_recording(&self, id: &str) -> Option<&str> {
         self.chains.get(id)?.recordings.first().map(String::as_str)

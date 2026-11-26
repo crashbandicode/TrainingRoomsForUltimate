@@ -633,9 +633,14 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
             start_state: crate::model::state::record::StartState::Standard,
         }))
     };
-    if !nana && crate::engine::rr_host::capture_role() != 0 {
-        // The state a match capture keeps per frame, only while a take is recorded (its start seeds frame 0).
-        crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state(&mut *(accessor as *mut smash::app::BattleObjectModuleAccessor)));
+    if !nana {
+        let capture = crate::engine::rr_host::capture_role() != 0;
+        let play = crate::engine::rr_host::play_sampling();
+        if capture || play {
+            let frame = crate::runtime::macros::replay_capture::state(&mut *(accessor as *mut smash::app::BattleObjectModuleAccessor));
+            if capture { crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &frame); }
+            if play { crate::engine::rr_host::play_live(role.index(), &frame); }
+        }
     }
     if !crate::engine::rr_host::fighter_frame(live, crate::engine::rr_host::save_state_step(
         ENABLE.load(Ordering::Acquire), TEMPORARY.load(Ordering::Acquire),

@@ -296,12 +296,16 @@ fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     }
 }
 
-/// One block of a take's track, when the memory is there.
+/// One block of a take's track, when the memory is there: zeroed in one allocation, not built cell by cell.
 fn new_block() -> Option<Box<[AtomicU32]>> {
-    let mut cells = Vec::new();
-    cells.try_reserve_exact(TAKE_CHUNK * FRAME_CELLS).ok()?;
-    cells.resize_with(TAKE_CHUNK * FRAME_CELLS, || AtomicU32::new(0));
-    Some(cells.into_boxed_slice())
+    let cells = TAKE_CHUNK * FRAME_CELLS;
+    let layout = std::alloc::Layout::array::<AtomicU32>(cells).ok()?;
+    // SAFETY: the layout is not empty; all-zero bytes are a valid `AtomicU32` (zero, what each cell started as); the
+    // box owns exactly this allocation and frees it with the same layout.
+    unsafe {
+        let ptr = std::alloc::alloc_zeroed(layout) as *mut AtomicU32;
+        (!ptr.is_null()).then(|| Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, cells)))
+    }
 }
 
 /// The worker: free a block. No new push finds it; with a push already inside one, it stays for a later pass.
@@ -394,6 +398,17 @@ impl TakeTrack {
         if let Some(live) = self.table().and_then(|table| table.live.get(slot)) {
             for (cell, value) in live.iter().zip(cells(frame)) {
                 cell.store(value, Ordering::Release);
+            }
+        }
+    }
+
+    /// Seed this role at the start of a new take, before its first input is recorded.
+    pub fn seed(&self, slot: usize, frame: Option<ReplayFrame>) {
+        if let Some(frame) = frame {
+            self.live(slot, &frame);
+        } else if let Some(live) = self.table().and_then(|table| table.live.get(slot)) {
+            for (index, cell) in live.iter().enumerate() {
+                cell.store(if index == 0 { u32::MAX } else { 0 }, Ordering::Release);
             }
         }
     }
@@ -676,7 +691,8 @@ mod tests {
         assert!(push.contains("TAKE.push(len, usize::from(side == ROLE_CPU));"));
         assert!(host.contains("let track = TAKE.take(frames.len());") && host.contains("capture.set_track(track);"));
         let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
-        assert!(states.contains("TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state("));
+        assert!(states.contains("let frame = crate::runtime::macros::replay_capture::state(")
+            && states.contains("if capture { crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &frame); }"));
     }
 
     #[test]
@@ -955,14 +971,19 @@ mod tests {
     #[test]
     fn the_sampler_reads_nothing_with_no_take() {
         let root = env!("CARGO_MANIFEST_DIR");
-        // A fighter frame reads the nine values only while a take is being recorded: one atomic read otherwise.
+        // A fighter frame reads the nine values only for a take or a generated track.
         let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
-        let gate = states.find("if !nana && crate::engine::rr_host::capture_role() != 0 {").expect("the take test comes first");
-        let sample = states.find("TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state(").unwrap();
-        assert!(gate < sample && states[gate..sample].lines().count() <= 3, "the sample sits inside the take test");
+        let gate = states.split_once("let capture = crate::engine::rr_host::capture_role() != 0;").unwrap().1
+            .split_once("if !crate::engine::rr_host::fighter_frame(").unwrap().0;
+        assert!(gate.contains("let play = crate::engine::rr_host::play_sampling();"));
+        assert!(gate.contains("if capture || play {"));
+        assert!(gate.contains("if capture { crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &frame); }"));
+        assert!(gate.contains("if play { crate::engine::rr_host::play_live(role.index(), &frame); }"));
         assert_eq!(states.matches("replay_capture::state(").count(), 1);
         // So a take's start reads both bodies once: its first frame has its state.
         let host = std::fs::read_to_string(format!("{root}/src/runtime/features/recording_host.rs")).unwrap();
+        assert!(host.contains("TAKE.seed(slot, frame)"));
+        assert!(host.contains("store(slot, frame);"));
         let chords = host.split_once("pub fn on_chords(").unwrap().1.split_once("\n}").unwrap().0;
         assert!(chords.contains("seed_take_track(Some(cpu));"), "the Record chord seeds the take");
         let picker = std::fs::read_to_string(format!("{root}/src/runtime/features/record_place.rs")).unwrap();
@@ -973,6 +994,27 @@ mod tests {
         take.live(0, &state(0, 0));
         take.push(0, 0);
         assert_eq!(take.take(1).map(|track| track[0][1].start.fighter_kind), Some(-1));
+    }
+
+    #[test]
+    fn a_new_take_does_not_reuse_the_previous_takes_missing_partner() {
+        let take = TakeTrack::new();
+        take.service(false, 0);
+        for recorded in [0, 1] {
+            let partner = 1 - recorded;
+            take.seed(recorded, Some(state(recorded, 4)));
+            take.seed(partner, Some(state(partner, 4)));
+            take.push(0, recorded);
+            assert_eq!(take.take(1).unwrap()[0][1], state(partner, 4));
+
+            take.service(false, 0);
+            take.seed(recorded, Some(state(recorded, 9)));
+            take.seed(partner, None);
+            take.push(0, recorded);
+            let pair = take.take(1).unwrap()[0];
+            assert_eq!(pair[0], state(recorded, 9));
+            assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
+        }
     }
 
     #[test]

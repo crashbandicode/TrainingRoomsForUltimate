@@ -271,6 +271,10 @@ impl MacroRecording {
         self.track_source = source;
     }
 
+    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {
+        self.track.take().map(|track| (self.track_source, track))
+    }
+
     /// Keep frames `range` of the recording, with the same slice of its track.
     pub fn keep(&mut self, range: std::ops::Range<usize>) {
         self.frames.truncate(range.end);

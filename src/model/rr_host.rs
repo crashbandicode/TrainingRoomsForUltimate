@@ -13,8 +13,9 @@ use super::library::{
 };
 use super::frame_queue::FrameQueue;
 use super::macro_ui::clip_marks::{Seen, Span, Watch, WATCH_SPANS};
+use super::macro_ui::play_track::PLAY;
 use super::macro_ui::scrub_track::TAKE;
-use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES};
+use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, ReplayFrame, StartState, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
@@ -1230,12 +1231,17 @@ pub(crate) fn player_tint() -> Option<[f32; 3]> {
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
-    take_frame(Role::Player)
+    take_frame(Role::Player, || {})
+}
+
+#[cfg(test)]
+pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
+    take_cpu_frame_seeded(|| {})
 }
 
 #[cfg(any(test, target_os = "switch"))]
-pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    let frame = take_frame(Role::Cpu);
+pub(crate) fn take_cpu_frame_seeded(seed: impl FnOnce()) -> Option<InputFrame> {
+    let frame = take_frame(Role::Cpu, seed);
     if let Some(frame) = frame.filter(|_| make_actor_cpu() && INPUT_MODE.load(Ordering::Acquire) & 1 != 0) {
         MAKE_CPU_FRAME.store(pack(frame), Ordering::Release);
         INPUT_POLLS[0].fetch_add(1, Ordering::Release);
@@ -1249,12 +1255,18 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) -> bool {
+    on_player_poll_seeded(out, || {})
+}
+
+/// # Safety
+/// `out` is null or the live mapped-input record for this poll.
+pub unsafe fn on_player_poll_seeded(out: *mut MappedInputs, seed: impl FnOnce()) -> bool {
     if out.is_null() {
         return false;
     }
     let delay_before = DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire);
     // The fighter's poll takes the first input after the worker has published it.
-    let injected = take_player_frame();
+    let injected = take_frame(Role::Player, seed);
     if let Some(frame) = injected {
         *out = to_mapped(frame);
     } else if DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire) < delay_before {
@@ -1522,6 +1534,44 @@ pub fn catalog_generation() -> u64 {
 
 pub fn recording_version() -> (u64, u64) {
     (catalog_generation(), store::index_generation())
+}
+
+pub fn play_sampling() -> bool { PLAY.sampling() }
+pub fn play_allocated() -> bool { PLAY.allocated() }
+pub fn play_live(slot: usize, frame: &ReplayFrame) { PLAY.live(slot, frame); }
+pub fn play_seed(slot: usize, frame: Option<ReplayFrame>) { PLAY.seed(slot, frame); }
+pub fn take_generated() -> bool { PLAY.take_written() }
+
+#[inline(never)]
+pub fn play_track_service(root: &Path) {
+    use super::macro_ui::play_track::PlayTrack;
+    use super::macros::positions::{self, Source};
+    if PLAY_PLAYER.load(Ordering::Acquire) || PLAY_CPU.load(Ordering::Acquire) || lock(&PREVIEW_ASK).start.is_some() {
+        return;
+    }
+    PLAY.ready();
+    let Some((slot, generation)) = PLAY.open_run() else { return };
+    let role = if slot == 0 { Role::Player } else { Role::Cpu };
+    let over = !role_playing(role) || RUN_GEN[slot].load(Ordering::SeqCst) != generation;
+    if !over || PLAY.busy() != 0 { return; }
+    let Some((open, mut rows)) = PLAY.end() else { return };
+    if open.version != recording_version() { return; }
+    let dir = root.join(MACROS_DIR);
+    let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
+    let same = |played: &[InputFrame]| positions::same_inputs(open.id.as_str(), played, &recording.frames);
+    let matches = match open.retired_inputs.as_deref() {
+        Some(played) => same(played),
+        None => lock(&BOOK).as_ref().and_then(|held| held.book.inputs(open.id.as_str())).is_some_and(same),
+    };
+    if !matches { return; }
+    if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
+    let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
+    let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
+    if write {
+        if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
+        PLAY.note_written();
+    }
+    if done { PLAY.note_done(open.id.as_str(), open.version); }
 }
 
 #[cfg(any(test, target_os = "switch"))]
@@ -2043,6 +2093,14 @@ fn role_kind(role: Role) -> i32 {
     }
 }
 
+fn open_play_track(book: &Book, role: Role, id: &str, limit: usize, pass: bool) {
+    let kind = role_kind(role);
+    if id == CLIP_ID || book.is_chain(id) || kind < 0 || book.recorded_fighter(id) != Some(kind) { return; }
+    let Some(frames) = book.frame_count(id) else { return };
+    let slot = role_index(role);
+    PLAY.begin(id, slot, RUN_GEN[slot].load(Ordering::SeqCst), recording_version(), limit.min(frames) as u32, pass);
+}
+
 fn apply_waiting_answer(tick: &mut Tick) {
     if lock(&HELD).is_some() {
         return;
@@ -2171,6 +2229,9 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
     }
     if effect.started {
         mark_run(role);
+        if let Some(id) = book.index.active(role).filter(|id| book.plays_from_zero(id)) {
+            open_play_track(book, role, id, usize::MAX, true);
+        }
         if !next { owe_delay(role); }
     }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
@@ -2207,6 +2268,12 @@ fn step_role(machine: &mut Playback, book: &Book, role: Role) {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static POLL_ON_PUBLISH: core::cell::Cell<Option<fn(Role)>> = const { core::cell::Cell::new(None) };
+    static BEFORE_TAKE: core::cell::Cell<Option<Box<dyn FnOnce()>>> = const { core::cell::Cell::new(None) };
+}
+
 /// A cut clears the run flag. If it races this publish, the hook's cut flag still
 /// suppresses the old frame until the worker can clear the generation.
 fn publish(role: Role, frame: InputFrame) {
@@ -2214,6 +2281,8 @@ fn publish(role: Role, frame: InputFrame) {
         // The worker checked room before advancing playback. The hook can only free more room.
         let queued = role_frames(role).push(pack(frame));
         debug_assert!(queued, "replay advanced without room for its frame");
+        #[cfg(test)]
+        if let Some(poll) = POLL_ON_PUBLISH.take() { poll(role); }
     }
 }
 
@@ -2502,18 +2571,27 @@ fn start_run(
     book: &Book,
     role: Role,
     source: &str,
-    frames: Option<core::ops::Range<usize>>,
+    window: Option<PreviewWindow>,
     owed: Option<StartSpeed>,
     delayed: bool,
 ) -> bool {
-    let effect = match frames {
-        Some(frames) => machine.play_range(role, book, source, frames),
-        None => machine.play_file(role, book, source),
+    let (effect, track_end) = match window {
+        Some(PreviewWindow::Exact(frames)) => {
+            let end = (frames.start == 0).then_some(frames.end);
+            (machine.play_range(role, book, source, frames), end)
+        }
+        Some(PreviewWindow::Drill { frames, trim }) => {
+            let range = book.drill_preview_range(source, frames as usize, trim);
+            (machine.play_range(role, book, source, range), None)
+        }
+        None => (machine.play_file(role, book, source), None),
     };
     if effect.started {
         drop_frames(role);
         if delayed { owe_delay(role); }
         mark_run(role);
+        // A poll can consume input zero as soon as step_role publishes it.
+        if let Some(end) = track_end { open_play_track(book, role, source, end, false); }
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
         step_role(machine, book, role);
@@ -2577,10 +2655,6 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
     match start {
         Some(PreviewStart { source, role, window, playback }) => {
             PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
-            let frames = match window {
-                PreviewWindow::Exact(frames) => frames,
-                PreviewWindow::Drill { frames, trim } => book.drill_preview_range(&source, frames as usize, trim),
-            };
             let owed = if source == CLIP_ID {
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
@@ -2592,7 +2666,7 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
             } else {
                 warp_to_start(book, role, &source, tick)
             };
-            if !start_run(machine, book, role, &source, Some(frames), owed, playback) {
+            if !start_run(machine, book, role, &source, Some(window), owed, playback) {
                 PREVIEW.store(0, Ordering::Release);
             }
         }
@@ -2785,7 +2859,11 @@ fn refresh_held(held: &mut Option<Box<HeldBook>>, root: &Path, chords: [bool; 2]
         sources[role_index(role)] = Some(Source { id: source, active: false });
     }
     match read_held(root, sources, in_use, starts) {
-        Ok(next) => { *held = Some(Box::new(next)); true }
+        Ok(next) => {
+            if let Some(old) = held { PLAY.retire_book(&mut old.book); }
+            *held = Some(Box::new(next));
+            true
+        }
         Err(()) => false,
     }
 }
@@ -2839,13 +2917,13 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
-fn take_frame(role: Role) -> Option<InputFrame> {
-    let (frame, generation) = pop_frame(role)?;
-    credit_frame(role, generation);
-    Some(frame)
+fn take_frame(role: Role, seed: impl FnOnce()) -> Option<InputFrame> {
+    #[cfg(test)]
+    if let Some(publish) = BEFORE_TAKE.take() { publish(); }
+    pop_frame(role, |generation| PLAY.poll(|| credit_frame(role, generation, seed))).map(|(frame, _)| frame)
 }
 
-fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
+fn pop_frame(role: Role, taken: impl FnOnce(usize)) -> Option<(InputFrame, usize)> {
     // A pending restore must land before an input or it would undo that input.
     if WARP_HOLD.load(Ordering::Acquire) || start_gated() || cut_flag(role).load(Ordering::Acquire)
         || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
@@ -2856,13 +2934,13 @@ fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
     if DELAY_OWED[role_index(role)].fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1)).is_ok() {
         return None;
     }
-    role_frames(role).pop_tagged().map(|(frame, generation)| {
+    role_frames(role).pop_tagged_with(taken).map(|(frame, generation)| {
         PLAYED.fetch_add(1, Ordering::AcqRel);
         (unpack(frame), generation)
     })
 }
 
-fn credit_frame(role: Role, generation: usize) {
+fn credit_frame(role: Role, generation: usize, seed: impl FnOnce()) {
     let count = &FED[role_index(role)];
     let previous = count.load(Ordering::Relaxed);
     let generation = generation as u32;
@@ -2872,6 +2950,7 @@ fn credit_frame(role: Role, generation: usize) {
         1
     };
     count.store((u64::from(generation) << 32) | u64::from(next), Ordering::Release);
+    PLAY.fed(role_index(role), generation, next, seed);
 }
 
 fn role_frames(role: Role) -> &'static FrameQueue {
@@ -2916,6 +2995,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 #[cfg(test)]
 pub(crate) fn reset_host() {
+    PLAY.reset();
     slot_stop();
     for tape in &SLOT_TAPES {
         // SAFETY: host tests serialize the single publisher.
@@ -2997,6 +3077,7 @@ mod tests {
     use super::super::macros::StartState;
     use super::*;
     use crate::model::bridge_events::{Fed, FedSeen};
+    use std::process::Command;
     use std::sync::Mutex as TestMutex;
 
     static TEST_LOCK: TestMutex<()> = TestMutex::new(());
@@ -3345,12 +3426,12 @@ mod tests {
             assert_eq!(fed_frames(role), 0);
             assert_eq!(take().map(|frame| frame.buttons), Some(1));
             assert_eq!(fed_frames(role), 1);
-            let (old, generation) = pop_frame(role).unwrap();
+            let (old, generation) = pop_frame(role, |_| {}).unwrap();
             assert_eq!(old.buttons, 2);
             request_preview(&id, role, 2, 5);
             tick(&root);
             assert_eq!(fed_frames(role), 0);
-            credit_frame(role, generation);
+            credit_frame(role, generation, || {});
             assert_eq!(fed_frames(role), 0);
             for (count, buttons) in (1..=3).zip(3..=5) {
                 assert_eq!(take().map(|frame| frame.buttons), Some(buttons));
@@ -4895,7 +4976,634 @@ mod tests {
     }
 
     fn tick(root: &Path) {
+        play_track_service(root);
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
+    }
+
+    fn generated_fixture(tag: &str, frames: u32) -> (PathBuf, String, MacroRecording) {
+        reset_host();
+        let root = scratch(tag);
+        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
+        let inputs = (1..=frames).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
+        let recording = MacroRecording::new("Old", "13.0.5", StartState::neutral(7, 0, 1.0), inputs).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Cpu, 7);
+        (root, id, recording)
+    }
+
+    fn generated_sample(role: Role, index: u32) {
+        let sample = |kind, x| ReplayFrame {
+            input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0,
+        };
+        let slot = role_index(role);
+        play_live(slot, &sample(7, index as f32));
+        play_live(1 - slot, &sample(8, index as f32 + 100.0));
+    }
+
+    fn generated_take(role: Role, index: u32) -> Option<InputFrame> {
+        generated_sample(role, index);
+        match role { Role::Player => take_player_frame(), Role::Cpu => take_cpu_frame() }
+    }
+
+    fn generated_play(root: &Path, role: Role) {
+        on_chords(false, role == Role::Player, role == Role::Cpu);
+        tick(root);
+    }
+
+    fn generated_rows(root: &Path, id: &str, recording: &MacroRecording) -> Option<Vec<[ReplayFrame; 2]>> {
+        super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
+    }
+
+    fn a_poll_that_straddles_generation_arm_seeds_the_first_input_once() {
+        let _hold = hold();
+        for role in [Role::Cpu, Role::Player] { straddle_arm(role); }
+    }
+
+    fn straddle_arm(role: Role) {
+        let (root, id, recording) = generated_fixture("generated-seed-at-take", 3);
+        if role == Role::Player {
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(role, Some(&id), 1).unwrap();
+            index.save(&root).unwrap();
+            set_role_fighter(role, 7);
+            set_playback_delay(2);
+        }
+        let publish_root = root.clone();
+        BEFORE_TAKE.set(Some(Box::new(move || generated_play(&publish_root, role))));
+        let seeds = std::cell::Cell::new(0);
+        let seed = || {
+            seeds.set(seeds.get() + 1);
+            generated_sample(role, 42);
+        };
+        let poll = || match role {
+            Role::Cpu => take_cpu_frame_seeded(seed),
+            Role::Player => {
+                let mut out = MappedInputs::default();
+                unsafe { on_player_poll_seeded(&mut out, seed) }.then(|| to_frame(out))
+            }
+        };
+        if role == Role::Player {
+            for _ in 0..2 { assert_eq!(poll(), None); }
+            assert_eq!(seeds.get(), 0, "a delay poll is not input zero");
+        }
+        for input in &recording.frames { assert_eq!(poll(), Some(*input)); }
+        tick(&root);
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        assert_eq!((seeds.get(), rows[0][0].x, rows[0][1].x), (1, 42.0, 142.0));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
+        let _hold = hold();
+        let (root, first_id, first) = generated_fixture("generated-missing-partner", 3);
+        let sample = |kind| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        play_seed(1, Some(sample(7)));
+        play_seed(0, Some(sample(8)));
+        assert_eq!(take_cpu_frame(), Some(first.frames[0]));
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &first_id, &first).unwrap()[0][1].start.fighter_kind, 8);
+
+        let second = MacroRecording::new("Next", "13.0.5", StartState::neutral(7, 0, 1.0), first.frames.clone()).unwrap();
+        let second_id = Library::new(root.join(MACROS_DIR)).save_new(&second).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&second_id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        play_seed(1, Some(sample(7)));
+        play_seed(0, None);
+        assert_eq!(take_cpu_frame(), Some(second.frames[0]));
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &second_id, &second).unwrap()[0][1].start.fighter_kind, -1);
+    }
+
+    fn playback_over_existing_sidecar(source: crate::engine::macros::positions::Source, damaged: bool) -> bool {
+        use crate::engine::macros::positions;
+        let (root, id, recording) = generated_fixture("generated-body", 605);
+        let dir = root.join(MACROS_DIR);
+        let path = positions::path(&dir, &id);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
+        let old = vec![[frame, frame]; 601];
+        positions::write(&dir, &id, &recording.frames, &old, source).unwrap();
+        if damaged {
+            let mut bytes = std::fs::read(&path).unwrap();
+            let partner_x = 40 + 600 * 72 + 36 + 28;
+            bytes[partner_x..partner_x + 4].copy_from_slice(&f32::NAN.to_le_bytes());
+            std::fs::write(&path, bytes).unwrap();
+        }
+        assert_eq!(positions::kept(&dir, &id, &recording.frames), Some((source, 601)));
+        assert_eq!(generated_rows(&root, &id, &recording).is_none(), damaged);
+        let bytes = std::fs::read(&path).unwrap();
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..2 { assert_eq!(generated_take(Role::Cpu, i), Some(recording.frames[i as usize])); }
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        let correct = if damaged {
+            positions::source(&dir, &id, &recording.frames) == Some(positions::Source::Generated)
+                && generated_rows(&root, &id, &recording).is_some_and(|rows| {
+                    rows.len() == 2 && (rows[1][0].x, rows[1][1].x) == (1.0, 101.0)
+                })
+        } else {
+            std::fs::read(&path).unwrap() == bytes && generated_rows(&root, &id, &recording) == Some(old)
+        };
+        std::fs::remove_dir_all(root).unwrap();
+        correct
+    }
+
+    fn bad_sidecar_bodies_are_replaced_after_playback() {
+        use crate::engine::macros::positions::Source;
+        let _hold = hold();
+        let repaired = [Source::Generated, Source::Recorded].map(|source| playback_over_existing_sidecar(source, true));
+        assert_eq!(repaired, [true, true], "a nonfinite partner row in chunk two must not protect either source");
+    }
+
+    fn valid_sidecars_win_over_a_shorter_playback() {
+        use crate::engine::macros::positions::Source;
+        let _hold = hold();
+        for source in [Source::Generated, Source::Recorded] {
+            assert!(playback_over_existing_sidecar(source, false), "a valid {source:?} file changed");
+        }
+    }
+
+    fn an_old_macro_played_once_from_zero_gets_generated_positions() {
+        use crate::engine::macro_ui::{clip_panel::{ClipAction, ClipEditor}, scrub_track::Pos};
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-full", 5);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        for (i, input) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
+        }
+        tick(&root);
+        let rows = generated_rows(&root, &id, &recording).expect("generated positions");
+        assert_eq!(rows.len(), 5);
+        for (i, pair) in rows.iter().enumerate() {
+            assert_eq!((pair[0].x, pair[1].x), (i as f32, i as f32 + 100.0));
+        }
+        assert_eq!(positions::source(&root.join(MACROS_DIR), &id, &recording.frames), Some(Source::Generated));
+        let loaded = Library::new(root.join(MACROS_DIR)).load_edited(&id).unwrap();
+        let mut editor = ClipEditor::macro_file(loaded, false).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        assert_eq!(editor.scrub().1, Pos::Held);
+    }
+
+    fn a_stopped_playback_writes_the_inputs_that_were_consumed() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-stop", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 1);
+        super::super::macros::positions::remove(&root.join(MACROS_DIR), &id);
+        request_preview(&id, Role::Cpu, 0, 3);
+        tick(&root);
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        stop_preview();
+        tick(&root);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 1);
+    }
+
+    fn an_immediate_poll_of_the_first_preview_input_gets_its_positions() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-first-poll", 5);
+        tick(&root);
+        request_preview(&id, Role::Cpu, 0, 1);
+        POLL_ON_PUBLISH.set(Some(|role| {
+            assert_eq!(generated_take(role, 0).map(|frame| frame.buttons), Some(1));
+        }));
+        tick(&root);
+        assert_eq!(fed_frames(Role::Cpu), 1);
+        tick(&root);
+        let positions = generated_rows(&root, &id, &recording).expect("the first input of X was consumed");
+        assert_eq!((positions.len(), positions[0][0].x, positions[0][1].x), (1, 0.0, 100.0));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn an_editor_preview_from_zero_binds_the_whole_macro() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-preview", 5);
+        tick(&root);
+        request_preview(&id, Role::Cpu, 0, 1);
+        tick(&root);
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 1);
+    }
+
+    fn delay_polls_and_a_stop_before_the_first_input_keep_nothing() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, _) = generated_fixture("generated-delay", 5);
+        tick(&root);
+        set_playback_delay(3);
+        let writes = positions::writes();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..3 {
+            assert_eq!(generated_take(Role::Cpu, i), None);
+            tick(&root);
+        }
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(positions::writes(), writes);
+        assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
+    }
+
+    fn a_longer_generated_track_replaces_a_shorter_one_only() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-longer", 5);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        for i in 0..2 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 2);
+        generated_play(&root, Role::Cpu);
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
+        let writes = positions::writes();
+        generated_play(&root, Role::Cpu);
+        assert!(generated_take(Role::Cpu, 0).is_some());
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
+        assert_eq!(positions::writes(), writes);
+    }
+
+    fn a_generated_track_never_replaces_a_recorded_one() {
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-recorded", 5);
+        let dir = root.join(MACROS_DIR);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
+        let original = std::fs::read(positions::path(&dir, &id)).unwrap();
+        let writes = positions::writes();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert_eq!(std::fs::read(positions::path(&dir, &id)).unwrap(), original);
+        assert_eq!(positions::writes(), writes);
+        generated_play(&root, Role::Cpu);
+        assert!(!play_sampling());
+    }
+
+    fn an_adopted_generated_track_is_cropped_as_generated() {
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        for source in [Source::Generated, Source::Recorded] {
+            let (root, id, recording) = generated_fixture("generated-adoption", 5);
+            let dir = root.join(MACROS_DIR);
+            let library = Library::new(&dir);
+            let mut editor = ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap();
+            let rows: Vec<[ReplayFrame; 2]> = (0..5).map(|i| {
+                let sample = |kind, x| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
+                [sample(7, i as f32), sample(8, i as f32 + 100.0)]
+            }).collect();
+            if source == Source::Recorded {
+                positions::write(&dir, &id, &recording.frames, &rows, source).unwrap();
+            }
+            request_preview(&id, Role::Cpu, 0, 5);
+            tick(&root);
+            assert!(play_sampling());
+            for (i, input) in recording.frames.iter().enumerate() {
+                assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
+            }
+            tick(&root);
+            assert_eq!(positions::source(&dir, &id, &recording.frames), Some(source));
+            assert!(editor.adopt_positions(library.load_edited(&id).unwrap()));
+            editor.on_action(ClipAction::SelectIn);
+            editor.on_action(ClipAction::Nudge(1));
+            let ClipEffect::Export(export) = editor.on_action(ClipAction::Confirm) else { panic!("macro crop") };
+            assert_eq!(&export.frames, &recording.frames[1..]);
+            let new_id = library.save_new(&export).unwrap();
+            assert_eq!(positions::source(&dir, &new_id, &export.frames), Some(source));
+            assert_eq!(positions::read(&dir, &new_id, &export.frames), Some(rows[1..].to_vec()));
+        }
+    }
+
+    fn the_play_chord_pass_opens_and_writes_no_positions_file() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-chord", 5);
+        let before = (positions::reads(), positions::heads(), positions::writes());
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling(), "the first chord opens the sampler");
+        assert_eq!((positions::reads(), positions::heads(), positions::writes()), before);
+        for (i, frame) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*frame));
+        }
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
+
+        let (root, id, recording) = generated_fixture("generated-stop-chord", 5);
+        let before = (positions::reads(), positions::heads(), positions::writes());
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        assert_eq!((positions::reads(), positions::heads(), positions::writes()), before);
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        tick(&root);
+        assert_eq!(positions::writes(), before.2);
+        assert_eq!(generated_take(Role::Cpu, 1), Some(recording.frames[1]));
+        tick(&root);
+        assert_eq!(positions::writes(), before.2);
+        generated_play(&root, Role::Cpu);
+        assert_eq!(positions::writes(), before.2, "the stop chord writes no positions");
+        tick(&root);
+        assert_eq!(positions::writes(), before.2 + 1);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 2);
+    }
+
+    fn nothing_is_allocated_for_generation_before_the_first_generating_play() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-lazy", 5);
+        assert!(!play_allocated());
+        for _ in 0..3 {
+            tick(&root);
+            assert!(!play_allocated(), "idle passes do not allocate");
+        }
+        set_role_fighter(Role::Cpu, 8);
+        publish_fighter_prompt(false);
+        generated_play(&root, Role::Cpu);
+        assert!(!play_allocated(), "another fighter does not generate");
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        set_role_fighter(Role::Cpu, 7);
+        let chain = Chain::new("Chain", vec![id.clone()]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&chain_id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(!play_allocated(), "a chain does not generate");
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        request_preview(&id, Role::Cpu, 1, 4);
+        tick(&root);
+        assert!(!play_allocated(), "a preview from In 1 does not generate");
+        for i in 1..4 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_allocated());
+        assert!(play_sampling());
+        for (i, frame) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*frame));
+        }
+        tick(&root);
+        assert!(play_allocated());
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
+    }
+
+    fn a_library_write_during_the_run_drops_its_track() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-version", 5);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..2 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        for i in 2..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
+    }
+
+    fn a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions() {
+        let _hold = hold();
+        for stop in [false, true] { external_edit_before_settle(stop); }
+    }
+
+    fn external_edit_before_settle(stop: bool) {
+        use crate::engine::macros::positions;
+        let (root, id, recording) = generated_fixture("generated-external-edit", 3);
+        let dir = root.join(MACROS_DIR);
+        generated_play(&root, Role::Cpu);
+        for (i, input) in recording.frames.iter().take(if stop { 2 } else { 3 }).enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
+        }
+        // Same external-edit contract as playback_immediate: no store event and no file-size change.
+        let path = dir.join(format!("{id}.json"));
+        let mut bytes = std::fs::read(&path).unwrap();
+        let field = b"\"buttons\":1";
+        let at = bytes.windows(field.len()).position(|s| s == field).unwrap() + field.len() - 1;
+        bytes[at] = b'9';
+        std::fs::write(&path, bytes).unwrap();
+        let changed = Library::new(&dir).load(&id).unwrap();
+        assert_eq!(changed.frames[0].buttons, 9);
+        if stop { generated_play(&root, Role::Cpu); } // The stop chord refreshes the held book before settle.
+        tick(&root);
+        assert!(!positions::path(&dir, &id).exists(), "the worker must not sign the old poses with the new inputs");
+        generated_play(&root, Role::Cpu);
+        for (i, input) in changed.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, 10 + i as u32), Some(*input));
+        }
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &changed).unwrap()[0][0].x, 10.0);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn a_recorded_file_written_before_the_worker_drains_is_kept() {
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-race", 5);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..2 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        generated_play(&root, Role::Cpu);
+        let dir = root.join(MACROS_DIR);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 0.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
+        let original = std::fs::read(positions::path(&dir, &id)).unwrap();
+        tick(&root);
+        assert_eq!(std::fs::read(positions::path(&dir, &id)).unwrap(), original);
+    }
+
+    fn only_a_single_macro_from_input_zero_on_its_own_fighter_generates() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        for kind in 0..7 {
+            let (root, id, mut recording) = generated_fixture("generated-exclusions", 5);
+            match kind {
+                0 => {
+                    let chain = Chain::new("Chain", vec![id.clone()]).unwrap();
+                    let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+                    let mut index = RecordingIndex::load(&root).unwrap();
+                    index.set_active(Role::Cpu, Some(&chain_id), 1).unwrap();
+                    index.save(&root).unwrap();
+                }
+                1 => {
+                    recording.frames[0] = InputFrame::default();
+                    recording.trim = Trim::Start;
+                    Library::new(root.join(MACROS_DIR)).overwrite(&id, &recording).unwrap();
+                }
+                5 => { set_role_fighter(Role::Cpu, 8); publish_fighter_prompt(false); }
+                6 => set_role_fighter(Role::Cpu, -1),
+                _ => {}
+            }
+            tick(&root);
+            match kind {
+                0 | 1 | 5 | 6 => generated_play(&root, Role::Cpu),
+                2 => { request_preview(&id, Role::Cpu, 1, 4); tick(&root); }
+                3 => { request_clip_preview(recording.clone(), Role::Cpu); tick(&root); }
+                4 => {
+                    set_role_fighter(Role::Player, 7);
+                    assert!(request_drill_preview(&id, 5, Trim::Off));
+                    tick(&root);
+                }
+                _ => unreachable!(),
+            }
+            assert!(!play_sampling(), "excluded start {kind}");
+            let role = if kind == 4 { Role::Player } else { Role::Cpu };
+            assert!(role_playing(role), "excluded run {kind} actually started");
+            if kind != 3 { assert!(generated_take(role, 0).is_some(), "excluded run {kind} fed an input"); }
+            tick(&root);
+            assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
+        }
+    }
+
+    fn a_loop_and_a_second_role_never_join_one_track() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-loop", 3);
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..6 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows.iter().map(|row| row[0].x as u32).collect::<Vec<_>>(), vec![0, 1, 2]);
+
+        let (root, cpu, recording) = generated_fixture("generated-two-roles", 3);
+        let player = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Player, Some(&player), 1).unwrap();
+        index.save(&root).unwrap();
+        set_role_fighter(Role::Player, 7);
+        tick(&root);
+        on_chords(false, true, true);
+        tick(&root);
+        for i in 0..3 {
+            assert!(generated_take(Role::Player, i).is_some());
+            assert!(generated_take(Role::Cpu, i).is_some());
+        }
+        tick(&root);
+        assert_eq!(generated_rows(&root, &player, &recording).unwrap().len(), 3);
+        assert!(!positions::path(&root.join(MACROS_DIR), &cpu).exists());
+    }
+
+    fn a_finished_write_is_announced_once() {
+        let _hold = hold();
+        let (root, _, _) = generated_fixture("generated-notice", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        let at_first_play = recording_version();
+        for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(take_generated());
+        assert!(!take_generated());
+        let after_settle = recording_version();
+        generated_play(&root, Role::Cpu);
+        assert!(!play_sampling(), "a done macro armed again: library version at the first Play {at_first_play:?}, after the settle {after_settle:?}, at the second Play {:?}", recording_version());
+        for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!take_generated());
+    }
+
+    fn save_to_same_library_from_another_thread(root: &Path) {
+        let root = root.to_path_buf();
+        std::thread::spawn(move || {
+            let inputs = vec![InputFrame::default(); 3];
+            let other = MacroRecording::new("Other", "13.0.5", StartState::neutral(7, 0, 1.0), inputs).unwrap();
+            Library::new(root.join(MACROS_DIR)).save_new(&other).unwrap();
+        }).join().unwrap();
+    }
+
+    fn another_threads_save_to_the_same_library_rearms_a_done_macro() {
+        let _hold = hold();
+        let (root, _, _) = generated_fixture("generated-foreign-done", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(take_generated());
+        assert!(!take_generated());
+        let before = recording_version();
+        save_to_same_library_from_another_thread(&root);
+        assert_ne!(recording_version(), before);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling(), "a same-library save invalidates the done cache");
+    }
+
+    fn another_threads_save_to_the_same_library_drops_an_open_run() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-foreign-open", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        let writes = positions::writes();
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        let before = recording_version();
+        save_to_same_library_from_another_thread(&root);
+        assert_ne!(recording_version(), before);
+        for i in 1..3 { assert_eq!(generated_take(Role::Cpu, i), Some(recording.frames[i as usize])); }
+        tick(&root);
+        assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
+        assert_eq!(positions::writes(), writes);
+    }
+
+    fn the_last_input_is_credited_before_the_worker_drains() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-last-input", 2);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        generated_sample(Role::Cpu, 1);
+        let writes = positions::writes();
+        let open = play_sampling();
+        PLAY.poll(|| {
+            let (frame, generation) = pop_frame(Role::Cpu, |_| {}).unwrap();
+            assert_eq!(frame, recording.frames[1]);
+            play_track_service(&root);
+            assert_eq!(positions::writes(), writes);
+            if open { assert!(play_sampling()); }
+            credit_frame(Role::Cpu, generation, || {});
+        });
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).map(|rows| rows.len()), Some(2));
+        assert!(open);
     }
 
     /// Eden `rc5-fid-measure1` (2026-11-08): the worker's ticks are not the game's frames. Two ticks
@@ -7453,6 +8161,50 @@ mod tests {
             ("the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies", the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
+    }
+
+    mod generation {
+        use super::*;
+
+        /// The library version is process-wide, so no other test may write a library while these cases run.
+        /// The rows run exactly as in the module's table, each on its own thread.
+        #[test]
+        fn case_table() {
+            if std::env::var_os("TR_GENERATION_TABLE").is_none() {
+                let name = format!("{}::case_table", module_path!().split_once("::").unwrap().1);
+                let status = Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", &name, "--nocapture"])
+                    .env("TR_GENERATION_TABLE", "1")
+                    .status().unwrap();
+                assert!(status.success(), "the generation cases failed in their own process");
+            } else {
+                crate::test_table::run(&[
+                    ("an_old_macro_played_once_from_zero_gets_generated_positions", super::an_old_macro_played_once_from_zero_gets_generated_positions as fn()),
+                    ("a_stopped_playback_writes_the_inputs_that_were_consumed", super::a_stopped_playback_writes_the_inputs_that_were_consumed as fn()),
+                    ("an_editor_preview_from_zero_binds_the_whole_macro", super::an_editor_preview_from_zero_binds_the_whole_macro as fn()),
+                    ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", super::delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
+                    ("a_longer_generated_track_replaces_a_shorter_one_only", super::a_longer_generated_track_replaces_a_shorter_one_only as fn()),
+                    ("a_generated_track_never_replaces_a_recorded_one", super::a_generated_track_never_replaces_a_recorded_one as fn()),
+                    ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", super::a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
+                    ("an_adopted_generated_track_is_cropped_as_generated", super::an_adopted_generated_track_is_cropped_as_generated as fn()),
+                    ("the_play_chord_pass_opens_and_writes_no_positions_file", super::the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
+                    ("nothing_is_allocated_for_generation_before_the_first_generating_play", super::nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
+                    ("a_library_write_during_the_run_drops_its_track", super::a_library_write_during_the_run_drops_its_track as fn()),
+                    ("a_recorded_file_written_before_the_worker_drains_is_kept", super::a_recorded_file_written_before_the_worker_drains_is_kept as fn()),
+                    ("only_a_single_macro_from_input_zero_on_its_own_fighter_generates", super::only_a_single_macro_from_input_zero_on_its_own_fighter_generates as fn()),
+                    ("a_loop_and_a_second_role_never_join_one_track", super::a_loop_and_a_second_role_never_join_one_track as fn()),
+                    ("a_finished_write_is_announced_once", super::a_finished_write_is_announced_once as fn()),
+                    ("the_last_input_is_credited_before_the_worker_drains", super::the_last_input_is_credited_before_the_worker_drains as fn()),
+                    ("bad_sidecar_bodies_are_replaced_after_playback", super::bad_sidecar_bodies_are_replaced_after_playback as fn()),
+                    ("valid_sidecars_win_over_a_shorter_playback", super::valid_sidecars_win_over_a_shorter_playback as fn()),
+                    ("an_immediate_poll_of_the_first_preview_input_gets_its_positions", super::an_immediate_poll_of_the_first_preview_input_gets_its_positions as fn()),
+                    ("a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions", super::a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions as fn()),
+                    ("a_poll_that_straddles_generation_arm_seeds_the_first_input_once", super::a_poll_that_straddles_generation_arm_seeds_the_first_input_once as fn()),
+                    ("another_threads_save_to_the_same_library_rearms_a_done_macro", super::another_threads_save_to_the_same_library_rearms_a_done_macro as fn()),
+                    ("another_threads_save_to_the_same_library_drops_an_open_run", super::another_threads_save_to_the_same_library_drops_an_open_run as fn()),
+                ]);
+            }
+        }
     }
     }
 }

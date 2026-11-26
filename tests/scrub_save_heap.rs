@@ -114,6 +114,12 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let read = crate::engine::macros::positions::read(&folder, "timing", &rec.frames).map(|track| track.len());
     let read_us = timed.elapsed().as_micros();
     let sidecar = fs::metadata(crate::engine::macros::positions::path(&folder, "timing")).unwrap().len();
+    let before = heap_bytes().total;
+    let checked = crate::engine::macros::positions::check(&folder, "timing", &rec.frames);
+    let check_alloc = heap_bytes().total - before;
+    assert_eq!(checked, Some((crate::engine::macros::positions::Source::Recorded, MAX_FRAMES as u32)));
+    eprintln!("SCRUB_CHECK frames={MAX_FRAMES} allocated={check_alloc}");
+    assert!(check_alloc < 64 * 1024, "validating the existing sidecar allocated {check_alloc} bytes");
     crate::engine::macros::positions::remove(&folder, "timing");
     writeln!(std::io::stderr(), "SCRUB_SIDECAR frames={MAX_FRAMES} bytes={sidecar} write_us={write_us} read_us={read_us}").unwrap();
     assert_eq!((read, sidecar), (Some(MAX_FRAMES), 40 + 72 * MAX_FRAMES as u64));
