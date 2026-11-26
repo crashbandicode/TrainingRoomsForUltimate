@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Package 6 carry tool: manifest-driven copy of the fork's ours-new files with a deterministic path rewrite.
 
-    python3 -I tools/carry_pkg6.py carry   [--stage m5o] [--update] [--manifest FILE]
-    python3 -I tools/carry_pkg6.py verify  [--stage m5o] [--dest-only]
+    python3 -I tools/carry_pkg6.py carry   [--stage m5q] [--update] [--manifest FILE]
+    python3 -I tools/carry_pkg6.py verify  [--stage m5q] [--dest-only]
 
 The manifest (docs/provenance/pkg6-carry-manifest.json) lists, for every carried file, the stage path, the
 destination, the crate the file belongs to in the fork (root / consts / mii / tui), an optional list of exact-text
@@ -167,6 +167,10 @@ def transform(entry: dict, modules: dict, stage_bytes: bytes, dest_by_src: dict)
                 k += 1
             text = "\n".join(lines[:k]) + ("\n" if k else "") + entry["prepend"] + "\n".join(lines[k:])
         out = text.encode("utf-8")
+    return apply_edits(entry, out)
+
+
+def apply_edits(entry: dict, out: bytes) -> bytes:
     for e in entry.get("edits", []):
         s = out.decode("utf-8")
         cut = test_cut.apply_edit(e, s)  # rc.9 test cut: remove or wrap test-gated modules
@@ -217,13 +221,13 @@ def main():
         return
     bad = 0
     changed = []
+    pending = []
     for entry in manifest["files"]:
         dest = os.path.join(a.root, entry["dest"])
         if entry.get("removed"):
             # rc.9 test cut: a carried test-only file that is no longer in the tree; the entry keeps its stage hash and the reason
             if a.cmd == "carry":
-                if os.path.exists(dest):
-                    os.remove(dest)
+                pending.append((entry, dest, None))
             elif os.path.exists(dest):
                 print("PRESENT", entry["dest"], "(the manifest records it as removed)"); bad += 1
             continue
@@ -234,7 +238,10 @@ def main():
                 print("EDITED ", entry["dest"]); bad += 1
             continue
         src_path = os.path.join(stage, entry["src"])
-        data = open(src_path, "rb").read()
+        try:
+            data = open(src_path, "rb").read()
+        except OSError as error:
+            print("SOURCE FAILS", entry["src"] + ":", error); bad += 1; continue
         src_hash = sha(data)
         if src_hash != entry["src_sha256"]:
             if a.cmd == "carry" and a.update:
@@ -242,24 +249,39 @@ def main():
                 entry["src_sha256"] = src_hash
             else:
                 print("STAGE CHANGED", entry["src"], entry["src_sha256"][:12], "->", src_hash[:12]); bad += 1; continue
-        out = transform(entry, modules, data, dest_by_src)
+        try:
+            out = transform(entry, modules, data, dest_by_src)
+        except SystemExit as error:
+            message = str(error)
+            prefix = entry["src"] + ": "
+            print(f"EDIT FAILS {entry['src']}: {message.removeprefix(prefix)}")
+            bad += 1
+            continue
         if a.cmd == "carry":
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            open(dest, "wb").write(out)
-            entry["dest_sha256"] = sha(out)
+            pending.append((entry, dest, out))
         else:
             if not os.path.exists(dest) or open(dest, "rb").read() != out:
                 print("DIFFERS", entry["dest"]); bad += 1
+    if bad:
+        print(f"{bad} problem(s)")
+        if a.cmd == "carry":
+            print("nothing written")
+        sys.exit(1)
     if a.cmd == "carry":
+        for entry, dest, out in pending:
+            if out is None:
+                if os.path.exists(dest):
+                    os.remove(dest)
+            else:
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                open(dest, "wb").write(out)
+                entry["dest_sha256"] = sha(out)
         manifest["stage"] = stage_name
         json.dump(manifest, open(mpath, "w"), indent=1)
         open(mpath, "a").write("\n")
         for c in changed:
             print("re-synced", *c)
         print(f"carried {len(manifest['files'])} files from stage {stage_name}")
-    if bad:
-        print(f"{bad} problem(s)")
-        sys.exit(1)
     if a.cmd == "verify":
         print(f"verified {len(manifest['files'])} files" + (" (dest only)" if a.dest_only else f" against stage {stage_name}"))
 
@@ -345,4 +367,5 @@ def write_ledger(root, manifest):
         f.write(DELETED_SECTION)
 
 
-main()
+if __name__ == "__main__":
+    main()
