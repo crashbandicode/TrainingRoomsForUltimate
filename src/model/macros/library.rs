@@ -50,7 +50,7 @@ pub type Library = Store<MacroRecording>;
 impl Record for MacroRecording {
     type Error = MacroError;
     type Summary = MacroEntry;
-    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
+    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
 
     fn validate(&self) -> Result<(), MacroError> {

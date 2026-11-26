@@ -1280,7 +1280,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "39a5e69483a07bdcdefe55fa5804cda48511b66c2a5727d9cdb629aceb2333bb",
+   "dest_sha256": "f6ce869690a2224298e7721bfed5d320ecc56f2850719a76f30bf9281db9464a",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1311,6 +1311,11 @@
      "old": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn name(&self) -> &str {",
      "new": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn owns(bytes: &[u8]) -> bool {\n        !super::recording::is_chain_document(bytes)\n    }\n\n    fn name(&self) -> &str {",
      "reason": "Recording redesign rr-1: a chain file in macros/ is a different record, so the recording list omits it."
+    },
+    {
+     "old": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];",
+     "new": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];",
+     "reason": "Scrub positions (2026-11-26 00:21:37Z): the macro reader knows the tracked schema even when a track row fails to parse."
     }
    ]
   },
