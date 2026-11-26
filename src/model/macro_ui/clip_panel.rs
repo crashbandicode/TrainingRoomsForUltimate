@@ -426,11 +426,17 @@ impl ClipEditor {
             if self.opened_fighters[slot].is_none() { self.opened_fighters[slot] = kind; }
             self.seen_fighters[slot] = kind;
         }
+        let mut cleared = false;
         if settled && self.loading_fighter.is_some_and(|(slot, kind)| self.seen_fighters[slot] == Some(kind)) {
             self.loading_fighter = None;
             self.fighter_load_passes = 0;
+            // The line that asked to wait for this swap goes with it.
+            if self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) {
+                self.error = None;
+                cleared = true;
+            }
         }
-        before != (self.fighter_word(0), self.fighter_word(1), self.fighter_keys(), self.fighter_line())
+        cleared || before != (self.fighter_word(0), self.fighter_word(1), self.fighter_keys(), self.fighter_line())
     }
 
     pub fn note_poses(&mut self, states: [u32; 2]) -> bool {

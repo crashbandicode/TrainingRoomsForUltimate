@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "8a836baf2c02c69d939d50cc02594ac63f78c397c0574829b2e5c872aee01aa8",
+   "dest_sha256": "e8651980f251bdf74b44dfbcb889ecf069fece241cb0c01a3e78b35ff3fdda27",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3307,6 +3307,11 @@
      "reason": "P5b C: the unsettled pass changes nothing on the strip (test).",
      "old": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(e.note_fighters([Some(6), Some(18)], false));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT), \"seen but not settled: still loading\");\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n",
      "new": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(!e.note_fighters([Some(6), Some(18)], false), \"seen but not settled: nothing on the strip changes\");\n        assert_eq!((e.fighter_loading(), e.view().error.as_deref()), (Some((0, 6)), Some(FIGHTER_SWAP_WAIT)));\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n"
+    },
+    {
+     "reason": "P5b C: the swap-wait line goes once the swap it spoke of has settled.",
+     "old": "            if self.opened_fighters[slot].is_none() { self.opened_fighters[slot] = kind; }\n            self.seen_fighters[slot] = kind;\n        }\n        if settled && self.loading_fighter.is_some_and(|(slot, kind)| self.seen_fighters[slot] == Some(kind)) {\n            self.loading_fighter = None;\n            self.fighter_load_passes = 0;\n        }\n        before != (self.fighter_word(0), self.fighter_word(1), self.fighter_keys(), self.fighter_line())\n    }\n\n    pub fn note_poses(&mut self, states: [u32; 2]) -> bool {\n",
+     "new": "            if self.opened_fighters[slot].is_none() { self.opened_fighters[slot] = kind; }\n            self.seen_fighters[slot] = kind;\n        }\n        let mut cleared = false;\n        if settled && self.loading_fighter.is_some_and(|(slot, kind)| self.seen_fighters[slot] == Some(kind)) {\n            self.loading_fighter = None;\n            self.fighter_load_passes = 0;\n            // The line that asked to wait for this swap goes with it.\n            if self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) {\n                self.error = None;\n                cleared = true;\n            }\n        }\n        cleared || before != (self.fighter_word(0), self.fighter_word(1), self.fighter_keys(), self.fighter_line())\n    }\n\n    pub fn note_poses(&mut self, states: [u32; 2]) -> bool {\n"
     }
    ]
   },
