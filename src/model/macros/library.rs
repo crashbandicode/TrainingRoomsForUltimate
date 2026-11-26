@@ -52,6 +52,13 @@ impl Record for MacroRecording {
     type Summary = MacroEntry;
     const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
+    const STREAM_READ: bool = true;
+    fn stream_write(&self) -> bool { self.track.is_some() }
+    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {
+        #[derive(serde::Deserialize)]
+        struct Header { kind: Option<String> }
+        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some("chain"))
+    }
 
     fn validate(&self) -> Result<(), MacroError> {
         MacroRecording::validate(self)

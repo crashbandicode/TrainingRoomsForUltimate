@@ -199,8 +199,29 @@ mod track_rows {
     }
 
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
-        let rows = Option::<Vec<[Row; 2]>>::deserialize(deserializer)?;
-        Ok(rows.map(|rows| rows.into_iter().map(|pair| [frame(pair[0]), frame(pair[1])]).collect()))
+        #[derive(Deserialize)]
+        struct Rows(#[serde(deserialize_with = "read_pairs")] Vec<[ReplayFrame; 2]>);
+        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))
+    }
+
+    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {
+        struct Pairs;
+        impl<'de> serde::de::Visitor<'de> for Pairs {
+            type Value = Vec<[ReplayFrame; 2]>;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("a sequence") }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut pairs = Vec::new();
+                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {
+                    let len = pairs.len();
+                    if len == pairs.capacity() && len < super::MAX_FRAMES {
+                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));
+                    }
+                    pairs.push([frame(a), frame(b)]);
+                }
+                Ok(pairs)
+            }
+        }
+        deserializer.deserialize_seq(Pairs)
     }
 }
 

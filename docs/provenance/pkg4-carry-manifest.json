@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "aea79aa6fb7a395f277d049690e6d7f726705ad27f51ffed2c1b8e4ca4d3c179",
+   "dest_sha256": "96e2856df709f4ef152a4bf812fae5e81f8b7c87d8b1010ece754621a26f927b",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -844,6 +844,11 @@
      "old": "        let rows: Option<Vec<[Row; 2]>> = track.as_ref().map(|track| track.iter().map(|pair| [row(&pair[0]), row(&pair[1])]).collect());\n        rows.serialize(serializer)",
      "new": "        let Some(track) = track else { return serializer.serialize_none() };\n        let mut seq = serializer.serialize_seq(Some(track.len()))?;\n        for [first, second] in track {\n            seq.serialize_element(&[row(first), row(second)])?;\n        }\n        seq.end()",
      "reason": "Scrub save peak (2026-11-26 01:24:01Z): preserve the nine-number rows without allocating an entire second track."
+    },
+    {
+     "old": "        let rows = Option::<Vec<[Row; 2]>>::deserialize(deserializer)?;\n        Ok(rows.map(|rows| rows.into_iter().map(|pair| [frame(pair[0]), frame(pair[1])]).collect()))",
+     "new": "        #[derive(Deserialize)]\n        struct Rows(#[serde(deserialize_with = \"read_pairs\")] Vec<[ReplayFrame; 2]>);\n        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))\n    }\n\n    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {\n        struct Pairs;\n        impl<'de> serde::de::Visitor<'de> for Pairs {\n            type Value = Vec<[ReplayFrame; 2]>;\n            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a sequence\") }\n            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {\n                let mut pairs = Vec::new();\n                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {\n                    let len = pairs.len();\n                    if len == pairs.capacity() && len < super::MAX_FRAMES {\n                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));\n                    }\n                    pairs.push([frame(a), frame(b)]);\n                }\n                Ok(pairs)\n            }\n        }\n        deserializer.deserialize_seq(Pairs)",
+     "reason": "Scrub save peak (2026-11-26 01:30:00Z): decode each packed pair straight into the retained track; cap geometric growth at the recorder maximum."
     }
    ]
   },
@@ -1290,7 +1295,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "39a5e69483a07bdcdefe55fa5804cda48511b66c2a5727d9cdb629aceb2333bb",
+   "dest_sha256": "5a541f67b7e4bebf8eb116fbe9cbcb23c2e26e8ebcc6bb96e055cf208b1e5da2",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1321,6 +1326,11 @@
      "old": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn name(&self) -> &str {",
      "new": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn owns(bytes: &[u8]) -> bool {\n        !super::recording::is_chain_document(bytes)\n    }\n\n    fn name(&self) -> &str {",
      "reason": "Recording redesign rr-1: a chain file in macros/ is a different record, so the recording list omits it."
+    },
+    {
+     "old": "    const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;\n\n    fn validate(&self)",
+     "new": "    const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;\n    const STREAM_READ: bool = true;\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }\n\n    fn validate(&self)",
+     "reason": "Scrub save peak (2026-11-26 01:30:00Z): macro reads and tracked writes use a bounded buffer, including the shared-directory ownership probe."
     }
    ]
   },
