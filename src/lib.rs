@@ -4,6 +4,9 @@
 //! game and exists only for the Switch. The crate is a `cdylib` only, so tests include `model` by
 //! path.
 
+// The host gates deny warnings through clippy; this is the same rule for the code only the Switch builds compile.
+#![cfg_attr(target_os = "switch", deny(warnings))]
+
 /// rc.9 test cut: the unit tests of the `model` and `engine` files compile in this crate only. A test crate that includes one of
 /// those files by path (`tests/*.rs`) defines this macro empty, so each unit test runs once and not once per test crate.
 #[cfg(test)]
