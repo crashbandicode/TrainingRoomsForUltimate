@@ -160,7 +160,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 | [Record with an AI on Player 1](#record-works-while-an-ai-plays-player-1) | Record starts instead of being refused |
 | [Named grabs, throws and edge attacks](#grabs-throws-and-edge-attacks-are-named-in-combo-files) | Five more moves are written by name in combo files |
 | [B stops a preview](#b-stops-a-preview-and-the-pop-up-shows-its-chords) | And the Recording pop-up shows your chords |
-| [Delete for replay captures](#delete-for-replay-captures) | A Delete row, and Y in the Replay window |
+| [Delete for replay captures](#delete-for-replay-captures) | A Delete row, and Y in the Replay window's capture list |
 | [Named move marks](#the-clip-editor-s-marks-name-the-form-of-a-move) | Jab 1, Jab 2, Forward air on the editor's timeline |
 | [Playback start](#playback-starts-without-reading-the-library) | Play no longer reads the whole library; a Playback delay option |
 | [Guard the Edge and Juggler](#guard-the-edge-and-juggler-start-from-the-floor-you-stand-on) | They start from the floor you stand on |
@@ -178,7 +178,7 @@ An AI here is the CPU pilot plugin, or TrainingRooms' own Player 1 control.
 | --- | --- | --- |
 | Record | Starts. The take holds Player 1's inputs as the game receives them, the AI's included | Refused |
 | Play on Player 1 | Refused | Refused |
-| L + R + A | Refused | Refused |
+| L + R + A in a waiting room (Quick Reset) | Refused | Refused |
 
 More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1).
 
@@ -214,7 +214,7 @@ More: [Recording › Replay window](menu/recording.md#replay-window) and
 | Where | How |
 | --- | --- |
 | A capture's screen under RECORDINGS | The **Delete** row |
-| The Replay window | Y deletes the capture under the cursor |
+| The Replay window's capture list, before opening the editor | Y deletes the highlighted capture |
 
 | Delete | What it does |
 | --- | --- |
@@ -239,7 +239,7 @@ More: [Recording › Replay window](menu/recording.md#replay-window) and [Move n
 | Play's start | Install 5 |
 | --- | --- |
 | What it reads | The index, the file each side plays and its start save. Not the whole recording library, and nothing while a macro plays |
-| How long it takes | Timed in Eden on 2026-11-26, not on the console: 9 frames after the press for a 3-second macro, 10 or 11 for a 30-second one, 27 for a ten-minute one. [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc) |
+| Time from pressing Play to the first input | In one Eden run on 2026-11-26: 9 frames for the 3-second macros; 10 for the newly recorded 30-second take and 11 for the old one; 27 for the single start of the old ten-minute macro. Not timed on console. [Timing comparison](EVIDENCE-rc15-installs.md#eden-on-the-build-before-the-fix-eb39d6bc) |
 | Known limit | If Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can pass what you hold instead of nothing. It is one frame at most, at the start |
 
 | Playback delay | A new option under Recording › Options |
