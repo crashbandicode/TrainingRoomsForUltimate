@@ -10,3 +10,4 @@ pub mod recordings;
 #[cfg(test)]
 pub mod replay_panel;
 pub mod replay_target;
+pub mod scrub_track;

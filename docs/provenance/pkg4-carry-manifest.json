@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "f9056b05d4bd60456a32321c4cb6d2896ef65534700a4cf56f14b01c16a5e741",
+   "dest_sha256": "2675a9da9fb852fb4eb506b2e84f9577644c17cd38924f8877174023ca40f018",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2162,6 +2162,21 @@
      "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): the unused tail accessor of the tests-first commit is removed",
      "old": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n",
      "new": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n            let view = e.view();\n            e.preview_cursor(view.end - view.start);\n            assert_eq!(e.view().cursor, view.end - 1);\n            assert!(e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));\n            assert!(!e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n"
+    },
+    {
+     "old": "            target: self.plays_on_player() }",
+     "new": "            target: self.plays_on_player(), pos: Pos::None }\n    }\n\n    /// What the fighters show for the selected handle, and what the key line says about it. `track` is the saved\n    /// macros remembered track: the In it was previewed with and its frames.\n    pub fn scrub(&self, track: Option<(u32, u32)>) -> (Ask, Pos) {\n        let _ = track;\n        (Ask::None, Pos::None)\n    }\n\n    /// The worker: what the game side did with the last ask, for the key line.\n    pub fn note_scrub(&mut self, pos: Pos) {\n        let _ = pos;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub target: Option<bool>,\n}",
+     "new": "    pub target: Option<bool>,\n    /// What the key line says about the fighters positions at the selected handle (`scrub_track`).\n    pub pos: Pos,\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
+     "new": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::engine::macro_ui::scrub_track::{Ask, Pos};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },

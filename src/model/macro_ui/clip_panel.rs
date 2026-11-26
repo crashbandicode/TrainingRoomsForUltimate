@@ -2,6 +2,7 @@
 use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};
 use crate::engine::macro_ui::macro_panel::Pad;
 use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};
+use crate::engine::macro_ui::scrub_track::{Ask, Pos};
 use crate::model::combo_record::UnitKind;
 
 pub const CLIP_BAR_UNITS: u16 = 1600;
@@ -298,6 +299,8 @@ pub struct ClipView {
     pub near: Option<(u32, Option<u32>)>,
     /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.
     pub target: Option<bool>,
+    /// What the key line says about the fighters positions at the selected handle (`scrub_track`).
+    pub pos: Pos,
 }
 
 pub struct ClipEditor {
@@ -522,7 +525,19 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player() }
+            target: self.plays_on_player(), pos: Pos::None }
+    }
+
+    /// What the fighters show for the selected handle, and what the key line says about it. `track` is the saved
+    /// macros remembered track: the In it was previewed with and its frames.
+    pub fn scrub(&self, track: Option<(u32, u32)>) -> (Ask, Pos) {
+        let _ = track;
+        (Ask::None, Pos::None)
+    }
+
+    /// The worker: what the game side did with the last ask, for the key line.
+    pub fn note_scrub(&mut self, pos: Pos) {
+        let _ = pos;
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing
