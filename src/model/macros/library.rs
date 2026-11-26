@@ -68,7 +68,6 @@ impl Record for MacroRecording {
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
     const STREAM_READ: bool = true;
     fn summary_name(summary: &MacroEntry) -> &str { &summary.name }
-    fn stream_write(&self) -> bool { self.track.is_some() }
     fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {
         #[derive(serde::Deserialize)]
         struct Header { kind: Option<String> }

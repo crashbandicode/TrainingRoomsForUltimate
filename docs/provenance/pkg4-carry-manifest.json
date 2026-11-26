@@ -1355,7 +1355,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "cb414c92839e1f87c209c5d6e689100f7d1899b92fc5779289bbeb68e66c85a0",
+   "dest_sha256": "fdcd13074d1b7cd016213b2cc20425c0d1da1f99ab6095e7ec6eba9fda15af81",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1481,6 +1481,11 @@
      "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::Placement;\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};",
      "new": "use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};",
      "reason": "Use the normal input-only macro decoder for the list as well as load (sidecar decision, 2026-11-26 03:10:37Z)."
+    },
+    {
+     "old": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "new": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "reason": "Input-only streaming (2026-11-26 03:10:37Z): the JSON writer must not need an in-memory position track to stream a long macro."
     }
    ]
   },
