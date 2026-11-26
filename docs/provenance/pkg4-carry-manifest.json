@@ -2185,7 +2185,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "33ea4374048c565119a7454af4c81518742f03b118b9a2095909a224715f0f1e",
+   "dest_sha256": "33d21430f901cfb6db7c06181abe9c642abd0e6c60ac9d03f2f8927a99f7dd1b",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3252,6 +3252,11 @@
      "reason": "P5b C: the per-fighter toggle and its keys (SM3, SM4).",
      "old": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n",
      "new": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel, ToggleFighter { player: bool },\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n"
+    },
+    {
+     "reason": "P5b C: exercise the per-fighter toggle while a preview is playing.",
+     "old": "        assert!(input.contains(\"shoulder_action(\"));\n        assert!(!input.contains(\"Some(ClipAction::SelectIn)\"));\n        assert!(!input.contains(\"Some(ClipAction::SelectOut)\"));\n    }\n\n    fn the_strip_names_the_fighter_and_its_key() {\n",
+     "new": "        assert!(input.contains(\"shoulder_action(\"));\n        assert!(!input.contains(\"Some(ClipAction::SelectIn)\"));\n        assert!(!input.contains(\"Some(ClipAction::SelectOut)\"));\n        let tap = input.find(\"if TARGET_TAP.lock().unwrap().zr_tap(held)\").unwrap();\n        let modified = input.find(\"if modifier && clip_view().is_some_and(|v| v.playing)\").unwrap();\n        let playing = input.find(\"if clip_view().is_some_and(|v| v.playing)\").unwrap();\n        assert!(tap < modified && modified < playing);\n        assert!(input[modified..playing].contains(\"shoulder_action(\"));\n        assert!(input[modified..playing].contains(\"on_action(action);\"));\n    }\n\n    fn the_strip_names_the_fighter_and_its_key() {\n"
     }
    ]
   },
@@ -6020,7 +6025,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "129a489b366abe48d11117f90c961779f496c2060d52fa6921b6cafc40ab5cab",
+   "dest_sha256": "a337212852d3e70a81141cd6e58d3a4b36c0fa3fdac99f3ae0659a953d63baf4",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -7121,6 +7126,11 @@
      "reason": "P5b C: switch the clip preview fighters after scrub release",
      "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\nuse crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};\nuse crate::engine::macros::{PackedPose, Pose};\n\n",
      "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\nuse crate::runtime::roster::{character_roster, roster_requests};\nuse crate::runtime::ui::facts;\nuse crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};\nuse crate::engine::macros::{PackedPose, Pose};\n\n"
+    },
+    {
+     "reason": "P5b C: preserve the playing-preview keys while switching fighters.",
+     "old": "        on_action(ClipAction::SwapTarget);\n        return;\n    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if modifier {\n            if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {\n                on_action(action);\n                *HOLD.lock().unwrap() = (0, 0, false);\n                return;\n            }\n        }\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }\n        *HOLD.lock().unwrap() = (0, 0, false);\n        return;\n",
+     "new": "        on_action(ClipAction::SwapTarget);\n        return;\n    }\n    if modifier && clip_view().is_some_and(|v| v.playing) {\n        if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {\n            on_action(action);\n            *HOLD.lock().unwrap() = (0, 0, false);\n            return;\n        }\n    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }\n        *HOLD.lock().unwrap() = (0, 0, false);\n        return;\n"
     }
    ]
   },

@@ -1261,14 +1261,14 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         on_action(ClipAction::SwapTarget);
         return;
     }
-    if clip_view().is_some_and(|v| v.playing) {
-        if modifier {
-            if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {
-                on_action(action);
-                *HOLD.lock().unwrap() = (0, 0, false);
-                return;
-            }
+    if modifier && clip_view().is_some_and(|v| v.playing) {
+        if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {
+            on_action(action);
+            *HOLD.lock().unwrap() = (0, 0, false);
+            return;
         }
+    }
+    if clip_view().is_some_and(|v| v.playing) {
         if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
         *HOLD.lock().unwrap() = (0, 0, false);
         return;

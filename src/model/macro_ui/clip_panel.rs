@@ -1243,6 +1243,12 @@ mod tests {
         assert!(input.contains("shoulder_action("));
         assert!(!input.contains("Some(ClipAction::SelectIn)"));
         assert!(!input.contains("Some(ClipAction::SelectOut)"));
+        let tap = input.find("if TARGET_TAP.lock().unwrap().zr_tap(held)").unwrap();
+        let modified = input.find("if modifier && clip_view().is_some_and(|v| v.playing)").unwrap();
+        let playing = input.find("if clip_view().is_some_and(|v| v.playing)").unwrap();
+        assert!(tap < modified && modified < playing);
+        assert!(input[modified..playing].contains("shoulder_action("));
+        assert!(input[modified..playing].contains("on_action(action);"));
     }
 
     fn the_strip_names_the_fighter_and_its_key() {
