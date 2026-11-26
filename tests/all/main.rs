@@ -26,6 +26,8 @@ mod allocation;
 mod input_json;
 #[path = "../scrub_chain_heap.rs"]
 mod scrub_chain_heap;
+#[path = "../scrub_play_timing.rs"]
+mod scrub_play_timing;
 #[path = "../scrub_save_heap.rs"]
 mod scrub_save_heap;
 #[path = "../../src/test_table.rs"]
