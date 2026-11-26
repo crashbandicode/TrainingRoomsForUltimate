@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "f0579f6184a893ef837519eb317608eae47ddc1f67a441f3467bdbfd98674bd5",
+   "dest_sha256": "aea79aa6fb7a395f277d049690e6d7f726705ad27f51ffed2c1b8e4ca4d3c179",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -834,6 +834,16 @@
      "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    use serde::{Deserialize, Serialize};\n\n    type Row",
+     "new": "    use serde::{ser::SerializeSeq, Deserialize};\n\n    type Row",
+     "reason": "Scrub save peak (2026-11-26 01:24:01Z): write track rows into the current JSON sequence."
+    },
+    {
+     "old": "        let rows: Option<Vec<[Row; 2]>> = track.as_ref().map(|track| track.iter().map(|pair| [row(&pair[0]), row(&pair[1])]).collect());\n        rows.serialize(serializer)",
+     "new": "        let Some(track) = track else { return serializer.serialize_none() };\n        let mut seq = serializer.serialize_seq(Some(track.len()))?;\n        for [first, second] in track {\n            seq.serialize_element(&[row(first), row(second)])?;\n        }\n        seq.end()",
+     "reason": "Scrub save peak (2026-11-26 01:24:01Z): preserve the nine-number rows without allocating an entire second track."
     }
    ]
   },

@@ -171,7 +171,7 @@ pub struct MacroRecording {
 mod track_rows {
     use super::super::ReplayFrame;
     use super::{InputFrame, StartState};
-    use serde::{Deserialize, Serialize};
+    use serde::{ser::SerializeSeq, Deserialize};
 
     type Row = (i32, u32, f32, i32, i32, f32, f32, f32, f32);
 
@@ -190,8 +190,12 @@ mod track_rows {
     }
 
     pub fn serialize<S: serde::Serializer>(track: &Option<Vec<[ReplayFrame; 2]>>, serializer: S) -> Result<S::Ok, S::Error> {
-        let rows: Option<Vec<[Row; 2]>> = track.as_ref().map(|track| track.iter().map(|pair| [row(&pair[0]), row(&pair[1])]).collect());
-        rows.serialize(serializer)
+        let Some(track) = track else { return serializer.serialize_none() };
+        let mut seq = serializer.serialize_seq(Some(track.len()))?;
+        for [first, second] in track {
+            seq.serialize_element(&[row(first), row(second)])?;
+        }
+        seq.end()
     }
 
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
