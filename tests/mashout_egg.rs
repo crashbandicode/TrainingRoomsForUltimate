@@ -274,7 +274,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
 fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
     let runtime = include_str!("../src/runtime/features/stage_geometry.rs");
     let reader_start = runtime.find("#[repr(C, align(16))]").unwrap();
-    let reader_end = runtime.find("/// The main floor under the camera's middle").unwrap();
+    let reader_end = runtime.find("use crate::model::stage_geometry::{is_placement_floor").unwrap();
     let model = include_str!("../src/model/stage_geometry.rs");
     let rule_start = model.find("/// True when the line is a placement floor.").unwrap();
     let rule_end = model.find("/// One ray of the column scan").unwrap();

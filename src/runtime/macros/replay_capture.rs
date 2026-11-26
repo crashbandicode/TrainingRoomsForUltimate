@@ -15,7 +15,7 @@ use crate::engine::library::Role;
 use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
 use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
 use crate::runtime::game::{self, natives};

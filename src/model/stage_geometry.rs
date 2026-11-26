@@ -1,7 +1,6 @@
 //! Shared pure stage geometry: placement classification, scans, outlines and ledges.
 use super::edge_juggle::perfect::Outline;
 pub use super::edge_juggle::perfect::{Point, Segment};
-use super::mashout::entry::PlacementFloor;
 use super::tech::discovery::{Ray, Rays};
 use super::tech::surface::{Kind, Line, Surfaces, MAX_LINES};
 use super::tech::Vec2;
@@ -64,42 +63,6 @@ pub fn outline_of(walk: &Surfaces) -> (Outline, Option<[Point; 2]>) {
     }
     let floor = walk.lines().filter(|line| line.kind() == Some(Kind::Floor) && !line.passable);
     (outline, floor_ledges(floor.map(ends)))
-}
-
-fn ledge(
-    ray: &mut impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
-    mut floor: PlacementFloor,
-    right: bool,
-    limits: [f32; 2],
-) -> Option<Point> {
-    let dir = if right { 1.0 } else { -1.0 };
-    for _ in 0..MAX_LINES {
-        let [a, b] = floor.ends;
-        let end = if (a[0] < b[0]) == right { b } else { a };
-        let Some(next) = ray(end[0] + dir, limits, false) else {
-            return Some(end);
-        };
-        if !next.ends.contains(&end) || next.ends == floor.ends {
-            return Some(end);
-        }
-        floor = next;
-    }
-    None
-}
-
-/// The main floor under the camera's middle and its two ledges.
-pub fn main_floor(
-    mut ray: impl FnMut(f32, [f32; 2], bool) -> Option<PlacementFloor>,
-    [left, right, top, bottom]: [f32; 4],
-) -> Option<(Segment, Point)> {
-    let x = left.midpoint(right);
-    let limits = [top, bottom];
-    let floor = ray(x, limits, false)?;
-    let ledges = [
-        ledge(&mut ray, floor, false, limits)?,
-        ledge(&mut ray, floor, true, limits)?,
-    ];
-    Some((ledges, [x, floor.height(x)?]))
 }
 
 // The off-stage rule (artifacts/phase23/training-stage-tracing/FINDINGS.md §6): where a point is against the stage,
@@ -428,34 +391,17 @@ impl Probe for Copied<'_> {
     }
 }
 
-/// A traced line as the rule sees it: `stand` is placement's floor rule with platforms.
-pub fn met(line: Line) -> Met {
-    let stand = if line.passable { !line.wall && line.normal.y > 0.0 } else { line.floor };
-    Met { ends: line.ends.map(|point| [point.x, point.y]), stand, through: line.passable }
-}
-
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
     use super::*;
     use crate::model::tech::discovery::{decode, far_end};
-    use crate::model::tech::surface::{Kind, Source, Walk, MAX_LINES};
+    use crate::model::tech::surface::{Kind, Source, Walk};
 
     fn point([x, y]: Point) -> Vec2 { Vec2 { x, y } }
 
     fn line(id: usize, ends: Segment, normal: Point, flags: u32) -> Line {
         decode(id, ends.map(point), point(normal), (flags >> 8) as u8).unwrap()
-    }
-
-    fn floor(ends: Segment) -> PlacementFloor {
-        PlacementFloor { ends, stationary: true, flags: 0x0800 }
-    }
-
-    fn floor_at(floors: &[PlacementFloor], x: f32) -> Option<PlacementFloor> {
-        floors.iter().copied().find(|floor| {
-            let [a, b] = floor.ends.map(|end| end[0]);
-            (a.min(b)..=a.max(b)).contains(&x)
-        })
     }
 
     struct Stage { lines: Vec<Line> }
@@ -588,37 +534,6 @@ mod tests {
             assert!(!is_placement_floor(0x0100, 0., platforms));
             assert!(!is_placement_floor(0, -1., platforms));
         }
-        let main = floor([[-10., 0.], [10., 0.]]);
-        let lower = floor([[10., -5.], [30., -5.]]);
-        assert!(floor_at(&[lower], 11.).is_some(), "a lower floor exists past the wall");
-        let result = main_floor(|x, _, _| if x > 10. { None } else { floor_at(&[main], x) }, [-10., 10., 50., -50.]);
-        assert_eq!(result, Some(([[-10., 0.], [10., 0.]], [0., 0.])));
-    }
-
-    #[test]
-    fn ledges_follow_joined_floors_to_the_last_end() {
-        let joined = [
-            floor([[-10., 0.], [10., 0.]]),
-            floor([[-30., 0.], [-10., 0.]]),
-            floor([[10., 0.], [30., 10.]]),
-        ];
-        let camera = [-10., 10., 50., -50.];
-        assert_eq!(main_floor(|x, limits, platforms| {
-            assert_eq!(limits, [50., -50.]);
-            assert!(!platforms);
-            floor_at(&joined, x)
-        }, camera), Some(([[-30., 0.], [30., 10.]], [0., 0.])));
-        let gap = [joined[0], floor([[10_f32.next_up(), 0.], [30., 10.]])];
-        assert_eq!(main_floor(|x, _, _| floor_at(&gap, x), camera),
-                   Some(([[-10., 0.], [10., 0.]], [0., 0.])));
-        assert_eq!(main_floor(|_, _, _| Some(joined[0]), camera),
-                   Some(([[-10., 0.], [10., 0.]], [0., 0.])));
-        let chain: Vec<_> = (0..=MAX_LINES).map(|i| {
-            let x = i as f32 * 2.;
-            floor([[x, 0.], [x + 2., 0.]])
-        }).collect();
-        assert_eq!(main_floor(|x, _, _| floor_at(&chain, x), [0., 2., 50., -50.]), None);
-        assert_eq!(main_floor(|_, _, _| None, camera), None);
     }
 
     #[test]
