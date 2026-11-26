@@ -1,4 +1,4 @@
-# rc.15 installs 1 to 5: what was installed and what was tested
+# rc.15 installs 1 to 6: what was installed and what was tested
 
 2026-11-25. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
@@ -14,20 +14,21 @@ author. Times are UTC.
 
 ## Summary
 
-| | Install 1 | Install 2 | Install 3 | Install 4 | Install 5 |
-| --- | --- | --- | --- | --- | --- |
-| Commit | `152629cd` | `71158421` | `e7667f26` | `a945b0c1` | `b7a382e4` |
-| Release NRO (sha256, first 8) | `3d6836da` | `1b5608ed` | `eff66d92` | `99e00e92` | `0cb29525` |
-| Size | 5,226,496 B | 5,210,112 B | 5,210,112 B | 5,337,088 B | 5,373,952 B |
-| On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 | 2026-11-25 23:06 |
-| Card readback | match | match | match | match | match |
-| Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 |
-| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room |
-| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | one (2026-11-25) |
+| | Install 1 | Install 2 | Install 3 | Install 4 | Install 5 | Install 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Commit | `152629cd` | `71158421` | `e7667f26` | `a945b0c1` | `b7a382e4` | `5df3d9dc` |
+| Release NRO (sha256, first 8) | `3d6836da` | `1b5608ed` | `eff66d92` | `99e00e92` | `0cb29525` | `c1ced861` |
+| Size | 5,226,496 B | 5,210,112 B | 5,210,112 B | 5,337,088 B | 5,373,952 B | 5,402,624 B |
+| On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 | 2026-11-25 23:06 | 2026-11-26 12:22 |
+| Card readback | match | match | match | match | match | match |
+| Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 | 3,108 / 0 / 4 |
+| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room | none on this file: its runs were under way at the install. The build before its last fix (`eb39d6bc`) passed a Play-start comparison and release and diag rows |
+| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | three (2026-11-25 and 2026-11-26) | none yet |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
 (`strings` on `artifacts/phase23/install4/gate-a945b0c1/nro/libtraining_rooms-a945b0c1-release.nro`). The install 5
 file holds `rc15 b7a382e4` and `0.2.0-rc.15` (the copy kept with its install record): its version was not raised.
+The install 6 file holds `rc15 5df3d9dc` and `0.2.0-rc.15` (merge 17's gate release file).
 
 The host-test count falls between install 1 and install 2 because three test binaries stopped repeating the same
 184 tests each (`artifacts/phase23/test-speed/HANDOFF.md`, the entry that counts 2,911 against 2,359). The counts are
@@ -147,9 +148,9 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 19:35 | install 3 | Quick Play: after a match the loser declined the rematch, picked a different fighter and came back to the room; the earlier fighter was put back as both the CPU and Player 1. | Install 4 (`6146f8e9`). Not run in Eden: the final session exercised no Quick Play feature of TrainingRooms. |
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
-| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([The next build](#the-next-build)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
-| 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. |
-| 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not fixed in merge 17. Assigned for the following build (inbox 11:57:13Z, with the operator's words). A code review identified why the hold may not lift a landed fighter; this still needs confirmation in Eden (12:09:32Z). |
+| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([Install 6](#install-6-5df3d9dc)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
+| 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. The fix is on the card since install 6 (2026-11-26). |
+| 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not fixed in install 6 (merge 17). Assigned for the following build (inbox 11:57:13Z, with the operator's words). A code review identified why the hold may not lift a landed fighter; this still needs confirmation in Eden (12:09:32Z). |
 | 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | Not changed. Assigned for a later build, cause first (inbox 2026-11-26 11:57:13Z, tr-primary-2, with the operator's words). No cause is established, and it has not been reproduced. |
 
 ## Install 5 (`b7a382e4`)
@@ -261,11 +262,24 @@ frame was looked at.
 | Eggs-ercise's off-stage zone follows the stage | `1c6a71e5` | `gate-f9b81e42` |
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
 
-## The next build
+## Install 6 (`5df3d9dc`)
 
-Merged after install 5 and **not on the card**. The operator ordered the card install of merge 17 (`5df3d9dc`) on
-2026-11-26 (inbox 12:03:32Z, tr-primary-2); no install receipt exists yet. The Gate column names the receipt under
-`artifacts/phase23/next-build/`; the gates are host tests and builds. The Eden runs follow the table.
+- **Card:** `artifacts/phase23/card-install/20261126-1156Z-card-5df3d9dc/deployment.json`, state
+  `installed_verified`. Over DBI's USB file transfer, finished at 12:22:55. Before `0cb29525`, after `c1ced861`,
+  read back. 21 plugins before and after; the other 20 and the protected files are unchanged. The old file is kept
+  on the card as `ultimate/TrainingRooms/backups/pre-c1ced861e4c67a54.nro`, and its readback matches `0cb29525`.
+- **The installed file** is merge 17's gate release file,
+  `artifacts/phase23/next-build/gate-5df3d9dc/nro/libtraining_rooms-5df3d9dc-release.nro`: 5,402,624 B and the same
+  SHA-256, hashed for this page.
+- **Ordered by the operator** on 2026-11-26 at about 11:53 (`operator-approval.json` in the same folder; inbox
+  12:23:14Z, tr-primary-2).
+- **After it:** `main` went on to `7edddeaa` with documentation only. No NRO was built from that head for the card
+  (f9-fix, inbox 12:17:41Z).
+- **Eden on this exact file:** in testing; see [the last part](#eden-on-install-6-itself-5df3d9dc-merge-17). The file was installed before those runs ended.
+- **The operator's reports:** none on this build yet.
+
+The changes in this build were merged one by one after install 5 (`b7a382e4`). The Gate column names the receipt
+under `artifacts/phase23/next-build/`; the gates are host tests and builds. The Eden runs follow the table.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
@@ -281,7 +295,6 @@ Merged after install 5 and **not on the card**. The operator ordered the card in
 - **Why the fix:** an Eden session on `eb39d6bc`, the build before it, found on a match capture that both fighters
   stood beside their recorded points while the line read held (row SP-10; dup-audit, inbox 2026-11-26 10:24:00Z).
   tr-primary-2 ruled it a defect to fix in this build (10:27:48Z).
-- **In work:** nothing.
 - **Repeated Play, host only:** starts took 0.98 to 1.07 times as long as on the previous `main` (`6dbf9aa9`).
   This range does not describe the first Play of an old macro without positions.
 - **First Play that generates positions, host only:** the median of seven paired differences in cold-start
@@ -293,7 +306,7 @@ Merged after install 5 and **not on the card**. The operator ordered the card in
 ### Eden, on the build before the fix (`eb39d6bc`)
 
 One session by dup-audit on 2026-11-26, on merge 16's release NRO (sha256 `d4557201…`) and diag NRO (`8abda32f…`).
-**Nothing in this part ran on merge 17.** Receipts: `artifacts/phase23/scrub-positions/eden-session/evidence/`.
+**Nothing in this part ran on merge 17, the installed build.** Receipts: `artifacts/phase23/scrub-positions/eden-session/evidence/`.
 The first run is install 5's own build, as the baseline.
 
 | Run (folder) | Build | Passed | No verdict |
@@ -335,7 +348,7 @@ bridge and the same three staged old macros on both builds):
   while a fighter is held; scrubbing the final frame of a long recording (SP-17); the menu thread's stack depth
   (SP-19 could not be read in that boot).
 
-### Eden, on merge 17 (`5df3d9dc`)
+### Eden, on install 6 itself (`5df3d9dc`, merge 17)
 
 **In testing.** Merge 17's NROs are release sha256 `c1ced861…` and diag `853964b2…`
 (`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Two Eden boots on the diag NRO were up on 2026-11-26, with
