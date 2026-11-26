@@ -29,6 +29,8 @@ mod slice_load;
 mod scrub_chain_heap;
 #[path = "../scrub_play_timing.rs"]
 mod scrub_play_timing;
+#[path = "../generated_idle.rs"]
+mod generated_idle;
 #[path = "../scrub_save_heap.rs"]
 mod scrub_save_heap;
 #[path = "../../src/test_table.rs"]

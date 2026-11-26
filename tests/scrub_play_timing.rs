@@ -39,6 +39,24 @@ fn play_start_timings() {
         report("load", frames, json, || { assert_eq!(library.load(&ids[0]).unwrap().frames.len(), frames); });
         report("play", frames, json, || start(&root, &ids[0]));
         report("chain3", frames, json, || start(&root, &chain));
+        let inputs = (0..frames).map(|i| InputFrame { buttons: (i % 7 + 1) as u32, ..InputFrame::default() }).collect();
+        let plain = MacroRecording::new(format!("Armed {frames}"), "13.0.5", StartState::neutral(8, 0, 1.0), inputs).unwrap();
+        let armed_id = library.save_new(&plain).unwrap();
+        assert!(!crate::engine::macros::positions::path(&root.join(MACROS_DIR), &armed_id).exists()); // head-only
+        let armed_json = fs::metadata(root.join(MACROS_DIR).join(format!("{armed_id}.json"))).unwrap().len();
+        ARMED.with(|armed| armed.set(false));
+        report("play_armed", frames, armed_json, || start_armed(&root, &armed_id));
+        assert!(ARMED.with(|armed| armed.get()) && host::play_sampling()); // head-only
+        host::on_chords(false, true, false);
+        let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
+        for _ in 0..2 {
+            host::play_track_service(&root); // head-only
+            host::service_at(&root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
+        }
+        let armed_inputs = library.load(&armed_id).unwrap().frames;
+        assert_eq!(armed_inputs.len(), frames);
+        assert_eq!(crate::engine::macros::positions::source(&root.join(MACROS_DIR), &armed_id, &armed_inputs), Some(crate::engine::macros::positions::Source::Generated)); // head-only
+        assert_eq!(crate::engine::macros::positions::read(&root.join(MACROS_DIR), &armed_id, &armed_inputs).map(|rows| rows.len()), Some(1)); // head-only
     }
 }
 
@@ -58,8 +76,26 @@ fn start(root: &Path, id: &str) {
     assert_eq!(host::take_player_frame().map(|frame| frame.buttons), Some(1), "the first input after the chord");
 }
 
+fn start_armed(root: &Path, id: &str) {
+    let mut index = RecordingIndex::load(root).unwrap();
+    index.set_active(Role::Player, Some(id), 1).unwrap();
+    index.set_loop(Role::Player, LoopCount::Finite(1));
+    index.save(root).unwrap();
+    host::reset_host();
+    host::set_role_fighter(Role::Player, 8);
+    let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
+    let tick = || host::service_at(root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
+    tick();
+    TIMED.with(|timed| timed.set(Some(Instant::now())));
+    host::on_chords(false, true, false);
+    tick();
+    ARMED.with(|armed| armed.set(host::play_sampling())); // head-only
+    assert_eq!(host::take_player_frame().map(|frame| frame.buttons), Some(1), "the first input after the chord");
+}
+
 thread_local! {
     static TIMED: core::cell::Cell<Option<Instant>> = const { core::cell::Cell::new(None) };
+    static ARMED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Run `what` `RUNS` times and print the median and the fastest, in microseconds. `start` restarts the clock at its

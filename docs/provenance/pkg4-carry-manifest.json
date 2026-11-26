@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "3bb7a602b3996d543092a14a2e908c8793edd892b5ec9b1dc691ecbc40de2709",
+   "dest_sha256": "8b2a51f6a349526b33cde72d1690e2d3a5f3796b0b3dbbb5be68a6ac0a1242fe",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -924,6 +924,11 @@
      "old": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}",
      "new": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n}",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): take a position track with its source for editor adoption.",
+     "old": "        self.track_source = source;\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n",
+     "new": "        self.track_source = source;\n    }\n\n    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {\n        self.track.take().map(|track| (self.track_source, track))\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n"
     }
    ]
   },
@@ -2000,7 +2005,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "78038211fa424d541e410b88404774d348dcc19d7d134b3102006883a3436fe7",
+   "dest_sha256": "779140d7ab3436cc7d515f45f78c28e149a7d3a092299472ad59c16763bfa1f2",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2872,6 +2877,11 @@
      "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): adopt a matching, longer generated track without changing the selection.",
      "old": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
      "new": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some(track) = loaded.track else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_track(Some(track));\n        true\n    }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): exercise adoption of a generated position track.",
+     "old": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n",
+     "new": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n"
     }
    ]
   },

@@ -5169,7 +5169,6 @@ mod tests {
         positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
         let original = std::fs::read(positions::path(&dir, &id)).unwrap();
         let writes = positions::writes();
-        tick(&root);
         generated_play(&root, Role::Cpu);
         assert!(play_sampling());
         for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
@@ -5178,6 +5177,41 @@ mod tests {
         assert_eq!(positions::writes(), writes);
         generated_play(&root, Role::Cpu);
         assert!(!play_sampling());
+    }
+
+    fn an_adopted_generated_track_is_cropped_as_generated() {
+        use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        for source in [Source::Generated, Source::Recorded] {
+            let (root, id, recording) = generated_fixture("generated-adoption", 5);
+            let dir = root.join(MACROS_DIR);
+            let library = Library::new(&dir);
+            let mut editor = ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap();
+            let rows: Vec<[ReplayFrame; 2]> = (0..5).map(|i| {
+                let sample = |kind, x| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
+                [sample(7, i as f32), sample(8, i as f32 + 100.0)]
+            }).collect();
+            if source == Source::Recorded {
+                positions::write(&dir, &id, &recording.frames, &rows, source).unwrap();
+            }
+            request_preview(&id, Role::Cpu, 0, 5);
+            tick(&root);
+            assert!(play_sampling());
+            for (i, input) in recording.frames.iter().enumerate() {
+                assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
+            }
+            tick(&root);
+            assert_eq!(positions::source(&dir, &id, &recording.frames), Some(source));
+            assert!(editor.adopt_positions(library.load_edited(&id).unwrap()));
+            editor.on_action(ClipAction::SelectIn);
+            editor.on_action(ClipAction::Nudge(1));
+            let ClipEffect::Export(export) = editor.on_action(ClipAction::Confirm) else { panic!("macro crop") };
+            assert_eq!(&export.frames, &recording.frames[1..]);
+            let new_id = library.save_new(&export).unwrap();
+            assert_eq!(positions::source(&dir, &new_id, &export.frames), Some(source));
+            assert_eq!(positions::read(&dir, &new_id, &export.frames), Some(rows[1..].to_vec()));
+        }
     }
 
     fn the_play_chord_pass_opens_and_writes_no_positions_file() {
@@ -7850,6 +7884,7 @@ mod tests {
             ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
             ("a_longer_generated_track_replaces_a_shorter_one_only", a_longer_generated_track_replaces_a_shorter_one_only as fn()),
             ("a_generated_track_never_replaces_a_recorded_one", a_generated_track_never_replaces_a_recorded_one as fn()),
+            ("an_adopted_generated_track_is_cropped_as_generated", an_adopted_generated_track_is_cropped_as_generated as fn()),
             ("the_play_chord_pass_opens_and_writes_no_positions_file", the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
             ("nothing_is_allocated_for_generation_before_the_first_generating_play", nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
             ("a_library_write_during_the_run_drops_its_track", a_library_write_during_the_run_drops_its_track as fn()),

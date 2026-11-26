@@ -1319,7 +1319,7 @@ mod tests {
         let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);
         let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
         let mut loaded = recording.clone();
-        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));
+        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);
         assert!(e.adopt_positions(loaded.clone()));
         assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);
         assert_eq!(e.scrub().1, Pos::Held);
