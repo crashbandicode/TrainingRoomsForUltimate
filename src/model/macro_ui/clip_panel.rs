@@ -180,7 +180,8 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     let loading = view.fighters.contains(&"loading");
     if !view.fighter_line.is_empty() {
         if loading { primary = view.fighter_line.clone(); }
-        else if view.pos != Pos::Off { notice = view.fighter_line.clone(); }
+        // A line about the take's positions keeps its place: another fighter would not show that take's moves either.
+        else if view.pos.text().is_empty() { notice = view.fighter_line.clone(); }
     }
     if let Some(error) = &view.error {
         let [mut primary, follow] = feedback_lines(error);

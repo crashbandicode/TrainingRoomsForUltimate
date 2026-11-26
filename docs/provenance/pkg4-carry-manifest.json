@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "892c9fa4a176d0f13877a2843a8f4500b0e5db230d0c1e0cd06cfb381b5447e1",
+   "dest_sha256": "6444634fb71d5079f01f19ea8607e6a1469fab9dae542e1a928b68d3925501dd",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3337,6 +3337,11 @@
      "reason": "P5b C: test that a positions line keeps its place over the fighter hint.",
      "old": "        let mut off = e.view();\n        off.pos = Pos::Off;\n        assert_eq!(clip_help(&off, \"ZL/ZR\", \"ZL\", 1).notice, \"Can't stand there on this stage.\");\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        let help = clip_help(&e.view(), \"ZL/ZR\", \"ZL\", 1);\n        assert_eq!(help.primary, \"Loading Kirby\u2026 B cancels\");\n",
      "new": "        let mut off = e.view();\n        off.pos = Pos::Off;\n        assert_eq!(clip_help(&off, \"ZL/ZR\", \"ZL\", 1).notice, \"Can't stand there on this stage.\");\n        // A line about the take's positions stays: on such a take another fighter would show no moves either.\n        for pos in [Pos::NoTrack, Pos::NoMoves, Pos::End] {\n            let mut view = e.view();\n            (view.pos, view.clean_start, view.move_start) = (pos, true, None);\n            assert_eq!(clip_help(&view, \"ZL/ZR\", \"ZL\", 1).notice, pos.text(), \"{pos:?}\");\n        }\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        let help = clip_help(&e.view(), \"ZL/ZR\", \"ZL\", 1);\n        assert_eq!(help.primary, \"Loading Kirby\u2026 B cancels\");\n"
+    },
+    {
+     "reason": "P5b C: a positions line keeps its place over the fighter hint.",
+     "old": "    let loading = view.fighters.contains(&\"loading\");\n    if !view.fighter_line.is_empty() {\n        if loading { primary = view.fighter_line.clone(); }\n        else if view.pos != Pos::Off { notice = view.fighter_line.clone(); }\n    }\n    if let Some(error) = &view.error {\n        let [mut primary, follow] = feedback_lines(error);\n",
+     "new": "    let loading = view.fighters.contains(&\"loading\");\n    if !view.fighter_line.is_empty() {\n        if loading { primary = view.fighter_line.clone(); }\n        // A line about the take's positions keeps its place: another fighter would not show that take's moves either.\n        else if view.pos.text().is_empty() { notice = view.fighter_line.clone(); }\n    }\n    if let Some(error) = &view.error {\n        let [mut primary, follow] = feedback_lines(error);\n"
     }
    ]
   },
