@@ -166,7 +166,7 @@ pub struct MacroRecording {
     pub track: Option<Vec<[super::ReplayFrame; 2]>>,
 }
 
-/// The track in a file: per frame, each fighters kind, costume, facing, situation, status, speed x, speed y, x and y.
+/// The track in a file: per frame, each fighter's kind, costume, facing, situation, status, speed x, speed y, x and y.
 mod track_rows {
     use super::super::ReplayFrame;
     use super::{InputFrame, StartState};
@@ -193,7 +193,7 @@ mod track_rows {
         rows.serialize(serializer)
     }
 
-    pub fn deserialize<de, D: serde::Deserializer<de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
         let rows = Option::<Vec<[Row; 2]>>::deserialize(deserializer)?;
         Ok(rows.map(|rows| rows.into_iter().map(|pair| [frame(pair[0]), frame(pair[1])]).collect()))
     }
@@ -281,7 +281,7 @@ impl MacroRecording {
         Ok(())
     }
 
-    /// Attach the position track a take recorded (one entry per frame), or drop it: the files version follows.
+    /// Attach the position track a take recorded (one entry per frame), or drop it: the file's version follows.
     pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {
         self.schema_version = match (&track, self.mii) {
             (Some(_), _) => TRACK_SCHEMA_VERSION,
@@ -405,7 +405,7 @@ pub enum MacroError {
     UnsupportedVersion {
         found: u32,
     },
-    /// The position track is not one finite entry per frame, or the files version does not match its presence.
+    /// The position track is not one finite entry per frame, or the file's version does not match its presence.
     InvalidTrack,
     InvalidName(&'static str),
     InvalidGameVersion(&'static str),
