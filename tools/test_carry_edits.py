@@ -83,8 +83,8 @@ class CarryEditsTests(unittest.TestCase):
         self.replay("".join(base), "".join(wanted), edits)
 
     def test_no_unique_context_is_refused(self):
-        base = "same\n" * 20
-        wanted = "same\n" * 10 + "inserted\n" + "same\n" * 10
+        base = "same\n" * 80
+        wanted = "same\n" * 36 + "inserted\n" + "same\n" * 44
         for count in range(1, 14):
             self.assertGreater(base.count("same\n" * count), 1)
         with self.assertRaisesRegex(SystemExit, "no unique context for the block at base line"):

@@ -30,5 +30,8 @@ lines of more than 14 characters found unchanged in this repository at `b5177cdb
   geometry, the play-target swap and the `actions` file key. The edits to carried files are recorded in the package-4
   manifest.
 
+Change a carried file by adding manifest edits: `python3 -I tools/carry_edits.py <dest> <base> --reason <reason>`
+writes them from the file as it was and the file as wanted. Then run `carry_pkg4.py carry`, `ledger` and `verify`.
+
 The counts come from a scan of `git show --unified=0 <commit> -- '*.rs'` against `src/**/*.rs`; the scan and its output
 are kept with the lane's artifacts (`artifacts/phase23/replay-editor/prov.py`, `provenance-scan.txt`).
