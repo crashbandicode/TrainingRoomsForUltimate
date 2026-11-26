@@ -24,17 +24,27 @@ use crate::engine::rr_host as host;
 #[test]
 fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
     let track = macros::ReplayTrack { entry: 0, quantized_analog: false, fighter: None,
-        frames: vec![macros::ReplayFrame { start: StartState::neutral(0x48, 0, 1.0),
-            input: InputFrame::default(), x: 0.0, y: 0.0 }; 12] };
+        frames: (0..12).map(|i| macros::ReplayFrame { start: StartState::neutral(if i < 6 { 0x48 } else { 8 }, 0, 1.0),
+            input: InputFrame::default(), x: 0.0, y: 0.0 }).collect() };
     let mut editor = ClipEditor::new(macros::ReplaySession { tracks: vec![track], ..Default::default() }, vec![0]).unwrap();
-    editor.on_action(ClipAction::Nudge(7));
-    // The captured inputs alone are exportable, but no exact Mii configuration was resolved.
-    let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected capture inputs") };
-    let refusal = recording.playback_target().unwrap_err();
-    editor.report_error(refusal.to_string());
+    editor.on_action(ClipAction::SelectOut);
+    editor.on_action(ClipAction::Nudge(-6));
+    editor.on_action(ClipAction::SelectOut);
+    editor.on_action(ClipAction::Nudge(2));
+    assert_eq!((editor.view().fighter_kind, editor.crop_kind()), (8, 0x48));
+    let check = |r: &mut MacroRecording| r.playback_target().map(|_| ()).map_err(|e| e.to_string());
+    assert!(matches!(editor.confirm_capture(check), ClipEffect::Error(_)));
     assert_eq!(editor.shown_frame(), Some(7));
+    editor.on_action(ClipAction::SelectOut);
+    assert_eq!(editor.view().end, 8);
+    editor.on_action(ClipAction::SelectOut);
+    editor.on_action(ClipAction::Nudge(-1));
     editor.on_action(ClipAction::SelectIn);
-    assert_eq!(editor.view().start, 7);
+    editor.on_action(ClipAction::SelectIn);
+    editor.on_action(ClipAction::Nudge(-3));
+    assert_eq!((editor.view().fighter_kind, editor.crop_kind()), (0x48, 8));
+    let ClipEffect::Export(ordinary) = editor.confirm_capture(check) else { panic!("valid ordinary crop refused") };
+    assert_eq!((ordinary.start.fighter_kind, ordinary.frames.len(), editor.shown_frame()), (8, 2, None));
 }
 
 #[test]

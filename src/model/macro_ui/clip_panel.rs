@@ -505,6 +505,7 @@ impl ClipEditor {
 
     pub fn track(&self) -> &ReplayTrack { &self.session.tracks[self.track] }
     pub fn sample(&self) -> ReplayFrame { self.track().frames[self.window.cursor() as usize] }
+    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
@@ -792,13 +793,7 @@ impl ClipEditor {
                         Err(error) => ClipEffect::Error(error),
                     };
                 }
-                let suffix = format!(" P{}", self.track().entry + 1);
-                let prefix: String = self.source_name.chars()
-                    .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
-                return match self.export_selection(&format!("{prefix}{suffix}")) {
-                    Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }
-                    Err(error) => ClipEffect::Error(error),
-                };
+                return self.confirm_capture(|_| Ok(()));
             }
             ClipAction::Cancel => {
                 if self.playing {
@@ -810,6 +805,17 @@ impl ClipEditor {
             }
         }
         ClipEffect::StopPreview
+    }
+
+    /// The game validates the exact saved identity before accepting A; preview only needs the inputs.
+    pub fn confirm_capture(&mut self, attach: impl FnOnce(&mut MacroRecording) -> Result<(), String>) -> ClipEffect {
+        let suffix = format!(" P{}", self.track().entry + 1);
+        let prefix: String = self.source_name.chars()
+            .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
+        match self.export_selection(&format!("{prefix}{suffix}")).and_then(|mut take| { attach(&mut take)?; Ok(take) }) {
+            Ok(take) => { self.error = None; self.browsed = false; self.pause(); ClipEffect::Export(Box::new(take)) }
+            Err(error) => { self.report_error(error.clone()); ClipEffect::Error(error) }
+        }
     }
 }
 

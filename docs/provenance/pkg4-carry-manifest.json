@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "689dc86a0ba978797b6b760243e04d808f94da80223f65b0994df0f2367c1b8d",
+   "dest_sha256": "2e0d72726488be2199ead377b8db6630e351968c935b1ee3ee24ed8d3f334a6e",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2327,6 +2327,21 @@
      "old": "        window.seek(self.window.cursor().min(window.total() - 1));",
      "new": "        window.seek(match self.handle {\n            Handle::In => window.start(),\n            Handle::Out => window.end() - 1,\n            Handle::Playhead => self.window.cursor().min(window.total() - 1),\n        });",
      "reason": "Free playhead (2026-11-26 00:45:28Z): after a fighter switch the shown frame is the selected handle on the new track, including a longer full take."
+    },
+    {
+     "old": "    pub fn sample(&self) -> ReplayFrame { self.track().frames[self.window.cursor() as usize] }",
+     "new": "    pub fn sample(&self) -> ReplayFrame { self.track().frames[self.window.cursor() as usize] }\n    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): validate the captured crop's fighter identity, not the form at the browsing cursor."
+    },
+    {
+     "old": "                let suffix = format!(\" P{}\", self.track().entry + 1);\n                let prefix: String = self.source_name.chars()\n                    .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();\n                return match self.export_selection(&format!(\"{prefix}{suffix}\")) {\n                    Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }\n                    Err(error) => ClipEffect::Error(error),\n                };",
+     "new": "                return self.confirm_capture(|_| Ok(()));",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): share capture confirmation with the game path that validates the saved identity."
+    },
+    {
+     "old": "        ClipEffect::StopPreview\n    }\n}",
+     "new": "        ClipEffect::StopPreview\n    }\n\n    /// The game validates the exact saved identity before accepting A; preview only needs the inputs.\n    pub fn confirm_capture(&mut self, attach: impl FnOnce(&mut MacroRecording) -> Result<(), String>) -> ClipEffect {\n        let suffix = format!(\" P{}\", self.track().entry + 1);\n        let prefix: String = self.source_name.chars()\n            .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();\n        match self.export_selection(&format!(\"{prefix}{suffix}\")).and_then(|mut take| { attach(&mut take)?; Ok(take) }) {\n            Ok(take) => { self.error = None; self.browsed = false; self.pause(); ClipEffect::Export(Box::new(take)) }\n            Err(error) => { self.report_error(error.clone()); ClipEffect::Error(error) }\n        }\n    }\n}",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): keep cut-here armed if exact target validation refuses the export."
     }
    ]
   },
@@ -5090,7 +5105,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "e5f79f1295fe900148eae9a6bde1d6f209810913f9da1c7dd8155a671069be50",
+   "dest_sha256": "dd6f51d9db1815e908b26a17101b865e0e0b44689b150a4882b60dc8d2004f43",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6016,6 +6031,26 @@
      "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): repeat browsing only when scrubbing is allowed and clear held direction during preview.",
      "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n",
      "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n"
+    },
+    {
+     "old": "    let (effect, configuration, file, source, requested) = {",
+     "new": "    let (effect, file, source, requested) = {",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): validate configuration in the capture confirmation before committing browse state."
+    },
+    {
+     "old": "        let configuration=editor.as_ref().and_then(|editor|editor.target().ok().flatten())\n            .and_then(Target::configuration);\n",
+     "new": "",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): save identity does not follow the browsing cursor outside the crop."
+    },
+    {
+     "old": "        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source, requested)\n    };\n    // Only a saved file carries identity, and it is always the recorded one: the\n    // original kind, plus the exact Mii for a Mii track. A preview is inputs only\n    // and needs neither, so it never depends on which fighter the CPU is.\n    let attach=|mut recording:Box<crate::engine::macros::MacroRecording>| -> Result<Box<crate::engine::macros::MacroRecording>,String> {\n        if let Some(configuration)=configuration {recording.set_mii(configuration).map_err(|e|e.to_string())?;}\n        else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {\n            return Err(\"Recorded Mii metadata is unavailable; reopen this capture before saving\".into());\n        }\n        recording.playback_target().map_err(|e|e.to_string())?;\n        Ok(recording)",
+     "new": "        let effect = editor.as_mut().map(|e| {\n            if file || !matches!(action, ClipAction::Confirm) { return e.on_action(action); }\n            let view = e.view();\n            let configuration = e.target_for(view.entry, e.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);\n            e.confirm_capture(|recording| {\n                if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }\n                else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {\n                    // restriction: replay-mii-metadata\n                    return Err(\"Recorded Mii metadata is unavailable; reopen this capture before saving\".into());\n                }\n                recording.playback_target().map(|_| ()).map_err(|e| e.to_string())\n            })\n        });\n        (effect, file, source, requested)",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): apply the existing exact identity check inside capture confirmation. On refusal the editor stays where it was."
+    },
+    {
+     "old": "            if file {\n                name_file(crate::engine::rr_runtime::ClipFile::Macro(recording));\n                return;\n            }\n            match attach(recording) {\n                Ok(recording) if requested => name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),\n                Ok(recording)=>crate::runtime::macros::named_macros::offer_replay_recording(*recording),Err(error)=>notify(error),\n            }",
+     "new": "            if file || requested {\n                name_file(crate::engine::rr_runtime::ClipFile::Macro(recording));\n            } else { crate::runtime::macros::named_macros::offer_replay_recording(*recording); }",
+     "reason": "Free playhead (2026-11-26 01:10:29Z): only accepted exports reach the name handoff."
     }
    ]
   },
