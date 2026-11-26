@@ -110,7 +110,7 @@ fn rejects_non_finite_floats_in_every_field() {
 }
 
 fn rejects_unsupported_schema_version_and_missing_fighter() {
-    for version in [0, 3, u32::MAX] {
+    for version in [0, 4, u32::MAX] {
         let mut rec = recording("Version");
         rec.schema_version = version;
         let err = rec.validate().unwrap_err();

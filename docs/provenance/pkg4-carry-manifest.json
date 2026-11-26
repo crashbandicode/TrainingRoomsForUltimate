@@ -1238,7 +1238,7 @@
    "dest": "src/model/macros/recording/tests.rs",
    "crate": "macros",
    "src_sha256": "d08afc313059da5a98b341647b8187ba0079a96379a5a5377ea8d936e98d1a22",
-   "dest_sha256": "f19b54b6cb48027980a953e1a5bf745f9f0d94789a500596b1045c3c1e315411",
+   "dest_sha256": "f6d46a5cee49af242744ca66689998b6f0d71455a1264c86c3f0292da2000362",
    "edits": [
     {
      "table_file": true,
@@ -1247,6 +1247,11 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "old": "    for version in [0, 3, u32::MAX] {",
+     "new": "    for version in [0, 4, u32::MAX] {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },

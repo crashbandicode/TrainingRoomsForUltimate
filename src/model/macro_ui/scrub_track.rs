@@ -455,7 +455,7 @@ mod tests {
             assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
             assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Re-record to see positions while scrubbing.");
             let line = crate::engine::macro_ui::clip_marks::bridge_clip(&editor.view(), Some("macro.p1"), false).text();
-            assert!(line.ends_with(" pos=no_track"), "{line}");
+            assert!(line.contains(" running=0 pos=no_track target="), "{line}");
         }
         // X does not stand in for the missing track.
         assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { .. }));
