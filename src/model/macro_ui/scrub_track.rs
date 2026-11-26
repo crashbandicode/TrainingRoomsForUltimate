@@ -329,6 +329,11 @@ impl Slot {
         result
     }
 
+    /// The worker's release check before it starts a wanted play.
+    pub fn released(&self) -> bool {
+        self.with(|block| block.released()).unwrap_or(true)
+    }
+
     /// The worker: cancel the request and keep the slot reachable until the fighters have released it.
     pub fn close(&self) {
         let idle = self.with(|block| {
@@ -1107,6 +1112,50 @@ mod tests {
             assert_eq!(pair[0], state(recorded, 9));
             assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
         }
+    }
+
+    #[test]
+    fn preview_release_proof_keeps_a_partner_held_from_an_earlier_row() {
+        let slot = Slot::new();
+        assert!(slot.publish(Block::new()).is_ok());
+        let place = Some(spot(3.0, 4.0, 1.0));
+        slot.with(|b| {
+            b.ask_at(Some(4), Ask::Group { target: 0, deltas: [place; 2] });
+            for role in 0..2 {
+                b.set_seen(role, SEEN_HELD);
+                b.ack(role, b.generation());
+            }
+            // The CPU has not run since row 4. The next row has no partner.
+            b.ask_at(Some(5), Ask::Group { target: 0, deltas: [place, None] });
+            b.ask_at(None, Ask::None);
+            b.set_seen(0, SEEN_IDLE);
+            b.ack(0, b.generation());
+        });
+        assert!(!slot.released(), "the CPU is still holding its row-4 point");
+        slot.with(|b| { b.set_seen(1, SEEN_IDLE); b.ack(1, b.generation()); });
+        assert!(slot.released(), "both bodies reported their releases");
+        slot.close();
+    }
+
+    #[test]
+    fn preview_release_proof_sees_a_first_callback_that_has_not_reported_yet() {
+        let slot = Slot::new();
+        assert!(slot.publish(Block::new()).is_ok());
+        let place = Some(spot(3.0, 4.0, 1.0));
+        slot.with(|b| b.ask_at(Some(4), Ask::Group { target: 0, deltas: [None, place] }));
+        slot.with(|b| {
+            let generation = b.generation();
+            assert!(b.held_at(1, [0.0; 2]).is_some());
+            // The worker handles X after the CPU has its point, but before its first result.
+            b.ask_at(None, Ask::None);
+            assert!(!slot.released(), "the first fighter callback can still acquire the body");
+            b.set_seen(1, SEEN_HELD);
+            b.ack(1, generation);
+        });
+        assert!(!slot.released(), "the late hold is now observable");
+        slot.with(|b| { b.set_seen(1, SEEN_IDLE); b.ack(1, b.generation()); });
+        assert!(slot.released(), "the held CPU came home; absent P1 needs no callback");
+        slot.close();
     }
 
     #[test]
