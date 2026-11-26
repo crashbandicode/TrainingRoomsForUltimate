@@ -31,7 +31,7 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.forget();
         }
         let seen = match point(block, &holds, slot, accessor) {
-            Some(spot) => hold(block, slot, &mut holds[slot], accessor, spot),
+            Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),
             None => release(&mut holds[slot], accessor),
         };
         block.set_seen(slot, seen);
@@ -40,34 +40,36 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
 }
 
 /// Where this role's body is asked to be. The group's home is where the hold found the target role's body: its
-/// hold's origin, or where it stands now when it is not held yet.
+/// hold's origin, which the block keeps when the target is let go while its partner is held (`Block::point`), or
+/// where it stands now when it was not held.
 unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, accessor: usize) -> Option<Spot> {
-    let target = block.target_slot()?;
-    let home = match holds[target] {
-        Some(hold) => hold.origin().at,
-        None if target == slot => [natives::pos_x(accessor), natives::pos_y(accessor)],
-        None => {
-            let pose = crate::engine::rr_host::live_pose(target);
-            if pose.fighter_kind < 0 {
-                return None;
-            }
-            [pose.x, pose.y]
+    block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {
+        if target == slot {
+            return Some([natives::pos_x(accessor), natives::pos_y(accessor)]);
         }
-    };
-    block.held_at(slot, home)
+        let pose = crate::engine::rr_host::live_pose(target);
+        (pose.fighter_kind >= 0).then_some([pose.x, pose.y])
+    })
 }
 
-/// Hold the body at `spot`, facing as recorded. A point outside the camera's limits, or one the stage rule does not
-/// let a body stand at (inside a solid, past a blast line), is not taken: the body goes back, or stays, where the
-/// hold found it.
-unsafe fn hold(block: &Block, index: usize, slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
+/// Hold the body at `spot`, facing as recorded. A point outside the camera's limits, one the stage rule does not let
+/// a body stand at (inside a solid, past a blast line), or one the game pushed this body sideways off under this
+/// request (`Block::pushed`: a wall beside it, a floor's end) is not taken: the body goes back, or stays, where the
+/// hold found it. `generation`: the request, as the frame read it before the ask.
+unsafe fn hold(block: &Block, generation: u32, index: usize, slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
     let Some(limits) = natives::camera_limit_range() else { return release(slot, accessor) };
-    if !in_bounds(spot.at, limits) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {
+    let body = natives::battle_object_id(accessor);
+    if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {
         release(slot, accessor);
         return SEEN_OFF;
     }
-    if placement::hold_at(slot, accessor, natives::battle_object_id(accessor), spot.at, false).is_none() {
+    if placement::hold_at(slot, accessor, body, spot.at, false).is_none() {
         return SEEN_IDLE;
+    }
+    // The hold's report is about the write of the frame before; the body is where the game left it until this write.
+    if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {
+        release(slot, accessor);
+        return SEEN_OFF;
     }
     state::set_lr(accessor, spot.facing);
     SEEN_HELD
