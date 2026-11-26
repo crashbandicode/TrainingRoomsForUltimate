@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "952a80e988a901d1af98ea72c6c17018ce5140c5d2d5dd80971038519e4b1faf",
+   "dest_sha256": "892c9fa4a176d0f13877a2843a8f4500b0e5db230d0c1e0cd06cfb381b5447e1",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3332,6 +3332,11 @@
      "reason": "P5b C: the per-fighter toggle and its keys (SM3, SM4).",
      "old": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n",
      "new": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel, ToggleFighter { player: bool },\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n"
+    },
+    {
+     "reason": "P5b C: test that a positions line keeps its place over the fighter hint.",
+     "old": "        let mut off = e.view();\n        off.pos = Pos::Off;\n        assert_eq!(clip_help(&off, \"ZL/ZR\", \"ZL\", 1).notice, \"Can't stand there on this stage.\");\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        let help = clip_help(&e.view(), \"ZL/ZR\", \"ZL\", 1);\n        assert_eq!(help.primary, \"Loading Kirby\u2026 B cancels\");\n",
+     "new": "        let mut off = e.view();\n        off.pos = Pos::Off;\n        assert_eq!(clip_help(&off, \"ZL/ZR\", \"ZL\", 1).notice, \"Can't stand there on this stage.\");\n        // A line about the take's positions stays: on such a take another fighter would show no moves either.\n        for pos in [Pos::NoTrack, Pos::NoMoves, Pos::End] {\n            let mut view = e.view();\n            (view.pos, view.clean_start, view.move_start) = (pos, true, None);\n            assert_eq!(clip_help(&view, \"ZL/ZR\", \"ZL\", 1).notice, pos.text(), \"{pos:?}\");\n        }\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        let help = clip_help(&e.view(), \"ZL/ZR\", \"ZL\", 1);\n        assert_eq!(help.primary, \"Loading Kirby\u2026 B cancels\");\n"
     }
    ]
   },

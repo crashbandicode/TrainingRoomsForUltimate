@@ -1286,6 +1286,12 @@ mod tests {
         let mut off = e.view();
         off.pos = Pos::Off;
         assert_eq!(clip_help(&off, "ZL/ZR", "ZL", 1).notice, "Can't stand there on this stage.");
+        // A line about the take's positions stays: on such a take another fighter would show no moves either.
+        for pos in [Pos::NoTrack, Pos::NoMoves, Pos::End] {
+            let mut view = e.view();
+            (view.pos, view.clean_start, view.move_start) = (pos, true, None);
+            assert_eq!(clip_help(&view, "ZL/ZR", "ZL", 1).notice, pos.text(), "{pos:?}");
+        }
         e.on_action(ClipAction::ToggleFighter { player: true });
         let help = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
         assert_eq!(help.primary, "Loading Kirby… B cancels");
