@@ -63,7 +63,7 @@ Read the help line below the row. It tells you what must change.
 | "Select a Kirby hat first" | The hat list is empty. | Add a hat under Fighters & Stages › Kirby Hats. |
 | "Kirby hat could not be loaded" | The hat did not load. | Try again. |
 | "Wait for the practice fighters to finish loading" | The fighters are not ready. | Wait, then open the list again. |
-| "P1 is controlled by an AI: Play on Player 1 is off" or "P1 is controlled by an AI: Quick Reset is off" | An AI plays Player 1. | Take back Player 1 to use that action. Install 4 also refuses Record; the next build lets you record the AI's inputs. |
+| "P1 is controlled by an AI: Play on Player 1 is off" or "P1 is controlled by an AI: Quick Reset is off" | An AI plays Player 1. | Take back Player 1 for Play or Quick Reset. Record already captures the AI's inputs in installs 5 and 6; install 4 refused it. |
 | "Could not save button_config.ini" | The shortcut file could not be written. | The change lasts until you close the game. |
 
 More: [Restrictions](../RESTRICTIONS.md).

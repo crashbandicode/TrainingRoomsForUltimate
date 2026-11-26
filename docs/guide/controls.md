@@ -84,8 +84,8 @@ With Online Deluxe installed, some chords wait so its own buttons work:
 ## When the CPU pilot plays Player 1
 
 While the CPU pilot or TrainingRooms' own CPU control plays Player 1, Play on Player 1 is refused. In a waiting
-room, L + R + A is refused too. **Install 4** also refuses Record. In the **next build**, Record works and captures
-Player 1's inputs as the game receives them, including the AI's.
+room, L + R + A is refused too. Install 4 also refused Record. In installs 5 and 6, Record captures Player 1's
+inputs as the game receives them, including the AI's.
 More: CPU › [Player 1 control](../menu/cpu.md#player-1-control).
 
 More: [Display & Controls](../menu/display-and-controls.md), [Using the menu](using-the-menu.md).

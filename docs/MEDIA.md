@@ -4,13 +4,11 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
-## Tutorial clips (2026-11-25)
+## Tutorial clips (2026-11-25 and 2026-11-26)
 
-MP4 clips named `media/tut-*.mp4`: H.264, 1280×720, 60 fps, no audio, 10 s at most, cut at the ends only. Each was
-filmed whole-screen at 1920×1080 in Eden on the release build `c51f4d81` with the full plugin set of the card, run
-`tut-c51f4d81-yoga-1`. The capture tool draws a small yellow `BRIDGE LIVE` mark at the top of the screen, which a
-player never sees. It is cropped out: the picture is the 1842×1036 region at (39, 44) of the 1080p frame, scaled to
-720p. Where a clip opens or ends in Training with the input display on, that crop also cuts the display's top lane.
+The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.
+They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
+yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
 | Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
 | --- | --- | --- | ---: | --- | --- |
@@ -22,6 +20,12 @@ player never sees. It is cropped out: the picture is the 1842×1036 region at (3
 | `tut-clip-playhead.mp4` | Right browses to 64, Y takes it to the start of the nearest move, at 66, L sets In there; R later keeps frame 100 (Out 101) | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 | `tut-juggler-setup-and-result.mp4` | Juggler: Set up… (CPU spot, percent, Player 1's start, Preview), Start; the CPU lands unhit and the result notice shows | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
 | `tut-guard-edge-setup-and-score.mp4` | Guard the Edge: Set up… (CPU start off stage, Player 1's start, Preview), Start, three attempts, “Secured 1/3” | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
+
+### Earlier waiting-room example
+
+| Clip | What it shows | Run | Bytes | SHA256 (first 16) |
+| --- | --- | --- | ---: | --- |
+| [Guard the Edge in a waiting room](guide/waiting-rooms.md#what-works-there) | CPU placement and a recovery at the ledge, 0/1. Not an install 6 test. | `rc15-ib-17060a5e-yoga-lobby-3`, 720p export of `guard-the-edge-lobby.mp4` | 2,015,965 | `ac0699f06cf92fee` |
 
 ## rc.15 install 4 clips (2026-11-25)
 
