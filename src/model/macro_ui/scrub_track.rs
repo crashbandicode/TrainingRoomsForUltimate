@@ -39,7 +39,8 @@ pub enum Pos {
     NoTrack,
     /// The fighters are shown at the handle's frame.
     Held,
-    /// A fighter's point is outside this stage's camera limits: that fighter does not move.
+    /// A fighter's point is not a place to stand on this stage (outside the camera's limits or the blast lines, or
+    /// inside a solid): that fighter does not move.
     Off,
     /// The macro's track ends before this frame (a block could not be had while recording): nobody is held.
     End,
@@ -50,7 +51,7 @@ impl Pos {
     pub const fn text(self) -> &'static str {
         match self {
             Pos::NoTrack => "Play it once to see positions while scrubbing.",
-            Pos::Off => "Off this stage.",
+            Pos::Off => "Can't stand there on this stage.",
             Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
         }
@@ -84,8 +85,7 @@ pub fn in_bounds(at: [f32; 2], limits: [f32; 4]) -> bool {
 /// floor or a platform, or in open air, also under the stage. Not in a solid, not outside the blast lines, and not
 /// on a stage that could not be read.
 pub fn can_stand(place: Result<Place, Unread>) -> bool {
-    let _ = place;
-    true
+    matches!(place, Ok(Place::OverStage | Place::Open | Place::Under))
 }
 
 /// The one point rule for captures and macros: each fighter's delta on frame `at` from the selected fighter's place
@@ -153,6 +153,10 @@ impl Block {
     /// the editor asks for another frame.
     pub fn forget(&self) {
         self.dropped.store(self.ask.generation().wrapping_add(1), Ordering::Release);
+        // Another body, maybe another stage: what the stage said is asked again.
+        for verdict in &self.stands {
+            verdict.store(0, Ordering::Release);
+        }
     }
 
     fn forgotten(&self) -> bool {
@@ -172,8 +176,12 @@ impl Block {
     /// The game thread: whether the role's body may stand at `at`. The stage is asked (`class`) once per point, so a
     /// held body casts rays only when its point changes.
     pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
-        let _ = (slot, at, class, &self.classed, &self.stands);
-        true
+        let (Some(point), Some(verdict)) = (self.classed.get(slot), self.stands.get(slot)) else { return false };
+        let key = u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits());
+        if point.swap(key, Ordering::AcqRel) != key || verdict.load(Ordering::Acquire) == 0 {
+            verdict.store(if class() { 1 } else { 2 }, Ordering::Release);
+        }
+        verdict.load(Ordering::Acquire) == 1
     }
 
     /// The role whose home anchors the group.
