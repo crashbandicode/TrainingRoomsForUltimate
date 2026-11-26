@@ -73,7 +73,7 @@
  "Lobby practice (waiting-room practice, waiting UI patch, automation helper)": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 47
+   "ours-new": 46
   },
   "files": [
    "docs/REVISION29_DRAW_DECOUPLING.md",
@@ -90,7 +90,6 @@
    "docs/lobby-practice/ldn-item-restore.gif",
    "docs/lobby-practice/ldn-ledge-playback.gif",
    "docs/lobby-practice/stage-menu.gif",
-   "docs/lobby-practice/waiting-room.gif",
    "docs/lobby-practice/waiting-room.png",
    "docs/native-operations.md",
    "docs/nro-session.md",
@@ -145,7 +144,6 @@
    "docs/character-changes.md",
    "docs/character-cycles-validation.md",
    "docs/fighter-hotswap.md",
-   "docs/fighter-hotswap/character-cycles.gif",
    "docs/fighter-hotswap/hotswap.gif",
    "docs/fighter-hotswap/manual-hotswap.gif",
    "docs/fighter-hotswap/solo-popo.gif",
@@ -284,6 +282,7 @@
    "training_mod_consts/src/body_bank.rs",
    "training_mod_consts/src/body_bank/memory.rs",
    "training_mod_consts/src/body_bank/memory_table.rs",
+   "training_mod_consts/src/body_bank/mii_publish.rs",
    "training_mod_consts/src/body_bank/window_share.rs",
    "training_mod_consts/src/capacity_creation.rs",
    "training_mod_consts/src/character_forms.rs",
@@ -335,14 +334,13 @@
  "Character items (menu icons from game assets, turnip face, item choice)": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 46
+   "ours-new": 45
   },
   "files": [
    "docs/character-items.md",
    "docs/character-items/SCREENSHOTS.md",
    "docs/character-items/page-1.png",
    "docs/character-items/page-2.png",
-   "docs/feature-walkthroughs/character-items.gif",
    "scripts/item-icons/assets/icon-00.png",
    "scripts/item-icons/assets/icon-01.png",
    "scripts/item-icons/assets/icon-02.png",
@@ -386,6 +384,21 @@
    "training_mod_consts/src/character_items.rs"
   ]
  },
+ "UNMAPPED": {
+  "disposition": "review",
+  "origins": {
+   "ours-new": 7
+  },
+  "files": [
+   "docs/cpu-rolls-apply.md",
+   "docs/skyline-logger-race.md",
+   "src/log_stress.rs",
+   "src/training/cpu_rolls.rs",
+   "training_mod_consts/src/cpu_rolls.rs",
+   "training_mod_consts/src/log_stress.rs",
+   "training_mod_consts/src/notice_queue.rs"
+  ]
+ },
  "Cycle preload (fighter/hat preloading, capacity, admission grace, preload metrics, group swap config)": {
   "disposition": "ours: carry over",
   "origins": {
@@ -409,11 +422,10 @@
  "Kirby hats (hat orders, hat cycle, copy packages)": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 6
+   "ours-new": 5
   },
   "files": [
    "docs/feature-walkthroughs/kirby-grid.png",
-   "docs/feature-walkthroughs/kirby-hats.gif",
    "docs/kirby-hats.md",
    "src/kirby_hat_cycle.rs",
    "src/kirby_hats.rs",
@@ -423,18 +435,15 @@
  "Mii fighters (saved Miis, native editor bridge, HUD portraits, ordinary/CPU Mii, LDN qualification)": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 132
+   "ours-new": 129
   },
   "files": [
    "docs/feature-walkthroughs/mii-editor.png",
    "docs/feature-walkthroughs/mii-gunner-hud.gif",
    "docs/feature-walkthroughs/mii-gunner-hud.json",
    "docs/feature-walkthroughs/mii-hud-portraits.png",
-   "docs/feature-walkthroughs/mii-selection.gif",
    "docs/mii-fighters.md",
    "docs/mii-replay-discovery/README.md",
-   "docs/mii-replay-discovery/mii-discovery-existing.gif",
-   "docs/mii-replay-discovery/mii-discovery-new.gif",
    "src/mii_auto_init.rs",
    "src/mii_backend.rs",
    "src/mii_catalog_request.rs",
@@ -734,7 +743,7 @@
  "Named macros, replay import, record slots, clip editor, live replay": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 67
+   "ours-new": 66
   },
   "files": [
    "docs/media-provenance.json",
@@ -760,7 +769,6 @@
    "docs/named-macros/images/15-native-stop-restored.png",
    "docs/named-macros/images/16-persistent-capture.png",
    "docs/named-macros/images/crop.gif",
-   "docs/named-macros/images/fighter.gif",
    "docs/named-macros/images/match.gif",
    "docs/named-macros/images/move-snap.gif",
    "docs/named-macros/images/naming.gif",
@@ -819,15 +827,13 @@
  "Setup library and JSON saves (named setups, save_states.json, training_modpack.json, port tool)": {
   "disposition": "ours: carry over",
   "origins": {
-   "ours-new": 30
+   "ours-new": 28
   },
   "files": [
    "docs/setup-library.md",
    "docs/setup-library/SCREENSHOTS.md",
    "docs/setup-library/bind.gif",
-   "docs/setup-library/library.gif",
    "docs/setup-library/list.png",
-   "docs/setup-library/restore.gif",
    "docs/setup-library/restore.png",
    "docs/setup-library/save.gif",
    "src/training/setup_library.rs",
@@ -857,18 +863,14 @@
  "Upstream artwork and layout (unlicensed assets)": {
   "disposition": "upstream: replace (redraw) \u2014 never copy",
   "origins": {
-   "upstream-identical": 53,
+   "upstream-identical": 49,
    "binary-differs": 1
   },
   "files": [
    "photos/2021081718384700-0E7DF678130F4F0FA2C88AE72B47AFDF.jpg",
-   "photos/FLy0xiw.gif",
-   "photos/character_item.gif",
    "photos/damage_range.png",
    "photos/defensive_settings.png",
-   "photos/ezgif-2-299a3e9b46.gif",
    "photos/mash_settings.png",
-   "photos/mash_trigger_tumble.gif",
    "photos/mash_triggers.png",
    "photos/misc_settings.png",
    "photos/save_states.png",
@@ -920,8 +922,8 @@
  "Upstream: input recording/playback, input display, input delay, button chords, notifications": {
   "disposition": "upstream: clean-room spec (SPEC-input-*)",
   "origins": {
-   "mixed": 6,
-   "upstream-identical": 3
+   "mixed": 7,
+   "upstream-identical": 2
   },
   "files": [
    "src/common/button_config.rs",
@@ -1049,8 +1051,8 @@
  "Upstream: CPU behaviour (mash, followup, triggers, overrides, defensive, ledge, tech, shield, aerial/throw timing, frame advantage)": {
   "disposition": "upstream: clean-room spec (SPEC-cpu-*)",
   "origins": {
-   "upstream-identical": 11,
-   "mixed": 5
+   "upstream-identical": 7,
+   "mixed": 9
   },
   "files": [
    "src/training/air_dodge_direction.rs",
