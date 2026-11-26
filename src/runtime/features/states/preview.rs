@@ -1,8 +1,9 @@
 //! Clip checkpoints are game-owned values, observed and restored on a fighter callback.
 use super::{Raw, Role, ACTIVE, CONSTS_READY, LOADING};
+use crate::engine::macro_ui::scrub_track::SLOT;
 use crate::engine::rr_host::HomeWarp;
 use crate::engine::mii::lifetime::Configuration;
-use crate::model::state::{ids::C, preview::{settle, Body, Checkpoint, Error, Settle}};
+use crate::model::state::{ids::C, preview::{settle, take_home_ask, Body, Checkpoint, Error, Settle}};
 use crate::runtime::features::recorder;
 use crate::runtime::{game::natives, lobby::training::practice};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -42,11 +43,7 @@ pub(super) unsafe fn take_home() -> bool {
     }
     // A start that follows the scrub hold's release stays asked, as it does while a load runs, until the released CPU
     // has settled or will not (tr-primary-2 2026-11-26 12:54:05Z). The wait is on the CPU's state, never on a clock.
-    let waiting = ASK.load(Ordering::Acquire);
-    if waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait) {
-        return false;
-    }
-    let ask = ASK.swap(0, Ordering::AcqRel);
+    let ask = take_home_ask(&ASK, |waiting| waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait));
     if ask == 0 {
         return false;
     }
@@ -55,6 +52,7 @@ pub(super) unsafe fn take_home() -> bool {
         CHECKPOINT.lock().clear();
         result
     } else {
+        SLOT.with(|block| block.settled());
         request(true, ask == 2 || ask == 5, ask >= 4)
     };
     match result {
@@ -73,15 +71,10 @@ pub(super) unsafe fn take_home() -> bool {
 /// The released CPU's state for a start the editor asked after its hold let go; none when no such start waits. A
 /// verdict other than `Wait` ends the wait: the checkpoint's own gate then takes or refuses the start.
 unsafe fn settling() -> Option<Settle> {
-    use crate::engine::macro_ui::scrub_track::SLOT;
     if !SLOT.with(|block| block.settling()).unwrap_or(false) {
         return None;
     }
-    let verdict = observe().map_or(Settle::Refuse, |(_, raws)| settle(cpu_body(&raws[1])));
-    if verdict != Settle::Wait {
-        SLOT.with(|block| block.settled());
-    }
-    Some(verdict)
+    Some(observe().map_or(Settle::Refuse, |(_, raws)| settle(cpu_body(&raws[1]))))
 }
 
 /// The CPU for `settle`: the gate's own situation and status reads, the landing statuses, and the floor under an
