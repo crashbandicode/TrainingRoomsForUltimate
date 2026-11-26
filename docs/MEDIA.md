@@ -20,6 +20,8 @@ player never sees. It is cropped out: the picture is the 1842×1036 region at (3
 | `tut-save-load.mp4` | ZL + D-pad Down saves, two jabs hit the CPU, ZL + D-pad Up puts both fighters back at 0% | `t06-save-load` of run `tut-c51f4d81-yoga-2` (the diagnostic build of `c51f4d81`), 0.5–7.5 s, whole frame: the capture tool was switched off during the take, so nothing is cropped | 3,748,140 | `435f35b4f8e24e1c` | [Save states](guide/save-states.md) |
 | `tut-clip-scrub.mp4` | Crop on a macro: L, Right moves the start and the fighters stand where the recording had them; R, Left moves the end; R releases them. No preview | `t41-clip-scrub` of run `tut-5df3d9dc-yoga-3` (the diagnostic build of `5df3d9dc`), 0.6–10.8 s | 2,866,172 | `0aafcffcbbcd865d` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 | `tut-clip-playhead.mp4` | Right browses to 64, Y takes it to the start of the nearest move, at 66, L sets In there; R later keeps frame 100 (Out 101) | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
+| `tut-juggler-setup-and-result.mp4` | Juggler: Set up… (CPU spot, percent, Player 1's start, Preview), Start; the CPU lands unhit and the result notice shows | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
+| `tut-guard-edge-setup-and-score.mp4` | Guard the Edge: Set up… (CPU start off stage, Player 1's start, Preview), Start, three attempts, “Secured 1/3” | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
 
 ## rc.15 install 4 clips (2026-11-25)
 
