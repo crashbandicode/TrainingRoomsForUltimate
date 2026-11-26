@@ -29,8 +29,10 @@ pub enum Act {
 /// which is asked of the game only then), else none. The game starts an animation it is given without a test
 /// that the fighter has one of that name.
 pub fn asked_of(recorded: PackedPose, has: impl FnOnce(u64) -> bool) -> PackedPose {
-    let _ = has;
-    recorded
+    match recorded.get() {
+        Some(pose) if has(pose.motion) => recorded,
+        _ => PackedPose::NONE,
+    }
 }
 
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown

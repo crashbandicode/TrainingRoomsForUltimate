@@ -10,7 +10,7 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{decide, drawn, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, Act, FALL, WAIT};
 use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
@@ -92,18 +92,21 @@ unsafe fn stands(accessor: usize, at: [f32; 2]) -> bool {
     can_stand(RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
-/// The frame's animation on a held body (SM1). It is set on first claim or when the game shows another frame, at rate 0 and
-/// without its script lines: the scripts sleep under the hold, and the game would otherwise run them up to the
-/// frame the animation starts at, hitbox lines included. The role's frame then reports what the game shows.
-/// `asleep`: the hold's own report for this frame. The body's kind is the role's, as its fighter frame published it.
+/// The frame's animation on a held body (SM1). The scrub sets it once to make the body its own, and again only
+/// when the game shows another animation or frame; at rate 0 and without its script lines: the scripts sleep
+/// under the hold, and the game would otherwise run them up to the frame the animation starts at, hitbox lines
+/// included. A body is asked only for an animation it has: the game starts one without that test. The role's
+/// frame then reports what the game shows. `asleep`: the hold's own report for this frame. The body's kind is
+/// the role's, as its fighter frame published it.
 unsafe fn pose(block: &Block, index: usize, accessor: usize, spot: Spot, asleep: bool) {
     let mut owned = block.pose(index).0 == POSE_SHOWN;
     let kind = crate::engine::rr_host::live_pose(index).fighter_kind;
     let read = || (natives::motion_kind(accessor), natives::motion_frame(accessor));
-    match decide(spot.kind, spot.pose, kind, asleep, owned, read()) {
+    let asked = asked_of(spot.pose, |motion| natives::is_anim_resource(accessor, motion));
+    match decide(spot.kind, asked, kind, asleep, owned, read()) {
         Act::Set(pose) => {
             owned |= natives::change_motion(accessor, pose.motion, pose.frame, 0.0, false);
-            // A fighter with no animation of that name keeps nothing of the scrub's: the report below says none.
+            // A set the game did not take leaves nothing of the scrub's on the body: the report below says none.
             if natives::motion_kind(accessor) != pose.motion {
                 natives::change_motion(accessor, FALL, 0.0, 1.0, true);
             }
@@ -112,7 +115,7 @@ unsafe fn pose(block: &Block, index: usize, accessor: usize, spot: Spot, asleep:
         Act::Keep => {}
     }
     let shown = read();
-    let state = drawn(spot.kind, spot.pose, kind, asleep, owned, shown);
+    let state = drawn(spot.kind, asked, kind, asleep, owned, shown);
     block.set_pose(index, state, PackedPose::pack(Pose { motion: shown.0, frame: shown.1 }));
     #[cfg(feature = "diag")]
     super::scrub_pose_probe::note(index, block.shown(), state, spot.pose, shown);

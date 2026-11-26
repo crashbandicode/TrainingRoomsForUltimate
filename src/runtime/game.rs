@@ -244,6 +244,12 @@ pub mod natives {
         at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
+    /// `MotionModule::is_anim_resource(accessor, motion)`: whether the fighter has an animation of that name. A
+    /// row that was not granted answers no.
+    pub unsafe fn is_anim_resource(accessor: usize, motion: u64) -> bool {
+        at::<extern "C" fn(usize, u64) -> bool>(sites_pkg2::MOTION_IS_ANIM_RESOURCE_OFFSET).is_some_and(|f| f(accessor, motion))
+    }
+
     /// `run_lines`: the game runs the animation's script lines up to `frame`, as it does for its own calls. False
     /// starts the animation at `frame` and runs none of them (the native's last argument, true).
     /// Returns whether the guarded native was called, not whether the game accepted the motion.
