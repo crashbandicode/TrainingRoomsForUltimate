@@ -237,7 +237,8 @@ impl Block {
 
     /// The game thread, after the hold's step for the role in `slot`. `moved`: where the game has the body, when the
     /// hold reports that the game moved it off the point written on the frame before. The scrub refuses a body the
-    /// game moved sideways: its x is not, bit for bit, the x asked. Walls and the ends of floors do that; gravity and
+    /// game moved sideways: its x is not the x asked, compared exactly as the hold compares (plus and minus zero are
+    /// one place: the CPU's Training home is x 0). Walls and the ends of floors do that; gravity and
     /// a floor under the point never move x, so a body the floor takes straight up or down stays held and is shown
     /// where the floor has it. (A ceiling pushing straight down is not refused.) The report is about this request
     /// only when that write was this role's, for this request (`generation`, read before the ask), at this point:
@@ -246,7 +247,7 @@ impl Block {
     pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], moved: Option<[f32; 2]>) -> bool {
         let (Some(wrote), Some(pushed)) = (self.wrote.get(slot), self.pushed.get(slot)) else { return false };
         let (key, request) = (key(at), u64::from(generation) + 1);
-        let sideways = moved.is_some_and(|seen| seen[0].to_bits() != at[0].to_bits());
+        let sideways = moved.is_some_and(|seen| seen[0] != at[0]);
         if sideways && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
             pushed.0.store(key, Ordering::Relaxed);
             pushed.1.store(request, Ordering::Relaxed);
@@ -1452,8 +1453,13 @@ mod tests {
         assert_eq!(let_go(stand, BodyRead { speed: Some([0.0; 2]), ..air(stand) }), (false, false, false), "at rest");
         // A point within one fall step over the floor: the floor takes the body, a few hundredths under its point.
         assert_eq!(let_go([-30.0, 0.05], landed(stand)), (true, false, false), "taken by the floor: held, shown on it");
-        // The same x in other bits is another x: minus zero is not zero.
-        assert_eq!(let_go([0.0, y], air([-0.0, y + fall[1]])), (true, true, true));
+        // Minus zero is the same place as zero, for the hold and for the scrub: a fighter standing at x 0 (the CPU's
+        // Training home) is not let go on such a read, reported or not.
+        assert_eq!(let_go([0.0, y], air([-0.0, y + fall[1]])), (false, false, false));
+        assert_eq!(let_go([0.0, 0.01], landed([-0.0, 0.01])), (true, false, false));
+        // The smallest step of x away is another place.
+        let beside = f32::from_bits(0xc2a2_0001);
+        assert_eq!(let_go([-81.0, y], air([beside, y + fall[1]])), (true, true, true), "one bit of x");
         // The game side hands the hold's report over, and asks for the refusal before it takes the body.
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
         let hold = runtime.split_once("unsafe fn hold(").map_or("", |(_, rest)| rest);
