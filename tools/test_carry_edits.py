@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Host tests for carry_edits.py: python3 -I tools/test_carry_edits.py"""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -106,6 +107,28 @@ class CarryEditsTests(unittest.TestCase):
         edits = carry_edits.derive(base, wanted, "crlf")
         self.assertIn("\r\n", edits[0]["old"])
         self.replay(base, wanted, edits)
+
+    def test_stale_base_refused_before_manifest_write(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            actual = "".join(lines(30))
+            stale = actual.replace("line 0\n", "outdated header\n")
+            wanted = stale.replace("line 20\n", "wanted change\n")
+            (root / "base").write_bytes(stale.encode())
+            (root / "wanted").write_bytes(wanted.encode())
+            entry = {"dest": "wanted", "dest_sha256": hashlib.sha256(actual.encode()).hexdigest()}
+            manifest = root / "manifest.json"
+            manifest.write_bytes(json.dumps({"files": [entry]}).encode())
+            before = manifest.read_bytes()
+            # The edit itself applies cleanly even to the wrong base; a carry/verify round trip
+            # would keep actual's header rather than reproducing wanted byte for byte.
+            edits = carry_edits.derive(stale, wanted, "change")
+            carried = carry_pkg4.apply_edits({"src": "fixture", "edits": edits}, actual.encode())
+            self.assertNotEqual(carried, wanted.encode())
+            with self.assertRaisesRegex(SystemExit, "base"):
+                carry_edits.main(["wanted", str(root / "base"), "--reason", "change", "--root", directory,
+                                  "--manifest", "manifest.json"])
+            self.assertEqual(before, manifest.read_bytes())
 
     def test_manifest_is_written_as_the_carry_tool_writes_it(self):
         with tempfile.TemporaryDirectory() as directory:
