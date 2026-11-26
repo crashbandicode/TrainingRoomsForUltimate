@@ -10,17 +10,15 @@ Current release: rc.15
 Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed on the project's test console on
 2026-11-26).
 
-- **Installed:** the file on the card was read back and matches the build.
-- **Eden:** install 6 is in testing. At installation, two Training boots were running on its diagnostic build;
-  the installed release file had no smoke verdict. The build before its last fix (`eb39d6bc`) passed its Play-start comparison with install 5, its record,
-  old-macro, snap and browse checks, and part of the diagnostic checks. The Play-start result and the rename result
-  carry over: rename passed by typing in Eden's keyboard window, not by pad. The rest of the build is install 5,
-  which had a short smoke boot and a one-player waiting-room boot.
-- **On the console:** no report on install 6 yet. Three reports on install 5 are on record. The clip editor's
-  "In is mid-action" refusal after a snap (2026-11-25) has its fix in install 6. A fighter placed off stage on a
-  save that stays on the ground once it has landed, and Guard the Edge's starting spot varying between rounds
-  (both 2026-11-26), are not fixed. Known issues below has each. They are reports of what the operator saw, not
-  tests of a build; the reports on the earlier builds are in the evidence page.
+| Check | Install 6 |
+| --- | --- |
+| Installed | The file on the card was read back and matches the build |
+| Eden, on install 6's diagnostic build | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. One defect found: positions stop 20 seconds into a long take |
+| Eden, on the installed release file | No smoke boot yet, and no waiting-room pair |
+| Eden, on `eb39d6bc` (before the last fix) | Record, old macros, snap, browse and part of the diagnostic checks passed |
+| Results carried over | Play-start comparison with install 5; rename through Eden's keyboard window, not by pad |
+| The rest of the build | Is install 5, which had a short smoke boot and a one-player waiting-room boot |
+| On the console | On install 6, the operator saw the fighters change position while scrubbing but not show the moves. See [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc); the three reports from install 5 are under [Known issues](#known-issues). |
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -106,20 +104,25 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Fixed in install 6: "In is mid-action" after a snap in a match capture.** On install 5 (install 4 uses the same snap code), plain Y
-  snaps In to a mark, and if that frame is still mid-action, preview and save are refused. The way round there:
-  with In selected, hold ZL or ZR (Z on a GameCube pad) and press Y, release the modifier, then press X to preview
-  or A to save. In install 6, Y resolves the move itself (`dbded2d1`). In Eden on the build before install 6's last
-  fix (`eb39d6bc`), Y moved In to the attack's start, and X then previewed. No report from the console on it yet.
-- **Placement on a save, reported on install 5:** a fighter switched to Off stage floats, but once it is moved into
-  the ground it lands and then stays on the ground as the crosshair moves. Switch On stage and Off stage again to put
-  it right. Neither install 5 nor install 6 fixes it. A fix is planned for the following build; there is no
-  confirmed in-game fix yet.
-- **Guard the Edge, reported on install 5:** the fighter sometimes starts slightly off the chosen spot, lower on one
-  round and higher on the next. Not fixed in install 5 or in install 6; a fix is planned for the following build.
-  No cause is established.
-  [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console)
-- **Test coverage:** install 6 has no report from the console yet, and its own Eden checks are in testing.
+| Issue on install 5 | What happens | Workaround | Install 6 |
+| --- | --- | --- | --- |
+| Match capture: "In is mid-action" after Y | Plain Y can leave In mid-action, blocking preview and save. Install 4 has the same snap code. | With In selected, hold ZL or ZR (Z on GameCube) and press Y. **Release the modifier**, then press X to preview or A to save. | **Fixed:** Y resolves the move (`dbded2d1`). [Snap check on the earlier build](RELEASE-NOTES-rc15.md#y-on-in-makes-a-capture-previewable) |
+| Placement on a save | The Off stage fighter floats until it touches ground. It then stays grounded as the crosshair moves. | Switch On stage, then Off stage again. | Open; fix planned for the following build. |
+| Guard the Edge | At one chosen spot the fighter starts lower in some rounds and higher in others. | No workaround established. | Open; cause not confirmed. Fix planned for the following build. |
+
+The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
+
+| Found in testing install 6 | What happens | Workaround | Status |
+| --- | --- | --- | --- |
+| Scrub positions can stop at 20 seconds | Two long recordings kept all inputs but only 1,200 frames of positions. The rest still plays; the editor cannot place the fighters there. | None in install 6: Play does not extend a valid positions file saved by Record. | Open; cause read from the code. Fixed in the next build. |
+| First X refused after a snap | Seen on a match capture. Before taking a temporary checkpoint, X needs the CPU grounded and idle. The scrub hold can prevent that. | Press L again for In (R for Out) to deselect, let the CPU settle, then press X. | Open; cause read from the code. A macro using its own start save bypasses this checkpoint. |
+| Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
+
+The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).
+
+Other limits:
+
+- **Test coverage:** the install 6 scrub report is an operator observation, not a full console test. Its Eden checks are in progress.
   [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc)
   Install 5 has three reports from console play, not a full hardware verdict. Eden covered parts of Training in its
   first boot and a one-player Local Wireless waiting room in its second.
