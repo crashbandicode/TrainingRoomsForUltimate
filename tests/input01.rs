@@ -583,7 +583,9 @@ fn the_recorder_reads_player_ones_record_after_the_pilot_wrote_it() {
     let fallback = poll.find("crate::runtime::p1::input(slot as i32, out)").expect("the fallback's write");
     let recorder = poll.find("recorder::on_p1_poll(out);").expect("the recorder's read");
     assert!(delay < fallback && fallback < recorder, "delay, then the fallback, then the recorder");
-    let host = body(include_str!("../src/model/rr_host.rs"), "pub unsafe fn on_player_poll(");
+    let hook = body(include_str!("../src/runtime/features/recording_host.rs"), "pub unsafe fn on_player_poll(");
+    assert!(hook.contains("rr_host::on_player_poll_seeded(out,"), "the recorder forwards this mapped record");
+    let host = body(include_str!("../src/model/rr_host.rs"), "pub unsafe fn on_player_poll_seeded(");
     assert!(host.contains("push_capture(ROLE_PLAYER, to_frame(*out));"), "the take stores that record");
 }
 
