@@ -63,9 +63,9 @@ Planned for this build and not merged yet. Each moves up to Merged when it lands
 - **In work: see the fighters while you scrub.** Moving In, Out or the free playhead shows the available fighter
   positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
   both use the same offset, so their recorded spacing is kept. Record saves the positions in a second file beside
-  the macro; the macro file itself does not change, so Play reads what it reads today. A macro with no such file,
-  or with one that no longer matches it, still loads and plays, but must be re-recorded to show positions. Combos
-  and drills are unchanged.
+  the macro. The macro format stays the same, so older builds can still read new macros. Older macros still load
+  and play on the new build. If the positions file is missing, unreadable or no longer matches the macro, the
+  macro still plays; re-record to see positions while scrubbing. Combos and drills are unchanged.
 
 ## Install 5
 
