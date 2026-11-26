@@ -920,9 +920,9 @@ fn scrub_service() {
     if SLOT.empty() {
         let _ = SLOT.publish(Block::new());
     }
-    let ask = editor.scrub().0;
+    let (shown, ask) = (editor.shown_frame(), editor.scrub().0);
     let pos = SLOT.with(|block| {
-        block.set_ask(ask);
+        block.show(shown, ask);
         block.pos()
     });
     if pos.is_some_and(|pos| editor.note_scrub(pos)) {

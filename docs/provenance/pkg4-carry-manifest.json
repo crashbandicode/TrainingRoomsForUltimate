@@ -5380,7 +5380,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "7c9eb565edcb28169e558190a6087ff9322374d5f61c315e93109458b8a570f1",
+   "dest_sha256": "ce07496b54711e1722dac7d8f259fdb0e16ff45609b7de82b30cec43925fab61",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6346,6 +6346,16 @@
      "old": "    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};",
      "new": "    use crate::engine::macro_ui::scrub_track::{Block, SLOT};",
      "reason": "Scrub close (2026-11-26 02:36:50Z): exercise the same worker close operation during the first pending hold."
+    },
+    {
+     "old": "        block.set_ask(ask);",
+     "new": "        block.show(shown, ask);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    let ask = editor.scrub().0;",
+     "new": "    let (shown, ask) = (editor.shown_frame(), editor.scrub().0);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },

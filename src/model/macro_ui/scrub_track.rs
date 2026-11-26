@@ -128,8 +128,10 @@ impl Block {
     /// The worker: what the fighters show from the next frame on, and the frame it is for. Another frame is another
     /// request also when its points are the same (an idle take), so a dropped hold wakes on any move of the handle.
     pub fn show(&self, frame: Option<u32>, ask: Ask) {
-        let _ = (frame, &self.shown);
-        self.set_ask(ask);
+        let frame = frame.map_or(0, |frame| frame.wrapping_add(1));
+        if self.shown.swap(frame, Ordering::AcqRel) != frame || self.ask.read() != ask {
+            self.ask.publish(ask);
+        }
     }
 
     /// The game thread: the body a hold was made on is gone (a swapped fighter, a new scene). Nobody is held until
