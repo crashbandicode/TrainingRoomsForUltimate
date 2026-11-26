@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+
 use super::btt;
 use super::panes::{EggLook, EggPicture, EGG_WHOLE};
 use super::practice_state::CpuView;
@@ -91,6 +93,34 @@ pub struct BodyRead {
     pub speed: Option<[f32; 2]>,
     /// The game frame of the read (it wraps).
     pub frame: u32,
+}
+
+/// The hold's clock: the game's own frames of the body a hold holds, one count for Player 1's body (seat 0) and
+/// one for the CPU's (seat 1). The fighter-frame wrapper tells it of every fighter's frame as the game's frame
+/// function returns, before anything of ours can return early, so a hold call that was skipped shows as a second
+/// frame. The UI facts' frame number is not this: it stands still on a frame whose facts were not published.
+#[derive(Default)]
+pub struct HoldClock {
+    held: [AtomicUsize; 2],
+    frames: [AtomicU32; 2],
+}
+
+impl HoldClock {
+    pub const fn new() -> Self {
+        Self { held: [AtomicUsize::new(0), AtomicUsize::new(0)], frames: [AtomicU32::new(0), AtomicU32::new(0)] }
+    }
+
+    /// The game ran a frame of the fighter whose body is `body`.
+    pub fn ran(&self, _body: usize) {
+        self.frames[0].fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// The count of `body`'s game frames, kept in `seat`. A body the seat was not counting starts two past every
+    /// count given so far, in either seat: no write made before it reads as one frame old.
+    pub fn frame(&self, seat: usize, body: usize) -> u32 {
+        self.held[seat & 1].store(body, Ordering::Relaxed);
+        self.frames[0].load(Ordering::Relaxed)
+    }
 }
 
 /// A picker's hold on the CPU: the body itself waits at its start point. In view the game draws it under the
@@ -440,6 +470,71 @@ mod tests {
         // Taken into the air after a stand, the first frame has no written air point to compare with.
         hold.observe([5.0, 9.0], stood(4), false);
         assert_eq!(hold.displaced, None);
+    }
+
+    const KIRBY: usize = 0x7100_4000;
+    const OTHER: usize = 0x7100_8000;
+
+    /// rv-edge-juggle-sol, 2026-11-26 14:58:37Z: the UI facts' frame number stands still on a game frame whose
+    /// facts were not published, so a hold call skipped on one frame and facts not published on the next read as
+    /// one frame. The clock counts the game's frames of the very body the hold holds, and of no other fighter
+    /// (Nana runs under Popo's entry).
+    #[test]
+    fn the_holds_clock_counts_the_game_frames_of_the_body_it_holds() {
+        let clock = HoldClock::new();
+        let at = [-125.0, -68.426_03];
+        let mut slot = None;
+        hold_step(&mut slot, 7, false, || origin(3.0));
+        let hold = slot.as_mut().unwrap();
+        let landed = |frame| BodyRead { at: [-125.0, 0.01], landed: true, speed: Some([0.0; 2]), frame };
+        let moved = Some(Displaced { at: [-125.0, 0.01], landed: true });
+        let wrote = clock.frame(1, KIRBY);
+        hold.observe(at, air(at, wrote), false);
+        // One game frame: the game runs each fighter once.
+        clock.ran(OTHER);
+        clock.ran(KIRBY);
+        assert_eq!(clock.frame(1, KIRBY), wrote + 1);
+        hold.observe(at, landed(wrote + 1), false);
+        assert_eq!(hold.displaced, moved, "one game frame after the write");
+        // The hold's caller returned early on the next frame: the game ran the body twice since the last write.
+        for _ in 0..2 {
+            clock.ran(OTHER);
+            clock.ran(KIRBY);
+        }
+        assert_eq!(clock.frame(1, KIRBY), wrote + 3);
+        hold.observe(at, landed(wrote + 3), false);
+        assert_eq!(hold.displaced, None, "two game frames after the write");
+        // The game did not run the body (only the other fighter): the count stands, and nothing is judged.
+        clock.ran(OTHER);
+        assert_eq!(clock.frame(1, KIRBY), wrote + 3);
+        hold.observe(at, landed(wrote + 3), false);
+        assert_eq!(hold.displaced, None, "no game frame after the write");
+        clock.ran(KIRBY);
+        hold.observe(at, landed(clock.frame(1, KIRBY)), false);
+        assert_eq!(hold.displaced, moved);
+    }
+
+    /// A body the clock was not counting: its frames since a write are not known, so its first count is past
+    /// every count given before, in either seat, by more than one.
+    #[test]
+    fn a_body_the_clock_starts_to_count_is_never_one_frame_after_an_earlier_write() {
+        let clock = HoldClock::new();
+        clock.frame(0, KIRBY);
+        clock.ran(KIRBY);
+        let wrote = clock.frame(0, KIRBY);
+        // Another body is read in the other seat, then this one: its frames were not counted there.
+        let given = clock.frame(1, OTHER).max(wrote);
+        clock.ran(KIRBY);
+        let taken = clock.frame(1, KIRBY);
+        assert!(taken > given + 1, "counts up to {given} were given before {taken}");
+        // Back in its own seat, after another body sat there for one call.
+        clock.frame(0, OTHER);
+        clock.ran(KIRBY);
+        let back = clock.frame(0, KIRBY);
+        assert!(back > taken + 1, "{taken} was given before {back}");
+        // From there the count is the body's own game frames again.
+        clock.ran(KIRBY);
+        assert_eq!(clock.frame(0, KIRBY), back + 1);
     }
     /// The operator's picture: the CPU start of Guard the Edge at (-199, -8), left of the Fixed camera's view.
     fn picker_marks() -> Marks {

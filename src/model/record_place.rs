@@ -2369,7 +2369,16 @@ mod tests {
         assert!(hold_at.contains(".observe(at, read, grounded)"));
         let unread = hold_at.split("recording_host::fighter_speed(body) else {").nth(1).expect("the speed read");
         assert!(unread.split('}').next().unwrap().contains("return None;"));
-        assert!(hold_at.contains("facts::fact_frame_number()"));
+        // The read's frame is the hold's clock: the game's own frames of this very body, told by the fighter-frame
+        // wrapper as the first thing after the game's frame function returns, for every fighter. Not the UI
+        // facts' frame number, which stands still on a frame whose facts were not published.
+        assert!(hold_at.contains("frame: CLOCK.frame(usize::from(natives::module_accessor(0) != Some(body)), body),"));
+        assert!(!placement.contains("fact_frame_number"));
+        let ran = placement.split("pub(super) unsafe fn ran(").nth(1).expect("the clock is told").split("\n}").next().unwrap();
+        assert!(ran.contains("CLOCK.ran(natives::fighter_accessor(fighter));"));
+        let on_frame = include_str!("../runtime/features/cpu.rs").split("extern \"C\" fn on_frame(").nth(1).unwrap();
+        let ran = on_frame.split("let result = original(a0, a1, a2, a3, a4, a5, a6, a7);").nth(1).unwrap();
+        assert!(ran.trim_start().starts_with("unsafe { super::placement::ran(a0) };"));
         // The hold itself stays the three writes it was: the report changes nothing it does.
         let hold = placement.split("pub(super) unsafe fn hold(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(!hold.contains("displaced") && !hold.contains("init_pos"));
