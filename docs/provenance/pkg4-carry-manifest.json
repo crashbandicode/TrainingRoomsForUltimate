@@ -1349,7 +1349,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "c64033fa28c43c80a0bfbf29b5b1dec0997eadcef653b92a5c36407cd9707492",
+   "dest_sha256": "a1036509efccc01ded30e7c0fe1b870b77fbb6d28aeb7829f1977837d57c28a2",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -1407,6 +1407,16 @@
     {
      "old": "            edited_json(|v| v[\"schema_version\"] = json!(3)),",
      "new": "            edited_json(|v| v[\"schema_version\"] = json!(4)),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 3 })\n    ));",
+     "new": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 4 })\n    ));",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        Err(MacroError::UnsupportedVersion { found: 3 })",
+     "new": "        Err(MacroError::UnsupportedVersion { found: 4 })",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1715,7 +1725,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "0b1ccb77bb06ba0aec94dc4d5072eab43fd7d3dda93d6f9472d5131e75afbfb8",
+   "dest_sha256": "631335793b9e5f07784f54ca85b3c61c03a3e672ce51b67735cf02dd9acf20db",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2356,6 +2366,16 @@
     {
      "old": "    /// What the key line says about the fighters positions at the selected handle (`scrub_track`).",
      "new": "    /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let at = match self.handle {\n            Handle::In => self.window.start(),\n            Handle::Out => self.window.end().saturating_sub(1),\n            Handle::Playhead => return (Ask::None, Pos::None),\n        };\n        if self.playing {\n            return (Ask::None, Pos::None);\n        }",
+     "new": "        let Some(at) = self.shown_frame() else { return (Ask::None, Pos::None) };",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n    /// What the fighters show for the selected handle, and what the key line says about it. A capture and a macro",
+     "new": "\n    /// The frame the fighters are shown at: In when In is selected, the last kept frame when Out is; none while a\n    /// preview plays, and for a combo or a drill.\n    pub fn shown_frame(&self) -> Option<u32> {\n        if self.playing || matches!(self.file, Some(FileSource::Combo(_))) {\n            return None;\n        }\n        match self.handle {\n            Handle::In => Some(self.window.start()),\n            Handle::Out => Some(self.window.end().saturating_sub(1)),\n            Handle::Playhead => None,\n        }\n    }\n\n    /// What the fighters show for the selected handle, and what the key line says about it. A capture and a macro",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

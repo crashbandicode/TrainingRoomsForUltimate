@@ -634,9 +634,8 @@ pub unsafe fn on_fighter_frame(fighter: usize) {
         }))
     };
     if !nana {
-        // The state a match capture keeps per frame, for a Record take's track; then the clip editor's scrub hold.
+        // The state a match capture keeps per frame, for a Record take's track.
         crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state(&mut *(accessor as *mut smash::app::BattleObjectModuleAccessor)));
-        super::scrub_hold::frame(role.index(), accessor);
     }
     if !crate::engine::rr_host::fighter_frame(live, crate::engine::rr_host::save_state_step(
         ENABLE.load(Ordering::Acquire), TEMPORARY.load(Ordering::Acquire),

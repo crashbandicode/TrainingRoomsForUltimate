@@ -533,17 +533,23 @@ impl ClipEditor {
             target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if self.off => Pos::Off, pos => pos } }
     }
 
+    /// The frame the fighters are shown at: In when In is selected, the last kept frame when Out is; none while a
+    /// preview plays, and for a combo or a drill.
+    pub fn shown_frame(&self) -> Option<u32> {
+        if self.playing || matches!(self.file, Some(FileSource::Combo(_))) {
+            return None;
+        }
+        match self.handle {
+            Handle::In => Some(self.window.start()),
+            Handle::Out => Some(self.window.end().saturating_sub(1)),
+            Handle::Playhead => None,
+        }
+    }
+
     /// What the fighters show for the selected handle, and what the key line says about it. A capture and a macro
     /// with a track go through the same rule (`scrub_track::deltas`); Out shows the last kept frame.
     pub fn scrub(&self) -> (Ask, Pos) {
-        let at = match self.handle {
-            Handle::In => self.window.start(),
-            Handle::Out => self.window.end().saturating_sub(1),
-            Handle::Playhead => return (Ask::None, Pos::None),
-        };
-        if self.playing {
-            return (Ask::None, Pos::None);
-        }
+        let Some(at) = self.shown_frame() else { return (Ask::None, Pos::None) };
         match &self.file {
             Some(FileSource::Combo(_)) => return (Ask::None, Pos::None),
             Some(FileSource::Macro { recording, .. }) if recording.track.is_none() => return (Ask::None, Pos::NoTrack),

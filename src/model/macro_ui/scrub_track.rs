@@ -40,6 +40,8 @@ pub enum Pos {
     Held,
     /// A fighter's point is outside this stage's camera limits: that fighter does not move.
     Off,
+    /// The macro's track ends before this frame (a block could not be had while recording): nobody is held.
+    End,
 }
 
 impl Pos {
@@ -48,6 +50,7 @@ impl Pos {
         match self {
             Pos::NoTrack => "Re-record to see positions while scrubbing.",
             Pos::Off => "Off this stage.",
+            Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
         }
     }
@@ -59,6 +62,7 @@ impl Pos {
             Pos::NoTrack => "no_track",
             Pos::Held => "held",
             Pos::Off => "off",
+            Pos::End => "end",
         }
     }
 }
@@ -116,7 +120,7 @@ impl Block {
     }
 
     /// Where the role in `slot` is held, `home` being where the hold found the target role; none when it is not held.
-    pub fn target(&self, slot: usize, home: [f32; 2]) -> Option<Spot> {
+    pub fn held_at(&self, slot: usize, home: [f32; 2]) -> Option<Spot> {
         let Ask::Group { deltas, .. } = self.ask() else { return None };
         let delta = (*deltas.get(slot)?)?;
         Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing })
@@ -250,6 +254,14 @@ fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     }
 }
 
+/// One block of a take's track, when the memory is there.
+fn new_block() -> Option<Box<[AtomicU32]>> {
+    let mut cells = Vec::new();
+    cells.try_reserve_exact(TAKE_CHUNK * FRAME_CELLS).ok()?;
+    cells.resize_with(TAKE_CHUNK * FRAME_CELLS, || AtomicU32::new(0));
+    Some(cells.into_boxed_slice())
+}
+
 struct TakeTable {
     /// Each role's state as its last fighter frame read it (the capture's sampler).
     live: [[AtomicU32; STATE_CELLS]; 2],
@@ -288,6 +300,11 @@ impl TakeTrack {
 
     /// The worker, every pass. `open`: a take is being recorded; `frames`: the frames it holds, not yet saved.
     pub fn service(&self, open: bool, frames: usize) {
+        self.service_with(open, frames, new_block);
+    }
+
+    /// `service` with the block allocator given: one that returns nothing leaves the block out.
+    pub fn service_with(&self, open: bool, frames: usize, alloc: impl Fn() -> Option<Box<[AtomicU32]>>) {
         if self.table().is_none() {
             let table = Box::new(TakeTable {
                 live: [const { [const { AtomicU32::new(0) }; STATE_CELLS] }; 2],
@@ -302,8 +319,8 @@ impl TakeTrack {
         for (index, chunk) in table.chunks.iter().enumerate() {
             let ptr = chunk.load(Ordering::SeqCst);
             if index <= ahead {
-                if ptr.is_null() {
-                    let cells: Box<[AtomicU32]> = (0..TAKE_CHUNK * FRAME_CELLS).map(|_| AtomicU32::new(0)).collect();
+                let made = if ptr.is_null() { alloc().filter(|cells| cells.len() == TAKE_CHUNK * FRAME_CELLS) } else { None };
+                if let Some(cells) = made {
                     chunk.store(Box::into_raw(cells) as *mut AtomicU32, Ordering::SeqCst);
                 }
             } else if !open && frames == 0 && !ptr.is_null() {
@@ -393,7 +410,7 @@ mod tests {
     }
 
     fn capture(tracks: usize) -> ClipEditor {
-        let tracks = (0..tracks).map(|fighter| ReplayTrack { fighter: None, entry: 1 - fighter as i32,
+        let tracks = (0..tracks).map(|fighter| ReplayTrack { fighter: None, entry: fighter as i32,
             frames: (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() }, ..state(fighter, i) }).collect(),
             quantized_analog: false }).collect();
         ClipEditor::new(ReplaySession { tracks, truncated: false, breaks: Vec::new() }, vec![14]).unwrap()
@@ -462,10 +479,10 @@ mod tests {
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
-        for pos in [Pos::None, Pos::NoTrack, Pos::Held, Pos::Off] {
+        for pos in [Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End] {
             assert!(pos.text().chars().count() <= 67, "{pos:?}");
         }
-        assert_eq!([Pos::None, Pos::NoTrack, Pos::Held, Pos::Off].map(Pos::word), ["none", "no_track", "held", "off"]);
+        assert_eq!([Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "off", "end"]);
     }
 
     #[test]
@@ -476,17 +493,17 @@ mod tests {
         editor.on_action(ClipAction::Nudge(5));
         let block = Block::new();
         block.set_ask(editor.scrub().0);
-        assert_eq!(block.target(1, [10.0, 0.0]).map(|spot| spot.at[0]), Some(25.0));
+        assert_eq!(block.held_at(1, [10.0, 0.0]).map(|spot| spot.at[0]), Some(25.0));
         // Moving In again, X and reselecting do not rebase it.
         editor.on_action(ClipAction::Nudge(1));
         assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         block.set_ask(editor.scrub().0);
-        assert_eq!(block.target(1, [10.0, 0.0]), Some(spot(28.0, 6.0, -1.0)));
+        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(spot(28.0, 6.0, -1.0)));
         editor.on_action(ClipAction::SelectOut);
         block.set_ask(editor.scrub().0);
-        assert_eq!(block.target(1, [10.0, 0.0]), Some(spot(37.0, 9.0, -1.0)));
+        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(spot(37.0, 9.0, -1.0)));
     }
 
     #[test]
@@ -500,8 +517,8 @@ mod tests {
         // fighter keeps the recorded spacing to it.
         let home = [100.0, 7.0];
         assert_eq!(block.target_slot(), Some(1));
-        assert_eq!(block.target(1, home), Some(spot(112.0, 11.0, 1.0)));
-        assert_eq!(block.target(0, home), Some(spot(100.0 + (-24.0 - 20.0), 7.0 + 42.0, 1.0)));
+        assert_eq!(block.held_at(1, home), Some(spot(112.0, 11.0, 1.0)));
+        assert_eq!(block.held_at(0, home), Some(spot(100.0 + (-24.0 - 20.0), 7.0 + 42.0, 1.0)));
         // A capture with one track moves one body.
         let mut single = capture(1);
         single.on_action(ClipAction::SelectIn);
@@ -583,7 +600,7 @@ mod tests {
             take.push(index as usize, 1);
         }
         assert_eq!(take.take(3), Some((0..3).map(|i| [state(1, i), state(0, i)]).collect::<Vec<_>>()));
-        assert_eq!(take.take(2), None, "one state per frame, or no track");
+        assert_eq!(take.take(2).map(|track| track.len()), Some(2), "never more states than frames");
         // Every field of the capture's state is kept.
         let odd = ReplayFrame { input: InputFrame::default(), x: -88.5, y: 12.25,
             start: StartState { fighter_kind: 74, costume: 5, facing: -1.0, situation: 2, status: 486, speed_x: -1.25, speed_y: 3.5 } };
@@ -601,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn the_take_buffer_grows_in_blocks_and_a_gap_leaves_no_track() {
+    fn the_take_buffer_grows_in_blocks_and_a_gap_ends_the_track() {
         let take = TakeTrack::new();
         take.service(false, 0);
         let fill = |from: usize, to: usize| {
@@ -610,27 +627,76 @@ mod tests {
                 take.push(index, 0);
             }
         };
-        fill(0, TAKE_CHUNK);
-        // The worker never came by: the second block is not there, and the game thread does not make one.
-        take.push(TAKE_CHUNK, 0);
-        assert_eq!(take.take(TAKE_CHUNK + 1), None);
-        take.push(TAKE_CHUNK + 1, 0);
-        assert_eq!(take.take(TAKE_CHUNK + 2), None, "frames after the gap do not make a track");
+        // The worker never came by: the second block is not there, and the game thread does not make one. The track
+        // ends there and keeps what it has; the take's inputs go on.
+        fill(0, TAKE_CHUNK + 3);
+        let track = take.take(TAKE_CHUNK + 3).expect("the first block's frames");
+        assert_eq!(track.len(), TAKE_CHUNK);
+        assert_eq!(track[TAKE_CHUNK - 1][0].x, state(0, (TAKE_CHUNK - 1) as u32).x);
+        // A block that comes late does not join frames across the gap.
+        take.service(true, TAKE_CHUNK + 3);
+        fill(TAKE_CHUNK + 3, TAKE_CHUNK + 6);
+        assert_eq!(take.take(TAKE_CHUNK + 6).map(|track| track.len()), Some(TAKE_CHUNK));
         // With the worker one block ahead of the take, it goes on.
         fill(0, TAKE_CHUNK - 1);
         take.service(true, TAKE_CHUNK - 1);
         fill(TAKE_CHUNK - 1, TAKE_CHUNK + 5);
         let track = take.take(TAKE_CHUNK + 5).expect("a whole track");
-        assert_eq!(track[TAKE_CHUNK + 4][0].x, state(0, (TAKE_CHUNK + 4) as u32).x);
+        assert_eq!((track.len(), track[TAKE_CHUNK + 4][0].x), (TAKE_CHUNK + 5, state(0, (TAKE_CHUNK + 4) as u32).x));
         // Saved and idle: the blocks past the first are freed; the first stays for the next take's first frames.
         take.service(false, 0);
-        fill(0, TAKE_CHUNK);
-        assert_eq!(take.take(TAKE_CHUNK).map(|track| track.len()), Some(TAKE_CHUNK));
-        take.push(TAKE_CHUNK, 0);
-        assert_eq!(take.take(TAKE_CHUNK + 1), None);
+        fill(0, TAKE_CHUNK + 1);
+        assert_eq!(take.take(TAKE_CHUNK + 1).map(|track| track.len()), Some(TAKE_CHUNK));
+        assert_eq!(TakeTrack::new().take(5), None, "a take with no state kept has no track");
         assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 43_200);
         assert_eq!(TAKE_CHUNKS * TAKE_CHUNK, MAX_FRAMES);
         assert!(include_str!("scrub_track.rs").contains("Self { table: AtomicUsize::new(NO_BLOCK) }"), "initialised data, not BSS");
+    }
+
+    #[test]
+    fn a_failed_block_saves_a_playable_macro_with_a_shorter_track() {
+        let take = TakeTrack::new();
+        take.service(false, 0);
+        let frames = TAKE_CHUNK + 5;
+        for index in 0..frames {
+            if index == TAKE_CHUNK - 1 {
+                // The worker asks for the next block, and the allocation fails.
+                take.service_with(true, index, || None);
+            }
+            take.live(0, &state(0, index as u32));
+            take.live(1, &state(1, index as u32));
+            take.push(index, 0);
+        }
+        let track = take.take(frames).expect("the frames before the failure");
+        assert_eq!(track.len(), TAKE_CHUNK);
+        // The take keeps every input and is saved with the shorter track.
+        let mut recording = MacroRecording::new("Long", "13.0.5", StartState::neutral(18, 0, 1.0),
+            (0..frames as u32).map(|i| InputFrame { buttons: i, ..InputFrame::default() }).collect()).unwrap();
+        recording.set_track(Some(track));
+        recording.validate().expect("a shorter track is valid");
+        let back: MacroRecording = serde_json::from_str(&serde_json::to_string(&recording).unwrap()).unwrap();
+        assert_eq!((back.frames.len(), back.track.as_ref().map(Vec::len), back.schema_version), (frames, Some(TAKE_CHUNK), 3));
+        // In the editor a frame with its state holds the fighters; past the track's end nobody is held.
+        let mut editor = ClipEditor::macro_file(back, true).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        assert!(matches!(editor.scrub(), (Ask::Group { .. }, Pos::Held)));
+        editor.on_action(ClipAction::SelectOut);
+        assert_eq!(editor.scrub(), (Ask::None, Pos::End));
+        assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Positions end here.");
+        editor.on_action(ClipAction::Nudge(-5));
+        assert!(matches!(editor.scrub(), (Ask::Group { .. }, Pos::Held)), "Out - 1 is the track's last frame");
+        // A crop past the track's end is a macro without one; a crop across it keeps the part it has.
+        let mut tail = recording.clone();
+        tail.keep(TAKE_CHUNK + 1..frames);
+        assert_eq!((tail.track.is_none(), tail.schema_version), (true, 1));
+        tail.validate().unwrap();
+        let mut across = recording.clone();
+        across.keep(TAKE_CHUNK - 2..frames);
+        assert_eq!(across.track.as_ref().map(Vec::len), Some(2));
+        across.validate().unwrap();
+        let mut empty = recording.clone();
+        empty.track = Some(Vec::new());
+        assert!(empty.validate().is_err(), "a track holds at least one frame");
     }
 
     #[test]
@@ -653,7 +719,7 @@ mod tests {
         let broken: [fn(&mut MacroRecording); 4] = [
             |recording| recording.schema_version = 1,
             |recording| recording.track = None,
-            |recording| { recording.track.as_mut().unwrap().pop(); },
+            |recording| { let extra = recording.track.as_ref().unwrap()[0]; recording.track.as_mut().unwrap().push(extra); },
             |recording| recording.track.as_mut().unwrap()[0][1].x = f32::NAN,
         ];
         for (index, edit) in broken.iter().enumerate() {
@@ -685,7 +751,7 @@ mod tests {
         let panel = std::fs::read_to_string(format!("{root}/src/model/macro_ui/clip_panel.rs")).unwrap();
         assert!(panel.contains("kept.keep(self.window.start() as usize..self.window.end() as usize);"));
         let runtime = std::fs::read_to_string(format!("{root}/src/model/rr_runtime.rs")).unwrap();
-        assert!(runtime.contains(".map(|track| track[kept.start..kept.end].to_vec());"));
+        assert!(runtime.contains(".map(|track| track[kept.start.min(track.len())..kept.end.min(track.len())].to_vec())"));
     }
 
     #[test]
@@ -704,7 +770,7 @@ mod tests {
             assert_eq!(slot.with(|_| ()), None);
             assert!(!slot.reap(), "a reader is inside");
             assert!(slot.publish(Block::new()).is_err(), "not before the old block is freed");
-            assert_eq!(block.target(0, [0.0, 0.0]), Some(spot(1.0, 2.0, 1.0)));
+            assert_eq!(block.held_at(0, [0.0, 0.0]), Some(spot(1.0, 2.0, 1.0)));
         });
         assert!(slot.reap());
         assert!(slot.empty() && slot.reap(), "nothing left to free");
@@ -728,8 +794,10 @@ mod tests {
         assert!(gate < read, "nothing is read outside a practice");
         assert!(!runtime.contains(".lock()"), "the fighter frame takes no blocking lock");
         assert!(!runtime.contains("Scene::") && !runtime.contains("scene::"), "one path for Training and the room");
-        let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
-        assert_eq!(states.matches("super::scrub_hold::frame(role.index(), accessor);").count(), 1);
+        let picker = std::fs::read_to_string(format!("{root}/src/runtime/features/record_place.rs")).unwrap();
+        assert_eq!(picker.matches("super::scrub_hold::frame(slot, accessor);").count(), 1);
+        let scrub = picker.split_once("unsafe fn scrub(fighter: usize) {").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(scrub.contains("!crate::engine::macro_ui::scrub_track::SLOT.live() { return; }"), "nothing is read with no editor");
     }
     }
 }

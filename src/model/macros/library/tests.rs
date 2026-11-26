@@ -363,11 +363,11 @@ fn load_reports_the_specific_failure() {
 
     assert!(matches!(
         lib.load("future"),
-        Err(MacroError::UnsupportedVersion { found: 3 })
+        Err(MacroError::UnsupportedVersion { found: 4 })
     ));
     assert!(matches!(
         lib.load("shape"),
-        Err(MacroError::UnsupportedVersion { found: 3 })
+        Err(MacroError::UnsupportedVersion { found: 4 })
     ));
     assert!(matches!(
         lib.load("big"),

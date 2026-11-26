@@ -44,7 +44,7 @@ unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, acc
             [pose.x, pose.y]
         }
     };
-    block.target(slot, home)
+    block.held_at(slot, home)
 }
 
 /// Hold the body at `spot`, facing as recorded. A point outside the camera's limits is not taken: the body goes

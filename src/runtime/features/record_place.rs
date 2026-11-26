@@ -660,8 +660,24 @@ unsafe fn read_raw(accessor: usize) -> Raw {
     }
 }
 
+/// The clip editor's scrub hold (`scrub_hold`) for a role's own body, behind this picker's rows: it places bodies
+/// with the same natives. Nothing is read while no editor is open.
+unsafe fn scrub(fighter: usize) {
+    if fighter == 0 || !crate::engine::macro_ui::scrub_track::SLOT.live() { return; }
+    let accessor = natives::fighter_accessor(fighter);
+    let slot = if natives::module_accessor(0) == Some(accessor) {
+        0
+    } else if recorder::cpu_body().is_some_and(|body| body.fighter == fighter) {
+        1
+    } else {
+        return;
+    };
+    super::scrub_hold::frame(slot, accessor);
+}
+
 pub unsafe fn frame(fighter: usize) {
     if !INSTALLED.load(Ordering::Acquire) { return; }
+    scrub(fighter);
     if fighter == 0 || OPEN.load(Ordering::Acquire) == 0 && !ACTIVE.load(Ordering::Acquire)
         && !CANCEL_LOAD.load(Ordering::Acquire) && !WATCHING.load(Ordering::Acquire)
         && WAKE.load(Ordering::Acquire) == 0 {

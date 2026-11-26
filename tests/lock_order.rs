@@ -88,7 +88,7 @@ fn static_locks(root: &Path) -> Vec<(String, String)> {
 /// Receivers named otherwise than their type's module (docs lane review R2, finding 1): the inline keyboard is held as `keyboard`
 /// (`name_keyboard`, `native_keyboard`: `inline_keyboard::Keyboard`), the catalog request's `Broker` as `broker`.
 const RECEIVER_MODULES: &[(&str, &str)] = &[("keyboard", "inline_keyboard"), ("broker", "mii_catalog_request"), ("saved_kind", "layouts"),
-    ("bridge", "bridge_state")];
+    ("bridge", "bridge_state"), ("TAKE", "scrub_track"), ("SLOT", "scrub_track"), ("block", "scrub_track")];
 
 /// Ambiguous method calls left unfollowed although a runtime candidate reaches a lock, by `(method, receivers, why none of the runtime
 /// candidates is meant)`; `?` is a receiver that is not an identifier (a call's result, a path). Docs lane review R2, finding 1.
