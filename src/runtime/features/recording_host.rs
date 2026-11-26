@@ -48,15 +48,16 @@ pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, pl
 /// # Safety
 /// Game thread; `cpu` was resolved this frame.
 pub(super) unsafe fn seed_take_track(cpu: Option<super::recorder::Body>) {
-    seed_both(cpu, |slot, frame| crate::engine::macro_ui::scrub_track::TAKE.live(slot, frame));
+    seed_both(cpu, |slot, frame| crate::engine::macro_ui::scrub_track::TAKE.seed(slot, frame));
 }
 
-unsafe fn seed_both(cpu: Option<super::recorder::Body>, store: impl Fn(usize, &crate::engine::macros::ReplayFrame)) {
+unsafe fn seed_both(cpu: Option<super::recorder::Body>, store: impl Fn(usize, Option<crate::engine::macros::ReplayFrame>)) {
     for (slot, body) in [super::recorder::body_of(0), cpu].into_iter().enumerate() {
-        if let Some(body) = body {
+        let frame = body.map(|body| {
             let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
-            store(slot, &crate::runtime::macros::replay_capture::state(module));
-        }
+            crate::runtime::macros::replay_capture::state(module)
+        });
+        store(slot, frame);
     }
 }
 
@@ -231,7 +232,7 @@ pub unsafe fn cpu_role_poll(out: *mut MappedInputs) -> bool {
 /// The CPU run's frame for this game frame (the AI epilogue, game thread); its first one after a warp gets the start speed.
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
     if rr_host::play_seed_due(crate::engine::library::Role::Cpu) {
-        unsafe { seed_both(super::recorder::cpu_body(), rr_host::play_live); }
+        unsafe { seed_both(super::recorder::cpu_body(), rr_host::play_seed); }
     }
     let frame = rr_host::take_cpu_frame();
     if frame.is_some() {
@@ -248,7 +249,7 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
     if rr_host::play_seed_due(crate::engine::library::Role::Player) {
-        seed_both(super::recorder::cpu_body(), rr_host::play_live);
+        seed_both(super::recorder::cpu_body(), rr_host::play_seed);
     }
     if rr_host::on_player_poll(out) {
         observe_start(crate::engine::library::Role::Player);

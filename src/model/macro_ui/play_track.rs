@@ -75,6 +75,7 @@ impl PlayTrack {
     pub fn sampling(&self) -> bool { self.key.load(Ordering::SeqCst) != IDLE }
     pub fn allocated(&self) -> bool { self.made.load(Ordering::SeqCst) }
     pub fn live(&self, slot: usize, frame: &ReplayFrame) { self.rows.live(slot, frame); }
+    pub fn seed(&self, slot: usize, frame: Option<ReplayFrame>) { self.rows.seed(slot, frame); }
     pub fn seed_due(&self, slot: usize) -> bool {
         let key = self.key.load(Ordering::SeqCst);
         key != IDLE && key as u32 as usize == slot && self.count.load(Ordering::Acquire) == 0
@@ -234,6 +235,9 @@ mod tests {
         let editor = include_str!("../../runtime/macros/replay_capture.rs");
         assert!(states.contains("play_sampling()"));
         assert_eq!(host.matches("play_seed_due(").count(), 2);
+        assert_eq!(host.matches("seed_both(super::recorder::cpu_body(), rr_host::play_seed)").count(), 2);
+        assert!(host.contains("TAKE.seed(slot, frame)"));
+        assert!(host.contains("store(slot, frame);"));
         assert!(host.contains("play_track_service("));
         assert!(editor.contains("take_generated()") && editor.contains("adopt_positions("));
         let worker = include_str!("../rr_host.rs").split_once("pub fn play_track_service(").unwrap().1

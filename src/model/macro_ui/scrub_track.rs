@@ -398,6 +398,11 @@ impl TakeTrack {
         }
     }
 
+    /// Seed this role at the start of a new take, before its first input is recorded.
+    pub fn seed(&self, slot: usize, frame: Option<ReplayFrame>) {
+        if let Some(frame) = frame { self.live(slot, &frame); }
+    }
+
     /// The game thread, as frame `index` of the take is stored for the role in `slot`: both fighters' states go
     /// with it. Frame 0 starts the track again. A frame whose block is not there, or that does not follow the last
     /// one kept, is left out: the track ends before it, and the take's inputs go on.
@@ -967,6 +972,8 @@ mod tests {
         assert_eq!(states.matches("replay_capture::state(").count(), 1);
         // So a take's start reads both bodies once: its first frame has its state.
         let host = std::fs::read_to_string(format!("{root}/src/runtime/features/recording_host.rs")).unwrap();
+        assert!(host.contains("TAKE.seed(slot, frame)"));
+        assert!(host.contains("store(slot, frame);"));
         let chords = host.split_once("pub fn on_chords(").unwrap().1.split_once("\n}").unwrap().0;
         assert!(chords.contains("seed_take_track(Some(cpu));"), "the Record chord seeds the take");
         let picker = std::fs::read_to_string(format!("{root}/src/runtime/features/record_place.rs")).unwrap();
@@ -977,6 +984,27 @@ mod tests {
         take.live(0, &state(0, 0));
         take.push(0, 0);
         assert_eq!(take.take(1).map(|track| track[0][1].start.fighter_kind), Some(-1));
+    }
+
+    #[test]
+    fn a_new_take_does_not_reuse_the_previous_takes_missing_partner() {
+        let take = TakeTrack::new();
+        take.service(false, 0);
+        for recorded in [0, 1] {
+            let partner = 1 - recorded;
+            take.seed(recorded, Some(state(recorded, 4)));
+            take.seed(partner, Some(state(partner, 4)));
+            take.push(0, recorded);
+            assert_eq!(take.take(1).unwrap()[0][1], state(partner, 4));
+
+            take.service(false, 0);
+            take.seed(recorded, Some(state(recorded, 9)));
+            take.seed(partner, None);
+            take.push(0, recorded);
+            let pair = take.take(1).unwrap()[0];
+            assert_eq!(pair[0], state(recorded, 9));
+            assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
+        }
     }
 
     #[test]

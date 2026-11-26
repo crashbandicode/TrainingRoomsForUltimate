@@ -1528,6 +1528,7 @@ pub fn recording_version() -> (u64, u64) {
 pub fn play_sampling() -> bool { PLAY.sampling() }
 pub fn play_allocated() -> bool { PLAY.allocated() }
 pub fn play_live(slot: usize, frame: &ReplayFrame) { PLAY.live(slot, frame); }
+pub fn play_seed(slot: usize, frame: Option<ReplayFrame>) { PLAY.seed(slot, frame); }
 pub fn play_seed_due(role: Role) -> bool { PLAY.seed_due(role_index(role)) }
 pub fn take_generated() -> bool { PLAY.take_written() }
 
@@ -5006,6 +5007,34 @@ mod tests {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
     }
 
+    fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
+        let _hold = hold();
+        let (root, first_id, first) = generated_fixture("generated-missing-partner", 3);
+        let sample = |kind| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        play_seed(1, Some(sample(7)));
+        play_seed(0, Some(sample(8)));
+        assert_eq!(take_cpu_frame(), Some(first.frames[0]));
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &first_id, &first).unwrap()[0][1].start.fighter_kind, 8);
+
+        let second = MacroRecording::new("Next", "13.0.5", StartState::neutral(7, 0, 1.0), first.frames.clone()).unwrap();
+        let second_id = Library::new(root.join(MACROS_DIR)).save_new(&second).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&second_id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        play_seed(1, Some(sample(7)));
+        play_seed(0, None);
+        assert_eq!(take_cpu_frame(), Some(second.frames[0]));
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(generated_rows(&root, &second_id, &second).unwrap()[0][1].start.fighter_kind, -1);
+    }
+
     fn playback_over_existing_sidecar(source: crate::engine::macros::positions::Source, damaged: bool) -> bool {
         use crate::engine::macros::positions;
         let (root, id, recording) = generated_fixture("generated-body", 605);
@@ -7929,6 +7958,7 @@ mod tests {
             ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
             ("a_longer_generated_track_replaces_a_shorter_one_only", a_longer_generated_track_replaces_a_shorter_one_only as fn()),
             ("a_generated_track_never_replaces_a_recorded_one", a_generated_track_never_replaces_a_recorded_one as fn()),
+            ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
             ("an_adopted_generated_track_is_cropped_as_generated", an_adopted_generated_track_is_cropped_as_generated as fn()),
             ("the_play_chord_pass_opens_and_writes_no_positions_file", the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
             ("nothing_is_allocated_for_generation_before_the_first_generating_play", nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
