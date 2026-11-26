@@ -127,8 +127,10 @@ both fighters stood beside their recorded points while the editor said they were
 | Play start on `eb39d6bc` | Each tested macro started on install 5's frame or one earlier, including the first Plays of the old 30-second and ten-minute macros |
 | Timing coverage | One Eden host, one boot per build. The playback path is unchanged; install 6 and the console were not timed here. |
 | Eden, on install 6's diagnostic build | Record with no preview, In and Out following the handles, release on deselect, the old-macro line, a crop keeping its positions, and the file sizes passed. Deleting a macro removed both its files. The menu thread used 49,904 B of stack, under its 57,648 B bound |
-| A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the ground was not moved, and the other was held at its own point. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
-| Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. Release on X and on close, and a fighter walked off stage, gave no verdict yet |
+| A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the floor was not moved. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
+| Known issue found there | A point inside the stage's wall, just beside the end of the floor and below it, was not refused: that fighter was shown about 5 units from its recorded point, pressed against the wall. [Known issues](CURRENT-RELEASE.md#known-issues) |
+| Release, on that build | X played the preview and let the fighters go after it; B closed the editor with both fighters back where they stood |
+| Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. A fighter walked off stage gave no verdict yet |
 | The installed release file | No smoke boot yet; the rows above ran the diagnostic build of the same commit |
 | Host | No host test runs the Switch code that holds the fighters |
 

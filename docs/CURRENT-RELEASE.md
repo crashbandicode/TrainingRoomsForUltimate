@@ -116,6 +116,7 @@ The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the
 | --- | --- | --- | --- |
 | Scrub positions can stop at 20 seconds | Two long recordings kept all inputs but only 1,200 frames of positions. The rest still plays; the editor cannot place the fighters there. | None in install 6: Play does not extend a valid positions file saved by Record. | Open; cause read from the code. Fixed in the next build. |
 | First X refused after a snap | Seen on a match capture. Before taking a temporary checkpoint, X needs the CPU grounded and idle. The scrub hold can prevent that. | Press L again for In (R for Out) to deselect, let the CPU settle, then press X. | Open; cause read from the code. A macro using its own start save bypasses this checkpoint. |
+| A point inside the stage's wall is not refused | While scrubbing, a recorded point just beside the end of the floor and below it is treated as free. That fighter is shown about 5 units from its point, against the wall, and the editor does not say so. Seen on a match capture. | None. | Open; accepted as a defect. Fixed in the next build. |
 | Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).

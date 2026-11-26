@@ -376,7 +376,8 @@ A mid-action In shows the snap hint instead. The fighters' placement does not de
 
 Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the
 old-macro line, a crop that keeps its positions, and Delete removing both files. On a match capture a fighter whose
-point was inside the ground was left where it stood. Positions from one Play, and at once after X, were seen on
+point was inside the ground was left where it stood; one whose point was inside the stage's wall beside the floor was
+not refused and stood beside its point, which is a [known issue](../CURRENT-RELEASE.md#known-issues). Positions from one Play, and at once after X, were seen on
 `eb39d6bc`, the build before install 6's last fix. Not seen yet: the waiting room, a fighter swap or a scene change
 while a fighter is held, and the installed release file itself.
 
