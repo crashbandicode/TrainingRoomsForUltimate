@@ -152,8 +152,9 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
   [Install evidence](EVIDENCE-rc15-installs.md#the-waiting-room-boot)
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
   showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
-  Y alone does not make In a move start. Until a fix is in a build, hold ZL or ZR and press Y with In selected,
-  then X. A fix is written and not merged. No other report on this build is on record.
+  in a match capture, plain Y can leave In on a mid-action frame. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y
+  for the move start. Release the modifier before pressing X to preview, or press A to save. The fix is not in
+  install 5. No other report on this build is on record.
 
 ## Install 4
 
