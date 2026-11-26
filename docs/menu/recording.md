@@ -347,8 +347,9 @@ snapping In on a match capture, or a match-capture preview or export.
 2026-11-26. Positions while you scrub, in install 6. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
 the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
-separately. A point outside the camera bounds, inside solid ground or a wall, or beyond the safe blast-line bounds
-is refused. The same applies if the stage geometry cannot be read. That fighter returns to where its hold began,
+separately. The editor refuses points it detects inside solid ground or a wall, outside the camera bounds, or beyond
+the safe blast-line bounds. Install 6 misses a wall beside the floor's end (see the test below). If the point is refused
+or the stage geometry cannot be read, that fighter returns to where its hold began,
 or stays put if it was not held; the
 other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
 without that warning.
