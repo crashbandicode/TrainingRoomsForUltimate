@@ -676,7 +676,8 @@ mod tests {
         assert!(push.contains("TAKE.push(len, usize::from(side == ROLE_CPU));"));
         assert!(host.contains("let track = TAKE.take(frames.len());") && host.contains("capture.set_track(track);"));
         let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
-        assert!(states.contains("TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state("));
+        assert!(states.contains("let frame = crate::runtime::macros::replay_capture::state(")
+            && states.contains("if capture { crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &frame); }"));
     }
 
     #[test]
