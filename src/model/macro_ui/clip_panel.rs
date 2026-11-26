@@ -578,8 +578,10 @@ impl ClipEditor {
     }
 
     /// The worker: what the game side did with the last ask, for the key line.
-    pub fn note_scrub(&mut self, pos: Pos) {
-        self.off = pos == Pos::Off;
+    /// Whether the key line changed.
+    pub fn note_scrub(&mut self, pos: Pos) -> bool {
+        let off = pos == Pos::Off;
+        std::mem::replace(&mut self.off, off) != off
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing

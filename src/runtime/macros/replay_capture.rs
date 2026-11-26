@@ -919,7 +919,7 @@ fn scrub_service() {
             (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)
         });
         if idle == Some(true) {
-            SLOT.retire();
+            SLOT.withdraw();
         }
         SLOT.reap();
         return;
@@ -932,12 +932,8 @@ fn scrub_service() {
         block.set_ask(ask);
         block.pos()
     });
-    if let Some(pos) = pos {
-        let before = editor.view().pos;
-        editor.note_scrub(pos);
-        if editor.view().pos != before {
-            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
-        }
+    if pos.is_some_and(|pos| editor.note_scrub(pos)) {
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
     }
 }
 

@@ -201,7 +201,7 @@ impl Slot {
     pub fn with<R>(&self, f: impl FnOnce(&Block) -> R) -> Option<R> {
         self.readers.fetch_add(1, Ordering::SeqCst);
         let ptr = self.ptr.load(Ordering::SeqCst);
-        // SAFETY: an even word is a block made by `publish`; `reap` frees it only after `retire` made the word odd
+        // SAFETY: an even word is a block made by `publish`; `reap` frees it only after `withdraw` made the word odd
         // and the count read `NO_READER`, which this reader's count, taken before the load, prevents.
         let result = (ptr & 1 == 0).then(|| f(unsafe { &*(ptr as *const Block) }));
         self.readers.fetch_sub(1, Ordering::SeqCst);
@@ -209,7 +209,7 @@ impl Slot {
     }
 
     /// The worker: no new reader finds the block. It is freed by `reap`.
-    pub fn retire(&self) {
+    pub fn withdraw(&self) {
         let ptr = self.ptr.load(Ordering::SeqCst);
         if ptr & 1 == 0 {
             self.ptr.store(ptr | 1, Ordering::SeqCst);
@@ -769,7 +769,7 @@ mod tests {
         // A reader that is inside when the block is retired keeps it alive; a new reader finds nothing.
         slot.with(|block| {
             block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(1.0, 2.0, 1.0)), None] });
-            slot.retire();
+            slot.withdraw();
             assert!(!slot.live());
             assert_eq!(slot.with(|_| ()), None);
             assert!(!slot.reap(), "a reader is inside");
@@ -779,7 +779,7 @@ mod tests {
         assert!(slot.reap());
         assert!(slot.empty() && slot.reap(), "nothing left to free");
         assert!(slot.publish(Block::new()).is_ok());
-        slot.retire();
+        slot.withdraw();
         assert!(slot.reap());
         // The static is initialised data: both words start non-zero.
         let source = include_str!("scrub_track.rs");

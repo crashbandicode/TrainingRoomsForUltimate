@@ -348,10 +348,10 @@ fn load_reports_the_specific_failure() {
         edited_json(|v| v["schema_version"] = json!(4)),
     )
     .unwrap();
-    // A version-3 file whose layout this crate cannot parse is still a version error.
+    // A version-4 file whose layout this crate cannot parse is still a version error.
     fs::write(
         tmp.path().join("shape.json"),
-        br#"{"schema_version":3,"frames":"packed"}"#,
+        br#"{"schema_version":4,"frames":"packed"}"#,
     )
     .unwrap();
     fs::write(
