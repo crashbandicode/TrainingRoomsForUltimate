@@ -7,11 +7,16 @@ fn hold(polls: u32) -> Event {
 fn clip() -> Clip {
     Clip { pos: "none", ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true,
         target: "cpu", marks: 2, mark: Some((90, None)), text: MoveText::new("66 frames into Special"),
-        pose: ["none"; 2], fighter: ["current"; 2] }
+        pose: [""; 2], fighter: [""; 2] }
 }
 
 #[test]
 fn the_clip_line_carries_the_pose_and_fighter_words() {
+    assert_eq!(clip().text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
+        target=cpu marks=2 mark=90-none move=\"66 frames into Special\"");
+    assert_eq!(Clip { pos: "held", ..clip() }.text(),
+        "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
+        pos=held target=cpu marks=2 mark=90-none move=\"66 frames into Special\"");
     let c = Clip { pos: "held", pose: ["shown", "other_fighter"], fighter: ["recorded", "loading"], ..clip() };
     assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
         pos=held pose.p1=shown pose.cpu=other_fighter fighter.p1=recorded fighter.cpu=loading \

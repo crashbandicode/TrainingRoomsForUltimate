@@ -80,6 +80,10 @@ impl Clip {
         if !matches!(self.pos, "" | "none") {
             let _ = write!(line, " pos={}", self.pos);
         }
+        if !self.fighter[0].is_empty() {
+            let _ = write!(line, " pose.p1={} pose.cpu={} fighter.p1={} fighter.cpu={}",
+                self.pose[0], self.pose[1], self.fighter[0], self.fighter[1]);
+        }
         let _ = write!(line, " target={} marks={} mark=", self.target, self.marks);
         let _ = match self.mark {
             Some((start, Some(end))) => write!(line, "{start}-{end}"),
