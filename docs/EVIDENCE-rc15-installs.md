@@ -72,8 +72,8 @@ each gate's own; they were not compared test by test here.
 | Eden, after the install | 2026-11-24, this build |
 | Eden, after the install: Waiting room, run `rc15-i3-e7667f26-xps-f15-4-1` | Inbox 14:34:27Z, rv-integration. The practice partner's Stop passed (120 consecutive reads). The install 2 failure is fixed: after Lobby Practice Off during a running drill the original fighter returned and stayed through 729 and then 900 reads. |
 | Eden, after the install: Training, run `mod-inputs-yoga-01` | `artifacts/phase23/mod-tests/inputs-yoga/RESULTS.md`. Passed: the frame strip's marks for Pikachu's up special and Kirby's angled side tilt; drill files and grades for Pikachu, Pichu, Greninja, Palutena, Zelda and Mewtwo; Kirby's angled tilt as a drill. |
-| Eden, after the install: **Product failures found there** | Sheik's, Fox's, Falco's and Wolf's special direction was saved as a second step, and after a Training reset the next drill attempt was not graded. Install 4 addresses both. |
-| Eden, after the install: not tested there | The waiting room, a hit combo with an up special, loading an older drill file. |
+| Yoga Training: product failures | Sheik's, Fox's, Falco's and Wolf's special direction was saved as a second step, and after a Training reset the next drill attempt was not graded. Install 4 addresses both. |
+| Yoga Training: not tested in that run | The waiting room (tested separately on the XPS), a Pikachu hit combo with up special, loading a version 2 drill, and the `L U` direction case (F14-3). |
 | The operator's reports | Two, on 2026-11-24, [below](#the-operator-s-reports-from-the-console). |
 
 ## Install 4 (`a945b0c1`)
