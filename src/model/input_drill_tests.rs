@@ -103,7 +103,7 @@ fn input_schema_crop_and_hit_format_remain_distinct() {
     assert!(read.crop_units(1,1).is_err()); assert!(read.crop_units(0,3).is_err());
     let hit=ComboRecord::new("Combo 1".into(),Combo::from_links([LinkRec::INPUT]).unwrap(),None);
     let hit_value=serde_json::to_value(&hit).unwrap(); assert_eq!(hit_value["schema_version"],1); assert!(hit_value.get("kind").is_none()); assert!(hit_value.get("input_steps").is_none());
-    let root=std::env::temp_dir().join(format!("tr-input-schema-{}",std::process::id())); std::fs::create_dir_all(&root).unwrap();
+    let root=crate::test_scratch::Scratch::new("tr-input-schema");
     let lib=ComboLibrary::new(&root); let id=lib.save_new(&read).unwrap(); let before=std::fs::read(root.join(format!("{id}.json"))).unwrap();
     lib.save_new(&crop).unwrap(); assert_eq!(std::fs::read(root.join(format!("{id}.json"))).unwrap(),before); std::fs::remove_dir_all(root).unwrap();
 }
@@ -157,7 +157,7 @@ fn full_capacity_file_roundtrip_receipt() {
     let link=LinkRec { from:Move::NeutralSpecial,to:Move::NeutralSpecial,verdict:Verdict::True(None),window:Some((0,4)),events,drift:Some(Dir::ForwardDown),..LinkRec::INPUT };
     let record=ComboRecord::new("Combo full".into(),Combo::from_links([link;LINKS]).unwrap(),None);
     let bytes=serde_json::to_vec_pretty(&record).unwrap(); println!("CAPACITY_JSON bytes={}",bytes.len());
-    let root=std::env::temp_dir().join(format!("tr-capacity-file-{}",std::process::id())); std::fs::create_dir_all(&root).unwrap();
+    let root=crate::test_scratch::Scratch::new("tr-capacity-file");
     let lib=ComboLibrary::new(&root); let id=lib.save_new(&record).unwrap();
     let saved_bytes=std::fs::metadata(root.join(format!("{id}.json"))).unwrap().len();
     println!("CAPACITY_FILE bytes={saved_bytes} max={}", crate::model::combo_record::MAX_FILE_BYTES);
@@ -169,7 +169,8 @@ fn full_capacity_file_roundtrip_receipt() {
 fn capacity_file_read_bound_preserves_refusal() {
     use crate::model::{combo_record::{ComboError,MAX_FILE_BYTES},store::StoreError};
     assert_eq!(MAX_FILE_BYTES,LINKS as u64 * 4096);
-    let root=std::env::temp_dir().join(format!("tr-capacity-bound-{}",std::process::id()));
+    let scratch=crate::test_scratch::Scratch::new("tr-capacity-bound");
+    let root=scratch.join("root");
     let lib=ComboLibrary::new(&root);
     let record=ComboRecord::new("Boundary".into(),Combo::from_links([LinkRec::INPUT]).unwrap(),None);
     let id=lib.save_new(&record).unwrap(); let path=root.join(format!("{id}.json"));

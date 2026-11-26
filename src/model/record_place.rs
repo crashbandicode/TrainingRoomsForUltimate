@@ -6,6 +6,7 @@ use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
 use super::stage_geometry::{classify, default_spot, nearest_ledge, Probe};
 use super::state::record::{SavedState, StartState};
+use super::storage::FixedPath;
 
 pub const READY_FRAMES: u16 = 60;
 pub const CHECK_FRAMES: u16 = 60;
@@ -452,6 +453,13 @@ fn who_key(who: Who) -> &'static str {
     match who { Who::P1 => "p1", Who::Cpu => "cpu" }
 }
 
+/// A body the game landed leaves the ground again at a spot of free air. `free`: the shared stage rule lets a body
+/// be at the spot; `floor`: the height of the floor the picker finds for the spot, which is above the spot when the
+/// spot is within the picker's slack under that floor's surface. Lifted there, the body would hang inside the floor.
+pub fn leaves_ground(free: bool, spot: f32, floor: Option<f32>) -> bool {
+    free && floor.is_none_or(|height| height <= spot)
+}
+
 pub fn write_shown(shown: &Shown, first: bool, popup: bool, role: Who, out: &mut String) {
     use core::fmt::Write as _;
     use crate::model::bridge_state::push_str;
@@ -803,6 +811,23 @@ impl Wizard {
 
     /// The notice. `name`: the save's name when the wizard is opened on one.
     pub fn write_text(&self, recorded: Who, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
+        self.write_page(recorded, name, [None; 2], out)
+    }
+
+    /// `write_text`, with where the game has a fighter's body when it moved it off its spot (`bodies`, by role).
+    pub fn write_text_at(
+        &self, recorded: Who, name: &str, bodies: [Option<[f32; 2]>; 2], out: &mut FixedPath<224>,
+    ) -> core::fmt::Result {
+        self.write_page(recorded, "", bodies, out)?;
+        if self.mode == Mode::Save {
+            out.prepend_fitting(name);
+        }
+        Ok(())
+    }
+
+    fn write_page(
+        &self, recorded: Who, name: &str, bodies: [Option<[f32; 2]>; 2], out: &mut impl core::fmt::Write,
+    ) -> core::fmt::Result {
         let (number, title) = match self.page {
             Page::Ask => return self.write_ask(name, out),
             Page::Where => (1, "Where"), Page::Spot => (2, "Spot"), Page::State => (3, "State"),
@@ -832,6 +857,8 @@ impl Wizard {
                     write!(out, "{place} ({}, {})", fighter.at[0].round() as i32, fighter.at[1].round() as i32)?;
                     if self.page == Page::Preview {
                         write!(out, " · {} · {}%", fighter.state.title(), fighter.percent)?;
+                    } else if let Some(body) = bodies[who.index()] {
+                        write!(out, " · body at ({}, {})", body[0].round() as i32, body[1].round() as i32)?;
                     }
                 }
                 Page::State => write!(out, "{}", fighter.state.title())?,
@@ -2344,6 +2371,186 @@ mod tests {
         assert_eq!(placement.matches("crosshair::hold_step(").count(), 1);
         assert!(include_str!("../runtime/features/edge_juggle.rs").contains("placement::preview("));
         assert!(include_str!("../runtime/features/record_place.rs").contains("placement::hold_at("));
+    }
+
+    #[test]
+    fn the_shared_hold_reports_a_moved_body_and_the_picker_lifts_a_landed_one() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        // The body is read before this frame's write, against the point written on the frame before; with no
+        // speed read the hold does not run.
+        assert!(hold_at.find("natives::pos_x(body)").unwrap() < hold_at.find("crosshair::hold_step(").unwrap());
+        assert!(hold_at.contains(".observe(at, read, grounded)"));
+        let unread = hold_at.split("recording_host::fighter_speed(body) else {").nth(1).expect("the speed read");
+        assert!(unread.split('}').next().unwrap().contains("return None;"));
+        // The read's frame is the hold's clock: the game's own frames of this very body, told by the fighter-frame
+        // wrapper as the first thing after the game's frame function returns, for every fighter. Not the UI
+        // facts' frame number, which stands still on a frame whose facts were not published.
+        assert!(hold_at.contains("frame: CLOCK.frame(usize::from(natives::module_accessor(0) != Some(body)), body),"));
+        assert!(!placement.contains("fact_frame_number"));
+        let ran = placement.split("pub(super) unsafe fn ran(").nth(1).expect("the clock is told").split("\n}").next().unwrap();
+        assert!(ran.contains("CLOCK.ran(natives::fighter_accessor(fighter));"));
+        let on_frame = include_str!("../runtime/features/cpu.rs").split("extern \"C\" fn on_frame(").nth(1).unwrap();
+        let ran = on_frame.split("let result = original(a0, a1, a2, a3, a4, a5, a6, a7);").nth(1).unwrap();
+        assert!(ran.trim_start().starts_with("unsafe { super::placement::ran(a0) };"));
+        // The hold itself stays the three writes it was: the report changes nothing it does.
+        let hold = placement.split("pub(super) unsafe fn hold(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(!hold.contains("displaced") && !hold.contains("init_pos"));
+        // The placement picker: a landed body is lifted again when its spot is free air by the shared stage rule.
+        let place = include_str!("../runtime/features/record_place.rs");
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        let held = frame.split("placement::hold_at(&mut holds[who.index()]").nth(1).unwrap();
+        let landed = held.find("moved.landed").expect("the picker reads the report");
+        let free = held.find("placement::free_at(accessor, fighter.at)").expect("the shared stage rule");
+        assert!(landed < free && free < held.find(".lift_again()").expect("the lift is asked for"));
+        assert!(held.contains("record_place::leaves_ground(") && held.contains("placement::floor_under(accessor, fighter.at, true)"));
+        // The card shows where the game has a moved body, and keeps its help when that does not fit.
+        let (shown, plain) = frame.split_once("wizard.write_text_at(recorded, name, bodies, &mut text).is_err()").expect("the card");
+        assert!(shown.contains("hold.displaced") && plain.contains("wizard.write_text(recorded, name, &mut text)"));
+        let free_at = placement.split("pub(super) unsafe fn free_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(free_at.contains("classify(") && free_at.contains("can_stand("));
+        // The drill's picker and its rounds do not act on the report; the scrub reads it through the same hold.
+        assert!(!include_str!("../runtime/features/edge_juggle.rs").contains("displaced"));
+        assert!(include_str!("../runtime/features/scrub_hold.rs").contains("placement::hold_at("));
+    }
+
+    /// Eden, run place-float-xps-05: lifted at a spot 0.43 under the long floor's surface, which the stage rule
+    /// counts as on that floor, the body hung in the air inside the floor, followed the crosshair down inside the
+    /// solid, and was thrown 45 units out of it at a depth of 8.43.
+    #[test]
+    fn a_landed_body_is_not_lifted_into_the_floor_it_stands_on() {
+        assert!(!leaves_ground(true, -0.426_033, Some(0.0)), "within the slack under the floor's surface");
+        assert!(!leaves_ground(false, -8.426_033, None), "inside the solid");
+        assert!(leaves_ground(true, 3.573_967, Some(0.0)), "above the floor");
+        assert!(leaves_ground(true, 20.0, Some(0.014)), "under a platform, over the floor below");
+        assert!(leaves_ground(true, -20.0, None), "open air");
+    }
+
+    /// The operator's route (2026-11-26, about 15:25Z): Off stage is selected and the body floats; the crosshair
+    /// goes sideways onto the stage and the body lands; it goes sideways back past the floor's end, where there
+    /// is no floor under it. The body gets the placing frames of its first float again, then the same hold. The
+    /// words are run place-float-xps-06's at the long floor's left end (x -80), asked y -3.5262246.
+    #[test]
+    fn a_body_landed_on_the_stage_floats_again_when_the_crosshair_leaves_the_floor_sideways() {
+        use crate::model::crosshair::{hold_step, BodyRead, CpuPreview, Displaced, Origin, PreviewAct, PREVIEW_SETTLE};
+        let y = f32::from_bits(0xc061_adaa);
+        let fall = f32::from_bits(0xbd83_126f);
+        let settle = usize::from(PREVIEW_SETTLE);
+        let mut frame = 0;
+        // One frame of the picker: the hold's act, the body as read before the write, then the picker's rule.
+        let mut step = |slot: &mut Option<CpuPreview>, spot: [f32; 2], body: [f32; 2], landed: bool, free: bool, floor: Option<f32>| {
+            let act = hold_step(slot, 7, false, || Origin { at: [0.0, 0.01], grounded: true, facing: 1.0 });
+            let hold = slot.as_mut().unwrap();
+            let speed = Some([0.0, if landed { 0.0 } else { fall }]);
+            hold.observe(spot, BodyRead { at: body, landed, speed, frame }, false);
+            frame += 1;
+            if hold.displaced.is_some_and(|moved| moved.landed) && leaves_ground(free, spot[1], floor) {
+                hold.lift_again();
+            }
+            act
+        };
+        let under = |spot: [f32; 2]| [spot[0], spot[1] + fall];
+        let mut slot = None;
+        // 1. The float left of the floor: the placing frames, then the hold.
+        let start = [-100.0, y];
+        let first: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, start, under(start), false, true, None)).collect();
+        assert!(first[..settle].iter().all(|act| *act == PreviewAct::Lift) && first[settle..].iter().all(|act| *act == PreviewAct::Hold));
+        // 2. Sideways onto the stage, inside the long floor: the game puts the body on the floor; it stays held.
+        let inside = [-79.0, y];
+        assert_eq!(step(&mut slot, inside, under(start), false, false, None), PreviewAct::Hold);
+        for _ in 0..3 {
+            assert_eq!(step(&mut slot, inside, [-79.0, 0.01], true, false, None), PreviewAct::Hold);
+        }
+        assert_eq!(slot.unwrap().displaced, Some(Displaced { at: [-79.0, 0.01], landed: true }));
+        // 3. Sideways back past the floor's end, beside its wall: free air with no floor under it.
+        let beside = [-81.0, y];
+        assert_eq!(step(&mut slot, beside, [-79.0, 0.01], true, true, None), PreviewAct::Hold);
+        let again: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, beside, under(beside), false, true, None)).collect();
+        assert_eq!(again, first, "the placing frames of the first float, then the hold");
+        assert_eq!(slot.unwrap().displaced, None);
+        // The game pulls the body back onto the floor's end at this spot: a spot is tried once. At the next spot
+        // out it is lifted again.
+        for _ in 0..3 {
+            assert_eq!(step(&mut slot, beside, [-80.0, 0.01], true, true, None), PreviewAct::Hold);
+        }
+        let out = [-82.0, y];
+        assert_eq!(step(&mut slot, out, [-80.0, 0.01], true, true, None), PreviewAct::Hold);
+        let third: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, out, under(out), false, true, None)).collect();
+        assert_eq!(third, first);
+        assert_eq!(slot.unwrap().displaced, None);
+    }
+
+    /// The hold's seam is where a game run reads the float: this frame's act, and the body's status and animation
+    /// as the game left it, beside its point and speed. The animation after a body floats again is compared with
+    /// its first float's there (tr-primary-2 2026-11-26 15:25:49Z: the same animation, not merely Fall). The
+    /// status and the animation have no use in the product: the diag build alone reads them, in a module of its
+    /// own (rv-edge-juggle-sol 15:45:47Z), so no unit's install comes to depend on a native for a trace word
+    /// (the first green, 6046f2de, read them in the shipped hold, which two capability tests refused).
+    #[test]
+    fn the_holds_seam_carries_the_act_and_the_bodys_status_and_animation() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let seam = placement.split("pub extern \"C\" fn placement_hold_seam(").nth(1).unwrap();
+        assert!(seam.starts_with("meta: u64, asked: u64, seen: u64, speed: u64) {"));
+        let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        // The act is in the shipped seam's first word: it is the hold's own, not a read.
+        assert!(hold_at.contains("| ((act as u64) << 36)"));
+        assert!(hold_at.contains("placement_hold_seam(meta, pack(at), pack(read.at), pack([speed_x, speed_y]));"));
+        for native in ["motion_kind", "motion_frame", "status_kind"] {
+            assert!(!placement.contains(native), "{native} is read by the diag build only");
+        }
+        // The diag build's read, before this frame's write like the point and the speed.
+        let (before, _) = hold_at.split_once("#[cfg(feature = \"diag\")]\n    super::placement_probe::hold_state(meta, body);")
+            .expect("the diag build's read");
+        assert!(!before.contains("lift(body, at") && !before.contains("hold(body, at)") && !before.contains("stand(body, at"));
+        assert!(include_str!("../runtime/features/mod.rs").contains("#[cfg(feature = \"diag\")]\nmod placement_probe;"));
+        let probe = include_str!("../runtime/features/placement_probe.rs");
+        assert!(probe.contains("pub extern \"C\" fn placement_hold_state(meta: u64, motion: u64, status: u64, granted: u64) {"));
+        assert!(probe.contains("natives::motion_kind(body),"));
+        assert!(probe.contains("u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),"));
+        // A read that is not granted answers 0: the grants go with the words.
+        assert!(probe.contains("[s::MOTION_KIND_OFFSET, s::STATUS_KIND_OFFSET, s::MOTION_FRAME_OFFSET]") && probe.contains("game::granted(site)"));
+    }
+
+    #[test]
+    fn a_body_the_game_moved_is_shown_beside_its_spot() {
+        use crate::model::chords::logical::A;
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        let plain = text(&w, "Jab start");
+        assert!(plain.contains("2/5 Spot"), "{plain}");
+        let shown = |bodies| {
+            let mut out = FixedPath::new();
+            w.write_text_at(Who::P1, "Jab start", bodies, &mut out).unwrap();
+            out.as_str().to_owned()
+        };
+        assert_eq!(shown([None; 2]), plain);
+        // SP-10's CPU: asked x -81.72 beside the long floor's wall, left by the game at x -86.85.
+        let cpu = plain.lines().nth(2).unwrap();
+        assert_eq!(shown([None, Some([-86.85, -15.187])]), plain.replace(cpu, &format!("{cpu} · body at (-87, -15)")));
+        // The spot's own numbers stay the crosshair's.
+        let p1 = plain.lines().nth(1).unwrap();
+        assert_eq!(shown([Some([-40.1, 0.01]), None]), plain.replace(p1, &format!("{p1} · body at (-40, 0)")));
+    }
+
+    #[test]
+    fn a_long_save_name_leaves_room_for_displaced_bodies_and_spot_controls() {
+        use crate::model::{chords::logical::A, storage::FixedPath};
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        for (name, bodies) in [
+            ("n".repeat(48), [None, Some([-87.0, -15.0])]),
+            ("界".repeat(48), [Some([-40.0, 0.0]), Some([-87.0, -15.0])]),
+        ] {
+            assert!(crate::engine::library::check_label(&name).is_ok());
+            let mut card = FixedPath::<224>::new();
+            let mut expected = String::new();
+            w.write_page(Who::P1, "", bodies, &mut expected).unwrap();
+            let result = w.write_text_at(Who::P1, &name, bodies, &mut card);
+            assert!(result.is_ok(), "the actual placement notice buffer must fit the complete card");
+            assert!(card.as_str().ends_with(&expected), "only the displayed name may be shortened: {card:?}");
+            let shown_name = card.as_str().strip_suffix(&expected).unwrap();
+            assert_eq!(shown_name, &name[..name.floor_char_boundary(224 - expected.len())]);
+        }
     }
 
     #[test]

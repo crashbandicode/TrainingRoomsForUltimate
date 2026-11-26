@@ -118,19 +118,12 @@ mod tests {
     lib_unit_tests! {
     use super::*;
     use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    struct Temp(PathBuf);
+    struct Temp(crate::test_scratch::Scratch);
     impl Temp {
         fn new() -> Self {
-            static NEXT: AtomicU64 = AtomicU64::new(0);
-            let dir = std::env::temp_dir().join(format!("mii-store-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-            fs::create_dir(&dir).unwrap();
-            Self(dir)
+            Self(crate::test_scratch::Scratch::new("mii-store"))
         }
     }
-    impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
-
     fn draft(moves: [u8; 4]) -> Draft {
         let template = classify(&RawSlot { index: 0, slot_id: 2622, name_len: 1,
             name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0], colour: 1, voice: 37,

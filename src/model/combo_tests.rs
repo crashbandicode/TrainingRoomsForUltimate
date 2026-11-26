@@ -807,8 +807,8 @@ fn rename_keeps_the_events() {
         .any(|event| matches!(event.kind, Kind::Release(_) | Kind::Flick(_))));
     let combo = Combo::from_links([link]).unwrap();
     let events = link.events;
-    let dir = std::env::temp_dir().join(format!("tr-rr12-rename-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+    let scratch = crate::test_scratch::Scratch::new("tr-rr12-rename");
+    let dir = scratch.join("root");
     let library = ComboLibrary::new(&dir);
     let id = library
         .save_new(&ComboRecord::new("Nair".into(), combo, None))

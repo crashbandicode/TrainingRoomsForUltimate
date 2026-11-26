@@ -6,7 +6,6 @@ use crate::model;
 
 use std::cell::Cell;
 use std::fs;
-use std::path::PathBuf;
 
 use model::chords::*;
 use model::ini_files::{self, EditRefusal, FileRead, Reject};
@@ -30,11 +29,8 @@ fn sample(held: &[u8], pressed: &[u8]) -> Sample {
     Sample { held: c(held).0, pressed: c(pressed).0, ..Sample::default() }
 }
 
-fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("trainingrooms-input04-{}-{name}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).unwrap();
-    dir
+fn temp_dir(name: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("trainingrooms-input04-{name}"))
 }
 
 #[test]
@@ -292,6 +288,11 @@ fn ini_written_only_on_confirmed_change() {
 
 #[test]
 fn ini_write_failure_keeps_the_old_file() {
+    struct RestorePermissions(std::path::PathBuf, fs::Permissions);
+    impl Drop for RestorePermissions {
+        fn drop(&mut self) { let _ = fs::set_permissions(&self.0, self.1.clone()); }
+    }
+
     let dir = temp_dir("writefail");
     let path = dir.join("button_config.ini");
     fs::write(&path, DEFAULT_INI).unwrap();
@@ -307,6 +308,7 @@ fn ini_write_failure_keeps_the_old_file() {
     fs::create_dir(&ro).unwrap();
     fs::write(ro.join("keep.ini"), "old").unwrap();
     let mut perms = fs::metadata(&ro).unwrap().permissions();
+    let _restore = RestorePermissions(ro.clone(), perms.clone());
     std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o555);
     fs::set_permissions(&ro, perms.clone()).unwrap();
     if fs::File::create(ro.join("probe")).is_err() {

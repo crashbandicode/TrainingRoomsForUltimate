@@ -7,10 +7,9 @@ fn a_full_input_only_macro_streams_its_save_and_loads_from_one_buffer() {
     const TEST: &str = "input_json::a_full_input_only_macro_streams_its_save_and_loads_from_one_buffer";
     const ROOT: &str = "TR_INPUT_JSON_TEST_DIR";
     let Some(dir) = env::var_os(ROOT).map(PathBuf::from) else {
-        let dir = env::temp_dir().join(format!("tr-input-json-{}", std::process::id()));
-        fs::create_dir(&dir).unwrap();
+        let dir = crate::test_scratch::Scratch::new("tr-input-json");
         let run = |phase| Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
-            .env(ROOT, &dir).env("TR_INPUT_JSON_PHASE", phase).status().unwrap().success();
+            .env(ROOT, dir.path()).env("TR_INPUT_JSON_PHASE", phase).status().unwrap().success();
         let saved = run("save");
         let loaded = saved && run("load");
         fs::remove_dir_all(&dir).unwrap();

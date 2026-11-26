@@ -15,6 +15,10 @@ macro_rules! lib_unit_tests {
 #[cfg(test)]
 mod test_table;
 
+#[cfg(test)]
+#[path = "../tests/support/scratch.rs"]
+mod test_scratch;
+
 pub mod model;
 
 // The carried fork engines (package 6): each area is test-only until its consumer lands, except those engine/mod.rs leaves open.

@@ -3099,14 +3099,8 @@ mod tests {
         TEST_LOCK.lock().unwrap_or_else(|err| err.into_inner())
     }
 
-    fn scratch(tag: &str) -> std::path::PathBuf {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let n = NEXT.fetch_add(1, Ordering::Relaxed);
-        let dir =
-            std::env::temp_dir().join(format!("tr-rr7-host-{tag}-{n}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+        crate::test_scratch::Scratch::new(&format!("tr-rr7-host-{tag}"))
     }
 
     #[test]
@@ -4993,7 +4987,7 @@ mod tests {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
     }
 
-    fn generated_fixture(tag: &str, frames: u32) -> (PathBuf, String, MacroRecording) {
+    fn generated_fixture(tag: &str, frames: u32) -> (crate::test_scratch::Scratch, String, MacroRecording) {
         reset_host();
         let root = scratch(tag);
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
@@ -5044,7 +5038,7 @@ mod tests {
             set_role_fighter(role, 7);
             set_playback_delay(2);
         }
-        let publish_root = root.clone();
+        let publish_root = root.path().to_path_buf();
         BEFORE_TAKE.set(Some(Box::new(move || generated_play(&publish_root, role))));
         let seeds = std::cell::Cell::new(0);
         let seed = || {
@@ -6700,7 +6694,7 @@ mod tests {
         assert!(!pair_settled(), "a captured pair waits for the worker");
         let (taken_tx, taken_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
-        let worker_root = root.clone();
+        let worker_root = root.path().to_path_buf();
         let worker = std::thread::spawn(move || {
             write_saved_with(&worker_root, move || {
                 taken_tx.send(()).unwrap();

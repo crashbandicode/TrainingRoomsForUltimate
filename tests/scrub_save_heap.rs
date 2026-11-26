@@ -11,10 +11,9 @@ fn a_maximum_take_serializes_without_a_second_track() {
     const KEY: &str = "TR_SCRUB_SAVE_HEAP_ROOT";
     let Some(root) = env::var_os(KEY).map(std::path::PathBuf::from) else {
         // The production allocator's peak is process-wide: run just this case in a fresh process.
-        let root = env::temp_dir().join(format!("tr-scrub-save-{}", std::process::id()));
-        fs::create_dir(&root).unwrap();
+        let root = crate::test_scratch::Scratch::new("tr-scrub-save");
         let run = |phase| Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
-            .env(KEY, &root).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
+            .env(KEY, root.path()).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
         let saved = run("save");
         let loaded = root.join("measured").is_file() && run("load");
         let listed = root.join("measured").is_file() && run("list");

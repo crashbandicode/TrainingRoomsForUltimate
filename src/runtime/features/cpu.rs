@@ -507,6 +507,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
     // Package 4, S4-4: the capture observers and the clip preview see the state the game is about to advance.
     unsafe { crate::runtime::macros::frame_before(a0) };
     let result = original(a0, a1, a2, a3, a4, a5, a6, a7);
+    unsafe { super::placement::ran(a0) };
     unsafe { crate::runtime::macros::frame_after(a0) };
     let ready = ensure_consts();
     let _scope = HookScope::enter_hook(HookId::CpuFrame);

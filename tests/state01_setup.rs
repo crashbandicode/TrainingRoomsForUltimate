@@ -5,8 +5,7 @@
 use crate::model;
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::path::Path;
 
 use model::state::held_item::HeldItem;
 use model::state::record::{Charge, Marker, Robin, Steve};
@@ -14,24 +13,15 @@ use model::state::setup::*;
 use model::store::StoreError;
 use serde_json::{json, Value};
 
-struct TempDir(PathBuf);
+struct TempDir(crate::test_scratch::Scratch);
 
 impl TempDir {
     fn new() -> Self {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let path = std::env::temp_dir().join(format!("training_rooms-setup-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
+        Self(crate::test_scratch::Scratch::new("training_rooms-setup"))
     }
 
     fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        self.0.path()
     }
 }
 

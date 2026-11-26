@@ -73,26 +73,15 @@ mod tests {
     use crate::engine::compat::menu::{OnOff, BASE_MENU};
     use crate::engine::preload::cycle_preload_config::{load_ini, render, CyclePreloadSlots, IniLoad};
     
-    use std::path::PathBuf;
-
-    struct Dir(PathBuf);
+    struct Dir(crate::test_scratch::Scratch);
     impl Dir {
         fn new(name: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!("tr-preload-boot-{}-{name}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&dir);
-            std::fs::create_dir_all(&dir).unwrap();
-            Self(dir)
+            Self(crate::test_scratch::Scratch::new(&format!("tr-preload-boot-{name}")))
         }
         fn path(&self) -> String {
             self.0.join("cycle_preload.ini").to_str().unwrap().to_owned()
         }
     }
-    impl Drop for Dir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-
     fn imported() -> TrainingModpackMenu {
         let mut menu = BASE_MENU;
         menu.cycle_preload_slots = CyclePreloadSlots::TWO;

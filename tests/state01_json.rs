@@ -8,7 +8,6 @@ use crate::model;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use model::state::file::{Defaulted, SaveFile, SLOTS};
 use model::state::held_item::HeldItem;
@@ -97,7 +96,7 @@ fn start_state_survives_fresh_process_continuation() {
     for phase in ["save", "continue"] {
         let output = std::process::Command::new(&exe)
             .args(["--exact", "state01_json::start_state_survives_fresh_process_continuation"])
-            .env(PHASE, phase).env(ROOT, &root.0).output().unwrap();
+            .env(PHASE, phase).env(ROOT, root.0.path()).output().unwrap();
         assert!(output.status.success(), "{phase}: {}", String::from_utf8_lossy(&output.stderr));
     }
     let (file, outcome) = persist::load(&root.0.join("save_states.json"));
@@ -162,7 +161,7 @@ fn state01_mii_writer_survives_fresh_process_continuation() {
         let child = std::process::Command::new(&exe)
             .args(["--exact", "state01_json::state01_mii_writer_survives_fresh_process_continuation", "--nocapture"])
             .env(PHASE, phase)
-            .env(ROOT, &root.0)
+            .env(ROOT, root.0.path())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn().unwrap();
@@ -180,20 +179,11 @@ fn state01_mii_writer_survives_fresh_process_continuation() {
     assert!(file.cpu.iter().all(|record| !record.is_saved()));
 }
 
-struct TempDir(PathBuf);
+struct TempDir(crate::test_scratch::Scratch);
 
 impl TempDir {
     fn new() -> Self {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let path = std::env::temp_dir().join(format!("training_rooms-state01-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        Self(crate::test_scratch::Scratch::new("training_rooms-state01"))
     }
 }
 
