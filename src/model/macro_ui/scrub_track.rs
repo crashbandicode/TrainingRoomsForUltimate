@@ -236,14 +236,17 @@ impl Block {
     }
 
     /// The game thread, after the hold's step for the role in `slot`. `moved`: where the game has the body, when the
-    /// hold reports that the game moved it off the point written on the frame before. That is about this request only
-    /// when that write was this role's, for this request (`generation`, read before the ask), at this point: then the
-    /// body is refused here, and `true` says to let it go. Otherwise this frame's write is noted and the next frame
-    /// is judged.
+    /// hold reports that the game moved it off the point written on the frame before. The scrub refuses a body the
+    /// game moved sideways: its x is not, bit for bit, the x asked. Walls and the ends of floors do that; gravity and
+    /// a floor under the point never move x, so a body the floor takes straight up or down stays held and is shown
+    /// where the floor has it. (A ceiling pushing straight down is not refused.) The report is about this request
+    /// only when that write was this role's, for this request (`generation`, read before the ask), at this point:
+    /// then the body is refused here, and `true` says to let it go. Otherwise this frame's write is noted and the
+    /// next frame is judged.
     pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], moved: Option<[f32; 2]>) -> bool {
         let (Some(wrote), Some(pushed)) = (self.wrote.get(slot), self.pushed.get(slot)) else { return false };
         let (key, request) = (key(at), u64::from(generation) + 1);
-        let sideways = moved.is_some();
+        let sideways = moved.is_some_and(|seen| seen[0].to_bits() != at[0].to_bits());
         if sideways && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
             pushed.0.store(key, Ordering::Relaxed);
             pushed.1.store(request, Ordering::Relaxed);
