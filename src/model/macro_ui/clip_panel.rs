@@ -1753,6 +1753,47 @@ mod tests {
         ClipEditor::new(session, vec![14]).unwrap()
     }
 
+    fn reopened_capture_crop(with_moves: bool) -> MacroRecording {
+        use crate::engine::macros::{Library, PackedPose};
+        let dir = crate::test_scratch::Scratch::new("tr-capture-crop-poses");
+        let lib = Library::new(&dir);
+        let mut editor = unequal_tracks();
+        if with_moves {
+            for track in &mut editor.session.tracks {
+                for (i, frame) in track.frames.iter_mut().enumerate() {
+                    frame.pose = PackedPose([frame.start.fighter_kind as u32, (i as u32) << 8]);
+                }
+            }
+        }
+        editor.select_kind(18);
+        editor.window.set_in(1);
+        editor.window.set_out(4);
+        let ClipEffect::Export(exported) = editor.on_action(ClipAction::Confirm) else { panic!("crop refused") };
+        let id = lib.save_new(&exported).unwrap();
+        lib.load_edited(&id).unwrap()
+    }
+
+    #[test]
+    fn capture_crop_reopens_with_its_own_two_fighters_moves() {
+        use crate::engine::macros::{positions::{Moves, Source}, PackedPose};
+        let (source, moves, rows) = reopened_capture_crop(true).take_sourced_track().unwrap();
+        assert_eq!(rows.len(), 3);
+        for (i, row) in rows.iter().enumerate() {
+            let frame = (1 + i as u32) << 8;
+            assert_eq!(row[0].pose, PackedPose([18, frame]));
+            assert_eq!(row[1].pose, if i < 2 { PackedPose([8, frame]) } else { PackedPose::NONE });
+        }
+        assert_eq!((source, moves), (Source::Recorded, Moves::Take));
+    }
+
+    #[test]
+    fn capture_crop_without_poses_reopens_eligible_for_a_playback_upgrade() {
+        use crate::engine::macros::positions::{Moves, Source};
+        let (source, moves, rows) = reopened_capture_crop(false).take_sourced_track().unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!((source, moves), (Source::Recorded, Moves::None));
+    }
+
     fn automatic_cpu_selection_and_full_range_fighter_switch_keep_all_inputs() {
         let mut e = unequal_tracks();
         assert_eq!(e.view().end, 3);
