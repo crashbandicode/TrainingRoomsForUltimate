@@ -112,6 +112,7 @@ fn the_fed_sample_is_first_in_player_ones_poll_and_the_worker_never_sends_it() {
 fn clip_text_names_the_window_and_the_editor_cursor() {
     let c = clip();
     assert_eq!(c.text(), "clip ctx=replay total=200 in=12 out=157 cursor=156 playing=1 handle=playhead running=1 \
+        pose.p1=none pose.cpu=none fighter.p1=current fighter.cpu=current \
         target=cpu marks=2 mark=90-none move=\"66 frames into Special\"");
 }
 
