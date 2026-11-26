@@ -17,9 +17,7 @@
 
 use crate::model::store::{Record, Store, StoreError, MAX_FILE_BYTES};
 
-use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};
-use super::recording::Placement;
-use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};
+use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};
 
 /// The store's own failures become the macro crate's error, variant for variant (the carried code matches on `MacroError`).
 impl From<StoreError> for MacroError {
@@ -50,56 +48,14 @@ pub struct MacroEntry {
     pub start_save_on: bool,
 }
 
-// Feed the normal macro decoder its normal fields, but skip position rows when only
-// making a menu entry. Their shape and values are checked when the macro is opened.
-struct HeaderFields<'a, A> { map: A, track: &'a mut Option<bool> }
-
-impl<'de, A: MapAccess<'de>> MapAccess<'de> for HeaderFields<'_, A> {
-    type Error = A::Error;
-    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error> {
-        while let Some(key) = self.map.next_key::<String>()? {
-            if key != "track" { return seed.deserialize(key.into_deserializer()).map(Some); }
-            if self.track.is_some() { return Err(de::Error::duplicate_field("track")); }
-            *self.track = Some(self.map.next_value::<Option<de::IgnoredAny>>()?.is_some());
-        }
-        Ok(None)
-    }
-    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {
-        self.map.next_value_seed(seed)
-    }
-}
-
-struct MacroHeader;
-impl<'de> Visitor<'de> for MacroHeader {
-    type Value = (MacroRecording, bool);
-    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("a named macro") }
-    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-        let mut track = None;
-        let fields = de::value::MapAccessDeserializer::new(HeaderFields { map, track: &mut track });
-        let rec = serde::Deserialize::deserialize(fields)?;
-        Ok((rec, track.unwrap_or(false)))
-    }
-}
-
-/// A macro read without its position rows, for the list and for playback. The file's version is still checked against
-/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.
-fn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {
-    let mut de = serde_json::Deserializer::from_reader(reader);
-    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.
-    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;
-    de.end()?;
-    Ok(rec.validate_header().and_then(|()| {
-        rec.validate_frame_count()?;
-        Ok(rec)
-    }))
-}
-
 impl Store<MacroRecording> {
     /// Loads a macro for the clip editor: the macro, and its positions when the file beside it binds it
     /// (`positions`). Playback, the list and every other load read the macro only (`load`).
     pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {
         let mut recording = self.load(id)?;
-        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));
+        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {
+            recording.set_sourced_track(source, track);
+        }
         Ok(recording)
     }
 }
@@ -112,31 +68,22 @@ impl Record for MacroRecording {
     type Summary = MacroEntry;
     const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
-    const STREAM_READ: bool = true;
-    fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {
-        Ok(read_header(reader)?.map(|rec| rec.summary(id)))
-    }
-    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }
-    fn stream_write(&self) -> bool { self.track.is_some() }
-    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {
-        #[derive(serde::Deserialize)]
-        struct Header { kind: Option<String> }
-        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some("chain"))
-    }
+    const STREAM_WRITE: bool = true;
 
     /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an
     /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)
     /// carries no positions in memory and keeps the file that binds its inputs.
-    fn before_write(&self, dir: &std::path::Path, id: &str) {
-        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
-            super::positions::remove(dir, id);
+    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {
+        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
+            return super::positions::invalidate(dir, id);
         }
+        Ok(())
     }
 
     /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
     fn after_write(&self, dir: &std::path::Path, id: &str) {
         if let Some(track) = &self.track {
-            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {
+            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {
                 super::positions::remove(dir, id);
             }
         }
@@ -151,7 +98,7 @@ impl Record for MacroRecording {
     }
 
     fn owns(bytes: &[u8]) -> bool {
-        !super::recording::is_chain_document(bytes)
+        !crate::model::store::is_chain_document(bytes)
     }
 
     fn name(&self) -> &str {

@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "8b73c67ddb0b298d2aeea3079ad622c9198e2b35f6425254cd05ec0172be5058",
+   "dest_sha256": "3bb7a602b3996d543092a14a2e908c8793edd892b5ec9b1dc691ecbc40de2709",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -903,6 +903,26 @@
     {
      "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.\npub fn is_chain_document(bytes: &[u8]) -> bool {\n    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)\n}\n\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "new": "\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.track = track;\n    }",
+     "new": "        self.track = track;\n        self.track_source = super::positions::Source::Recorded;\n    }\n\n    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {\n        self.track = Some(track);\n        self.track_source = source;\n    }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            track: None,\n        };",
+     "new": "            track: None,\n            track_source: super::positions::Source::Recorded,\n        };",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}",
+     "new": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n}",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1355,7 +1375,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "0c2902986937ab55bec610dda30bc3a5facbf30ba914bf9f5a58309fd38b870f",
+   "dest_sha256": "860b6f02eddc1da99b235b89c193cf23206d60a91e7b472b4d68bdfd54f54fa1",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1471,6 +1491,56 @@
      "old": "            if super::positions::write(dir, id, &self.frames, track).is_err() {",
      "new": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "new": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {\n        Ok(read_header(reader)?.map(|rec| rec.summary(id)))\n    }\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "new": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n// Feed the normal macro decoder its normal fields, but skip position rows when only\n// making a menu entry. Their shape and values are checked when the macro is opened.\nstruct HeaderFields<'a, A> { map: A, track: &'a mut Option<bool> }\n\nimpl<'de, A: MapAccess<'de>> MapAccess<'de> for HeaderFields<'_, A> {\n    type Error = A::Error;\n    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error> {\n        while let Some(key) = self.map.next_key::<String>()? {\n            if key != \"track\" { return seed.deserialize(key.into_deserializer()).map(Some); }\n            if self.track.is_some() { return Err(de::Error::duplicate_field(\"track\")); }\n            *self.track = Some(self.map.next_value::<Option<de::IgnoredAny>>()?.is_some());\n        }\n        Ok(None)\n    }\n    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {\n        self.map.next_value_seed(seed)\n    }\n}\n\nstruct MacroHeader;\nimpl<'de> Visitor<'de> for MacroHeader {\n    type Value = (MacroRecording, bool);\n    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a named macro\") }\n    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {\n        let mut track = None;\n        let fields = de::value::MapAccessDeserializer::new(HeaderFields { map, track: &mut track });\n        let rec = serde::Deserialize::deserialize(fields)?;\n        Ok((rec, track.unwrap_or(false)))\n    }\n}\n\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.\n    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {",
+     "new": "\nimpl Store<MacroRecording> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::Placement;\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};",
+     "new": "use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            super::positions::remove(dir, id);\n        }\n    }\n",
+     "new": "            super::positions::remove(dir, id);\n        }\n        Ok(())\n    }\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);",
+     "new": "    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {\n        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            return super::positions::invalidate(dir, id);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        !super::recording::is_chain_document(bytes)",
+     "new": "        !crate::model::store::is_chain_document(bytes)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
+     "new": "    const STREAM_WRITE: bool = true;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
+     "new": "            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));",
+     "new": "        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, track);\n        }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1479,7 +1549,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "4b18f313d7870029a415f02e9ba8c22c064ee341acd1b68e6498c2120cb61734",
+   "dest_sha256": "0b7d897fe064ec134aa0d39d10fcc445366c48fa6b86822dccb42ea8543fc9d7",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -1612,6 +1682,11 @@
     {
      "old": "            edited_json(|v| v[\"schema_version\"] = json!(4)),",
      "new": "            edited_json(|v| v[\"schema_version\"] = json!(3)),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());\n}",
+     "new": "    assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());\n}\n\n#[test]\nfn listing_and_loading_ignore_the_same_unknown_v1_fields() {\n    let tmp = TempDir::new();\n    let lib = Library::new(tmp.path());\n    let original = recording(\"Shared\");\n    let id = lib.save_new(&original).unwrap();\n    let path = tmp.path().join(format!(\"{id}.json\"));\n    let json = fs::read_to_string(&path).unwrap();\n    // Since positions moved to a sidecar, \"track\" has no meaning in v1, even to the list.\n    fs::write(path, json.replacen('{', r#\"{\"track\":null,\"track\":[],\"#, 1)).unwrap();\n    assert_eq!(lib.load(&id).unwrap(), original);\n    let listing = lib.list().unwrap();\n    assert!(listing.skipped.is_empty(), \"{:?}\", listing.skipped);\n    assert_eq!(ids(&listing), [id.as_str()]);\n}",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

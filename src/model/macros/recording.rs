@@ -164,6 +164,9 @@ pub struct MacroRecording {
     /// (`positions`), and only the clip editor's load reads it back.
     #[serde(skip)]
     pub track: Option<Vec<[super::ReplayFrame; 2]>>,
+    /// A crop inherits the source of its rows; exporting it is not another Record.
+    #[serde(skip)]
+    pub(super) track_source: super::positions::Source,
 }
 
 impl MacroRecording {
@@ -189,6 +192,7 @@ impl MacroRecording {
             start_save: None,
             start_save_on: true,
             track: None,
+            track_source: super::positions::Source::Recorded,
         };
         recording.validate()?;
         Ok(recording)
@@ -259,6 +263,12 @@ impl MacroRecording {
     /// Attach the positions a take recorded (one entry per frame from the first), or drop them.
     pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {
         self.track = track;
+        self.track_source = super::positions::Source::Recorded;
+    }
+
+    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {
+        self.track = Some(track);
+        self.track_source = source;
     }
 
     /// Keep frames `range` of the recording, with the same slice of its track.
@@ -339,14 +349,6 @@ fn start_save_switch_on() -> bool {
 
 fn is_switch_on(on: &bool) -> bool {
     *on
-}
-
-/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.
-pub fn is_chain_document(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<serde_json::Value>(bytes)
-        .ok()
-        .and_then(|value| value.get("kind").and_then(serde_json::Value::as_str).map(|kind| kind == "chain"))
-        .unwrap_or(false)
 }
 
 fn check_name(name: &str) -> Result<(), MacroError> {

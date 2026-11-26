@@ -40,9 +40,10 @@ pub fn path(dir: &Path, id: &str) -> PathBuf {
 }
 
 /// Where a positions file came from: a take's own recording, or a playback of a macro that had none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Source {
+    #[default]
     Recorded = 1,
     Generated = 2,
 }
@@ -161,9 +162,13 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
 /// The positions of the macro `id`, whose inputs are `inputs`; none when the file is missing, is not one this build
 /// reads, or does not bind this macro. A file with no rows is an empty track, not a missing one.
 pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFrame; 2]>> {
+    read_with_source(dir, id, inputs).map(|(_, track)| track)
+}
+
+pub(super) fn read_with_source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, Vec<[ReplayFrame; 2]>)> {
     let mut track = Vec::new();
-    scan(dir, id, inputs, Some(&mut track))?;
-    Some(track)
+    let (source, _) = scan(dir, id, inputs, Some(&mut track))?;
+    Some((source, track))
 }
 
 /// Validate the same rows Crop would read, without collecting a second track on the playback worker.
@@ -204,13 +209,20 @@ pub fn kept(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, u32)
         .map(|(frames, source)| (source, frames as u32))
 }
 
-/// Remove the positions file of `id`, and its unfinished write; a missing file is fine. The folder is synced where
-/// the system has that, so the removal is on the card before a new macro is written under the id.
+/// Best-effort cleanup after deleting the macro or abandoning a sidecar write.
 pub fn remove(dir: &Path, id: &str) {
+    let _ = invalidate(dir, id);
+}
+
+/// Unlink the published positions before reusing their id. As with the macro store, there is no directory barrier.
+pub(super) fn invalidate(dir: &Path, id: &str) -> io::Result<()> {
     let file = path(dir, id);
     let _ = fs::remove_file(crate::model::store::with_suffix(&file, ".tmp"));
-    if fs::remove_file(file).is_ok() {
-        let _ = fs::File::open(dir).and_then(|dir| dir.sync_all());
+    #[cfg(test)]
+    if FAIL_UNLINK.with(|fail| fail.get()) { return Err(io::ErrorKind::PermissionDenied.into()); }
+    match fs::remove_file(file) {
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        result => result,
     }
 }
 
@@ -220,6 +232,7 @@ thread_local! {
     static HEADS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static WRITES: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static FAIL_WRITE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    static FAIL_UNLINK: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Positions files opened for reading by this thread (tests: playback and the list open none).
@@ -244,6 +257,7 @@ pub fn fail_writes(fail: bool) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+    use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
     use crate::engine::macros::{Library, MacroRecording};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -276,6 +290,28 @@ mod tests {
             recording.set_track(Some(track(frames)));
         }
         recording
+    }
+
+    #[test]
+    fn a_saved_editor_crop_preserves_its_partial_positions_source() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        for origin in [Source::Recorded, Source::Generated] {
+            let rec = recording("Walk", 8, false);
+            let id = library.save_new(&rec).unwrap();
+            write(&dir, &id, &rec.frames, &track(3), origin).unwrap();
+            let mut editor = ClipEditor::macro_file(library.load_edited(&id).unwrap(), true).unwrap();
+            editor.on_action(ClipAction::SelectIn);
+            editor.on_action(ClipAction::Nudge(1));
+            editor.on_action(ClipAction::SelectOut);
+            editor.on_action(ClipAction::Nudge(-1));
+            let ClipEffect::Export(crop) = editor.on_action(ClipAction::Confirm) else { panic!("no macro crop") };
+            assert_eq!(&crop.frames, &rec.frames[1..7]);
+            let kept = library.save_new(&crop).unwrap();
+            assert_eq!(read(&dir, &kept, &crop.frames), Some(vec![pair(1), pair(2)]));
+            assert_eq!(source(&dir, &kept, &crop.frames), Some(origin), "cropping does not record new positions");
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -409,6 +445,48 @@ mod tests {
         // Delete removes both files.
         library.delete(&id).unwrap();
         assert!(!path(&dir, &id).exists() && !dir.join(format!("{id}.json")).exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_sidecar_invalidation_unlink() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        let id = library.save_new(&recording("Old", 3, true)).unwrap();
+        let mut next = recording("Replacement", 3, false);
+        next.set_track(Some(vec![pair(99); 3]));
+        let json = dir.join(format!("{id}.json"));
+        let before = fs::read(&json).unwrap();
+        FAIL_UNLINK.with(|cell| cell.set(true));
+        fail_writes(true);
+        let result = library.overwrite(&id, &next);
+        let retry = library.overwrite(&id, &next);
+        fail_writes(false);
+        FAIL_UNLINK.with(|cell| cell.set(false));
+        let reopened = library.load_edited(&id).unwrap();
+        assert!(result.is_err(), "unlink failed but overwrite reported success; macro={}", reopened.name);
+        assert!(retry.is_err(), "a retry must not bypass an outstanding unlink failure");
+        assert_eq!(fs::read(json).unwrap(), before);
+        assert_eq!(reopened.name, "Old");
+        assert_eq!(reopened.track, Some(track(3)));
+        library.overwrite(&id, &next).unwrap();
+        assert_eq!(library.load_edited(&id).unwrap(), next);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_sidecar_invalidation_from_an_interrupted_delete_is_not_adopted() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        let id = library.save_new(&recording("Walk", 3, true)).unwrap();
+        fs::remove_file(dir.join(format!("{id}.json"))).unwrap();
+        let plain = recording("Walk", 3, false);
+        FAIL_UNLINK.with(|cell| cell.set(true));
+        let refused = library.save_new(&plain);
+        FAIL_UNLINK.with(|cell| cell.set(false));
+        assert!(refused.is_err() && !dir.join(format!("{id}.json")).exists());
+        assert_eq!(library.save_new(&plain).unwrap(), id);
+        assert!(library.load_edited(&id).unwrap().track.is_none(), "a fresh take adopted the deleted take's positions");
         fs::remove_dir_all(dir).unwrap();
     }
 

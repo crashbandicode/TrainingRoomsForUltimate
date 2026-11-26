@@ -23,8 +23,12 @@ mod model;
 #[allow(dead_code, unused_imports)]
 pub mod engine;
 mod allocation;
+mod input_json;
+mod slice_load;
 #[path = "../scrub_chain_heap.rs"]
 mod scrub_chain_heap;
+#[path = "../scrub_play_timing.rs"]
+mod scrub_play_timing;
 #[path = "../scrub_save_heap.rs"]
 mod scrub_save_heap;
 #[path = "../../src/test_table.rs"]

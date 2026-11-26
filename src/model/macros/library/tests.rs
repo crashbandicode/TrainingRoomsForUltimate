@@ -40,6 +40,22 @@ fn missing_or_empty_directory_lists_nothing() {
     assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());
 }
 
+#[test]
+fn listing_and_loading_ignore_the_same_unknown_v1_fields() {
+    let tmp = TempDir::new();
+    let lib = Library::new(tmp.path());
+    let original = recording("Shared");
+    let id = lib.save_new(&original).unwrap();
+    let path = tmp.path().join(format!("{id}.json"));
+    let json = fs::read_to_string(&path).unwrap();
+    // Since positions moved to a sidecar, "track" has no meaning in v1, even to the list.
+    fs::write(path, json.replacen('{', r#"{"track":null,"track":[],"#, 1)).unwrap();
+    assert_eq!(lib.load(&id).unwrap(), original);
+    let listing = lib.list().unwrap();
+    assert!(listing.skipped.is_empty(), "{:?}", listing.skipped);
+    assert_eq!(ids(&listing), [id.as_str()]);
+}
+
 fn save_new_persists_and_reloads_through_a_fresh_library() {
     let tmp = TempDir::new();
     let dir = tmp.path().join("ultimate").join("macros");
