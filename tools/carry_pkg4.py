@@ -27,7 +27,7 @@ import argparse, hashlib, json, os, posixpath, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
 
-STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
+STAGES = os.environ.get("TR_CARRY_STAGES") or "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg4-carry-manifest.json"
 LEDGER = "docs/provenance/pkg4-carry-ledger.md"
 EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "training_mod_macros": "macros",
@@ -118,7 +118,7 @@ def apply_edits(entry: dict, out: bytes) -> bytes:
             if s.count(e["delete_from"]) != 1:
                 raise SystemExit(f"{entry['src']}: delete_from `{e['delete_from'][:60]}` matches {s.count(e['delete_from'])} times")
             a = s.index(e["delete_from"])
-            b = s.rindex(e["delete_to_last"]) if "delete_to_last" in e else s.find(e["delete_to"], a + len(e["delete_from"]))
+            b = s.rfind(e["delete_to_last"]) if "delete_to_last" in e else s.find(e["delete_to"], a + len(e["delete_from"]))
             if b < 0 or b < a:
                 raise SystemExit(f"{entry['src']}: delete_to for `{e['delete_from'][:60]}` not found")
             out = (s[:a] + s[b:]).encode("utf-8")
@@ -175,13 +175,13 @@ def main():
         return
     bad = 0
     changed = []
+    pending = []
     for entry in manifest["files"]:
         dest = os.path.join(a.root, entry["dest"])
         if entry.get("removed"):
             # rc.9 test cut: a carried test-only file that is no longer in the tree; the entry keeps its stage hash and the reason
             if a.cmd == "carry":
-                if os.path.exists(dest):
-                    os.remove(dest)
+                pending.append((entry, dest, None))
             elif os.path.exists(dest):
                 print("PRESENT", entry["dest"], "(the manifest records it as removed)"); bad += 1
             continue
@@ -191,7 +191,10 @@ def main():
             if sha(open(dest, "rb").read()) != entry["dest_sha256"]:
                 print("EDITED ", entry["dest"]); bad += 1
             continue
-        data = open(source_path(entry, stage_dir), "rb").read()
+        try:
+            data = open(source_path(entry, stage_dir), "rb").read()
+        except OSError as error:
+            print("SOURCE FAILS", entry["src"] + ":", error); bad += 1; continue
         src_hash = sha(data)
         if src_hash != entry["src_sha256"]:
             if a.cmd == "carry" and a.update:
@@ -199,23 +202,38 @@ def main():
                 entry["src_sha256"] = src_hash
             else:
                 print("SOURCE CHANGED", entry["src"], entry["src_sha256"][:12], "->", src_hash[:12]); bad += 1; continue
-        out = transform(entry, modules, data, dest_by_src)
+        try:
+            out = transform(entry, modules, data, dest_by_src)
+        except SystemExit as error:
+            message = str(error)
+            prefix = entry["src"] + ": "
+            print(f"EDIT FAILS {entry['src']}: {message.removeprefix(prefix)}")
+            bad += 1
+            continue
         if a.cmd == "carry":
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            open(dest, "wb").write(out)
-            entry["dest_sha256"] = sha(out)
+            pending.append((entry, dest, out))
         elif not os.path.exists(dest) or open(dest, "rb").read() != out:
             print("DIFFERS", entry["dest"]); bad += 1
+    if bad:
+        print(f"{bad} problem(s)")
+        if a.cmd == "carry":
+            print("nothing written")
+        sys.exit(1)
     if a.cmd == "carry":
+        for entry, dest, out in pending:
+            if out is None:
+                if os.path.exists(dest):
+                    os.remove(dest)
+            else:
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                open(dest, "wb").write(out)
+                entry["dest_sha256"] = sha(out)
         manifest["stage"] = stage_name
         json.dump(manifest, open(mpath, "w"), indent=1)
         open(mpath, "a").write("\n")
         for c in changed:
             print("re-synced", *c)
         print(f"carried {len(manifest['files'])} files from stage {stage_name}")
-    if bad:
-        print(f"{bad} problem(s)")
-        sys.exit(1)
     if a.cmd == "verify":
         print(f"verified {len(manifest['files'])} files" + (" (dest only)" if a.dest_only else f" against stage {stage_name}"))
 
@@ -235,4 +253,5 @@ def write_ledger(root, manifest):
             f.write(f"| `{e['dest']}` | `{e['src']}` | `{e['src_sha256'][:16]}` | `{e['dest_sha256'][:16] or 'removed'}` | {edits} |\n")
 
 
-main()
+if __name__ == "__main__":
+    main()
