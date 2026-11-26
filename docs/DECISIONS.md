@@ -2249,8 +2249,9 @@ in steps of 1/256. The positions file keeps SM2's plainer row.
   the row's kind, the animation is one that fighter has (`MotionModule::is_anim_resource`, the one new guarded call),
   and the hold reports the fighter held with its scripts asleep;
 - kept each frame by reading `motion_kind` and `frame` back and setting again only when they differ;
-- on a frame with no animation for that fighter, or when the hold refuses the point: the plain animation goes back
-  while the fighter stays held, so the last move is never left showing;
+- on a frame with no animation for that fighter, the plain animation goes back while the fighter stays held. When
+  the hold refuses the point it lets the fighter go, by the release order below. Either way the last move is never
+  left showing;
 - on release, in this order: a plain animation back (`wait` on the ground, `fall` in the air, speed 1), then the
   hold's own restore, then the scripts wake. A fighter is never woken with an attack's animation on it. This happens
   in the fighter frame that lets the body go, before that frame reports the release (the report the next build's
