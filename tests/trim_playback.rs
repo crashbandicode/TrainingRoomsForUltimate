@@ -22,6 +22,28 @@ use std::sync::{Mutex, MutexGuard};
 use crate::engine::rr_host as host;
 
 #[test]
+fn switching_tracks_shows_the_selected_handle_on_the_new_track() {
+    let track = |entry, len| macros::ReplayTrack { entry, quantized_analog: false, fighter: None,
+        frames: vec![macros::ReplayFrame { start: StartState::neutral(entry, 0, 1.0),
+            input: InputFrame::default(), x: 0.0, y: 0.0 }; len] };
+    let session = macros::ReplaySession { tracks: vec![track(0, 10), track(1, 30)], ..Default::default() };
+    let mut editor = ClipEditor::new(session, vec![0]).unwrap();
+    editor.on_action(ClipAction::SelectOut);
+    editor.on_action(ClipAction::NextFighter);
+    let view = editor.view();
+    assert_eq!((view.end, view.cursor, view.shown), (30, 29, Some(29)));
+    editor.on_action(ClipAction::Nudge(-4));
+    editor.on_action(ClipAction::PreviousFighter);
+    let view = editor.view();
+    assert_eq!((view.end, view.cursor, view.shown), (10, 9, Some(9)));
+    editor.on_action(ClipAction::SelectOut);
+    editor.on_action(ClipAction::Nudge(-3));
+    editor.on_action(ClipAction::NextFighter);
+    let view = editor.view();
+    assert_eq!((view.cursor, view.shown), (6, None));
+}
+
+#[test]
 fn install5_previewable_capture_windows_remain_previewable() {
     use macros::{MoveFamily, MoveStartRules, ReplayFrame, ReplaySession, ReplayTrack};
 
