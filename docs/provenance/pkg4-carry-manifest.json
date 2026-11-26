@@ -2005,7 +2005,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "c357af6b8cca7edffae6de07e8970d90175491c18efa28ce2de090a1a0296e8b",
+   "dest_sha256": "d332edc30615d0ac1849375d57566d6764f866cbdbd99298e44ff9dc73b07069",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2932,6 +2932,26 @@
      "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
      "old": "    } else {\n        follow\n    };\n    let notice = if let Some(start) = view.move_start {\n        format!(\"Move at {} + {}f setup. Plays from the temporary preview setup.\",\n            start.action_frame, start.action_frame - start.frame)\n    } else if view.clean_start {\n",
      "new": "    } else {\n        follow\n    };\n    // A body that is not moved: the line that says why comes before the snapped move's line and the snap hint.\n    let notice = if view.pos == Pos::Off {\n        view.pos.text().to_owned()\n    } else if let Some(start) = view.move_start {\n        format!(\"Move at {} + {}f setup. Plays from the temporary preview setup.\",\n            start.action_frame, start.action_frame - start.frame)\n    } else if view.clean_start {\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): tests.",
+     "old": "        assert_eq!(e.shown_frame(), Some(1));\n        // Taken by the worker once the bodies are released: the play starts from the same selection.\n        e.on_action(ClipAction::Nudge(-1));\n        e.want_play(ClipAction::TogglePlay);\n        let Some(action) = e.take_wanted_play() else { panic!(\"a wanted play\") };\n        assert!(e.wanted_play().is_none());\n        assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));\n        assert!(e.view().playing);\n",
+     "new": "        assert_eq!(e.shown_frame(), Some(1));\n        // Taken by the worker once the bodies are released: the play starts from the same selection.\n        e.on_action(ClipAction::Nudge(-1));\n        e.want_play(ClipAction::TogglePlay, false);\n        let Some((action, false)) = e.take_wanted_play() else { panic!(\"a wanted preview\") };\n        assert!(e.wanted_play().is_none());\n        assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));\n        assert!(e.view().playing);\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): tests.",
+     "old": "        let mut e = editor();\n        e.on_action(ClipAction::SelectIn);\n        assert_eq!((e.shown_frame(), e.scrub().1), (Some(0), Pos::Held));\n        e.want_play(ClipAction::TogglePlay);\n        assert!(matches!(e.wanted_play(), Some(ClipAction::TogglePlay)));\n        assert_eq!((e.shown_frame(), e.scrub()), (None, (Ask::None, Pos::None)), \"the hold is asked to let go\");\n        assert!(!e.view().playing, \"the play has not started\");\n        // Another press drops it, and the handle's frame is shown again.\n",
+     "new": "        let mut e = editor();\n        e.on_action(ClipAction::SelectIn);\n        assert_eq!((e.shown_frame(), e.scrub().1), (Some(0), Pos::Held));\n        e.want_play(ClipAction::TogglePlay, true);\n        assert!(matches!(e.wanted_play(), Some((ClipAction::TogglePlay, true))));\n        assert_eq!((e.shown_frame(), e.scrub()), (None, (Ask::None, Pos::None)), \"the hold is asked to let go\");\n        assert!(!e.view().playing, \"the play has not started\");\n        // Another press drops it, and the handle's frame is shown again.\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
+     "old": "    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    /// X while the fighters are held at a shown frame: the play is wanted, not started. From here no frame is shown,\n    /// so the hold lets the bodies go; the worker takes the play when the hold reports them released.\n    pub fn want_play(&mut self, action: ClipAction) {\n        self.wanted = Some(action);\n    }\n\n    pub fn wanted_play(&self) -> Option<ClipAction> {\n        self.wanted\n    }\n\n    pub fn take_wanted_play(&mut self) -> Option<ClipAction> {\n        self.wanted.take()\n    }\n\n",
+     "new": "    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    /// X while the fighters are held at a shown frame: the play is wanted, not started. From here no frame is shown,\n    /// so the hold lets the bodies go; the worker takes the play when the hold reports them released.\n    pub fn want_play(&mut self, action: ClipAction, playback: bool) {\n        self.wanted = Some((action, playback));\n    }\n\n    pub fn wanted_play(&self) -> Option<(ClipAction, bool)> {\n        self.wanted\n    }\n\n    pub fn take_wanted_play(&mut self) -> Option<(ClipAction, bool)> {\n        self.wanted.take()\n    }\n\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
+     "old": "    anchor: u32,\n    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,\n    /// A play asked for while the fighters were held at a shown frame: kept until the hold reports them released.\n    wanted: Option<ClipAction>,\n}\n\nfn prepare(mut session: ReplaySession) -> Option<ReplaySession> {\n",
+     "new": "    anchor: u32,\n    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,\n    /// A play asked for while the fighters were held at a shown frame, and whether it is a playback rather than a\n    /// preview: kept until the hold reports them released.\n    wanted: Option<(ClipAction, bool)>,\n}\n\nfn prepare(mut session: ReplaySession) -> Option<ReplaySession> {\n"
     }
    ]
   },
@@ -5695,7 +5715,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "cb90d7b7e3d176f46503a91f08c8249ee2d33bea96cefdd250ae34c9bc0419e1",
+   "dest_sha256": "19d4b09ca3288849bbb98d415c61ca104231615a8cefa81488c8c3c9cce21411",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6701,6 +6721,21 @@
      "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
      "old": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n",
      "new": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\n/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.\nstatic WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
+     "old": "        SLOT.with(|block| block.await_settle());\n        editor.take_wanted_play()\n    };\n    if let Some(action) = wanted {\n        crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] released: the play is asked\"));\n        apply_action_as(action, WANTED_PLAYBACK.load(Ordering::Acquire));\n    }\n}\n\n",
+     "new": "        SLOT.with(|block| block.await_settle());\n        editor.take_wanted_play()\n    };\n    if let Some((action, playback)) = wanted {\n        crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] released: the play is asked\"));\n        apply_action_as(action, playback);\n    }\n}\n\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
+     "old": "        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action);\n    }\n    WANTED_PLAYBACK.store(playback, Ordering::Release);\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n    scrub_service();\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n",
+     "new": "        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n    scrub_service();\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
+     "old": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\n/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.\nstatic WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n",
+     "new": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n"
     }
    ]
   },

@@ -340,8 +340,9 @@ pub struct ClipEditor {
     anchor: u32,
     /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).
     noted: Pos,
-    /// A play asked for while the fighters were held at a shown frame: kept until the hold reports them released.
-    wanted: Option<ClipAction>,
+    /// A play asked for while the fighters were held at a shown frame, and whether it is a playback rather than a
+    /// preview: kept until the hold reports them released.
+    wanted: Option<(ClipAction, bool)>,
 }
 
 fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
@@ -535,15 +536,15 @@ impl ClipEditor {
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
     /// X while the fighters are held at a shown frame: the play is wanted, not started. From here no frame is shown,
     /// so the hold lets the bodies go; the worker takes the play when the hold reports them released.
-    pub fn want_play(&mut self, action: ClipAction) {
-        self.wanted = Some(action);
+    pub fn want_play(&mut self, action: ClipAction, playback: bool) {
+        self.wanted = Some((action, playback));
     }
 
-    pub fn wanted_play(&self) -> Option<ClipAction> {
+    pub fn wanted_play(&self) -> Option<(ClipAction, bool)> {
         self.wanted
     }
 
-    pub fn take_wanted_play(&mut self) -> Option<ClipAction> {
+    pub fn take_wanted_play(&mut self) -> Option<(ClipAction, bool)> {
         self.wanted.take()
     }
 
@@ -1363,8 +1364,8 @@ mod tests {
         let mut e = editor();
         e.on_action(ClipAction::SelectIn);
         assert_eq!((e.shown_frame(), e.scrub().1), (Some(0), Pos::Held));
-        e.want_play(ClipAction::TogglePlay);
-        assert!(matches!(e.wanted_play(), Some(ClipAction::TogglePlay)));
+        e.want_play(ClipAction::TogglePlay, true);
+        assert!(matches!(e.wanted_play(), Some((ClipAction::TogglePlay, true))));
         assert_eq!((e.shown_frame(), e.scrub()), (None, (Ask::None, Pos::None)), "the hold is asked to let go");
         assert!(!e.view().playing, "the play has not started");
         // Another press drops it, and the handle's frame is shown again.
@@ -1373,8 +1374,8 @@ mod tests {
         assert_eq!(e.shown_frame(), Some(1));
         // Taken by the worker once the bodies are released: the play starts from the same selection.
         e.on_action(ClipAction::Nudge(-1));
-        e.want_play(ClipAction::TogglePlay);
-        let Some(action) = e.take_wanted_play() else { panic!("a wanted play") };
+        e.want_play(ClipAction::TogglePlay, false);
+        let Some((action, false)) = e.take_wanted_play() else { panic!("a wanted preview") };
         assert!(e.wanted_play().is_none());
         assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));
         assert!(e.view().playing);

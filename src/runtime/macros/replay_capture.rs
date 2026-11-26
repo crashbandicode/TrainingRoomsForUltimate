@@ -27,8 +27,6 @@ const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);
 static TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());
-/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.
-static WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);
 static BROWSER: Mutex<Option<Browser>> = Mutex::new(None);
 static REVISION: AtomicU64 = AtomicU64::new(1);
 static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
@@ -941,9 +939,8 @@ fn hold_play(action: ClipAction, playback: bool) -> bool {
         let mut editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_mut() else { return false };
         if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }
-        editor.want_play(action);
+        editor.want_play(action, playback);
     }
-    WANTED_PLAYBACK.store(playback, Ordering::Release);
     crate::runtime::diag_log::diagnostic(format_args!("[Scrub] play wanted: the hold lets the fighters go first"));
     scrub_service();
     crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
@@ -961,9 +958,9 @@ fn service_wanted_play() {
         SLOT.with(|block| block.await_settle());
         editor.take_wanted_play()
     };
-    if let Some(action) = wanted {
+    if let Some((action, playback)) = wanted {
         crate::runtime::diag_log::diagnostic(format_args!("[Scrub] released: the play is asked"));
-        apply_action_as(action, WANTED_PLAYBACK.load(Ordering::Acquire));
+        apply_action_as(action, playback);
     }
 }
 

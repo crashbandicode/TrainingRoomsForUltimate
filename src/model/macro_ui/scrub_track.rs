@@ -1173,6 +1173,7 @@ mod tests {
         let released = service.find("block.released()").expect("the release is read");
         assert!(released < service.find("block.await_settle()").unwrap() && released < service.find("editor.take_wanted_play()").unwrap());
         assert!(worker.contains("[Scrub] play wanted") && worker.contains("[Scrub] released"), "both steps are in the trace");
+        assert!(!worker.contains("static WANTED"), "the wanted play lives in the editor, not in a static (BSS)");
     }
 
     #[test]
