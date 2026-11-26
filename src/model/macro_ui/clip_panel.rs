@@ -335,8 +335,8 @@ pub struct ClipEditor {
     watch_base: u32,
     /// The frame the scrub's positions are measured from: the In when the clip, its capture or its track was opened.
     anchor: u32,
-    /// The game side left a fighter where it was: its point is outside the stage (`note_scrub`).
-    off: bool,
+    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).
+    noted: Pos,
 }
 
 fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
@@ -378,7 +378,7 @@ impl ClipEditor {
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, browsed: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
-            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, off: false })
+            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -410,7 +410,7 @@ impl ClipEditor {
             file: Some(file), previous: None, previous_selected: false, track: 0,
             window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false, browsed: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
-            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, off: false })
+            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held })
     }
 
     /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.
@@ -547,7 +547,7 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if self.off => Pos::Off, pos => pos } }
+            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }
     }
 
     /// What the fighters show at `shown_frame` (the selected handle's frame, or the moved playhead's), and what the
@@ -585,8 +585,7 @@ impl ClipEditor {
     /// The worker: what the game side did with the last ask, for the key line.
     /// Whether the key line changed.
     pub fn note_scrub(&mut self, pos: Pos) -> bool {
-        let off = pos == Pos::Off;
-        std::mem::replace(&mut self.off, off) != off
+        std::mem::replace(&mut self.noted, pos) != pos
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing

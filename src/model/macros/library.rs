@@ -81,6 +81,27 @@ impl<'de> Visitor<'de> for MacroHeader {
     }
 }
 
+/// A macro read without its position rows, for the list and for playback. The file's version is still checked against
+/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.
+fn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {
+    let mut de = serde_json::Deserializer::from_reader(reader);
+    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;
+    de.end()?;
+    Ok(rec.validate_header().and_then(|()| {
+        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }
+        rec.validate_frame_count()?;
+        Ok(rec)
+    }))
+}
+
+impl Store<MacroRecording> {
+    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not
+    /// built. Crop and the clip editor load the whole file (`load`).
+    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {
+        self.load(id)
+    }
+}
+
 /// The named-macro library: the original API, now on the generic store.
 pub type Library = Store<MacroRecording>;
 
@@ -91,14 +112,7 @@ impl Record for MacroRecording {
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
     const STREAM_READ: bool = true;
     fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {
-        let mut de = serde_json::Deserializer::from_reader(reader);
-        let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;
-        de.end()?;
-        Ok(rec.validate_header().and_then(|()| {
-            if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }
-            rec.validate_frame_count()?;
-            Ok(rec.summary(id))
-        }))
+        Ok(read_header(reader)?.map(|rec| rec.summary(id)))
     }
     fn summary_name(summary: &MacroEntry) -> &str { &summary.name }
     fn stream_write(&self) -> bool { self.track.is_some() }

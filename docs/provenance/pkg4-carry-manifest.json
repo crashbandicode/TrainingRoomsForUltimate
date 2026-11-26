@@ -1280,7 +1280,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "ead193b48cc4d183710277980f48cb75c907bc99cab930f1a036af17f3d67102",
+   "dest_sha256": "e53817d39e6d0be22e6385c57ac195d4719cd5eb7601e9cd9e897610de33452a",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1340,6 +1340,16 @@
     {
      "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\n",
      "new": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::{Placement, TRACK_SCHEMA_VERSION};\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let mut de = serde_json::Deserializer::from_reader(reader);\n        let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n        de.end()?;\n        Ok(rec.validate_header().and_then(|()| {\n            if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n            rec.validate_frame_count()?;\n            Ok(rec.summary(id))\n        }))",
+     "new": "        Ok(read_header(reader)?.map(|rec| rec.summary(id)))",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n/// The named-macro library: the original API, now on the generic store.",
+     "new": "\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {\n    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not\n    /// built. Crop and the clip editor load the whole file (`load`).\n    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        self.load(id)\n    }\n}\n\n/// The named-macro library: the original API, now on the generic store.",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1750,7 +1760,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "06ae4f622c2d04e13938036cbecb582b0c7116927604a8716fc1da73c006a6e4",
+   "dest_sha256": "e34aabed3cc6754dec9358cbf3ec542ad22e1f1fa6ee5c64fa249857f9c4247d",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2576,6 +2586,31 @@
     {
      "old": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
      "new": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::engine::macro_ui::scrub_track::{self, Ask, Pos};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let off = pos == Pos::Off;\n        std::mem::replace(&mut self.off, off) != off",
+     "new": "        std::mem::replace(&mut self.noted, pos) != pos",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if self.off => Pos::Off, pos => pos } }",
+     "new": "            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, off: false })",
+     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, off: false })",
+     "new": "            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// The game side left a fighter where it was: its point is outside the stage (`note_scrub`).\n    off: bool,",
+     "new": "    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

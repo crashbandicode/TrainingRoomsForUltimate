@@ -95,6 +95,8 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
 pub struct Block {
     ask: hos_lock::Published<Ask>,
     seen: [AtomicU32; 2],
+    /// The ask's generation, plus one, at which the game side found a hold made on another body; zero before any.
+    dropped: AtomicU32,
     /// Each role's hold, as the placement picker keeps one. The game thread only, with `try_lock`.
     pub holds: hos_lock::Mutex<[Option<CpuPreview>; 2]>,
 }
@@ -104,6 +106,7 @@ impl Block {
         Box::new(Self {
             ask: hos_lock::Published::new(Ask::None),
             seen: [const { AtomicU32::new(SEEN_IDLE) }; 2],
+            dropped: AtomicU32::new(0),
             holds: hos_lock::Mutex::new([None; 2]),
         })
     }
@@ -119,8 +122,21 @@ impl Block {
         }
     }
 
+    /// The game thread: the body a hold was made on is gone (a swapped fighter, a new scene). Nobody is held until
+    /// the editor asks for another frame.
+    pub fn forget(&self) {
+        let _ = &self.dropped;
+    }
+
+    fn forgotten(&self) -> bool {
+        self.dropped.load(Ordering::Acquire) == self.ask.generation().wrapping_add(1)
+    }
+
     /// Where the role in `slot` is held, `home` being where the hold found the target role; none when it is not held.
     pub fn held_at(&self, slot: usize, home: [f32; 2]) -> Option<Spot> {
+        if self.forgotten() {
+            return None;
+        }
         let Ask::Group { deltas, .. } = self.ask() else { return None };
         let delta = (*deltas.get(slot)?)?;
         Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing })
@@ -149,6 +165,7 @@ impl Block {
     pub fn pos(&self) -> Pos {
         match self.ask() {
             Ask::None => Pos::None,
+            Ask::Group { .. } if self.forgotten() => Pos::None,
             Ask::Group { .. } if (0..2).any(|slot| self.seen(slot) == SEEN_OFF) => Pos::Off,
             Ask::Group { .. } => Pos::Held,
         }
@@ -866,6 +883,38 @@ mod tests {
         }).unwrap();
         slot.close();
         assert!(slot.empty());
+    }
+
+    #[test]
+    fn a_swapped_fighter_drops_the_hold_until_the_handle_moves() {
+        let block = Block::new();
+        let ask = |x: f32| Ask::Group { target: 1, deltas: [Some(spot(x, 0.0, 1.0)), Some(spot(x + 1.0, 0.0, 1.0))] };
+        block.set_ask(ask(3.0));
+        assert_eq!(block.pos(), Pos::Held);
+        // The game side finds a hold made on another body: a hot swap, a new scene.
+        block.forget();
+        assert_eq!((block.held_at(0, [0.0, 0.0]), block.held_at(1, [0.0, 0.0])), (None, None), "neither body is held");
+        assert_eq!(block.pos(), Pos::None);
+        // The same frame asked again changes nothing; a moved handle holds again.
+        block.set_ask(ask(3.0));
+        assert_eq!(block.held_at(1, [0.0, 0.0]), None);
+        block.set_ask(ask(4.0));
+        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(spot(15.0, 0.0, 1.0)));
+        assert_eq!(block.pos(), Pos::Held);
+        // The key line and the bridge follow what the game side said.
+        let mut editor = capture(2);
+        editor.on_action(ClipAction::SelectIn);
+        assert_eq!(editor.view().pos, Pos::Held);
+        assert!(editor.note_scrub(Pos::None));
+        assert_eq!(editor.view().pos, Pos::None);
+        assert!(!editor.note_scrub(Pos::None));
+        assert!(editor.note_scrub(Pos::Off));
+        assert_eq!(editor.view().pos, Pos::Off);
+        assert!(editor.note_scrub(Pos::Held));
+        assert_eq!(editor.view().pos, Pos::Held);
+        let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
+        assert!(runtime.contains("if holds[slot].is_some_and(|hold| hold.body() != natives::battle_object_id(accessor)) {"));
+        assert!(runtime.contains("block.forget();"));
     }
 
     #[test]

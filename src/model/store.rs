@@ -339,6 +339,18 @@ impl<R: Record> Store<R> {
         data.record::<R>(id)
     }
 
+    /// Loads the record with this id through `read`, which decodes the file its own way (a large record that leaves a
+    /// payload out). The id check, the size limit and the missing-file error are `load`'s.
+    pub fn load_with(&self, id: &str, read: impl FnOnce(&mut dyn Read) -> serde_json::Result<Result<R, R::Error>>) -> Result<R, R::Error> {
+        check_id::<R>(id).map_err(lift::<R>)?;
+        payload_read().map_err(lift::<R>)?;
+        let (len, mut file) = fs::File::open(self.file(id, "json"))
+            .and_then(|file| Ok((file.metadata()?.len(), file)))
+            .map_err(|err| lift::<R>(if err.kind() == io::ErrorKind::NotFound { StoreError::NotFound(id.to_owned()) } else { err.into() }))?;
+        check_len(len, R::MAX_FILE_BYTES).map_err(lift::<R>)?;
+        streamed::<R, _>(&mut file, len, read).map_err(|err| lift::<R>(err.into()))?
+    }
+
     /// Saves as a brand-new file and returns its id. The id comes from the
     /// name (`my-drill`, then `my-drill-2`, ...) and never matches an existing
     /// file, good or corrupt, so nothing already on disk can be replaced.
