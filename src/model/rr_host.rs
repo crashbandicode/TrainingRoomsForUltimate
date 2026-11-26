@@ -3077,6 +3077,7 @@ mod tests {
     use super::super::macros::StartState;
     use super::*;
     use crate::model::bridge_events::{Fed, FedSeen};
+    use std::process::Command;
     use std::sync::Mutex as TestMutex;
 
     static TEST_LOCK: TestMutex<()> = TestMutex::new(());
@@ -5016,7 +5017,6 @@ mod tests {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
     }
 
-    #[test]
     fn a_poll_that_straddles_generation_arm_seeds_the_first_input_once() {
         let _hold = hold();
         for role in [Role::Cpu, Role::Player] { straddle_arm(role); }
@@ -5119,7 +5119,6 @@ mod tests {
         correct
     }
 
-    #[test]
     fn bad_sidecar_bodies_are_replaced_after_playback() {
         use crate::engine::macros::positions::Source;
         let _hold = hold();
@@ -5127,7 +5126,6 @@ mod tests {
         assert_eq!(repaired, [true, true], "a nonfinite partner row in chunk two must not protect either source");
     }
 
-    #[test]
     fn valid_sidecars_win_over_a_shorter_playback() {
         use crate::engine::macros::positions::Source;
         let _hold = hold();
@@ -5178,7 +5176,6 @@ mod tests {
         assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 1);
     }
 
-    #[test]
     fn an_immediate_poll_of_the_first_preview_input_gets_its_positions() {
         let _hold = hold();
         let (root, id, recording) = generated_fixture("generated-first-poll", 5);
@@ -5397,7 +5394,6 @@ mod tests {
         assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
     }
 
-    #[test]
     fn a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions() {
         let _hold = hold();
         for stop in [false, true] { external_edit_before_settle(stop); }
@@ -8003,22 +7999,6 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
-            ("an_old_macro_played_once_from_zero_gets_generated_positions", an_old_macro_played_once_from_zero_gets_generated_positions as fn()),
-            ("a_stopped_playback_writes_the_inputs_that_were_consumed", a_stopped_playback_writes_the_inputs_that_were_consumed as fn()),
-            ("an_editor_preview_from_zero_binds_the_whole_macro", an_editor_preview_from_zero_binds_the_whole_macro as fn()),
-            ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
-            ("a_longer_generated_track_replaces_a_shorter_one_only", a_longer_generated_track_replaces_a_shorter_one_only as fn()),
-            ("a_generated_track_never_replaces_a_recorded_one", a_generated_track_never_replaces_a_recorded_one as fn()),
-            ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
-            ("an_adopted_generated_track_is_cropped_as_generated", an_adopted_generated_track_is_cropped_as_generated as fn()),
-            ("the_play_chord_pass_opens_and_writes_no_positions_file", the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
-            ("nothing_is_allocated_for_generation_before_the_first_generating_play", nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
-            ("a_library_write_during_the_run_drops_its_track", a_library_write_during_the_run_drops_its_track as fn()),
-            ("a_recorded_file_written_before_the_worker_drains_is_kept", a_recorded_file_written_before_the_worker_drains_is_kept as fn()),
-            ("only_a_single_macro_from_input_zero_on_its_own_fighter_generates", only_a_single_macro_from_input_zero_on_its_own_fighter_generates as fn()),
-            ("a_loop_and_a_second_role_never_join_one_track", a_loop_and_a_second_role_never_join_one_track as fn()),
-            ("a_finished_write_is_announced_once", a_finished_write_is_announced_once as fn()),
-            ("the_last_input_is_credited_before_the_worker_drains", the_last_input_is_credited_before_the_worker_drains as fn()),
             ("an_owed_slot_does_not_show_the_playback_indicator", an_owed_slot_does_not_show_the_playback_indicator as fn()),
             ("the_host_deletes_a_saved_capture_through_the_file_delete", the_host_deletes_a_saved_capture_through_the_file_delete as fn()),
             ("a_macro_made_from_a_capture_outlives_its_delete", a_macro_made_from_a_capture_outlives_its_delete as fn()),
@@ -8138,6 +8118,48 @@ mod tests {
             ("the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies", the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
+    }
+
+    mod generation {
+        use super::*;
+
+        /// The library version is process-wide, so no other test may write a library while these cases run.
+        /// The rows run exactly as in the module's table, each on its own thread.
+        #[test]
+        fn case_table() {
+            if std::env::var_os("TR_GENERATION_TABLE").is_none() {
+                let name = format!("{}::case_table", module_path!().split_once("::").unwrap().1);
+                let status = Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", &name, "--nocapture"])
+                    .env("TR_GENERATION_TABLE", "1")
+                    .status().unwrap();
+                assert!(status.success(), "the generation cases failed in their own process");
+            } else {
+                crate::test_table::run(&[
+                    ("an_old_macro_played_once_from_zero_gets_generated_positions", super::an_old_macro_played_once_from_zero_gets_generated_positions as fn()),
+                    ("a_stopped_playback_writes_the_inputs_that_were_consumed", super::a_stopped_playback_writes_the_inputs_that_were_consumed as fn()),
+                    ("an_editor_preview_from_zero_binds_the_whole_macro", super::an_editor_preview_from_zero_binds_the_whole_macro as fn()),
+                    ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", super::delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
+                    ("a_longer_generated_track_replaces_a_shorter_one_only", super::a_longer_generated_track_replaces_a_shorter_one_only as fn()),
+                    ("a_generated_track_never_replaces_a_recorded_one", super::a_generated_track_never_replaces_a_recorded_one as fn()),
+                    ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", super::a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
+                    ("an_adopted_generated_track_is_cropped_as_generated", super::an_adopted_generated_track_is_cropped_as_generated as fn()),
+                    ("the_play_chord_pass_opens_and_writes_no_positions_file", super::the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
+                    ("nothing_is_allocated_for_generation_before_the_first_generating_play", super::nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
+                    ("a_library_write_during_the_run_drops_its_track", super::a_library_write_during_the_run_drops_its_track as fn()),
+                    ("a_recorded_file_written_before_the_worker_drains_is_kept", super::a_recorded_file_written_before_the_worker_drains_is_kept as fn()),
+                    ("only_a_single_macro_from_input_zero_on_its_own_fighter_generates", super::only_a_single_macro_from_input_zero_on_its_own_fighter_generates as fn()),
+                    ("a_loop_and_a_second_role_never_join_one_track", super::a_loop_and_a_second_role_never_join_one_track as fn()),
+                    ("a_finished_write_is_announced_once", super::a_finished_write_is_announced_once as fn()),
+                    ("the_last_input_is_credited_before_the_worker_drains", super::the_last_input_is_credited_before_the_worker_drains as fn()),
+                    ("bad_sidecar_bodies_are_replaced_after_playback", super::bad_sidecar_bodies_are_replaced_after_playback as fn()),
+                    ("valid_sidecars_win_over_a_shorter_playback", super::valid_sidecars_win_over_a_shorter_playback as fn()),
+                    ("an_immediate_poll_of_the_first_preview_input_gets_its_positions", super::an_immediate_poll_of_the_first_preview_input_gets_its_positions as fn()),
+                    ("a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions", super::a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions as fn()),
+                    ("a_poll_that_straddles_generation_arm_seeds_the_first_input_once", super::a_poll_that_straddles_generation_arm_seeds_the_first_input_once as fn()),
+                ]);
+            }
+        }
     }
     }
 }
