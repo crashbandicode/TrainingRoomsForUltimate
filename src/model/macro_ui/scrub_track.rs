@@ -1048,6 +1048,30 @@ mod tests {
     }
 
     #[test]
+    fn a_new_shown_frame_rechecks_the_same_point_on_both_roles() {
+        use crate::model::stage_geometry::{classify, Copied, Met};
+        let block = Block::new();
+        let ask = Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)); 2] };
+        let permits = |floor_y| {
+            let floor = [Met { ends: [[-20.0, floor_y], [20.0, floor_y]], stand: true, through: false }];
+            can_stand(classify(&mut Copied(&floor), [-100.0, 100.0, 100.0, -100.0], [0.0, 0.0]))
+        };
+        block.ask_at(Some(10), ask);
+        for slot in 0..2 {
+            assert!(block.standable(slot, [0.0, 0.0], || permits(-4.0)));
+        }
+        block.ask_at(Some(10), ask);
+        for slot in 0..2 {
+            assert!(block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged hold")));
+        }
+        block.ask_at(Some(11), ask);
+        for slot in 0..2 {
+            assert!(!block.standable(slot, [0.0, 0.0], || permits(4.0)), "frame 11: role {slot} is inside the floor");
+            assert!(!block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged refusal")));
+        }
+    }
+
+    #[test]
     fn a_point_in_the_ground_or_past_the_blast_lines_holds_nobody() {
         use crate::model::stage_geometry::{classify, Copied, Met};
         // A stage as copied lines: solid ground from -150 to 150 at height 0, and two platforms over it.
