@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "7f795052e7f67c281e83a7818f8baf26f1381fa1b074e2ae1ef65db1becd029e",
+   "dest_sha256": "cb13f5ac436650e97c363a96d49f6364f176c16d4a5fb462ddb07077505d0fcd",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2262,6 +2262,66 @@
      "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): add inert browsed state and shown-frame and repeat shims for the red-first cases.",
      "old": "    pub fn play_role(&self) -> crate::engine::library::Role {\n        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }\n    }\n}\n\n/// The same editor changes units and offered actions with its source.\n",
      "new": "    pub fn play_role(&self) -> crate::engine::library::Role {\n        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }\n    }\n    pub fn scrubs(&self) -> bool { self.handle != Handle::Playhead }\n}\n\n/// The same editor changes units and offered actions with its source.\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "                let prefix: String = self.source_name.chars()\n                    .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();\n                return match self.export_selection(&format!(\"{prefix}{suffix}\")) {\n                    Ok(recording) => ClipEffect::Export(Box::new(recording)),\n                    Err(error) => ClipEffect::Error(error),\n                };\n            }\n",
+     "new": "                let prefix: String = self.source_name.chars()\n                    .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();\n                return match self.export_selection(&format!(\"{prefix}{suffix}\")) {\n                    Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }\n                    Err(error) => ClipEffect::Error(error),\n                };\n            }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    return match recording.crop_units(self.window.start(), self.window.end()) {\n                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),\n                        Err(error) => ClipEffect::Error(error.to_string()),\n                    };\n                }\n                if self.file.is_some() {\n                    return match self.export_selection(&self.source_name) {\n                        Ok(recording) => ClipEffect::Export(Box::new(recording)),\n                        Err(error) => ClipEffect::Error(error),\n                    };\n                }\n",
+     "new": "                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    return match recording.crop_units(self.window.start(), self.window.end()) {\n                        Ok(saved) => { self.browsed = false; ClipEffect::ExportCombo(Box::new(saved)) }\n                        Err(error) => ClipEffect::Error(error.to_string()),\n                    };\n                }\n                if self.file.is_some() {\n                    return match self.export_selection(&self.source_name) {\n                        Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }\n                        Err(error) => ClipEffect::Error(error),\n                    };\n                }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "                self.set_track((self.track + offset) % count);\n            }\n            ClipAction::ToggleCapture => {\n                if let Some(previous) = &mut self.previous {\n                    std::mem::swap(&mut self.session, previous);\n                    std::mem::swap(&mut self.source_name, &mut self.previous_name);\n",
+     "new": "                self.set_track((self.track + offset) % count);\n            }\n            ClipAction::ToggleCapture => {\n                self.browsed = false;\n                if let Some(previous) = &mut self.previous {\n                    std::mem::swap(&mut self.session, previous);\n                    std::mem::swap(&mut self.source_name, &mut self.previous_name);\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "                        self.window.set_out(add(self.window.end()));\n                        self.window.seek(self.window.end() - 1);\n                    }\n                    Handle::Playhead => {\n                        return ClipEffect::Error(\"Press L for the start or R for the end, then hold Left or Right\".into());\n                    }\n",
+     "new": "                        self.window.set_out(add(self.window.end()));\n                        self.window.seek(self.window.end() - 1);\n                    }\n                    Handle::Playhead if self.context().preview() => {\n                        self.window.seek(add(self.window.cursor()).min(self.window.total() - 1));\n                        self.browsed = true;\n                    }\n                    Handle::Playhead => {\n                        return ClipEffect::Error(\"Press L for the start or R for the end, then hold Left or Right\".into());\n                    }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "            ClipAction::SelectIn | ClipAction::SelectOut => {\n                self.pause();\n                let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };\n                self.handle = if self.handle == handle { Handle::Playhead } else { handle };\n                match self.handle {\n                    Handle::In => { self.window.seek(self.window.start()); }\n",
+     "new": "            ClipAction::SelectIn | ClipAction::SelectOut => {\n                self.pause();\n                let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };\n                if self.handle == Handle::Playhead && self.browsed {\n                    let cursor = self.window.cursor();\n                    match handle {\n                        Handle::In => {\n                            if cursor >= self.window.end() { return ClipEffect::Error(\"Playhead is past Out: set Out first\".into()); }\n                            self.window.set_in(cursor);\n                            self.move_start = None;\n                        }\n                        Handle::Out => {\n                            if cursor <= self.window.start() { return ClipEffect::Error(\"Playhead is at or before In: set In first\".into()); }\n                            self.window.set_out(cursor + 1);\n                            self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());\n                        }\n                        Handle::Playhead => {}\n                    }\n                }\n                self.browsed = false;\n                self.handle = if self.handle == handle { Handle::Playhead } else { handle };\n                match self.handle {\n                    Handle::In => { self.window.seek(self.window.start()); }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "                let Some(at) = at else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                self.window.seek(at);\n                self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());\n                if self.handle == Handle::In && self.file.is_none() && self.move_start.is_none()\n                    && !self.clean_statuses.contains(&self.track().frames[at as usize].start.status) {\n                    if let Some(Err(error)) = self.move_at(at) { return ClipEffect::Error(error); }\n",
+     "new": "                let Some(at) = at else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                self.window.seek(at);\n                if self.handle == Handle::Playhead { self.browsed = true; }\n                else { self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end()); }\n                if self.handle == Handle::In && self.file.is_none() && self.move_start.is_none()\n                    && !self.clean_statuses.contains(&self.track().frames[at as usize].start.status) {\n                    if let Some(Err(error)) = self.move_at(at) { return ClipEffect::Error(error); }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "        match action {\n            ClipAction::Snap => {\n                let at = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In if self.move_start.is_some() => Some(self.window.start()),\n                    Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),\n",
+     "new": "        match action {\n            ClipAction::Snap => {\n                let at = match self.handle {\n                    Handle::Playhead if self.context().preview() =>\n                        self.marks.snap_in(self.window.cursor()).map(|at| at.min(self.window.total() - 1)),\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In if self.move_start.is_some() => Some(self.window.start()),\n                    Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "        self.window = window;\n        self.marks = track_marks(&self.session.tracks[index]);\n        self.playing = false;\n        self.move_start = None;\n    }\n\n",
+     "new": "        self.window = window;\n        self.marks = track_marks(&self.session.tracks[index]);\n        self.playing = false;\n        self.browsed = false;\n        self.move_start = None;\n    }\n\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "        self.marks.forget_watched(self.watch_base, self.window.end());\n        self.window.seek(self.watch_base);\n        self.handle = Handle::Playhead;\n        self.playing = true;\n        effect\n    }\n",
+     "new": "        self.marks.forget_watched(self.watch_base, self.window.end());\n        self.window.seek(self.watch_base);\n        self.handle = Handle::Playhead;\n        self.browsed = false;\n        self.playing = true;\n        effect\n    }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n        (!self.playing && self.handle != Handle::Playhead && self.context().preview()).then_some(self.window.cursor())\n    }\n\n    pub fn view(&self) -> ClipView {\n",
+     "new": "\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n        (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())\n    }\n\n    pub fn view(&self) -> ClipView {\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "    pub fn play_role(&self) -> crate::engine::library::Role {\n        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }\n    }\n    pub fn scrubs(&self) -> bool { self.handle != Handle::Playhead }\n}\n\n/// The same editor changes units and offered actions with its source.\n",
+     "new": "    pub fn play_role(&self) -> crate::engine::library::Role {\n        if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }\n    }\n    pub fn scrubs(&self) -> bool { !self.playing && (self.handle != Handle::Playhead || self.context.preview()) }\n}\n\n/// The same editor changes units and offered actions with its source.\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
+     "old": "        Handle::In => (\n            \"Start selected. Hold Left or Right to move it.\".to_owned(),\n            format!(\"Hold longer to speed up, or hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead => (\n            \"Press L for the start, or R for the end.\".to_owned(),\n",
+     "new": "        Handle::In => (\n            \"Start selected. Hold Left or Right to move it.\".to_owned(),\n            format!(\"Hold longer to speed up, or hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead if view.context.preview() && view.shown.is_some() => (\n            \"Playhead moved. L sets the start here, R the end.\".to_owned(),\n            \"Left or Right browses on. Y goes to the nearest move.\".to_owned(),\n        ),\n        Handle::Playhead if view.context.preview() => (\n            \"Hold Left or Right to browse the take, or Y for the nearest move.\".to_owned(),\n            format!(\"Press L for the start, or R for the end. Hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead => (\n            \"Press L for the start, or R for the end.\".to_owned(),\n"
     }
    ]
   },
@@ -5025,7 +5085,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "4dafde3542c76ae3953b8e3f15e3cb96abf02f09d1f752672b50bcead507141a",
+   "dest_sha256": "e5f79f1295fe900148eae9a6bde1d6f209810913f9da1c7dd8155a671069be50",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5931,6 +5991,26 @@
      "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
      "old": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n",
      "new": "                if playback {\n                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());\n                } else {\n                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n                }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): repeat browsing only when scrubbing is allowed and clear held direction during preview.",
+     "old": "        }\n    };\n    if let Some(delta) = delta {\n        if clip_view().is_some_and(|view| view.handle != Handle::Playhead) {\n            on_action(ClipAction::Nudge(delta));\n        }\n    }\n",
+     "new": "        }\n    };\n    if let Some(delta) = delta {\n        if clip_view().is_some_and(|view| view.scrubs()) {\n            on_action(ClipAction::Nudge(delta));\n        }\n    }\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): repeat browsing only when scrubbing is allowed and clear held direction during preview.",
+     "old": "pub fn scrub_pace() -> i32 {\n    let hold = *HOLD.lock().unwrap();\n    if hold.0 == 0 { return 0; }\n    let editing = clip_view().is_some_and(|view| view.handle != Handle::Playhead);\n    if !editing { return 0; }\n    scrub_repeat_step(hold.1, hold.2)\n}\n",
+     "new": "pub fn scrub_pace() -> i32 {\n    let hold = *HOLD.lock().unwrap();\n    if hold.0 == 0 { return 0; }\n    let editing = clip_view().is_some_and(|view| view.scrubs());\n    if !editing { return 0; }\n    scrub_repeat_step(hold.1, hold.2)\n}\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): repeat browsing only when scrubbing is allowed and clear held direction during preview.",
+     "old": "    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }\n        return;\n    }\n    let p = controller.just_down;\n",
+     "new": "    }\n    if clip_view().is_some_and(|v| v.playing) {\n        if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }\n        *HOLD.lock().unwrap() = (0, 0, false);\n        return;\n    }\n    let p = controller.just_down;\n"
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): repeat browsing only when scrubbing is allowed and clear held direction during preview.",
+     "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n",
+     "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n"
     }
    ]
   },

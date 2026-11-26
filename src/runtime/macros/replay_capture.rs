@@ -15,7 +15,7 @@ use crate::engine::library::Role;
 use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
 use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, Handle, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
 
@@ -1141,6 +1141,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
     }
     if clip_view().is_some_and(|v| v.playing) {
         if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
+        *HOLD.lock().unwrap() = (0, 0, false);
         return;
     }
     let p = controller.just_down;
@@ -1183,7 +1184,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
 pub fn scrub_pace() -> i32 {
     let hold = *HOLD.lock().unwrap();
     if hold.0 == 0 { return 0; }
-    let editing = clip_view().is_some_and(|view| view.handle != Handle::Playhead);
+    let editing = clip_view().is_some_and(|view| view.scrubs());
     if !editing { return 0; }
     scrub_repeat_step(hold.1, hold.2)
 }
@@ -1204,7 +1205,7 @@ pub fn after_draw() {
         }
     };
     if let Some(delta) = delta {
-        if clip_view().is_some_and(|view| view.handle != Handle::Playhead) {
+        if clip_view().is_some_and(|view| view.scrubs()) {
             on_action(ClipAction::Nudge(delta));
         }
     }

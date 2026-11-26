@@ -58,6 +58,7 @@ pub fn clip_frame(view: &ClipView, fighter: &str, pace: i32, frame: &mut Frame) 
     } else {
         let _ = write!(window, "{} - {}  ({length} frames, {:.2}s of {})", view.start, view.end, length as f32 / FPS, view.total);
     }
+    if let Some(at) = view.shown.filter(|_| view.handle == Handle::Playhead) { let _ = write!(window, " · playhead {at}"); }
     let title = format!("{}: {}", if matches!(view.context, ClipContext::Replay { .. }) { "Replay window" } else { "Crop" }, view.source_name);
     push(frame, &title, &window, Tone::Normal);
     let target = match view.context {

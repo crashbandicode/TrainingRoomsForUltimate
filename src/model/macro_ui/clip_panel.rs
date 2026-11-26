@@ -123,6 +123,14 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
             "Start selected. Hold Left or Right to move it.".to_owned(),
             format!("Hold longer to speed up, or hold {coarse} to start fast."),
         ),
+        Handle::Playhead if view.context.preview() && view.shown.is_some() => (
+            "Playhead moved. L sets the start here, R the end.".to_owned(),
+            "Left or Right browses on. Y goes to the nearest move.".to_owned(),
+        ),
+        Handle::Playhead if view.context.preview() => (
+            "Hold Left or Right to browse the take, or Y for the nearest move.".to_owned(),
+            format!("Press L for the start, or R for the end. Hold {coarse} to start fast."),
+        ),
         Handle::Playhead => (
             "Press L for the start, or R for the end.".to_owned(),
             format!("Then hold Left or Right. Hold {coarse} to start fast."),
@@ -254,7 +262,7 @@ impl ClipView {
     pub fn play_role(&self) -> crate::engine::library::Role {
         if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }
     }
-    pub fn scrubs(&self) -> bool { self.handle != Handle::Playhead }
+    pub fn scrubs(&self) -> bool { !self.playing && (self.handle != Handle::Playhead || self.context.preview()) }
 }
 
 /// The same editor changes units and offered actions with its source.
@@ -502,7 +510,7 @@ impl ClipEditor {
 
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
     pub fn shown_frame(&self) -> Option<u32> {
-        (!self.playing && self.handle != Handle::Playhead && self.context().preview()).then_some(self.window.cursor())
+        (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())
     }
 
     pub fn view(&self) -> ClipView {
@@ -569,6 +577,7 @@ impl ClipEditor {
         self.marks.forget_watched(self.watch_base, self.window.end());
         self.window.seek(self.watch_base);
         self.handle = Handle::Playhead;
+        self.browsed = false;
         self.playing = true;
         effect
     }
@@ -625,6 +634,7 @@ impl ClipEditor {
         self.window = window;
         self.marks = track_marks(&self.session.tracks[index]);
         self.playing = false;
+        self.browsed = false;
         self.move_start = None;
     }
 
@@ -650,6 +660,8 @@ impl ClipEditor {
         match action {
             ClipAction::Snap => {
                 let at = match self.handle {
+                    Handle::Playhead if self.context().preview() =>
+                        self.marks.snap_in(self.window.cursor()).map(|at| at.min(self.window.total() - 1)),
                     Handle::Playhead => return ClipEffect::Error("Press L for the start or R for the end, then Y to snap".into()),
                     Handle::In if self.move_start.is_some() => Some(self.window.start()),
                     Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),
@@ -658,7 +670,8 @@ impl ClipEditor {
                 let Some(at) = at else { return ClipEffect::Error("No move marks yet: X previews and marks them".into()) };
                 self.pause();
                 self.window.seek(at);
-                self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());
+                if self.handle == Handle::Playhead { self.browsed = true; }
+                else { self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end()); }
                 if self.handle == Handle::In && self.file.is_none() && self.move_start.is_none()
                     && !self.clean_statuses.contains(&self.track().frames[at as usize].start.status) {
                     if let Some(Err(error)) = self.move_at(at) { return ClipEffect::Error(error); }
@@ -674,6 +687,23 @@ impl ClipEditor {
             ClipAction::SelectIn | ClipAction::SelectOut => {
                 self.pause();
                 let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };
+                if self.handle == Handle::Playhead && self.browsed {
+                    let cursor = self.window.cursor();
+                    match handle {
+                        Handle::In => {
+                            if cursor >= self.window.end() { return ClipEffect::Error("Playhead is past Out: set Out first".into()); }
+                            self.window.set_in(cursor);
+                            self.move_start = None;
+                        }
+                        Handle::Out => {
+                            if cursor <= self.window.start() { return ClipEffect::Error("Playhead is at or before In: set In first".into()); }
+                            self.window.set_out(cursor + 1);
+                            self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());
+                        }
+                        Handle::Playhead => {}
+                    }
+                }
+                self.browsed = false;
                 self.handle = if self.handle == handle { Handle::Playhead } else { handle };
                 match self.handle {
                     Handle::In => { self.window.seek(self.window.start()); }
@@ -695,6 +725,10 @@ impl ClipEditor {
                         self.window.set_out(add(self.window.end()));
                         self.window.seek(self.window.end() - 1);
                     }
+                    Handle::Playhead if self.context().preview() => {
+                        self.window.seek(add(self.window.cursor()).min(self.window.total() - 1));
+                        self.browsed = true;
+                    }
                     Handle::Playhead => {
                         return ClipEffect::Error("Press L for the start or R for the end, then hold Left or Right".into());
                     }
@@ -712,6 +746,7 @@ impl ClipEditor {
                 self.set_track((self.track + offset) % count);
             }
             ClipAction::ToggleCapture => {
+                self.browsed = false;
                 if let Some(previous) = &mut self.previous {
                     std::mem::swap(&mut self.session, previous);
                     std::mem::swap(&mut self.source_name, &mut self.previous_name);
@@ -743,13 +778,13 @@ impl ClipEditor {
                 self.pause();
                 if let Some(FileSource::Combo(recording)) = &self.file {
                     return match recording.crop_units(self.window.start(), self.window.end()) {
-                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),
+                        Ok(saved) => { self.browsed = false; ClipEffect::ExportCombo(Box::new(saved)) }
                         Err(error) => ClipEffect::Error(error.to_string()),
                     };
                 }
                 if self.file.is_some() {
                     return match self.export_selection(&self.source_name) {
-                        Ok(recording) => ClipEffect::Export(Box::new(recording)),
+                        Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }
                         Err(error) => ClipEffect::Error(error),
                     };
                 }
@@ -757,7 +792,7 @@ impl ClipEditor {
                 let prefix: String = self.source_name.chars()
                     .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
                 return match self.export_selection(&format!("{prefix}{suffix}")) {
-                    Ok(recording) => ClipEffect::Export(Box::new(recording)),
+                    Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }
                     Err(error) => ClipEffect::Error(error),
                 };
             }
