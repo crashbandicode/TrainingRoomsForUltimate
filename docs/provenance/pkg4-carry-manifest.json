@@ -5760,7 +5760,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "60311445d9026603c79c17884049c07a46a13348b3609c2c98f6ff9624ae680a",
+   "dest_sha256": "523bc3ade7e9a1270616200f9ace5dedf99fa91c3d40de9dc93b5d15693bc8c3",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6791,6 +6791,11 @@
      "reason": "Validate both actual scrub holds and in-flight fighter readers before starting a queued preview (review of dec899a6).",
      "old": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n",
      "new": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.released() { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n"
+    },
+    {
+     "reason": "P6: the unused ClipContext import is removed; the Switch builds deny warnings, and both uses in the file name the type by its full path.",
+     "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n",
+     "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\n"
     }
    ]
   },

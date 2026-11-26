@@ -1,5 +1,4 @@
 //! Stage geometry reads shared by runtime features.
-use crate::model::edge_juggle::perfect;
 use crate::model::mashout::entry;
 use crate::model::sites_mashout::{self, FLOOR_RAY, FLOOR_RAY_IMPL};
 use crate::model::tech::discovery::{decode, far_end};
@@ -82,11 +81,6 @@ impl FloorRay {
         let stationary = ends == vertices.map(|ptr| ((ptr + 0x20) as *const [f32; 2]).read());
         Some(entry::PlacementFloor { ends, stationary, flags })
     }
-}
-
-/// The main floor under the camera's middle and its two ledges, by the placement ray.
-pub(super) unsafe fn stage_floor(ray: &FloorRay, camera: [f32; 4]) -> Option<(perfect::Segment, perfect::Point)> {
-    crate::model::stage_geometry::main_floor(|x, limits, platforms| ray.floor(x, limits, platforms), camera)
 }
 
 use crate::model::stage_geometry::{is_placement_floor, Met, Point, Probe, Unread};
@@ -214,12 +208,4 @@ pub(super) unsafe fn training_outline(
     let mut walk = Surfaces::EMPTY;
     closed_walk(ray, x, limits, &mut walk)?;
     Some(crate::model::stage_geometry::outline_of(&walk))
-}
-
-/// The closed outline of the solid under a column, line by line as the rule sees it. It stores nothing.
-pub(super) unsafe fn solid(ray: &FloorRay, x: f32, limits: [f32; 2], each: impl FnMut(Met)) -> Option<()> {
-    let mut walk = Surfaces::EMPTY;
-    closed_walk(ray, x, limits, &mut walk)?;
-    walk.lines().map(crate::model::stage_geometry::met).for_each(each);
-    Some(())
 }
