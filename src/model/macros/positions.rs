@@ -161,21 +161,32 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
 /// The positions of the macro `id`, whose inputs are `inputs`; none when the file is missing, is not one this build
 /// reads, or does not bind this macro. A file with no rows is an empty track, not a missing one.
 pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFrame; 2]>> {
+    let mut track = Vec::new();
+    scan(dir, id, inputs, Some(&mut track))?;
+    Some(track)
+}
+
+/// Validate the same rows Crop would read, without collecting a second track on the playback worker.
+pub fn check(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, u32)> {
+    scan(dir, id, inputs, None)
+}
+
+fn scan(dir: &Path, id: &str, inputs: &[InputFrame], mut track: Option<&mut Vec<[ReplayFrame; 2]>>) -> Option<(Source, u32)> {
     #[cfg(test)]
     READS.with(|reads| reads.set(reads.get() + 1));
     let mut file = fs::File::open(path(dir, id)).ok()?;
-    let (frames, _) = bound(&mut file, id, inputs)?;
-    let mut track = Vec::new();
-    track.try_reserve_exact(frames).ok()?;
+    let (frames, source) = bound(&mut file, id, inputs)?;
+    if let Some(out) = &mut track { out.try_reserve_exact(frames).ok()?; }
     let mut buffer = vec![0u8; CHUNK_FRAMES.min(frames) * FRAME];
-    while track.len() < frames {
-        let count = (frames - track.len()).min(CHUNK_FRAMES);
+    for start in (0..frames).step_by(CHUNK_FRAMES) {
+        let count = (frames - start).min(CHUNK_FRAMES);
         file.read_exact(&mut buffer[..count * FRAME]).ok()?;
         for bytes in buffer[..count * FRAME].as_chunks::<FRAME>().0 {
-            track.push([get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?]);
+            let pair = [get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?];
+            if let Some(out) = &mut track { out.push(pair); }
         }
     }
-    Some(track)
+    Some((source, frames as u32))
 }
 
 /// Where the positions file of `id` came from, when it binds these inputs. Only its header is read.

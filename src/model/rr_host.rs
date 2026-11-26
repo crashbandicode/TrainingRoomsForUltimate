@@ -1547,7 +1547,7 @@ pub fn play_track_service(root: &Path) {
     let dir = root.join(MACROS_DIR);
     let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
     if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
-    let existing = positions::kept(&dir, open.id.as_str(), &recording.frames);
+    let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
     let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
     if write {
         if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
