@@ -12,10 +12,8 @@ use crate::model::screens::hot_list_frame;
 use crate::model::settings::Settings;
 
 /// A fresh data folder for one case.
-fn dir(case: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("tr-btt5-{case}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn dir(case: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("tr-btt5-{case}"))
 }
 
 /// This stage's listed names, in order, and how many are hot.
@@ -27,7 +25,8 @@ fn names(root: &Path, stage: i32) -> (Vec<String>, usize) {
 /// Save writes a new file every time, named `Layout N · <stage>` with the lowest free N on that stage; the file holds the
 /// stage, the targets and its use; nothing already there is replaced.
 fn layout_save_makes_a_new_file_never_overwrites() {
-    let root = dir("save");
+    let scratch = dir("save");
+    let root = scratch.join("root");
     assert_eq!(all(&root), (vec![], 0), "no folder: no layouts, nothing wrong");
     let first = save_new(&root, 0, "Battlefield", &[[-20.0, 15.0], [0.0, 15.0]]).unwrap();
     let bytes = std::fs::read(root.join(DIR).join(format!("{first}.json"))).unwrap();
@@ -43,7 +42,8 @@ fn layout_save_makes_a_new_file_never_overwrites() {
 
 /// The default name takes the lowest number no layout of that stage uses (as "Combo N"); other stages' names don't count.
 fn layout_default_name_takes_the_lowest_free_number() {
-    let root = dir("name");
+    let scratch = dir("name");
+    let root = scratch.join("root");
     for _ in 0..3 {
         save_new(&root, 0, "Battlefield", &[[0.0, 15.0]]).unwrap();
     }
@@ -58,7 +58,8 @@ fn layout_default_name_takes_the_lowest_free_number() {
 
 /// The list: the five used last, newest first (save, load, rename, duplicate are each a use), then the rest by name.
 fn layouts_hot_five_newest_first_then_by_name() {
-    let root = dir("hot");
+    let scratch = dir("hot");
+    let root = scratch.join("root");
     for _ in 0..7 {
         save_new(&root, 0, "Battlefield", &[[0.0, 15.0]]).unwrap();
     }
@@ -74,7 +75,8 @@ fn layouts_hot_five_newest_first_then_by_name() {
 
 /// A sixth use pushes the oldest out of the five; its file stays, below the line, by name.
 fn layouts_sixth_use_pushes_the_oldest_out_the_file_stays() {
-    let root = dir("sixth");
+    let scratch = dir("sixth");
+    let root = scratch.join("root");
     for _ in 0..6 {
         save_new(&root, 0, "Battlefield", &[[0.0, 15.0]]).unwrap();
     }
@@ -87,7 +89,8 @@ fn layouts_sixth_use_pushes_the_oldest_out_the_file_stays() {
 /// Only this stage's layouts are listed (and reach the chords' five); a file that can't be read is skipped and counted, and
 /// the old per-stage slot files (`targets/<stage>.json`, never shipped) are neither read nor written.
 fn layouts_list_only_this_stage() {
-    let root = dir("stage");
+    let scratch = dir("stage");
+    let root = scratch.join("root");
     save_new(&root, 0, "Battlefield", &[[0.0, 15.0]]).unwrap();
     save_new(&root, 2, "Big Battlefield", &[[1.0, 15.0], [9.0, 15.0]]).unwrap();
     std::fs::create_dir_all(root.join("targets")).unwrap();
@@ -107,7 +110,8 @@ fn layouts_list_only_this_stage() {
 /// Rename keeps the file (its id) and moves it to the top; Duplicate makes a new file with the same targets; Delete removes the
 /// file and the list closes up. A bad name or too many targets is refused before anything is written.
 fn layout_rename_keeps_the_file_duplicate_makes_a_copy_delete_removes() {
-    let root = dir("files");
+    let scratch = dir("files");
+    let root = scratch.join("root");
     let id = save_new(&root, 0, "Battlefield", &[[3.0, 4.0]]).unwrap();
     save_new(&root, 0, "Battlefield", &[[5.0, 6.0]]).unwrap();
     use_file(&root, &id, Some("  Ledge trap ")).unwrap();

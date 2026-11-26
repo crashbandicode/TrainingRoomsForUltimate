@@ -6,21 +6,46 @@ use crate::model;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use model::migration::{self, ImportResult};
 use model::migration_run::{run_background, run_blocking, status_word, Roots, Stage};
 use model::sha256::sha256_hex;
 use serde_json::Value;
 
-struct Tmp(PathBuf);
+struct Tmp(crate::test_scratch::Scratch);
+
+#[cfg(unix)]
+struct RestorePermissions(Vec<PathBuf>, fs::Permissions);
+
+#[cfg(unix)]
+impl Drop for RestorePermissions {
+    fn drop(&mut self) {
+        for path in &self.0 { let _ = fs::set_permissions(path, self.1.clone()); }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn locked_fixture_is_removed_on_unwind() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = Tmp::new();
+    let path = root.0.path().to_path_buf();
+    let locked = root.0.join("locked");
+    fs::create_dir(&locked).unwrap();
+    fs::write(locked.join("file"), b"x").unwrap();
+    let result = std::panic::catch_unwind(move || {
+        let _root = root;
+        let _restore = RestorePermissions(vec![locked.clone()], fs::Permissions::from_mode(0o755));
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+        panic!("test unwind");
+    });
+    assert!(result.is_err());
+    assert!(!path.exists());
+}
 
 impl Tmp {
     fn new() -> Self {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let p = std::env::temp_dir().join(format!("training_rooms-import-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        fs::create_dir_all(&p).unwrap();
-        Self(p)
+        Self(crate::test_scratch::Scratch::new("training_rooms-import"))
     }
 
     fn fork(&self) -> PathBuf {
@@ -29,12 +54,6 @@ impl Tmp {
 
     fn rooms(&self) -> PathBuf {
         self.0.join("TrainingRooms")
-    }
-}
-
-impl Drop for Tmp {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
     }
 }
 
@@ -287,7 +306,7 @@ fn migration_cpu_item_selection_survives_fresh_process() {
     let launch = |phase| {
         let start = stamp();
         let result = std::process::Command::new(&exe).args(["--exact", NAME, "--nocapture"])
-            .env(ROOT, &t.0).env(PHASE, phase).output().unwrap();
+            .env(ROOT, t.0.path()).env(PHASE, phase).output().unwrap();
         assert!(result.status.success(), "{phase}: {}{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
         (start, stamp())
     };
@@ -508,6 +527,12 @@ fn migration_staging_folders_are_skipped_and_never_touched() {
     let t = Tmp::new();
     fork_folder(&t);
     write(&t.fork().join("replay_captures/.55.smd-12.tmp/manifest.json"), b"x");
+    #[cfg(unix)]
+    let _restore = {
+        use std::os::unix::fs::PermissionsExt;
+        RestorePermissions([".33.smd-0.tmp", ".55.smd-12.tmp"].into_iter()
+            .map(|name| t.fork().join("replay_captures").join(name)).collect(), fs::Permissions::from_mode(0o755))
+    };
     // The staging folders are made unreadable: if the import tried to read them it would report an error.
     #[cfg(unix)]
     {
@@ -597,6 +622,7 @@ fn migration_unreadable_source_file_is_partial() {
         use std::os::unix::fs::PermissionsExt;
         let t = Tmp::new();
         fork_folder(&t);
+        let _restore = RestorePermissions(vec![t.fork().join("mii-presets.json")], fs::Permissions::from_mode(0o644));
         fs::set_permissions(t.fork().join("mii-presets.json"), fs::Permissions::from_mode(0o000)).unwrap();
         let (receipt, marker) = full_import(&t);
         fs::set_permissions(t.fork().join("mii-presets.json"), fs::Permissions::from_mode(0o644)).unwrap();
@@ -716,6 +742,7 @@ fn migration_r2_8_a_permission_denied_directory_is_incomplete_and_retried() {
     let t = Tmp::new();
     fork_folder(&t);
     let macros = t.fork().join("macros");
+    let _restore = RestorePermissions(vec![macros.clone()], fs::Permissions::from_mode(0o755));
     fs::set_permissions(&macros, fs::Permissions::from_mode(0o000)).unwrap();
     // A privileged runner can read anything: this premise (an actual permission error) is checked, not assumed.
     let denied = fs::read_dir(&macros).is_err();

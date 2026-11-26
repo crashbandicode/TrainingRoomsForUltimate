@@ -9,6 +9,9 @@ macro_rules! callgraph_self_tests {
     ($($body:tt)*) => { $($body)* };
 }
 
+#[path = "../support/scratch.rs"]
+mod test_scratch;
+
 #[path = "../common/callgraph.rs"]
 mod callgraph;
 #[path = "../common/mod.rs"]
@@ -109,6 +112,8 @@ mod frame_strip_settings;
 mod fs027_busy_sees_rr_host;
 #[path = "../game_thread_handoffs.rs"]
 mod game_thread_handoffs;
+#[path = "../temp_dir_scan.rs"]
+mod temp_dir_scan;
 #[path = "../hook_alloc.rs"]
 mod hook_alloc;
 #[path = "../hook_locks.rs"]

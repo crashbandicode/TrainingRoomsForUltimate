@@ -409,8 +409,7 @@ mod tests {
         provider.reply = Some(Ok(Reply::Snapshot(Box::new(record()))));
         assert_eq!(ui.poll(&mut provider), Some(Ok(true)));
         let token = ui.name_revision();
-        let dir = std::env::temp_dir().join(format!("tr-setup-ui-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let dir = crate::test_scratch::Scratch::new("tr-setup-ui");
         let blocker = dir.join("not-a-directory");
         std::fs::write(&blocker, b"keep").unwrap();
         let library = SetupLibrary::new(&blocker);
@@ -434,7 +433,8 @@ mod tests {
     /// Save setup here asks for a snapshot of where the fighters stand and keeps it as a new file. Nothing binds, so the bound
     /// save (the slot Load reads) is never written; Save setup from bound save still asks for the bound save.
     fn save_setup_here_reads_the_fighters_and_never_writes_the_bound_save() {
-        let dir = std::env::temp_dir().join(format!("tr-setup-here-{}", std::process::id()));
+        let scratch = crate::test_scratch::Scratch::new("tr-setup-here");
+        let dir = scratch.join("root");
         let library = SetupLibrary::new(dir.join("setups"));
         let mut ui = Setups::default();
         let mut provider = Fake::default();
@@ -503,7 +503,8 @@ mod tests {
     /// X (or Rename on a setup's own screen): the setup's record is the draft and the confirmed name overwrites its file, so the id
     /// and every other field stay; a cancelled rename changes nothing and leaves no rename behind.
     fn renaming_a_setup_overwrites_its_file_and_keeps_its_id() {
-        let dir = std::env::temp_dir().join(format!("tr-setup-rename-{}", std::process::id()));
+        let scratch = crate::test_scratch::Scratch::new("tr-setup-rename");
+        let dir = scratch.join("root");
         let library = SetupLibrary::new(dir.join("setups"));
         let id = library.save_new(&record()).unwrap();
         let mut ui = Setups::<Target, u32>::default();

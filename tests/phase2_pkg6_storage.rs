@@ -69,15 +69,14 @@ fn q7_persisted_explicit_choice_continues_in_a_fresh_process() {
         }
         return;
     }
-    let root = std::env::temp_dir().join(format!("tr-pkg6-q7-{}-{}", std::process::id(), now()));
-    std::fs::create_dir(&root).unwrap();
+    let root = crate::test_scratch::Scratch::new("tr-pkg6-q7");
     std::fs::write(root.join("replay_capture.ini"), b"# retained\n[capture]\nenabled=off\nenabled=on\nkeep=7\n").unwrap();
     let result = || {
         for mode in ["save", "restore"] {
             println!("Q7 launch={mode} at={}", now());
             let output = std::process::Command::new(std::env::current_exe().unwrap())
                 .args(["--exact", TEST, "--nocapture"])
-                .env(KEY, &root).env("TR_PKG6_Q7_MODE", mode).output().unwrap();
+                .env(KEY, root.path()).env("TR_PKG6_Q7_MODE", mode).output().unwrap();
             let stdout = String::from_utf8_lossy(&output.stdout);
             assert!(stdout.contains("running 1 test"), "{mode} did not execute the child test: {stdout}");
             println!("{stdout}");

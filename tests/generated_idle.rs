@@ -9,9 +9,8 @@ fn no_positions_sampler_until_the_first_eligible_play() {
     const TEST: &str = "generated_idle::no_positions_sampler_until_the_first_eligible_play";
     const KEY: &str = "TR_GENERATED_IDLE_ROOT";
     let Some(root) = env::var_os(KEY).map(std::path::PathBuf::from) else {
-        let root = env::temp_dir().join(format!("tr-generated-idle-{}", std::process::id()));
-        fs::create_dir(&root).unwrap();
-        let ran = Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"]).env(KEY, &root).status().unwrap().success();
+        let root = crate::test_scratch::Scratch::new("tr-generated-idle");
+        let ran = Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"]).env(KEY, root.path()).status().unwrap().success();
         fs::remove_dir_all(root).unwrap();
         assert!(ran, "the fresh process failed");
         return;

@@ -167,12 +167,7 @@ mod tests {
     }
 
     fn real_file_adapter_reads_only_and_detects_truncation() {
-        let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let dir = std::env::temp_dir().join(format!("mii-catalog-test-{}-{unique}", std::process::id()));
-        std::fs::create_dir(&dir).unwrap();
-        struct Cleanup(std::path::PathBuf);
-        impl Drop for Cleanup { fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); } }
-        let _cleanup = Cleanup(dir.clone());
+        let dir = crate::test_scratch::Scratch::new("mii-catalog-test");
         let file = dir.join("mii_7.bin");
         let mut bytes = vec![0; SLOT_SIZE]; bytes[..HEADER_LEN].copy_from_slice(&header(7));
         std::fs::write(&file, &bytes).unwrap();
