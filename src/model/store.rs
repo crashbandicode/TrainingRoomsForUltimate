@@ -123,7 +123,7 @@ pub trait Record: Serialize + DeserializeOwned {
     fn owns_reader(_reader: impl Read) -> serde_json::Result<bool> { Ok(true) }
     /// A record with a file of its own beside the record's (a macro's positions): before the record is written under
     /// `id`, after it is in place, and after it is deleted. Default: nothing.
-    fn before_write(&self, _dir: &Path, _id: &str) {}
+    fn before_write(&self, _dir: &Path, _id: &str, _new: bool) -> io::Result<()> { Ok(()) }
     fn after_write(&self, _dir: &Path, _id: &str) {}
     fn after_delete(_dir: &Path, _id: &str) {}
     /// Everything the store requires before it writes or accepts a file.
@@ -356,7 +356,7 @@ impl<R: Record> Store<R> {
         fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
         let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         let id = self.free_id(rec.name()).map_err(lift::<R>)?;
-        self.write_atomic(&id, rec, bytes)?;
+        self.write_atomic(&id, rec, bytes, true)?;
         Ok(id)
     }
 
@@ -373,7 +373,7 @@ impl<R: Record> Store<R> {
         if !exists {
             return Err(lift::<R>(StoreError::NotFound(id.to_owned())));
         }
-        self.write_atomic(id, rec, bytes)
+        self.write_atomic(id, rec, bytes, false)
     }
 
     /// Removes the record `id` (and a leftover backup of it).
@@ -431,8 +431,8 @@ impl<R: Record> Store<R> {
         Err(StoreError::NoFreeId)
     }
 
-    fn write_atomic(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>) -> Result<(), R::Error> {
-        rec.before_write(&self.dir, id);
+    fn write_atomic(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>, new: bool) -> Result<(), R::Error> {
+        rec.before_write(&self.dir, id, new).map_err(|err| lift::<R>(err.into()))?;
         let path = self.file(id, "json");
         let size = if let Some(bytes) = bytes {
             write_replace(&path, &bytes).map_err(|e| lift::<R>(e.into()))?;
