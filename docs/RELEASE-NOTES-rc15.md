@@ -4,12 +4,12 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
-Five of these builds were installed on the project's test console one after another, and are called install 1 to 5.
+Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub (all merged) |
+| [Install 6](#install-6) | 2026-11-26 | `5df3d9dc` | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -25,23 +25,13 @@ What "tested" means in these notes:
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
 
-## Next build (not installed yet)
+## Install 6
 
-The build after install 5, at merge 17 (`5df3d9dc`). Three changes are merged, all in the clip editor, with one fix
-to the third, and nothing is still in work. The operator ordered its card install on 2026-11-26; it is not installed
-yet.
+Installed 2026-11-26 (12:22). Build `5df3d9dc`. It is still an rc.15 build: its footer reads
+`0.2.0-rc.15 · rc15 5df3d9dc`. It holds install 5 and the three changes to the clip editor below, with one fix to
+the third, all merged on 2026-11-26.
 
-- **Host:** every merge passed host tests and builds.
-- **Eden, on the build before the fix (`eb39d6bc`):** Play started no later than on install 5; a take was recorded
-  and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable;
-  and the playhead browsed a take. The same session found the defect that merge 17 fixes.
-- **Eden, on merge 17 itself:** in testing. No result is in, and none is claimed here.
-
-The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#the-next-build).
-
-### Merged
-
-#### Y on In makes a capture previewable (merged 2026-11-26)
+### Y on In makes a capture previewable
 
 - In the Replay window on a match capture, Y with In selected snaps In to a mark. When that frame is in the middle
   of an action, Y now also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it.
@@ -54,7 +44,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
   [Known issues](CURRENT-RELEASE.md#known-issues).
   [Replay window](menu/recording.md#replay-window)
 
-#### A free playhead in the clip editor (merged 2026-11-26)
+### A free playhead in the clip editor
 
 - With no handle selected, Left and Right move the playhead over the whole take of a macro or a capture, inside or
   outside the kept part. In and Out do not change.
@@ -68,7 +58,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
   and the snap with Y have host tests only; holding a direction on a pad has no host test.
   [Replay window](menu/recording.md#replay-window)
 
-#### The fighters are shown while you scrub (merged 2026-11-26)
+### The fighters are shown while you scrub
 
 - With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
   frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
@@ -96,17 +86,28 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 - Seen in Eden on `eb39d6bc`, the build before that fix: a recorded take held both fighters at In with no preview,
   In and Out followed the handles, and deselecting let them go; an old macro read "Play it once to see positions
   while scrubbing." and got its positions from one Play; X in the editor showed them at once; a crop kept them.
-- Merge 17's own checks are in testing. Merge 16 did not establish scrub behavior in a waiting room, through a
-  fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions.
-  No host test runs the Switch code that holds the fighters.
-- On one Eden host (one boot per build), every tested macro on merge 16 started on install 5's frame count or
+- Install 6's own checks are in testing. The build before the fix did not establish scrub behavior in a waiting
+  room, through a fighter swap or scene change, on the final frame of a long recording, or after deleting a macro
+  with positions. No host test runs the Switch code that holds the fighters.
+- On one Eden host (one boot per build), every tested macro on `eb39d6bc` started on install 5's frame count or
   one frame earlier. That includes the first Play of the old 30-second and ten-minute macros. The unchanged
-  playback path carries this result forward; these are not timings from a merge-17 boot or the console.
+  playback path carries this result forward; these are not timings from a boot of install 6 or from the console.
   [Replay window](menu/recording.md#replay-window)
 
-### In work
+### Tested
 
-Nothing planned for this build is still in work.
+- **Installed:** yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback
+  copy of install 5 was also saved on the card.
+- **Host:** every merge passed host tests and builds.
+- **Tested in Eden, on the build before the fix (`eb39d6bc`), not on this exact build:** Play started no later than
+  on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play;
+  Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the
+  fix addresses.
+- **Merge 17 in Eden:** at installation, two Training boots were testing its diagnostic build. No result from a
+  smoke test of the installed release file is claimed here.
+- **The operator reported:** nothing on this build yet.
+
+The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).
 
 ## Install 5
 
@@ -237,8 +238,11 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
   showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
   in a match capture, plain Y can leave In on a mid-action frame. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y
-  for the move start. Release the modifier before pressing X to preview, or press A to save. A fix is merged
-  (`dbded2d1`) for the build after install 5; it is not in install 5. No other report on this build is on record.
+  for the move start. Release the modifier before pressing X to preview, or press A to save. The fix (`dbded2d1`)
+  is in install 6, not in install 5.
+- **The operator reported** (2026-11-26, on this build): a fighter placed off stage on a save stays on the ground
+  once it has landed; and Guard the Edge's starting spot varies between rounds. Neither is fixed in install 6:
+  [Known issues](CURRENT-RELEASE.md#known-issues).
 
 ## Install 4
 
