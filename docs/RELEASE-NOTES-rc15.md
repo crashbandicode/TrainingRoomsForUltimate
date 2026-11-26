@@ -87,8 +87,8 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
   recorded, or when Trim skips the first input.
 - A fighter is not put at a point where it cannot stand on this stage: inside the ground or a wall, outside the
   camera's limits, past a blast line, or anywhere when the stage cannot be read. The editor then reads
-  "Can't stand there on this stage."; a fighter already held goes back to where the hold began, and the other
-  fighter is still shown.
+  "Can't stand there on this stage."; a fighter already held goes back to where the hold began. Each fighter's
+  point is judged by itself, so the other one is still shown when its own point allows.
 - The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
 - Fixed before the card build (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
   the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:

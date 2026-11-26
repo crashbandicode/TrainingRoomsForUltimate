@@ -332,6 +332,7 @@ bridge and the same three staged old macros on both builds):
 ### Eden, on merge 17 (`5df3d9dc`)
 
 **In testing.** Merge 17's NROs are release sha256 `c1ced861…` and diag `853964b2…`
-(`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). dup-audit's two boots for them were accepted as started at
-11:25 on 2026-11-26 (inbox 11:40:39Z, tr-primary-2). No result is in, and none is claimed here. Planned: the diag
-rows again with the match capture row, a release smoke, and a fresh waiting-room pair.
+(`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Two Eden boots on the diag NRO were up on 2026-11-26, with
+their rows started at 12:02 and 12:03 (dup-audit, inbox 12:04:29Z): `scrub-m17-xps-01` with SP-1 to SP-11, SP-17
+and SP-19, and `scrub-m17b-yoga-01` with the rows that never flew on `eb39d6bc`. No result is in, and none is
+claimed here. Not staged yet: a smoke boot of the release NRO, and a fresh waiting-room pair.

@@ -338,8 +338,9 @@ Browsing was seen in Eden on `eb39d6bc`, an earlier head of that build; the cuts
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
 the target's position when the hold begins, so their recorded spacing is kept. A fighter is not put at a point where
 it cannot stand on this stage: inside the ground or a wall, outside the camera's limits, past a blast line, or
-anywhere when the stage cannot be read. A held fighter then goes back to where its hold began, a fighter not yet held
-is left alone, and the other fighter is still shown. The key line reads "Can't stand there on this stage.".
+anywhere when the stage cannot be read. A held fighter then goes back to where its hold began, and a fighter not yet
+held is left alone. Each fighter's point is judged by itself, so the other one is still shown when its own point
+allows. The key line reads "Can't stand there on this stage.".
 
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
   capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
