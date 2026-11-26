@@ -24,7 +24,7 @@ import argparse, hashlib, json, os, posixpath, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
 
-STAGES = "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
+STAGES = os.environ.get("TR_CARRY_STAGES") or "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
 EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "byteflags": "byteflags",
             "training_mod_sync": "sync", "training_mod_macros": "macros", "log": "log"}
