@@ -2506,6 +2506,25 @@ mod tests {
     }
 
     #[test]
+    fn a_long_save_name_leaves_room_for_displaced_bodies_and_spot_controls() {
+        use crate::model::{chords::logical::A, storage::FixedPath};
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        for (name, bodies) in [
+            ("n".repeat(48), [None, Some([-87.0, -15.0])]),
+            ("界".repeat(48), [Some([-40.0, 0.0]), Some([-87.0, -15.0])]),
+        ] {
+            assert!(crate::model::library::check_label(&name).is_ok());
+            let mut card = FixedPath::<224>::new();
+            let mut expected = String::new();
+            w.write_text_at(Who::P1, "", bodies, &mut expected).unwrap();
+            let result = w.write_text_at(Who::P1, &name, bodies, &mut card);
+            assert!(result.is_ok(), "the actual placement notice buffer must fit the complete card");
+            assert!(card.as_str().ends_with(&expected), "only the displayed name may be shortened: {card:?}");
+        }
+    }
+
+    #[test]
     fn the_pickers_share_one_floor_read() {
         let place = include_str!("../runtime/features/record_place.rs");
         let tech = include_str!("../runtime/features/tech.rs");
