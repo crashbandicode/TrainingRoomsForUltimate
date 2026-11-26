@@ -1526,6 +1526,7 @@ pub fn recording_version() -> (u64, u64) {
 }
 
 pub fn play_sampling() -> bool { PLAY.sampling() }
+pub fn play_allocated() -> bool { PLAY.allocated() }
 pub fn play_live(slot: usize, frame: &ReplayFrame) { PLAY.live(slot, frame); }
 pub fn play_seed_due(role: Role) -> bool { PLAY.seed_due(role_index(role)) }
 pub fn take_generated() -> bool { PLAY.take_written() }
@@ -5185,12 +5186,18 @@ mod tests {
         let (root, id, recording) = generated_fixture("generated-chord", 5);
         let before = (positions::reads(), positions::heads(), positions::writes());
         generated_play(&root, Role::Cpu);
-        assert!(!play_sampling(), "the first chord precedes preparation");
+        assert!(play_sampling(), "the first chord opens the sampler");
         assert_eq!((positions::reads(), positions::heads(), positions::writes()), before);
-        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        for (i, frame) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*frame));
+        }
         tick(&root);
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
+
+        let (root, id, recording) = generated_fixture("generated-stop-chord", 5);
+        let before = (positions::reads(), positions::heads(), positions::writes());
         generated_play(&root, Role::Cpu);
-        assert!(play_sampling(), "an idle pass prepared the sampler");
+        assert!(play_sampling());
         assert_eq!((positions::reads(), positions::heads(), positions::writes()), before);
         assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
         tick(&root);
@@ -5203,6 +5210,55 @@ mod tests {
         tick(&root);
         assert_eq!(positions::writes(), before.2 + 1);
         assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 2);
+    }
+
+    fn nothing_is_allocated_for_generation_before_the_first_generating_play() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-lazy", 5);
+        assert!(!play_allocated());
+        for _ in 0..3 {
+            tick(&root);
+            assert!(!play_allocated(), "idle passes do not allocate");
+        }
+        set_role_fighter(Role::Cpu, 8);
+        publish_fighter_prompt(false);
+        generated_play(&root, Role::Cpu);
+        assert!(!play_allocated(), "another fighter does not generate");
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        set_role_fighter(Role::Cpu, 7);
+        let chain = Chain::new("Chain", vec![id.clone()]).unwrap();
+        let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&chain_id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(!play_allocated(), "a chain does not generate");
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        request_preview(&id, Role::Cpu, 1, 4);
+        tick(&root);
+        assert!(!play_allocated(), "a preview from In 1 does not generate");
+        for i in 1..4 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(!play_allocated());
+
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.save(&root).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_allocated());
+        assert!(play_sampling());
+        for (i, frame) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*frame));
+        }
+        tick(&root);
+        assert!(play_allocated());
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 5);
     }
 
     fn a_library_write_during_the_run_drops_its_track() {
@@ -7795,6 +7851,7 @@ mod tests {
             ("a_longer_generated_track_replaces_a_shorter_one_only", a_longer_generated_track_replaces_a_shorter_one_only as fn()),
             ("a_generated_track_never_replaces_a_recorded_one", a_generated_track_never_replaces_a_recorded_one as fn()),
             ("the_play_chord_pass_opens_and_writes_no_positions_file", the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
+            ("nothing_is_allocated_for_generation_before_the_first_generating_play", nothing_is_allocated_for_generation_before_the_first_generating_play as fn()),
             ("a_library_write_during_the_run_drops_its_track", a_library_write_during_the_run_drops_its_track as fn()),
             ("a_recorded_file_written_before_the_worker_drains_is_kept", a_recorded_file_written_before_the_worker_drains_is_kept as fn()),
             ("only_a_single_macro_from_input_zero_on_its_own_fighter_generates", only_a_single_macro_from_input_zero_on_its_own_fighter_generates as fn()),

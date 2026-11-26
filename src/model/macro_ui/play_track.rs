@@ -70,6 +70,7 @@ impl PlayTrack {
     }
 
     pub fn sampling(&self) -> bool { self.key.load(Ordering::SeqCst) != IDLE }
+    pub fn allocated(&self) -> bool { self.prepared.load(Ordering::SeqCst) }
     pub fn live(&self, slot: usize, frame: &ReplayFrame) { self.rows.live(slot, frame); }
     pub fn seed_due(&self, slot: usize) -> bool {
         let key = self.key.load(Ordering::SeqCst);
@@ -177,8 +178,7 @@ mod tests {
 
     fn fed_keeps_only_its_runs_rows_in_order() {
         let track = PlayTrack::new();
-        assert!(!track.begin("walk", 1, 23, (2, 3), 3, true));
-        track.ready();
+        assert!(!track.allocated());
         assert!(track.begin("walk", 1, 23, (2, 3), 3, true));
         track.live(1, &sample(1.0));
         track.live(0, &sample(101.0));
@@ -192,7 +192,6 @@ mod tests {
         assert_eq!((open.id.as_str(), open.slot, open.generation), ("walk", 1, 23));
         assert_eq!(rows.len(), 1);
         assert_eq!((rows[0][0].x, rows[0][1].x), (1.0, 101.0));
-        track.ready();
         assert!(track.begin("walk", 1, 24, (2, 3), 3, true));
         track.fed(1, 24, 2);
         assert!(track.end().is_none());
@@ -204,7 +203,7 @@ mod tests {
 
     fn the_static_is_idle_at_rest() {
         let track = PlayTrack::new();
-        assert!(!track.sampling() && track.open_run().is_none() && !track.take_written());
+        assert!(!track.allocated() && !track.sampling() && track.open_run().is_none() && !track.take_written());
         assert_eq!(Id::new("walk").unwrap().as_str(), "walk");
         assert!(Id::new(&"a".repeat(crate::model::store::MAX_ID_CHARS + 1)).is_none());
         let source = include_str!("play_track.rs");
