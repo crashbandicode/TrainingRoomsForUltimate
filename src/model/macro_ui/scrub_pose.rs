@@ -269,7 +269,7 @@ mod tests {
         let hold = include_str!("../../runtime/features/scrub_hold.rs");
         let swapped = hold.split_once("if holds[slot].is_some_and(|hold| hold.body() != natives::battle_object_id(accessor)) {").map_or("", |(_, rest)| rest);
         let swapped = swapped.split_once("\n        }\n").map_or("", |(inside, _)| inside);
-        assert_eq!(swapped.lines().filter(|line| !line.trim_start().starts_with("//")).map(str::trim).collect::<Vec<_>>(),
+        assert_eq!(swapped.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with("//")).collect::<Vec<_>>(),
             ["let partner = block.pose(slot ^ 1);", "block.forget();", "block.set_pose(slot ^ 1, partner.0, partner.1);"]);
         // The plain animation before the wake: the posed arm of the release reads that report.
         let release = hold.split_once("unsafe fn release(").map_or("", |(_, rest)| rest);
