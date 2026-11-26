@@ -1355,7 +1355,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "0c2902986937ab55bec610dda30bc3a5facbf30ba914bf9f5a58309fd38b870f",
+   "dest_sha256": "165e29d7f1d4825d4f420bdc06c6096af29c364f93385d8b5a17c5b1d3bc8c8b",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1471,6 +1471,16 @@
      "old": "            if super::positions::write(dir, id, &self.frames, track).is_err() {",
      "new": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            super::positions::remove(dir, id);\n        }\n    }\n",
+     "new": "            super::positions::remove(dir, id);\n        }\n        Ok(())\n    }\n",
+     "reason": "Refuse failed sidecar invalidation before writing; a fresh id never adopts an orphan (2026-11-26 03:44:27Z)."
+    },
+    {
+     "old": "    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);",
+     "new": "    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {\n        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            return super::positions::invalidate(dir, id);",
+     "reason": "Refuse failed sidecar invalidation before writing; a fresh id never adopts an orphan (2026-11-26 03:44:27Z)."
     }
    ]
   },

@@ -179,33 +179,28 @@ pub fn source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Source> {
     fs::File::open(path(dir, id)).ok().and_then(|mut file| bound(&mut file, id, inputs)).map(|(_, source)| source)
 }
 
-/// Remove the positions file of `id`, and its unfinished write; a missing file is fine. The folder is synced where
-/// the system has that, so the removal is on the card before a new macro is written under the id.
+/// Best-effort cleanup after deleting the macro or abandoning a sidecar write.
 pub fn remove(dir: &Path, id: &str) {
+    let _ = invalidate(dir, id);
+}
+
+/// Unlink the published positions before reusing their id. As with the macro store, there is no directory barrier.
+pub(super) fn invalidate(dir: &Path, id: &str) -> io::Result<()> {
     let file = path(dir, id);
     let _ = fs::remove_file(crate::model::store::with_suffix(&file, ".tmp"));
-    if unlink(&file).is_ok() {
-        let _ = sync_folder(dir);
+    #[cfg(test)]
+    if FAIL_UNLINK.with(|fail| fail.get()) { return Err(io::ErrorKind::PermissionDenied.into()); }
+    match fs::remove_file(file) {
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        result => result,
     }
-}
-
-fn unlink(path: &Path) -> io::Result<()> {
-    #[cfg(test)]
-    if FAULT.with(|fault| fault.get() == Some("unlink")) { return Err(io::ErrorKind::PermissionDenied.into()); }
-    fs::remove_file(path)
-}
-
-fn sync_folder(dir: &Path) -> io::Result<()> {
-    #[cfg(test)]
-    if FAULT.with(|fault| fault.get() == Some("sync")) { return Err(io::Error::other("injected directory sync failure")); }
-    fs::File::open(dir)?.sync_all()
 }
 
 #[cfg(test)]
 thread_local! {
     static READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static FAIL_WRITE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
-    static FAULT: core::cell::Cell<Option<&'static str>> = const { core::cell::Cell::new(None) };
+    static FAIL_UNLINK: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Positions files opened for reading by this thread (tests: playback and the list open none).
@@ -392,33 +387,31 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
-    fn replacement_fault(fault: &'static str) {
+    #[test]
+    fn a_failed_sidecar_invalidation_unlink() {
         let dir = scratch();
         let library = Library::new(&dir);
         let id = library.save_new(&recording("Old", 3, true)).unwrap();
         let mut next = recording("Replacement", 3, false);
         next.set_track(Some(vec![pair(99); 3]));
-        FAULT.with(|cell| cell.set(Some(fault)));
+        let json = dir.join(format!("{id}.json"));
+        let before = fs::read(&json).unwrap();
+        FAIL_UNLINK.with(|cell| cell.set(true));
         fail_writes(true);
         let result = library.overwrite(&id, &next);
         let retry = library.overwrite(&id, &next);
         fail_writes(false);
-        FAULT.with(|cell| cell.set(None));
+        FAIL_UNLINK.with(|cell| cell.set(false));
         let reopened = library.load_edited(&id).unwrap();
-        assert!(result.is_err(), "{fault} failed but overwrite reported success; macro={}", reopened.name);
-        assert!(retry.is_err(), "a retry must not bypass an outstanding {fault} failure");
+        assert!(result.is_err(), "unlink failed but overwrite reported success; macro={}", reopened.name);
+        assert!(retry.is_err(), "a retry must not bypass an outstanding unlink failure");
+        assert_eq!(fs::read(json).unwrap(), before);
         assert_eq!(reopened.name, "Old");
-        assert_eq!(reopened.track, (fault == "unlink").then(|| track(3)));
+        assert_eq!(reopened.track, Some(track(3)));
         library.overwrite(&id, &next).unwrap();
         assert_eq!(library.load_edited(&id).unwrap(), next);
         fs::remove_dir_all(dir).unwrap();
     }
-
-    #[test]
-    fn a_failed_sidecar_invalidation_unlink() { replacement_fault("unlink"); }
-
-    #[test]
-    fn a_failed_sidecar_invalidation_sync() { replacement_fault("sync"); }
 
     #[test]
     fn a_failed_sidecar_invalidation_from_an_interrupted_delete_is_not_adopted() {
@@ -427,6 +420,10 @@ mod tests {
         let id = library.save_new(&recording("Walk", 3, true)).unwrap();
         fs::remove_file(dir.join(format!("{id}.json"))).unwrap();
         let plain = recording("Walk", 3, false);
+        FAIL_UNLINK.with(|cell| cell.set(true));
+        let refused = library.save_new(&plain);
+        FAIL_UNLINK.with(|cell| cell.set(false));
+        assert!(refused.is_err() && !dir.join(format!("{id}.json")).exists());
         assert_eq!(library.save_new(&plain).unwrap(), id);
         assert!(library.load_edited(&id).unwrap().track.is_none(), "a fresh take adopted the deleted take's positions");
         fs::remove_dir_all(dir).unwrap();

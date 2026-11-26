@@ -127,10 +127,11 @@ impl Record for MacroRecording {
     /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an
     /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)
     /// carries no positions in memory and keeps the file that binds its inputs.
-    fn before_write(&self, dir: &std::path::Path, id: &str) {
-        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
-            super::positions::remove(dir, id);
+    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {
+        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
+            return super::positions::invalidate(dir, id);
         }
+        Ok(())
     }
 
     /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
