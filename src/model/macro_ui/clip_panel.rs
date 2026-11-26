@@ -557,7 +557,8 @@ impl ClipEditor {
         }
         // Fighter 0 is the selected (a macro: the recorded) one; fighter 1 the other, when the source has it.
         let frame = |fighter: usize, index: u32| match &self.file {
-            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter]),
+            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter])
+                .filter(|frame| frame.start.fighter_kind >= 0),
             Some(FileSource::Combo(_)) => None,
             None => {
                 let track = match (fighter, self.session.tracks.len()) {
@@ -639,6 +640,23 @@ impl ClipEditor {
             Ok(_) => Err("Move is outside the crop; move Out later".into()),
             Err(error) => Err(error),
         })
+    }
+
+    /// A capture saved as a macro carries the kept frames' states: the selected fighter's and, when the capture has
+    /// exactly two, the other one's (kind -1 where there is none). The new file scrubs as its capture does.
+    fn tracked(&self, mut recording: MacroRecording) -> MacroRecording {
+        if self.file.is_none() {
+            let start = self.window.start() as usize;
+            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);
+            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
+            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
+            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
+                frames.iter().enumerate()
+                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
+                    .collect()
+            }));
+        }
+        recording
     }
 
     fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {
@@ -802,7 +820,7 @@ impl ClipEditor {
                 }
                 if self.file.is_some() {
                     return match self.export_selection(&self.source_name) {
-                        Ok(recording) => ClipEffect::Export(Box::new(recording)),
+                        Ok(recording) => ClipEffect::Export(Box::new(self.tracked(recording))),
                         Err(error) => ClipEffect::Error(error),
                     };
                 }
@@ -810,7 +828,7 @@ impl ClipEditor {
                 let prefix: String = self.source_name.chars()
                     .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
                 return match self.export_selection(&format!("{prefix}{suffix}")) {
-                    Ok(recording) => ClipEffect::Export(Box::new(recording)),
+                    Ok(recording) => ClipEffect::Export(Box::new(self.tracked(recording))),
                     Err(error) => ClipEffect::Error(error),
                 };
             }

@@ -138,7 +138,7 @@ pub fn finish_recording(
         track.truncate(kept.end);
         track.drain(..kept.start.min(track.len()));
         track
-    }).filter(|track| !track.is_empty());
+    });
     let (frames, marks) = finish_take(capture.frames.clone(), &capture.spans, trim);
     if frames.is_empty() {
         return Ok(RecordStop::Empty);

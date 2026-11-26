@@ -253,9 +253,9 @@ impl MacroRecording {
             _ => return Err(MacroError::InvalidMii("schema, fighter class and exact configuration disagree")),
         }
         self.placement.validate()?;
-        // A track and its version go together: an entry per frame from the first, as far as it goes, every number
-        // finite.
-        let tracked = self.track.as_ref().is_some_and(|track| !track.is_empty() && track.len() <= self.frames.len()
+        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,
+        // for a crop past its end), every number finite.
+        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()
             && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
         if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
             return Err(MacroError::InvalidTrack);
@@ -300,9 +300,6 @@ impl MacroRecording {
         if let Some(track) = &mut self.track {
             track.truncate(range.end);
             track.drain(..range.start.min(track.len()));
-        }
-        if self.track.as_ref().is_some_and(Vec::is_empty) {
-            self.set_track(None);
         }
     }
 

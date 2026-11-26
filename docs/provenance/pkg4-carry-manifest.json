@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "f0579f6184a893ef837519eb317608eae47ddc1f67a441f3467bdbfd98674bd5",
+   "dest_sha256": "48ebc4b4812b2f7c4224732884edb4ed8ff16f90e031d1e89dfe5a16c2693cd5",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -833,6 +833,16 @@
     {
      "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            track.drain(..range.start.min(track.len()));\n        }\n        if self.track.as_ref().is_some_and(Vec::is_empty) {\n            self.set_track(None);\n        }",
+     "new": "            track.drain(..range.start.min(track.len()));\n        }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        // A track and its version go together: an entry per frame from the first, as far as it goes, every number\n        // finite.\n        let tracked = self.track.as_ref().is_some_and(|track| !track.is_empty() && track.len() <= self.frames.len()",
+     "new": "        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,\n        // for a crop past its end), every number finite.\n        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1715,7 +1725,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "74e5a121550c1d9da20f438a4fee0538c1617daa7c1316cbe318445ea4bc05ee",
+   "dest_sha256": "05ae682b67d5ce9dfdabe79c13b259e70bf30f55dda7de593689d51164d1c0cc",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2386,6 +2396,26 @@
     {
      "old": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
      "new": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::engine::macro_ui::scrub_track::{self, Ask, Pos};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                return match self.export_selection(&format!(\"{prefix}{suffix}\")) {\n                    Ok(recording) => ClipEffect::Export(Box::new(recording)),\n                    Err(error) => ClipEffect::Error(error),",
+     "new": "                return match self.export_selection(&format!(\"{prefix}{suffix}\")) {\n                    Ok(recording) => ClipEffect::Export(Box::new(self.tracked(recording))),\n                    Err(error) => ClipEffect::Error(error),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                        Ok(recording) => ClipEffect::Export(Box::new(recording)),",
+     "new": "                        Ok(recording) => ClipEffect::Export(Box::new(self.tracked(recording))),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            Err(error) => Err(error),\n        })\n    }\n",
+     "new": "            Err(error) => Err(error),\n        })\n    }\n\n    /// A capture saved as a macro carries the kept frames' states: the selected fighter's and, when the capture has\n    /// exactly two, the other one's (kind -1 where there is none). The new file scrubs as its capture does.\n    fn tracked(&self, mut recording: MacroRecording) -> MacroRecording {\n        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };\n            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n                    .collect()\n            }));\n        }\n        recording\n    }\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter]),",
+     "new": "            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter])\n                .filter(|frame| frame.start.fighter_kind >= 0),",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
