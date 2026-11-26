@@ -517,7 +517,15 @@ impl ClipEditor {
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
-    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }
+    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {
+        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };
+        let Some(track) = loaded.track else { return false };
+        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {
+            return false;
+        }
+        recording.set_track(Some(track));
+        true
+    }
 
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
     pub fn shown_frame(&self) -> Option<u32> {

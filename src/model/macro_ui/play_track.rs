@@ -1,4 +1,10 @@
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::Mutex;
+
 use crate::engine::macros::{positions::Source, ReplayFrame};
+use super::scrub_track::TakeTrack;
+
+const IDLE: u64 = u64::MAX;
 
 #[derive(Clone, Copy)]
 pub struct Id {
@@ -26,7 +32,23 @@ pub struct Open {
     pub pass: bool,
 }
 
-pub struct PlayTrack;
+pub struct PlayTrack {
+    rows: TakeTrack,
+    key: AtomicU64,
+    limit: AtomicU32,
+    count: AtomicU32,
+    written: AtomicBool,
+    prepared: AtomicBool,
+    busy: AtomicU32,
+    state: Mutex<State>,
+}
+
+struct State {
+    open: Option<Open>,
+    done: Vec<String>,
+    done_version: (u64, u64),
+}
+
 pub static PLAY: PlayTrack = PlayTrack::new();
 
 impl Default for PlayTrack {
@@ -34,23 +56,103 @@ impl Default for PlayTrack {
 }
 
 impl PlayTrack {
-    pub const fn new() -> Self { Self }
-    pub fn ready(&self) {}
-    pub fn sampling(&self) -> bool { false }
-    pub fn live(&self, _slot: usize, _frame: &ReplayFrame) {}
-    pub fn seed_due(&self, _slot: usize) -> bool { false }
-    pub fn fed(&self, _slot: usize, _generation: u32, _count: u32) {}
-    pub fn begin(&self, _id: &str, _slot: usize, _generation: u32, _version: (u64, u64), _limit: u32, _pass: bool) -> bool { false }
-    pub fn end(&self) -> Option<(Open, Vec<[ReplayFrame; 2]>)> { None }
-    pub fn open_run(&self) -> Option<(usize, u32)> { None }
-    pub fn note_done(&self, _id: &str, _version: (u64, u64)) {}
-    pub fn note_written(&self) {}
-    pub fn take_written(&self) -> bool { false }
-    pub fn busy(&self) -> u32 { 0 }
-    pub fn poll<R>(&self, take: impl FnOnce() -> R) -> R { take() }
-    pub fn write_wanted(_existing: Option<(Source, u32)>, _rows: usize, _inputs: usize) -> (bool, bool) { (false, false) }
+    pub const fn new() -> Self {
+        Self {
+            rows: TakeTrack::new(), key: AtomicU64::new(IDLE), limit: AtomicU32::new(0), count: AtomicU32::new(0),
+            written: AtomicBool::new(false), prepared: AtomicBool::new(false), busy: AtomicU32::new(0),
+            state: Mutex::new(State { open: None, done: Vec::new(), done_version: (0, 0) }),
+        }
+    }
+
+    pub fn ready(&self) {
+        self.rows.service(self.sampling(), self.count.load(Ordering::Acquire) as usize);
+        self.prepared.store(true, Ordering::SeqCst);
+    }
+
+    pub fn sampling(&self) -> bool { self.key.load(Ordering::SeqCst) != IDLE }
+    pub fn live(&self, slot: usize, frame: &ReplayFrame) { self.rows.live(slot, frame); }
+    pub fn seed_due(&self, slot: usize) -> bool {
+        let key = self.key.load(Ordering::SeqCst);
+        key != IDLE && key as u32 as usize == slot && self.count.load(Ordering::Acquire) == 0
+    }
+
+    pub fn fed(&self, slot: usize, generation: u32, count: u32) {
+        let key = u64::from(generation) << 32 | slot as u64;
+        if self.key.load(Ordering::SeqCst) == key && count > 0 && count <= self.limit.load(Ordering::Acquire)
+            && (count == 1 || self.count.load(Ordering::Acquire) != 0) {
+            self.rows.push(count as usize - 1, slot);
+            self.count.store(count, Ordering::Release);
+        }
+    }
+
+    pub fn begin(&self, id: &str, slot: usize, generation: u32, version: (u64, u64), limit: u32, pass: bool) -> bool {
+        let Some(name) = Id::new(id) else { return false };
+        if slot > 1 || !self.prepared.load(Ordering::SeqCst) { return false; }
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if state.done_version != version {
+            state.done.clear();
+            state.done_version = version;
+        }
+        if self.key.load(Ordering::SeqCst) != IDLE || state.open.is_some() || state.done.iter().any(|done| done == id) {
+            return false;
+        }
+        self.limit.store(limit, Ordering::Release);
+        self.count.store(0, Ordering::Release);
+        state.open = Some(Open { id: name, slot, generation, version, pass });
+        self.key.store(u64::from(generation) << 32 | slot as u64, Ordering::SeqCst);
+        true
+    }
+
+    pub fn end(&self) -> Option<(Open, Vec<[ReplayFrame; 2]>)> {
+        self.key.store(IDLE, Ordering::SeqCst);
+        let open = self.state.lock().unwrap_or_else(|error| error.into_inner()).open.take()?;
+        let count = self.count.swap(0, Ordering::AcqRel);
+        self.rows.take(count as usize).map(|rows| (open, rows))
+    }
+
+    pub fn open_run(&self) -> Option<(usize, u32)> {
+        self.state.lock().unwrap_or_else(|error| error.into_inner()).open.as_ref().map(|open| (open.slot, open.generation))
+    }
+
+    pub fn note_done(&self, id: &str, version: (u64, u64)) {
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if state.done_version != version {
+            state.done.clear();
+            state.done_version = version;
+        }
+        if !state.done.iter().any(|done| done == id) { state.done.push(id.to_owned()); }
+    }
+
+    pub fn note_written(&self) { self.written.store(true, Ordering::Release); }
+    pub fn take_written(&self) -> bool { self.written.swap(false, Ordering::AcqRel) }
+    pub fn busy(&self) -> u32 { self.busy.load(Ordering::SeqCst) }
+    pub fn poll<R>(&self, take: impl FnOnce() -> R) -> R {
+        if self.key.load(Ordering::SeqCst) == IDLE { return take(); }
+        self.busy.fetch_add(1, Ordering::SeqCst);
+        let result = take();
+        self.busy.fetch_sub(1, Ordering::SeqCst);
+        result
+    }
+
+    pub fn write_wanted(existing: Option<(Source, u32)>, rows: usize, inputs: usize) -> (bool, bool) {
+        match existing {
+            Some((Source::Recorded, _)) => (false, true),
+            Some((Source::Generated, count)) if count as usize >= rows => (false, count as usize >= inputs),
+            _ => (rows > 0, rows >= inputs),
+        }
+    }
+
     #[cfg(test)]
-    pub fn reset(&self) {}
+    pub fn reset(&self) {
+        self.key.store(IDLE, Ordering::SeqCst);
+        self.limit.store(0, Ordering::Release);
+        self.count.store(0, Ordering::Release);
+        self.written.store(false, Ordering::Release);
+        self.prepared.store(false, Ordering::SeqCst);
+        self.busy.store(0, Ordering::SeqCst);
+        *self.state.lock().unwrap_or_else(|error| error.into_inner()) =
+            State { open: None, done: Vec::new(), done_version: (0, 0) };
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +177,7 @@ mod tests {
 
     fn fed_keeps_only_its_runs_rows_in_order() {
         let track = PlayTrack::new();
+        assert!(!track.begin("walk", 1, 23, (2, 3), 3, true));
         track.ready();
         assert!(track.begin("walk", 1, 23, (2, 3), 3, true));
         track.live(1, &sample(1.0));
@@ -89,6 +192,14 @@ mod tests {
         assert_eq!((open.id.as_str(), open.slot, open.generation), ("walk", 1, 23));
         assert_eq!(rows.len(), 1);
         assert_eq!((rows[0][0].x, rows[0][1].x), (1.0, 101.0));
+        track.ready();
+        assert!(track.begin("walk", 1, 24, (2, 3), 3, true));
+        track.fed(1, 24, 2);
+        assert!(track.end().is_none());
+        track.note_done("walk", (2, 3));
+        assert!(!track.begin("walk", 1, 25, (2, 3), 3, true));
+        assert!(track.begin("walk", 1, 25, (2, 4), 3, true));
+        assert!(track.end().is_none());
     }
 
     fn the_static_is_idle_at_rest() {
@@ -98,6 +209,7 @@ mod tests {
         assert!(Id::new(&"a".repeat(crate::model::store::MAX_ID_CHARS + 1)).is_none());
         let source = include_str!("play_track.rs");
         assert!(source.contains("pub static PLAY: PlayTrack = PlayTrack::new();"));
+        assert!(source.contains("const IDLE: u64 = u64::MAX;") && source.contains("key: AtomicU64::new(IDLE)"));
     }
 
     fn runtime_wires_sampling_seed_service_and_adoption() {
@@ -108,6 +220,9 @@ mod tests {
         assert_eq!(host.matches("play_seed_due(").count(), 2);
         assert!(host.contains("play_track_service("));
         assert!(editor.contains("take_generated()") && editor.contains("adopt_positions("));
+        let worker = include_str!("../rr_host.rs").split_once("pub fn play_track_service(").unwrap().1
+            .split_once("\n}").unwrap().0;
+        assert!(worker.find("PLAY_PLAYER.load").unwrap() < worker.find("PLAY.ready();").unwrap());
     }
 
     #[test]

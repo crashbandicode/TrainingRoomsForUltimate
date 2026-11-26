@@ -1925,7 +1925,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "d0ae63942655f0b42e40c9c9bb740a806584034c4ffaa66e1ea8755b4cb49cb5",
+   "dest_sha256": "78038211fa424d541e410b88404774d348dcc19d7d134b3102006883a3436fe7",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2792,6 +2792,11 @@
      "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): add an inert position-adoption seam.",
      "old": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
      "new": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): adopt a matching, longer generated track without changing the selection.",
+     "old": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
+     "new": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some(track) = loaded.track else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_track(Some(track));\n        true\n    }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
     }
    ]
   },
@@ -5555,7 +5560,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "416f977487abf0dd2827d9bda975e9d74b8c82177b8a39d6265e8bdb8cf888db",
+   "dest_sha256": "b250a3845792fea2cec53ca777b9b41f9461e66b49a7a9894caa05e1f7a11793",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6541,6 +6546,11 @@
      "old": "        block.show(shown, ask);",
      "new": "        block.ask_at(shown, ask);",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): load a generated track outside the editor lock and adopt it only for the same open macro.",
+     "old": "\npub fn worker_preview_notices() {\n    scrub_service();\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n",
+     "new": "\npub fn worker_preview_notices() {\n    scrub_service();\n    if rr_host::take_generated() {\n        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));\n        if let Some(id) = id {\n            let dir = std::path::Path::new(crate::model::storage::ROOT).join(crate::engine::library::MACROS_DIR);\n            if let Ok(loaded) = crate::engine::macros::Library::new(dir).load_edited(&id) {\n                let mut editor = EDITOR.lock().unwrap();\n                if let Some(editor) = editor.as_mut().filter(|editor| editor.source.as_ref().is_some_and(|(source, _)| source == &id)) {\n                    if editor.clip.adopt_positions(loaded) {\n                        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n                    }\n                }\n            }\n        }\n    }\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n"
     }
    ]
   },

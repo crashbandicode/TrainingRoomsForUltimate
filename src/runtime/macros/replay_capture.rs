@@ -932,6 +932,20 @@ fn scrub_service() {
 
 pub fn worker_preview_notices() {
     scrub_service();
+    if rr_host::take_generated() {
+        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));
+        if let Some(id) = id {
+            let dir = std::path::Path::new(crate::model::storage::ROOT).join(crate::engine::library::MACROS_DIR);
+            if let Ok(loaded) = crate::engine::macros::Library::new(dir).load_edited(&id) {
+                let mut editor = EDITOR.lock().unwrap();
+                if let Some(editor) = editor.as_mut().filter(|editor| editor.source.as_ref().is_some_and(|(source, _)| source == &id)) {
+                    if editor.clip.adopt_positions(loaded) {
+                        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+                    }
+                }
+            }
+        }
+    }
     service_file_name();
     if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {
         let play = {

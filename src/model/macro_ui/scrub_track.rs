@@ -955,11 +955,14 @@ mod tests {
     #[test]
     fn the_sampler_reads_nothing_with_no_take() {
         let root = env!("CARGO_MANIFEST_DIR");
-        // A fighter frame reads the nine values only while a take is being recorded: one atomic read otherwise.
+        // A fighter frame reads the nine values only for a take or a generated track.
         let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
-        let gate = states.find("if !nana && crate::engine::rr_host::capture_role() != 0 {").expect("the take test comes first");
-        let sample = states.find("TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state(").unwrap();
-        assert!(gate < sample && states[gate..sample].lines().count() <= 3, "the sample sits inside the take test");
+        let gate = states.split_once("let capture = crate::engine::rr_host::capture_role() != 0;").unwrap().1
+            .split_once("if !crate::engine::rr_host::fighter_frame(").unwrap().0;
+        assert!(gate.contains("let play = crate::engine::rr_host::play_sampling();"));
+        assert!(gate.contains("if capture || play {"));
+        assert!(gate.contains("if capture { crate::engine::macro_ui::scrub_track::TAKE.live(role.index(), &frame); }"));
+        assert!(gate.contains("if play { crate::engine::rr_host::play_live(role.index(), &frame); }"));
         assert_eq!(states.matches("replay_capture::state(").count(), 1);
         // So a take's start reads both bodies once: its first frame has its state.
         let host = std::fs::read_to_string(format!("{root}/src/runtime/features/recording_host.rs")).unwrap();

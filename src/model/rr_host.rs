@@ -1531,7 +1531,30 @@ pub fn play_seed_due(role: Role) -> bool { PLAY.seed_due(role_index(role)) }
 pub fn take_generated() -> bool { PLAY.take_written() }
 
 #[inline(never)]
-pub fn play_track_service(_root: &Path) { PLAY.ready(); }
+pub fn play_track_service(root: &Path) {
+    use super::macro_ui::play_track::PlayTrack;
+    use super::macros::positions::{self, Source};
+    if PLAY_PLAYER.load(Ordering::Acquire) || PLAY_CPU.load(Ordering::Acquire) || lock(&PREVIEW_ASK).start.is_some() {
+        return;
+    }
+    PLAY.ready();
+    let Some((slot, generation)) = PLAY.open_run() else { return };
+    let role = if slot == 0 { Role::Player } else { Role::Cpu };
+    let over = !role_playing(role) || RUN_GEN[slot].load(Ordering::SeqCst) != generation;
+    if !over || PLAY.busy() != 0 { return; }
+    let Some((open, mut rows)) = PLAY.end() else { return };
+    if open.version != recording_version() { return; }
+    let dir = root.join(MACROS_DIR);
+    let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
+    if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
+    let existing = positions::kept(&dir, open.id.as_str(), &recording.frames);
+    let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
+    if write {
+        if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
+        PLAY.note_written();
+    }
+    if done { PLAY.note_done(open.id.as_str(), open.version); }
+}
 
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn bump_catalog() {
@@ -2052,6 +2075,14 @@ fn role_kind(role: Role) -> i32 {
     }
 }
 
+fn open_play_track(book: &Book, role: Role, id: &str, limit: usize, pass: bool) {
+    let kind = role_kind(role);
+    if id == CLIP_ID || book.is_chain(id) || kind < 0 || book.recorded_fighter(id) != Some(kind) { return; }
+    let Some(frames) = book.frame_count(id) else { return };
+    let slot = role_index(role);
+    PLAY.begin(id, slot, RUN_GEN[slot].load(Ordering::SeqCst), recording_version(), limit.min(frames) as u32, pass);
+}
+
 fn apply_waiting_answer(tick: &mut Tick) {
     if lock(&HELD).is_some() {
         return;
@@ -2180,6 +2211,9 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
     }
     if effect.started {
         mark_run(role);
+        if let Some(id) = book.index.active(role).filter(|id| book.plays_from_zero(id)) {
+            open_play_track(book, role, id, usize::MAX, true);
+        }
         if !next { owe_delay(role); }
     }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
@@ -2586,6 +2620,10 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
     match start {
         Some(PreviewStart { source, role, window, playback }) => {
             PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
+            let track_end = match &window {
+                PreviewWindow::Exact(frames) if frames.start == 0 => Some(frames.end),
+                _ => None,
+            };
             let frames = match window {
                 PreviewWindow::Exact(frames) => frames,
                 PreviewWindow::Drill { frames, trim } => book.drill_preview_range(&source, frames as usize, trim),
@@ -2601,7 +2639,10 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
             } else {
                 warp_to_start(book, role, &source, tick)
             };
-            if !start_run(machine, book, role, &source, Some(frames), owed, playback) {
+            if start_run(machine, book, role, &source, Some(frames), owed, playback) {
+                // If input 0 was already taken, this run has no rows.
+                if let Some(end) = track_end { open_play_track(book, role, &source, end, false); }
+            } else {
                 PREVIEW.store(0, Ordering::Release);
             }
         }
@@ -2849,9 +2890,11 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
 fn take_frame(role: Role) -> Option<InputFrame> {
-    let (frame, generation) = pop_frame(role)?;
-    credit_frame(role, generation);
-    Some(frame)
+    PLAY.poll(|| {
+        let (frame, generation) = pop_frame(role)?;
+        credit_frame(role, generation);
+        Some(frame)
+    })
 }
 
 fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
@@ -2881,6 +2924,7 @@ fn credit_frame(role: Role, generation: usize) {
         1
     };
     count.store((u64::from(generation) << 32) | u64::from(next), Ordering::Release);
+    PLAY.fed(role_index(role), generation, next);
 }
 
 fn role_frames(role: Role) -> &'static FrameQueue {
@@ -5081,7 +5125,7 @@ mod tests {
         tick(&root);
         assert_eq!(positions::writes(), before.2);
         generated_play(&root, Role::Cpu);
-        assert_eq!(positions::writes(), before.2, "the stop chord writes nothing");
+        assert_eq!(positions::writes(), before.2, "the stop chord writes no positions");
         tick(&root);
         assert_eq!(positions::writes(), before.2 + 1);
         assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 2);
