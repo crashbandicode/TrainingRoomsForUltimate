@@ -260,7 +260,7 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
 
-*The playhead reaches 64 without changing In or Out. Y snaps to a move mark (here, the start at 66); L sets In. After L again, Right reaches 100 and R keeps that frame: Out reads 101. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+*The playhead reaches 64 without changing In or Out. Y takes it to the start of the nearest move, at 66; L sets In there. After L again, Right reaches 100 and R keeps that frame: Out reads 101. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
 
 Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
 

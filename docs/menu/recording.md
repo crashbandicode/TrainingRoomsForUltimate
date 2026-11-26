@@ -308,7 +308,7 @@ More: [Change placement and the Replay window](../guide/recording.md#change-plac
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
 
-*With neither handle selected, Right moves the playhead. Y snaps to the nearest move mark, here the start at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
 
 Turns part of a saved match into a macro. It lists the captures you have: "Latest Vault capture" and "Previous Vault
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
