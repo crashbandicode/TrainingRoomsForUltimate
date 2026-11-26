@@ -95,10 +95,11 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **The clip editor can keep refusing with "In is mid-action" after a snap.** With In selected, Y alone moves the
-  handle to a mark but does not make it a move start, so X and A are still refused. The way round: with In
-  selected, hold ZL or ZR and press Y, then X. Reported by the operator on install 5 and reproduced by a host test;
-  install 4 has the same code. A fix is written and not merged.
+- **"In is mid-action" after a snap in a match capture.** Plain Y snaps In to a mark. If that frame is still
+  mid-action, preview and save are refused. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y to snap to a
+  move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
+  saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
+  A fix is written but is not in install 5.
 - **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
   parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
