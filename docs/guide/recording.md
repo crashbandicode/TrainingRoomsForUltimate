@@ -254,24 +254,24 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 
 ### Crop
 
-Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
-
-- L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves when the editor is idle.
-- 2026-11-26, merged for the build after install 5: on a macro, with no handle selected, Left/Right move the playhead over the whole take and Y takes it to the nearest move mark. Once it has moved, L cuts the start at that frame and R makes it the last frame kept. Host tests only; not yet seen in a game.
-- The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
-- A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
-- A macro crop keeps that range of input frames and the original's one start context; no pose is stored for every frame. Move marks recorded with the take stay with the frames they belong to.
-- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. A ZR tap swaps the target and stops a running preview. While it plays, the strip's key line reads `B stop preview`; B or X stops it and drops the remaining frames. After the last frame the result stays for about a second and the key line reads `B back`; B or X ends the tail without closing the editor, then the usual keys return and B closes it.
-- A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
-- A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
-
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
 
-*Crop on a macro, no preview played. L selects the start; holding Right moves it, and the fighters stand where the recording had them on that frame. R selects the end; holding Left moves it back. R again lets both fighters go. Eden, 2026-11-26, the build after install 5, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-scrub.mp4)
+*Scrubbing Macro 3 without playing it: L selects In, Right moves it to 64. R selects Out, Left moves it to 116, and R again releases the fighters. Their positions change, not their move animations. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-scrub.mp4)
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
 
-*The playhead, with nothing selected. Holding Right moves it through the take (the range line reads `playhead 64`) and the fighters follow. Y jumps to the nearest move's start and L sets the start there. L again, Right, then R sets the end at the playhead. Eden, 2026-11-26, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-playhead.mp4)
+*The playhead reaches 64 without changing In or Out. Y snaps to a move mark (here, the start at 66); L sets In. After L again, Right reaches 100 and R keeps that frame: Out reads 101. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+
+Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
+
+- L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves when the editor is idle.
+- In install 6 on a macro, with no handle selected, Left/Right move the playhead over the whole take and Y snaps to the nearest move mark. Once it has moved, L makes its frame the first kept frame and R makes it the last.
+- The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
+- A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
+- A macro crop keeps that range of input frames, its available positions and the original's one start context. Move marks stay with their frames. Install 6 does not store a move animation for every frame.
+- X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. A ZR tap swaps the target and stops a running preview. While it plays, the strip's key line reads `B stop preview`; B or X stops it and drops the remaining frames. After the last frame the result stays for about a second and the key line reads `B back`; B or X ends the tail without closing the editor, then the usual keys return and B closes it.
+- A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
+- A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 
 ![A macro start handle moves from frame 0 to 180](../media/rc15-crop-editor.gif)<br>
 *Macro Crop range selection: L, then Left/Right moves the start handle. Eden, 2026-11-15, rc.15 `d520d325`. Preview and save-as-new were checked separately; this clip shows the selection.*

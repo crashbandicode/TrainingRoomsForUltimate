@@ -302,6 +302,14 @@ More: [Change placement and the Replay window](../guide/recording.md#change-plac
 
 ### Replay window
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*The same editor opened from Macro 3's Crop row: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With neither handle selected, Right moves the playhead. Y snaps to the nearest move mark, here the start at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+
 Turns part of a saved match into a macro. It lists the captures you have: "Latest Vault capture" and "Previous Vault
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
 its name and its length in frames ("(partial)" if it ended early).
@@ -332,7 +340,7 @@ install 5. With no handle selected on a macro or a capture the strip reads "Hold
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-Host tests only; not yet seen in a game.
+The macro clip shows browsing, snapping the playhead and cutting with L and R in Eden. It does not show a match-capture preview or export.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
@@ -350,14 +358,6 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 - 2026-11-25: a take, and each fighter of a replay capture, stores the fighter it was recorded on (`recorded_fighter`, the key a combo file uses), so its specials read that fighter's own names whoever Player 1 is. A take or capture saved before that has none: its specials take the fighter's own names only while Player 1 is that fighter; otherwise they read "Neutral special", "Side special" and so on. A Mii's specials are named by the selection saved with the take, and by those common names when the take saved none. If you delete the latest Vault capture while its replay is still playing, the rest of the replay becomes a partial capture. Fighters already seen use the same rule as an old capture for their special names.
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
-
-*L, then Left/Right: the start handle moves and the fighters stand where the recording had them on that frame; R does the same for the end. No preview is played. Eden, 2026-11-26, the build after install 5, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-scrub.mp4)
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
-
-*With nothing selected, Left/Right moves the playhead, Y jumps to the nearest move's start, and L or R cuts there. Eden, 2026-11-26, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-playhead.mp4)
 
 ![Moving a macro's start handle from frame 0 to 180 keeps the final 134 frames](../media/rc15-crop-editor.gif)<br>
 *Macro Crop, Eden, 2026-11-15, rc.15 d520d325 (untested on hardware). L selects the start handle; Left/Right moves it. This clip shows range selection.*
