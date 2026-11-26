@@ -40,6 +40,8 @@ pub enum Pos {
     None,
     /// A macro recorded before positions were kept.
     NoTrack,
+    /// The fighters are shown at the frame's places; the macro kept no animations (recorded before they were kept).
+    NoMoves,
     /// The fighters are shown at the handle's frame.
     Held,
     /// A fighter's point is not a place to stand on this stage (outside the camera's limits or the blast lines, or
@@ -54,6 +56,7 @@ impl Pos {
     pub const fn text(self) -> &'static str {
         match self {
             Pos::NoTrack => "Play it once to see positions while scrubbing.",
+            Pos::NoMoves => "Play it once to see the moves while scrubbing.",
             Pos::Off => "Can't stand there on this stage.", // restriction: scrub-point-not-standable
             Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
@@ -65,7 +68,7 @@ impl Pos {
         match self {
             Pos::None => "none",
             Pos::NoTrack => "no_track",
-            Pos::Held => "held",
+            Pos::Held | Pos::NoMoves => "held",
             Pos::Off => "off",
             Pos::End => "end",
         }
@@ -818,10 +821,10 @@ mod tests {
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
-        for pos in [Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End] {
+        for pos in [Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End] {
             assert!(pos.text().chars().count() <= 67, "{pos:?}");
         }
-        assert_eq!([Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "off", "end"]);
+        assert_eq!([Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "held", "off", "end"]);
     }
 
     #[test]
@@ -1157,7 +1160,7 @@ mod tests {
         assert_eq!(saved.track.as_ref().map(|track| (track.len(), track[0][0], track[0][1].start.fighter_kind)), Some((10, state(0, 0), -1)));
         let mut reopened = ClipEditor::macro_file(*saved, false).unwrap();
         reopened.on_action(ClipAction::SelectIn);
-        assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::Held)));
+        assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::NoMoves)));
         // The X preview's clip is not given a track: it is played, not saved.
         let mut previewed = capture(2);
         let ClipEffect::Preview(clip) = previewed.on_action(ClipAction::TogglePlay) else { panic!("expected a preview") };

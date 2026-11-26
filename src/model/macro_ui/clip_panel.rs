@@ -714,7 +714,7 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos },
+            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held | Pos::NoMoves if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos },
             fighters: [self.fighter_word(0), self.fighter_word(1)], poses: self.poses,
             fighter_line: self.fighter_line(), fighter_keys: self.fighter_keys() }
     }
@@ -747,6 +747,7 @@ impl ClipEditor {
         match (ask, &self.file) {
             (Ask::None, Some(FileSource::Macro { .. })) => (ask, Pos::End),
             (Ask::None, _) => (ask, Pos::None),
+            (_, Some(FileSource::Macro { recording, .. })) if !recording.has_moves() => (ask, Pos::NoMoves),
             _ => (ask, Pos::Held),
         }
     }
@@ -1853,6 +1854,62 @@ mod tests {
         }
     }
 
+    fn macro_with_position_moves(moves: crate::engine::macros::positions::Moves) -> (MacroRecording, Vec<[ReplayFrame; 2]>) {
+        use crate::engine::macros::positions::Source;
+        let e = saved_macro(false);
+        let mut recording = match &e.file {
+            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),
+            _ => panic!("macro"),
+        };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),
+            start: recording.start, x: 2.0, y: 3.0 };
+        let track = vec![[frame, frame]; recording.frames.len()];
+        recording.set_sourced_track(Source::Recorded, moves, track.clone());
+        (recording, track)
+    }
+
+    fn a_macro_without_moves_says_to_play_it_once() {
+        use crate::engine::macros::positions::{Moves, Source};
+        for moves in [Moves::None, Moves::Take, Moves::Playback] {
+            let (recording, track) = macro_with_position_moves(moves);
+            let mut editor = ClipEditor::macro_file(recording.clone(), false).unwrap();
+            editor.on_action(ClipAction::SelectIn);
+            let view = editor.view();
+            assert_eq!(editor.scrub().1, if moves == Moves::None { Pos::NoMoves } else { Pos::Held });
+            assert_eq!(clip_help(&view, "ZL", "ZL", 0).notice,
+                if moves == Moves::None { "Play it once to see the moves while scrubbing." } else { "" });
+            assert_eq!(view.pos.word(), "held");
+            assert!(!editor.note_scrub(Pos::Held));
+            assert_eq!(editor.view().pos, view.pos);
+            if moves == Moves::None {
+                let mut loaded = recording;
+                loaded.set_sourced_track(Source::Generated, Moves::Playback, track);
+                assert!(editor.adopt_positions(loaded));
+                assert_eq!(editor.scrub().1, Pos::Held);
+                assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "");
+            }
+        }
+    }
+
+    fn a_capture_never_asks_for_a_playback() {
+        let mut editor = snap_capture();
+        editor.on_action(ClipAction::SelectIn);
+        assert_eq!(editor.scrub().1, Pos::Held);
+    }
+
+    fn a_refused_point_still_wins_over_the_moves_hint() {
+        use crate::engine::macros::positions::Moves;
+        let (recording, _) = macro_with_position_moves(Moves::None);
+        let mut editor = ClipEditor::macro_file(recording, false).unwrap();
+        editor.on_action(ClipAction::SelectIn);
+        assert_eq!(editor.scrub().1, Pos::NoMoves);
+        assert!(editor.note_scrub(Pos::Off));
+        assert_eq!(editor.view().pos, Pos::Off);
+        assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, Pos::Off.text());
+        assert!(editor.note_scrub(Pos::None));
+        assert_eq!(editor.view().pos, Pos::None);
+    }
+
     fn generated_positions_reach_the_open_editor_at_once() {
         let mut e = saved_macro(false);
         let recording = match &e.file {
@@ -2268,6 +2325,9 @@ mod tests {
             ("a_second_toggle_waits_for_the_swap", a_second_toggle_waits_for_the_swap as fn()),
             ("the_modifier_turns_l_and_r_into_the_fighter_toggles", the_modifier_turns_l_and_r_into_the_fighter_toggles as fn()),
             ("the_strip_names_the_fighter_and_its_key", the_strip_names_the_fighter_and_its_key as fn()),
+            ("a_macro_without_moves_says_to_play_it_once", a_macro_without_moves_says_to_play_it_once as fn()),
+            ("a_capture_never_asks_for_a_playback", a_capture_never_asks_for_a_playback as fn()),
+            ("a_refused_point_still_wins_over_the_moves_hint", a_refused_point_still_wins_over_the_moves_hint as fn()),
             ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
             ("the_open_editor_takes_moves_for_the_frames_it_already_had", the_open_editor_takes_moves_for_the_frames_it_already_had as fn()),
             ("x_after_a_held_frame_previews_in_either_order_of_the_two_threads", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),
