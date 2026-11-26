@@ -27,7 +27,7 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Install 6
 
-| | |
+| Install 6 | Details |
 | --- | --- |
 | Installed | 2026-11-26 (12:22), and read back |
 | Build | `5df3d9dc`. Still an rc.15 build: the footer reads `0.2.0-rc.15 · rc15 5df3d9dc` |
@@ -97,13 +97,14 @@ is kept. This works on a macro and on a match capture.
 | "Positions end here." | Past the positions of a playback that was stopped early; it gives positions up to where it stopped |
 | "Can't stand there on this stage." | Either fighter's point is inside solid ground or a wall, outside the camera's limits, or past the safe blast-line bounds. A fighter already held goes back to where the hold began. Each fighter's point is judged by itself, so the other one is still shown when its own point allows |
 
-| Rule | |
+| Rule | What it means |
 | --- | --- |
 | The macro's own file | Stays the same: older builds can still read new macros, older macros still load and play on this build, and Play reads what it read before. The macro does not need positions to play |
 | Positions made by a playback | Are that playback's, not the original recording's |
 | A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
 | No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
-| Not shown | The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing |
+| Fighter pose | Frozen or neutral; this is not a replay of the animation |
+| Not shown | Projectiles, items and damage. Combos and drills have no position display |
 
 **Fixed before the card build** (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
 the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
@@ -111,21 +112,23 @@ both fighters stood beside their recorded points while the editor said they were
 
 | Checked | Result |
 | --- | --- |
-| Eden, on `eb39d6bc`, the build before that fix | A recorded take held both fighters at In with no preview, In and Out followed the handles, and deselecting let them go. An old macro read "Play it once to see positions while scrubbing." and got its positions from one Play. X in the editor showed them at once. A crop kept them |
-| Play's start, in Eden (one host, one boot per build) | Every tested macro on `eb39d6bc` started on install 5's frame count or one frame earlier, including the first Play of the old 30-second and ten-minute macros. The unchanged playback path carries this result forward; these are not timings from a boot of install 6 or from the console |
+| Holds on `eb39d6bc` | Both fighters followed In and Out without a preview; deselecting released them |
+| Old macro and crop on `eb39d6bc` | The no-positions line appeared. One Play generated positions; X showed them immediately in the editor. A crop kept them. |
+| Play start on `eb39d6bc` | Each tested macro started on install 5's frame or one earlier, including the first Plays of the old 30-second and ten-minute macros |
+| Timing coverage | One Eden host, one boot per build. The playback path is unchanged; install 6 and the console were not timed here. |
 | Not established by the build before the fix | Scrub behavior in a waiting room, through a fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions |
 | Install 6 itself | Its own checks are in testing |
 | Host | No host test runs the Switch code that holds the fighters |
 
 ### Tested
 
-| | Install 6 |
+| Check | Install 6 |
 | --- | --- |
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
 | Eden, on merge 17 | At installation, two Training boots were testing its diagnostic build. No result from a smoke test of the installed release file is claimed here |
-| The operator reported | Nothing about TrainingRooms on this build yet |
+| On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).
 
