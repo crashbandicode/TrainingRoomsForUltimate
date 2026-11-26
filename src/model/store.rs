@@ -757,6 +757,13 @@ static CATALOG_WRITES: Mutex<BTreeMap<PathBuf, CatalogSignatures>> = Mutex::new(
 static RECORDING_WRITE: Mutex<()> = Mutex::new(());
 static CATALOG_GEN: AtomicU64 = AtomicU64::new(0);
 static INDEX_GEN: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+thread_local! {
+    static THREAD_GEN: core::cell::Cell<u64> = const { core::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub fn thread_generation() -> u64 { THREAD_GEN.with(|generation| generation.get()) }
 
 fn recording_root(root: &Path) -> bool {
     cfg!(test) || root == Path::new(crate::model::storage::ROOT)
@@ -789,6 +796,8 @@ fn note_catalog_write(dir: &Path, id: &str, size: Option<u64>) {
     let mut writes = CATALOG_WRITES.lock().unwrap_or_else(|err| err.into_inner());
     writes.entry(root.to_path_buf()).or_default().insert((folder, id.to_owned()), size);
     CATALOG_GEN.fetch_add(1, Ordering::Release);
+    #[cfg(test)]
+    THREAD_GEN.with(|generation| generation.set(generation.get().wrapping_add(1)));
     drop(writes);
     #[cfg(target_os = "switch")]
     if folder == 1 {
@@ -807,6 +816,8 @@ pub fn catalog_generation() -> u64 {
 
 pub fn advance_catalog() {
     CATALOG_GEN.fetch_add(1, Ordering::Release);
+    #[cfg(test)]
+    THREAD_GEN.with(|generation| generation.set(generation.get().wrapping_add(1)));
     wake_catalog();
 }
 
@@ -817,6 +828,8 @@ pub fn index_generation() -> u64 {
 pub fn note_index_write(root: &Path) {
     if recording_root(root) {
         INDEX_GEN.fetch_add(1, Ordering::Release);
+        #[cfg(test)]
+        THREAD_GEN.with(|generation| generation.set(generation.get().wrapping_add(1)));
         wake_catalog();
     }
 }
