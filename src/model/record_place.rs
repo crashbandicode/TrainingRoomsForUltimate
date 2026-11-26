@@ -455,8 +455,8 @@ fn who_key(who: Who) -> &'static str {
 /// A body the game landed leaves the ground again at a spot of free air. `free`: the shared stage rule lets a body
 /// be at the spot; `floor`: the height of the floor the picker finds for the spot, which is above the spot when the
 /// spot is within the picker's slack under that floor's surface. Lifted there, the body would hang inside the floor.
-pub fn leaves_ground(free: bool, _spot: f32, _floor: Option<f32>) -> bool {
-    free
+pub fn leaves_ground(free: bool, spot: f32, floor: Option<f32>) -> bool {
+    free && floor.is_none_or(|height| height <= spot)
 }
 
 pub fn write_shown(shown: &Shown, first: bool, popup: bool, role: Who, out: &mut String) {
@@ -815,7 +815,7 @@ impl Wizard {
 
     /// `write_text`, with where the game has a fighter's body when it moved it off its spot (`bodies`, by role).
     pub fn write_text_at(
-        &self, recorded: Who, name: &str, _bodies: [Option<[f32; 2]>; 2], out: &mut impl core::fmt::Write,
+        &self, recorded: Who, name: &str, bodies: [Option<[f32; 2]>; 2], out: &mut impl core::fmt::Write,
     ) -> core::fmt::Result {
         let (number, title) = match self.page {
             Page::Ask => return self.write_ask(name, out),
@@ -846,6 +846,8 @@ impl Wizard {
                     write!(out, "{place} ({}, {})", fighter.at[0].round() as i32, fighter.at[1].round() as i32)?;
                     if self.page == Page::Preview {
                         write!(out, " · {} · {}%", fighter.state.title(), fighter.percent)?;
+                    } else if let Some(body) = bodies[who.index()] {
+                        write!(out, " · body at ({}, {})", body[0].round() as i32, body[1].round() as i32)?;
                     }
                 }
                 Page::State => write!(out, "{}", fighter.state.title())?,

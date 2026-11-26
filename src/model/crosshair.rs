@@ -134,7 +134,9 @@ impl CpuPreview {
             return;
         }
         self.displaced = self.wrote
-            .filter(|(wrote, _)| read.landed || read.at[0] != wrote[0] || read.at[1] > wrote[1])
+            .filter(|(_, frame)| read.frame == frame.wrapping_add(1))
+            .zip(read.speed)
+            .filter(|((wrote, _), speed)| read.landed || read.at != [wrote[0], wrote[1] + speed[1]])
             .map(|_| Displaced { at: read.at, landed: read.landed });
         if self.wrote.map(|(wrote, _)| wrote) != Some(at) {
             self.relifted = false;
