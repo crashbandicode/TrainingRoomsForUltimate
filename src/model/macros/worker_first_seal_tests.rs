@@ -4,7 +4,7 @@ use crate::engine::macros::{LiveInput, StartState};
 use crate::engine::macros::handoff::{FixedReplayId, FixedReplayTitle, LiveArchive, LiveEvent};
 
 fn frame(value: u32) -> LiveFrame {
-    LiveFrame { input: LiveInput { buttons: value, axes: [0.25, -0.5, 0.0, 0.0] },
+    LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: value, axes: [0.25, -0.5, 0.0, 0.0] },
         start: StartState::neutral(8, 0, 1.0), x: value as f32, y: 2.0,
         position_z: 0.0, speed_z: 0.0, body: 42 }
 }

@@ -36,6 +36,8 @@ mod scrub_play_timing;
 mod generated_idle;
 #[path = "../scrub_save_heap.rs"]
 mod scrub_save_heap;
+#[path = "../capture_fresh_process.rs"]
+mod capture_fresh_process;
 #[path = "../../src/test_table.rs"]
 mod test_table;
 #[path = "../build_tag.rs"]

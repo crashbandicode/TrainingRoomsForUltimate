@@ -2,14 +2,15 @@
 //! this module neither decodes proprietary replay bytes nor invents action state.
 use {crate::engine::macros::FrameWindow, crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::StartState};
 
-/// Input and start-context observation. Native simulation provides the preview;
-/// no animation/pose samples are retained in the per-frame capture buffer.
+/// Input, start context, and the packed animation name and frame in the capture buffer
+/// (scrub-moves SM5 B, decided 2026-11-26).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ReplayFrame {
     pub input: InputFrame,
     pub start: StartState,
     pub x: f32,
     pub y: f32,
+    pub pose: crate::engine::macros::PackedPose,
 }
 
 #[derive(Clone, Debug)]
@@ -120,6 +121,7 @@ mod tests {
     fn track() -> ReplayTrack {
         ReplayTrack { fighter: None, entry: 1, quantized_analog: false,
             frames: (0..12).map(|i| ReplayFrame {
+                pose: crate::engine::macros::PackedPose::NONE,
                 input: InputFrame { buttons: if i == 3 { 513 } else { 0 }, ..InputFrame::default() },
                 start: StartState { status: if (4..9).contains(&i) { 44 } else { 14 },
                     speed_y: -(i as f32), ..StartState::neutral(18, 0, 1.0) }, x: 0.0, y: i as f32,
