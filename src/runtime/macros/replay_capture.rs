@@ -27,6 +27,8 @@ const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);
 static TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());
+/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.
+static WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);
 static BROWSER: Mutex<Option<Browser>> = Mutex::new(None);
 static REVISION: AtomicU64 = AtomicU64::new(1);
 static SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);
@@ -930,8 +932,44 @@ fn scrub_service() {
     }
 }
 
+/// X while the fighters are held at a shown frame (tr-primary-2 2026-11-26 12:54:05Z): the hold lets them go first.
+/// The editor keeps the play as wanted and shows no frame, so "nobody" is published at once; `service_wanted_play`
+/// starts it on the pass that finds the bodies released. `false`: nothing is held and the play starts now.
+fn hold_play(action: ClipAction, playback: bool) -> bool {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return false };
+        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }
+        editor.want_play(action);
+    }
+    WANTED_PLAYBACK.store(playback, Ordering::Release);
+    crate::runtime::diag_log::diagnostic(format_args!("[Scrub] play wanted: the hold lets the fighters go first"));
+    scrub_service();
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+    true
+}
+
+/// Every worker pass: a wanted play starts once the hold reports the bodies released. The start that follows waits
+/// for the released CPU by its state on the game side (`states::preview::take_home`).
+fn service_wanted_play() {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    let wanted = {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return };
+        if editor.wanted_play().is_none() || !SLOT.with(|block| block.released()).unwrap_or(true) { return; }
+        SLOT.with(|block| block.await_settle());
+        editor.take_wanted_play()
+    };
+    if let Some(action) = wanted {
+        crate::runtime::diag_log::diagnostic(format_args!("[Scrub] released: the play is asked"));
+        apply_action_as(action, WANTED_PLAYBACK.load(Ordering::Acquire));
+    }
+}
+
 pub fn worker_preview_notices() {
     scrub_service();
+    service_wanted_play();
     if rr_host::take_generated() {
         let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));
         if let Some(id) = id {
@@ -1079,6 +1117,7 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         notify("Wait for the requested fighter to load".into());
         return;
     }
+    if matches!(action, ClipAction::TogglePlay | ClipAction::Restart) && hold_play(action, playback) { return; }
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
         // A previous track's Switch is not authority to swap for a later Keep.
         if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.switch = false; }

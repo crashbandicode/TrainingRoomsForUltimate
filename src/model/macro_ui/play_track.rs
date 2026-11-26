@@ -150,8 +150,9 @@ impl PlayTrack {
 
     pub fn write_wanted(existing: Option<(Source, u32)>, rows: usize, inputs: usize) -> (bool, bool) {
         match existing {
-            Some((Source::Recorded, _)) => (false, true),
-            Some((Source::Generated, count)) if count as usize >= rows => (false, count as usize >= inputs),
+            // A file that covers the playback's frames stays, whatever made it. A whole one is done; a short one
+            // (a stopped playback, a take whose positions ended early) is replaced when a playback covers more.
+            Some((_, count)) if count as usize >= rows => (false, count as usize >= inputs),
             _ => (rows > 0, rows >= inputs),
         }
     }

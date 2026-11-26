@@ -33,8 +33,15 @@ pub struct Body {
 
 /// No clock: every state waited on is one the game leaves by itself, and every other state refuses at once.
 pub fn settle(body: Body) -> Settle {
-    let _ = body;
-    Settle::Refuse
+    if body.gone {
+        Settle::Refuse
+    } else if body.ground && body.idle {
+        Settle::Ready
+    } else if body.ground && (body.falling || body.landing) || body.air && body.floor {
+        Settle::Wait
+    } else {
+        Settle::Refuse
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -2005,7 +2005,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "0b205c2ec4b168a30c71d57eb79ccc14ed19b8f23f8b3534f3ff37156265e252",
+   "dest_sha256": "c357af6b8cca7edffae6de07e8970d90175491c18efa28ce2de090a1a0296e8b",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2917,6 +2917,21 @@
      "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): a play asked for while the fighters are held at a shown frame is kept as wanted until the hold reports them released.",
      "old": "    anchor: u32,\n    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,\n}\n\nfn prepare(mut session: ReplaySession) -> Option<ReplaySession> {\n",
      "new": "    anchor: u32,\n    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,\n    /// A play asked for while the fighters were held at a shown frame: kept until the hold reports them released.\n    wanted: Option<ClipAction>,\n}\n\nfn prepare(mut session: ReplaySession) -> Option<ReplaySession> {\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "    }\n\n    pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {\n        if self.file.is_some() && matches!(action,\n            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {\n            return ClipEffect::None;\n",
+     "new": "    }\n\n    pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {\n        // Any press drops a play that waits for the hold to let go; the worker takes it before it applies it.\n        self.wanted = None;\n        if self.file.is_some() && matches!(action,\n            ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {\n            return ClipEffect::None;\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "    }\n\n    pub fn shown_frame(&self) -> Option<u32> {\n        (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())\n    }\n\n    pub fn view(&self) -> ClipView {\n",
+     "new": "    }\n\n    pub fn shown_frame(&self) -> Option<u32> {\n        (self.wanted.is_none() && !self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed))\n            .then_some(self.window.cursor())\n    }\n\n    pub fn view(&self) -> ClipView {\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "    } else {\n        follow\n    };\n    let notice = if let Some(start) = view.move_start {\n        format!(\"Move at {} + {}f setup. Plays from the temporary preview setup.\",\n            start.action_frame, start.action_frame - start.frame)\n    } else if view.clean_start {\n",
+     "new": "    } else {\n        follow\n    };\n    // A body that is not moved: the line that says why comes before the snapped move's line and the snap hint.\n    let notice = if view.pos == Pos::Off {\n        view.pos.text().to_owned()\n    } else if let Some(start) = view.move_start {\n        format!(\"Move at {} + {}f setup. Plays from the temporary preview setup.\",\n            start.action_frame, start.action_frame - start.frame)\n    } else if view.clean_start {\n"
     }
    ]
   },
@@ -5680,7 +5695,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "b250a3845792fea2cec53ca777b9b41f9461e66b49a7a9894caa05e1f7a11793",
+   "dest_sha256": "cb90d7b7e3d176f46503a91f08c8249ee2d33bea96cefdd250ae34c9bc0419e1",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6671,6 +6686,21 @@
      "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): load a generated track outside the editor lock and adopt it only for the same open macro.",
      "old": "\npub fn worker_preview_notices() {\n    scrub_service();\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n",
      "new": "\npub fn worker_preview_notices() {\n    scrub_service();\n    if rr_host::take_generated() {\n        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));\n        if let Some(id) = id {\n            let dir = std::path::Path::new(crate::model::storage::ROOT).join(crate::engine::library::MACROS_DIR);\n            if let Ok(loaded) = crate::engine::macros::Library::new(dir).load_edited(&id) {\n                let mut editor = EDITOR.lock().unwrap();\n                if let Some(editor) = editor.as_mut().filter(|editor| editor.source.as_ref().is_some_and(|(source, _)| source == &id)) {\n                    if editor.clip.adopt_positions(loaded) {\n                        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n                    }\n                }\n            }\n        }\n    }\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "        notify(\"Wait for the requested fighter to load\".into());\n        return;\n    }\n    if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {\n        // A previous track's Switch is not authority to swap for a later Keep.\n        if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.switch = false; }\n",
+     "new": "        notify(\"Wait for the requested fighter to load\".into());\n        return;\n    }\n    if matches!(action, ClipAction::TogglePlay | ClipAction::Restart) && hold_play(action, playback) { return; }\n    if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {\n        // A previous track's Switch is not authority to swap for a later Keep.\n        if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.switch = false; }\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "    }\n}\n\npub fn worker_preview_notices() {\n    scrub_service();\n    if rr_host::take_generated() {\n        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));\n        if let Some(id) = id {\n",
+     "new": "    }\n}\n\n/// X while the fighters are held at a shown frame (tr-primary-2 2026-11-26 12:54:05Z): the hold lets them go first.\n/// The editor keeps the play as wanted and shows no frame, so \"nobody\" is published at once; `service_wanted_play`\n/// starts it on the pass that finds the bodies released. `false`: nothing is held and the play starts now.\nfn hold_play(action: ClipAction, playback: bool) -> bool {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action);\n    }\n    WANTED_PLAYBACK.store(playback, Ordering::Release);\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n    scrub_service();\n    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n    true\n}\n\n/// Every worker pass: a wanted play starts once the hold reports the bodies released. The start that follows waits\n/// for the released CPU by its state on the game side (`states::preview::take_home`).\nfn service_wanted_play() {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    let wanted = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n        if editor.wanted_play().is_none() || !SLOT.with(|block| block.released()).unwrap_or(true) { return; }\n        SLOT.with(|block| block.await_settle());\n        editor.take_wanted_play()\n    };\n    if let Some(action) = wanted {\n        crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] released: the play is asked\"));\n        apply_action_as(action, WANTED_PLAYBACK.load(Ordering::Acquire));\n    }\n}\n\npub fn worker_preview_notices() {\n    scrub_service();\n    service_wanted_play();\n    if rr_host::take_generated() {\n        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));\n        if let Some(id) = id {\n"
+    },
+    {
+     "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:48:20Z, 12:54:05Z): the line that says why a body is not moved comes first; a play asked for while the fighters are held starts only when the hold reports them released.",
+     "old": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n",
+     "new": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\n/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.\nstatic WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n"
     }
    ]
   },

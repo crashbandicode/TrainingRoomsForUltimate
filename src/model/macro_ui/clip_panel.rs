@@ -146,7 +146,10 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
     } else {
         follow
     };
-    let notice = if let Some(start) = view.move_start {
+    // A body that is not moved: the line that says why comes before the snapped move's line and the snap hint.
+    let notice = if view.pos == Pos::Off {
+        view.pos.text().to_owned()
+    } else if let Some(start) = view.move_start {
         format!("Move at {} + {}f setup. Plays from the temporary preview setup.",
             start.action_frame, start.action_frame - start.frame)
     } else if view.clean_start {
@@ -545,7 +548,8 @@ impl ClipEditor {
     }
 
     pub fn shown_frame(&self) -> Option<u32> {
-        (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())
+        (self.wanted.is_none() && !self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed))
+            .then_some(self.window.cursor())
     }
 
     pub fn view(&self) -> ClipView {
@@ -734,6 +738,8 @@ impl ClipEditor {
     }
 
     pub fn on_action(&mut self, action: ClipAction) -> ClipEffect {
+        // Any press drops a play that waits for the hold to let go; the worker takes it before it applies it.
+        self.wanted = None;
         if self.file.is_some() && matches!(action,
             ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture | ClipAction::UseLeadIn) {
             return ClipEffect::None;

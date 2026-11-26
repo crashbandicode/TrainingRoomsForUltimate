@@ -144,7 +144,7 @@ impl Block {
     /// The worker: what the fighters show from the next frame on.
     pub fn set_ask(&self, ask: Ask) {
         if self.ask.read() != ask {
-            self.ask.publish(ask);
+            self.put(ask);
         }
     }
 
@@ -153,7 +153,7 @@ impl Block {
     pub fn ask_at(&self, frame: Option<u32>, ask: Ask) {
         let frame = frame.map_or(0, |frame| frame.wrapping_add(1));
         if self.shown.swap(frame, Ordering::AcqRel) != frame || self.ask.read() != ask {
-            self.ask.publish(ask);
+            self.put(ask);
         }
     }
 
@@ -197,6 +197,15 @@ impl Block {
         ok
     }
 
+    /// Publish an ask. A group ask names the roles a later "nobody" waits for, and ends an older start's wait.
+    fn put(&self, ask: Ask) {
+        if let Ask::Group { deltas, .. } = ask {
+            self.moved.store(u32::from(deltas[0].is_some()) | u32::from(deltas[1].is_some()) << 1, Ordering::Release);
+            self.settle.store(0, Ordering::Release);
+        }
+        self.ask.publish(ask);
+    }
+
     /// The generation of the ask now published. A role's frame reads it before the ask and reports it with `ack`.
     pub fn generation(&self) -> u32 {
         self.ask.generation()
@@ -204,28 +213,38 @@ impl Block {
 
     /// The game thread, at the end of a role's fighter frame: the generation it read before it read the ask.
     pub fn ack(&self, slot: usize, generation: u32) {
-        let _ = (slot, generation, &self.acked);
+        if let Some(acked) = self.acked.get(slot) {
+            acked.store(generation.wrapping_add(1), Ordering::Release);
+        }
     }
 
     /// The worker: nobody is asked to be held, and every role the last ask moved has run a fighter frame under that
     /// "nobody", which is the frame that lets its body go. A role that never ran a frame here has no body to wait for.
     pub fn released(&self) -> bool {
-        let _ = &self.moved;
-        true
+        if self.ask() != Ask::None {
+            return false;
+        }
+        let (now, moved) = (self.ask.generation().wrapping_add(1), self.moved.load(Ordering::Acquire));
+        self.acked.iter().enumerate().all(|(slot, acked)| {
+            let acked = acked.load(Ordering::Acquire);
+            moved & (1 << slot) == 0 || acked == 0 || acked == now
+        })
     }
 
     /// The worker, as it starts a play that waited for the release: the start waits for the released CPU.
     pub fn await_settle(&self) {
-        let _ = &self.settle;
+        self.settle.store(1, Ordering::Release);
     }
 
     /// The game thread: a start waits for the CPU the hold let go.
     pub fn settling(&self) -> bool {
-        false
+        self.settle.load(Ordering::Acquire) != 0
     }
 
     /// The game thread: the released CPU was seen settled, or will not settle; the wait is over.
-    pub fn settled(&self) {}
+    pub fn settled(&self) {
+        self.settle.store(0, Ordering::Release);
+    }
 
     /// The role whose home anchors the group.
     pub fn target_slot(&self) -> Option<usize> {

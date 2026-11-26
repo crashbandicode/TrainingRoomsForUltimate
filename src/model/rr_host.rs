@@ -1470,8 +1470,13 @@ pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState) -> Tick
     tick
 }
 
-/// The worker's pass once migration has finished: what waits is serviced, and nothing else.
+/// The worker's pass once migration has finished. A take that is being recorded gets its next block of positions on
+/// every pass, whether or not anything else waits: with the pending test in front of it the positions stopped at
+/// the two blocks the Record chord's pass had made (SP-17). Then what waits is serviced.
 pub fn worker_tick(root: &Path, player: SavedState, cpu: SavedState) -> Option<Tick> {
+    if CAP_ROLE.load(Ordering::Acquire) != 0 {
+        TAKE.service(true, CAP_LEN.load(Ordering::Acquire));
+    }
     if !pending() {
         return None;
     }
