@@ -279,7 +279,7 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
   for the move start. Release the modifier before pressing X to preview, or press A to save. The fix (`dbded2d1`)
   is in install 6, not in install 5.
 - **The operator reported** (2026-11-26, on this build): a fighter placed off stage on a save stays on the ground
-  once it has landed; and Guard the Edge's starting spot varies between rounds. Neither is fixed in install 6:
+  once it has landed; and Guard the Edge's start varies between rounds (the CPU is let go at the same point, and the game's AI then moves differently). Neither is fixed in install 6:
   [Known issues](CURRENT-RELEASE.md#known-issues).
 
 ## Install 4

@@ -151,9 +151,24 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([Install 6](#install-6-5df3d9dc)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
 | 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. The fix is on the card since install 6 (2026-11-26). |
 | 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not fixed in install 6 (merge 17). Assigned for the following build (inbox 11:57:13Z, with the operator's words). A code review identified why the hold may not lift a landed fighter; this still needs confirmation in Eden (12:09:32Z). |
-| 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | Not changed. Assigned for a later build, cause first (inbox 2026-11-26 11:57:13Z, tr-primary-2, with the operator's words). No cause is established, and it has not been reproduced. |
+| 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | The [Eden comparison](#guard-the-edge-release-points) found different first inputs and camera framing, not different release coordinates. It did not measure the operator's console rounds. |
 | 2026-11-26 12:29 | install 6 | The game crashed right after A on the title screen; the operator guessed it is intermittent. | No TrainingRooms frame is in the crash, and its owner is not established. The game's resource inflate thread faulted in the game's own copy into a fresh block, for a stock file; ARCropolis only forwards that call. The block's first page could not be written, and what left the heap in that state is not known (inbox 13:35:17Z, tr-primary-2; `artifacts/phase23/hw-crash-20261126-1229Z/SUMMARY.md`). A May 25 report predating TrainingRooms has the same signature. Under investigation by another lane; no fix was tested. Not listed as a TrainingRooms issue. |
 | 2026-11-26 about 12:41 | install 6 | In Create macro from, moving the playhead moved the fighters in space but did not show their moves. The operator also asked to choose the recorded or current character separately for Player 1 and the CPU. | Install 6 stores positions but not move animation frames. Both requested changes are in design, not in this build (inbox 12:41:51Z, tr-primary-2). No cause for the reported uneven movement was established. |
+
+### Guard the Edge release points
+
+On install 6's release file (`5df3d9dc`, `c1ced861…`), all 35 release records matched the CPU's picked coordinates.
+These were two Guard the Edge runs in Eden on the XPS, not the release smoke test.
+
+| Setup | Releases | What the first frames showed |
+| --- | ---: | --- |
+| Idle; Player 1 jabs (`place-float-xps-03`) | 10 + 10 | No split like the one at the in-view start. |
+| Deep start (`place-float-xps-04`) | 9 | The first frames agreed in all eight rounds seen in full. |
+| Start in view (`place-float-xps-04`) | 6 | Rounds 1, 3 and 5: the ordinary CPU pressed Guard and air-dodged up and toward the stage. Rounds 2 and 6: it fell, then used Up special. Round 4's first free frames were not captured. |
+
+The camera also framed the stage differently at Ready. Screen height alone does not show that the release point
+changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; report 13:36:05Z, accepted
+13:36:40Z. The operator chose a change at 13:40:17Z; these runs did not test it.
 
 ## Install 5 (`b7a382e4`)
 
