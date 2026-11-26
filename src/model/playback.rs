@@ -112,7 +112,7 @@ impl Book {
         }
     }
 
-    /// The book keeps what playback reads. A macros position track is for the clip editor only, and is dropped here.
+    /// The book keeps what playback reads. A macro's position track is for the clip editor only, and is dropped here.
     pub fn add_recording(&mut self, id: impl Into<String>, mut recording: MacroRecording) {
         recording.set_track(None);
         self.recordings.insert(id.into(), recording);
