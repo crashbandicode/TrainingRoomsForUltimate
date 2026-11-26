@@ -48,7 +48,7 @@ and for an Eden session on them.
 
 - With no handle selected, Left and Right move the playhead over the whole take of a macro or a capture, inside or
   outside the kept part. In and Out do not change.
-- Y then moves the playhead to the nearest move mark, never to the start or end of the take.
+- Y then moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target.
 - Once the playhead has moved, L makes its frame the first kept frame and R makes it the last kept frame (Out is
   one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
 - An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
