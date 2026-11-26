@@ -38,7 +38,8 @@ and for an Eden session on them.
 - In the Replay window on a match capture, Y with In selected snaps In to a mark. When that frame is in the middle
   of an action, Y now also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it.
 - Where no move can start at that frame, the strip says why. A second Y keeps the same move.
-- The check behind "In is mid-action" is unchanged, and no In that install 5 previews is refused now.
+- The check behind "In is mid-action" is unchanged. Host tests compared all 1,176 crop ranges of a 48-frame
+  capture: every preview that worked on install 5 kept its starting state and inputs.
 - Found by the operator on install 5, where the way round is ZL or ZR + Y:
   [Known issues](CURRENT-RELEASE.md#known-issues).
   [Replay window](menu/recording.md#replay-window)
@@ -47,12 +48,13 @@ and for an Eden session on them.
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
 
-- **In work: the fighters are shown where they were while you scrub.** With In or Out selected in the clip editor,
-  both fighters are held where the recording had them at that frame, with no preview first. For this, Record stores
-  each frame's positions in the macro file. Macros recorded before still load and play; the editor asks you to
-  record them again to see positions. Combos and drills are unchanged.
+- **In work: see the fighters while you scrub.** Moving In, Out or the free playhead shows the available fighter
+  positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
+  both use the same offset, so their recorded spacing is kept. New macros store positions; older macros still
+  load and play, but must be re-recorded to show positions. Combos and drills are unchanged.
 - **In work: a free playhead.** With no handle selected, Left and Right move the playhead over the whole take and Y
-  snaps it to the nearest move. Once it has moved, L sets In there and R sets Out there.
+  snaps it to the nearest move mark. Once it has moved, L makes that frame the first kept frame; R makes it the
+  last kept frame (Out is one frame later). Neither cut can cross the other handle.
 
 ## Install 5
 
