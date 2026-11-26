@@ -3240,3 +3240,11 @@ ceiling = 208329
 date = "2026-11-26"
 reason = "Scrub positions, P3b of the next build, on rc-next d1d67d92 (208324): +5, measured by the size step of the gate on eec428a9. The fighter callback that forgets a hold made on another body lets go on that callback, whatever the worker has published since: a request published between the two steps had the old hold's origin read as the group's home, used for the new body and kept."
 approved_by = "tr-primary-2 2026-11-26 19:19:11Z (+5 lines approved; P3b of this build)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208689
+date = "2026-11-26"
+reason = "Scrub moves, P5b part B (SM1: the clip editor's scrub draws the recorded animation on a held fighter without its script lines, asks the game whether the fighter has that animation first, and lets a posed body go plain before the wake), on feat/scrub-moves-p5b de33380e (208555: part A with the capture crop fix; part A's own +226 entry is place-t1a's and is not in this tree): +134, measured by the size step of the gate on 7d92c201 (208684 against part A's 208550 on f74a277c). The ceiling is this branch's count; the join's entry is the sum of the three parts."
+approved_by = "tr-primary-2 2026-11-26 20:51:11Z (P5b pre-approved: each part raises its own entry by its own figure, up to +900 lines in all on rc-next cbd709f9's 208329; release NRO at most +8 KiB and release raw .bss +0 against cbd709f9)."
