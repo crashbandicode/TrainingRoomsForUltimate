@@ -97,6 +97,8 @@ pub struct Block {
     seen: [AtomicU32; 2],
     /// The ask's generation, plus one, at which the game side found a hold made on another body; zero before any.
     dropped: AtomicU32,
+    /// The frame the ask is for, plus one; zero for none.
+    shown: AtomicU32,
     /// Each role's hold, as the placement picker keeps one. The game thread only, with `try_lock`.
     pub holds: hos_lock::Mutex<[Option<CpuPreview>; 2]>,
 }
@@ -107,6 +109,7 @@ impl Block {
             ask: hos_lock::Published::new(Ask::None),
             seen: [const { AtomicU32::new(SEEN_IDLE) }; 2],
             dropped: AtomicU32::new(0),
+            shown: AtomicU32::new(0),
             holds: hos_lock::Mutex::new([None; 2]),
         })
     }
@@ -120,6 +123,13 @@ impl Block {
         if self.ask.read() != ask {
             self.ask.publish(ask);
         }
+    }
+
+    /// The worker: what the fighters show from the next frame on, and the frame it is for. Another frame is another
+    /// request also when its points are the same (an idle take), so a dropped hold wakes on any move of the handle.
+    pub fn show(&self, frame: Option<u32>, ask: Ask) {
+        let _ = (frame, &self.shown);
+        self.set_ask(ask);
     }
 
     /// The game thread: the body a hold was made on is gone (a swapped fighter, a new scene). Nobody is held until
@@ -915,6 +925,30 @@ mod tests {
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
         assert!(runtime.contains("if holds[slot].is_some_and(|hold| hold.body() != natives::battle_object_id(accessor)) {"));
         assert!(runtime.contains("block.forget();"));
+    }
+
+    #[test]
+    fn a_dropped_hold_wakes_on_another_frame_with_the_same_points() {
+        // An idle take: every frame has the same points.
+        let ask = Ask::Group { target: 1, deltas: [Some(spot(0.0, 0.0, 1.0)), Some(spot(2.0, 0.0, 1.0))] };
+        let block = Block::new();
+        block.show(Some(5), ask);
+        assert_eq!(block.pos(), Pos::Held);
+        block.forget();
+        block.show(Some(5), ask);
+        assert_eq!((block.held_at(1, [10.0, 0.0]), block.pos()), (None, Pos::None), "the same frame again holds nobody");
+        // One nudge: the next frame, the same points.
+        block.show(Some(6), ask);
+        assert_eq!((block.held_at(1, [10.0, 0.0]), block.pos()), (Some(spot(12.0, 0.0, 1.0)), Pos::Held));
+        // Showing a frame again does not publish again.
+        let generation = block.ask.generation();
+        block.show(Some(6), ask);
+        assert_eq!(block.ask.generation(), generation);
+        // No frame shown: nothing asked.
+        block.show(None, Ask::None);
+        assert_eq!(block.pos(), Pos::None);
+        let worker = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/macros/replay_capture.rs")).unwrap();
+        assert!(worker.contains("block.show(shown, ask);"), "the worker names the shown frame");
     }
 
     #[test]
