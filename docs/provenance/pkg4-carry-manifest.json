@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "5474ce434daa19ce0fe3b3523bfaff77162a6a1b573110cee3135c5be11e08fd",
+   "dest_sha256": "33f7207d5ea8a52754de0503e084caf2d772a98f04c42fa41d5322932101c22b",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2357,6 +2357,11 @@
      "reason": "Refused save keeps the browse, compact form (reviewer rv-edge-juggle-sol 14db4f9b, 2026-11-26; tr-primary-2 01:19:45Z): a capture and a saved macro share confirm_macro; no duplicate reset of the moved state",
      "old": "                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    return match recording.crop_units(self.window.start(), self.window.end()) {\n                        Ok(saved) => { self.browsed = false; ClipEffect::ExportCombo(Box::new(saved)) }\n                        Err(error) => ClipEffect::Error(error.to_string()),\n                    };\n                }\n                if self.file.is_some() {\n                    return match self.export_selection(&self.source_name) {\n                        Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }\n                        Err(error) => ClipEffect::Error(error),\n                    };\n                }\n                return self.confirm_capture(|_| Ok(()));\n            }\n            ClipAction::Cancel => {\n                if self.playing {\n",
      "new": "                self.pause();\n                if let Some(FileSource::Combo(recording)) = &self.file {\n                    return match recording.crop_units(self.window.start(), self.window.end()) {\n                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),\n                        Err(error) => ClipEffect::Error(error.to_string()),\n                    };\n                }\n                return self.confirm_macro(|_| Ok(()));\n            }\n            ClipAction::Cancel => {\n                if self.playing {\n"
+    },
+    {
+     "old": "self.marks.snap_in(self.window.cursor()).map(|at| at.min(self.window.total() - 1))",
+     "new": "self.marks.nearest(self.window.cursor()).map(|(start, _)| start).filter(|&at| at < self.window.total())",
+     "reason": "Free playhead (2026-11-26 01:25:49Z): Y goes to the marked move shown as nearest, not the unmarked start of the take. Selected handle boundary snapping stays unchanged."
     }
    ]
   },
