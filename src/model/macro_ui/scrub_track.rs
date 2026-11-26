@@ -1369,6 +1369,36 @@ mod tests {
         assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]), "use the replacement's home");
     }
 
+    /// P3: the worker publishes a new request between `forget()` and `point` inside one fighter callback. The callback
+    /// still has the hold of the body that is gone in its slot. It lets go on that callback, and the new request is
+    /// acted on from the next one, from where the new body stands; the old body's home is neither used nor kept.
+    #[test]
+    fn a_request_published_while_a_callback_forgets_never_uses_the_old_bodys_home() {
+        let block = Block::new();
+        let at = |point: Option<Spot>| point.map(|spot| spot.at);
+        let group = Ask::Group { target: 0, deltas: [Some(spot(2.0, 0.0, 1.0)), Some(spot(-40.0, 0.0, -1.0))] };
+        let (old, new) = ([-30.0, 0.5], [16.0, 0.5]);
+        block.ask_at(Some(139), group);
+        assert_eq!(at(block.point(0, |_| Some(old), |_| None)), Some([-28.0, 0.5]));
+        // The target's body is another: its callback forgets, and before it asks for its point a new frame is shown.
+        block.forget();
+        block.ask_at(Some(140), group);
+        assert_eq!(block.point(0, |_| Some(old), |_| Some(new)), None, "the callback that forgot lets go");
+        // From the next callback the request is acted on, from where the new body stands.
+        assert_eq!(at(block.point(0, |_| None, |_| Some(new))), Some([18.0, 0.5]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some(new))), Some([-24.0, 0.5]), "the old body's home is not kept");
+        // The same with the new body refused where it is asked: no hold of it, and still not the old home.
+        block.ask_at(Some(141), group);
+        assert_eq!(at(block.point(0, |_| Some(new), |_| None)), Some([18.0, 0.5]));
+        block.forget();
+        block.ask_at(Some(142), group);
+        assert_eq!(block.point(1, |_| Some(new), |_| Some(old)), None, "the partner's callback forgot");
+        for _ in 0..3 {
+            assert_eq!(at(block.point(0, |_| None, |_| Some(old))), Some([-28.0, 0.5]));
+            assert_eq!(at(block.point(1, |_| None, |_| Some(old))), Some([-70.0, 0.5]));
+        }
+    }
+
     /// P3 (tr-primary-2 2026-11-26 13:43:10Z, 13:47:51Z; rv-preview-vis 13:44:24Z, 16:20:59Z): a body the game pushes
     /// off its point is refused there, for that shown request and that body, and is not taken again.
     #[test]
