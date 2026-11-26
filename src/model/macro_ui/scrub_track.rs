@@ -485,18 +485,18 @@ pub static SLOT: Slot = Slot::new();
 /// Frames in one block of a take's position track: 10 s.
 pub const TAKE_CHUNK: usize = 600;
 const TAKE_CHUNKS: usize = MAX_FRAMES / TAKE_CHUNK;
-const STATE_CELLS: usize = 9;
+const STATE_CELLS: usize = 11;
 const FRAME_CELLS: usize = 2 * STATE_CELLS;
 
 fn cells(frame: &ReplayFrame) -> [u32; STATE_CELLS] {
     let start = frame.start;
     [start.fighter_kind as u32, start.costume, start.facing.to_bits(), start.situation as u32, start.status as u32,
-        start.speed_x.to_bits(), start.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits()]
+        start.speed_x.to_bits(), start.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits(), frame.pose.0[0], frame.pose.0[1]]
 }
 
 fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     ReplayFrame {
-        pose: crate::engine::macros::PackedPose::NONE,
+        pose: PackedPose([cells[9], cells[10]]),
         input: InputFrame::default(),
         start: StartState { fighter_kind: cells[0] as i32, costume: cells[1], facing: f32::from_bits(cells[2]), situation: cells[3] as i32,
             status: cells[4] as i32, speed_x: f32::from_bits(cells[5]), speed_y: f32::from_bits(cells[6]) },
@@ -1012,8 +1012,8 @@ mod tests {
         let rows = take.take(TAKE_CHUNK + 1).unwrap();
         assert_eq!(rows.len(), TAKE_CHUNK + 1);
         for i in [0, TAKE_CHUNK - 1, TAKE_CHUNK] {
-            for slot in 0..2 {
-                assert_eq!(rows[i][slot].pose, PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]));
+            for (slot, frame) in rows[i].iter().enumerate() {
+                assert_eq!(frame.pose, PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]));
             }
         }
     }

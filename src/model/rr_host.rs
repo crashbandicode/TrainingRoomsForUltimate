@@ -1557,8 +1557,8 @@ pub fn take_generated() -> bool { PLAY.take_written() }
 
 #[inline(never)]
 pub fn play_track_service(root: &Path) {
-    use super::macro_ui::play_track::PlayTrack;
-    use super::macros::positions::{self, Source};
+    use super::macro_ui::play_track::{PlayTrack, Wanted};
+    use super::macros::positions::{self, Moves, Source};
     if PLAY_PLAYER.load(Ordering::Acquire) || PLAY_CPU.load(Ordering::Acquire) || lock(&PREVIEW_ASK).start.is_some() {
         return;
     }
@@ -1579,10 +1579,17 @@ pub fn play_track_service(root: &Path) {
     if !matches { return; }
     if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
     let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
-    let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
-    if write {
-        if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
-        PLAY.note_written();
+    let (wanted, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
+    match wanted {
+        Wanted::Keep => {},
+        Wanted::Write => {
+            if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated, Moves::Playback).is_err() { return; }
+            PLAY.note_written();
+        },
+        Wanted::Merge => {
+            if !matches!(positions::merge(&dir, open.id.as_str(), &recording.frames, &rows), Ok(true)) { return; }
+            PLAY.note_written();
+        },
     }
     if done { PLAY.note_done(open.id.as_str(), open.version); }
 }
@@ -5123,7 +5130,12 @@ mod tests {
         let _hold = hold();
         let (root, id, recording) = generated_fixture("generated-keep-moves", 5);
         let dir = root.join(MACROS_DIR);
-        let rows = generation_v1(&dir, &id, &recording.frames, Source::Recorded);
+        let mut rows = generation_v1(&dir, &id, &recording.frames, Source::Recorded);
+        for (i, pair) in rows.iter_mut().enumerate() {
+            for (role, frame) in pair.iter_mut().enumerate() {
+                frame.pose = crate::engine::macros::PackedPose([i as u32 + role as u32 + 1, (i as u32 + 1) << 8]);
+            }
+        }
         positions::write(&dir, &id, &recording.frames, &rows, Source::Recorded, Moves::Take).unwrap();
         let before = std::fs::read(positions::path(&dir, &id)).unwrap();
         generated_play(&root, Role::Cpu);

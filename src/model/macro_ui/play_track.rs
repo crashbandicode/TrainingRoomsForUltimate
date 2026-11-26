@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 
-use crate::engine::macros::{positions::Source, InputFrame, ReplayFrame};
+use crate::engine::macros::{positions::{Moves, Source}, InputFrame, ReplayFrame};
 use crate::engine::playback::Book;
 use super::scrub_track::TakeTrack;
 
@@ -52,6 +52,9 @@ struct State {
 }
 
 pub static PLAY: PlayTrack = PlayTrack::new();
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Wanted { Keep, Write, Merge }
 
 impl Default for PlayTrack {
     fn default() -> Self { Self::new() }
@@ -148,12 +151,17 @@ impl PlayTrack {
         result
     }
 
-    pub fn write_wanted(existing: Option<(Source, u32)>, rows: usize, inputs: usize) -> (bool, bool) {
+    pub fn write_wanted(existing: Option<(Source, u32, Moves)>, rows: usize, inputs: usize) -> (Wanted, bool) {
         match existing {
-            // A file that covers the playback's frames stays, whatever made it. A whole one is done; a short one
-            // (a stopped playback, a take whose positions ended early) is replaced when a playback covers more.
-            Some((_, count)) if count as usize >= rows => (false, count as usize >= inputs),
-            _ => (rows > 0, rows >= inputs),
+            None => (if rows > 0 { Wanted::Write } else { Wanted::Keep }, rows >= inputs),
+            Some((_, count, Moves::Take | Moves::Playback)) if count as usize >= rows => (Wanted::Keep, count as usize >= inputs),
+            Some((_, _, Moves::Take | Moves::Playback)) => (Wanted::Write, rows >= inputs),
+            Some((Source::Recorded, count, Moves::None)) if count as usize >= inputs =>
+                if rows >= count as usize { (Wanted::Merge, true) } else { (Wanted::Keep, false) },
+            Some((Source::Recorded, count, Moves::None)) =>
+                if rows > count as usize { (Wanted::Write, rows >= inputs) } else { (Wanted::Keep, false) },
+            Some((Source::Generated, count, Moves::None)) =>
+                if rows > 0 && rows >= count as usize { (Wanted::Write, rows >= inputs) } else { (Wanted::Keep, false) },
         }
     }
 

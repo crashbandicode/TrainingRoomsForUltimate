@@ -525,11 +525,12 @@ impl ClipEditor {
 
     pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {
         let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };
-        let Some((source, track)) = loaded.take_sourced_track() else { return false };
-        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {
+        let Some((source, moves, track)) = loaded.take_sourced_track() else { return false };
+        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held|
+            held.len() > track.len() || held.len() == track.len() && (recording.has_moves() || moves == crate::engine::macros::positions::Moves::None)) {
             return false;
         }
-        recording.set_sourced_track(source, track);
+        recording.set_sourced_track(source, moves, track);
         true
     }
 
