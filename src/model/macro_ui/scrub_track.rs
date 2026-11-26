@@ -318,11 +318,11 @@ impl Block {
         self.settle.store(0, Ordering::Release);
     }
 
-    /// The role whose home anchors the group.
+    /// A forgotten group has no anchor, even while its old hold awaits release.
     pub fn target_slot(&self) -> Option<usize> {
         match self.ask() {
-            Ask::Group { target, .. } => Some(usize::from(target)),
-            Ask::None => None,
+            Ask::Group { target, .. } if !self.forgotten() => Some(usize::from(target)),
+            _ => None,
         }
     }
 
