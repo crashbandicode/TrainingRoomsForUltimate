@@ -517,13 +517,13 @@ impl ClipEditor {
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
-    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {
+    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {
         let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };
-        let Some(track) = loaded.track else { return false };
+        let Some((source, track)) = loaded.take_sourced_track() else { return false };
         if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {
             return false;
         }
-        recording.set_track(Some(track));
+        recording.set_sourced_track(source, track);
         true
     }
 

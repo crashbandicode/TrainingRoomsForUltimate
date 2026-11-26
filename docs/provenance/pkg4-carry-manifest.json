@@ -2005,7 +2005,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "779140d7ab3436cc7d515f45f78c28e149a7d3a092299472ad59c16763bfa1f2",
+   "dest_sha256": "e10ca2772f4ceb78d00f22e5648c41039dd604c3b0877ea68ee81adef0d7a5a3",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2882,6 +2882,11 @@
      "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): exercise adoption of a generated position track.",
      "old": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n",
      "new": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): preserve the source of a generated or recorded position track when adopting it.",
+     "old": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some(track) = loaded.track else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_track(Some(track));\n        true\n    }\n\n",
+     "new": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some((source, track)) = loaded.take_sourced_track() else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_sourced_track(source, track);\n        true\n    }\n\n"
     }
    ]
   },
