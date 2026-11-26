@@ -905,7 +905,7 @@ mod tests {
             assert_eq!(editor.scrub(), (Ask::None, Pos::None), "a playing preview holds nothing");
         }
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("None => release(&mut holds[slot], accessor),"), "a role with no point is released");
+        assert!(runtime.contains("None => release(block, slot, &mut holds[slot], accessor),"), "a role with no point is released");
         assert!(runtime.contains("placement::restore(accessor, hold.origin());"));
     }
 
@@ -1554,7 +1554,7 @@ mod tests {
         let judged = "if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {";
         let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
         assert!(order(&["block.refused(index, generation, body, spot.at)", "placement::hold_at(slot, accessor, body, spot.at, false)", judged, "state::set_lr(accessor, spot.facing);"]));
-        assert!(hold.contains(&format!("{judged}\n        release(slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
+        assert!(hold.contains(&format!("{judged}\n        release(block, index, slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
         assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
         assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
     }
