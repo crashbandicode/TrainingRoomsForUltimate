@@ -148,7 +148,7 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
 | 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed. A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
-| 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Nothing in a build yet. Reproduced by a host test on `58c9ccb5`, whose code is install 5's: 4 of 24 editor cases fail, among them Y alone leaving In without a move start, while the case that snaps with ZL or ZR + Y passes (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; place-t1a, inbox 23:49:51Z). The Y snap's code is the same in install 4 (`a945b0c1`), compared line by line for this page. A fix is written (`656f1c09`) and is not gated or merged. The smoke boot's editor check opened the editor and previewed a take without moving a handle. |
+| 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not in install 5. Reproduced by a host test on `58c9ccb5`, whose code is install 5's: 4 of 24 editor cases fail, among them Y alone leaving In without a move start, while the case that snaps with ZL or ZR + Y passes (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; place-t1a, inbox 23:49:51Z). The Y snap's code is the same in install 4 (`a945b0c1`), compared line by line for this page. The fix merged after install 5 as `dbded2d1` (pin `3990f50e`; gate `artifacts/phase23/next-build/gate-dbded2d1/`, six steps exit 0): on a capture, Y on a mark that is mid-action now resolves the move as the held-modifier snap does. Host tests and builds only; the operator's own take is not reproduced, and nothing ran in a game. The smoke boot's editor check opened the editor and previewed a take without moving a handle. |
 
 ## Install 5 (`b7a382e4`)
 
@@ -258,3 +258,23 @@ frame was looked at.
 | Guard the Edge and Juggler start from the floor the player stands on; two Guard the Edge options | `7e6ff810` | `gate-f9b81e42` (one gate for this merge, the next row and a docs merge) |
 | Eggs-ercise's off-stage zone follows the stage | `1c6a71e5` | `gate-f9b81e42` |
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
+
+## The next build
+
+Merged after install 5 and **not on the card**. The Gate column names the receipt under
+`artifacts/phase23/next-build/`. These are host tests and builds, not gameplay tests.
+
+| Merge | Head | Gate |
+| --- | --- | --- |
+| The clip editor: Y on In resolves the move on a capture | `dbded2d1` | `gate-dbded2d1`: six steps exit 0; 3,049 tests passed, 0 failed, 4 ignored |
+| The clip editor: a free playhead | `ce2dba91` | `gate-6dbf9aa9` (one gate for this merge and a docs merge): six steps exit 0; 3,052 tests passed, 0 failed, 4 ignored |
+
+- **Not run in a game.** Both merge records say so. The snap fix's adds that the operator's own take was not
+  reproduced; the playhead's, that holding a direction on a pad has no host test.
+- **In work, not merged:** the fighters shown at the handle's frame while scrubbing, with the positions kept in a
+  file beside the macro and the macro file's format unchanged; a macro without such a file gets one from a
+  playback from its first frame (inbox 2026-11-26 00:21:37Z; the separate file, 03:06:35Z; the playback,
+  03:24:51Z; tr-primary-2, relaying the operator). None of it is implemented in `main`.
+- **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
+  then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
+  about it is claimed here.

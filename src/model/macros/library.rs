@@ -17,7 +17,7 @@
 
 use crate::model::store::{Record, Store, StoreError, MAX_FILE_BYTES};
 
-use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};
+use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};
 
 /// The store's own failures become the macro crate's error, variant for variant (the carried code matches on `MacroError`).
 impl From<StoreError> for MacroError {
@@ -35,13 +35,29 @@ impl From<StoreError> for MacroError {
 }
 
 /// Summary of one loadable macro, enough to fill a selection dropdown.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MacroEntry {
     pub id: String,
     pub name: String,
     pub fighter_kind: i32,
     pub costume: u32,
     pub frame_count: usize,
+    pub trim: crate::model::trim::Trim,
+    pub placement: Placement,
+    pub start_save: Option<String>,
+    pub start_save_on: bool,
+}
+
+impl Store<MacroRecording> {
+    /// Loads a macro for the clip editor: the macro, and its positions when the file beside it binds it
+    /// (`positions`). Playback, the list and every other load read the macro only (`load`).
+    pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {
+        let mut recording = self.load(id)?;
+        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {
+            recording.set_sourced_track(source, track);
+        }
+        Ok(recording)
+    }
 }
 
 /// The named-macro library: the original API, now on the generic store.
@@ -52,13 +68,37 @@ impl Record for MacroRecording {
     type Summary = MacroEntry;
     const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
+    const STREAM_WRITE: bool = true;
+
+    /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an
+    /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)
+    /// carries no positions in memory and keeps the file that binds its inputs.
+    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {
+        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
+            return super::positions::invalidate(dir, id);
+        }
+        Ok(())
+    }
+
+    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
+    fn after_write(&self, dir: &std::path::Path, id: &str) {
+        if let Some(track) = &self.track {
+            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {
+                super::positions::remove(dir, id);
+            }
+        }
+    }
+
+    fn after_delete(dir: &std::path::Path, id: &str) {
+        super::positions::remove(dir, id);
+    }
 
     fn validate(&self) -> Result<(), MacroError> {
         MacroRecording::validate(self)
     }
 
     fn owns(bytes: &[u8]) -> bool {
-        !super::recording::is_chain_document(bytes)
+        !crate::model::store::is_chain_document(bytes)
     }
 
     fn name(&self) -> &str {
@@ -72,6 +112,10 @@ impl Record for MacroRecording {
             fighter_kind: self.start.fighter_kind,
             costume: self.start.costume,
             frame_count: self.frames.len(),
+            trim: self.trim,
+            placement: self.placement,
+            start_save: self.start_save.clone(),
+            start_save_on: self.start_save_on,
         }
     }
 }

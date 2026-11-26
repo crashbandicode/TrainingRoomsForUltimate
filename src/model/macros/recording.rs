@@ -158,6 +158,15 @@ pub struct MacroRecording {
     /// With an id, On warps once and Off keeps the id. Default On. Omitted from JSON when On.
     #[serde(default = "start_save_switch_on", skip_serializing_if = "is_switch_on")]
     pub start_save_on: bool,
+    /// Where both fighters were on each frame, as a match capture keeps it (`ReplayFrame` with no input): the
+    /// recorded fighter first, then the other one. One entry per frame from the first; shorter than the frames when
+    /// recording ran out of memory for it. It is never in the macro's own file: the library keeps it beside it
+    /// (`positions`), and only the clip editor's load reads it back.
+    #[serde(skip)]
+    pub track: Option<Vec<[super::ReplayFrame; 2]>>,
+    /// A crop inherits the source of its rows; exporting it is not another Record.
+    #[serde(skip)]
+    pub(super) track_source: super::positions::Source,
 }
 
 impl MacroRecording {
@@ -182,6 +191,8 @@ impl MacroRecording {
             recorded_fighter: None,
             start_save: None,
             start_save_on: true,
+            track: None,
+            track_source: super::positions::Source::Recorded,
         };
         recording.validate()?;
         Ok(recording)
@@ -189,6 +200,18 @@ impl MacroRecording {
 
     /// Checks everything `Library` requires before it writes or accepts a file.
     pub fn validate(&self) -> Result<(), MacroError> {
+        self.validate_header()?;
+        // The positions a take carries: an entry per frame from the first, as far as they go (not at all, for a crop
+        // past their end), every number finite.
+        let fits = self.track.as_ref().is_none_or(|track| track.len() <= self.frames.len()
+            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
+        if !fits {
+            return Err(MacroError::InvalidTrack);
+        }
+        self.validate_frame_count()
+    }
+
+    pub(super) fn validate_header(&self) -> Result<(), MacroError> {
         if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION) {
             return Err(MacroError::UnsupportedVersion {
                 found: self.schema_version,
@@ -210,7 +233,10 @@ impl MacroRecording {
                 if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},
             _ => return Err(MacroError::InvalidMii("schema, fighter class and exact configuration disagree")),
         }
-        self.placement.validate()?;
+        self.placement.validate()
+    }
+
+    pub(super) fn validate_frame_count(&self) -> Result<(), MacroError> {
         if self.frames.is_empty() {
             return Err(MacroError::EmptyFrames);
         }
@@ -232,6 +258,31 @@ impl MacroRecording {
         self.mii = Some(configuration);
         self.schema_version = MII_SCHEMA_VERSION;
         Ok(())
+    }
+
+    /// Attach the positions a take recorded (one entry per frame from the first), or drop them.
+    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {
+        self.track = track;
+        self.track_source = super::positions::Source::Recorded;
+    }
+
+    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {
+        self.track = Some(track);
+        self.track_source = source;
+    }
+
+    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {
+        self.track.take().map(|track| (self.track_source, track))
+    }
+
+    /// Keep frames `range` of the recording, with the same slice of its track.
+    pub fn keep(&mut self, range: std::ops::Range<usize>) {
+        self.frames.truncate(range.end);
+        self.frames.drain(..range.start);
+        if let Some(track) = &mut self.track {
+            track.truncate(range.end);
+            track.drain(..range.start.min(track.len()));
+        }
     }
 
     /// Legacy Mii files remain readable; no preferred Mii can stand in for their
@@ -304,14 +355,6 @@ fn is_switch_on(on: &bool) -> bool {
     *on
 }
 
-/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.
-pub fn is_chain_document(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<serde_json::Value>(bytes)
-        .ok()
-        .and_then(|value| value.get("kind").and_then(serde_json::Value::as_str).map(|kind| kind == "chain"))
-        .unwrap_or(false)
-}
-
 fn check_name(name: &str) -> Result<(), MacroError> {
     if name.trim().is_empty() {
         return Err(MacroError::InvalidName("is empty"));
@@ -339,6 +382,8 @@ pub enum MacroError {
     UnsupportedVersion {
         found: u32,
     },
+    /// A take's positions are longer than its frames, or hold a number that is not finite.
+    InvalidTrack,
     InvalidName(&'static str),
     InvalidGameVersion(&'static str),
     InvalidMii(&'static str),
@@ -370,6 +415,7 @@ impl fmt::Display for MacroError {
                 f,
                 "unsupported schema version {found} (supported: {SCHEMA_VERSION} and {MII_SCHEMA_VERSION})"
             ),
+            Self::InvalidTrack => f.write_str("the positions do not match the frames"),
             Self::InvalidName(why) => write!(f, "invalid name: {why}"),
             Self::InvalidGameVersion(why) => write!(f, "invalid game version: {why}"),
             Self::InvalidMii(why) => write!(f, "Mii macro unavailable: {why}"),

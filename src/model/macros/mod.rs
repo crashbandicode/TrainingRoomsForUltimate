@@ -38,6 +38,7 @@ mod library;
 mod live_capture;
 mod live_frame;
 mod move_start;
+pub mod positions;
 mod recording;
 mod replay;
 mod shared_capture;

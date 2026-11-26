@@ -9,6 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
+| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, and a free playhead (both merged); the fighters shown while you scrub (in work) |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -23,6 +24,52 @@ What "tested" means in these notes:
   are reports, not a list of passes, and only reports that are on record are written.
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
+
+## Next build (not installed yet)
+
+The build after install 5. Two changes are merged and one is in work, all three in the clip editor. The merged
+changes passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
+and for an Eden session on them.
+
+### Merged
+
+#### Y on In makes a capture previewable (merged 2026-11-26)
+
+- In the Replay window on a match capture, Y with In selected snaps In to a mark. When that frame is in the middle
+  of an action, Y now also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it.
+- Where no move can start at that frame, the strip says why. A second Y keeps the same move.
+- The check behind "In is mid-action" is unchanged. Host tests compared all 1,176 crop ranges of a 48-frame
+  capture: every preview that worked on install 5 kept its starting state and inputs.
+- Found by the operator on install 5, where the way round is ZL or ZR + Y:
+  [Known issues](CURRENT-RELEASE.md#known-issues).
+  [Replay window](menu/recording.md#replay-window)
+
+#### A free playhead in the clip editor (merged 2026-11-26)
+
+- With no handle selected, Left and Right move the playhead over the whole take of a macro or a capture, inside or
+  outside the kept part. In and Out do not change.
+- Y then moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target.
+- Once the playhead has moved, L makes its frame the first kept frame and R makes it the last kept frame (Out is
+  one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
+- An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
+- Combos and drills are unchanged.
+- Host tests and builds only. Holding a direction on a pad has no host test.
+  [Replay window](menu/recording.md#replay-window)
+
+### In work
+
+Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
+
+- **In work: see the fighters while you scrub.** Moving In, Out or the free playhead shows the available fighter
+  positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
+  both use the same offset, so their recorded spacing is kept. Record saves the positions in a second file beside
+  the macro. The macro format stays the same, so older builds can still read new macros. Older macros still load
+  and play on the new build. A macro with no positions file gets one when it is played by itself from its first
+  frame, with Play or with X from the start of the take; you do not record it again. The two fighters are sampled
+  during that playback, so those positions are that playback's, not the original recording's. A playback stopped
+  early gives positions up to where it stopped, and a file made this way never replaces one saved by Record. If the
+  positions file is missing, unreadable or no longer matches the macro, the macro still plays. Combos and drills
+  are unchanged.
 
 ## Install 5
 
@@ -153,8 +200,8 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
   showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
   in a match capture, plain Y can leave In on a mid-action frame. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y
-  for the move start. Release the modifier before pressing X to preview, or press A to save. The fix is not in
-  install 5. No other report on this build is on record.
+  for the move start. Release the modifier before pressing X to preview, or press A to save. A fix is merged
+  (`dbded2d1`) for the build after install 5; it is not in install 5. No other report on this build is on record.
 
 ## Install 4
 

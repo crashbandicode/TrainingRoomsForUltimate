@@ -99,7 +99,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
   mid-action, preview and save are refused. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y to snap to a
   move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
   saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
-  A fix is written but is not in install 5.
+  A fix is merged (`dbded2d1`) for the build after install 5; it is not on the card, and it has not run in a game.
 - **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
   parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)

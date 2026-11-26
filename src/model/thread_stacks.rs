@@ -87,7 +87,8 @@ pub const THREADS: [ThreadStack; 19] = [
     // button_config.ini, replay_capture.ini and settings.json atomic writes
     row(ThreadId::IniWriter, c"tr-ini-writer", 28 * KIB, 9_072, 9_344, "Eden st-02..st-12", "features::writer::run"),
     // mii-editor-last.json (and the diag results observer trace): serialise from the boxed slot, atomic replace
-    row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_880, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
+    // Static depth on bac7a4d5 diag: operator ruling 2026-11-26 ~02:45Z (raising stack limit is fine).
+    row(ThreadId::TraceWriter, c"tr-trace-writer", 28 * KIB, 2_896, 8_624, "Eden st-02..st-12, ui18-02 native Mii editor", "compat::filesystem::init::{closure#0}"),
     // diag: diag-settings-next.json parse, publish and apply
     row(ThreadId::DiagReload, c"tr-diag-reload", 40 * KIB, 17_696, 15_712, "Eden final-rc8-chain-test-722525a5-r2, the rc.8 pass's chained 9d6c7e02 sessions", "diag_reload::start::{closure#0}"),
     // first-boot import of the fork's files (blocking part), joined with a deadline

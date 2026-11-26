@@ -319,13 +319,20 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | --- | --- |
 | Up/Down | On a capture with two sides, pick whose inputs to take. Nothing for a saved file. |
 | ZR | A tap (pressed and released with nothing else) swaps where the preview of a macro or a capture plays: the CPU or Player 1, as ZR does on the Recording page. The strip names it ("Plays on CPU", or after a capture's fighter "plays on Player 1"). A recording opened from its own screen starts on its Plays on choice, and Make uses the target the strip shows. During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
-| L / R | L picks the start and R the end. After a preview or save, pick a handle again before moving it. |
-| Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. |
-| Y | Snaps the selected handle to the nearest move: In to a move's start, Out to a move's end. A move whose end is not known offers the next move's start, or the end of the take. Pick a handle with L or R first. On a Replay window capture, a start in the middle of an action also takes the move's short setup, as ZL + Y does, so X and A work from it; where no move can start there, the strip says why. |
+| L / R | L picks In and R picks Out. After browsing with no handle selected (Left/Right or Y), L instead makes the playhead's frame the first kept frame; R makes it the last kept frame (Out is one frame later). The new handle is selected. A playhead at or after Out cannot become In, and one at or before In cannot become Out: the strip reads "Playhead is past Out: set Out first" or "Playhead is at or before In: set In first", and nothing changes. |
+| Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. With no handle selected, on a macro or a capture, they move the playhead instead, over the whole take, inside or outside the kept part; In and Out do not change. A combo or a drill has no free playhead: pick a handle first. |
+| Y | With a handle selected, snaps In to a move's start or Out to its end. A move whose end is not known offers the next move's start, or the end of the take. On a Replay window capture, a start in the middle of an action also takes the move's short setup, as ZL + Y does, so X and A work from it; where no move can start there, the strip says why. With no handle selected, on a macro or a capture, Y moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target. |
 | ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
 | X | Previews the kept part: a capture on the CPU (or on Player 1 after a ZR tap, or when its Plays on says so), or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early and drops its remaining frames. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
+
+2026-11-26. The free playhead (Left/Right, Y, then L or R with no handle selected) is merged for the build after
+install 5. With no handle selected on a macro or a capture the strip reads "Hold Left or Right to browse the take, or
+Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
+Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
+cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
+Host tests only; not yet seen in a game.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.

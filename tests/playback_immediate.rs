@@ -797,7 +797,7 @@ fn playback_delay_is_one_path_for_training_and_the_waiting_room() {
     let runtime = include_str!("../src/runtime/features/recording_host.rs");
     let recorder = include_str!("../src/runtime/features/recorder.rs");
     assert!(runtime.contains("rr_host::set_playback_delay(super::recorder::settings().delay)"));
-    assert!(host_source.contains("fn pop_frame(role: Role)"));
+    assert!(host_source.contains("fn pop_frame(role: Role, taken: impl FnOnce(usize))"));
     assert!(recorder.contains("rr_host::cpu_controller"));
     assert!(recorder.contains("if !(native_training || scene::lobby_term())"));
     assert!(recorder.contains("recording_host::on_player_poll(out)"));
@@ -906,5 +906,5 @@ fn the_start_speed_waits_for_the_first_input_after_the_delay() {
     assert_eq!(host::take_start_speed(Role::Player).map(|speed| speed.speed), Some((1.25, -0.5)));
     let source = include_str!("../src/runtime/features/recording_host.rs");
     let player = source.split("pub unsafe fn on_player_poll(").nth(1).unwrap().split("\n}").next().unwrap();
-    assert!(player.contains("if rr_host::on_player_poll(out)") && player.contains("apply_start_speed("));
+    assert!(player.contains("if rr_host::on_player_poll_seeded(out,") && player.contains("apply_start_speed("));
 }
