@@ -709,18 +709,25 @@ mod tests {
         assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Positions end here.");
         editor.on_action(ClipAction::Nudge(-5));
         assert!(matches!(editor.scrub(), (Ask::Group { .. }, Pos::Held)), "Out - 1 is the track's last frame");
-        // A crop past the track's end is a macro without one; a crop across it keeps the part it has.
+        // A crop wholly past the track's end is still a take of the new format whose positions ran out: version 3
+        // with an empty track, not an old file. Reopened, it holds nobody and says so.
         let mut tail = recording.clone();
         tail.keep(TAKE_CHUNK + 1..frames);
-        assert_eq!((tail.track.is_none(), tail.schema_version), (true, 1));
-        tail.validate().unwrap();
+        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 3));
+        tail.validate().expect("an empty track is valid");
+        let tail: MacroRecording = serde_json::from_str(&serde_json::to_string(&tail).unwrap()).unwrap();
+        assert_eq!((tail.track.as_ref().map(Vec::len), tail.schema_version), (Some(0), 3));
+        let mut reopened = ClipEditor::macro_file(tail, false).unwrap();
+        for action in [ClipAction::SelectIn, ClipAction::SelectOut] {
+            reopened.on_action(action);
+            assert_eq!(reopened.scrub(), (Ask::None, Pos::End));
+            assert_eq!(clip_help(&reopened.view(), "ZL", "ZL", 0).notice, "Positions end here.");
+        }
+        // A crop across the end keeps the part it has.
         let mut across = recording.clone();
         across.keep(TAKE_CHUNK - 2..frames);
         assert_eq!(across.track.as_ref().map(Vec::len), Some(2));
         across.validate().unwrap();
-        let mut empty = recording.clone();
-        empty.track = Some(Vec::new());
-        assert!(empty.validate().is_err(), "a track holds at least one frame");
     }
 
     #[test]
@@ -778,6 +785,41 @@ mod tests {
         let finish = runtime.split_once("pub fn finish_recording(").unwrap().1.split_once("\n}").unwrap().0;
         assert!(finish.contains("capture.track.borrow_mut().take()") && finish.contains("track.drain(..kept.start.min(track.len()));"));
         assert!(!finish.contains("to_vec()"), "the track is cut in place, not copied");
+    }
+
+    #[test]
+    fn a_capture_saved_as_a_macro_carries_both_tracks() {
+        let mut editor = capture(2);
+        editor.on_action(ClipAction::SelectIn);
+        editor.on_action(ClipAction::Nudge(2));
+        editor.on_action(ClipAction::SelectOut);
+        editor.on_action(ClipAction::Nudge(-1));
+        // In 2, Out 9: seven frames, saved with A.
+        let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        assert_eq!((saved.frames.len(), saved.schema_version), (7, 3));
+        assert_eq!(saved.track, Some((2..9).map(|i| [state(0, i), state(1, i)]).collect()));
+        saved.validate().unwrap();
+        // Reopened from its file, it scrubs both bodies at the capture's spacing, with no preview.
+        let file: MacroRecording = serde_json::from_str(&serde_json::to_string(&*saved).unwrap()).unwrap();
+        let mut reopened = ClipEditor::macro_file(file, false).unwrap();
+        reopened.on_action(ClipAction::SelectOut);
+        let block = Block::new();
+        block.set_ask(reopened.scrub().0);
+        // The file's last frame is the capture's frame 8; its anchor is the capture's frame 2, at (26, 2).
+        assert_eq!(block.held_at(1, [0.0, 0.0]), Some(spot(44.0 - 26.0, 8.0 - 2.0, -1.0)));
+        assert_eq!(block.held_at(0, [0.0, 0.0]), Some(spot(-28.0 - 26.0, 34.0 - 2.0, 1.0)));
+        // A capture with one fighter saves that fighter's track; the other one is marked absent and is never held.
+        let mut single = capture(1);
+        single.on_action(ClipAction::SelectIn);
+        let ClipEffect::Export(saved) = single.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        assert_eq!(saved.track.as_ref().map(|track| (track.len(), track[0][0], track[0][1].start.fighter_kind)), Some((10, state(0, 0), -1)));
+        let mut reopened = ClipEditor::macro_file(*saved, false).unwrap();
+        reopened.on_action(ClipAction::SelectIn);
+        assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::Held)));
+        // The X preview's clip is not given a track: it is played, not saved.
+        let mut previewed = capture(2);
+        let ClipEffect::Preview(clip) = previewed.on_action(ClipAction::TogglePlay) else { panic!("preview refused") };
+        assert_eq!((clip.track.is_none(), clip.schema_version), (true, 1));
     }
 
     #[test]
