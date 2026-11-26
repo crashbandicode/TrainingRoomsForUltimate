@@ -27,8 +27,9 @@ both fighters' hurtboxes are yellow pills; at 1/4 speed Mario's neutral air show
 
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
 
-*The import as decided on 2026-11-01, when `replay_captures/` was also made a full copy. As the picture says, the
-originals are never touched, and a destination that exists is never overwritten. [Decisions](DECISIONS.md)*
+*The first-boot import decision of 2026-11-01. Published replay captures are copied in the background with no size
+cap; unfinished capture staging folders are skipped. Files in the blocking part are skipped if larger than 8 MiB.
+The originals stay in place, and an existing destination file is never overwritten. [Decisions](DECISIONS.md)*
 
 ```mermaid
 flowchart LR
@@ -57,10 +58,9 @@ flowchart LR
 
 R is Z on a GameCube controller.
 
-Game speed shows a small pop-up while the chord is held. In Training it steps through the game's own speeds (1/4, 1/2,
-2/3, x1, x1.5) and sets Training's Speed setting, so the Training menu shows the same value. In the waiting-room
-practice it offers the same five speeds, only for that practice; a match always starts at normal speed (rc.8; the
-details are under Game speed below).
+Game speed shows a small pop-up while the chord is held. In Training it changes the game's Speed setting; in the
+waiting room it changes only your practice. A match always starts at normal speed. See [Game speed](#game-speed)
+for the speeds and how to step one frame.
 
 The first time Training or a waiting room's practice opens on a new install, TrainingRooms also shows six reminders:
 Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off.
@@ -102,7 +102,8 @@ their own build; see [MEDIA.md](MEDIA.md).
 (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.), A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back; in Training the yellow hurtbox pills cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
 neutral air keeps its red hitbox on screen for over a second (the frame strip's lane turns red with it). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3
+Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes, hitboxes and grab boxes. A normal hurtbox
+is grey; yellow means it cannot be hit, and green means it takes no damage. Since rc.3
 every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
 the game's effect spheres, and the discs trail the camera by one to two frames while it pans. Since rc.13 a long box
 is drawn as one pill.
@@ -148,8 +149,8 @@ around. Let go and the pop-up closes; the speed stays.
 | Where | What the chord does |
 | --- | --- |
 | While you hold the chord | No other chord fires, and the chord's buttons and D-pad Left / Right don't reach the game. The rest of Player 1's controller still does, so you can keep moving. |
-| **In Training** | The speeds are Training's own: 1/4, 1/2, 2/3, x1 and x1.5. The chord sets the same Speed setting as the game's pause menu (Other Settings › Speed), so the pause menu and the HUD's stopwatch show the speed you chose, and a speed chosen in the pause menu is where the pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1. The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1. |
-| **In the waiting-room practice** | The speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the room's timers and the other player stay at normal speed. Each practice session starts at x1. |
+| **In Training** | The pop-up and Other Settings › Speed use the same setting: 1 Frame, 1/4, 1/2, 2/3, x1 or x1.5. In rc.15, when the frame-step checks pass at boot, Left from 1/4 selects 1 Frame and Right from 1 Frame selects 1/4. Release the chord and press ZL to advance one frame (L on a GameCube controller). If the checks fail, the pop-up skips 1 Frame. The stopwatch appears away from x1 and goes away at x1. |
+| **In the waiting-room practice** | The same speeds, including 1 Frame when available, affect only your practice. The room's timers and the other player stay at normal speed. Each practice starts at x1. |
 | A Quickplay or online match | It never changes one: a match always starts at normal speed. |
 | **With the standalone CPU pilot** driving Player 1 | The chord works the same way. In the waiting-room practice the pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled. |
 
@@ -161,7 +162,8 @@ around. Let go and the pop-up closes; the speed stays.
 stopwatch; R + D-pad Up held, Right, and the stopwatch reads x1.5; held again, Left back to x1, and it goes away.*
 
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
-like the others. They don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords leave them alone.
+like the others. They wait while L is held unless the edited chord itself includes L; the default chords therefore
+leave Online Deluxe's L + R + D-pad overlay chords alone.
 
 With Online Deluxe 0.10.5 or later, a chord doesn't fire while Deluxe's window shows a page with rows (Settings, Window
 Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
