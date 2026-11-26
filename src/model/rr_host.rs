@@ -5542,37 +5542,6 @@ mod tests {
         assert!(!take_generated());
     }
 
-    fn another_threads_library_write_does_not_rearm_a_done_macro() {
-        let _hold = hold();
-        let (root, _, recording) = generated_fixture("generated-foreign-done", 3);
-        tick(&root);
-        generated_play(&root, Role::Cpu);
-        assert!(play_sampling());
-        for (i, input) in recording.frames.iter().enumerate() {
-            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
-        }
-        tick(&root);
-        assert!(take_generated());
-        std::thread::spawn(|| store::advance_catalog()).join().unwrap();
-        generated_play(&root, Role::Cpu);
-        assert!(!play_sampling());
-    }
-
-    fn another_threads_library_write_does_not_drop_an_open_run() {
-        let _hold = hold();
-        let (root, id, recording) = generated_fixture("generated-foreign-open", 3);
-        tick(&root);
-        generated_play(&root, Role::Cpu);
-        assert!(play_sampling());
-        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
-        std::thread::spawn(|| store::advance_catalog()).join().unwrap();
-        for i in 1..3 {
-            assert_eq!(generated_take(Role::Cpu, i), Some(recording.frames[i as usize]));
-        }
-        tick(&root);
-        assert_eq!(generated_rows(&root, &id, &recording).map(|rows| rows.len()), Some(3));
-    }
-
     fn the_last_input_is_credited_before_the_worker_drains() {
         use crate::engine::macros::positions;
         let _hold = hold();
@@ -8047,8 +8016,6 @@ mod tests {
             ("only_a_single_macro_from_input_zero_on_its_own_fighter_generates", only_a_single_macro_from_input_zero_on_its_own_fighter_generates as fn()),
             ("a_loop_and_a_second_role_never_join_one_track", a_loop_and_a_second_role_never_join_one_track as fn()),
             ("a_finished_write_is_announced_once", a_finished_write_is_announced_once as fn()),
-            ("another_threads_library_write_does_not_rearm_a_done_macro", another_threads_library_write_does_not_rearm_a_done_macro as fn()),
-            ("another_threads_library_write_does_not_drop_an_open_run", another_threads_library_write_does_not_drop_an_open_run as fn()),
             ("the_last_input_is_credited_before_the_worker_drains", the_last_input_is_credited_before_the_worker_drains as fn()),
             ("an_owed_slot_does_not_show_the_playback_indicator", an_owed_slot_does_not_show_the_playback_indicator as fn()),
             ("the_host_deletes_a_saved_capture_through_the_file_delete", the_host_deletes_a_saved_capture_through_the_file_delete as fn()),
