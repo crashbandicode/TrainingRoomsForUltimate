@@ -118,7 +118,7 @@ def apply_edits(entry: dict, out: bytes) -> bytes:
             if s.count(e["delete_from"]) != 1:
                 raise SystemExit(f"{entry['src']}: delete_from `{e['delete_from'][:60]}` matches {s.count(e['delete_from'])} times")
             a = s.index(e["delete_from"])
-            b = s.rindex(e["delete_to_last"]) if "delete_to_last" in e else s.find(e["delete_to"], a + len(e["delete_from"]))
+            b = s.rfind(e["delete_to_last"]) if "delete_to_last" in e else s.find(e["delete_to"], a + len(e["delete_from"]))
             if b < 0 or b < a:
                 raise SystemExit(f"{entry['src']}: delete_to for `{e['delete_from'][:60]}` not found")
             out = (s[:a] + s[b:]).encode("utf-8")
