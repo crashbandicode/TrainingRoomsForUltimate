@@ -104,7 +104,7 @@ is kept. This works on a macro and on a match capture.
 | Positions made by a playback | Are that playback's, not the original recording's |
 | A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
 | No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
-| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does. For "Can't stand there on this stage." this order is a mistake: the following build shows that line first |
+| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does. For "Can't stand there on this stage." this order is a mistake. Fixed in the next build. |
 | Fighter pose | Frozen or neutral; this is not a replay of the animation |
 | Not shown | Projectiles, items and damage. Combos and drills have no position display |
 
