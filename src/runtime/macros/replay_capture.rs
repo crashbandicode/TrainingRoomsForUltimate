@@ -1049,26 +1049,26 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         SELECTION_REVISION.fetch_add(1,Ordering::AcqRel);
     }
     // Drop the editor lock before opening the naming panel or notifying the game.
-    let (effect, configuration, file, source, requested) = {
+    let (effect, file, source, requested) = {
         let mut editor = EDITOR.lock().unwrap();
         REVISION.fetch_add(1, Ordering::Relaxed);
-        let configuration=editor.as_ref().and_then(|editor|editor.target().ok().flatten())
-            .and_then(Target::configuration);
         let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
         let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());
-        (editor.as_mut().map(|editor| editor.on_action(action)), configuration, file, source, requested)
-    };
-    // Only a saved file carries identity, and it is always the recorded one: the
-    // original kind, plus the exact Mii for a Mii track. A preview is inputs only
-    // and needs neither, so it never depends on which fighter the CPU is.
-    let attach=|mut recording:Box<crate::engine::macros::MacroRecording>| -> Result<Box<crate::engine::macros::MacroRecording>,String> {
-        if let Some(configuration)=configuration {recording.set_mii(configuration).map_err(|e|e.to_string())?;}
-        else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {
-            return Err("Recorded Mii metadata is unavailable; reopen this capture before saving".into());
-        }
-        recording.playback_target().map_err(|e|e.to_string())?;
-        Ok(recording)
+        let effect = editor.as_mut().map(|e| {
+            if file || !matches!(action, ClipAction::Confirm) { return e.on_action(action); }
+            let view = e.view();
+            let configuration = e.target_for(view.entry, e.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);
+            e.confirm_capture(|recording| {
+                if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }
+                else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {
+                    // restriction: replay-mii-metadata
+                    return Err("Recorded Mii metadata is unavailable; reopen this capture before saving".into());
+                }
+                recording.playback_target().map(|_| ()).map_err(|e| e.to_string())
+            })
+        });
+        (effect, file, source, requested)
     };
     match effect {
         Some(ClipEffect::Preview(recording)) => match recording.validate() {
@@ -1094,14 +1094,9 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         Some(ClipEffect::Export(recording)) => {
             stop_preview();
             *HOLD.lock().unwrap() = (0, 0, false);
-            if file {
+            if file || requested {
                 name_file(crate::engine::rr_runtime::ClipFile::Macro(recording));
-                return;
-            }
-            match attach(recording) {
-                Ok(recording) if requested => name_file(crate::engine::rr_runtime::ClipFile::Macro(recording)),
-                Ok(recording)=>crate::runtime::macros::named_macros::offer_replay_recording(*recording),Err(error)=>notify(error),
-            }
+            } else { crate::runtime::macros::named_macros::offer_replay_recording(*recording); }
         }
         Some(ClipEffect::ExportCombo(recording)) => {
             *HOLD.lock().unwrap() = (0, 0, false);
