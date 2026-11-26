@@ -1234,8 +1234,8 @@ mod tests {
         assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));
         assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));
-        assert!(e.note_fighters([Some(6), Some(18)], false));
-        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT), "seen but not settled: still loading");
+        assert!(!e.note_fighters([Some(6), Some(18)], false), "seen but not settled: nothing on the strip changes");
+        assert_eq!((e.fighter_loading(), e.view().error.as_deref()), (Some((0, 6)), Some(FIGHTER_SWAP_WAIT)));
         assert!(e.note_fighters([Some(6), Some(18)], true));
         assert_eq!((e.fighter_loading(), e.view().error), (None, None));
     }

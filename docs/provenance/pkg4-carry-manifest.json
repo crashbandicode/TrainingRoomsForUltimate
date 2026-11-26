@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "f28f9c107489bb5b78de078c7cd58f52b6f2e65b17984eb99133ab82e04497fe",
+   "dest_sha256": "8a836baf2c02c69d939d50cc02594ac63f78c397c0574829b2e5c872aee01aa8",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3302,6 +3302,11 @@
      "reason": "P5b C: test that the swap-wait line goes once the swap has settled.",
      "old": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(e.cancel_fighter());\n        assert_eq!(e.fighter_loading(), None);\n    }\n\n    fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {\n",
      "new": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(e.cancel_fighter());\n        assert_eq!(e.fighter_loading(), None);\n        // The wait line goes when the swap it spoke of has settled, without another press.\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(e.note_fighters([Some(6), Some(18)], false));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT), \"seen but not settled: still loading\");\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n\n    fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {\n"
+    },
+    {
+     "reason": "P5b C: the unsettled pass changes nothing on the strip (test).",
+     "old": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(e.note_fighters([Some(6), Some(18)], false));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT), \"seen but not settled: still loading\");\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n",
+     "new": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(!e.note_fighters([Some(6), Some(18)], false), \"seen but not settled: nothing on the strip changes\");\n        assert_eq!((e.fighter_loading(), e.view().error.as_deref()), (Some((0, 6)), Some(FIGHTER_SWAP_WAIT)));\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n"
     }
    ]
   },
