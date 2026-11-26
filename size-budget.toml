@@ -3184,3 +3184,11 @@ ceiling = 206265
 date = "2026-11-26"
 reason = "A free playhead in the clip editor (operator 2026-11-26: yes add it), on main dbded2d1 (206183): +82. With nothing selected Left/Right browses the whole take and Y goes to the nearest move; after a browse L and R set In and Out at the playhead; ClipEditor::shown_frame and ClipView::shown name the frame the fighters are shown at; a track change shows the selected handle (reviewer 361eb723, +4). Files: src/model/macro_ui/clip_panel.rs, src/runtime/macros/replay_capture.rs, src/editors/clip.rs."
 approved_by = "tr-primary-2 2026-11-26 00:58:36Z (approved at the count measured after the fold of 361eb723, up to 206,283: an operator-ordered feature)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 206278
+date = "2026-11-26"
+reason = "The free playhead with the refused-save fix folded (reviewer rv-edge-juggle-sol 14db4f9b: a capture save is accepted only after the exact Mii of the cropped fighter is validated, and a refusal changes no state), on main dbded2d1 (206183): +95, measured by tools/size_gate.py on a540c23e. It replaces the 206265 of the entry above, which was measured before that fix."
+approved_by = "tr-primary-2 2026-11-26 00:58:36Z (approved at the measured count after the reviewer folds, up to 206,283) and 01:19:45Z (wait for the compact tip, then the entry at the measured count)."
