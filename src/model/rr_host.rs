@@ -2552,18 +2552,27 @@ fn start_run(
     book: &Book,
     role: Role,
     source: &str,
-    frames: Option<core::ops::Range<usize>>,
+    window: Option<PreviewWindow>,
     owed: Option<StartSpeed>,
     delayed: bool,
 ) -> bool {
-    let effect = match frames {
-        Some(frames) => machine.play_range(role, book, source, frames),
-        None => machine.play_file(role, book, source),
+    let (effect, track_end) = match window {
+        Some(PreviewWindow::Exact(frames)) => {
+            let end = (frames.start == 0).then_some(frames.end);
+            (machine.play_range(role, book, source, frames), end)
+        }
+        Some(PreviewWindow::Drill { frames, trim }) => {
+            let range = book.drill_preview_range(source, frames as usize, trim);
+            (machine.play_range(role, book, source, range), None)
+        }
+        None => (machine.play_file(role, book, source), None),
     };
     if effect.started {
         drop_frames(role);
         if delayed { owe_delay(role); }
         mark_run(role);
+        // A poll can consume input zero as soon as step_role publishes it.
+        if let Some(end) = track_end { open_play_track(book, role, source, end, false); }
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
         step_role(machine, book, role);
@@ -2627,14 +2636,6 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
     match start {
         Some(PreviewStart { source, role, window, playback }) => {
             PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
-            let track_end = match &window {
-                PreviewWindow::Exact(frames) if frames.start == 0 => Some(frames.end),
-                _ => None,
-            };
-            let frames = match window {
-                PreviewWindow::Exact(frames) => frames,
-                PreviewWindow::Drill { frames, trim } => book.drill_preview_range(&source, frames as usize, trim),
-            };
             let owed = if source == CLIP_ID {
                 PREVIEW_AWAY.store(1, Ordering::Release);
                 tick.home = Some(HomeWarp::Start {
@@ -2646,10 +2647,7 @@ fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
             } else {
                 warp_to_start(book, role, &source, tick)
             };
-            if start_run(machine, book, role, &source, Some(frames), owed, playback) {
-                // If input 0 was already taken, this run has no rows.
-                if let Some(end) = track_end { open_play_track(book, role, &source, end, false); }
-            } else {
+            if !start_run(machine, book, role, &source, Some(window), owed, playback) {
                 PREVIEW.store(0, Ordering::Release);
             }
         }
