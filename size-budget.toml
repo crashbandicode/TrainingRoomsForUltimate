@@ -3176,3 +3176,11 @@ basis = "rustfmt-sloc4"
 ceiling = 206183
 date = "2026-11-26"
 reason = "cut: the boundary fix of the snap in the clip editor (reviewer rv-edge-juggle-sol, 33f54959) is 9 counted lines smaller than the first form: 206,183 measured by tools/size_gate.py on the folded head, +17 on main 58c9ccb5 (206166)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 206265
+date = "2026-11-26"
+reason = "A free playhead in the clip editor (operator 2026-11-26: yes add it), on main dbded2d1 (206183): +82. With nothing selected Left/Right browses the whole take and Y goes to the nearest move; after a browse L and R set In and Out at the playhead; ClipEditor::shown_frame and ClipView::shown name the frame the fighters are shown at; a track change shows the selected handle (reviewer 361eb723, +4). Files: src/model/macro_ui/clip_panel.rs, src/runtime/macros/replay_capture.rs, src/editors/clip.rs."
+approved_by = "tr-primary-2 2026-11-26 00:58:36Z (approved at the count measured after the fold of 361eb723, up to 206,283: an operator-ordered feature)."
