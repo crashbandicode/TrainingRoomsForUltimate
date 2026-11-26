@@ -115,6 +115,25 @@ mod tests {
     }
 
     #[test]
+    fn matching_pose_is_claimed_once_by_the_scrubs_own_setter() {
+        let asked = pose(12.5);
+        let natural = (SMASH, 12.5);
+        assert_eq!(decide(KIRBY, asked, KIRBY, true, false, natural), Act::Set(asked.get().unwrap()),
+            "a natural match is not a claim: the first eligible callback must issue the stopped setter");
+        assert_eq!(decide(KIRBY, asked, KIRBY, true, true, natural), Act::Keep);
+    }
+
+    #[test]
+    fn an_owned_pose_corrects_the_actual_frame_inside_one_packed_step() {
+        let asked = pose(12.5);
+        for frame in [12.5 - 1.0 / 1024.0, 12.5 + 1.0 / 1024.0] {
+            assert_eq!(decide(KIRBY, asked, KIRBY, true, true, (SMASH, frame)), Act::Set(asked.get().unwrap()),
+                "correct the game read itself, even when it would round to the requested frame");
+        }
+        assert_eq!(decide(KIRBY, asked, KIRBY, true, true, (SMASH, 12.5)), Act::Keep);
+    }
+
+    #[test]
     fn a_pose_is_set_on_a_sleeping_body_of_the_recorded_fighter_when_the_game_shows_another() {
         let asked = pose(12.5);
         // The held body falls; the recorded frame is mid-smash.
