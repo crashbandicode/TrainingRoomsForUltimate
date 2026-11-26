@@ -53,7 +53,7 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 | Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
 | Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
 | Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast case passed |
-| Seen once, cause not established | On a match capture in a filming boot of that build, Y on a mid-action In and then X was refused with "Let the CPU settle to idle and leave the ledge before previewing", and nothing played. Under investigation |
+| Seen in a filming boot of that build, cause not established | On a match capture that plays on the CPU, with In still selected after Y, X was refused with "Let the CPU settle to idle and leave the ledge before previewing", and nothing played. After L to deselect In and a second's wait, X previewed. One take each way. Under investigation |
 
 ### A free playhead in the clip editor
 
