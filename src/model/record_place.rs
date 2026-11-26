@@ -2469,23 +2469,32 @@ mod tests {
     /// The hold's seam is where a game run reads the float: this frame's act, and the body's status and animation
     /// as the game left it, beside its point and speed. The animation after a body floats again is compared with
     /// its first float's there (tr-primary-2 2026-11-26 15:25:49Z: the same animation, not merely Fall). The
-    /// first green (6046f2de) also read the animation's frame, which two capability tests refused.
+    /// status and the animation have no use in the product: the diag build alone reads them, in a module of its
+    /// own (rv-edge-juggle-sol 15:45:47Z), so no unit's install comes to depend on a native for a trace word
+    /// (the first green, 6046f2de, read them in the shipped hold, which two capability tests refused).
     #[test]
     fn the_holds_seam_carries_the_act_and_the_bodys_status_and_animation() {
         let placement = include_str!("../runtime/features/placement.rs");
         let seam = placement.split("pub extern \"C\" fn placement_hold_seam(").nth(1).unwrap();
-        assert!(seam.starts_with("meta: u64, asked: u64, seen: u64, speed: u64, motion: u64, status: u64) {"));
+        assert!(seam.starts_with("meta: u64, asked: u64, seen: u64, speed: u64) {"));
         let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
-        let (before, call) = hold_at.split_once("placement_hold_seam(").unwrap();
-        let call = call.split("\n    );").next().unwrap();
-        assert!(call.contains("| ((act as u64) << 36)"));
-        assert!(call.contains("natives::motion_kind(body),"));
-        assert!(call.contains("u64::from(natives::status_kind(body) as u32),"));
-        // The animation's frame is not read: `motion_frame` is a native the drills' unit does not otherwise
-        // need (`capabilities::CROSS_NEEDS`), and a trace word must not add a row a drill's install depends on.
-        assert!(!placement.contains("motion_frame"));
-        // Read before this frame's write, like the point and the speed.
+        // The act is in the shipped seam's first word: it is the hold's own, not a read.
+        assert!(hold_at.contains("| ((act as u64) << 36)"));
+        assert!(hold_at.contains("placement_hold_seam(meta, pack(at), pack(read.at), pack([speed_x, speed_y]));"));
+        for native in ["motion_kind", "motion_frame", "status_kind"] {
+            assert!(!placement.contains(native), "{native} is read by the diag build only");
+        }
+        // The diag build's read, before this frame's write like the point and the speed.
+        let (before, _) = hold_at.split_once("#[cfg(feature = \"diag\")]\n    super::placement_probe::hold_state(meta, body);")
+            .expect("the diag build's read");
         assert!(!before.contains("lift(body, at") && !before.contains("hold(body, at)") && !before.contains("stand(body, at"));
+        assert!(include_str!("../runtime/features/mod.rs").contains("#[cfg(feature = \"diag\")]\nmod placement_probe;"));
+        let probe = include_str!("../runtime/features/placement_probe.rs");
+        assert!(probe.contains("pub extern \"C\" fn placement_hold_state(meta: u64, motion: u64, status: u64, granted: u64) {"));
+        assert!(probe.contains("natives::motion_kind(body),"));
+        assert!(probe.contains("u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),"));
+        // A read that is not granted answers 0: the grants go with the words.
+        assert!(probe.contains("[s::MOTION_KIND_OFFSET, s::STATUS_KIND_OFFSET, s::MOTION_FRAME_OFFSET]") && probe.contains("game::granted(site)"));
     }
 
     #[test]
