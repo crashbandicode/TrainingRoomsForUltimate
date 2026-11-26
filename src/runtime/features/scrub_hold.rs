@@ -8,8 +8,10 @@
 //!
 //! NOT YET SWITCH-RUN.
 use super::placement;
-use crate::engine::macro_ui::scrub_track::{in_bounds, Block, Spot, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
+use super::stage_geometry::RayProbe;
+use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::model::crosshair::CpuPreview;
+use crate::model::stage_geometry::{classify, Unread};
 use crate::runtime::{game::natives, lobby::training::practice, state_natives as state};
 
 /// # Safety
@@ -27,7 +29,7 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.forget();
         }
         let seen = match point(block, &holds, slot, accessor) {
-            Some(spot) => hold(&mut holds[slot], accessor, spot),
+            Some(spot) => hold(block, slot, &mut holds[slot], accessor, spot),
             None => release(&mut holds[slot], accessor),
         };
         block.set_seen(slot, seen);
@@ -52,11 +54,12 @@ unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, acc
     block.held_at(slot, home)
 }
 
-/// Hold the body at `spot`, facing as recorded. A point outside the camera's limits is not taken: the body goes
-/// back, or stays, where the hold found it.
-unsafe fn hold(slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
+/// Hold the body at `spot`, facing as recorded. A point outside the camera's limits, or one the stage rule does not
+/// let a body stand at (inside a solid, past a blast line), is not taken: the body goes back, or stays, where the
+/// hold found it.
+unsafe fn hold(block: &Block, index: usize, slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
     let Some(limits) = natives::camera_limit_range() else { return release(slot, accessor) };
-    if !in_bounds(spot.at, limits) {
+    if !in_bounds(spot.at, limits) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {
         release(slot, accessor);
         return SEEN_OFF;
     }
@@ -65,6 +68,13 @@ unsafe fn hold(slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u3
     }
     state::set_lr(accessor, spot.facing);
     SEEN_HELD
+}
+
+/// The shared stage rule for a point, read by the placement ray through this role's own body on its own frame. The
+/// block asks it again for a new shown frame or a changed world point. A stage that cannot be read lets nobody stand.
+unsafe fn stands(accessor: usize, at: [f32; 2]) -> bool {
+    let Some(blast) = super::tech_surfaces::blast_bounds() else { return false };
+    can_stand(RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
 /// Let the body go: awake again and back where the hold found it. A hold of another body (a swapped fighter, a new
