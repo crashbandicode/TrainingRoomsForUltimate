@@ -332,20 +332,21 @@ With no handle selected on a macro or a capture the strip reads "Hold Left or Ri
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-Browsing was seen in Eden on `eb39d6bc`, the build before install 6's last fix; the cuts and the snap have host tests only.
+Browsing was seen in Eden on `eb39d6bc`. On install 6's diagnostic build, a filmed macro showed Y snapping the
+playhead to frame 66 and L and R setting the two cuts. It did not demonstrate snapping In on a match capture.
 
 2026-11-26. Positions while you scrub, in install 6. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
 the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
 separately. A point outside the camera bounds, inside solid ground or a wall, or beyond the safe blast-line bounds
-is refused. The same applies if the stage geometry cannot be read. The line reads "Can't stand there on this stage."
-if either point is refused. That fighter returns to where its hold began, or stays put if it was not held; the
+is refused. The same applies if the stage geometry cannot be read. That fighter returns to where its hold began,
+or stays put if it was not held; the
 other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
 without that warning.
 
-The position lines share one place on the strip with the snap hint. On a capture with In in the middle of an action
-the strip reads "Press ZL+Y to snap to the move start, then X to preview." there instead, and after a snap it reads
-the line about the move's setup. The fighters are still held or left as described above.
+Only one notice fits on the strip. A snapped move with a temporary setup shows its setup line first. Otherwise a
+clean In can show the position message, including "Can't stand there on this stage." if either point is refused.
+A mid-action In shows the snap hint instead. The fighters' placement does not depend on which notice wins.
 
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
   capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
@@ -357,10 +358,11 @@ the line about the move's setup. The fighters are still held or left as describe
   playing character's fighter kind differs from the recorded one, or when Trim skips the first input.
 - A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
   here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
-- Known defect in install 6: a take longer than 20 seconds (1,200 frames) keeps positions for its first 20 seconds
-  only, and reads "Positions end here." past them. [Known issues](../CURRENT-RELEASE.md#known-issues)
-- Known defect in install 6: with In or Out selected, the first X can be refused with "Let the CPU settle to idle
-  and leave the ledge before previewing". Press L or R again to deselect the handle, then X.
+- On install 6, a long recording can keep all its inputs but stop saving positions after 20 seconds (1,200 frames).
+  Playing it will not extend a valid file written by Record. [Known issues](../CURRENT-RELEASE.md#known-issues)
+- On a capture, or a macro preview that uses a temporary checkpoint, the first X can be refused with "Let the CPU
+  settle to idle and leave the ledge before previewing". Press the selected handle's button again (L for In, R for
+  Out), let the CPU settle, then press X. A macro loading its own start save does not use that checkpoint.
 - The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
 
 Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the

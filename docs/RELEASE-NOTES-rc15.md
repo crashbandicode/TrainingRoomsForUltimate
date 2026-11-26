@@ -75,7 +75,7 @@ With no handle selected, on a macro or a capture:
 | Checked | Result |
 | --- | --- |
 | Eden, on `eb39d6bc` | With nothing selected the playhead moved to two other frames while In and Out stayed where they were, and the strip read "Playhead moved. L sets the start here, R the end." |
-| Host tests only | The cuts with L and R, and the snap with Y |
+| Eden, install 6 diagnostic build | In the macro demonstration, Y snapped from 64 to a mark at 66. L set In to 66; R later kept frame 100 (Out 101). This is footage, not a verdict for a test row. |
 | No host test | Holding a direction on a pad |
 
 ### The fighters are shown while you scrub
@@ -95,7 +95,7 @@ is kept. This works on a macro and on a match capture.
 | The editor reads | When |
 | --- | --- |
 | "Play it once to see positions while scrubbing." | The macro has no positions |
-| "Positions end here." | Past the positions of a playback that was stopped early; it gives positions up to where it stopped. Also 20 seconds into a longer take recorded on install 6, which is a defect: see below |
+| "Positions end here." | The selected frame is beyond the saved positions. This can follow an early stop during generation or the long-recording defect below. |
 | "Can't stand there on this stage." | Either fighter's point is inside solid ground or a wall, outside the camera's limits, or past the safe blast-line bounds. A fighter already held goes back to where the hold began. Each fighter's point is judged by itself, so the other one is still shown when its own point allows |
 
 | Rule | What it means |
@@ -104,13 +104,13 @@ is kept. This works on a macro and on a match capture.
 | Positions made by a playback | Are that playback's, not the original recording's |
 | A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
 | No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
-| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does. For "Can't stand there on this stage." this order is a mistake. Fixed in the next build. |
+| Where the three lines show | A snapped move's temporary setup gets the notice first. Otherwise a clean In shows the position message; a mid-action In shows the snap hint instead. This can hide "Can't stand there on this stage." Fixed in the next build. |
 | Fighter pose | Frozen or neutral; this is not a replay of the animation |
 | Not shown | Projectiles, items and damage. Combos and drills have no position display |
 
-**Defect found in testing install 6:** a take longer than 20 seconds (1,200 frames) keeps positions for its first
-20 seconds only. Past them the editor reads "Positions end here." and the fighters are not shown. The take's inputs
-are whole. A fix is planned for the following build: [Known issues](CURRENT-RELEASE.md#known-issues).
+**Long recordings:** two takes kept all 1,553 and 3,253 input frames but only the first 1,200 frames of scrub
+positions. Both were recorded with the menu closed. This is not a length limit on playback.
+[Known issues](CURRENT-RELEASE.md#known-issues)
 
 **Fixed before the card build** (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
 the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
