@@ -85,8 +85,8 @@ fn put_row(out: &mut [u8], frame: &ReplayFrame) {
     let start = frame.start;
     let words = [start.fighter_kind as u32, start.costume, start.facing.to_bits(), start.situation as u32, start.status as u32,
         start.speed_x.to_bits(), start.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits()];
-    for (cell, word) in out.chunks_exact_mut(4).zip(words) {
-        cell.copy_from_slice(&word.to_le_bytes());
+    for (cell, word) in out.as_chunks_mut::<4>().0.iter_mut().zip(words) {
+        *cell = word.to_le_bytes();
     }
 }
 
@@ -129,7 +129,7 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
         file.write_all(&header(Binding::of(id, inputs), track.len() as u32))?;
         let mut buffer = vec![0u8; CHUNK_FRAMES.min(track.len()) * FRAME];
         for chunk in track.chunks(CHUNK_FRAMES) {
-            for (pair, out) in chunk.iter().zip(buffer.chunks_exact_mut(FRAME)) {
+            for (pair, out) in chunk.iter().zip(buffer.as_chunks_mut::<FRAME>().0) {
                 put_row(&mut out[..ROW], &pair[0]);
                 put_row(&mut out[ROW..], &pair[1]);
             }
@@ -152,7 +152,7 @@ pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFr
     while track.len() < frames {
         let count = (frames - track.len()).min(CHUNK_FRAMES);
         file.read_exact(&mut buffer[..count * FRAME]).ok()?;
-        for bytes in buffer[..count * FRAME].chunks_exact(FRAME) {
+        for bytes in buffer[..count * FRAME].as_chunks::<FRAME>().0 {
             track.push([get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?]);
         }
     }
