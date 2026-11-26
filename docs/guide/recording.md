@@ -40,7 +40,7 @@ rename it on its own screen). The Record presses themselves are not in the recor
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
 
-*ZR + D-pad Down starts Record, and Mario is tinted red while his inputs are taken: two jabs and a forward smash. The chord again stops it. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-record-macro.mp4)
+*ZR + D-pad Down starts Record. Mario is tinted red as his forward smash sends Link to 18.5%. The tint clears when recording stops. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-record-macro.mp4)
 
 1. Choose who records in the pop-up (ZR + D-pad Right): Player 1 at first, or the CPU.
 2. Press ZR + D-pad Down. While the take records, the HUD shows **REC P1** in red or **REC CPU** in blue, and the

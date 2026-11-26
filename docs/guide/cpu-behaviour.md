@@ -12,7 +12,7 @@ follow them separately; they do not control Player 1, even with [Player 1 contro
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/67d92f30104dd21a740499e4b780336754029284" autoplay muted loop playsinline controls></video>
 
-*CPU › Mash is set to an attack. Mario walks up and jabs Link, and Link hits back as soon as he can: Mario takes 3%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-mash.mp4)
+*With CPU › Mash set to an attack, Mario jabs Link and Link hits back. Link ends at 2.7%, Mario at 3.7%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-mash.mp4)
 
 [Mash](../menu/cpu.md#mash) sets the CPU's first reaction; [Followup](../menu/cpu.md#followup) sets what comes next.
 When a situation starts, the CPU picks both actions at once, at random from their ticked choices. It performs each as

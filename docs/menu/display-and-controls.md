@@ -22,7 +22,7 @@ either way.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
 
-*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Mario jabs, and the hit draws in red; then he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-hitbox-visualization.mp4)
+*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Look for the pink hitbox on Mario's jab and the purple box when he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-hitbox-visualization.mp4)
 
 Draws the fighters' boxes and, optionally, hittable objects' hurtboxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
