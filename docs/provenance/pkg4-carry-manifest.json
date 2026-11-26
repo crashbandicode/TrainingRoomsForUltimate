@@ -5340,7 +5340,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "bba97080a165ebabbd6b12e2676079cc0559c221c15bdd69ec27f6eb02d252e1",
+   "dest_sha256": "7c9eb565edcb28169e558190a6087ff9322374d5f61c315e93109458b8a570f1",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6296,6 +6296,16 @@
      "old": "\npub fn worker_preview_notices() {",
      "new": "\n/// The worker: what the open editor's selected handle shows goes to the fighters (`scrub_track`), and what they did\n/// with it comes back for the key line. With no editor nothing is asked, and the block is freed once no body is held.\nfn scrub_service() {\n    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};\n    let mut editor = EDITOR.lock().unwrap();\n    let Some(editor) = editor.as_mut() else {\n        let idle = SLOT.with(|block| {\n            block.set_ask(Ask::None);\n            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)\n        });\n        if idle == Some(true) {\n            SLOT.withdraw();\n        }\n        SLOT.reap();\n        return;\n    };\n    if SLOT.empty() {\n        let _ = SLOT.publish(Block::new());\n    }\n    let ask = editor.scrub().0;\n    let pos = SLOT.with(|block| {\n        block.set_ask(ask);\n        block.pos()\n    });\n    if pos.is_some_and(|pos| editor.note_scrub(pos)) {\n        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n    }\n}\n\npub fn worker_preview_notices() {",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let idle = SLOT.with(|block| {\n            block.set_ask(Ask::None);\n            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)\n        });\n        if idle == Some(true) {\n            SLOT.withdraw();\n        }\n        SLOT.reap();",
+     "new": "        SLOT.close();",
+     "reason": "Scrub close (2026-11-26 02:36:50Z): exercise the same worker close operation during the first pending hold."
+    },
+    {
+     "old": "    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};",
+     "new": "    use crate::engine::macro_ui::scrub_track::{Block, SLOT};",
+     "reason": "Scrub close (2026-11-26 02:36:50Z): exercise the same worker close operation during the first pending hold."
     }
    ]
   },

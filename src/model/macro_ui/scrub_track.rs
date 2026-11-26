@@ -209,6 +209,16 @@ impl Slot {
     }
 
     /// The worker: no new reader finds the block. It is freed by `reap`.
+    pub fn close(&self) {
+        let idle = self.with(|block| {
+            block.set_ask(Ask::None);
+            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)
+        });
+        if idle == Some(true) { self.withdraw(); }
+        self.reap();
+    }
+
+    /// Stop new readers without disturbing ones already inside.
     pub fn withdraw(&self) {
         let ptr = self.ptr.load(Ordering::SeqCst);
         if ptr & 1 == 0 {
@@ -831,6 +841,28 @@ mod tests {
         let held = format!("{book:?}");
         assert!(held.contains("track: None") && !held.contains("track: Some"), "a book holds no track");
         assert_eq!(held.matches("buttons: 9").count(), 2, "both macros keep their inputs");
+    }
+
+    #[test]
+    fn closing_during_the_first_hold_keeps_the_release_reachable() {
+        let slot = Slot::new();
+        assert!(slot.publish(Block::new()).is_ok());
+        slot.with(|block| {
+            block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(3.0, 4.0, 1.0)), None] });
+            let _hold = block.holds.try_lock().unwrap();
+            assert_eq!(block.held_at(0, [1.0, 2.0]), Some(spot(4.0, 6.0, 1.0)));
+            // Interleave close after the fighter has its point but before it publishes the first hold.
+            slot.close();
+            block.set_seen(0, SEEN_HELD);
+        }).unwrap();
+        slot.close();
+        assert!(slot.live(), "the next fighter frame must still find its release");
+        slot.with(|block| {
+            assert_eq!((block.ask(), block.seen(0)), (Ask::None, SEEN_HELD));
+            block.set_seen(0, SEEN_IDLE);
+        }).unwrap();
+        slot.close();
+        assert!(slot.empty());
     }
 
     #[test]

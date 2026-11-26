@@ -911,17 +911,10 @@ pub fn clip_fighter_label(view: &ClipView) -> String {
 /// The worker: what the open editor's selected handle shows goes to the fighters (`scrub_track`), and what they did
 /// with it comes back for the key line. With no editor nothing is asked, and the block is freed once no body is held.
 fn scrub_service() {
-    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};
+    use crate::engine::macro_ui::scrub_track::{Block, SLOT};
     let mut editor = EDITOR.lock().unwrap();
     let Some(editor) = editor.as_mut() else {
-        let idle = SLOT.with(|block| {
-            block.set_ask(Ask::None);
-            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)
-        });
-        if idle == Some(true) {
-            SLOT.withdraw();
-        }
-        SLOT.reap();
+        SLOT.close();
         return;
     };
     if SLOT.empty() {
