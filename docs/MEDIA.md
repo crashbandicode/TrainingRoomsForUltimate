@@ -29,7 +29,7 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 
 ## rc.15 install 4 clips (2026-11-25)
 
-19 MP4 clips of install 4's features, embedded in the [rc.15 release notes](RELEASE-NOTES-rc15.md#clips).
+19 MP4 clips of install 4's features, embedded in the [rc.15 release notes](RELEASE-NOTES-rc15.md#install-4).
 
 - **Run/build:** Eden runs `i4-media-qp-yoga-01` (the Quick Play capture) and `i4-media-yoga-01` (Training), the
   installed build `a945b0c1` with the card's 21 plugins; Eden only, not checked on the console.
