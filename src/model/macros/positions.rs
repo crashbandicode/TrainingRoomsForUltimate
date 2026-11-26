@@ -40,9 +40,10 @@ pub fn path(dir: &Path, id: &str) -> PathBuf {
 }
 
 /// Where a positions file came from: a take's own recording, or a playback of a macro that had none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Source {
+    #[default]
     Recorded = 1,
     Generated = 2,
 }
@@ -157,10 +158,14 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
 /// The positions of the macro `id`, whose inputs are `inputs`; none when the file is missing, is not one this build
 /// reads, or does not bind this macro. A file with no rows is an empty track, not a missing one.
 pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFrame; 2]>> {
+    read_with_source(dir, id, inputs).map(|(_, track)| track)
+}
+
+pub(super) fn read_with_source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, Vec<[ReplayFrame; 2]>)> {
     #[cfg(test)]
     READS.with(|reads| reads.set(reads.get() + 1));
     let mut file = fs::File::open(path(dir, id)).ok()?;
-    let (frames, _) = bound(&mut file, id, inputs)?;
+    let (frames, source) = bound(&mut file, id, inputs)?;
     let mut track = Vec::new();
     track.try_reserve_exact(frames).ok()?;
     let mut buffer = vec![0u8; CHUNK_FRAMES.min(frames) * FRAME];
@@ -171,7 +176,7 @@ pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFr
             track.push([get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?]);
         }
     }
-    Some(track)
+    Some((source, track))
 }
 
 /// Where the positions file of `id` came from, when it binds these inputs. Only its header is read.
@@ -219,6 +224,7 @@ pub fn fail_writes(fail: bool) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+    use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
     use crate::engine::macros::{Library, MacroRecording};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -251,6 +257,28 @@ mod tests {
             recording.set_track(Some(track(frames)));
         }
         recording
+    }
+
+    #[test]
+    fn a_saved_editor_crop_preserves_its_partial_positions_source() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        for origin in [Source::Recorded, Source::Generated] {
+            let rec = recording("Walk", 8, false);
+            let id = library.save_new(&rec).unwrap();
+            write(&dir, &id, &rec.frames, &track(3), origin).unwrap();
+            let mut editor = ClipEditor::macro_file(library.load_edited(&id).unwrap(), true).unwrap();
+            editor.on_action(ClipAction::SelectIn);
+            editor.on_action(ClipAction::Nudge(1));
+            editor.on_action(ClipAction::SelectOut);
+            editor.on_action(ClipAction::Nudge(-1));
+            let ClipEffect::Export(crop) = editor.on_action(ClipAction::Confirm) else { panic!("no macro crop") };
+            assert_eq!(&crop.frames, &rec.frames[1..7]);
+            let kept = library.save_new(&crop).unwrap();
+            assert_eq!(read(&dir, &kept, &crop.frames), Some(vec![pair(1), pair(2)]));
+            assert_eq!(source(&dir, &kept, &crop.frames), Some(origin), "cropping does not record new positions");
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

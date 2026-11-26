@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "7e766a6cd8d550ae1ab1243c8ebf812944f02de866a8c885ce5bee4e726d1036",
+   "dest_sha256": "3bb7a602b3996d543092a14a2e908c8793edd892b5ec9b1dc691ecbc40de2709",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -908,6 +908,21 @@
     {
      "old": "\n/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.\npub fn is_chain_document(bytes: &[u8]) -> bool {\n    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)\n}\n\nfn check_name(name: &str) -> Result<(), MacroError> {",
      "new": "\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.track = track;\n    }",
+     "new": "        self.track = track;\n        self.track_source = super::positions::Source::Recorded;\n    }\n\n    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {\n        self.track = Some(track);\n        self.track_source = source;\n    }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            track: None,\n        };",
+     "new": "            track: None,\n            track_source: super::positions::Source::Recorded,\n        };",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}",
+     "new": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n}",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1360,7 +1375,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "28f5fcafb2be3f617ffe608238fbf23cb71620cd426100f19638843cb6c0e3cb",
+   "dest_sha256": "860b6f02eddc1da99b235b89c193cf23206d60a91e7b472b4d68bdfd54f54fa1",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1515,6 +1530,16 @@
     {
      "old": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
      "new": "    const STREAM_WRITE: bool = true;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
+     "new": "            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));",
+     "new": "        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, track);\n        }",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
