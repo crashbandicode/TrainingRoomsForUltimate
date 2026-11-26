@@ -3,8 +3,8 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 5 (`b7a382e4`, 2026-11-25), is
-installed and tested in Eden in part; one report from the console is on record. What's new, how to install it and what is known not to work
+**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 6 (`5df3d9dc`, 2026-11-26), is
+installed and read back. Its Eden checks are in progress. What's new, how to install it and what is known not to work
 are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
@@ -20,152 +20,128 @@ Every option is documented in the [docs](docs/README.md), one page per menu page
 Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
 
 1. Set up Skyline for Smash Ultimate 13.0.5 on your Switch.
-2. Copy `libtraining_rooms.nro`, `libnro_hook.nro` and `libparam_hook.nro` into
+2. Copy `libtraining_rooms.nro` and `libnro_hook.nro` into
    `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/` on the SD card.
+   The hook enables CPU DI, tech and out-of-shield options; its usual companion `libparam_hook.nro` is optional for TrainingRooms.
 3. If `libtraining_modpack.nro` is there, remove it: the two can't run together.
 4. Start the game and open Training. Settings from the Training Modpack are copied over the first time.
 5. Press B + D-pad Up (or Minus) to open the menu.
 
 ## Controls
 
-| Button | What it does |
-| --- | --- |
-| B + D-pad Up, or Minus | Open the menu |
-| ZL + D-pad Down / Up | Save / load a state |
-| ZR + D-pad Down | Record |
-| ZR + D-pad Up / Left | Play the recording on the CPU / on yourself |
-| ZR + D-pad Right | Recording pop-up (B closes it) |
-| ZL + D-pad Left / Right | Switch the CPU's / your fighter |
-| R + D-pad Down | Input display on / off |
-| Hold R + D-pad Up, then Left / Right | Game speed |
-| Hold B, click the left / right stick | Kirby hat: yours / the CPU's (left stick at rest) |
-| L + R + A | Reset positions |
+Use chords in Training and waiting-room practice. Open **Display & Controls › Button chords**, press A on a chord,
+then X. Hold and release the new chord; A keeps it.
 
-Change the chords and the menu shortcuts at Display & Controls › Button chords. B + D-pad Up, the Kirby hat clicks and
-L + R + A stay fixed. Switching your own fighter needs Fighters & Stages › Player Swapping On (it's Off at first).
-GameCube controllers, Online Deluxe and the CPU pilot change some chords: see [the controls guide](docs/guide/controls.md).
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
+
+*Button chords: Save State Save reads ZL + D-pad Down; X, then holding ZL + D-pad Left sets the new chord, and that chord saves. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-controls-change-chord.mp4)
+
+The clip's new chord is also Cycle CPU by default; change or clear Cycle CPU if you want it to do only one thing.
+
+| Action | Default | Change it at |
+| --- | --- | --- |
+| Save State Save | ZL + D-pad Down | Button chords |
+| Save State Load | ZL + D-pad Up | Button chords |
+| Record | ZR + D-pad Down | Button chords |
+| Play on CPU | ZR + D-pad Up | Button chords |
+| Play on Player 1 | ZR + D-pad Left | Button chords |
+| Recording pop-up | ZR + D-pad Right | Button chords |
+| Cycle Player | ZL + D-pad Right | Button chords |
+| Cycle CPU | ZL + D-pad Left | Button chords |
+| Input display | R + D-pad Down | Button chords |
+| Game speed | Hold R + D-pad Up, then Left / Right | Button chords |
+| Open the menu | Minus | Menu shortcut 1 |
+| Open the menu | Disabled | Menu shortcut 2 |
+
+B + D-pad Up opens the menu and cannot be changed. L + R + A can reset, and holding B and clicking the left / right stick
+cycles your / the CPU's Kirby hat (left stick at rest); these buttons are fixed. Cycle Player needs **Player Swapping**
+On. See [Controls](docs/guide/controls.md) for GameCube and Online Deluxe.
 
 ### Game speed
 
-Slow a move down: hold R + D-pad Up, then press Left to step slower or Right to step quicker (1/4, 1/2, 2/3, x1, x1.5).
-A stopwatch on the HUD shows any speed but x1.
+Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to keep the speed. See [Game speed](docs/guide/game-speed.md), including 1 Frame.
 
-![A forward smash at x1; R + D-pad Up steps the speed to 1/4; the same smash, four times slower](docs/media/rc11-game-speed.gif)<br>*The same smash at x1, then at 1/4*
-
-More: [the game speed guide](docs/guide/game-speed.md).
+<!-- CLIP: tut-game-speed.mp4 | A smash at x1 → hold R + D-pad Up, Left steps to 1/4, the stopwatch shows it → the same smash, slow -->
+*Clip coming.*
 
 ## The menu
 
-L and R turn the pages, ZL + Up/Down jumps between sections, A changes a row, Y resets it, and B closes the menu. Left or
-Right flips an On/Off row too. Changes apply when it closes. More: [using the menu](docs/guide/using-the-menu.md).
+Open with B + D-pad Up. L / R turn pages, Up / Down choose a row, A opens or changes it, and B goes back or closes the
+menu. Changes apply when it closes; see [Using the menu](docs/guide/using-the-menu.md).
 
-![The menu on Taunts: D-pad Right flips it Off, D-pad Left flips it On again, with no A](docs/media/rc13-left-right-toggle.gif)<br>*Left / Right flip an On/Off row. Eden, rc.13 (untested on hardware).*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
+
+*B + D-pad Up opens the menu, R turns through the five pages, B closes it and practice goes on. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-menu-tour.mp4)
 
 ### CPU
 
-Teach the CPU to DI, tech, shield, mash and follow up, and set its level. Choose how it escapes your attacks: **B +
-D-pad Up → CPU → DI Direction**, then **A** to pick a direction.
+Choose how the [CPU responds](docs/guide/cpu-behaviour.md): open **CPU › Mash** with A and tick an action, then choose
+when it fires in **Mash Triggers**.
 
-![DI Down, then DI Up: the same smash at the same damage sends the CPU low, then high](docs/media/rc13-di.gif)<br>*DI Down, then DI Up from the menu. Eden, rc.13 (untested on hardware).*
-
-Make it dodge again and again: in **CPU → Mash** tick Spot Dodge or Roll Forwards, and in **Mash Triggers** tick
-**Always**.
-
-![Mash with Always ticked: the CPU spot-dodges (left) or rolls forward (right) again and again](docs/media/rc13-mash-dodge-always.gif)<br>*Mash a dodge, Always. Eden, rc.13 (untested on hardware).*
-
-All the options: [the CPU page](docs/menu/cpu.md).
+<!-- CLIP: tut-cpu-mash.mp4 | CPU › Mash set to Jab → Mario jabs the CPU → the CPU answers with a jab out of hitstun -->
+*Clip coming.*
 
 ### Saves
 
-Save where you stand with ZL + D-pad Down and go back with ZL + D-pad Up. Choose the damage, mirroring and buffs on
-load, and keep whole setups in a library.
+With Save States On, save both fighters' positions with ZL + D-pad Down; ZL + D-pad Up loads them again.
+[Save states](docs/guide/save-states.md) also covers damage, mirroring and buffs on load.
 
-![Save, a smash sends the CPU away, then Load puts both fighters back](docs/media/rc10-save-load.gif)<br>*Save, move, load: back where you saved*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2f0394ea36fb533c09e157925c016b4e369ab2a6" autoplay muted loop playsinline controls></video>
 
-All the options: [the Saves page](docs/menu/saves.md).
+*ZL + D-pad Down saves beside the CPU; two jabs take it to 4.9%; ZL + D-pad Up puts both fighters back at 0%. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-save-load.mp4)
 
 ### Recording
 
-Record yourself with ZR + D-pad Down and let the CPU play it back with ZR + D-pad Up.
+Record a macro: select Player 1 or CPU in the Recording pop-up, press ZR + D-pad Down, do the moves, then press it
+again to stop.
 
-![Mario records a jab and a smash, then the CPU does the same moves](docs/media/rc10-record-play-cpu.gif)<br>*Record, then the CPU plays it back*
+<!-- CLIP: tut-record-macro.mp4 | ZR + D-pad Down starts Record: the REC mark, Mario tinted → jab, jab, smash → the chord stops it and the notice names the macro -->
+*Clip coming.*
 
-Save a combo you landed and drill it: **B + D-pad Up → Recording → Combos & Sequences → + Save last combo…**, and the link cells under the frame strip grade each try. The card on the right shows the drill, result and streak.
-For sequences, it stacks three combos and marks the current one. The strip and card fade together when a fighter moves
-behind either one.
+To drill a combo, land it, then choose **Recording › Combos & Sequences › + Save last combo…**. The link cells grade
+your next attempts.
 
-![The combo helper grading a combo](docs/media/rc7-combo-helper.gif)<br>*Grading a combo*
+<!-- CLIP: tut-combo-save-drill.mp4 | Kirby lands jab into side tilt → Recording › Combos & Sequences › + Save last combo… → the next try is graded on the link cells -->
+*Clip coming.*
 
-Turn **Display & Controls → Link history** off to make the strip shorter. The **LINK** readout then shows the newest
-move pair with its verdict, for example **TRUE · Jab > Jab**. During a drill, its link cells use the LAST row’s space.
+Cut a macro, combo or drill into a new file with [Crop](docs/guide/recording.md#crop).
 
-Cut failed attempts out of a macro, combo or input drill: open its **Crop** row with **A**, use **L/R** and **Left/Right** to pick what stays, then **A** saves a new named copy.
+Practise movement without a hit with [Input drills](docs/guide/recording.md#input-drills).
 
-![A macro start handle moves from frame 0 to 180](docs/media/rc15-crop-editor.gif)<br>
-*Macro Crop range selection. Eden, 2026-11-15, rc.15 `d520d325`; this clip shows the handles, with preview and save checked separately.*
-
-Practise movement without landing a hit: choose **Recording → Combos & Sequences → COMBOS → DRILLS > → + Record drill…**, press **A**, then use **ZR + D-pad Down** to start and stop; **Make combo** on a no-hit macro makes a drill too.
-
-![An input drill's Crop changes the kept range from four steps to three](docs/media/rc15-input-drill.gif)<br>
-*A drill's Crop selects whole steps (L/R, then Left/Right). Eden, 2026-11-15, rc.15 `2eb3903e`; this early build shows a helper overlap fixed before release. This clip shows cropping; recording and no-hit conversion have no GIF yet.*
-
-More: [Input drills](docs/guide/recording.md#input-drills), [Crop](docs/guide/recording.md#crop) and [the Recording page](docs/menu/recording.md).
+More: [Recording](docs/guide/recording.md) and [playback options](docs/menu/recording.md).
 
 ### Fighters & Stages
 
-Give Kirby the next hat: hold **B** with the left stick at rest, then click the left stick.
+Switch fighters without leaving practice: choose the order in **Character Cycles**, then press ZL + D-pad Left to
+cycle the CPU. See [Fighter cycles](docs/guide/fighter-cycles.md).
 
-![Kirby gets Falco's hat, then Sheik's](docs/media/rc7-kirby-hats.gif)<br>*Changing Kirby's hat*
+<!-- CLIP: tut-fighter-cycle.mp4 | The Character Cycles grid → the Cycle CPU chord replaces Link with Donkey Kong in place -->
+*Clip coming.*
 
-Rotate the practice stage: set **Fighters & Stages → Training Stage Rotation → On**, then go back through the character
-select for the next stage.
+To change stage, open **Change Stage** with A, choose a stage and form, then press A. See [Stages](docs/guide/stages.md).
 
-![Training Stage Rotation On: the picked stage opens Training, and each return through the character select opens the next](docs/media/rc13-stage-pick.gif)<br>*Training Stage Rotation. Eden, rc.13 (untested on hardware).*
+<!-- CLIP: tut-stage-change.mp4 | Fighters & Stages › Change Stage → the grid → Battlefield in its Ω form loads with both fighters -->
+*Clip coming.*
 
-The page also switches fighters without leaving Training, makes Mii fighters and changes the stage right now.
-
-![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](docs/media/rc13-player-swapping-gate.gif)<br>*Player Swapping gates the Cycle Player chord. Eden, rc.13 (untested on hardware).*
-
-All the options: [the Fighters & Stages page](docs/menu/fighters-and-stages.md).
+Choose and start a game under [Practice games](docs/menu/practice-games.md).
 
 ### Display & Controls
 
-See attack, hurt and grab boxes: in **Display & Controls → Hitbox Visualization**, tick Hitboxes, Grab boxes and Hurtboxes. There is one colour scheme: attacks red (the strongest part) and pink (weaker or later parts), grabs purple, normal hurtboxes grey, hurtboxes that can't be hit yellow, hurtboxes that take no damage green, windboxes sky blue, wind areas olive, and launch and wind directions white.
+See attacks and hurtboxes: press A on [Hitbox Visualization](docs/menu/display-and-controls.md#hitbox-visualization),
+then A to tick Hitboxes, Grab boxes and Hurtboxes. The Colour legend appears beside the checklist.
 
-![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, then at 1/4 speed a neutral air's red hitbox](docs/media/rc14-hitbox.gif)<br>
-*Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, and at 1/4 speed Mario's neutral air shows its red hitbox. This rc.14 clip predates the current colours: its normal hurtboxes are yellow, which are grey now. Eden, rc.14 (untested on hardware).*
+<!-- CLIP: tut-hitbox-visualization.mp4 | Hitbox Visualization: tick Hitboxes, Grab boxes, Hurtboxes → the hurtbox pills → a neutral air's red hitbox -->
+*Clip coming.*
 
-See where summoned objects and items can be hit: **Display & Controls → Hitbox Visualization → Article hurtboxes**, then **A** ticks it.
-
-![Olimar's Pikmin without hurtboxes, with hurtbox pills, with status colours, then without](docs/media/rc15-article-hurtboxes.gif)<br>
-*Article hurtboxes Off → hurtbox pills → status colours → Off. This earlier rc.15 clip draws normal pills yellow; the current colours are grey for normal, yellow for can't be hit and green for no damage. Eden, 2026-11-15, rc.15 `6def8553`; Pikmin shown.*
-
-Read what each colour means beside the checklist: press **A** on **Hitbox Visualization** to see the **Colour legend** for what you ticked.
-
-![The Hitbox Visualization checklist beside its labelled colour swatches](docs/media/rc15-colour-legend-normal.png)<br>
-*Earlier two-scheme build, before the single-palette update; [the Frame data colours view](docs/media/rc15-colour-legend-frame-data.png). Eden, 2026-11-15, rc.15 `35268287`. Stills only; no legend GIF yet.*
-
-The grab boxes are purple:
-
-![At 1/4 speed, the grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its hurtboxes](docs/media/rc13-grab-boxes.gif)<br>*Grab boxes, purple in the current colours; this rc.13 clip predates them and shows magenta grab boxes and yellow hurtboxes. Eden, rc.13 (untested on hardware).*
-
-Tick **Windboxes** to see the pushes that cause no hitstun, such as F.L.U.D.D.'s water, in sky blue; their wind areas are olive.
-
-<!-- CAPTURE-REQUEST hb-legend-v03 (README clip): the windbox clip described under hb-legend-v03 in docs/menu/display-and-controls.md, F.L.U.D.D. then Ganondorf's up tilt, one short clip with a one-line caption. -->
-
-The page also has the input display, frame advantage and your own buttons.
-
-All the options: [the Display & Controls page](docs/menu/display-and-controls.md).
+See hittable objects with [Article hurtboxes](docs/menu/display-and-controls.md#hitbox-visualization).
 
 ## Waiting rooms
 
-Practise while you wait for an online or local match: open the room menu with **B + D-pad Up**. **Fighters & Stages →
-Lobby Practice** is On by default; turn it Off to leave the waiting rooms to the game.
+Practise while waiting for a local wireless or Quickplay match. With **Fighters & Stages › Lobby Practice** On,
+open the room menu with B + D-pad Up. See [Waiting rooms](docs/guide/waiting-rooms.md).
 
-![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as hurtbox pills with the Waiting and Ready signs still on screen](docs/media/rc14-waiting-menu.gif)<br>
-*The menu in a waiting room (B + D-pad Up): Hitbox Visualization with Hurtboxes ticked draws both practice fighters as hurtbox pills (yellow in this clip; grey in the current colours). The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
-
-More: [the waiting rooms guide](docs/guide/waiting-rooms.md).
+<!-- CLIP: tut-lobby-practice-menu.mp4 | A Local Wireless waiting room (one member): B + D-pad Up opens the room menu, Hurtboxes ticked, both practice fighters drawn as pills -->
+*Clip coming.*
 
 ## License
 
@@ -177,7 +153,7 @@ endorsed by Nintendo.
 ## More
 
 [The docs](docs/README.md): every menu page and guide. The current release is [rc.15](docs/CURRENT-RELEASE.md),
-**installed and tested in Eden in part, with one report from the console on record** (see [Status](docs/TECHNICAL.md#status)): what's new, how
+**installed, with its own Eden checks in progress** (see [Status](docs/TECHNICAL.md#status)): what's new, how
 to install it and its known issues.
 The rc.15 builds are in [their release notes](docs/RELEASE-NOTES-rc15.md). Release notes for rc.12, rc.13 and rc.14
 are on their

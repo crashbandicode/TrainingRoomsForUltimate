@@ -22,6 +22,8 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
         return;
     }
     SLOT.with(|block| {
+        // Read before the ask: a frame that read an older ask reports the older generation (`Block::released`).
+        let generation = block.generation();
         let Some(mut holds) = block.holds.try_lock() else { return };
         // A hold made on another body (a swapped fighter, a new scene): the hold is dropped, for both roles, until the
         // editor asks for another frame.
@@ -33,6 +35,7 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             None => release(&mut holds[slot], accessor),
         };
         block.set_seen(slot, seen);
+        block.ack(slot, generation);
     });
 }
 

@@ -288,11 +288,10 @@ pub fn service() {
     sync_bound(root);
     sync_slots(root);
     place_commit(root);
-    if !rr_host::pending() {
-        return;
+    // The model decides what this pass does: a take's positions, then whatever waits.
+    if let Some(tick) = rr_host::worker_tick(root, player, cpu) {
+        apply(&tick);
     }
-    let tick = rr_host::service_pending(root, player, cpu);
-    apply(&tick);
 }
 
 /// Change placement: the picker confirmed a placement on a save, and the worker writes the file and answers the

@@ -20,6 +20,9 @@ either way.
 
 ### Hitbox Visualization
 
+<!-- CLIP: tut-hitbox-visualization.mp4 | Tick Hitboxes, Grab boxes and Hurtboxes → hurtbox pills → a neutral air's red hitbox -->
+*Clip coming.*
+
 Draws the fighters' boxes and, optionally, hittable objects' hurtboxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
 practice fighters in a waiting room.
@@ -29,20 +32,11 @@ practice fighters in a waiting room.
 - **How:** A opens the checklist; A ticks, ZL ticks all or none, B goes back. The row shows how many are ticked, such
   as "3 of 6".
 
-Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist. Each swatch names its colour and explains what it shows, with the meanings lined up. Only ticked drawing families appear. Fighter and article hurtboxes share the same key.
+Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist. Only ticked drawing
+families appear; fighter and article hurtboxes share the same key.
 
-![Hitbox Visualization with Frame data colours unticked: the checklist beside thirteen labelled colour swatches](../media/rc15-colour-legend-normal.png)
-
-*Colour legend with Frame data colours Off: eight hitbox colours, grab and shared hurtbox colours, windboxes, wind areas and direction lines. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
-
-![Frame data colours ticked: red strong and pink weak hitboxes, purple grab boxes, and white, blue and green hurtbox swatches](../media/rc15-colour-legend-frame-data.png)
-
-*The same checklist with Frame data colours On: the legend changes as the tick changes. Eden, 2026-11-15, rc.15 source `35268287`, diag `1660a9e4`; untested on hardware.*
-
-The captures above and below show an older build with two colour schemes. The current menu has one scheme and no Frame data colours option; its colours are listed below. The updated palette awaits hardware review.
-
-A settings file from before this checklist keeps what it showed: On ticks Hitboxes, Grab boxes and Hurtboxes, and Off
-ticks none. Existing checklists keep their drawing choices; the removed Frame data colours value is ignored. Article hurtboxes starts unticked in files that predate it.
+<!-- CLIP: tut-hitbox-colour-legend.mp4 | A on Hitbox Visualization → the Colour legend beside the checklist -->
+*Clip coming.*
 
 | Colour | What it shows |
 | --- | --- |
@@ -66,11 +60,31 @@ moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and so
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
 draws it too; with both ticked it is drawn once, in sky blue, and with Windboxes alone only the windboxes are drawn.
 
-These moves have a windbox in the game's own move data. A few moves whose names the data does not give are left out.
-Sheik's Burst Grenade is an item: its pulls are windboxes of the grenade, drawn like any item's. R.O.B.'s Gyro has none:
-its spin on the ground hits with hitstun, so it is drawn under Hitboxes.
-King K. Rool's Blunderbuss pulls with a windbox (and grab boxes catch who it pulls in). His Crownerang has a small
-windbox on his arm while he throws the crown. Palutena's Counter and Greninja's down taunt have one too.
+<!-- CLIP: tut-hitbox-windboxes.mp4 | Windboxes ticked → F.L.U.D.D.'s push in sky blue -->
+*Clip coming.*
+
+Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through olive box or
+circle with a white line pointing the way it pushes. A dot means the wind has no one direction.
+
+| Wind from | Drawn | Examples |
+| --- | --- | --- |
+| A fighter's own move | Yes | Mario's F.L.U.D.D. (a windbox); Ganondorf's up tilt (windboxes inside a wind area) |
+| What a fighter throws or summons | Yes | The pillar of Ness's PK Fire, Samus's bomb, Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which pulls, and Hero's Kaboom take the same path; they were not filmed on their own. |
+| An item | Yes | Sheik's Burst Grenade: its pull is a windbox and its explosion a wind area. The Gust Bellows and a Poké Ball's Pokémon take the same path; they were not filmed on their own. |
+| Stage hazards | No | Pac-Land's fire hydrant |
+
+**Windboxes that are easy to miss.** They are in the game's own move data. The public windbox lists miss the first
+four.
+
+| Fighter | Move | What the data has |
+| --- | --- | --- |
+| King K. Rool | Blunderbuss (neutral special, held) | It pulls with a windbox; grab boxes catch who it pulls in. |
+| King K. Rool | Crownerang (side special) | A small windbox on his arm while he throws the crown. |
+| Palutena | Counter (down special) | A windbox. |
+| Greninja | down taunt | A windbox. |
+| R.O.B. | Gyro | No windbox. Its spin on the ground hits with hitstun, so it is drawn under Hitboxes. |
+
+**Every move with a windbox** in the game's move data. A few moves whose names the data does not give are left out.
 
 | Fighter | Moves with a windbox |
 | --- | --- |
@@ -114,18 +128,8 @@ windbox on his arm while he throws the crown. Palutena's Counter and Greninja's 
 | Wii Fit Trainer | neutral special (while charging) |
 | Zelda | down special (the Phantom) |
 
-Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through olive box or
-circle where the wind blows, with a white line, edged in dark so it shows on a pale stage, pointing the way it pushes. A
-dot in the middle means the wind has no one direction. The wind areas of what a fighter throws or summons are drawn too,
-such as the pillar of Ness's PK Fire, Samus's bomb and Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which
-pulls, and Hero's Kaboom make theirs the same way: they take the same path, but were not filmed on their own. An item's
-wind area is drawn the same way, such as the one Sheik's Burst Grenade makes when it explodes; other items, such as the
-Gust Bellows or a Poké Ball's Pokémon, take that path too and were not filmed on their own.
-Stage hazards are not drawn, such as Pac-Land's fire hydrant.
-
-These fighters have moves with a wind area. Eden tried the special moves and smashes of every fighter whose moves can
-make one, and Ganondorf's up tilt; aerials, throws and the other tilts were not tried, so a move missing here may still
-have one.
+**Moves with a wind area.** Eden tried the special moves and smashes of every fighter whose moves can make one, and
+Ganondorf's up tilt. Aerials, throws and the other tilts were not tried, so a move missing here may still have one.
 
 | Fighter | Moves with a wind area |
 | --- | --- |
@@ -164,31 +168,14 @@ mirrors when the attacker turns around. Two dashes mean the game picks the angle
 hits and whether the target is on the ground; they point at 38 degrees, where such a hit sends a fighter in the air.
 A dot means the hit carries the fighter along with the attack. With Hitboxes not ticked, the lines are drawn alone.
 
-![Windboxes ticked at 1/4 speed: F.L.U.D.D.'s water as a windbox disc pushing the CPU; Ganondorf's up tilt with windboxes inside the see-through wind-area box and its white line; then the same up tilt with Hitboxes ticked too, the kick's hit drawn](../media/rc14-windboxes.gif)<br>
-*Windboxes on, at 1/4 speed: F.L.U.D.D.'s water and Ganondorf's up-tilt wind push without hitstun, drawn as windboxes; the wind area is the see-through box with its white line. Windboxes are sky blue and wind areas olive in the current colours; this clip predates them and draws both blue. With Hitboxes ticked too, the kick's hit is drawn as well (the last frames). Eden, rc.14 (untested on hardware).*
-
-![Windboxes only at 1/10 speed: King K. Rool holds B and the Blunderbuss becomes a vacuum; its windbox pulls Mario in until he is caught](../media/rc14-windbox-krool-vacuum.gif)<br>
-*Windboxes only, 1/10 speed: after the cannonball hits, holding B turns the Blunderbuss into a vacuum. Its windbox (sky blue in the current colours; deep blue in this older clip) pulls Mario in without damage until he's caught. Eden, rc.14 (untested on hardware).*
-<!-- CAPTURE-REQUEST hb-legend-v03: Windboxes alone, 1/4 speed: Mario's F.L.U.D.D. (the water sky blue, nothing else drawn), then Bowser's Fire Breath (only the flame that does not cause hitstun, sky blue), then Ganondorf's up tilt (its sky-blue windbox discs and the see-through olive box with its white line, which shows where the wind blows), then Chrom's Flare Blade held to charge (the see-through olive box on him with its white line pointing up and to the left). Then Hitboxes alone on F.L.U.D.D. (the water in its hitbox colour). Shoot it over the white Training grid on the build with the stronger wind-area colour. See artifacts/rc14-hb-legend/. -->
 <!-- CAPTURE-REQUEST hb-legend-v02: Hitboxes and Launch angles ticked, 1/4 speed: Ganondorf's up tilt (the windbox lines, then the kick's dashes and its 70-degree line) facing right then left; Mario's jab (dashes). Then Hurtboxes alone: only the hurtboxes. See artifacts/rc14-hb-legend/. -->
 
 A round box is a disc; a long one, such as a sword's hitbox or an arm's hurtbox, is one pill. The shapes are flat and
 drawn over the stage and the fighters. While the camera pans they trail by a frame or two.
 
-![Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked: the hurtbox pills, then at 1/4 speed a neutral air's red hitbox](../media/rc14-hitbox.gif)<br>
-*Display & Controls > On screen > Hitbox Visualization, A: the checklist (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.). A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back, and the menu closes onto both fighters' hurtboxes as pills, one pill for each long limb or the torso (yellow in this clip; grey in the current colours). At 1/4 speed Mario's short hop and neutral air show its red hitbox; the menu footer reads 0.2.0-rc.14 · rc14 17e50cd0. Eden, rc.14 (untested on hardware).*
-
-![At 1/4 speed, Ridley's hurtboxes as pills, and his tail attacks' hitbox as one red pill along the tail](../media/rc13-pills.gif)
-
-*Pills: at 1/4 speed, Ridley standing shows his hurtboxes as pills (yellow in this clip; grey in the current colours); his forward tilt and down tilt draw their hitbox as one red pill along the tail. Eden, rc.13 (untested on hardware).*
-
 **Shield and grab.** While a fighter shields nothing of it is drawn. While it is grabbing, its hurtboxes and grab box
 are, since a missed grab can be punished. Grab boxes show only in the grab's active frames: a grab that catches on the
 frame its box appears, as Samus's tether does, shows its box for that frame only, not through the pull.
-
-![At 1/4 speed, the grab boxes of Mario's grab, Samus's tether and Olimar's Pikmin; each grabber keeps its hurtboxes](../media/rc13-grab-boxes.gif)
-
-*Grab boxes: at 1/4 speed, Mario's standing grab, Samus's tether (a pill along the beam) and the Pikmin Olimar throws, each grab box drawn; the grabber keeps its hurtboxes through the grab. Grab boxes are purple and normal hurtboxes grey in the current colours; this clip predates them (magenta and yellow). Eden, rc.13 (untested on hardware).*
 
 **Projectiles and thrown items.** A projectile, or a thrown item such as Link's bomb, Peach's turnip or Diddy Kong's
 banana, has its hitboxes drawn while its attack lasts. Up to four at a time; a fifth replaces the oldest. Olimar's Pikmin
@@ -198,33 +185,29 @@ An object with no enabled hurtbox group draws none. These use the same discs, pi
 At most eight endpoints per object and 24 together are admitted, always as complete shapes. They take spare object
 slots and draw after the other boxes, so attacking objects and fighters keep priority.
 
-![Olimar's three Pikmin with Article hurtboxes off, hurtbox pills on, status colours on, and off again](../media/rc15-article-hurtboxes.gif)
-
-*Article hurtboxes: Off, hurtbox pills, the older Frame data colours view (blue for the Pikmin's current hit status), then Off again. The current single palette draws a normal hurtbox grey, one that can't be hit yellow and one that takes no damage green; there is no Frame data colours view. Eden, 2026-11-15, rc.15 source `6def8553`, diag `48ea01d1`; untested on hardware.*
-
 ![At 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight](../media/rc13-projectile-hitboxes.gif)
 
 *Projectiles and thrown items: at 1/4 speed, a red disc rides on Ridley's fireball, Link's arrow and Link's thrown bomb while each is in flight. Eden, rc.13 (untested on hardware).*
 
 ### Hitbox strength colours
 
-Hitboxes always use strength colours: a strong hitbox is red and a weak one is pink. Strong means
-it launches hardest. A hitbox is strong when it would send the other fighter further than any other hitbox out on that
-frame, such as a sword's tip or a knee's sweet spot. It is weak when another hitbox out on the same frame launches
-harder, such as the gust of King K. Rool's Gut Check beside its hit. SmashWiki says the gust deals the same damage as
-the hit; in the game's own data it deals 0.7 times the hit's damage, and the plugin follows the game. It is also weak
-when it launches less than the strongest hitbox earlier in the same move, as the late frames of a knee do. This is SmashWiki's definition of
-sweet and sour spots. The plugin works out the launch from each hitbox's own numbers in the game (damage, base knockback,
-knockback growth, set knockback), using the game's knockback formula and the other fighter's percent and weight at that
-moment, so no list of fighters is needed. It also counts the attacker's rage the way the game does: from 35% damage a
-hitbox launches harder, up to 1.1 times at 150%, and no harder after that; a set knockback hitbox gets no rage. The game
-never launches harder than its own limit, so two hitboxes that both reach it launch the same. Damage decides only between
-hitboxes that launch the same. The launch angle
-plays no part: which direction is best depends on the situation. With no other fighter to measure against, the colours
-rank the hitboxes as they would launch a middleweight at 0%. A hitbox it cannot rank, such as a jab's single hitbox or
-several identical hitboxes, is red. Grab boxes and hurtboxes use the colours in the table above. It recolours only what
-is ticked. There is no separate colour toggle.
+Hitboxes always use the strength colours above: red for the strongest launch and pink for a weaker hitbox or a weaker
+part of the same move. An unranked hitbox stays red. There is no separate colour toggle.
 
+### Spacing grader
+
+<!-- CLIP: tut-spacing-grader.mp4 | Spacing grader On → a spaced and an unspaced hit read differently -->
+*Clip coming.*
+
+On grades Player 1 hits, and Player 2 hits when the second fighter is player-controlled, by how deeply they reach the
+hurtbox. With the frame strip visible, the grade appears on the attacker's lane: **Excellent** near the hurtbox edge,
+**Good** slightly inside, and **OK** near its centre.
+
+While Spacing grader is On the frame strip stays on screen, even with Input Display Off.
+
+- **Values:** On, Off
+- **Default:** Off
+- **How:** A, Left or Right flips it.
 
 ### Frame Advantage
 
@@ -246,6 +229,9 @@ More: [Frame strip › ADVANTAGE](../guide/frame-strip.md#advantage)
 Frame strip draws the last second of frames at the top of the screen: your presses, your frames and the CPU's, how
 each follow-up linked, and the frame advantage. It works in Training and in waiting-room practice. It steps aside while
 a menu or the clip editor is open, the waiting room's own menu included, and comes back when it closes. The combo or drill helper bar steps aside with it.
+
+While Spacing grader is On the frame strip stays on screen, even with Input Display Off. Parry practice keeps it on
+screen the same way while it runs.
 
 - **Values:** Off, Frame strip
 - **Default:** Frame strip
@@ -279,6 +265,9 @@ More: [Frame strip](../guide/frame-strip.md#spot-labels)
 <!-- CAPTURE-REQUEST spots-v02: the frame strip after Marth's forward smash lands with the tip (Sweet) and again with the blade (Sour); then a hit by the CPU on Player 1, labelled on Player 1's lane. Spot labels Off first, then On. See artifacts/rc14-spots/. -->
 
 ### Input Delay
+
+<!-- CLIP: tut-input-delay.mp4 | Input Delay 0, then raised → the same press lands later on the strip -->
+*Clip coming.*
 
 Holds Player 1's inputs back by a number of frames, for example to practise as if playing online. Chords are not
 delayed. The frame strip and recordings see the inputs as delayed. The frames are game frames at every

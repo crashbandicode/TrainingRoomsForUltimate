@@ -1,94 +1,72 @@
 # Waiting rooms
 
-While you wait for a match, Smash puts you in a waiting room with training partners. TrainingRooms can run its
-practice there too: the same menu, the same chords, the same CPU settings. It knows two kinds of waiting room: local
-wireless rooms, and the online waiting room of Quickplay.
+Practise while you wait for a match in a local wireless or Quickplay waiting room.
 
-![In a local wireless waiting room: Display & Controls, Hitbox Visualization 0 of 6, its checklist with Hurtboxes ticked (1 of 6), and both practice fighters drawn as yellow pills with the Waiting and Ready signs still on screen](../media/rc14-waiting-menu.gif)<br>
-*The room menu on Display & Controls: Hitbox Visualization opens a checklist, A ticks Hurtboxes (the row reads 1 of 6), and when the menu closes both practice fighters are drawn as yellow pills; the Waiting and Ready signs stay on screen. The footer reads 0.2.0-rc.14 · rc14 400e2c69. The first second, the CPU page, is a separate recording cut in before Display & Controls. Eden, rc.14 (untested on hardware).*
+<!-- CLIP: tut-lobby-practice-menu.mp4 | A Local Wireless waiting room (one member): B + D-pad Up opens the room menu, Hurtboxes ticked, both practice fighters drawn as pills -->
+*Clip coming.*
 
 ## Lobby Practice is On by default
 
-Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On by default: the practice
-starts as soon as the waiting room's own screen is ready. If a waiting room is the first place you practise on a new
-install, the six reminders (Welcome and the main chords) show there.
+1. Fighters & Stages › [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) is On on a new install. If you
+   saved it Off, turn it On in Training before entering the room.
+2. In the waiting room, hold B and press D-pad Up to open the menu. Minus also opens it unless you changed Menu
+   shortcut 1.
+3. Change the settings you want and press B to close the menu.
 
-Turn it Off to leave the waiting rooms to the game: the menu doesn't open there and the chords do nothing. A settings
-file that already stores Off keeps it Off.
+With Lobby Practice Off, the menu and chords do not work in waiting rooms. A saved Off stays Off.
 
 ## What works there
 
-With Lobby Practice On, you use the same menu and chords as in Training:
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/838bcaf0259ef282ce4d24371ff058e36357264b" autoplay muted loop playsinline controls></video>
+
+*Guard the Edge in an earlier Eden waiting room (`17060a5e`): the CPU recovers at the ledge and the result reads 0/1.
+This shows a practice round, not opening the room menu or a new install 6 room test. The yellow `BRIDGE LIVE` mark at
+the top is drawn by the capture tool; players never see it.* [Open the clip](../media/guard-the-edge-waiting-room.mp4)
 
 | Tool | In waiting-room practice |
 | --- | --- |
-| The menu | B + D-pad Up (or Minus, or your own shortcut), as in Training: [Using the menu](using-the-menu.md). |
-| The CPU page | Drives the first training partner; CPU › [CPU Level](../menu/cpu.md#cpu-level) sets every partner's level ([CPU behaviour](cpu-behaviour.md)). |
-| Display | [Hitbox Visualization](../menu/display-and-controls.md#hitbox-visualization) draws the boxes of the two practice fighters, and the [frame strip](frame-strip.md) runs as in Training. |
-| The chords | Save states, recording and playback, the fighter cycles, Kirby hats and the input display. The CPU cycle changes the first training partner. See [Controls](controls.md). |
-| Combos | Save a combo you landed and drill it with the combo helper, as in Training. See [Recording › Combos](recording.md#combos). |
-| Stages | [Change Stage](stages.md#change-stage) goes to another stage now, and each new room opens on the next stage of [Lobby Stages](stages.md#lobby-stages). [Stage Hazards](stages.md#stage-hazards) counts there too. |
-| Fighters and items | Player Character, CPU Character, Give item and the Mii rows change your practice fighter; the match still uses the one you picked for it. *Add New…* opens Smash's Mii editor ([Mii fighters › In a waiting room](mii.md#in-a-waiting-room)). |
-| Practice games | [Eggs-ercise](../menu/fighters-and-stages.md#eggs-ercise) and [Break the Targets](../menu/fighters-and-stages.md#break-the-targets) work as in Training: a break freezes your fighter for a moment, and Break the Targets zooms the camera out. The targets show on your screen only. To start a new run here, open and close the menu. [Guard the Edge and Juggler](../menu/fighters-and-stages.md#guard-the-edge-and-juggler) work as in Training too, against the first training partner. While one runs, that partner is a full CPU at the drill's level, whatever Training Partner Behavior says; Stop gives the room's behavior back. Turning Lobby Practice Off while a drill runs stops it first; the partner gets its behavior and fighter back, then practice ends. L + R + A restarts a finished set. |
-| Hide CPU | CPU › [Hide CPU](../menu/cpu.md#hide-cpu) hides the first training partner, as in Training, and so does a practice game set to hide it. |
-| L + R + A | Puts both practice fighters back where they first stood (Display & Controls › [L+R+A Reset](../menu/display-and-controls.md#l-r-a-reset)). |
-| Respawn | As in Training, a KO'd practice fighter is back at once unless Fighters & Stages › [Respawn on platform](../menu/fighters-and-stages.md#respawn-on-platform) is On. |
-| Game speed | See [below](#game-speed). |
-![Saving a combo in a waiting room, then drilling it: a try graded TRUE](../media/rc11-lobby-combos.gif)
+| CPU settings | The first training partner is the CPU; CPU Level sets every partner's level. |
+| Display | Hitbox Visualization and the input display work on the practice fighters. |
+| Chords | Save states, Record, fighter cycles, Kirby hats and the input display work as in Training. |
+| Practice games | Open Fighters & Stages › Practice games and choose a game. See [Practice games](../menu/practice-games.md). |
+| L + R + A | Reset both practice fighters to where they first stood, unless an AI is playing Player 1. |
+
+More: [Controls](controls.md), [CPU behaviour](cpu-behaviour.md).
 
 ## Training Partners and Behavior
 
-Plus opens the waiting room's own menu, the game's: Leave Battle, Training Partners (how many partners stand in the
-room) and Training Partner Behavior (Attack or Stop). TrainingRooms doesn't change that menu, but it remembers your
-last Training Partners and Behavior and sets them again in the next waiting room, local wireless or Quickplay.
-
-- They are kept with your settings, so they last after you close the game.
-- Until you change them once, the next room keeps the game's own choice (Automatic, Attack).
-- This works whether Lobby Practice is On or Off.
-
-![The game's Training Partners goes from 1 to 2, and a second partner drops in](../media/rc6-waiting-partners.gif)
-
-![Training Partners 2 and Stop; leave; the next room starts with two partners standing still](../media/rc11-waiting-reentry.gif)
+The game's own waiting-room menu, opened with Plus, has Training Partners and Training Partner Behavior. TrainingRooms
+remembers your last choices for the next room, even with Lobby Practice Off. Close the TrainingRooms menu first.
 
 ## Lobby Items
 
-Fighters & Stages › [Lobby Items](../menu/fighters-and-stages.md#lobby-items) On (the default) leaves the room's items
-as the game makes them. Off: no new items appear, and the ones on the floor are removed when you turn it Off. It works
-in local wireless rooms and in Quickplay's room, whether Lobby Practice is On or not. Training and the match are not
-affected.
-
-![Side by side in the Quickplay waiting room: with Lobby Items On there are items on the floor; after it is set Off, there are none](../media/rc12-lobby-items.gif)
+Fighters & Stages › [Lobby Items](../menu/fighters-and-stages.md#lobby-items) On leaves the room's items as usual.
+Off stops new items and removes existing ones when possible, even if Lobby Practice is Off.
 
 ## The frame strip and the waiting room's menu
 
-The frame strip at the top of the screen steps aside while the waiting room's own menu is open (Plus), and comes back
-when it closes, so it never covers Leave Battle or Training Partners. It does the same for the TrainingRooms menu.
-
-![The frame strip in a waiting room, hidden while the waiting room's menu is open](../media/rc11-strip-under-menu.gif)
+The [frame strip](frame-strip.md) steps aside while the game's waiting-room menu or the TrainingRooms menu is open.
+It returns when the menu closes.
 
 ## Game speed
 
-The Game speed chord (hold R + D-pad Up, then Left or Right) has the same five speeds in a waiting room. Only your
-practice changes speed; the room's own timers keep their pace, and a match always starts at x1. See
-[Game speed › In the waiting rooms](game-speed.md#in-the-waiting-rooms).
+Hold R + D-pad Up and tap Left or Right to change your practice speed. The room's timers keep their normal pace.
+More: [Game speed](game-speed.md#in-the-waiting-rooms).
 
 ## What is different, or refused
 
 | Case | What happens |
 | --- | --- |
-| The name keyboard | It opens in Quickplay's room as in a local wireless room. A match closes the keyboard and nothing typed is applied; back in the same room it reopens with what you typed. |
-| Leaving Quickplay | While the TrainingRooms menu is open, Plus doesn't reach the game. Close the menu (B) before you open the game's menu to Leave Battle. |
-| The game's menu | While it is open, the chords don't fire, and a fighter swap is refused with the notice "Close the current game menu before swapping". |
-| The CPU pilot | While it plays Player 1, Play on Player 1 and L + R + A are refused; Record works. See [Controls › When the CPU pilot plays Player 1](controls.md#when-the-cpu-pilot-plays-player-1). |
+| The game's menu | Close the TrainingRooms menu before opening it. Chords do not fire while the game's menu is open. |
+| An AI plays Player 1 | Play on Player 1 and L + R + A are refused. Install 4 also refused Record; installs 5 and 6 let you record the AI's inputs. |
+| The name keyboard | A match closes it without applying the name. Back in the same room it reopens with what you typed. |
+
 ## When the match starts
 
-![Practice in a waiting room, then the match: the speed is back to x1, the level isn't applied and the match uses the fighters you picked; back in the room your practice fighters and Kirby's hat return](../diagrams/waiting-room-match.png)
+Practice ends. The match uses your picked fighters at x1, without the practice partners' level. If the TrainingRooms
+menu was open, it closes without keeping changes from that visit. Back in the same room your practice fighters and
+Kirby's hat return; Player 1's fighter returns only with Player Swapping On.
+In Quickplay, choosing a different fighter at character select starts the next practice with that fighter rather than
+restoring either of the previous practice fighters.
 
-The practice ends when the match begins, and nothing of it is carried into the match: the speed is back to x1, the
-partners' level isn't applied there, and the match is played with the fighters you picked for it. If the TrainingRooms
-menu was open, it closes, and the changes from that visit are not kept.
-
-Back in the same room after the match, TrainingRooms puts back the practice fighters you had switched to (Player 1's
-only with Player Swapping On) and Kirby's hat. A new room starts from the fighters you picked for the match.
-
-<!-- CAPTURE-REQUEST v14-room-to-match: a clip of the practice-to-match boundary: change the practice fighter and the game speed, join a real match (show both host and guest if any claim is about the other player), show the original fighter at x1, then return to the room. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
+More: [Fighters & Stages](../menu/fighters-and-stages.md), [Troubleshooting](troubleshooting.md).

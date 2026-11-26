@@ -9,7 +9,7 @@ below, with every option on it; the guides explain a topic across pages.
 | --- | --- |
 | [Getting started](guide/getting-started.md) | What you need, installing, the first start, opening the menu, a first look around, and how to read the build tag. |
 | [Current release](CURRENT-RELEASE.md) | Which release is current, which build is the newest, what is tested, what's new, how to install it and its known issues. |
-| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 5. |
+| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 6. |
 | [Troubleshooting](guide/troubleshooting.md) | What you may see, why, and what to do: the plugin or the menu not loading, greyed rows, the notices that say no, slow fighter loading, waiting rooms, settings, and where the logs are. |
 
 ## The menu, page by page
@@ -23,6 +23,7 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 | [Recording](menu/recording.md) | Your saves, macros, combos and sequences; replays; playback and combo helper options; the Recording pop-up. |
 | [Fighters & Stages](menu/fighters-and-stages.md) | Fighters for you and the CPU, character cycles, Kirby hats, items, Mii fighters, stages, waiting-room practice, loading options. |
 | [Display & Controls](menu/display-and-controls.md) | The HUD, hitboxes, frame advantage, the input display, input delay; button chords, reset, menu shortcuts. |
+| [Practice games](menu/practice-games.md) | Start and configure the practice games under Fighters & Stages. |
 
 ## Guides
 
@@ -32,14 +33,19 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 | [Controls](guide/controls.md) | Every button chord, its default and how to change it; GameCube controllers; Online Deluxe and the CPU pilot. |
 | [CPU behaviour](guide/cpu-behaviour.md) | How mash, followups, triggers and overrides combine; the direction grids; delays. |
 | [Save states](guide/save-states.md) | Saving and loading, what a state keeps, damage, mirroring, buffs, the setup library. |
-| [Recording](guide/recording.md) | Recording and playback, the pop-up, named macros and chains, loop, placement, replays. |
-| [Combos](guide/combos.md) | The combo helper, saving and drilling combos, sequences. |
-| [Frame strip](guide/frame-strip.md) | Reading the input display: lanes, frame advantage, input timing. |
-| [Game speed](guide/game-speed.md) | The speed pop-up and the stopwatch, in Training and the waiting rooms. |
+| [Recording](guide/recording.md) | Recording, playback, the pop-up, macros, combos, input drills, sequences and replays. |
+| [Combos](guide/combos.md) | Combo and input-drill files: sharing, writing and reading them. |
+| [Frame strip](guide/frame-strip.md) | The input display's lanes, chips and readouts; scroll-back and freeze. |
+| [Game speed](guide/game-speed.md) | Speed in Training and waiting rooms, 1 Frame and the Training HUD stopwatch. |
 | [Fighter cycles](guide/fighter-cycles.md) | Cycling fighters, the Character Cycles editor, Solo Popo, Kirby hats, loading. |
-| [Stages](guide/stages.md) | Change Stage, Lobby Stages and their forms, stage rotation, hazards. |
+| [Stages](guide/stages.md) | Change Stage, forms, custom stages, Lobby Stages, stage rotation and hazards. |
 | [Waiting rooms](guide/waiting-rooms.md) | Practising in online and local waiting rooms: what works there and what doesn't. |
 | [Mii fighters](guide/mii.md) | Picking a saved Mii, making a new one, replay Miis. |
+| [Parry practice](guide/parry-practice.md) | Record a CPU attack, practise parries and save a practice. |
+| [Mash out](guide/mash-out.md) | Choose a capture and mash to escape it. |
+| [Break the Targets](guide/break-the-targets.md) | Place targets, break them and manage saved layouts. |
+| [Tech practice](guide/tech-practice.md) | Choose a surface or use the wizard, then practise tech timing. |
+| [Eggs-ercise](guide/eggs-ercise.md) | Break flying targets and choose the session and target settings. |
 
 ## rc.15 features
 

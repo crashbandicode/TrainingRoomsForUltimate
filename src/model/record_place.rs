@@ -952,7 +952,10 @@ mod tests {
         assert!(request.contains("read_record(&raws[0])"));
         assert!(request.contains("read_record(&raws[1])"));
         let take = checkpoint.split("unsafe fn take_home()").nth(1).unwrap().split("\n}").next().unwrap();
-        assert!(take.find("LOADING.load(").unwrap() < take.find("ASK.swap(").unwrap());
+        let claim = take.find("take_home_ask(&ASK").expect("the game claims the checked request");
+        assert!(take.find("LOADING.load(").unwrap() < claim, "a load leaves the request queued");
+        let start = take.split("} else {").nth(1).expect("claimed Start");
+        assert!(start.find("block.settled()").unwrap() < start.find("request(true,").unwrap());
         let returning = take.split("if ask == 3 {").nth(1).unwrap().split("} else").next().unwrap();
         assert!(returning.contains("CHECKPOINT.lock().clear()"));
         let states = include_str!("../runtime/features/states.rs");

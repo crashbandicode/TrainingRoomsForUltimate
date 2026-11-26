@@ -302,6 +302,14 @@ More: [Change placement and the Replay window](../guide/recording.md#change-plac
 
 ### Replay window
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*The same editor opened from Macro 3's Crop row: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+
 Turns part of a saved match into a macro. It lists the captures you have: "Latest Vault capture" and "Previous Vault
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
 its name and its length in frames ("(partial)" if it ended early).
@@ -327,12 +335,52 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
 
-2026-11-26. The free playhead (Left/Right, Y, then L or R with no handle selected) is merged for the build after
-install 5. With no handle selected on a macro or a capture the strip reads "Hold Left or Right to browse the take, or
+2026-11-26. The free playhead (Left/Right, Y, then L or R with no handle selected) is in install 6.
+With no handle selected on a macro or a capture the strip reads "Hold Left or Right to browse the take, or
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-Host tests only; not yet seen in a game.
+Browsing was seen in Eden on `eb39d6bc`. The playhead clip above shows browsing, Y snapping the playhead to frame 66
+and L and R setting the two cuts on one macro, in Eden on install 6's diagnostic build (`5df3d9dc`). It does not show
+snapping In on a match capture, or a match-capture preview or export.
+
+2026-11-26. Positions while you scrub, in install 6. With In or Out selected, or once the
+playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
+the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
+separately. The editor refuses points it detects inside solid ground or a wall, outside the camera bounds, or beyond
+the safe blast-line bounds. Install 6 judges the point only, not whether the fighter's body fits beside a wall (see the test below). If the point is refused
+or the stage geometry cannot be read, that fighter returns to where its hold began,
+or stays put if it was not held; the
+other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
+without that warning.
+
+Only one notice fits on the strip. A snapped move with a temporary setup shows its setup line first. Otherwise a
+clean In can show the position message, including "Can't stand there on this stage." if either point is refused.
+A mid-action In shows the snap hint instead. The fighters' placement does not depend on which notice wins.
+
+- A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
+  capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
+  positions at startup. Delete also removes `<id>.pos`; Rename changes the display name, not the ID or either
+  filename.
+- A macro without positions reads "Play it once to see positions while scrubbing.". Play it by itself from its first
+  input, with Play or with X here from the start of the take, and they are saved; after X they show at once. They
+  are that playback's positions, not the original recording's. No positions file is made for a chain step, when the
+  playing character's fighter kind differs from the recorded one, or when Trim skips the first input.
+- A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
+  here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
+- On install 6, a long recording can keep all its inputs but stop saving positions after 20 seconds (1,200 frames).
+  Playing it will not extend a valid file written by Record. [Known issues](../CURRENT-RELEASE.md#known-issues)
+- On a capture, or a macro preview that uses a temporary checkpoint, the first X can be refused with "Let the CPU
+  settle to idle and leave the ledge before previewing". Press the selected handle's button again (L for In, R for
+  Out), let the CPU settle, then press X. A macro loading its own start save does not use that checkpoint.
+- The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
+
+Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the
+old-macro line, a crop that keeps its positions, and Delete removing both files. On a match capture a fighter whose
+point was inside the ground was left where it stood; one whose point was free but too close beside the stage's wall
+was pushed about 5 units off it by the game, which is a [known issue](../CURRENT-RELEASE.md#known-issues). Positions from one Play, and at once after X, were seen on
+`eb39d6bc`, the build before install 6's last fix. Not seen yet: the waiting room, a fighter swap or a scene change
+while a fighter is held, and the installed release file itself.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
@@ -555,6 +603,10 @@ Pyra and Mythra currently use common special names.
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video>
+
+*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, install 4, build `a945b0c1`.* [Open the clip](../media/i4-move-names-toggle.mp4)
 
 ### On-time tolerance
 

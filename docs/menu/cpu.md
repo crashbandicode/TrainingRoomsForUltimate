@@ -10,6 +10,11 @@ Player 1. [CPU behaviour](../guide/cpu-behaviour.md) shows how the rows work tog
 [Using the menu](../guide/using-the-menu.md) the keys (L/R page, Up/Down move, ZL + Up/Down jump a section, Left/Right
 change, A open, X save your current settings as your defaults, Y reset the focused row, B close). All pages are listed
 in [the docs index](../README.md).
+
+**Start here:** [CPU behaviour](../guide/cpu-behaviour.md) shows how the settings combine.
+[Mash](../guide/cpu-behaviour.md#mash-and-followup) · [Shield](#shield) ·
+[DI](../guide/cpu-behaviour.md#direction-chips)
+
 ## Reactions
 
 What the CPU does as soon as it can act again.
@@ -444,6 +449,10 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 Lets the game's CPU play Player 1 for you. This group shows one of two things. If the separate CPU pilot plugin is
 installed, it shows only the P1 control row. Without it, it shows P1 CPU Control and P1 CPU Level.
 
+The same Record rule applies to both pilots. Install 4 refused Record while the AI played Player 1.
+In installs 5 and 6, Record captures Player 1's inputs as the game receives them, including the AI's inputs.
+Play on Player 1 is still refused while the AI drives that fighter.
+
 ### P1 control
 
 Shown only when the CPU pilot plugin is installed. The row reads "CPU pilot plugin": the pilot drives Player 1, and
@@ -457,8 +466,7 @@ you set it on its own page (Online Deluxe's CPU Pilot page), not here.
 ### P1 CPU Control
 
 Shown only when the CPU pilot plugin is not installed. On: the game's CPU AI plays Player 1 in Training once you close
-the menu. It waits while a menu is open or a recording is played, and keeps playing while a recording is made: that
-recording holds its inputs. While it plays, Play on Player 1 is refused.
+the menu. It waits while a menu is open or a recording is played.
 
 - **Values:** On, Off.
 - **Default:** Off: you play Player 1.
@@ -514,6 +522,9 @@ Takes the CPU out of the fight without changing any of its settings.
 - **Values:** On, Off.
 - **Default:** Off.
 - **How:** Left/Right or A.
+
+<!-- CLIP: tut-cpu-hide.mp4 | Hide CPU On → the CPU vanishes → Off brings it back at its spot -->
+*Clip coming.*
 
 ![Hide CPU: Mario jabs the CPU (Hero), Hide CPU On makes the CPU vanish with its tag and its panel, Off brings it back with both and the next jab hits it](../media/rc14-hide-cpu.gif)<br>
 *CPU > Level > Hide CPU: Mario jabs the CPU, Hero (2.7%); D-pad Right turns Hide CPU On and the CPU is gone, and its "CPU" tag and its panel at the bottom go with it, leaving only Mario's panel, and Mario's jab hits nothing; D-pad Left turns it Off, Hero is back with its tag and panel and takes the next jab. The input is named in a box. Eden, rc.14 (untested on hardware).*
