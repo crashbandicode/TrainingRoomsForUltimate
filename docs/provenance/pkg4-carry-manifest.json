@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "00ba03f50ebfbca62da2d997a0d14add946a5fd8c613ace2f3c0c21716b17497",
+   "dest_sha256": "f28f9c107489bb5b78de078c7cd58f52b6f2e65b17984eb99133ab82e04497fe",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3297,6 +3297,11 @@
      "reason": "P5b C: the per-fighter toggle and its keys (SM3, SM4).",
      "old": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n",
      "new": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel, ToggleFighter { player: bool },\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n"
+    },
+    {
+     "reason": "P5b C: test that the swap-wait line goes once the swap has settled.",
+     "old": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(e.cancel_fighter());\n        assert_eq!(e.fighter_loading(), None);\n    }\n\n    fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {\n",
+     "new": "        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(e.cancel_fighter());\n        assert_eq!(e.fighter_loading(), None);\n        // The wait line goes when the swap it spoke of has settled, without another press.\n        e.on_action(ClipAction::ToggleFighter { player: true });\n        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT));\n        assert!(e.note_fighters([Some(6), Some(18)], false));\n        assert_eq!(e.view().error.as_deref(), Some(FIGHTER_SWAP_WAIT), \"seen but not settled: still loading\");\n        assert!(e.note_fighters([Some(6), Some(18)], true));\n        assert_eq!((e.fighter_loading(), e.view().error), (None, None));\n    }\n\n    fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {\n"
     }
    ]
   },
