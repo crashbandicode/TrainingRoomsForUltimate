@@ -375,10 +375,38 @@ fn is_switch_on(on: &bool) -> bool {
 
 /// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.
 pub fn is_chain_document(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<serde_json::Value>(bytes)
-        .ok()
-        .and_then(|value| value.get("kind").and_then(serde_json::Value::as_str).map(|kind| kind == "chain"))
-        .unwrap_or(false)
+    #[derive(Deserialize)]
+    struct Kind { kind: Option<String> }
+    serde_json::from_slice::<Kind>(bytes).is_ok_and(|header| header.kind.as_deref() == Some("chain"))
+}
+
+/// Read menu fields without materializing position rows. Only full loads validate
+/// the contents of a present track; both paths check its schema and the macro header.
+pub(super) fn listing_record(bytes: &[u8]) -> Result<MacroRecording, MacroError> {
+    #[derive(Deserialize)]
+    struct Head {
+        schema_version: u32, name: String, game_version: String, start: StartState,
+        mii: Option<crate::engine::mii::lifetime::Configuration>, placement: Placement, frames: Vec<InputFrame>,
+        #[serde(default)] trim: crate::model::trim::Trim,
+        start_save: Option<String>,
+        #[serde(default = "start_save_switch_on")] start_save_on: bool,
+        track: Option<serde::de::IgnoredAny>,
+    }
+    let h: Head = serde_json::from_slice(bytes).map_err(|e| {
+        #[derive(Deserialize)]
+        struct Version { schema_version: u32 }
+        match serde_json::from_slice::<Version>(bytes) {
+            Ok(v) if !matches!(v.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) =>
+                MacroError::UnsupportedVersion { found: v.schema_version },
+            _ => MacroError::Parse(e),
+        }
+    })?;
+    let record = MacroRecording { schema_version: h.schema_version, name: h.name, game_version: h.game_version,
+        start: h.start, mii: h.mii, placement: h.placement, frames: h.frames, trim: h.trim,
+        actions: Vec::new(), recorded_fighter: None, start_save: h.start_save, start_save_on: h.start_save_on,
+        track: h.track.map(|_| Vec::new()) };
+    record.validate()?;
+    Ok(record)
 }
 
 fn check_name(name: &str) -> Result<(), MacroError> {

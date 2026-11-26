@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "48ebc4b4812b2f7c4224732884edb4ed8ff16f90e031d1e89dfe5a16c2693cd5",
+   "dest_sha256": "d69039085072fcd53dda2d3e2863060949edd24b7a1412e2d80c3afbd19cf4b5",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -844,6 +844,11 @@
      "old": "        // A track and its version go together: an entry per frame from the first, as far as it goes, every number\n        // finite.\n        let tracked = self.track.as_ref().is_some_and(|track| !track.is_empty() && track.len() <= self.frames.len()",
      "new": "        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,\n        // for a crop past its end), every number finite.\n        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)",
+     "new": "    #[derive(Deserialize)]\n    struct Kind { kind: Option<String> }\n    serde_json::from_slice::<Kind>(bytes).is_ok_and(|header| header.kind.as_deref() == Some(\"chain\"))\n}\n\n/// Read menu fields without materializing position rows. Only full loads validate\n/// the contents of a present track; both paths check its schema and the macro header.\npub(super) fn listing_record(bytes: &[u8]) -> Result<MacroRecording, MacroError> {\n    #[derive(Deserialize)]\n    struct Head {\n        schema_version: u32, name: String, game_version: String, start: StartState,\n        mii: Option<crate::engine::mii::lifetime::Configuration>, placement: Placement, frames: Vec<InputFrame>,\n        #[serde(default)] trim: crate::model::trim::Trim,\n        start_save: Option<String>,\n        #[serde(default = \"start_save_switch_on\")] start_save_on: bool,\n        track: Option<serde::de::IgnoredAny>,\n    }\n    let h: Head = serde_json::from_slice(bytes).map_err(|e| {\n        #[derive(Deserialize)]\n        struct Version { schema_version: u32 }\n        match serde_json::from_slice::<Version>(bytes) {\n            Ok(v) if !matches!(v.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) =>\n                MacroError::UnsupportedVersion { found: v.schema_version },\n            _ => MacroError::Parse(e),\n        }\n    })?;\n    let record = MacroRecording { schema_version: h.schema_version, name: h.name, game_version: h.game_version,\n        start: h.start, mii: h.mii, placement: h.placement, frames: h.frames, trim: h.trim,\n        actions: Vec::new(), recorded_fighter: None, start_save: h.start_save, start_save_on: h.start_save_on,\n        track: h.track.map(|_| Vec::new()) };\n    record.validate()?;\n    Ok(record)",
+     "reason": "Macro catalog (2026-11-26 02:18:11Z): read kind and the listing header without a full JSON tree or position rows."
     }
    ]
   },
@@ -1290,7 +1295,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "f6ce869690a2224298e7721bfed5d320ecc56f2850719a76f30bf9281db9464a",
+   "dest_sha256": "bc3c393e0f2e1330ce66666772d372caa7ee6e127c541f0f6298e11f46f6124c",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1326,6 +1331,11 @@
      "old": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];",
      "new": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];",
      "reason": "Scrub positions (2026-11-26 00:21:37Z): the macro reader knows the tracked schema even when a track row fails to parse."
+    },
+    {
+     "old": "\n    fn name(&self) -> &str {",
+     "new": "\n    fn for_listing(_id: &str, bytes: &[u8]) -> Result<Self, MacroError> {\n        super::recording::listing_record(bytes)\n    }\n\n    fn name(&self) -> &str {",
+     "reason": "Macro catalog (2026-11-26 02:18:11Z): read kind and the listing header without a full JSON tree or position rows."
     }
    ]
   },
