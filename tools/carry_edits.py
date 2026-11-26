@@ -87,7 +87,8 @@ def main(argv=None):
     for edit in edits:
         print(f"{len(edit['old'].splitlines()):>3} -> {len(edit['new'].splitlines()):>3} lines  {edit['reason'][:60]}")
     if args.dry_run:
-        print("dry run: no files written")
+        print(f"dry run: {len(edits)} edits derived for {args.dest}; no files written")
+        return
     package = "pkg6" if "pkg6" in os.path.basename(args.manifest) else "pkg4"
     print(f"{len(edits)} edits appended to {args.dest}; now run: python3 -I tools/carry_{package}.py carry, ledger, verify")
 
