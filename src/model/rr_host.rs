@@ -13,6 +13,7 @@ use super::library::{
 };
 use super::frame_queue::FrameQueue;
 use super::macro_ui::clip_marks::{Seen, Span, Watch, WATCH_SPANS};
+use super::macro_ui::scrub_track::TAKE;
 use super::macros::{InputFrame, Library, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES};
 use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
@@ -1191,6 +1192,7 @@ pub fn push_capture(side: u8, frame: InputFrame) {
         return;
     }
     CAP_FRAMES[len].store(pack(frame), Ordering::Relaxed);
+    TAKE.push(len, usize::from(side == ROLE_CPU));
     CAP_LEN.store(len + 1, Ordering::Release);
 }
 
@@ -1281,8 +1283,10 @@ fn save_stopped_macro(root: &Path, player: SavedState, cpu: SavedState, tick: &m
     tick.diags.push(format!("screen=recording role={role_now} recording=0"));
     let (spans, count) = take_capture_spans();
     let (role, frames) = taken_frames();
+    let track = TAKE.take(frames.len());
     let mut capture = Capture::idle();
     toggle_record(&mut capture, role);
+    capture.set_track(track);
     for frame in frames {
         push_frame(&mut capture, role, frame);
     }
@@ -1310,6 +1314,7 @@ pub fn service_at(
     cpu: SavedState,
 ) -> Tick {
     let mut tick = Tick::default();
+    TAKE.service(CAP_ROLE.load(Ordering::Acquire) != 0, CAP_LEN.load(Ordering::Acquire));
     apply_waiting_answer(&mut tick);
     if !DEFER_MIGRATE.load(Ordering::Acquire)
         && !MIGRATED.load(Ordering::Acquire)

@@ -258,7 +258,7 @@ fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
         ("empty.json", Vec::new()),
         (
             "future.json",
-            edited_json(|v| v["schema_version"] = json!(3)),
+            edited_json(|v| v["schema_version"] = json!(4)),
         ),
         (
             "overflow.json",
@@ -300,7 +300,7 @@ fn corrupt_files_are_reported_and_never_lost_while_good_ones_still_list() {
             .as_str()
     };
     assert!(
-        reason("future.json").contains("unsupported schema version 3"),
+        reason("future.json").contains("unsupported schema version 4"),
         "{}",
         reason("future.json")
     );
@@ -345,7 +345,7 @@ fn load_reports_the_specific_failure() {
     let lib = Library::new(tmp.path());
     fs::write(
         tmp.path().join("future.json"),
-        edited_json(|v| v["schema_version"] = json!(3)),
+        edited_json(|v| v["schema_version"] = json!(4)),
     )
     .unwrap();
     // A version-3 file whose layout this crate cannot parse is still a version error.

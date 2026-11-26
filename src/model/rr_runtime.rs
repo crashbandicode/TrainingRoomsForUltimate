@@ -36,6 +36,8 @@ pub struct Capture {
     spans: Vec<Span>,
     /// The recorded role's fighter, as its take start read it (`MacroRecording::recorded_fighter`).
     fighter: Option<crate::model::move_names::FighterId>,
+    /// Both fighters' state on each frame of the take (`scrub_track::TakeTrack`), when every frame has one.
+    track: Option<Vec<[super::macros::ReplayFrame; 2]>>,
 }
 
 impl Capture {
@@ -46,7 +48,12 @@ impl Capture {
             frames: Vec::new(),
             spans: Vec::new(),
             fighter: None,
+            track: None,
         }
+    }
+
+    pub fn set_track(&mut self, track: Option<Vec<[super::macros::ReplayFrame; 2]>>) {
+        self.track = track;
     }
 
     pub fn set_spans(&mut self, spans: &[Span]) {
@@ -76,6 +83,7 @@ pub fn toggle_record(capture: &mut Capture, role: Role) -> bool {
         capture.on = true;
         capture.role = role;
         capture.frames.clear();
+        capture.track = None;
         true
     }
 }
@@ -123,6 +131,9 @@ pub fn finish_recording(
     at: u64,
     trim: crate::model::trim::Trim,
 ) -> Result<RecordStop, Error> {
+    let kept = trim.window(&capture.frames);
+    let track = capture.track.as_ref().filter(|track| track.len() == capture.frames.len())
+        .map(|track| track[kept.start..kept.end].to_vec());
     let (frames, marks) = finish_take(capture.frames.clone(), &capture.spans, trim);
     if frames.is_empty() {
         return Ok(RecordStop::Empty);
@@ -153,6 +164,7 @@ pub fn finish_recording(
     let mut recording = MacroRecording::new(&name, "13.0.5", start_state, frames).map_err(record)?;
     recording.actions = marks;
     recording.recorded_fighter = capture.fighter;
+    recording.set_track(track);
     recording.set_start_save(Some(&start_id)).map_err(record)?;
     let id = macros.save_new(&recording).map_err(record)?;
     RecordingIndex::update(root, |index| {
