@@ -818,10 +818,10 @@ mod tests {
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
-        for pos in [Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End] {
+        for pos in [Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End] {
             assert!(pos.text().chars().count() <= 67, "{pos:?}");
         }
-        assert_eq!([Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "off", "end"]);
+        assert_eq!([Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "held", "off", "end"]);
     }
 
     #[test]
