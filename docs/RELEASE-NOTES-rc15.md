@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable (merged); the fighters shown where they were while you scrub, and a free playhead (both in work) |
+| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, and a free playhead (both merged); the fighters shown while you scrub (in work) |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -27,8 +27,8 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Next build (not installed yet)
 
-The build after install 5. One change is merged and two are in work, all three in the clip editor. The merged
-change passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
+The build after install 5. Two changes are merged and one is in work, all three in the clip editor. The merged
+changes passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
 and for an Eden session on them.
 
 ### Merged
@@ -44,6 +44,18 @@ and for an Eden session on them.
   [Known issues](CURRENT-RELEASE.md#known-issues).
   [Replay window](menu/recording.md#replay-window)
 
+#### A free playhead in the clip editor (merged 2026-11-26)
+
+- With no handle selected, Left and Right move the playhead over the whole take of a macro or a capture, inside or
+  outside the kept part. In and Out do not change.
+- Y then moves the playhead to the nearest move mark, never to the start or end of the take.
+- Once the playhead has moved, L makes its frame the first kept frame and R makes it the last kept frame (Out is
+  one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
+- An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
+- Combos and drills are unchanged.
+- Host tests and builds only. Holding a direction on a pad has no host test.
+  [Replay window](menu/recording.md#replay-window)
+
 ### In work
 
 Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
@@ -52,9 +64,6 @@ Planned for this build and not merged yet. Each moves up to Merged when it lands
   positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
   both use the same offset, so their recorded spacing is kept. New macros store positions; older macros still
   load and play, but must be re-recorded to show positions. Combos and drills are unchanged.
-- **In work: a free playhead.** With no handle selected, Left and Right move the playhead over the whole take and Y
-  snaps it to the nearest move mark. Once it has moved, L makes that frame the first kept frame; R makes it the
-  last kept frame (Out is one frame later). Neither cut can cross the other handle.
 
 ## Install 5
 
