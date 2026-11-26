@@ -1,9 +1,9 @@
-use crate::engine::library::{Role, MACROS_DIR};
+use crate::engine::library::{Chain, Role, MACROS_DIR};
 use crate::engine::macro_ui::scrub_track::{TakeTrack, TAKE_CHUNK};
 use crate::engine::macros::{InputFrame, Library, ReplayFrame, StartState, MAX_FRAMES};
 use crate::engine::rr_runtime::{finish_recording, push_frame, toggle_record, Capture, RecordStop};
 use crate::model::{hook_stats::heap_bytes, state::record::SavedState, trim::Trim};
-use std::{env, fs, io::Write, process::Command};
+use std::{env, fs, io::Write, process::Command, time::Instant};
 
 #[test]
 fn a_maximum_take_serializes_without_a_second_track() {
@@ -17,12 +17,36 @@ fn a_maximum_take_serializes_without_a_second_track() {
             .env(KEY, &root).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
         let saved = run("save");
         let loaded = root.join("measured").is_file() && run("load");
+        let listed = root.join("measured").is_file() && run("list");
+        let catalog = root.join("measured").is_file() && run("catalog");
         fs::remove_dir_all(root).unwrap();
-        assert!(saved && loaded, "isolated checks: save={saved}, load={loaded}");
+        assert!(saved && loaded && listed && catalog, "isolated checks: save={saved}, load={loaded}, list={listed}, catalog={catalog}");
         return;
     };
 
     let folder = root.join(MACROS_DIR);
+    let phase = env::var("TR_SCRUB_PHASE").unwrap();
+    if matches!(phase.as_str(), "list" | "catalog") {
+        let id = fs::read_to_string(root.join("measured")).unwrap();
+        let library = Library::new(&folder);
+        let start = Instant::now();
+        let before = heap_bytes();
+        let count = if phase == "list" {
+            let listing = library.list().unwrap();
+            assert!(listing.skipped.is_empty());
+            assert_eq!(listing.entries.len(), 1);
+            listing.entries[0].frame_count
+        } else {
+            library.load_with_sibling::<Chain>(&id).unwrap().unwrap().unwrap().frames.len()
+        };
+        let elapsed = start.elapsed();
+        let after = heap_bytes();
+        let peak = after.peak - before.live;
+        writeln!(std::io::stderr(), "SCRUB_LIST path={phase} count={count} peak_above_idle={peak} largest={} time_us={}", after.largest, elapsed.as_micros()).unwrap();
+        assert_eq!(count, MAX_FRAMES);
+        assert!(peak < 1024 * 1024 && after.largest < 1024 * 1024, "listing materialized a track");
+        return;
+    }
     if env::var("TR_SCRUB_PHASE").as_deref() == Ok("load") {
         let id = fs::read_to_string(root.join("measured")).unwrap();
         let library = Library::new(&folder);
