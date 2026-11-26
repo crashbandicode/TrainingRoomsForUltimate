@@ -11,8 +11,8 @@ Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed
 2026-11-26).
 
 - **Installed:** the file on the card was read back and matches the build.
-- **Tested in Eden:** not on this exact build yet; its Eden checks are in testing, and no result of theirs is
-  claimed. The build before its last fix (`eb39d6bc`) passed its Play-start comparison with install 5, its record,
+- **Eden:** install 6 is in testing. At installation, two Training boots were running on its diagnostic build;
+  the installed release file had no smoke verdict. The build before its last fix (`eb39d6bc`) passed its Play-start comparison with install 5, its record,
   old-macro, snap and browse checks, and part of the diagnostic checks. The Play-start result and the rename result
   carry over: rename passed by typing in Eden's keyboard window, not by pad. The rest of the build is install 5,
   which had a short smoke boot and a one-player waiting-room boot.
@@ -106,7 +106,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Fixed in install 6: "In is mid-action" after a snap in a match capture.** On install 5 and earlier, plain Y
+- **Fixed in install 6: "In is mid-action" after a snap in a match capture.** On install 5 (install 4 uses the same snap code), plain Y
   snaps In to a mark, and if that frame is still mid-action, preview and save are refused. The way round there:
   with In selected, hold ZL or ZR (Z on a GameCube pad) and press Y, release the modifier, then press X to preview
   or A to save. In install 6, Y resolves the move itself (`dbded2d1`). In Eden on the build before install 6's last

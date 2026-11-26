@@ -96,15 +96,15 @@ the third, all merged on 2026-11-26.
 
 ### Tested
 
-- **Installed:** yes, and read back. Only TrainingRooms' file changed on the card; the other 20 plugins are
-  unchanged.
+- **Installed:** yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback
+  copy of install 5 was also saved on the card.
 - **Host:** every merge passed host tests and builds.
 - **Tested in Eden, on the build before the fix (`eb39d6bc`), not on this exact build:** Play started no later than
   on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play;
   Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the
   fix addresses.
-- **Tested in Eden on this exact build:** in testing. It was installed, on the operator's order, before those runs
-  ended. No result is in, and none is claimed here.
+- **Merge 17 in Eden:** at installation, two Training boots were testing its diagnostic build. No result from a
+  smoke test of the installed release file is claimed here.
 - **The operator reported:** nothing on this build yet.
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).

@@ -22,7 +22,7 @@ author. Times are UTC.
 | On the card | 2026-11-23 20:04 | 2026-11-24 00:43 | 2026-11-24 03:07 | 2026-11-25 07:26 | 2026-11-25 23:06 | 2026-11-26 12:22 |
 | Card readback | match | match | match | match | match | match |
 | Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 | 3,108 / 0 / 4 |
-| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room | none on this file: its runs were under way at the install. The build before its last fix (`eb39d6bc`) passed a Play-start comparison and release and diag rows |
+| Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room | No smoke result on the installed release file. Two Training runs used the diagnostic file from the same commit. Earlier results on `eb39d6bc` are listed below. |
 | The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | three (2026-11-25 and 2026-11-26) | none yet |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
@@ -273,9 +273,11 @@ frame was looked at.
   SHA-256, hashed for this page.
 - **Ordered by the operator** on 2026-11-26 at about 11:53 (`operator-approval.json` in the same folder; inbox
   12:23:14Z, tr-primary-2).
-- **After it:** `main` went on to `7edddeaa` with documentation only. No NRO was built from that head for the card
-  (f9-fix, inbox 12:17:41Z).
-- **Eden on this exact file:** in testing; see [the last part](#eden-on-install-6-itself-5df3d9dc-merge-17). The file was installed before those runs ended.
+- **Docs-only merge:** `main` already contained `7edddeaa` when the card was written. That merge did not rebuild
+  the NRO; the installed file is from `5df3d9dc` (f9-fix, inbox 12:17:41Z; deployment finished 12:22:55Z).
+- **Eden at installation:** the two running Training boots used merge 17's diagnostic NRO (`853964b2…`), not the
+  release file read back from the card. The release smoke and waiting-room checks were still pending.
+  [Merge 17 test status](#eden-on-install-6-itself-5df3d9dc-merge-17)
 - **The operator's reports:** none on this build yet.
 
 The changes in this build were merged one by one after install 5 (`b7a382e4`). The Gate column names the receipt
