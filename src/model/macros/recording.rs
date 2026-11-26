@@ -255,6 +255,18 @@ impl MacroRecording {
 
     /// Checks everything `Library` requires before it writes or accepts a file.
     pub fn validate(&self) -> Result<(), MacroError> {
+        self.validate_header()?;
+        // A track and its version go together: an entry per frame from the first, as far as it goes, every number
+        // finite.
+        let tracked = self.track.as_ref().is_some_and(|track| !track.is_empty() && track.len() <= self.frames.len()
+            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
+        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
+            return Err(MacroError::InvalidTrack);
+        }
+        self.validate_frame_count()
+    }
+
+    pub(super) fn validate_header(&self) -> Result<(), MacroError> {
         if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) {
             return Err(MacroError::UnsupportedVersion {
                 found: self.schema_version,
@@ -277,14 +289,10 @@ impl MacroRecording {
             (TRACK_SCHEMA_VERSION, None) => {},
             _ => return Err(MacroError::InvalidMii("schema, fighter class and exact configuration disagree")),
         }
-        self.placement.validate()?;
-        // A track and its version go together: an entry per frame from the first, as far as it goes, every number
-        // finite.
-        let tracked = self.track.as_ref().is_some_and(|track| !track.is_empty() && track.len() <= self.frames.len()
-            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
-        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
-            return Err(MacroError::InvalidTrack);
-        }
+        self.placement.validate()
+    }
+
+    pub(super) fn validate_frame_count(&self) -> Result<(), MacroError> {
         if self.frames.is_empty() {
             return Err(MacroError::EmptyFrames);
         }

@@ -37,7 +37,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
             assert_eq!(listing.entries.len(), 1);
             listing.entries[0].frame_count
         } else {
-            library.load_with_sibling::<Chain>(&id).unwrap().unwrap().unwrap().frames.len()
+            library.load_with_sibling::<Chain>(&id).unwrap().unwrap().unwrap().frame_count
         };
         let elapsed = start.elapsed();
         let after = heap_bytes();

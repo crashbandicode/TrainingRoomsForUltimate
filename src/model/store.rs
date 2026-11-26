@@ -122,12 +122,16 @@ pub trait Record: Serialize + DeserializeOwned {
     const STREAM_READ: bool = false;
     fn stream_write(&self) -> bool { false }
     fn owns_reader(_reader: impl Read) -> serde_json::Result<bool> { Ok(true) }
+    fn read_summary(_id: &str, _reader: &mut dyn Read) -> serde_json::Result<Result<Self::Summary, Self::Error>> {
+        unreachable!("only a streaming record supplies a header reader")
+    }
     /// Everything the store requires before it writes or accepts a file.
     fn validate(&self) -> Result<(), Self::Error>;
     /// Display name: its slug seeds new ids and it orders listings.
     fn name(&self) -> &str;
     /// Listing row for the record stored under `id`.
     fn summary(&self, id: &str) -> Self::Summary;
+    fn summary_name(summary: &Self::Summary) -> &str { let _ = summary; unreachable!("only used by streaming listings") }
     /// Whether `id` (a file name without `.json`) may name a record of this store. Default: [`MAX_ID_CHARS`] of
     /// `[a-z0-9_-]`, the ids the store itself makes. A store whose files people share may accept more.
     fn accepts_id(id: &str) -> bool {
@@ -191,9 +195,15 @@ impl<R: Record> ListCursor<R> {
                 return true;
             }
         };
-        match data.owns::<R>().map_err(|e| lift::<R>(e.into())).and_then(|owns|
-            if owns { data.record::<R>(id).map(Some) } else { Ok(None) }) {
-            Ok(Some(rec)) => self.entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
+        match data.owns::<R>().map_err(|e| lift::<R>(e.into())).and_then(|owns| {
+            if !owns { return Ok(None); }
+            if R::STREAM_READ {
+                data.summary::<R>(id).map_err(|e| lift::<R>(e.into()))?.map(|s| Some((R::summary_name(&s).to_lowercase(), s)))
+            } else {
+                data.record::<R>(id).map(|r| Some((r.name().to_lowercase(), r.summary(id))))
+            }
+        }) {
+            Ok(Some((name, summary))) => self.entries.push((name, id.to_owned(), summary)),
             Ok(None) => (),
             Err(err) => self.skipped.push(SkippedFile { file: name, reason: err.to_string() }),
         }
@@ -289,7 +299,7 @@ impl<R: Record> Store<R> {
 
     /// Read once and validate the owning type. Invalid data is stable for the
     /// catalog signature; an I/O error leaves the entry eligible to retry.
-    pub fn load_with_sibling<S: Record>(&self, id: &str) -> io::Result<Option<Result<R, S>>> {
+    pub fn load_with_sibling<S: Record>(&self, id: &str) -> io::Result<Option<Result<R::Summary, S>>> {
         if !R::accepts_id(id) && !S::accepts_id(id) {
             return Ok(None);
         }
@@ -299,7 +309,7 @@ impl<R: Record> Store<R> {
             Err(_) => return Ok(None),
         };
         Ok(if R::accepts_id(id) && data.len() <= R::MAX_FILE_BYTES && data.owns::<R>()? {
-            data.parsed::<R>(id)?.ok().map(Ok)
+            data.summary::<R>(id)?.ok().map(Ok)
         } else if S::accepts_id(id) && data.len() <= S::MAX_FILE_BYTES {
             data.parsed::<S>(id)?.ok().map(Err)
         } else {
@@ -337,7 +347,7 @@ impl<R: Record> Store<R> {
         fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
         let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         let id = self.free_id(rec.name()).map_err(lift::<R>)?;
-        self.write_record(&id, rec, bytes)?;
+        self.write_atomic(&id, rec, bytes)?;
         Ok(id)
     }
 
@@ -354,7 +364,7 @@ impl<R: Record> Store<R> {
         if !exists {
             return Err(lift::<R>(StoreError::NotFound(id.to_owned())));
         }
-        self.write_record(id, rec, bytes)
+        self.write_atomic(id, rec, bytes)
     }
 
     /// Removes the record `id` (and a leftover backup of it).
@@ -411,12 +421,12 @@ impl<R: Record> Store<R> {
         Err(StoreError::NoFreeId)
     }
 
-    fn write_record(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>) -> Result<(), R::Error> {
+    fn write_atomic(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>) -> Result<(), R::Error> {
         let path = self.file(id, "json");
         let size = if let Some(bytes) = bytes {
             write_replace(&path, &bytes).map_err(|e| lift::<R>(e.into()))?;
             bytes.len() as u64
-        } else {
+        } else if R::STREAM_READ {
             replace_with(&path, |tmp| {
                 let mut writer = BufWriter::new(fs::File::create(tmp)?);
                 serde_json::to_writer(&mut writer, rec)?;
@@ -424,7 +434,7 @@ impl<R: Record> Store<R> {
                 writer.get_ref().sync_all()?;
                 Ok(writer.get_ref().metadata()?.len())
             }).map_err(|e| lift::<R>(e.into()))?
-        };
+        } else { unreachable!("non-streaming records always have encoded bytes") };
         note_catalog_write(&self.dir, id, Some(size));
         Ok(())
     }
@@ -654,13 +664,35 @@ impl Payload {
         self.parsed::<R>(id).map_err(|e| lift::<R>(e.into()))?
     }
 
+    fn summary<R: Record>(&mut self, id: &str) -> io::Result<Result<R::Summary, R::Error>> {
+        match self {
+            Self::File(f, len) if R::STREAM_READ => streamed::<R, _>(f, *len, |r| R::read_summary(id, r)),
+            _ => Ok(self.parsed::<R>(id)?.map(|r| r.summary(id))),
+        }
+    }
+
     fn parsed<R: Record>(&mut self, id: &str) -> io::Result<Result<R, R::Error>> {
         let (f, len) = match self {
             Self::Bytes(data) => return Ok(decode::<R>(id, data)),
             Self::File(f, len) => (f, *len),
         };
-        Ok(match serde_json::from_reader::<_, R>(BufReader::new(Read::by_ref(f).take(len))) {
-            Ok(mut record) => { record.adopt(id); record.validate().map(|()| record) }
+        if !R::STREAM_READ {
+            // Only the bounded sibling of a streaming record (a small chain) uses this arm.
+            let mut bytes = Vec::with_capacity(len as usize);
+            f.take(len).read_to_end(&mut bytes)?;
+            return Ok(decode::<R>(id, &bytes));
+        }
+        streamed::<R, _>(f, len, |reader| {
+            let mut record: R = serde_json::from_reader(reader)?;
+            record.adopt(id);
+            Ok(record.validate().map(|()| record))
+        })
+    }
+}
+
+fn streamed<R: Record, T>(f: &mut fs::File, len: u64, read: impl FnOnce(&mut dyn Read) -> serde_json::Result<Result<T, R::Error>>) -> io::Result<Result<T, R::Error>> {
+        Ok(match read(&mut BufReader::new(Read::by_ref(f).take(len))) {
+            Ok(result) => result,
             Err(e) if e.is_io() => return Err(e.into()),
             Err(e) => {
                 #[derive(serde::Deserialize)]
@@ -674,7 +706,6 @@ impl Payload {
                 }
             }
         })
-    }
 }
 
 fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {

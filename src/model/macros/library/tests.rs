@@ -66,6 +66,7 @@ fn save_new_persists_and_reloads_through_a_fresh_library() {
             fighter_kind: 8,
             costume: 2,
             frame_count: 8,
+            trim: rec.trim, placement: rec.placement, start_save: rec.start_save.clone(), start_save_on: rec.start_save_on,
         }]
     );
     assert!(listing.skipped.is_empty());
@@ -686,7 +687,8 @@ fn library_is_the_macro_instantiation_of_the_generic_store() {
     assert_eq!(library.load(&id).unwrap(), recording("Same"));
     assert_eq!(
         library.list().unwrap().entries[0],
-        MacroEntry { id, name: "Same".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8 }
+        MacroEntry { id, name: "Same".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8,
+            trim: crate::model::trim::Trim::Off, placement: Placement::default(), start_save: None, start_save_on: true }
     );
     assert!(format!("{library:?}").starts_with("Store {"));
 }
