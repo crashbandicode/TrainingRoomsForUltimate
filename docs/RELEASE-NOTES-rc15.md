@@ -37,7 +37,7 @@ All three changes are in the clip editor of the [Replay window](menu/recording.m
 
 ### Y on In makes a capture previewable
 
-*Clip coming.*
+*Clip coming: it is held until the known issue with X after a snap is fixed.*
 
 On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
 found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
@@ -52,12 +52,14 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 | --- | --- |
 | Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
 | Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
-| Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast case passed |
+| Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast snap landed. The preview after a snap is not shown there: no preview in the Replay window fed a frame in that boot |
 | Known issue in install 6 | With In still selected after Y, X can be refused with "Let the CPU settle to idle and leave the ledge before previewing". Press L to deselect In, then X: [Known issues](CURRENT-RELEASE.md#known-issues) |
 
 ### A free playhead in the clip editor
 
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-playhead.mp4)
 
 With no handle selected, on a macro or a capture:
 
@@ -76,11 +78,14 @@ With no handle selected, on a macro or a capture:
 | --- | --- |
 | Eden, on `eb39d6bc` | With nothing selected the playhead moved to two other frames while In and Out stayed where they were, and the strip read "Playhead moved. L sets the start here, R the end." |
 | Eden, install 6 diagnostic build | In the macro demonstration, Y snapped from 64 to a mark at 66. L set In to 66; R later kept frame 100 (Out 101). This is footage, not a verdict for a test row. |
+| Eden test rows, same build | The playhead's browse, cut, no-move and snap rows passed |
 | No host test | Holding a direction on a pad |
 
 ### The fighters are shown while you scrub
 
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*Crop on Macro 3: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-scrub.mp4)
 
 With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
 frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
@@ -96,7 +101,7 @@ is kept. This works on a macro and on a match capture.
 | --- | --- |
 | "Play it once to see positions while scrubbing." | The macro has no positions |
 | "Positions end here." | The selected frame is beyond the saved positions. This can follow an early stop during generation or the long-recording defect below. |
-| "Can't stand there on this stage." | Either fighter's point is inside solid ground or a wall, outside the camera's limits, or past the safe blast-line bounds. A fighter already held goes back to where the hold began. Each fighter's point is judged by itself, so the other one is still shown when its own point allows |
+| "Can't stand there on this stage." | The editor detected a point inside solid ground or a wall, outside the camera limits, or past the safe blast-line bounds. A held fighter returns to its hold origin; the other fighter is judged separately. Install 6 misses the wall case described below. |
 
 | Rule | What it means |
 | --- | --- |
@@ -123,8 +128,10 @@ both fighters stood beside their recorded points while the editor said they were
 | Play start on `eb39d6bc` | Each tested macro started on install 5's frame or one earlier, including the first Plays of the old 30-second and ten-minute macros |
 | Timing coverage | One Eden host, one boot per build. The playback path is unchanged; install 6 and the console were not timed here. |
 | Eden, on install 6's diagnostic build | Record with no preview, In and Out following the handles, release on deselect, the old-macro line, a crop keeping its positions, and the file sizes passed. Deleting a macro removed both its files. The menu thread used 49,904 B of stack, under its 57,648 B bound |
-| A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the ground was not moved, and the other was held at its own point. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
-| Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. Release on X and on close, and a fighter walked off stage, gave no verdict yet |
+| A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the floor was not moved. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
+| Known issue found there | A point inside the stage's wall, just beside the end of the floor and below it, was not refused: that fighter was shown about 5 units from its recorded point, pressed against the wall. [Known issues](CURRENT-RELEASE.md#known-issues) |
+| Release, on that build | In Crop on a recorded macro, X played the preview and let the fighters go after it. B closed the editor with both fighters back at their homes. This is not the match-capture preview. |
+| Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. A fighter walked off stage gave no verdict yet |
 | The installed release file | No smoke boot yet; the rows above ran the diagnostic build of the same commit |
 | Host | No host test runs the Switch code that holds the fighters |
 
@@ -135,7 +142,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
-| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. Found: positions stop 20 seconds into a long take. No smoke boot of the installed release file, and no waiting-room pair, has flown |
+| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. No smoke boot of the installed release file, and no waiting-room pair, has flown |
 | On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).

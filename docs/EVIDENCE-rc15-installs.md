@@ -363,21 +363,26 @@ files named below were read for this page.
 
 | Run (folder) | Host | Passed | Defect | No verdict |
 | --- | --- | --- | --- | --- |
-| `scrub-m17-xps-01` (`m17-xps/`) | XPS | SP-1 to SP-4 (record with no preview, In follows, Out on the last frame, release on deselect), SP-7 (old macro), SP-8 (a crop keeps positions), SP-9 (file sizes), SP-19 (menu thread stack) | SP-17 (long take) | SP-5, SP-6 and SP-11 stopped in the test's own hooks. SP-10: see below |
-| `scrub-m17b-yoga-01` (`m17b-yoga/`) | Yoga | SP-1 and SP-8 again as fixtures, SP-21 (delete removes both files), S2 (a second snap), S3 (the fast snap) | none | The CPU take, SP-12, SP-13, S1 and P1 to P3 stopped in the test's set-up and were started again |
+| `scrub-m17-xps-01` (`m17-xps/`) | XPS | SP-1 to SP-4 (record with no preview, In follows, Out on the last frame, release on deselect), SP-5 (release on X), SP-6 (release on close), SP-7 (old macro), SP-8 (a crop keeps positions), SP-9 (file sizes), SP-19 (menu thread stack) | SP-17 (long take); SP-10 (a point in the stage's wall) | SP-11 stopped in the test's own take |
+| `scrub-m17b-yoga-01` (`m17b-yoga/`) | Yoga | SP-1 and SP-8 again as fixtures, SP-21 (delete removes both files), the take on the CPU, P1, P2, the no-move select and P3 (the playhead rows), S2 and S3 up to their preview | S1: the preview after the snap was refused (below) | SP-12 and SP-13: the swap chord and the pause menu did not act with the editor open, so the drop of a hold was not reachable; the hold stayed and nothing hung. Not a pass of the drop |
 
 | Row | What the reads show |
 | --- | --- |
 | SP-17, long recording | **Defect accepted** (12:48:20Z). Two closed-menu takes kept 1,553 and 3,253 inputs, but only 1,200 positions each. On the first, Out read `pos=end`, the line said "Positions end here.", and the file was 86,440 B. Takes of 182 to 222 frames had full files. |
 | Why the track can end early (code reading) | With no other work pending, the worker can skip allocating the next 600-frame block (`recording_host.rs:291`). It is not a fixed maximum. `eb39d6bc` has the same code, but this row did not run on it. |
 | Existing short file on install 6 | Play preserves a valid file written by Record, even when short (`play_track.rs:151–157`). Fixed in the next build. |
+| SP-5 and SP-6, release | On X the preview played with no `pos` and fed the take's 222 frames, and the fighters were released after. One B closed the editor, with both fighters idle at their homes on two reads (13:20:01Z; accepted 13:20:24Z) |
 | SP-19, the menu thread's stack | `used=49904 size=90112`, under the 57,648 bound. Read after SP-1 to SP-10 and before the long take ended |
-| SP-10, the match capture, on the fixed build | Frame 30 reads `held` and both bodies are exact. At frame 137 the line is `pos=off`, Player 1 is not moved, and the CPU is held at its own point. The key line showed the hint to snap, not "Can't stand there on this stage.", because In is mid-action at that frame (`src/model/macro_ui/clip_panel.rs` lines 149 to 155 put the setup line or the snap hint before the position line). The order is not on purpose (preview-vis-sol, 12:53:22Z; accepted 12:54:05Z). Fixed in the next build. The row's receipt reads failed: its hook stopped on a later step of its own |
+| SP-10, both flights | At frame 30 both fighters were at the expected points. At frame 137, Player 1's point was inside the floor; `pos=off` and Player 1 stayed at home. In was mid-action, so the snap hint hid the position warning. |
+| SP-10, 12:08 flight | The CPU reached its open point at (−86.96, −15.10). This flight stopped later at the test's fighter-switch check. |
+| SP-10, 13:01 flight | The requested CPU point (−81.72, −15.10) was beside the floor's end. It was not refused; two reads put the body **5.13 units left** of the point, against the wall. The row failed on that displacement, not the fighter-switch check. `eb39d6bc` showed a similar displacement. |
+| Wall verdict | **Defect accepted** (13:20:24Z). The test identifies the missed wall case, not the specific source line responsible. Fixed in the next build. |
 | First X on a capture: two takes | In `tut-5df3d9dc-yoga-3`, Y snapped In but X refused with In selected; no input frame was fed (12:46:48Z). In the control take, L deselected In; after a one-second wait X previewed on the CPU (12:51:05Z). The earlier successful release snap on `eb39d6bc` previewed on Player 1. |
+| S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Treated as a regression of install 6 until the release smoke says otherwise** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
 | Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. A fix is assigned, not tested here. |
 
 - **Not flown yet:** a smoke boot of the release NRO, which is the file on the card, and a fresh waiting-room pair.
-- **Not shown on this build:** a fighter swap or a scene change while a fighter is held (SP-12, SP-13), release on
-  X and on close (SP-5, SP-6), a fighter walked off stage (SP-11), and a take on the CPU. The formal playhead rows
-  had no verdict in this report. Separately, `tut-5df3d9dc-yoga-3` showed playhead browsing, Y to a mark, and
-  cutting with L and R on one macro; it did not establish that every formal test row passed.
+- **Not shown in the two test boots:** release through a fighter swap or a scene change (SP-12, SP-13), or a
+  fighter walked off stage (SP-11). No match-capture preview fed inputs in `scrub-m17b-yoga-01`. In the separate
+  filming boot, the deselected-In control **did** feed inputs; it is not a pass for X with In still selected.
+  The playhead rows passed on Yoga; the filming boot also showed browsing, Y to a move and both cuts on one macro.
