@@ -258,3 +258,20 @@ frame was looked at.
 | Guard the Edge and Juggler start from the floor the player stands on; two Guard the Edge options | `7e6ff810` | `gate-f9b81e42` (one gate for this merge, the next row and a docs merge) |
 | Eggs-ercise's off-stage zone follows the stage | `1c6a71e5` | `gate-f9b81e42` |
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
+
+## The next build
+
+Merged after install 5 and **not on the card**. The Gate column names the receipt under
+`artifacts/phase23/next-build/`. These are host tests and builds, not gameplay tests.
+
+| Merge | Head | Gate |
+| --- | --- | --- |
+| The clip editor: Y on In resolves the move on a capture | `dbded2d1` | `gate-dbded2d1`: six steps exit 0; 3,049 tests passed, 0 failed, 4 ignored |
+
+- **Not run in a game.** The merge record says so, and that the operator's own take was not reproduced.
+- **In work, not merged:** the fighters shown at the handle's frame while scrubbing, with a new macro file version
+  that stores positions; and a free playhead (inbox 2026-11-26 00:21:37Z and 00:31:52Z, tr-primary-2, relaying the
+  operator).
+- **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
+  then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
+  about it is claimed here.

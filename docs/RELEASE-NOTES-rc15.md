@@ -9,6 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
+| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable (merged); the fighters shown where they were while you scrub, and a free playhead (both in work) |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -23,6 +24,35 @@ What "tested" means in these notes:
   are reports, not a list of passes, and only reports that are on record are written.
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
+
+## Next build (not installed yet)
+
+The build after install 5. One change is merged and two are in work, all three in the clip editor. The merged
+change passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
+and for an Eden session on them.
+
+### Merged
+
+#### Y on In makes a capture previewable (merged 2026-11-26)
+
+- In the Replay window on a match capture, Y with In selected snaps In to a mark. When that frame is in the middle
+  of an action, Y now also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it.
+- Where no move can start at that frame, the strip says why. A second Y keeps the same move.
+- The check behind "In is mid-action" is unchanged, and no In that install 5 previews is refused now.
+- Found by the operator on install 5, where the way round is ZL or ZR + Y:
+  [Known issues](CURRENT-RELEASE.md#known-issues).
+  [Replay window](menu/recording.md#replay-window)
+
+### In work
+
+Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
+
+- **In work: the fighters are shown where they were while you scrub.** With In or Out selected in the clip editor,
+  both fighters are held where the recording had them at that frame, with no preview first. For this, Record stores
+  each frame's positions in the macro file. Macros recorded before still load and play; the editor asks you to
+  record them again to see positions. Combos and drills are unchanged.
+- **In work: a free playhead.** With no handle selected, Left and Right move the playhead over the whole take and Y
+  snaps it to the nearest move. Once it has moved, L sets In there and R sets Out there.
 
 ## Install 5
 
