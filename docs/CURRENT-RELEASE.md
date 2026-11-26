@@ -17,9 +17,11 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
   previewed. A second boot opened the menu, and Guard the Edge's set-up, in a one-player waiting room. Neither
   drill was played through, no placement was saved, no second player joined a room, and most of the build's other
   new items were not touched.
-- **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
-  with "In is mid-action" after a snap to the move start; Known issues below has the way round. It is a report of what they
-  saw, not a test of the build; the reports on the earlier builds are in the evidence page.
+- **On the console:** three reports so far. On 2026-11-25 the operator reported that the clip editor kept refusing
+  with "In is mid-action" after a snap to the move start. On 2026-11-26 they reported that a fighter placed off stage
+  on a save stays on the ground once it has landed, and that Guard the Edge's starting spot varies between rounds.
+  Known issues below has each. They are reports of what they saw, not tests of the build; the reports on the earlier
+  builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -100,7 +102,13 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
   move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
   saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
   A fix is merged (`dbded2d1`) for the build after install 5; it is not on the card, and it has not run in a game.
-- **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
+- **Placement on a save, reported on install 5:** a fighter switched to Off stage floats, but once it is moved into
+  the ground it lands and then stays on the ground as the crosshair moves. Switch On stage and Off stage again to put
+  it right. Not fixed; no cause is established.
+- **Guard the Edge, reported on install 5:** the fighter sometimes starts slightly off the chosen spot, lower on one
+  round and higher on the next. Not fixed; no cause is established.
+  [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console)
+- **Install 5 test coverage:** three reports from console play are on record, not a full hardware verdict. Eden covered
   parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
