@@ -63,7 +63,7 @@ Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to ke
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
 
-*Hold R + D-pad Up and tap Left: the label at the top right steps down through 2/3 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-game-speed.mp4)
+*Hold R + D-pad Up and tap Left: the label steps through 2/3, 1/2 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-game-speed.mp4)
 
 ## The menu
 
@@ -81,7 +81,7 @@ when it fires in **Mash Triggers**.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/67d92f30104dd21a740499e4b780336754029284" autoplay muted loop playsinline controls></video>
 
-*CPU › Mash is set to an attack. Mario walks up and jabs Link, and Link hits back as soon as he can: Mario takes 3%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-cpu-mash.mp4)
+*With CPU › Mash set to an attack, Mario jabs Link and Link hits back. Link ends at 2.7%, Mario at 3.7%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-cpu-mash.mp4)
 
 ### Saves
 
@@ -99,7 +99,7 @@ again to stop.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
 
-*ZR + D-pad Down starts Record, and Mario is tinted red while his inputs are taken: two jabs and a forward smash. The chord again stops it. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-record-macro.mp4)
+*ZR + D-pad Down starts Record. Mario is tinted red as his forward smash sends Link to 18.5%. The tint clears when recording stops. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-record-macro.mp4)
 
 To drill a combo, land it, then choose **Recording › Combos & Sequences › + Save last combo…**. The link cells grade
 your next attempts.
@@ -136,7 +136,7 @@ then A to tick Hitboxes, Grab boxes and Hurtboxes. The Colour legend appears bes
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
 
-*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Mario jabs, and the hit draws in red; then he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-hitbox-visualization.mp4)
+*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Look for the pink hitbox on Mario's jab and the purple box when he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-hitbox-visualization.mp4)
 
 See hittable objects with [Article hurtboxes](docs/menu/display-and-controls.md#hitbox-visualization).
 

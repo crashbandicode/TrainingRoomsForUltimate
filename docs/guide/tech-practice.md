@@ -2,7 +2,7 @@
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
 
-*Practice games › Tech practice › Start: Mario is launched at 72% and falls to the floor, again and again. No tech is pressed here, so he ends on his back; each result shows at the top left. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-tech-practice.mp4)
+*Practice games › Tech practice › Start: Mario launches at 72% and lands without a tech. The counter reaches “Missed · 5/20 · streak 0”; the clip ends with “Approximate aim has no solution for these values”. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-tech-practice.mp4)
 
 Works in Training and in the [waiting room](waiting-rooms.md). In [Practice games](../menu/practice-games.md#tech-practice), choose a session and **Tech wizard**, or choose **Surface** and **Start**. Press shield just before the launch reaches the surface; the notice shows your timing grade when available, your streak and session results.
 
