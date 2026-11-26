@@ -38,7 +38,7 @@ pub struct PlayTrack {
     limit: AtomicU32,
     count: AtomicU32,
     written: AtomicBool,
-    prepared: AtomicBool,
+    made: AtomicBool,
     busy: AtomicU32,
     state: Mutex<State>,
 }
@@ -59,18 +59,19 @@ impl PlayTrack {
     pub const fn new() -> Self {
         Self {
             rows: TakeTrack::new(), key: AtomicU64::new(IDLE), limit: AtomicU32::new(0), count: AtomicU32::new(0),
-            written: AtomicBool::new(false), prepared: AtomicBool::new(false), busy: AtomicU32::new(0),
+            written: AtomicBool::new(false), made: AtomicBool::new(false), busy: AtomicU32::new(0),
             state: Mutex::new(State { open: None, done: Vec::new(), done_version: (0, 0) }),
         }
     }
 
     pub fn ready(&self) {
-        self.rows.service(self.sampling(), self.count.load(Ordering::Acquire) as usize);
-        self.prepared.store(true, Ordering::SeqCst);
+        if self.made.load(Ordering::SeqCst) {
+            self.rows.service(self.sampling(), self.count.load(Ordering::Acquire) as usize);
+        }
     }
 
     pub fn sampling(&self) -> bool { self.key.load(Ordering::SeqCst) != IDLE }
-    pub fn allocated(&self) -> bool { self.prepared.load(Ordering::SeqCst) }
+    pub fn allocated(&self) -> bool { self.made.load(Ordering::SeqCst) }
     pub fn live(&self, slot: usize, frame: &ReplayFrame) { self.rows.live(slot, frame); }
     pub fn seed_due(&self, slot: usize) -> bool {
         let key = self.key.load(Ordering::SeqCst);
@@ -88,7 +89,7 @@ impl PlayTrack {
 
     pub fn begin(&self, id: &str, slot: usize, generation: u32, version: (u64, u64), limit: u32, pass: bool) -> bool {
         let Some(name) = Id::new(id) else { return false };
-        if slot > 1 || !self.prepared.load(Ordering::SeqCst) { return false; }
+        if slot > 1 { return false; }
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.done_version != version {
             state.done.clear();
@@ -96,6 +97,10 @@ impl PlayTrack {
         }
         if self.key.load(Ordering::SeqCst) != IDLE || state.open.is_some() || state.done.iter().any(|done| done == id) {
             return false;
+        }
+        if !self.made.load(Ordering::SeqCst) {
+            self.rows.service(true, 0);
+            self.made.store(true, Ordering::SeqCst);
         }
         self.limit.store(limit, Ordering::Release);
         self.count.store(0, Ordering::Release);
@@ -149,7 +154,8 @@ impl PlayTrack {
         self.limit.store(0, Ordering::Release);
         self.count.store(0, Ordering::Release);
         self.written.store(false, Ordering::Release);
-        self.prepared.store(false, Ordering::SeqCst);
+        // Tests leak the old table: TakeTrack never frees it.
+        self.made.store(false, Ordering::SeqCst);
         self.busy.store(0, Ordering::SeqCst);
         *self.state.lock().unwrap_or_else(|error| error.into_inner()) =
             State { open: None, done: Vec::new(), done_version: (0, 0) };
