@@ -580,7 +580,7 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }
+            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held | Pos::NoMoves if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }
     }
 
     /// What the fighters show at `shown_frame` (the selected handle's frame, or the moved playhead's), and what the
@@ -611,6 +611,7 @@ impl ClipEditor {
         match (ask, &self.file) {
             (Ask::None, Some(FileSource::Macro { .. })) => (ask, Pos::End),
             (Ask::None, _) => (ask, Pos::None),
+            (_, Some(FileSource::Macro { recording, .. })) if !recording.has_moves() => (ask, Pos::NoMoves),
             _ => (ask, Pos::Held),
         }
     }
