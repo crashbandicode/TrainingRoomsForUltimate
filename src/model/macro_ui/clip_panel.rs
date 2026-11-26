@@ -683,8 +683,8 @@ impl ClipEditor {
         if self.file.is_none() {
             let start = self.window.start() as usize;
             let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);
-            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
-            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
+            let state = |frame: &ReplayFrame| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), ..*frame };
+            let absent = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
             recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
                 frames.iter().enumerate()
                     .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
@@ -927,6 +927,7 @@ mod tests {
 
     fn snap_capture_with(setup: i32, action: i32, tail: i32) -> ClipEditor {
         let frames = (0..60).map(|i| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons: if (23..=26).contains(&i) { 1 } else { 0 }, ..InputFrame::default() },
             start: StartState { status: match i { 0..=19 => 0, 20..=24 => setup, 25..=39 => action, _ => tail },
                 ..StartState::neutral(74, 0, 1.0) },
@@ -1129,6 +1130,7 @@ mod tests {
 
     fn long_action_capture(last: u32) -> ClipEditor {
         let frames = (0..60).map(|i| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons: u32::from(i == 5 || i == 36), ..InputFrame::default() },
             start: StartState { status: if (8..=last).contains(&i) { 45 } else { 0 },
                 ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0,
@@ -1288,6 +1290,7 @@ mod tests {
     fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {
         use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};
         let mut frames: Vec<_> = (0..40).map(|i| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons: i, ..Default::default() },
             start: StartState { status: match i { 0 => 0, 28..=29 => 6,
                 30..=31 => 7, 32 => 45, 33 => 46, 34..=39 => 47, _ => 486 },
@@ -1481,7 +1484,7 @@ mod tests {
         e.on_action(ClipAction::Nudge(1));
         assert_eq!(e.scrub().1, Pos::NoTrack);
         let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
         let mut loaded = recording.clone();
         loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);
         assert!(e.adopt_positions(loaded.clone()));
@@ -1678,7 +1681,7 @@ mod tests {
         assert_eq!(exported(Some(e.on_action(confirm))).unwrap(), (0..10).collect::<Vec<_>>());
     }
     fn editor() -> ClipEditor {
-        let frames = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },
+        let frames = (0..10).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i, ..InputFrame::default() },
             start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
         ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,

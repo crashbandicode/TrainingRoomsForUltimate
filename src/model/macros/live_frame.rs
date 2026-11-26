@@ -36,6 +36,7 @@ pub struct LiveFrame {
     pub position_z: f32,
     pub speed_z: f32,
     pub body: u32,
+    pub pose: crate::engine::macros::PackedPose,
 }
 
 impl LiveFrame {

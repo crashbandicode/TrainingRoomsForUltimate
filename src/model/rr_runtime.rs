@@ -1962,7 +1962,7 @@ mod tests {
                 let track = |entry: i32, base: u32| ReplayTrack {
                     fighter: None,
                     entry, quantized_analog: false,
-                    frames: (0..3).map(|i| ReplayFrame { input: frame(base + i),
+                    frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: frame(base + i),
                         start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
                 };
                 let session = ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() };

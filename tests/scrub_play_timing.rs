@@ -43,7 +43,7 @@ fn play_start_timings() {
         let inputs = (0..frames).map(|i| InputFrame { buttons: (i % 7 + 1) as u32, ..InputFrame::default() }).collect();
         #[allow(unused_mut)]
         let mut rec = MacroRecording::new(name, "13.0.5", StartState::neutral(8, 0, 1.0), inputs).unwrap();
-        rec.set_track(Some(vec![[crate::engine::macros::ReplayFrame { input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: 1.0, y: 2.0 }; 2]; frames])); // head-only
+        rec.set_track(Some(vec![[crate::engine::macros::ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: 1.0, y: 2.0 }; 2]; frames])); // head-only
         let id = library.save_new(&rec).unwrap();
         // main-only: positions_file(&root.join(MACROS_DIR), &id, frames);
         id

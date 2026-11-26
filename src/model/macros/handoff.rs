@@ -275,12 +275,34 @@ impl LiveArchive {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
+    fn a_sample_slot_grows_by_the_pose_and_the_queues_keep_1024_slots() {
+        use crate::engine::macros::{LiveFrame, ReplayFrame};
+        assert_eq!(std::mem::size_of::<ReplayFrame>(), 52);
+        assert_eq!(std::mem::size_of::<LiveFrame>(), 76);
+        assert_eq!(super::REPLAY_EVENT_SLOTS, 1024);
+        // Base sizes were 64 and 200 bytes respectively.
+        assert_eq!(std::mem::size_of::<super::VaultEvent>(), 72);
+        assert_eq!(std::mem::size_of::<(u64, super::LiveEvent)>(), 200);
+    }
+
+    fn a_vault_sample_keeps_its_pose_through_the_archive() {
+        use super::{VaultArchive, VaultEvent};
+        use crate::engine::macros::{InputFrame, PackedPose, ReplayFrame, StartState};
+        let pose = PackedPose([0x3456_789a, 0x000c_8012]);
+        let sample = ReplayFrame { input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0),
+            x: 12.0, y: 4.0, pose };
+        let mut archive = VaultArchive::new();
+        archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
+        archive.apply(VaultEvent::Sample { epoch: 1, entry: 3, sample, quantized: false }, 0);
+        assert_eq!(archive.session.tracks[0].frames[0].pose, pose);
+    }
+
     fn live_worker_handoff_preserves_bound_saves_across_reset_and_refuses_event_loss() {
         use super::*;
         use crate::engine::macros::{LiveFrame, LiveInput, StartState};
         let mut tokens = LiveTokens::new();
         let mut archive = LiveArchive::new();
-        let sample = |buttons| LiveFrame { input: LiveInput { buttons, ..LiveInput::default() },
+        let sample = |buttons| LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons, ..LiveInput::default() },
             start: StartState::neutral(8, 0, 1.0), x: 1.0, y: 2.0, position_z: 3.0, speed_z: 0.0, body: 99 };
         let id = FixedReplayId::new("Replay-001").unwrap();
         let title = FixedReplayTitle::new(&"Match title".encode_utf16().collect::<Vec<_>>()).unwrap();
@@ -374,7 +396,7 @@ name").is_none());
     fn vault_events_preserve_tracks_previous_and_partial_identity() {
         use super::{VaultArchive, VaultEvent};
         use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
-        let sample = ReplayFrame { input: InputFrame { buttons: 7, ..InputFrame::default() },
+        let sample = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: 7, ..InputFrame::default() },
             start: StartState::neutral(8, 0, 1.0), x: 12.0, y: 4.0 };
         let mut archive = VaultArchive::new();
         archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
@@ -404,7 +426,7 @@ name").is_none());
     fn forgetting_a_vault_capture_drops_only_that_one() {
         use super::{VaultArchive, VaultEvent};
         use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
-        let sample = ReplayFrame { input: InputFrame { buttons: 7, ..InputFrame::default() },
+        let sample = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: 7, ..InputFrame::default() },
             start: StartState::neutral(8, 0, 1.0), x: 12.0, y: 4.0 };
         let two = || {
             let mut archive = VaultArchive::new();
@@ -441,7 +463,7 @@ name").is_none());
         let mut archive = VaultArchive::new();
         archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
         for (entry, buttons) in [(0, 1), (1, 101), (0, 2), (1, 102)] {
-            let sample = ReplayFrame { input: InputFrame { buttons, ..InputFrame::default() },
+            let sample = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 };
             archive.apply(VaultEvent::Sample { epoch: 1, entry, sample, quantized: false }, 0);
         }
@@ -456,7 +478,7 @@ name").is_none());
         use super::{VaultArchive, VaultEvent};
         use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
         let mut archive = VaultArchive::new();
-        let sample = |buttons| ReplayFrame { input: InputFrame { buttons, ..InputFrame::default() },
+        let sample = |buttons| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons, ..InputFrame::default() },
             start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0 };
         archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
         archive.apply(VaultEvent::Sample { epoch: 1, entry: 0, sample: sample(1), quantized: false }, 0);
@@ -474,6 +496,8 @@ name").is_none());
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_sample_slot_grows_by_the_pose_and_the_queues_keep_1024_slots", a_sample_slot_grows_by_the_pose_and_the_queues_keep_1024_slots as fn()),
+            ("a_vault_sample_keeps_its_pose_through_the_archive", a_vault_sample_keeps_its_pose_through_the_archive as fn()),
             ("forgetting_a_vault_capture_drops_only_that_one", forgetting_a_vault_capture_drops_only_that_one as fn()),
             ("a_capture_keeps_one_track_per_entry_player_one_included", a_capture_keeps_one_track_per_entry_player_one_included as fn()),
             ("an_open_recording_is_a_copy_that_later_samples_do_not_change", an_open_recording_is_a_copy_that_later_samples_do_not_change as fn()),

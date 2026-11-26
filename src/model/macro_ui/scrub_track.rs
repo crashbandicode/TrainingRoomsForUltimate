@@ -460,6 +460,7 @@ fn cells(frame: &ReplayFrame) -> [u32; STATE_CELLS] {
 
 fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     ReplayFrame {
+        pose: crate::engine::macros::PackedPose::NONE,
         input: InputFrame::default(),
         start: StartState { fighter_kind: cells[0] as i32, costume: cells[1], facing: f32::from_bits(cells[2]), situation: cells[3] as i32,
             status: cells[4] as i32, speed_x: f32::from_bits(cells[5]), speed_y: f32::from_bits(cells[6]) },
@@ -653,12 +654,12 @@ mod tests {
     fn state(fighter: usize, i: u32) -> ReplayFrame {
         let i = i as f32;
         let (x, y, facing) = if fighter == 0 { (20.0 + 3.0 * i, i, if i >= 6.0 { -1.0 } else { 1.0 }) } else { (-20.0 - i, 50.0 - 2.0 * i, 1.0) };
-        ReplayFrame { input: InputFrame::default(), start: StartState { status: 14, facing, ..StartState::neutral(18, 0, 1.0) }, x, y }
+        ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState { status: 14, facing, ..StartState::neutral(18, 0, 1.0) }, x, y }
     }
 
     fn capture(tracks: usize) -> ClipEditor {
         let tracks = (0..tracks).map(|fighter| ReplayTrack { fighter: None, entry: fighter as i32,
-            frames: (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() }, ..state(fighter, i) }).collect(),
+            frames: (0..10).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i, ..InputFrame::default() }, ..state(fighter, i) }).collect(),
             quantized_analog: false }).collect();
         ClipEditor::new(ReplaySession { tracks, truncated: false, breaks: Vec::new() }, vec![14]).unwrap()
     }
@@ -851,7 +852,7 @@ mod tests {
         assert_eq!(take.take(3), Some((0..3).map(|i| [state(1, i), state(0, i)]).collect::<Vec<_>>()));
         assert_eq!(take.take(2).map(|track| track.len()), Some(2), "never more states than frames");
         // Every field of the capture's state is kept.
-        let odd = ReplayFrame { input: InputFrame::default(), x: -88.5, y: 12.25,
+        let odd = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), x: -88.5, y: 12.25,
             start: StartState { fighter_kind: 74, costume: 5, facing: -1.0, situation: 2, status: 486, speed_x: -1.25, speed_y: 3.5 } };
         take.live(0, &odd);
         take.push(0, 0);

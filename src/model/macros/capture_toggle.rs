@@ -329,7 +329,7 @@ mod tests {
     use std::sync::Arc;
 
     fn sample(buttons: u32) -> LiveFrame {
-        LiveFrame { input: LiveInput { buttons, ..LiveInput::default() },
+        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons, ..LiveInput::default() },
             start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,
             position_z: 0.0, speed_z: 0.0, body: 1 }
     }

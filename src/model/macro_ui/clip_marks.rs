@@ -780,6 +780,7 @@ mod tests {
         assert!(line.ends_with("target=p1 marks=2 mark=90-none move=\"110 frames into Special\""), "{line}");
         assert!(bridge_clip(&editor.view(), Some("drill"), true).text().starts_with("clip ctx=drill total=200 "));
         let capture = ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: (0..40).map(|_| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame::default(), start: StartState::neutral(74, 0, 1.0), x: 0.0, y: 0.0 }).collect() }],
             truncated: false, breaks: Vec::new() };
         let mut vault = ClipEditor::new(capture, vec![0]).unwrap();
@@ -796,6 +797,7 @@ mod tests {
         use crate::model::chords::{bit, logical, logical_set, Buttons, STYLE_GAMECUBE};
         use clip_panel::TargetTap;
         let track = |entry: i32| ReplayTrack { fighter: None, entry, quantized_analog: false, frames: (0..40u32).map(|i| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons: i + 1, ..InputFrame::default() }, start: StartState::neutral(entry + 7, 0, 1.0),
             x: 0.0, y: 0.0 }).collect() };
         let capture = || ReplaySession { tracks: vec![track(0), track(1)], truncated: false, breaks: Vec::new() };
@@ -1564,7 +1566,7 @@ mod tests {
         archive.apply(VaultEvent::Begin { epoch: 1 }, 0);
         for frame in 0..40u32 {
             for (entry, kind) in [(0, 6), (1, 8)] {
-                let sample = ReplayFrame { input: InputFrame { buttons: if frame == 5 { 2 } else { 0 }, ..InputFrame::default() },
+                let sample = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: if frame == 5 { 2 } else { 0 }, ..InputFrame::default() },
                     start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
                 archive.apply(VaultEvent::Sample { epoch: 1, entry, sample, quantized: false }, 0);
                 if frame == 0 && entry == 1 { archive.apply(VaultEvent::Fighter { epoch: 1, entry, fighter: beta }, 0); }
@@ -1594,7 +1596,7 @@ mod tests {
         // A crop wholly after a transformation is valid; the first form cannot name the later one's special.
         archive.apply(VaultEvent::Begin { epoch: 2 }, 0);
         for frame in 0..40 {
-            let sample = ReplayFrame { input: InputFrame::default(), x: 0.0, y: 0.0,
+            let sample = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), x: 0.0, y: 0.0,
                 start: StartState::neutral(if frame < 20 { 8 } else { 9 }, 0, 1.0) };
             archive.apply(VaultEvent::Sample { epoch: 2, entry: 1, sample, quantized: false }, 0);
             if frame == 0 { archive.apply(VaultEvent::Fighter { epoch: 2, entry: 1, fighter: beta }, 0); }

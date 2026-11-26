@@ -60,7 +60,8 @@ fn a_maximum_take_serializes_without_a_second_track() {
         let overwrite_alloc = heap_bytes().total - before.total;
         assert_eq!(fs::read(folder.join(format!("{id}.json"))).unwrap(), serde_json::to_vec(&rec).unwrap());
         writeln!(std::io::stderr(), "SCRUB_LOAD frames={MAX_FRAMES} peak_above_idle={load_peak} overwrite_alloc={overwrite_alloc}").unwrap();
-        assert!(load_peak < 4 * 1024 * 1024, "load kept a second large allocation");
+        // One decoded track and the slack this check always had (4 MiB − 3,168,000 B, the track before the pose).
+        assert!(load_peak < (MAX_FRAMES * size_of::<[ReplayFrame; 2]>() + 1_026_304) as isize, "load kept a second large allocation");
         assert!(overwrite_alloc < 256 * 1024, "overwrite buffered the whole macro");
         return;
     }
@@ -68,7 +69,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let baseline = heap_bytes();
     let take = TakeTrack::new();
     let mut inputs = Vec::with_capacity(MAX_FRAMES);
-    let body = |kind, sign, i: usize| ReplayFrame { input: InputFrame::default(), start: StartState {
+    let body = |kind, sign, i: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {
         situation: 2, status: 14, speed_x: sign * 0.8125, speed_y: -0.4375,
         ..StartState::neutral(kind, 2, sign)
     }, x: sign * (i % 1600) as f32 / 16.0, y: (i % 768) as f32 / 16.0 };
