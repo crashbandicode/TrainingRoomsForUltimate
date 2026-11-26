@@ -888,6 +888,13 @@ pub unsafe fn frame(fighter: usize) {
             let fighter = wizard.setup[who.index()];
             placement::hold_at(&mut holds[who.index()], accessor, natives::battle_object_id(accessor), fighter.at,
                 fighter.place == Place::OnStage);
+            // The crosshair carried the body into the ground and the game landed it: it leaves the ground again
+            // as soon as its spot is free air.
+            if let Some(hold) = holds[who.index()].as_mut().filter(|hold| hold.displaced.is_some_and(|moved| moved.landed)) {
+                if placement::free_at(accessor, fighter.at) {
+                    hold.lift_again();
+                }
+            }
             engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
         }
         Session::Start(mut start) => {

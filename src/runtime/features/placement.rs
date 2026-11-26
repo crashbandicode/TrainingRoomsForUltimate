@@ -1,6 +1,8 @@
-use super::{cpu::konst, stage_geometry::FloorRay};
+use super::{cpu::konst, stage_geometry::{FloorRay, RayProbe}};
+use crate::engine::macro_ui::scrub_track::can_stand;
 use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::crosshair::{self, CpuPreview, Origin, PreviewAct};
+use crate::model::stage_geometry::{classify, Unread};
 use crate::runtime::{game::{self, natives}, state_natives as state};
 
 /// The floor point a fighter stands on for a crosshair at `at`. With `platforms`, the first floor at or below the
@@ -87,11 +89,13 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         *slot = None;
         return None;
     }
-    let act = crosshair::hold_step(slot, id, grounded, || Origin {
-        at: [natives::pos_x(body), natives::pos_y(body)],
-        grounded: natives::situation_kind(body) == konst(C::SituationGround),
-        facing: natives::lr(body),
-    });
+    // The body as the game left it, before this frame's write.
+    let seen = [natives::pos_x(body), natives::pos_y(body)];
+    let landed = natives::situation_kind(body) == konst(C::SituationGround);
+    let act = crosshair::hold_step(slot, id, grounded, || Origin { at: seen, grounded: landed, facing: natives::lr(body) });
+    if let Some(preview) = slot {
+        preview.observe(at, seen, landed, grounded);
+    }
     if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
         state::set_sleep(body, false);
     }
@@ -116,6 +120,14 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         preview.magnified = loupe != UNRESOLVED && natives::is_flag(body, loupe);
     }
     Some(asleep)
+}
+
+/// The shared stage rule for a point, through this body's own ray: free for a body to be at (over the stage, in
+/// open air or under the stage), not inside a solid and not past a blast line. A stage that cannot be read frees
+/// nothing.
+pub(super) unsafe fn free_at(body: usize, at: [f32; 2]) -> bool {
+    let Some(blast) = super::tech_surfaces::blast_bounds() else { return false };
+    can_stand(RayProbe::new(body).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
 /// Put a previewed body back where its picker found it. A preview only exists where `preview_ready` held.

@@ -115,12 +115,29 @@ impl CpuPreview {
     /// One frame's read of the body, taken before this frame's write. `at`: the point asked for on this frame;
     /// `seen` and `landed`: where the game has the body and whether it stands on the ground; `grounded`: the hold
     /// is a floor stand.
-    pub fn observe(&mut self, _at: [f32; 2], _seen: [f32; 2], _landed: bool, _grounded: bool) {}
+    pub fn observe(&mut self, at: [f32; 2], seen: [f32; 2], landed: bool, grounded: bool) {
+        if grounded {
+            (self.displaced, self.wrote, self.relifted) = (None, None, false);
+            return;
+        }
+        self.displaced = self.wrote
+            .filter(|wrote| landed || seen[0] != wrote[0] || seen[1] > wrote[1])
+            .map(|_| Displaced { at: seen, landed });
+        if self.wrote != Some(at) {
+            self.relifted = false;
+        }
+        self.wrote = Some(at);
+    }
 
     /// The caller asks for the placing frames again at the point now asked for. Once at a point; `false` when it
     /// has been asked there already.
     pub fn lift_again(&mut self) -> bool {
-        false
+        if self.relifted {
+            return false;
+        }
+        self.relifted = true;
+        self.frames = 0;
+        true
     }
 
     fn act(&mut self, grounded: bool) -> PreviewAct {
