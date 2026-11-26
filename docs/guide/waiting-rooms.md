@@ -17,6 +17,12 @@ With Lobby Practice Off, the menu and chords do not work in waiting rooms. A sav
 
 ## What works there
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/838bcaf0259ef282ce4d24371ff058e36357264b" autoplay muted loop playsinline controls></video>
+
+*Guard the Edge in an earlier Eden waiting room (`17060a5e`): the CPU recovers at the ledge and the result reads 0/1.
+This shows a practice round, not opening the room menu or a new install 6 room test. The yellow `BRIDGE LIVE` mark at
+the top is drawn by the capture tool; players never see it.* [Open the clip](../media/guard-the-edge-waiting-room.mp4)
+
 | Tool | In waiting-room practice |
 | --- | --- |
 | CPU settings | The first training partner is the CPU; CPU Level sets every partner's level. |
@@ -52,7 +58,7 @@ More: [Game speed](game-speed.md#in-the-waiting-rooms).
 | Case | What happens |
 | --- | --- |
 | The game's menu | Close the TrainingRooms menu before opening it. Chords do not fire while the game's menu is open. |
-| An AI plays Player 1 | Play on Player 1 and L + R + A are refused. Install 4 also refuses Record; in the next build you can record the AI's inputs. |
+| An AI plays Player 1 | Play on Player 1 and L + R + A are refused. Install 4 also refused Record; installs 5 and 6 let you record the AI's inputs. |
 | The name keyboard | A match closes it without applying the name. Back in the same room it reopens with what you typed. |
 
 ## When the match starts
