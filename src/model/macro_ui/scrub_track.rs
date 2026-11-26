@@ -51,7 +51,7 @@ impl Pos {
     pub const fn text(self) -> &'static str {
         match self {
             Pos::NoTrack => "Play it once to see positions while scrubbing.",
-            Pos::Off => "Can't stand there on this stage.",
+            Pos::Off => "Can't stand there on this stage.", // restriction: scrub-point-not-standable
             Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
         }
@@ -659,7 +659,7 @@ mod tests {
         block.set_ask(Ask::None);
         assert_eq!(block.pos(), Pos::None);
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("if !in_bounds(spot.at, limits) {"));
+        assert!(runtime.contains("if !in_bounds(spot.at, limits) || "));
         assert!(runtime.contains("return SEEN_OFF;"));
     }
 
