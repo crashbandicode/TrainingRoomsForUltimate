@@ -254,6 +254,7 @@ impl ClipView {
     pub fn play_role(&self) -> crate::engine::library::Role {
         if self.target == Some(true) { crate::engine::library::Role::Player } else { crate::engine::library::Role::Cpu }
     }
+    pub fn scrubs(&self) -> bool { self.handle != Handle::Playhead }
 }
 
 /// The same editor changes units and offered actions with its source.
@@ -278,6 +279,7 @@ pub struct ClipView {
     pub start: u32,
     pub end: u32,
     pub cursor: u32,
+    pub shown: Option<u32>,
     pub handle: Handle,
     pub playing: bool,
     pub entry: i32,
@@ -309,6 +311,7 @@ pub struct ClipEditor {
     window: FrameWindow,
     handle: Handle,
     playing: bool,
+    browsed: bool,
     clean_statuses: Vec<i32>,
     move_rules: Option<MoveStartRules>,
     move_start: Option<MoveStart>,
@@ -357,7 +360,7 @@ impl ClipEditor {
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
-            handle: Handle::Playhead, playing: false, clean_statuses, move_rules: None, move_start: None,
+            handle: Handle::Playhead, playing: false, browsed: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
             open_guard, error: None, marks, replay_player: false, watch_base: 0 })
     }
@@ -389,7 +392,7 @@ impl ClipEditor {
         open_guard.arm();
         Ok(Self { session: ReplaySession { tracks: Vec::new(), truncated: false, breaks: Vec::new() },
             file: Some(file), previous: None, previous_selected: false, track: 0,
-            window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false,
+            window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false, browsed: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
             source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })
     }
@@ -497,6 +500,11 @@ impl ClipEditor {
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
+    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
+    pub fn shown_frame(&self) -> Option<u32> {
+        (!self.playing && self.handle != Handle::Playhead && self.context().preview()).then_some(self.window.cursor())
+    }
+
     pub fn view(&self) -> ClipView {
         let (entry, fighter_kind, clean_start, quantized) = match &self.file {
             Some(FileSource::Macro { recording, player }) =>
@@ -516,7 +524,7 @@ impl ClipEditor {
             Handle::Playhead => (self.window.cursor(), false),
         };
         ClipView { context: self.context(), total: self.window.total(), start: self.window.start(), end: self.window.end(),
-            cursor: self.window.cursor(), handle: self.handle, playing: self.playing,
+            cursor: self.window.cursor(), shown: self.shown_frame(), handle: self.handle, playing: self.playing,
             entry, fighter_kind, previous_selected: self.previous_selected, previous_available: self.previous.is_some(),
             clean_start, move_start: self.move_start, quantized, truncated: self.session.truncated,
             source_name: self.source_name.clone(), error: self.error.clone(),
@@ -791,6 +799,192 @@ mod tests {
 
     fn snap_capture() -> ClipEditor {
         snap_capture_with(7, 45, 0)
+    }
+
+    fn cropped_capture() -> ClipEditor {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::SelectOut);
+        e.on_action(ClipAction::Nudge(-20));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(10));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!((e.view().start, e.view().end), (10, 40));
+        e
+    }
+
+    fn the_playhead_browses_the_whole_take_and_leaves_in_and_out() {
+        let mut e = cropped_capture();
+        let move_start = e.view().move_start;
+        assert!(!e.browsed);
+        assert_eq!(e.shown_frame(), None);
+        assert!(!matches!(e.on_action(ClipAction::Nudge(-5)), ClipEffect::Error(_)));
+        assert_eq!(e.view().cursor, 5);
+        assert_eq!(e.shown_frame(), Some(5));
+        assert_eq!(e.view().shown, Some(5));
+        e.on_action(ClipAction::Nudge(500));
+        assert_eq!(e.view().cursor, 59);
+        e.on_action(ClipAction::Nudge(-500));
+        assert_eq!(e.view().cursor, 0);
+        assert_eq!((e.view().start, e.view().end), (10, 40));
+        assert_eq!(e.view().handle, Handle::Playhead);
+        assert_eq!(e.view().move_start, move_start);
+
+        let mut e = saved_macro(false);
+        assert_eq!(e.shown_frame(), None);
+        assert!(!matches!(e.on_action(ClipAction::Nudge(3)), ClipEffect::Error(_)));
+        assert_eq!(e.view().cursor, 3);
+        assert_eq!(e.shown_frame(), Some(3));
+        e.on_action(ClipAction::Nudge(500));
+        assert_eq!(e.view().cursor, e.view().total - 1);
+        e.on_action(ClipAction::Nudge(-500));
+        assert_eq!(e.view().cursor, 0);
+        assert_eq!((e.view().start, e.view().end), (0, 10));
+        assert_eq!(e.view().handle, Handle::Playhead);
+    }
+
+    fn y_snaps_the_playhead_to_the_nearest_mark() {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::Nudge(30));
+        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+        assert_eq!(e.view().cursor, 23);
+        assert_eq!((e.view().start, e.view().end), (0, 60));
+        assert_eq!(e.shown_frame(), Some(23));
+    }
+
+    fn l_and_r_cut_here_after_the_playhead_moved() {
+        let mut e = cropped_capture();
+        e.on_action(ClipAction::Nudge(10));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.view().start, 20);
+        assert_eq!(e.view().handle, Handle::In);
+        assert_eq!(e.shown_frame(), Some(20));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(15));
+        e.on_action(ClipAction::SelectOut);
+        assert_eq!((e.view().start, e.view().end, e.view().cursor), (20, 36, 35));
+        assert_eq!(e.view().handle, Handle::Out);
+    }
+
+    fn l_and_r_only_select_when_the_playhead_has_not_moved() {
+        let mut e = cropped_capture();
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!((e.view().handle, e.view().start), (Handle::In, 10));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::SelectOut);
+        assert_eq!((e.view().handle, e.view().end), (Handle::Out, 40));
+        let mut e = cropped_capture();
+        e.on_action(ClipAction::Nudge(10));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::SelectOut);
+        assert_eq!((e.view().handle, e.view().end), (Handle::Out, 40));
+    }
+
+    fn cut_here_never_reorders_the_handles() {
+        let mut e = cropped_capture();
+        e.on_action(ClipAction::Nudge(35));
+        let ClipEffect::Error(text) = e.on_action(ClipAction::SelectIn) else { panic!("past Out was accepted") };
+        assert_eq!(text, "Playhead is past Out: set Out first");
+        assert_eq!((e.view().start, e.view().end, e.view().handle), (10, 40, Handle::Playhead));
+        assert_eq!(e.shown_frame(), Some(45));
+        e.on_action(ClipAction::SelectOut);
+        assert_eq!(e.view().end, 46);
+
+        let mut e = cropped_capture();
+        e.on_action(ClipAction::Nudge(0));
+        let ClipEffect::Error(text) = e.on_action(ClipAction::SelectOut) else { panic!("at In was accepted") };
+        assert_eq!(text, "Playhead is at or before In: set In first");
+        assert_eq!((e.view().start, e.view().end, e.view().handle), (10, 40, Handle::Playhead));
+        e.on_action(ClipAction::Nudge(-5));
+        let ClipEffect::Error(text) = e.on_action(ClipAction::SelectOut) else { panic!("before In was accepted") };
+        assert_eq!(text, "Playhead is at or before In: set In first");
+        assert_eq!((e.view().start, e.view().end, e.view().handle), (10, 40, Handle::Playhead));
+        e.on_action(ClipAction::Nudge(34));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.view().start, 39);
+    }
+
+    fn a_cut_here_in_mid_action_then_y_then_x_works() {
+        let mut e = snap_capture();
+        e.on_action(ClipAction::Nudge(30));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.view().start, 30);
+        assert!(e.view().move_start.is_none());
+        let ClipEffect::Error(text) = e.on_action(ClipAction::TogglePlay) else { panic!("preview accepted mid-action") };
+        assert_eq!(text, "In is mid-action. Snap to a move start before previewing or saving.");
+        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));
+        assert_eq!(e.view().move_start.unwrap().action_frame, 25);
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+    }
+
+    fn x_and_a_end_the_browse_and_a_refusal_keeps_it() {
+        let mut e = snap_capture();
+        assert!(!matches!(e.on_action(ClipAction::Nudge(20)), ClipEffect::Error(_)));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        assert_eq!(e.shown_frame(), None);
+        e.preview_progress(60);
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!((e.view().handle, e.view().start), (Handle::In, 0));
+
+        let mut e = snap_capture();
+        e.on_action(ClipAction::Nudge(20));
+        assert!(matches!(e.on_action(ClipAction::Confirm), ClipEffect::Export(_)));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!((e.view().handle, e.view().start), (Handle::In, 0));
+
+        let mut e = snap_capture();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(30));
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(-18));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));
+        assert_eq!(e.shown_frame(), Some(12));
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.view().start, 12);
+    }
+
+    fn combos_and_drills_have_no_free_playhead() {
+        let mut e = combo_editor();
+        let ClipEffect::Error(text) = e.on_action(ClipAction::Nudge(1)) else { panic!("combo browsed") };
+        assert_eq!(text, "Press L for the start or R for the end, then hold Left or Right");
+        let ClipEffect::Error(text) = e.on_action(ClipAction::Snap) else { panic!("combo snapped") };
+        assert_eq!(text, "Press L for the start or R for the end, then Y to snap");
+        assert_eq!(e.shown_frame(), None);
+        assert!(!e.view().scrubs());
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.shown_frame(), None);
+        assert!(e.view().scrubs());
+    }
+
+    fn the_key_line_names_browse_cut_here_and_snap() {
+        let mut e = snap_capture();
+        let help = clip_help(&e.view(), "ZL/ZR", "ZL", 0);
+        assert_eq!(help.primary, "Hold Left or Right to browse the take, or Y for the nearest move.");
+        assert_eq!(help.follow, "Press L for the start, or R for the end. Hold ZL/ZR to start fast.");
+        assert!(help.primary.chars().count() <= 75 && help.follow.chars().count() <= 75);
+        e.on_action(ClipAction::Nudge(1));
+        let help = clip_help(&e.view(), "ZL/ZR", "ZL", 0);
+        assert_eq!(help.primary, "Playhead moved. L sets the start here, R the end.");
+        assert_eq!(help.follow, "Left or Right browses on. Y goes to the nearest move.");
+        assert!(help.primary.chars().count() <= 75 && help.follow.chars().count() <= 75);
+        let help = clip_help(&combo_editor().view(), "ZL/ZR", "ZL", 0);
+        assert_eq!(help.primary, "Press L for the start, or R for the end.");
+        assert_eq!(help.follow, "Then hold Left or Right. Hold ZL/ZR to start fast.");
+    }
+
+    fn held_repeat_runs_for_a_browsing_playhead_and_never_during_a_preview() {
+        let mut e = snap_capture();
+        assert!(e.view().scrubs());
+        e.on_action(ClipAction::SelectIn);
+        assert!(e.view().scrubs());
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        assert!(!e.view().scrubs());
+        let source = include_str!("../../runtime/macros/replay_capture.rs");
+        let playing = source.split_once("if clip_view().is_some_and(|v| v.playing) {").unwrap().1
+            .split_once("return;").unwrap().0;
+        assert!(playing.contains("*HOLD.lock().unwrap() = (0, 0, false);"));
+        assert_eq!(source.matches("view.scrubs()").count(), 2);
+        assert!(!source.contains("view.handle != Handle::Playhead"));
     }
 
     fn long_action_capture(last: u32) -> ClipEditor {
@@ -1307,6 +1501,16 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_playhead_browses_the_whole_take_and_leaves_in_and_out", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),
+            ("y_snaps_the_playhead_to_the_nearest_mark", y_snaps_the_playhead_to_the_nearest_mark as fn()),
+            ("l_and_r_cut_here_after_the_playhead_moved", l_and_r_cut_here_after_the_playhead_moved as fn()),
+            ("l_and_r_only_select_when_the_playhead_has_not_moved", l_and_r_only_select_when_the_playhead_has_not_moved as fn()),
+            ("cut_here_never_reorders_the_handles", cut_here_never_reorders_the_handles as fn()),
+            ("a_cut_here_in_mid_action_then_y_then_x_works", a_cut_here_in_mid_action_then_y_then_x_works as fn()),
+            ("x_and_a_end_the_browse_and_a_refusal_keeps_it", x_and_a_end_the_browse_and_a_refusal_keeps_it as fn()),
+            ("combos_and_drills_have_no_free_playhead", combos_and_drills_have_no_free_playhead as fn()),
+            ("the_key_line_names_browse_cut_here_and_snap", the_key_line_names_browse_cut_here_and_snap as fn()),
+            ("held_repeat_runs_for_a_browsing_playhead_and_never_during_a_preview", held_repeat_runs_for_a_browsing_playhead_and_never_during_a_preview as fn()),
             ("b_stops_a_clip_preview_without_leaving", b_stops_a_clip_preview_without_leaving as fn()),
             ("a_second_b_leaves_the_editor", a_second_b_leaves_the_editor as fn()),
             ("a_saved_macro_previews_its_kept_window_on_its_role", a_saved_macro_previews_its_kept_window_on_its_role as fn()),

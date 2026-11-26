@@ -92,6 +92,7 @@ mod tests {
             start: 120,
             end: 480,
             cursor: 300,
+            shown: Some(300),
             handle: Handle::Out,
             playing: false,
             entry: 1,
@@ -127,6 +128,20 @@ mod tests {
         let mut f = Frame::new();
         clip_frame(&view(), "Pikachu", 45, &mut f);
         assert!(f.help[1].string_lossy().contains("45 frames per tick"), "{:?}", f.help[1]);
+    }
+
+    fn browsed_playhead_shows_its_frame_in_the_window_line() {
+        let mut v = view();
+        let mut f = Frame::new();
+        clip_frame(&v, "Pikachu", 0, &mut f);
+        assert!(!f.rows[0].value.string_lossy().contains("playhead"));
+        v.handle = Handle::Playhead;
+        v.shown = Some(300);
+        clip_frame(&v, "Pikachu", 0, &mut f);
+        assert!(f.rows[0].value.string_lossy().ends_with(" · playhead 300"));
+        v.shown = None;
+        clip_frame(&v, "Pikachu", 0, &mut f);
+        assert!(!f.rows[0].value.string_lossy().contains("playhead"));
     }
 
     fn preview_hint_shows_only_while_a_preview_plays() {
@@ -165,6 +180,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("browsed_playhead_shows_its_frame_in_the_window_line", browsed_playhead_shows_its_frame_in_the_window_line as fn()),
             ("preview_hint_shows_only_while_a_preview_plays", preview_hint_shows_only_while_a_preview_plays as fn()),
             ("the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn", the_clip_editor_names_no_tab_so_no_active_tab_box_is_drawn as fn()),
             ("a_preview_refusal_shows_in_the_frame", a_preview_refusal_shows_in_the_frame as fn()),
