@@ -1486,7 +1486,8 @@ mod tests {
         let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);
         let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
         let mut loaded = recording.clone();
-        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);
+        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated,
+            crate::engine::macros::positions::Moves::Playback, vec![[frame, frame], [frame, frame]]);
         assert!(e.adopt_positions(loaded.clone()));
         assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);
         assert_eq!(e.scrub().1, Pos::Held);
@@ -1502,6 +1503,29 @@ mod tests {
         e.on_action(ClipAction::Nudge(-1));
         assert_eq!(e.scrub().1, Pos::Held);
         assert!(!combo_editor().adopt_positions(loaded));
+    }
+
+    fn the_open_editor_takes_moves_for_the_frames_it_already_had() {
+        use crate::engine::macros::positions::{Moves, Source};
+        let mut editor = saved_macro(false);
+        let recording = match &editor.file {
+            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),
+            _ => panic!("macro"),
+        };
+        let mut frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE,
+            input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
+        let mut held = recording.clone();
+        held.set_sourced_track(Source::Recorded, Moves::None, vec![[frame, frame]; 2]);
+        assert!(editor.adopt_positions(held.clone()));
+        frame.pose = crate::engine::macros::PackedPose([42, 0x100]);
+        let mut loaded = recording.clone();
+        loaded.set_sourced_track(Source::Recorded, Moves::Playback, vec![[frame, frame]; 2]);
+        assert!(editor.adopt_positions(loaded.clone()));
+        assert!(!editor.adopt_positions(loaded));
+        assert!(!editor.adopt_positions(held));
+        let mut shorter = recording;
+        shorter.set_sourced_track(Source::Recorded, Moves::Playback, vec![[frame, frame]]);
+        assert!(!editor.adopt_positions(shorter));
     }
 
     fn b_stops_a_clip_preview_without_leaving() {
@@ -1816,6 +1840,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
+            ("the_open_editor_takes_moves_for_the_frames_it_already_had", the_open_editor_takes_moves_for_the_frames_it_already_had as fn()),
             ("x_after_a_held_frame_previews_in_either_order_of_the_two_threads", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),
             ("the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),
             ("a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped", a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped as fn()),

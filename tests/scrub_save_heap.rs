@@ -108,7 +108,8 @@ fn a_maximum_take_serializes_without_a_second_track() {
         bytes.len(), encoded.capacity()).unwrap();
     assert!(scratch < 4096, "serializing to a nonallocating writer requested {scratch} bytes");
     let timed = Instant::now();
-    crate::engine::macros::positions::write(&folder, "timing", &rec.frames, stored, crate::engine::macros::positions::Source::Recorded).unwrap();
+    crate::engine::macros::positions::write(&folder, "timing", &rec.frames, stored,
+        crate::engine::macros::positions::Source::Recorded, crate::engine::macros::positions::Moves::Take).unwrap();
     let write_us = timed.elapsed().as_micros();
     let timed = Instant::now();
     let read = crate::engine::macros::positions::read(&folder, "timing", &rec.frames).map(|track| track.len());
@@ -117,13 +118,13 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let before = heap_bytes().total;
     let checked = crate::engine::macros::positions::check(&folder, "timing", &rec.frames);
     let check_alloc = heap_bytes().total - before;
-    assert_eq!(checked, Some((crate::engine::macros::positions::Source::Recorded, MAX_FRAMES as u32)));
+    assert_eq!(checked, Some((crate::engine::macros::positions::Source::Recorded, MAX_FRAMES as u32, crate::engine::macros::positions::Moves::Take)));
     eprintln!("SCRUB_CHECK frames={MAX_FRAMES} allocated={check_alloc}");
     assert!(check_alloc < 64 * 1024, "validating the existing sidecar allocated {check_alloc} bytes");
     crate::engine::macros::positions::remove(&folder, "timing");
     writeln!(std::io::stderr(), "SCRUB_SIDECAR frames={MAX_FRAMES} bytes={sidecar} write_us={write_us} read_us={read_us}").unwrap();
-    assert_eq!((read, sidecar), (Some(MAX_FRAMES), 40 + 72 * MAX_FRAMES as u64));
+    assert_eq!((read, sidecar), (Some(MAX_FRAMES), 40 + 88 * MAX_FRAMES as u64));
     fs::write(root.join("measured"), id).unwrap();
     // At drain the packed recording blocks and decoded track briefly coexist; not two whole tracks plus JSON.
-    assert!(peak < 7 * 1024 * 1024, "saving still buffered the entire JSON file");
+    assert!(peak < (7 * 1024 * 1024 + MAX_FRAMES * 16) as isize, "saving still buffered the entire JSON file");
 }

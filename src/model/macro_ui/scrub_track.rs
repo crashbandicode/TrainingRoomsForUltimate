@@ -992,9 +992,30 @@ mod tests {
         fill(0, TAKE_CHUNK + 1);
         assert_eq!(take.take(TAKE_CHUNK + 1).map(|track| track.len()), Some(TAKE_CHUNK));
         assert_eq!(TakeTrack::new().take(5), None, "a take with no state kept has no track");
-        assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 43_200);
+        assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 52_800);
         assert_eq!(TAKE_CHUNKS * TAKE_CHUNK, MAX_FRAMES);
         assert!(include_str!("scrub_track.rs").contains("Self { table: AtomicUsize::new(NO_BLOCK) }"), "initialised data, not BSS");
+    }
+
+    #[test]
+    fn a_take_keeps_each_frames_animation() {
+        let take = TakeTrack::new();
+        take.service(true, 0);
+        for i in 0..=TAKE_CHUNK {
+            for slot in 0..2 {
+                let mut frame = state(slot, i as u32);
+                frame.pose = PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]);
+                take.live(slot, &frame);
+            }
+            take.push(i, 0);
+        }
+        let rows = take.take(TAKE_CHUNK + 1).unwrap();
+        assert_eq!(rows.len(), TAKE_CHUNK + 1);
+        for i in [0, TAKE_CHUNK - 1, TAKE_CHUNK] {
+            for slot in 0..2 {
+                assert_eq!(rows[i][slot].pose, PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]));
+            }
+        }
     }
 
     #[test]

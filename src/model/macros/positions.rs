@@ -283,6 +283,123 @@ mod tests {
         (0..frames).map(pair).collect()
     }
 
+    fn version_one(dir: &Path, id: &str, inputs: &[InputFrame], rows: &[[ReplayFrame; 2]], source: Source) {
+        let hash = |bytes: &[u8]| bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100_0000_01b3));
+        let input_bytes: Vec<_> = inputs.iter().flat_map(|input| input.buttons.to_le_bytes().into_iter()
+            .chain([input.lstick_x as u8, input.lstick_y as u8, input.rstick_x as u8, input.rstick_y as u8])).collect();
+        let mut bytes = vec![0; 40];
+        bytes[..4].copy_from_slice(b"TRPS");
+        bytes[4..6].copy_from_slice(&1u16.to_le_bytes());
+        bytes[6] = 2;
+        bytes[7] = 36;
+        bytes[8..12].copy_from_slice(&(rows.len() as u32).to_le_bytes());
+        bytes[12..16].copy_from_slice(&(inputs.len() as u32).to_le_bytes());
+        bytes[16..24].copy_from_slice(&hash(id.as_bytes()).to_le_bytes());
+        bytes[24..32].copy_from_slice(&hash(&input_bytes).to_le_bytes());
+        bytes[32] = source as u8;
+        for frame in rows.iter().flatten() {
+            let s = frame.start;
+            for word in [s.fighter_kind as u32, s.costume, s.facing.to_bits(), s.situation as u32, s.status as u32,
+                s.speed_x.to_bits(), s.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits()] {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        fs::write(path(dir, id), bytes).unwrap();
+    }
+
+    fn posed_track(frames: u32) -> Vec<[ReplayFrame; 2]> {
+        (0..frames).map(|i| {
+            let mut frames = pair(i);
+            for (role, frame) in frames.iter_mut().enumerate() {
+                frame.pose = crate::engine::macros::PackedPose([i + 1 + role as u32 * 10_000, (i + 1) << 8 | role as u32]);
+            }
+            frames
+        }).collect()
+    }
+
+    #[test]
+    fn a_version_1_file_still_loads_with_no_moves() {
+        let dir = scratch();
+        let inputs = inputs(3);
+        let rows = track(3);
+        version_one(&dir, "legacy", &inputs, &rows, Source::Recorded);
+        assert_eq!(read(&dir, "legacy", &inputs), Some(rows));
+        assert_eq!(check(&dir, "legacy", &inputs), Some((Source::Recorded, 3, Moves::None)));
+    }
+
+    #[test]
+    fn each_rows_pose_is_kept() {
+        let dir = scratch();
+        let inputs = inputs(1_300);
+        let rows = posed_track(1_300);
+        write(&dir, "poses", &inputs, &rows, Source::Generated, Moves::Playback).unwrap();
+        assert_eq!(read(&dir, "poses", &inputs), Some(rows));
+        assert_eq!(check(&dir, "poses", &inputs), Some((Source::Generated, 1_300, Moves::Playback)));
+    }
+
+    #[test]
+    fn a_file_this_build_does_not_read_gives_no_positions() {
+        let dir = scratch();
+        let inputs = inputs(3);
+        write(&dir, "broken", &inputs, &posed_track(3), Source::Recorded, Moves::Take).unwrap();
+        let good = fs::read(path(&dir, "broken")).unwrap();
+        for edit in [0, 1, 2, 3] {
+            let mut bytes = good.clone();
+            match edit {
+                0 => bytes[7] = 36,
+                1 => bytes[4] = 3,
+                2 => bytes[33] = 3,
+                _ => { bytes.pop(); },
+            }
+            fs::write(path(&dir, "broken"), bytes).unwrap();
+            assert_eq!(read(&dir, "broken", &inputs), None, "{edit}");
+            assert_eq!(check(&dir, "broken", &inputs), None, "{edit}");
+            assert_eq!(kept(&dir, "broken", &inputs), None, "{edit}");
+            assert!(!binds(&dir, "broken", &inputs), "{edit}");
+        }
+    }
+
+    #[test]
+    fn merge_gives_a_recorded_file_the_runs_moves_and_keeps_its_positions() {
+        let dir = scratch();
+        let inputs = inputs(1_300);
+        let recorded = track(1_300);
+        version_one(&dir, "merge", &inputs, &recorded, Source::Recorded);
+        let mut run = posed_track(1_300);
+        for pair in &mut run { for frame in pair { frame.x += 500.0; frame.y -= 700.0; } }
+        run[7][0].start.fighter_kind += 1;
+        run[650][1].start.status += 1;
+        assert!(merge(&dir, "merge", &inputs, &run).unwrap());
+        assert_eq!(check(&dir, "merge", &inputs), Some((Source::Recorded, 1_300, Moves::Playback)));
+        let got = read(&dir, "merge", &inputs).unwrap();
+        for i in 0..1_300 {
+            for role in 0..2 {
+                let mut expected = recorded[i][role];
+                if (i, role) != (7, 0) && (i, role) != (650, 1) { expected.pose = run[i][role].pose; }
+                assert_eq!(got[i][role], expected, "frame {i}, role {role}");
+            }
+        }
+    }
+
+    #[test]
+    fn merge_changes_nothing_when_it_does_not_apply_or_fails() {
+        let dir = scratch();
+        let inputs = inputs(1_300);
+        let run = posed_track(1_300);
+        for case in 0..4 {
+            let rows = track(if case == 1 { 1_200 } else { 1_300 });
+            version_one(&dir, "merge", &inputs, &rows, Source::Recorded);
+            let before = fs::read(path(&dir, "merge")).unwrap();
+            let mut other = inputs.clone();
+            if case == 2 { other[0].buttons ^= 1; }
+            if case == 3 { fail_writes(true); }
+            let result = merge(&dir, "merge", &other, if case == 0 { &run[..1_299] } else { &run });
+            fail_writes(false);
+            if case == 3 { assert!(result.is_err()); } else { assert!(!result.unwrap()); }
+            assert_eq!(fs::read(path(&dir, "merge")).unwrap(), before, "case {case}");
+        }
+    }
+
     fn recording(name: &str, frames: u32, tracked: bool) -> MacroRecording {
         let mut recording = MacroRecording::new(name, "13.0.5", StartState::neutral(18, 0, 1.0), inputs(frames)).unwrap();
         if tracked {
@@ -298,7 +415,7 @@ mod tests {
         for origin in [Source::Recorded, Source::Generated] {
             let rec = recording("Walk", 8, false);
             let id = library.save_new(&rec).unwrap();
-            write(&dir, &id, &rec.frames, &track(3), origin).unwrap();
+            write(&dir, &id, &rec.frames, &track(3), origin, Moves::None).unwrap();
             let mut editor = ClipEditor::macro_file(library.load_edited(&id).unwrap(), true).unwrap();
             editor.on_action(ClipAction::SelectIn);
             editor.on_action(ClipAction::Nudge(1));
@@ -317,13 +434,15 @@ mod tests {
     fn the_file_has_the_published_layout() {
         let dir = scratch();
         let inputs = inputs(700);
-        write(&dir, "walk", &inputs, &track(650), Source::Recorded).unwrap();
+        let mut rows = track(650);
+        rows[2][0].pose = crate::engine::macros::PackedPose([0x12345678, 0x1234]);
+        write(&dir, "walk", &inputs, &rows, Source::Recorded, Moves::Take).unwrap();
         let bytes = fs::read(path(&dir, "walk")).unwrap();
         assert_eq!(path(&dir, "walk"), dir.join("walk.pos"));
-        assert_eq!(bytes.len(), 40 + 72 * 650);
-        assert_eq!((bytes[32], &bytes[33..40]), (1, &[0u8; 7][..]), "the source, then padding");
+        assert_eq!(bytes.len(), 40 + 88 * 650);
+        assert_eq!((bytes[32], bytes[33], &bytes[34..40]), (1, 1, &[0u8; 6][..]));
         assert_eq!(&bytes[..4], b"TRPS");
-        assert_eq!((bytes[4], bytes[5], bytes[6], bytes[7]), (1, 0, 2, 36));
+        assert_eq!((bytes[4], bytes[5], bytes[6], bytes[7]), (2, 0, 2, 44));
         assert_eq!((word(&bytes, 8), word(&bytes, 12)), (650, 700));
         let id = b"walk".iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(0x100_0000_01b3));
         assert_eq!(bytes[16..24], id.to_le_bytes());
@@ -332,18 +451,19 @@ mod tests {
             .fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3));
         assert_eq!(bytes[24..32], hash.to_le_bytes());
         // Frame 2's rows: the recorded fighter's nine words, then the other fighter's.
-        let row = |at: usize| (0..9).map(|cell| word(&bytes, 40 + 72 * 2 + at + 4 * cell)).collect::<Vec<_>>();
+        let row = |at: usize| (0..9).map(|cell| word(&bytes, 40 + 88 * 2 + at + 4 * cell)).collect::<Vec<_>>();
         assert_eq!(row(0), [18, 3, (-1.0f32).to_bits(), 0, 14, 0.5f32.to_bits(), 0, 26.0f32.to_bits(), 2.0f32.to_bits()]);
-        assert_eq!(row(36), [74, 0, 1.0f32.to_bits(), 2, 0, 0, (-1.25f32).to_bits(), (-40.0f32).to_bits(), 7.5f32.to_bits()]);
+        assert_eq!(row(44), [74, 0, 1.0f32.to_bits(), 2, 0, 0, (-1.25f32).to_bits(), (-40.0f32).to_bits(), 7.5f32.to_bits()]);
+        assert_eq!(&bytes[40 + 88 * 2 + 36..40 + 88 * 2 + 44], &rows[2][0].pose.to_le_bytes());
         assert!(!dir.join("walk.pos.tmp").exists(), "the unfinished name is gone");
         // More than one chunk reads back whole; entries past the inputs are left out.
-        assert_eq!(read(&dir, "walk", &inputs), Some(track(650)));
+        assert_eq!(read(&dir, "walk", &inputs), Some(rows));
         assert_eq!(source(&dir, "walk", &inputs), Some(Source::Recorded));
         // A file made by a playback says so, and reads the same way.
-        write(&dir, "walk", &inputs, &track(650), Source::Generated).unwrap();
+        write(&dir, "walk", &inputs, &track(650), Source::Generated, Moves::Playback).unwrap();
         assert_eq!((source(&dir, "walk", &inputs), read(&dir, "walk", &inputs)), (Some(Source::Generated), Some(track(650))));
         assert_eq!(source(&dir, "walk", &inputs[..5]), None, "only for the macro it binds");
-        write(&dir, "walk", &inputs[..10], &track(650), Source::Recorded).unwrap();
+        write(&dir, "walk", &inputs[..10], &track(650), Source::Recorded, Moves::Take).unwrap();
         assert_eq!(read(&dir, "walk", &inputs[..10]), Some(track(10)));
         fs::remove_dir_all(dir).unwrap();
     }
@@ -355,10 +475,10 @@ mod tests {
         assert_eq!(read(&dir, "take", &inputs), None, "a missing file");
         assert!(!binds(&dir, "take", &inputs));
         // No rows is an empty track (positions that ran out at once), not a missing file.
-        write(&dir, "take", &inputs, &[], Source::Recorded).unwrap();
+        write(&dir, "take", &inputs, &[], Source::Recorded, Moves::Take).unwrap();
         assert_eq!(read(&dir, "take", &inputs), Some(Vec::new()));
         // A prefix shorter than the inputs is whole.
-        write(&dir, "take", &inputs, &track(8), Source::Recorded).unwrap();
+        write(&dir, "take", &inputs, &track(8), Source::Recorded, Moves::Take).unwrap();
         assert_eq!(read(&dir, "take", &inputs), Some(track(8)));
         assert!(binds(&dir, "take", &inputs));
         let good = fs::read(path(&dir, "take")).unwrap();
@@ -366,13 +486,13 @@ mod tests {
         let broken: [(&str, Edit); 10] = [
             ("a source this build does not know", |bytes| bytes[32] = 3),
             ("the magic", |bytes| bytes[0] = b'X'),
-            ("a later format version", |bytes| bytes[4] = 2),
+            ("a later format version", |bytes| bytes[4] = 3),
             ("one fighter", |bytes| bytes[6] = 1),
             ("another row size", |bytes| bytes[7] = 40),
             ("a partial last row", |bytes| { bytes.pop(); }),
             ("bytes after the last row", |bytes| bytes.push(0)),
             ("more frames than the file holds", |bytes| bytes[8] = 9),
-            ("more frames than the macro has inputs", |bytes| { bytes[8] = 13; bytes.extend([0; 72 * 5]); }),
+            ("more frames than the macro has inputs", |bytes| { bytes[8] = 13; bytes.extend([0; 88 * 5]); }),
             ("a number that is not finite", |bytes| bytes[40 + 28..40 + 32].copy_from_slice(&f32::NAN.to_le_bytes())),
         ];
         for (what, edit) in broken {
@@ -402,7 +522,7 @@ mod tests {
         // tr-primary-2 2026-11-26 03:10:37Z: the macro under an id is replaced by one with other inputs.
         let dir = scratch();
         let (first, second) = (inputs(20), (0..20).map(|i| InputFrame { buttons: 500 + i, ..InputFrame::default() }).collect::<Vec<_>>());
-        write(&dir, "take", &first, &track(20), Source::Recorded).unwrap();
+        write(&dir, "take", &first, &track(20), Source::Recorded, Moves::Take).unwrap();
         assert!(!binds(&dir, "take", &second));
         assert_eq!((read(&dir, "take", &second), source(&dir, "take", &second)), (None, None));
         // Through the library: the earlier take's file is gone once the new macro is in place, and nothing shows.

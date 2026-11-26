@@ -182,20 +182,44 @@ mod tests {
     }
 
     fn write_wanted_follows_the_rule() {
-        // A whole recorded file is never replaced. One that is shorter than the inputs (SP-17: a take's positions
-        // stopped early) is replaced by a playback that covers more frames, as a short generated file is.
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 5)), 5, 5), (false, true));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 5)), 2, 5), (false, true));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 1_553, 1_553), (true, true));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 1_300, 1_553), (true, false));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 900, 1_553), (false, false));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 0)), 5, 5), (true, true));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 5)), 2, 5), (false, true));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 3)), 2, 5), (false, false));
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 2)), 3, 5), (true, false));
-        assert_eq!(PlayTrack::write_wanted(None, 5, 5), (true, true));
-        assert_eq!(PlayTrack::write_wanted(None, 0, 5), (false, false));
-        assert_eq!(PlayTrack::write_wanted(None, 0, 0), (false, true));
+        use crate::engine::macros::positions::Moves;
+        use Wanted::{Keep, Merge, Write};
+        for moves in [Moves::Take, Moves::Playback] {
+            let cases = [
+                (Some((Source::Recorded, 5, moves)), 5, 5, (Keep, true)),
+                (Some((Source::Recorded, 5, moves)), 2, 5, (Keep, true)),
+                (Some((Source::Recorded, 1_200, moves)), 1_553, 1_553, (Write, true)),
+                (Some((Source::Recorded, 1_200, moves)), 1_300, 1_553, (Write, false)),
+                (Some((Source::Recorded, 1_200, moves)), 900, 1_553, (Keep, false)),
+                (Some((Source::Recorded, 0, moves)), 5, 5, (Write, true)),
+                (Some((Source::Generated, 5, moves)), 2, 5, (Keep, true)),
+                (Some((Source::Generated, 3, moves)), 2, 5, (Keep, false)),
+                (Some((Source::Generated, 2, moves)), 3, 5, (Write, false)),
+                (None, 5, 5, (Write, true)),
+                (None, 0, 5, (Keep, false)),
+                (None, 0, 0, (Keep, true)),
+            ];
+            for (existing, rows, inputs, expected) in cases {
+                assert_eq!(PlayTrack::write_wanted(existing, rows, inputs), expected);
+            }
+        }
+        let cases = [
+            (Some((Source::Recorded, 5, Moves::None)), 5, 5, (Merge, true)),
+            (Some((Source::Recorded, 5, Moves::None)), 4, 5, (Keep, false)),
+            (Some((Source::Recorded, 5, Moves::None)), 6, 5, (Merge, true)),
+            (Some((Source::Recorded, 3, Moves::None)), 3, 5, (Keep, false)),
+            (Some((Source::Recorded, 3, Moves::None)), 2, 5, (Keep, false)),
+            (Some((Source::Recorded, 3, Moves::None)), 4, 5, (Write, false)),
+            (Some((Source::Recorded, 3, Moves::None)), 5, 5, (Write, true)),
+            (Some((Source::Generated, 3, Moves::None)), 3, 5, (Write, false)),
+            (Some((Source::Generated, 3, Moves::None)), 2, 5, (Keep, false)),
+            (Some((Source::Generated, 3, Moves::None)), 5, 5, (Write, true)),
+            (Some((Source::Generated, 0, Moves::None)), 0, 5, (Keep, false)),
+            (Some((Source::Generated, 0, Moves::None)), 1, 5, (Write, false)),
+        ];
+        for (existing, rows, inputs, expected) in cases {
+            assert_eq!(PlayTrack::write_wanted(existing, rows, inputs), expected);
+        }
     }
 
     fn fed_keeps_only_its_runs_rows_in_order() {
