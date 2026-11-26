@@ -23,6 +23,8 @@ mod model;
 #[allow(dead_code, unused_imports)]
 pub mod engine;
 mod allocation;
+#[path = "../scrub_save_heap.rs"]
+mod scrub_save_heap;
 #[path = "../../src/test_table.rs"]
 mod test_table;
 #[path = "../build_tag.rs"]
