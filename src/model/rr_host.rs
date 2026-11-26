@@ -5275,6 +5275,36 @@ mod tests {
         assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
     }
 
+    #[test]
+    fn a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-external-edit", 3);
+        let dir = root.join(MACROS_DIR);
+        generated_play(&root, Role::Cpu);
+        for (i, input) in recording.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
+        }
+        // Same external-edit contract as playback_immediate: no store event and no file-size change.
+        let path = dir.join(format!("{id}.json"));
+        let mut bytes = std::fs::read(&path).unwrap();
+        let field = b"\"buttons\":1";
+        let at = bytes.windows(field.len()).position(|s| s == field).unwrap() + field.len() - 1;
+        bytes[at] = b'9';
+        std::fs::write(&path, bytes).unwrap();
+        let changed = Library::new(&dir).load(&id).unwrap();
+        assert_eq!(changed.frames[0].buttons, 9);
+        tick(&root);
+        assert!(!positions::path(&dir, &id).exists(), "the worker must not sign the old poses with the new inputs");
+        generated_play(&root, Role::Cpu);
+        for (i, input) in changed.frames.iter().enumerate() {
+            assert_eq!(generated_take(Role::Cpu, 10 + i as u32), Some(*input));
+        }
+        tick(&root);
+        assert_eq!(generated_rows(&root, &id, &changed).unwrap()[0][0].x, 10.0);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     fn a_recorded_file_written_before_the_worker_drains_is_kept() {
         use crate::engine::macros::positions::{self, Source};
         let _hold = hold();
