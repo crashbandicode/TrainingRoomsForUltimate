@@ -69,6 +69,11 @@ impl FrameQueue {
     }
 
     pub fn pop_tagged(&self) -> Option<(u64, usize)> {
+        self.pop_tagged_with(|_| {})
+    }
+
+    /// Credit the selected generation before advancing the head makes the last input look drained.
+    pub(crate) fn pop_tagged_with(&self, taken: impl FnOnce(usize)) -> Option<(u64, usize)> {
         let head = self.head.load(Ordering::Relaxed);
         loop {
             let generation = self.generation_start.load(Ordering::Acquire);
@@ -77,6 +82,7 @@ impl FrameQueue {
                 return None;
             }
             if let Some(word) = self.read_live(at, generation) {
+                taken(generation);
                 self.head.store(at.wrapping_add(1), Ordering::Release);
                 return Some((word, generation));
             }

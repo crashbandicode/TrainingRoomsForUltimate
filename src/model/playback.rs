@@ -112,7 +112,9 @@ impl Book {
         }
     }
 
-    pub fn add_recording(&mut self, id: impl Into<String>, recording: MacroRecording) {
+    /// The book keeps what playback reads. A macro's position track is for the clip editor only, and is dropped here.
+    pub fn add_recording(&mut self, id: impl Into<String>, mut recording: MacroRecording) {
+        recording.set_track(None);
         self.recordings.insert(id.into(), recording);
     }
 
@@ -160,6 +162,24 @@ impl Book {
 
     pub fn is_chain(&self, id: &str) -> bool {
         self.chains.contains_key(id)
+    }
+
+    pub fn plays_from_zero(&self, id: &str) -> bool {
+        !self.is_chain(id) && self.recordings.get(id).is_some_and(|recording|
+            !matches!(recording.trim, crate::model::trim::Trim::Start | crate::model::trim::Trim::Both)
+                || recording.frames.first().is_some_and(|frame| !crate::model::trim::neutral_frame(frame)))
+    }
+
+    pub fn frame_count(&self, id: &str) -> Option<usize> {
+        self.recordings.get(id).map(|recording| recording.frames.len())
+    }
+
+    pub(crate) fn inputs(&self, id: &str) -> Option<&[InputFrame]> {
+        self.recordings.get(id).map(|recording| recording.frames.as_slice())
+    }
+
+    pub(crate) fn take_inputs(&mut self, id: &str) -> Option<Vec<InputFrame>> {
+        self.recordings.get_mut(id).map(|recording| std::mem::take(&mut recording.frames))
     }
 
     /// A chain's macro 1 (whose start save the chain warps to); `None` for anything else.

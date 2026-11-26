@@ -30,7 +30,7 @@ use std::{
     collections::BTreeMap,
     ffi::OsString,
     fmt, fs,
-    io::{self, Write},
+    io::{self, BufWriter, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
     sync::{atomic::{AtomicU64, Ordering}, Mutex, MutexGuard, TryLockError},
@@ -118,6 +118,13 @@ pub trait Record: Serialize + DeserializeOwned {
     const SCHEMA_VERSIONS: &'static [u32];
     /// Largest file `load` and `list` will read.
     const MAX_FILE_BYTES: u64;
+    /// Serialize to the temporary file instead of building a JSON-sized save buffer.
+    const STREAM_WRITE: bool = false;
+    /// A record with a file of its own beside the record's (a macro's positions): before the record is written under
+    /// `id`, after it is in place, and after it is deleted. Default: nothing.
+    fn before_write(&self, _dir: &Path, _id: &str, _new: bool) -> io::Result<()> { Ok(()) }
+    fn after_write(&self, _dir: &Path, _id: &str) {}
+    fn after_delete(_dir: &Path, _id: &str) {}
     /// Everything the store requires before it writes or accepts a file.
     fn validate(&self) -> Result<(), Self::Error>;
     /// Display name: its slug seeds new ids and it orders listings.
@@ -179,7 +186,8 @@ impl<R: Record> ListCursor<R> {
         let Some(id) = name.strip_suffix(".json") else {
             return true;
         };
-        let data = match check_id::<R>(id).and_then(|()| read_bounded(&self.store.file(id, "json"), R::MAX_FILE_BYTES)) {
+        let path = self.store.file(id, "json");
+        let data = match check_id::<R>(id).and_then(|()| read_bounded(&path, R::MAX_FILE_BYTES)) {
             Ok(data) => data,
             Err(err) => {
                 let reason = lift::<R>(err).to_string();
@@ -187,9 +195,7 @@ impl<R: Record> ListCursor<R> {
                 return true;
             }
         };
-        if !R::owns(&data) {
-            return true;
-        }
+        if !R::owns(&data) { return true; }
         match decode::<R>(id, &data) {
             Ok(rec) => self.entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
             Err(err) => self.skipped.push(SkippedFile { file: name, reason: err.to_string() }),
@@ -234,7 +240,6 @@ impl<R: Record> Store<R> {
         }
     }
 
-    #[cfg(test)]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
@@ -280,13 +285,13 @@ impl<R: Record> Store<R> {
             }
         }
         self.restore_orphaned_backups(&mut names);
-        names.sort();
+        names.sort_unstable();
         Ok(ListCursor { store: self.clone(), names: names.into_iter(), entries: Vec::new(), skipped })
     }
 
     /// Read once and validate the owning type. Invalid data is stable for the
     /// catalog signature; an I/O error leaves the entry eligible to retry.
-    pub fn load_with_sibling<S: Record>(&self, id: &str) -> io::Result<Option<Result<R, S>>> {
+    pub fn load_with_sibling<S: Record>(&self, id: &str) -> io::Result<Option<Result<R::Summary, S>>> {
         if !R::accepts_id(id) && !S::accepts_id(id) {
             return Ok(None);
         }
@@ -294,7 +299,7 @@ impl<R: Record> Store<R> {
             return Ok(None);
         };
         Ok(if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
-            decode::<R>(id, &data).ok().map(Ok)
+            decode::<R>(id, &data).ok().map(|r| Ok(r.summary(id)))
         } else if S::accepts_id(id) && data.len() as u64 <= S::MAX_FILE_BYTES {
             decode::<S>(id, &data).ok().map(Err)
         } else {
@@ -332,7 +337,7 @@ impl<R: Record> Store<R> {
         fs::create_dir_all(&self.dir).map_err(|err| lift::<R>(err.into()))?;
         let _guard = catalog_folder(&self.dir).and_then(|(root, _)| recording_write_guard(root));
         let id = self.free_id(rec.name()).map_err(lift::<R>)?;
-        self.write_atomic(&id, &bytes).map_err(lift::<R>)?;
+        self.write_atomic(&id, rec, bytes, true)?;
         Ok(id)
     }
 
@@ -349,7 +354,7 @@ impl<R: Record> Store<R> {
         if !exists {
             return Err(lift::<R>(StoreError::NotFound(id.to_owned())));
         }
-        self.write_atomic(id, &bytes).map_err(lift::<R>)
+        self.write_atomic(id, rec, bytes, false)
     }
 
     /// Removes the record `id` (and a leftover backup of it).
@@ -362,6 +367,7 @@ impl<R: Record> Store<R> {
             Err(err) => return Err(lift::<R>(err.into())),
         }
         let _ = fs::remove_file(self.file(id, "json.bak"));
+        R::after_delete(&self.dir, id);
         note_catalog_write(&self.dir, id, None);
         Ok(())
     }
@@ -406,9 +412,23 @@ impl<R: Record> Store<R> {
         Err(StoreError::NoFreeId)
     }
 
-    fn write_atomic(&self, id: &str, bytes: &[u8]) -> Result<(), StoreError> {
-        write_replace(&self.file(id, "json"), bytes)?;
-        note_catalog_write(&self.dir, id, Some(bytes.len() as u64));
+    fn write_atomic(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>, new: bool) -> Result<(), R::Error> {
+        rec.before_write(&self.dir, id, new).map_err(|err| lift::<R>(err.into()))?;
+        let path = self.file(id, "json");
+        let size = if let Some(bytes) = bytes {
+            write_replace(&path, &bytes).map_err(|e| lift::<R>(e.into()))?;
+            bytes.len() as u64
+        } else if R::STREAM_WRITE {
+            replace_with(&path, |tmp| {
+                let mut writer = BufWriter::new(fs::File::create(tmp)?);
+                serde_json::to_writer(&mut writer, rec)?;
+                writer.flush()?;
+                writer.get_ref().sync_all()?;
+                Ok(writer.get_ref().metadata()?.len())
+            }).map_err(|e| lift::<R>(e.into()))?
+        } else { unreachable!("non-streaming records always have encoded bytes") };
+        rec.after_write(&self.dir, id);
+        note_catalog_write(&self.dir, id, Some(size));
         Ok(())
     }
 
@@ -518,9 +538,16 @@ fn lift<R: Record>(err: StoreError) -> R::Error {
     err.into()
 }
 
-fn encode<R: Record>(rec: &R) -> Result<Vec<u8>, R::Error> {
+/// The two record types sharing `macros/` need only the tag to identify which decoder owns a file.
+pub(crate) fn is_chain_document(bytes: &[u8]) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Header { kind: Option<String> }
+    serde_json::from_slice::<Header>(bytes).is_ok_and(|header| header.kind.as_deref() == Some("chain"))
+}
+
+fn encode<R: Record>(rec: &R) -> Result<Option<Vec<u8>>, R::Error> {
     rec.validate()?;
-    serde_json::to_vec(rec).map_err(|err| lift::<R>(err.into()))
+    if R::STREAM_WRITE { Ok(None) } else { serde_json::to_vec(rec).map(Some).map_err(|err| lift::<R>(err.into())) }
 }
 
 #[cfg(test)]
@@ -581,17 +608,26 @@ pub(crate) fn catalog_metadata_reads() -> usize {
 
 /// Reads a whole file after checking its size against `max`.
 fn read_bounded(path: &Path, max: u64) -> Result<Vec<u8>, StoreError> {
+    payload_read()?;
+    check_len(fs::metadata(path)?.len(), max)?;
+    Ok(fs::read(path)?)
+}
+
+fn payload_read() -> Result<(), StoreError> {
     #[cfg(test)]
     FILE_READS.with(|reads| reads.set(reads.get() + 1));
     #[cfg(test)]
     if FAIL_PAYLOAD.with(|fail| fail.replace(false)) {
         return Err(io::Error::from(io::ErrorKind::Interrupted).into());
     }
-    let bytes = fs::metadata(path)?.len();
+    Ok(())
+}
+
+fn check_len(bytes: u64, max: u64) -> Result<(), StoreError> {
     if bytes > max {
         return Err(StoreError::FileTooLarge { bytes, max });
     }
-    Ok(fs::read(path)?)
+    Ok(())
 }
 
 fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
@@ -604,10 +640,9 @@ fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
         Err(err) => {
             // A newer schema may not fit this layout; call that a version
             // problem rather than corruption.
-            let header = serde_json::from_slice::<serde_json::Value>(data)
-                .ok()
-                .and_then(|value| value.get("schema_version").and_then(serde_json::Value::as_u64))
-                .and_then(|version| u32::try_from(version).ok());
+            #[derive(serde::Deserialize)]
+            struct Header { schema_version: u32 }
+            let header = serde_json::from_slice::<Header>(data).ok().map(|h| h.schema_version);
             match header {
                 Some(found) if !R::SCHEMA_VERSIONS.contains(&found) => {
                     Err(lift::<R>(StoreError::UnsupportedVersion { found }))
@@ -623,8 +658,12 @@ fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
 /// replace). The old file is retired only after the new one is in place; on any failure it stays.
 /// Added for package 3's `save_states.json` (same rule as the store's own writes).
 pub fn write_replace(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    replace_with(path, |tmp| write_synced(tmp, bytes))
+}
+
+pub(crate) fn replace_with<T>(path: &Path, write: impl FnOnce(&Path) -> io::Result<T>) -> io::Result<T> {
     let tmp = with_suffix(path, ".tmp");
-    let result = write_synced(&tmp, bytes).and_then(|()| replace_file(&tmp, path));
+    let result = write(&tmp).and_then(|value| replace_file(&tmp, path).map(|()| value));
     if result.is_err() {
         let _ = fs::remove_file(&tmp);
     }

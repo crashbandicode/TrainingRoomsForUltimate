@@ -112,6 +112,7 @@ mod tests {
             mark_total: 0,
             near: None,
             target: Some(false),
+            pos: Default::default(),
         }
     }
 
