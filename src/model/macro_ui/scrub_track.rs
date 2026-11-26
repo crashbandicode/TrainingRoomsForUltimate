@@ -795,7 +795,7 @@ mod tests {
         editor.on_action(ClipAction::SelectOut);
         editor.on_action(ClipAction::Nudge(-1));
         // In 2, Out 9: seven frames, saved with A.
-        let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        let ClipEffect::Export(saved) = editor.on_action(ClipAction::Confirm) else { panic!("expected an export") };
         assert_eq!((saved.frames.len(), saved.schema_version), (7, 3));
         assert_eq!(saved.track, Some((2..9).map(|i| [state(0, i), state(1, i)]).collect()));
         saved.validate().unwrap();
@@ -811,14 +811,14 @@ mod tests {
         // A capture with one fighter saves that fighter's track; the other one is marked absent and is never held.
         let mut single = capture(1);
         single.on_action(ClipAction::SelectIn);
-        let ClipEffect::Export(saved) = single.on_action(ClipAction::Confirm) else { panic!("save refused") };
+        let ClipEffect::Export(saved) = single.on_action(ClipAction::Confirm) else { panic!("expected an export") };
         assert_eq!(saved.track.as_ref().map(|track| (track.len(), track[0][0], track[0][1].start.fighter_kind)), Some((10, state(0, 0), -1)));
         let mut reopened = ClipEditor::macro_file(*saved, false).unwrap();
         reopened.on_action(ClipAction::SelectIn);
         assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::Held)));
         // The X preview's clip is not given a track: it is played, not saved.
         let mut previewed = capture(2);
-        let ClipEffect::Preview(clip) = previewed.on_action(ClipAction::TogglePlay) else { panic!("preview refused") };
+        let ClipEffect::Preview(clip) = previewed.on_action(ClipAction::TogglePlay) else { panic!("expected a preview") };
         assert_eq!((clip.track.is_none(), clip.schema_version), (true, 1));
     }
 
