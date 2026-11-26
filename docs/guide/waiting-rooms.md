@@ -20,7 +20,8 @@ With Lobby Practice Off, the menu and chords do not work in waiting rooms. A sav
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/838bcaf0259ef282ce4d24371ff058e36357264b" autoplay muted loop playsinline controls></video>
 
 *Guard the Edge in an earlier Eden waiting room (`17060a5e`): the CPU recovers at the ledge and the result reads 0/1.
-This shows a practice round, not opening the room menu or a new install 6 room test.* [Open the clip](../media/guard-the-edge-waiting-room.mp4)
+This shows a practice round, not opening the room menu or a new install 6 room test. The yellow `BRIDGE LIVE` mark at
+the top is drawn by the capture tool; players never see it.* [Open the clip](../media/guard-the-edge-waiting-room.mp4)
 
 | Tool | In waiting-room practice |
 | --- | --- |
