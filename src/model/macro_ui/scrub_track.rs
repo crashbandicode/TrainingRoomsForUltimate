@@ -823,6 +823,17 @@ mod tests {
     }
 
     #[test]
+    fn a_playback_book_holds_no_track() {
+        // Playback never reads a track, and the book of every macro is loaded at once: it keeps the inputs only.
+        let mut book = crate::engine::playback::Book::new(crate::engine::library::RecordingIndex::fresh());
+        book.add_recording("tracked", recording(true));
+        book.add_recording("old", recording(false));
+        let held = format!("{book:?}");
+        assert!(held.contains("track: None") && !held.contains("track: Some"), "a book holds no track");
+        assert_eq!(held.matches("buttons: 9").count(), 2, "both macros keep their inputs");
+    }
+
+    #[test]
     fn a_retired_block_is_freed_only_with_no_reader() {
         let slot = Slot::new();
         assert!(slot.empty() && !slot.live());
