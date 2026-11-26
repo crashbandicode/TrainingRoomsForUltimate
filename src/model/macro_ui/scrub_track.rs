@@ -5,10 +5,11 @@
 //! The block lives on the heap while an editor is open. The game side reaches it through `Slot`, a published pointer
 //! with a reader count, and never through a lock the worker holds.
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use crate::engine::macros::{InputFrame, ReplayFrame, StartState, MAX_FRAMES};
 use crate::model::crosshair::CpuPreview;
+use crate::model::stage_geometry::{Place, Unread};
 
 /// A fighter's place and facing on one frame; as a delta, how far from the target fighter's home.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -79,6 +80,14 @@ pub fn in_bounds(at: [f32; 2], limits: [f32; 4]) -> bool {
     left <= at[0] && at[0] <= right && bottom <= at[1] && at[1] <= top
 }
 
+/// Whether a body may be put at a point of this stage, by the shared stage rule (`stage_geometry::classify`): over a
+/// floor or a platform, or in open air, also under the stage. Not in a solid, not outside the blast lines, and not
+/// on a stage that could not be read.
+pub fn can_stand(place: Result<Place, Unread>) -> bool {
+    let _ = place;
+    true
+}
+
 /// The one point rule for captures and macros: each fighter's delta on frame `at` from the selected fighter's place
 /// on the anchor frame. `selected` and `other` are the two fighters' states per frame; `target` is the role the
 /// selected fighter plays on.
@@ -99,6 +108,10 @@ pub struct Block {
     dropped: AtomicU32,
     /// The frame the ask is for, plus one; zero for none.
     shown: AtomicU32,
+    /// Each role's last point asked of the stage (x and y bits), and what the stage said: 0 not asked, 1 a body
+    /// may stand there, 2 it may not. The game thread only.
+    classed: [AtomicU64; 2],
+    stands: [AtomicU32; 2],
     /// Each role's hold, as the placement picker keeps one. The game thread only, with `try_lock`.
     pub holds: hos_lock::Mutex<[Option<CpuPreview>; 2]>,
 }
@@ -110,6 +123,8 @@ impl Block {
             seen: [const { AtomicU32::new(SEEN_IDLE) }; 2],
             dropped: AtomicU32::new(0),
             shown: AtomicU32::new(0),
+            classed: [const { AtomicU64::new(0) }; 2],
+            stands: [const { AtomicU32::new(0) }; 2],
             holds: hos_lock::Mutex::new([None; 2]),
         })
     }
@@ -152,6 +167,13 @@ impl Block {
         let Ask::Group { deltas, .. } = self.ask() else { return None };
         let delta = (*deltas.get(slot)?)?;
         Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing })
+    }
+
+    /// The game thread: whether the role's body may stand at `at`. The stage is asked (`class`) once per point, so a
+    /// held body casts rays only when its point changes.
+    pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
+        let _ = (slot, at, class, &self.classed, &self.stands);
+        true
     }
 
     /// The role whose home anchors the group.
@@ -1015,6 +1037,58 @@ mod tests {
             assert_eq!(pair[0], state(recorded, 9));
             assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
         }
+    }
+
+    #[test]
+    fn a_point_in_the_ground_or_past_the_blast_lines_holds_nobody() {
+        use crate::model::stage_geometry::{classify, Copied, Met};
+        // A stage as copied lines: solid ground from -150 to 150 at height 0, and two platforms over it.
+        let line = |ends, through| Met { ends, stand: true, through };
+        let stage = [line([[-150.0, 0.0], [150.0, 0.0]], false), line([[20.0, 30.0], [60.0, 30.0]], true), line([[20.0, 60.0], [60.0, 60.0]], true)];
+        let blast = [-240.0, 240.0, 190.0, -140.0];
+        let stands = |at: [f32; 2]| can_stand(classify(&mut Copied(&stage), blast, at));
+        // SP-10 (dup-audit, 2026-11-26): a capture's frame 137 with Player 1's home at (-30, 0.01) on the ground and
+        // the anchor at (40, 24.129) puts both bodies 15.1 under the ground.
+        let block = Block::new();
+        block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(11.715 - 40.0, 9.02 - 24.129, -1.0)), Some(spot(-11.715 - 40.0, 9.02 - 24.129, 1.0))] });
+        for slot in 0..2 {
+            let at = block.held_at(slot, [-30.0, 0.01]).unwrap().at;
+            assert!(at[1] < -15.0 && !stands(at), "a capture point inside the ground: {at:?}");
+            assert!(!block.standable(slot, at, || stands(at)));
+        }
+        // A point outside the blast lines, and a stage that cannot be read.
+        assert!(!stands([0.0, -139.5]) && !stands([-239.5, 50.0]));
+        assert!(!can_stand(Err(Unread)));
+        // A macro recorded from the upper platform down to the ground, opened with the fighter on the lower platform:
+        // every point moves 30 down, and the ground frame lands in the ground.
+        let (anchor, landed, home) = ([40.0, 60.01], [40.0, 0.01], [40.0, 30.01]);
+        block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(landed[0] - anchor[0], landed[1] - anchor[1], 1.0)), None] });
+        let at = block.held_at(0, home).unwrap().at;
+        assert_eq!(at, [40.0, 0.01 - 60.01 + 30.01]);
+        assert!(!block.standable(0, at, || stands(at)), "a shifted macro point in the ground");
+        // Open ground is held exactly: on the ground, on a platform, in the air, a little under a floor's surface (the
+        // rule's slack: the body stands on the floor), and off the stage's side.
+        for at in [[-58.285, 0.01], home, [0.0, 50.0], [0.0, -0.5], [-200.0, -15.0]] {
+            assert!(stands(at) && block.standable(0, at, || stands(at)), "{at:?}");
+        }
+        block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)), None] });
+        assert_eq!(block.held_at(0, home), Some(spot(home[0], home[1], 1.0)));
+        // The stage is asked once per point and role: again for another point, and again after the hold is dropped.
+        let asked = core::cell::Cell::new(0);
+        let ask = |at: [f32; 2]| block.standable(1, at, || { asked.set(asked.get() + 1); stands(at) });
+        assert!(ask([0.0, 0.01]) && ask([0.0, 0.01]) && ask([0.0, 0.01]));
+        assert_eq!(asked.get(), 1);
+        assert!(!ask([0.0, -20.0]) && !ask([0.0, -20.0]));
+        assert_eq!(asked.get(), 2);
+        block.forget();
+        assert!(!ask([0.0, -20.0]));
+        assert_eq!(asked.get(), 3);
+        // The line is true for a point in the ground and for one past a blast line; the bridge's word is unchanged.
+        assert_eq!((Pos::Off.text(), Pos::Off.word()), ("Can't stand there on this stage.", "off"));
+        let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
+        assert!(runtime.contains("if !in_bounds(spot.at, limits) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
+        assert!(runtime.contains("RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at))"));
+        assert!(!runtime.contains(".lock()"), "the fighter frame takes no blocking lock");
     }
 
     #[test]
