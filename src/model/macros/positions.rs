@@ -113,6 +113,7 @@ fn put_row(out: &mut [u8], frame: &ReplayFrame) {
 fn get_row(bytes: &[u8]) -> Option<ReplayFrame> {
     let float = |at: usize| Some(f32::from_bits(word(bytes, at))).filter(|value| value.is_finite());
     Some(ReplayFrame {
+        pose: crate::engine::macros::PackedPose::NONE,
         input: InputFrame::default(),
         start: StartState { fighter_kind: word(bytes, 0) as i32, costume: word(bytes, 4), facing: float(8)?, situation: word(bytes, 12) as i32,
             status: word(bytes, 16) as i32, speed_x: float(20)?, speed_y: float(24)? },
@@ -280,8 +281,8 @@ mod tests {
     /// The recorded fighter walks right and up; the other one stands to its left facing it.
     fn pair(i: u32) -> [ReplayFrame; 2] {
         let i = i as f32;
-        [ReplayFrame { input: InputFrame::default(), start: StartState { status: 14, speed_x: 0.5, ..StartState::neutral(18, 3, -1.0) }, x: 20.0 + 3.0 * i, y: i },
-            ReplayFrame { input: InputFrame::default(), start: StartState { situation: 2, speed_y: -1.25, ..StartState::neutral(74, 0, 1.0) }, x: -40.0, y: 7.5 }]
+        [ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState { status: 14, speed_x: 0.5, ..StartState::neutral(18, 3, -1.0) }, x: 20.0 + 3.0 * i, y: i },
+            ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState { situation: 2, speed_y: -1.25, ..StartState::neutral(74, 0, 1.0) }, x: -40.0, y: 7.5 }]
     }
 
     fn track(frames: u32) -> Vec<[ReplayFrame; 2]> {

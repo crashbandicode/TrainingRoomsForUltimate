@@ -5009,6 +5009,7 @@ mod tests {
 
     fn generated_sample(role: Role, index: u32) {
         let sample = |kind, x| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0,
         };
         let slot = role_index(role);
@@ -5072,7 +5073,7 @@ mod tests {
     fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
         let _hold = hold();
         let (root, first_id, first) = generated_fixture("generated-missing-partner", 3);
-        let sample = |kind| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+        let sample = |kind| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
         generated_play(&root, Role::Cpu);
         assert!(play_sampling());
         play_seed(1, Some(sample(7)));
@@ -5102,7 +5103,7 @@ mod tests {
         let (root, id, recording) = generated_fixture("generated-body", 605);
         let dir = root.join(MACROS_DIR);
         let path = positions::path(&dir, &id);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
         let old = vec![[frame, frame]; 601];
         positions::write(&dir, &id, &recording.frames, &old, source).unwrap();
         if damaged {
@@ -5263,7 +5264,7 @@ mod tests {
         let _hold = hold();
         let (root, id, recording) = generated_fixture("generated-recorded", 5);
         let dir = root.join(MACROS_DIR);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
         positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
         let original = std::fs::read(positions::path(&dir, &id)).unwrap();
         let writes = positions::writes();
@@ -5283,7 +5284,7 @@ mod tests {
         let _hold = hold();
         let (root, id, recording) = generated_fixture("generated-heal", 5);
         let dir = root.join(MACROS_DIR);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
         positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 3], Source::Recorded).unwrap();
         generated_play(&root, Role::Cpu);
         assert!(play_sampling());
@@ -5303,7 +5304,7 @@ mod tests {
             let library = Library::new(&dir);
             let mut editor = ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap();
             let rows: Vec<[ReplayFrame; 2]> = (0..5).map(|i| {
-                let sample = |kind, x| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
+                let sample = |kind, x| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
                 [sample(7, i as f32), sample(8, i as f32 + 100.0)]
             }).collect();
             if source == Source::Recorded {
@@ -5467,7 +5468,7 @@ mod tests {
         for i in 0..2 { assert!(generated_take(Role::Cpu, i).is_some()); }
         generated_play(&root, Role::Cpu);
         let dir = root.join(MACROS_DIR);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 0.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 0.0 };
         positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
         let original = std::fs::read(positions::path(&dir, &id)).unwrap();
         tick(&root);
@@ -7647,7 +7648,7 @@ mod tests {
         let root = scratch("long-take");
         let _ = service_at(&root, &none(), "2026-11-26", state(8), state(7));
         let pass = || worker_tick(&root, state(8), state(7));
-        let at = |index: usize| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: index as f32, y: 2.0 };
+        let at = |index: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: index as f32, y: 2.0 };
         set_record_role(Role::Player);
         on_chords(true, false, false);
         assert!(pass().is_some(), "the Record edge is serviced");
@@ -7837,7 +7838,7 @@ mod tests {
         let track = |entry: i32, base: u32| ReplayTrack {
             fighter: None,
             entry, quantized_analog: false,
-            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+            frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
         };
         let session = ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() };
@@ -7875,7 +7876,7 @@ mod tests {
         let track = |entry: i32, base: u32| ReplayTrack {
             fighter: None,
             entry, quantized_analog: false,
-            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+            frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
         };
         ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() }

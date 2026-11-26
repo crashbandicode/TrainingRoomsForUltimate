@@ -768,6 +768,7 @@ fn read_frame(reader: &mut impl Read) -> io::Result<ReplayFrame> {
     let mut record = [0u8; CAPTURE_RECORD_BYTES];
     read_exact_capture(reader, &mut record, "sample data")?;
     let frame = ReplayFrame {
+        pose: crate::engine::macros::PackedPose::NONE,
         input: InputFrame {
             buttons: read_u32(&record, 0),
             lstick_x: record[4] as i8,
@@ -899,6 +900,7 @@ mod tests {
 
     fn sample_session() -> ReplaySession {
         let first = ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame {
                 buttons: 0xa1b2_c3d4,
                 lstick_x: -127,
@@ -1202,6 +1204,7 @@ mod tests {
 
     fn two_sides() -> ReplaySession {
         let frame = |buttons, kind| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons, ..InputFrame::default() },
             start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,
         };

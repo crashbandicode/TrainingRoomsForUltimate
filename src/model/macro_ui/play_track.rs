@@ -178,7 +178,7 @@ mod tests {
     use crate::engine::macros::{InputFrame, StartState};
 
     fn sample(x: f32) -> ReplayFrame {
-        ReplayFrame { input: InputFrame::default(), start: StartState::neutral(7, 0, 1.0), x, y: 0.0 }
+        ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(7, 0, 1.0), x, y: 0.0 }
     }
 
     fn write_wanted_follows_the_rule() {

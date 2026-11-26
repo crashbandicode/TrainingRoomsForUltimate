@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "fb9935d21502fc62688416ceb6e884d7c1549b2841ccdadf1bb152a290ae3e81",
+   "dest_sha256": "6bdf8e5dcc43e305222d7099d7f0d80fea77b1ddaed61ad041e648d7bdafed4b",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -282,6 +282,21 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "        remove_if_there(&cache)?;\n        fs::remove_dir(dir)?;\n",
      "new": "        for item in fs::read_dir(&gone)? {\n            fs::remove_file(item?.path())?;\n        }\n        fs::remove_dir(gone)?;\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "\n    fn two_sides() -> ReplaySession {\n        let frame = |buttons, kind| ReplayFrame {\n            input: InputFrame { buttons, ..InputFrame::default() },\n            start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,\n        };\n",
+     "new": "\n    fn two_sides() -> ReplaySession {\n        let frame = |buttons, kind| ReplayFrame {\n            pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame { buttons, ..InputFrame::default() },\n            start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,\n        };\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "\n    fn sample_session() -> ReplaySession {\n        let first = ReplayFrame {\n            input: InputFrame {\n                buttons: 0xa1b2_c3d4,\n                lstick_x: -127,\n",
+     "new": "\n    fn sample_session() -> ReplaySession {\n        let first = ReplayFrame {\n            pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame {\n                buttons: 0xa1b2_c3d4,\n                lstick_x: -127,\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    let mut record = [0u8; CAPTURE_RECORD_BYTES];\n    read_exact_capture(reader, &mut record, \"sample data\")?;\n    let frame = ReplayFrame {\n        input: InputFrame {\n            buttons: read_u32(&record, 0),\n            lstick_x: record[4] as i8,\n",
+     "new": "    let mut record = [0u8; CAPTURE_RECORD_BYTES];\n    read_exact_capture(reader, &mut record, \"sample data\")?;\n    let frame = ReplayFrame {\n        pose: crate::engine::macros::PackedPose::NONE,\n        input: InputFrame {\n            buttons: read_u32(&record, 0),\n            lstick_x: record[4] as i8,\n"
     }
    ]
   },
@@ -290,7 +305,7 @@
    "dest": "src/model/macros/capture_toggle.rs",
    "crate": "macros",
    "src_sha256": "aa0f6a4b6440d708d0a774e19135ff9b425fa51ea4f16b7b3290279ed28f28d7",
-   "dest_sha256": "baeac271b1b0af7b4342ee73b0c4fb657ade269315edf141067d0a03832ef7aa",
+   "dest_sha256": "2b74b2f1c606854dc1d9b70750f187e43c78bb2ec14336798b17c36b3710340d",
    "edits": [
     {
      "table_tests": true,
@@ -369,6 +384,11 @@
       ]
      ],
      "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    use std::sync::Arc;\n\n    fn sample(buttons: u32) -> LiveFrame {\n        LiveFrame { input: LiveInput { buttons, ..LiveInput::default() },\n            start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,\n            position_z: 0.0, speed_z: 0.0, body: 1 }\n    }\n",
+     "new": "    use std::sync::Arc;\n\n    fn sample(buttons: u32) -> LiveFrame {\n        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons, ..LiveInput::default() },\n            start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,\n            position_z: 0.0, speed_z: 0.0, body: 1 }\n    }\n"
     }
    ]
   },
@@ -377,7 +397,7 @@
    "dest": "src/model/macros/live_capture.rs",
    "crate": "macros",
    "src_sha256": "61ae1a33ce4e788097f81761f12f0c86801b4f32a1ba273498b701ccc0f8bb91",
-   "dest_sha256": "11898fcf4d75f2fbb2fbafb45e90bafe6a3d00eb1a78542bd9025320e4261b46",
+   "dest_sha256": "c9ea4583233b6269c043681894fb8accb503df7350df0d8657e0521831846115",
    "edits": [
     {
      "old": "    pub fn active_key(&self) -> Option<NativeRecordKey> { self.active }",
@@ -565,6 +585,16 @@
      "old": "        let _ = (key, entry, fighter);",
      "new": "        if self.active != Some(key) { return; }\n        let Some(live) = self.records.back_mut().and_then(|record| record.live.as_mut()) else { return };\n        if let Some(track) = live.session.tracks.iter_mut().find(|track| track.entry == entry) { track.fighter = Some(fighter); }",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"duplicates_do_not_advance_and_gaps_never_compress_time\", duplicates_do_not_advance_and_gaps_never_compress_time as fn()),\n            (\"frame_limit_stops_one_track_without_stopping_other_fighters\", frame_limit_stops_one_track_without_stopping_other_fighters as fn()),\n            (\"a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded\", a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded as fn()),\n",
+     "new": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"a_live_sample_keeps_its_pose_through_the_pool\", a_live_sample_keeps_its_pose_through_the_pool as fn()),\n            (\"duplicates_do_not_advance_and_gaps_never_compress_time\", duplicates_do_not_advance_and_gaps_never_compress_time as fn()),\n            (\"frame_limit_stops_one_track_without_stopping_other_fighters\", frame_limit_stops_one_track_without_stopping_other_fighters as fn()),\n            (\"a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded\", a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded as fn()),\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    use {crate::engine::macros::LiveInput, crate::engine::macros::StartState};\n\n    fn sample(buttons: u32) -> LiveFrame {\n        LiveFrame { input: LiveInput { buttons, ..LiveInput::default() },\n            start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,\n            position_z: 0.0, speed_z: 0.0, body: 1 }\n    }\n\n    fn duplicates_do_not_advance_and_gaps_never_compress_time() {\n",
+     "new": "    use {crate::engine::macros::LiveInput, crate::engine::macros::StartState};\n\n    fn sample(buttons: u32) -> LiveFrame {\n        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons, ..LiveInput::default() },\n            start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,\n            position_z: 0.0, speed_z: 0.0, body: 1 }\n    }\n\n    fn a_live_sample_keeps_its_pose_through_the_pool() {\n        let mut pool = LiveCapturePool::new();\n        let key = pool.start_record(0);\n        let pose = crate::engine::macros::PackedPose([0x3456_789a, 0x000c_8012]);\n        let mut frame = sample(7);\n        frame.pose = pose;\n        assert!(pool.push(key, 1, 0, frame));\n        assert_eq!(pool.snapshot(key).unwrap().tracks[0].frames[0].pose, pose);\n    }\n\n    fn duplicates_do_not_advance_and_gaps_never_compress_time() {\n"
     }
    ]
   },
@@ -573,7 +603,7 @@
    "dest": "src/model/macros/live_frame.rs",
    "crate": "macros",
    "src_sha256": "a4f6894336d120ba5d80d20e306f7817c1f6a836d787d809b395bb3c7bf4c471",
-   "dest_sha256": "4a3ef35442daf52b9ffeb74e546f5efd56da6c9a21c28ce30d976158d3bbd3ec",
+   "dest_sha256": "5b056cec1e13e6fc6ba4517bc7e99f9e366bd73403194e261a5354ea4d9516a3",
    "edits": [
     {
      "old": "}\n\n#[derive(Clone, Debug, Default)]\npub struct LiveSession {\n",
@@ -611,6 +641,11 @@
      "old": "    pub frames: Vec<LiveFrame>,\n}",
      "new": "    pub frames: Vec<LiveFrame>,\n    /// The identity of the entry's fighter, read once by the hook (`LiveEvent::Fighter`).\n    pub fighter: Option<crate::model::move_names::FighterId>,\n}",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    pub position_z: f32,\n    pub speed_z: f32,\n    pub body: u32,\n}\n\nimpl LiveFrame {\n",
+     "new": "    pub position_z: f32,\n    pub speed_z: f32,\n    pub body: u32,\n    pub pose: crate::engine::macros::PackedPose,\n}\n\nimpl LiveFrame {\n"
     }
    ]
   },
@@ -619,7 +654,7 @@
    "dest": "src/model/macros/move_start.rs",
    "crate": "macros",
    "src_sha256": "c9f0962e3b1023d00376b12717bcd5236f8f8b0abfc20a493d584e2b259fba2e",
-   "dest_sha256": "14597ff7181079e295bafe7bc12894f4460438327501a34c5a6668d58bdbfdd7",
+   "dest_sha256": "a87b93b2d403a43ae1911343ce456ece45a950352782acd07ffc0e621e80ef13",
    "edits": [
     {
      "table_tests": true,
@@ -661,6 +696,11 @@
      "old": "        ReplayTrack { entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()",
      "new": "        ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    }\n    fn track(statuses: &[i32]) -> ReplayTrack {\n        ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()\n            .map(|(i, &status)| ReplayFrame { input: InputFrame { buttons: i as u32, ..Default::default() },\n                start: StartState { status, ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0 }).collect() }\n    }\n\n",
+     "new": "    }\n    fn track(statuses: &[i32]) -> ReplayTrack {\n        ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()\n            .map(|(i, &status)| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i as u32, ..Default::default() },\n                start: StartState { status, ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0 }).collect() }\n    }\n\n"
     }
    ]
   },
@@ -937,7 +977,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "af9af0b5525eb41ca486068ba64c460327ceda960c7b6ef5ab5aa8e83dd72f1d",
+   "dest_sha256": "27480fd6226235eabae992b490ffa8a0a28bb3ac6f7936f431490247402acd85",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -994,6 +1034,16 @@
      "old": "#[derive(Clone, Copy, Debug)]",
      "new": "#[derive(Clone, Copy, Debug, PartialEq)]",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    fn track() -> ReplayTrack {\n        ReplayTrack { fighter: None, entry: 1, quantized_analog: false,\n            frames: (0..12).map(|i| ReplayFrame {\n                input: InputFrame { buttons: if i == 3 { 513 } else { 0 }, ..InputFrame::default() },\n                start: StartState { status: if (4..9).contains(&i) { 44 } else { 14 },\n                    speed_y: -(i as f32), ..StartState::neutral(18, 0, 1.0) }, x: 0.0, y: i as f32,\n",
+     "new": "    fn track() -> ReplayTrack {\n        ReplayTrack { fighter: None, entry: 1, quantized_analog: false,\n            frames: (0..12).map(|i| ReplayFrame {\n                pose: crate::engine::macros::PackedPose::NONE,\n                input: InputFrame { buttons: if i == 3 { 513 } else { 0 }, ..InputFrame::default() },\n                start: StartState { status: if (4..9).contains(&i) { 44 } else { 14 },\n                    speed_y: -(i as f32), ..StartState::neutral(18, 0, 1.0) }, x: 0.0, y: i as f32,\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "//! this module neither decodes proprietary replay bytes nor invents action state.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::StartState};\n\n/// Input and start-context observation. Native simulation provides the preview;\n/// no animation/pose samples are retained in the per-frame capture buffer.\n#[derive(Clone, Copy, Debug, PartialEq)]\npub struct ReplayFrame {\n    pub input: InputFrame,\n    pub start: StartState,\n    pub x: f32,\n    pub y: f32,\n}\n\n#[derive(Clone, Debug)]\n",
+     "new": "//! this module neither decodes proprietary replay bytes nor invents action state.\nuse {crate::engine::macros::FrameWindow, crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::StartState};\n\n/// Input, start context, and the packed animation name and frame in the capture buffer\n/// (scrub-moves SM5 B, decided 2026-11-26).\n#[derive(Clone, Copy, Debug, PartialEq)]\npub struct ReplayFrame {\n    pub input: InputFrame,\n    pub start: StartState,\n    pub x: f32,\n    pub y: f32,\n    pub pose: crate::engine::macros::PackedPose,\n}\n\n#[derive(Clone, Debug)]\n"
     }
    ]
   },
@@ -1002,7 +1052,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "66e3ef0d1ffed27d93f7f9618fbb80d3a06f7cef36cd59a7e0e374eb5e7a0ea1",
+   "dest_sha256": "458166765d5cf3b0375e46948df3781ceb0c5bfddc0a6a98dce4a89e3f228283",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -1194,6 +1244,16 @@
      "old": "\n    /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with",
      "new": "\n    /// A capture written with its entry's fighter identity, deleted. A delete that cannot remove the plain file puts\n    /// the bundle back with every byte, the identity still read from it; the delete that finishes leaves nothing listed.\n    fn a_capture_with_its_fighter_identity_is_put_back_whole_and_deleted_whole() {\n        let fighter = crate::model::move_names::FighterId { chara: 0xb2, specials: [0, 2, 1, 0] };\n        let mut named = session();\n        named.tracks[0].fighter = Some(fighter);\n        let f = Fixture::new();\n        let dir = f.publish(&named);\n        let id = encode_file_id(\"native-id\");\n        let archive = CaptureArchive::new(&f.0);\n        let before = bytes_in(&dir);\n        let blocker = f.0.join(format!(\"{id}.tmrc\"));\n        fs::create_dir(&blocker).unwrap();\n        assert!(archive.delete(&id).is_err());\n        assert_eq!(bytes_in(&dir), before);\n        assert_eq!(f.load().unwrap().session.tracks[0].fighter, Some(fighter), \"the shared archive keeps the identity\");\n        assert!(!f.0.join(format!(\".{id}.smd-0.del\")).exists(), \"nothing is left under the other name\");\n        fs::remove_dir(&blocker).unwrap();\n        assert_eq!(archive.load(&id).unwrap().session.tracks[0].fighter, Some(fighter), \"and so does the editor's file\");\n        assert!(archive.delete(&id).unwrap(), \"the same delete then finishes\");\n        assert!(!dir.exists() && archive.list().unwrap().entries.is_empty());\n    }\n\n    /// P-TIMER: regular time, a stretch with no live play, then sudden death. The `.smd` keeps the true counters with",
      "reason": "Fold of main 3fd708bc (capture Delete) into the mark variants (2026-11-25): the tests of both sides stand side by side, and one case deletes a capture written with its entry's fighter identity."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    }\n\n    fn frame(axes: [f32;4]) -> LiveFrame {\n        LiveFrame { input: LiveInput { buttons: 0x80000201, axes },\n            start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,\n                ..StartState::neutral(18, 2, -1.0) },\n            x: -0.0, y: f32::from_bits(2), position_z: f32::from_bits(0x80000001),\n",
+     "new": "    }\n\n    fn frame(axes: [f32;4]) -> LiveFrame {\n        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: 0x80000201, axes },\n            start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,\n                ..StartState::neutral(18, 2, -1.0) },\n            x: -0.0, y: f32::from_bits(2), position_z: f32::from_bits(0x80000001),\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "                    let target = track.frames.capacity().saturating_mul(2).clamp(256, MAX_FRAMES);\n                    track.frames.try_reserve_exact(target - track.frames.len()).map_err(bad)?;\n                }\n                track.frames.push(ReplayFrame { input, x: k.position.x, y: k.position.y,\n                    start: StartState { fighter_kind: ident.fighter_kind.ok_or_else(|| bad(\"missing kind\"))?,\n                        costume: ident.costume.ok_or_else(|| bad(\"missing costume\"))? as u32,\n                        facing: k.facing, situation: s.situation_kind, status: s.status_kind,\n",
+     "new": "                    let target = track.frames.capacity().saturating_mul(2).clamp(256, MAX_FRAMES);\n                    track.frames.try_reserve_exact(target - track.frames.len()).map_err(bad)?;\n                }\n                track.frames.push(ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input, x: k.position.x, y: k.position.y,\n                    start: StartState { fighter_kind: ident.fighter_kind.ok_or_else(|| bad(\"missing kind\"))?,\n                        costume: ident.costume.ok_or_else(|| bad(\"missing costume\"))? as u32,\n                        facing: k.facing, situation: s.situation_kind, status: s.status_kind,\n"
     }
    ]
   },
@@ -1701,7 +1761,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "eab5c31a4d6e2e02754da202dbf2d4f977cb1809d2985b0e9dd6fd0c25a74f8f",
+   "dest_sha256": "71f6b3921be3e1d4c98e20f2bac7d91e84bb54d9127880b108e810e0762c793f",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -1838,6 +1898,16 @@
      "old": "mod move_start;\nmod recording;",
      "new": "mod move_start;\npub mod positions;\nmod recording;",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "#[cfg(test)]\npub use window::{timestamp, Step};\npub use replay::{ReplayFrame, ReplaySession, ReplayTrack};\npub use move_start::{MoveFamily, MoveStart, MoveStartRules};\n#[cfg(test)]\npub use move_start::MAX_MOVE_SETUP;\n",
+     "new": "#[cfg(test)]\npub use window::{timestamp, Step};\npub use replay::{ReplayFrame, ReplaySession, ReplayTrack};\npub use pose::{PackedPose, Pose};\npub use move_start::{MoveFamily, MoveStart, MoveStartRules};\n#[cfg(test)]\npub use move_start::MAX_MOVE_SETUP;\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "mod live_capture;\nmod live_frame;\nmod move_start;\npub mod positions;\nmod recording;\nmod replay;\n",
+     "new": "mod live_capture;\nmod live_frame;\nmod move_start;\nmod pose;\npub mod positions;\nmod recording;\nmod replay;\n"
     }
    ]
   },
@@ -2005,7 +2075,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "96711d6a3e1d58bdb6ccdbc4755397434666780b83a9a1e488a7070c35eeb45a",
+   "dest_sha256": "c28bb7524d52b747d439aa20b06a4461e159617a8b86362b679c012f321d145c",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2962,6 +3032,36 @@
      "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 13:24:36Z, 13:43:10Z): a model of the two orders of the worker's pass and the game's callback after X with a frame shown.",
      "old": "        assert!(e.view().playing);\n    }\n\n    fn generated_positions_reach_the_open_editor_at_once() {\n        let mut e = saved_macro(false);\n        let recording = match &e.file {\n",
      "new": "        assert!(e.view().playing);\n    }\n\n    /// A model of the two orders in which the game's fighter callback and the worker's passes can run after X with a\n    /// frame shown (tr-primary-2 2026-11-26 13:24:36Z, 13:43:10Z). It is not a replay of either test host. The CPU\n    /// is as the hold and the game treat it: lifted and in Fall while a frame is shown; on the ground, Fall still its\n    /// status, on the frame that lets it go; idle on the next. One game frame runs the checkpoint's gate first and\n    /// the hold's step second, as the callback does.\n    fn x_after_a_held_frame_previews_in_either_order_of_the_two_threads() {\n        use crate::engine::macro_ui::scrub_track::Block;\n        use crate::model::state::preview::{settle, Body, Settle};\n        struct Game { block: Box<Block>, cpu: Body, asked: bool }\n        impl Game {\n            fn publish(&self, e: &ClipEditor) {\n                self.block.ask_at(e.shown_frame(), e.scrub().0);\n            }\n            fn frame(&mut self) -> Option<Settle> {\n                let generation = self.block.generation();\n                let gate = match self.asked.then(|| settle(self.cpu)) {\n                    Some(Settle::Wait) if self.block.settling() => None,\n                    Some(verdict) => {\n                        self.asked = false;\n                        self.block.settled();\n                        Some(if verdict == Settle::Ready { Settle::Ready } else { Settle::Refuse })\n                    }\n                    None => None,\n                };\n                self.cpu = if self.block.held_at(1, [0.0, 0.0]).is_some() {\n                    Body { air: true, falling: true, floor: true, ..Body::default() }\n                } else if self.cpu.air {\n                    Body { ground: true, falling: true, ..Body::default() }\n                } else {\n                    Body { ground: true, idle: true, ..Body::default() }\n                };\n                for slot in 0..2 {\n                    self.block.ack(slot, generation);\n                }\n                gate\n            }\n            fn verdict(&mut self) -> Settle {\n                (0..8).find_map(|_| self.frame()).expect(\"the start is answered\")\n            }\n        }\n        let held = || {\n            let mut e = editor();\n            e.on_action(ClipAction::SelectIn);\n            let mut game = Game { block: Block::new(), cpu: Body { ground: true, idle: true, ..Body::default() }, asked: false };\n            game.publish(&e);\n            assert!(game.frame().is_none() && game.frame().is_none());\n            assert!(game.cpu.air && game.cpu.falling, \"the CPU is held at the shown frame\");\n            (e, game)\n        };\n        // Merge 17 and the build before it: X starts the play at once, the worker lets the hold go on its next pass,\n        // and the start reaches the game after `frames` game frames of that. Which comes first is not fixed.\n        let at_once = |frames: usize| {\n            let (mut e, mut game) = held();\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));\n            if frames > 0 {\n                game.publish(&e);\n            }\n            for _ in 0..frames {\n                assert!(game.frame().is_none());\n            }\n            game.asked = true;\n            let verdict = game.verdict();\n            game.publish(&e);\n            verdict\n        };\n        assert_eq!(at_once(0), Settle::Refuse, \"the refusing order: the gate runs before the hold has let go\");\n        assert_eq!(at_once(1), Settle::Refuse, \"let go on the frame before: on the ground, not idle yet\");\n        assert_eq!(at_once(2), Settle::Ready, \"the playing order: the hold let go two frames before the gate ran\");\n        // Now: X is kept as a wanted play, the worker starts it on the pass that finds the bodies released, and the\n        // start waits on the CPU's state. `frames`: the game frames between two worker passes.\n        for frames in 0..4 {\n            let (mut e, mut game) = held();\n            e.want_play(ClipAction::TogglePlay, false);\n            game.publish(&e);\n            let mut passes = 0;\n            while !game.block.released() {\n                for _ in 0..frames.max(usize::from(passes > 0)) {\n                    assert!(game.frame().is_none(), \"no start is asked before the release\");\n                }\n                passes += 1;\n                assert!(passes < 4, \"the hold never reported the bodies released\");\n            }\n            let Some((action, false)) = e.take_wanted_play() else { panic!(\"a wanted preview\") };\n            game.block.await_settle();\n            assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));\n            game.asked = true;\n            assert_eq!(game.verdict(), Settle::Ready, \"{frames} game frames to a worker pass\");\n        }\n    }\n\n    fn generated_positions_reach_the_open_editor_at_once() {\n        let mut e = saved_macro(false);\n        let recording = match &e.file {\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "        assert_eq!(exported(Some(e.on_action(confirm))).unwrap(), (0..10).collect::<Vec<_>>());\n    }\n    fn editor() -> ClipEditor {\n        let frames = (0..10).map(|i| ReplayFrame { input: InputFrame { buttons: i, ..InputFrame::default() },\n            start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },\n            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,\n",
+     "new": "        assert_eq!(exported(Some(e.on_action(confirm))).unwrap(), (0..10).collect::<Vec<_>>());\n    }\n    fn editor() -> ClipEditor {\n        let frames = (0..10).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i, ..InputFrame::default() },\n            start: StartState { status: if i == 4 { 99 } else { 14 }, ..StartState::neutral(18, 0, 1.0) },\n            x: i as f32, y: 0.0 }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::NoTrack);\n        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n",
+     "new": "        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::NoTrack);\n        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {\n        use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};\n        let mut frames: Vec<_> = (0..40).map(|i| ReplayFrame {\n            input: InputFrame { buttons: i, ..Default::default() },\n            start: StartState { status: match i { 0 => 0, 28..=29 => 6,\n                30..=31 => 7, 32 => 45, 33 => 46, 34..=39 => 47, _ => 486 },\n",
+     "new": "    fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {\n        use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};\n        let mut frames: Vec<_> = (0..40).map(|i| ReplayFrame {\n            pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame { buttons: i, ..Default::default() },\n            start: StartState { status: match i { 0 => 0, 28..=29 => 6,\n                30..=31 => 7, 32 => 45, 33 => 46, 34..=39 => 47, _ => 486 },\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "\n    fn long_action_capture(last: u32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            input: InputFrame { buttons: u32::from(i == 5 || i == 36), ..InputFrame::default() },\n            start: StartState { status: if (8..=last).contains(&i) { 45 } else { 0 },\n                ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0,\n",
+     "new": "\n    fn long_action_capture(last: u32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame { buttons: u32::from(i == 5 || i == 36), ..InputFrame::default() },\n            start: StartState { status: if (8..=last).contains(&i) { 45 } else { 0 },\n                ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0,\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "\n    fn snap_capture_with(setup: i32, action: i32, tail: i32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            input: InputFrame { buttons: if (23..=26).contains(&i) { 1 } else { 0 }, ..InputFrame::default() },\n            start: StartState { status: match i { 0..=19 => 0, 20..=24 => setup, 25..=39 => action, _ => tail },\n                ..StartState::neutral(74, 0, 1.0) },\n",
+     "new": "\n    fn snap_capture_with(setup: i32, action: i32, tail: i32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame { buttons: if (23..=26).contains(&i) { 1 } else { 0 }, ..InputFrame::default() },\n            start: StartState { status: match i { 0..=19 => 0, 20..=24 => setup, 25..=39 => action, _ => tail },\n                ..StartState::neutral(74, 0, 1.0) },\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };\n            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n",
+     "new": "        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), ..*frame };\n            let absent = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n"
     }
    ]
   },
@@ -2970,7 +3070,7 @@
    "dest": "src/model/macro_ui/replay_panel.rs",
    "crate": "tui",
    "src_sha256": "7f2595db169a3703c99d74d4ed25a7247c01dfd601bfd5e5cfa19350ea98eef9",
-   "dest_sha256": "298650cd3c8e61421a2afa8e167974a3ce35fdc18f4182841fc569bd5f154664",
+   "dest_sha256": "7440484e44997a8c7b457dee111d30facc68f610ba053e4abadaa9a077cfb81e",
    "edits": [
     {
      "old": "            Pad::Confirm => return self.confirm(),\n        }\n        Effect::None",
@@ -3012,6 +3112,11 @@
      "old": "        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { entry: 1, frames,",
      "new": "        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "    use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState};\n\n    fn editor() -> ReplayEditor {\n        let frames = (0..2000).map(|i| ReplayFrame { input: InputFrame::default(),\n            start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },\n            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,\n",
+     "new": "    use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState};\n\n    fn editor() -> ReplayEditor {\n        let frames = (0..2000).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),\n            start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },\n            x: i as f32, y: 0.0 }).collect();\n        ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,\n"
     }
    ]
   },
@@ -5725,7 +5830,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "60311445d9026603c79c17884049c07a46a13348b3609c2c98f6ff9624ae680a",
+   "dest_sha256": "fadc2bbedacbf2de6fa3319dbd99717d212b2a1c72835d7a15ccbc8702042903",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6756,6 +6861,16 @@
      "reason": "Validate both actual scrub holds and in-flight fighter readers before starting a queued preview (review of dec899a6).",
      "old": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n",
      "new": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.released() { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "            velocity.map(f32::to_bits));\n        return None;\n    }\n    let sample = LiveFrame { input: LiveInput::default(), start: before.start,\n        x: before.x, y: before.y, position_z: PostureModule::pos_z(module),\n        speed_z: velocity[2], body: module.battle_object_id };\n    #[cfg(feature = \"named-input-trace\")]\n",
+     "new": "            velocity.map(f32::to_bits));\n        return None;\n    }\n    let sample = LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput::default(), start: before.start,\n        x: before.x, y: before.y, position_z: PostureModule::pos_z(module),\n        speed_z: velocity[2], body: module.battle_object_id };\n    #[cfg(feature = \"named-input-trace\")]\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
+     "old": "}\n\npub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {\n    ReplayFrame { input: InputFrame::default(), start: StartState {\n        fighter_kind: app::utility::get_kind(module),\n        costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,\n        facing: PostureModule::lr(module),\n",
+     "new": "}\n\npub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {\n    ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {\n        fighter_kind: app::utility::get_kind(module),\n        costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,\n        facing: PostureModule::lr(module),\n"
     }
    ]
   },

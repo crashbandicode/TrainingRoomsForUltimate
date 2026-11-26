@@ -1280,7 +1280,7 @@ pub fn after_draw() {
 }
 
 pub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {
-    ReplayFrame { input: InputFrame::default(), start: StartState {
+    ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {
         fighter_kind: app::utility::get_kind(module),
         costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,
         facing: PostureModule::lr(module),
@@ -1324,7 +1324,7 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
             velocity.map(f32::to_bits));
         return None;
     }
-    let sample = LiveFrame { input: LiveInput::default(), start: before.start,
+    let sample = LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput::default(), start: before.start,
         x: before.x, y: before.y, position_z: PostureModule::pos_z(module),
         speed_z: velocity[2], body: module.battle_object_id };
     #[cfg(feature = "named-input-trace")]

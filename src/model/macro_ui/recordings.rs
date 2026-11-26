@@ -53,6 +53,7 @@ mod tests {
 
     fn capture(buttons: u32) -> ReplaySession {
         ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 0, frames: vec![ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons, ..InputFrame::default() },
             start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0,
         }], quantized_analog: false }], truncated: false, breaks: Vec::new() }
@@ -89,6 +90,7 @@ mod tests {
         assert_eq!(editor_label(1, "Fox"), "CPU Fox");
         assert_eq!(editor_label(2, "Fox"), "P3 Fox");
         let session = |entry: i32| ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry, frames: vec![ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame::default(), start: StartState::neutral(7, 0, 1.0), x: 0.0, y: 0.0 }], quantized_analog: false }],
             truncated: false, breaks: Vec::new() };
         let mut editor = ClipEditor::new(session(1), vec![0]).unwrap();

@@ -69,7 +69,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let baseline = heap_bytes();
     let take = TakeTrack::new();
     let mut inputs = Vec::with_capacity(MAX_FRAMES);
-    let body = |kind, sign, i: usize| ReplayFrame { input: InputFrame::default(), start: StartState {
+    let body = |kind, sign, i: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {
         situation: 2, status: 14, speed_x: sign * 0.8125, speed_y: -0.4375,
         ..StartState::neutral(kind, 2, sign)
     }, x: sign * (i % 1600) as f32 / 16.0, y: (i % 768) as f32 / 16.0 };

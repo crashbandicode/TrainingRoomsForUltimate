@@ -483,7 +483,7 @@ impl Projector {
                     let target = track.frames.capacity().saturating_mul(2).clamp(256, MAX_FRAMES);
                     track.frames.try_reserve_exact(target - track.frames.len()).map_err(bad)?;
                 }
-                track.frames.push(ReplayFrame { input, x: k.position.x, y: k.position.y,
+                track.frames.push(ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input, x: k.position.x, y: k.position.y,
                     start: StartState { fighter_kind: ident.fighter_kind.ok_or_else(|| bad("missing kind"))?,
                         costume: ident.costume.ok_or_else(|| bad("missing costume"))? as u32,
                         facing: k.facing, situation: s.situation_kind, status: s.status_kind,
@@ -546,7 +546,7 @@ mod tests {
     }
 
     fn frame(axes: [f32;4]) -> LiveFrame {
-        LiveFrame { input: LiveInput { buttons: 0x80000201, axes },
+        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: 0x80000201, axes },
             start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,
                 ..StartState::neutral(18, 2, -1.0) },
             x: -0.0, y: f32::from_bits(2), position_z: f32::from_bits(0x80000001),

@@ -28,7 +28,7 @@ fn a_chain_start_does_not_build_the_steps_position_tracks() {
     let library = Library::new(root.join(MACROS_DIR));
     let tracks = (STEPS * FRAMES * size_of::<[ReplayFrame; 2]>()) as isize;
     if env::var("TR_SCRUB_CHAIN_PHASE").as_deref() == Ok("make") {
-        let body = |kind, i: usize| ReplayFrame { input: InputFrame::default(),
+        let body = |kind, i: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),
             start: StartState { status: 14, ..StartState::neutral(kind, 0, 1.0) }, x: (i % 1600) as f32 / 16.0, y: 0.0 };
         let mut ids = Vec::new();
         for step in 0..STEPS {

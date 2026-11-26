@@ -315,9 +315,19 @@ mod tests {
     use {crate::engine::macros::LiveInput, crate::engine::macros::StartState};
 
     fn sample(buttons: u32) -> LiveFrame {
-        LiveFrame { input: LiveInput { buttons, ..LiveInput::default() },
+        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons, ..LiveInput::default() },
             start: StartState::neutral(8, 0, 1.0), x: 0.0, y: 0.0,
             position_z: 0.0, speed_z: 0.0, body: 1 }
+    }
+
+    fn a_live_sample_keeps_its_pose_through_the_pool() {
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        let pose = crate::engine::macros::PackedPose([0x3456_789a, 0x000c_8012]);
+        let mut frame = sample(7);
+        frame.pose = pose;
+        assert!(pool.push(key, 1, 0, frame));
+        assert_eq!(pool.snapshot(key).unwrap().tracks[0].frames[0].pose, pose);
     }
 
     fn duplicates_do_not_advance_and_gaps_never_compress_time() {
@@ -384,6 +394,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_live_sample_keeps_its_pose_through_the_pool", a_live_sample_keeps_its_pose_through_the_pool as fn()),
             ("duplicates_do_not_advance_and_gaps_never_compress_time", duplicates_do_not_advance_and_gaps_never_compress_time as fn()),
             ("frame_limit_stops_one_track_without_stopping_other_fighters", frame_limit_stops_one_track_without_stopping_other_fighters as fn()),
             ("a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded", a_fighter_resuming_elsewhere_or_backwards_seals_and_breaks_are_bounded as fn()),
