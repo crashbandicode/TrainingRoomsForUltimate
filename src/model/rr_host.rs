@@ -5540,6 +5540,49 @@ mod tests {
         assert!(!take_generated());
     }
 
+    fn save_to_same_library_from_another_thread(root: &Path) {
+        let root = root.to_path_buf();
+        std::thread::spawn(move || {
+            let inputs = vec![InputFrame::default(); 3];
+            let other = MacroRecording::new("Other", "13.0.5", StartState::neutral(7, 0, 1.0), inputs).unwrap();
+            Library::new(root.join(MACROS_DIR)).save_new(&other).unwrap();
+        }).join().unwrap();
+    }
+
+    fn another_threads_save_to_the_same_library_rearms_a_done_macro() {
+        let _hold = hold();
+        let (root, _, _) = generated_fixture("generated-foreign-done", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert!(take_generated());
+        assert!(!take_generated());
+        let before = recording_version();
+        save_to_same_library_from_another_thread(&root);
+        assert_ne!(recording_version(), before);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling(), "a same-library save invalidates the done cache");
+    }
+
+    fn another_threads_save_to_the_same_library_drops_an_open_run() {
+        use crate::engine::macros::positions;
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-foreign-open", 3);
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        let writes = positions::writes();
+        assert_eq!(generated_take(Role::Cpu, 0), Some(recording.frames[0]));
+        let before = recording_version();
+        save_to_same_library_from_another_thread(&root);
+        assert_ne!(recording_version(), before);
+        for i in 1..3 { assert_eq!(generated_take(Role::Cpu, i), Some(recording.frames[i as usize])); }
+        tick(&root);
+        assert!(!positions::path(&root.join(MACROS_DIR), &id).exists());
+        assert_eq!(positions::writes(), writes);
+    }
+
     fn the_last_input_is_credited_before_the_worker_drains() {
         use crate::engine::macros::positions;
         let _hold = hold();
@@ -8157,6 +8200,8 @@ mod tests {
                     ("an_immediate_poll_of_the_first_preview_input_gets_its_positions", super::an_immediate_poll_of_the_first_preview_input_gets_its_positions as fn()),
                     ("a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions", super::a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions as fn()),
                     ("a_poll_that_straddles_generation_arm_seeds_the_first_input_once", super::a_poll_that_straddles_generation_arm_seeds_the_first_input_once as fn()),
+                    ("another_threads_save_to_the_same_library_rearms_a_done_macro", super::another_threads_save_to_the_same_library_rearms_a_done_macro as fn()),
+                    ("another_threads_save_to_the_same_library_drops_an_open_run", super::another_threads_save_to_the_same_library_drops_an_open_run as fn()),
                 ]);
             }
         }
