@@ -982,6 +982,7 @@ fn service_wanted_fighter() {
     if roster_requests::take_clip_reply() == Some(false) {
         let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());
         if refused {
+            // restriction: clip-fighter-refused
             notify("The roster refused the fighter switch".into());
             return;
         }
