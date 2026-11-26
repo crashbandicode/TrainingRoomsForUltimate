@@ -337,6 +337,8 @@ pub struct ClipEditor {
     anchor: u32,
     /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).
     noted: Pos,
+    /// A play asked for while the fighters were held at a shown frame: kept until the hold reports them released.
+    wanted: Option<ClipAction>,
 }
 
 fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
@@ -378,7 +380,7 @@ impl ClipEditor {
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, browsed: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
-            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held })
+            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held, wanted: None })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -410,7 +412,7 @@ impl ClipEditor {
             file: Some(file), previous: None, previous_selected: false, track: 0,
             window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false, browsed: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
-            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held })
+            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held, wanted: None })
     }
 
     /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.
@@ -528,6 +530,20 @@ impl ClipEditor {
     }
 
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
+    /// X while the fighters are held at a shown frame: the play is wanted, not started. From here no frame is shown,
+    /// so the hold lets the bodies go; the worker takes the play when the hold reports them released.
+    pub fn want_play(&mut self, action: ClipAction) {
+        self.wanted = Some(action);
+    }
+
+    pub fn wanted_play(&self) -> Option<ClipAction> {
+        self.wanted
+    }
+
+    pub fn take_wanted_play(&mut self) -> Option<ClipAction> {
+        self.wanted.take()
+    }
+
     pub fn shown_frame(&self) -> Option<u32> {
         (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())
     }
@@ -1307,6 +1323,57 @@ mod tests {
         ClipEditor::macro_file(recording, player).unwrap()
     }
 
+    /// tr-primary-2 2026-11-26 12:48:20Z and 12:54:05Z: when a body is not moved, the line that says why comes first,
+    /// then the snapped move's line, then the snap hint. The other two positions lines stay behind the hint.
+    fn the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint() {
+        let mut e = editor();
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(4));
+        let mut view = e.view();
+        assert!(!view.clean_start && view.move_start.is_none());
+        let notice = |view: &ClipView| clip_help(view, "ZL/ZR", "ZL", 1).notice;
+        let hint = "Press ZL+Y to snap to the move start, then X to preview.";
+        view.pos = Pos::Held;
+        assert_eq!(notice(&view), hint);
+        view.pos = Pos::Off;
+        assert_eq!(notice(&view), "Can't stand there on this stage.");
+        view.move_start = Some(MoveStart { frame: 3, action_frame: 4, action_status: 99, context: StartState::neutral(18, 0, 1.0) });
+        assert_eq!(notice(&view), "Can't stand there on this stage.", "also over the snapped move's line");
+        view.pos = Pos::Held;
+        assert!(notice(&view).contains("1f setup"));
+        view.move_start = None;
+        for pos in [Pos::End, Pos::NoTrack] {
+            view.pos = pos;
+            assert_eq!(notice(&view), hint, "{pos:?}: nobody is refused a place");
+        }
+        view.clean_start = true;
+        view.pos = Pos::End;
+        assert_eq!(notice(&view), "Positions end here.");
+    }
+
+    /// X while the fighters are held at a shown frame (12:54:05Z): the play is wanted, not started; no frame is shown,
+    /// so the hold lets the bodies go; the worker starts it when the hold reports them released.
+    fn a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped() {
+        let mut e = editor();
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!((e.shown_frame(), e.scrub().1), (Some(0), Pos::Held));
+        e.want_play(ClipAction::TogglePlay);
+        assert!(matches!(e.wanted_play(), Some(ClipAction::TogglePlay)));
+        assert_eq!((e.shown_frame(), e.scrub()), (None, (Ask::None, Pos::None)), "the hold is asked to let go");
+        assert!(!e.view().playing, "the play has not started");
+        // Another press drops it, and the handle's frame is shown again.
+        e.on_action(ClipAction::Nudge(1));
+        assert!(e.wanted_play().is_none());
+        assert_eq!(e.shown_frame(), Some(1));
+        // Taken by the worker once the bodies are released: the play starts from the same selection.
+        e.on_action(ClipAction::Nudge(-1));
+        e.want_play(ClipAction::TogglePlay);
+        let Some(action) = e.take_wanted_play() else { panic!("a wanted play") };
+        assert!(e.wanted_play().is_none());
+        assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));
+        assert!(e.view().playing);
+    }
+
     fn generated_positions_reach_the_open_editor_at_once() {
         let mut e = saved_macro(false);
         let recording = match &e.file {
@@ -1649,6 +1716,8 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
+            ("the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),
+            ("a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped", a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped as fn()),
             ("the_playhead_browses_the_whole_take_and_leaves_in_and_out", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),
             ("y_snaps_the_playhead_to_the_nearest_mark", y_snaps_the_playhead_to_the_nearest_mark as fn()),
             ("l_and_r_cut_here_after_the_playhead_moved", l_and_r_cut_here_after_the_playhead_moved as fn()),

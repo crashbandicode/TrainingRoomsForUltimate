@@ -111,6 +111,12 @@ pub struct Block {
     /// Each role's last world point and tagged verdict. Only the game side touches these, under `holds`.
     classed: [AtomicU64; 2],
     stands: [AtomicU64; 2],
+    /// The ask's generation, plus one, each role's fighter frame last acted under; zero before its first frame.
+    acked: [AtomicU32; 2],
+    /// The roles the last group ask moved (bit 0 Player 1, bit 1 the CPU).
+    moved: AtomicU32,
+    /// A preview's start follows a release and waits for the released CPU by its state (`state::preview::settle`).
+    settle: AtomicU32,
     /// Each role's hold, as the placement picker keeps one. The game thread only, with `try_lock`.
     pub holds: hos_lock::Mutex<[Option<CpuPreview>; 2]>,
 }
@@ -124,6 +130,9 @@ impl Block {
             shown: AtomicU32::new(0),
             classed: [const { AtomicU64::new(0) }; 2],
             stands: [const { AtomicU64::new(0) }; 2],
+            acked: [const { AtomicU32::new(0) }; 2],
+            moved: AtomicU32::new(0),
+            settle: AtomicU32::new(0),
             holds: hos_lock::Mutex::new([None; 2]),
         })
     }
@@ -187,6 +196,36 @@ impl Block {
         verdict.store(tag | u64::from(ok), Ordering::Relaxed);
         ok
     }
+
+    /// The generation of the ask now published. A role's frame reads it before the ask and reports it with `ack`.
+    pub fn generation(&self) -> u32 {
+        self.ask.generation()
+    }
+
+    /// The game thread, at the end of a role's fighter frame: the generation it read before it read the ask.
+    pub fn ack(&self, slot: usize, generation: u32) {
+        let _ = (slot, generation, &self.acked);
+    }
+
+    /// The worker: nobody is asked to be held, and every role the last ask moved has run a fighter frame under that
+    /// "nobody", which is the frame that lets its body go. A role that never ran a frame here has no body to wait for.
+    pub fn released(&self) -> bool {
+        let _ = &self.moved;
+        true
+    }
+
+    /// The worker, as it starts a play that waited for the release: the start waits for the released CPU.
+    pub fn await_settle(&self) {
+        let _ = &self.settle;
+    }
+
+    /// The game thread: a start waits for the CPU the hold let go.
+    pub fn settling(&self) -> bool {
+        false
+    }
+
+    /// The game thread: the released CPU was seen settled, or will not settle; the wait is over.
+    pub fn settled(&self) {}
 
     /// The role whose home anchors the group.
     pub fn target_slot(&self) -> Option<usize> {
@@ -1049,6 +1088,72 @@ mod tests {
             assert_eq!(pair[0], state(recorded, 9));
             assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
         }
+    }
+
+    #[test]
+    fn a_play_waits_until_every_moved_role_has_let_go() {
+        let block = Block::new();
+        assert!(block.released(), "nothing was asked");
+        let ask = Ask::Group { target: 0, deltas: [Some(spot(1.0, 0.0, 1.0)), Some(spot(2.0, 0.0, 1.0))] };
+        block.ask_at(Some(6), ask);
+        // Both roles ran a frame under the ask and hold their bodies.
+        for slot in 0..2 {
+            block.ack(slot, block.generation());
+            block.set_seen(slot, SEEN_HELD);
+        }
+        assert!(!block.released(), "a frame is shown");
+        // X: the worker shows no frame. The bodies stay held until each role's next frame.
+        let shown = block.generation();
+        block.ask_at(None, Ask::None);
+        assert!(!block.released());
+        // A frame that had read the old ask does not count.
+        block.ack(0, shown);
+        assert!(!block.released());
+        block.ack(0, block.generation());
+        assert!(!block.released(), "the CPU has not let go");
+        block.ack(1, block.generation());
+        assert!(block.released());
+        // A role the ask did not move is not waited for.
+        let block = Block::new();
+        block.ask_at(Some(3), Ask::Group { target: 0, deltas: [Some(spot(1.0, 0.0, 1.0)), None] });
+        block.ack(0, block.generation());
+        block.ack(1, block.generation());
+        block.ask_at(None, Ask::None);
+        assert!(!block.released());
+        block.ack(0, block.generation());
+        assert!(block.released());
+        // Nor one that never ran a frame here: it has no body.
+        let block = Block::new();
+        block.ask_at(Some(3), ask);
+        block.ack(0, block.generation());
+        block.ask_at(None, Ask::None);
+        assert!(!block.released());
+        block.ack(0, block.generation());
+        assert!(block.released(), "the CPU never ran a frame");
+        // The start that follows waits for the released CPU until the game side ends the wait; a new hold ends it too.
+        assert!(!block.settling());
+        block.await_settle();
+        assert!(block.settling());
+        block.settled();
+        assert!(!block.settling());
+        block.await_settle();
+        block.ask_at(Some(4), ask);
+        assert!(!block.settling() && !block.released());
+        // The game side reads the generation before the ask and reports it after its step.
+        let read = |path: &str| std::fs::read_to_string(format!("{}{path}", env!("CARGO_MANIFEST_DIR"))).unwrap_or_default();
+        let hold = read("/src/runtime/features/scrub_hold.rs");
+        let generation = hold.find("let generation = block.generation();").expect("the generation is read");
+        assert!(generation < hold.find("point(block, &holds, slot, accessor)").unwrap(), "the generation is read before the ask");
+        assert!(hold.contains("block.set_seen(slot, seen);\n        block.ack(slot, generation);"));
+        // The worker: X is kept while a body is held, and started only on a pass that finds the bodies released.
+        let worker = read("/src/runtime/macros/replay_capture.rs");
+        assert!(worker.contains("if matches!(action, ClipAction::TogglePlay | ClipAction::Restart) && hold_play(action, playback) { return; }"));
+        let notices = worker.split_once("pub fn worker_preview_notices() {").map_or("", |(_, rest)| rest);
+        assert!(notices.trim_start().starts_with("scrub_service();\n    service_wanted_play();"), "the wanted play is looked at on every pass");
+        let service = worker.split_once("fn service_wanted_play() {").map_or("", |(_, rest)| rest);
+        let released = service.find("block.released()").expect("the release is read");
+        assert!(released < service.find("block.await_settle()").unwrap() && released < service.find("editor.take_wanted_play()").unwrap());
+        assert!(worker.contains("[Scrub] play wanted") && worker.contains("[Scrub] released"), "both steps are in the trace");
     }
 
     #[test]
