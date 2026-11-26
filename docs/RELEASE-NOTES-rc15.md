@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, and a free playhead (both merged); the fighters shown while you scrub (in work) |
+| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub (all merged) |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -27,9 +27,17 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Next build (not installed yet)
 
-The build after install 5. Two changes are merged and one is in work, all three in the clip editor. The merged
-changes passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
-and for an Eden session on them.
+The build after install 5, at merge 17 (`5df3d9dc`). Three changes are merged, all in the clip editor, with one fix
+to the third, and nothing is still in work. The operator ordered its card install on 2026-11-26; it is not installed
+yet.
+
+- **Host:** every merge passed host tests and builds.
+- **Eden, on the build before the fix (`eb39d6bc`):** Play started no later than on install 5; a take was recorded
+  and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable;
+  and the playhead browsed a take. The same session found the defect that merge 17 fixes.
+- **Eden, on merge 17 itself:** in testing. No result is in, and none is claimed here.
+
+The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#the-next-build).
 
 ### Merged
 
@@ -40,6 +48,8 @@ and for an Eden session on them.
 - Where no move can start at that frame, the strip says why. A second Y keeps the same move.
 - The check behind "In is mid-action" is unchanged. Host tests compared all 1,176 crop ranges of a 48-frame
   capture: every preview that worked on install 5 kept its starting state and inputs.
+- Seen in Eden on `eb39d6bc`: with In one frame into an attack, X played nothing and the refusal showed; Y moved In
+  to the attack's start; X then previewed and A saved a macro. A second Y and the faster cases have host tests only.
 - Found by the operator on install 5, where the way round is ZL or ZR + Y:
   [Known issues](CURRENT-RELEASE.md#known-issues).
   [Replay window](menu/recording.md#replay-window)
@@ -53,23 +63,50 @@ and for an Eden session on them.
   one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
 - An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
 - Combos and drills are unchanged.
-- Host tests and builds only. Holding a direction on a pad has no host test.
+- Seen in Eden on `eb39d6bc`: with nothing selected the playhead moved to two other frames while In and Out stayed
+  where they were, and the strip read "Playhead moved. L sets the start here, R the end.". The cuts with L and R
+  and the snap with Y have host tests only; holding a direction on a pad has no host test.
+  [Replay window](menu/recording.md#replay-window)
+
+#### The fighters are shown while you scrub (merged 2026-11-26)
+
+- With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
+  frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
+  is kept. This works on a macro and on a match capture.
+- Record saves a macro's positions in a second file beside it. The macro's own file stays the same, so older
+  builds can still read new macros, older macros still load and play on this build, and Play reads what it read
+  before. A crop and a capture saved as a macro carry their positions.
+- A macro with no positions reads "Play it once to see positions while scrubbing.". Play it by itself from its
+  first input, with Play or with X from the start of the take, and they are saved; you do not record it again.
+  After X in the editor they show at once.
+- Positions made by a playback are that playback's, not the original recording's. A playback stopped early gives
+  positions up to where it stopped; past them the editor reads "Positions end here.".
+- A playback never replaces a valid positions file saved by Record. A damaged or mismatched file counts as
+  missing, so an eligible playback can replace it. The macro does not need positions to play.
+- No positions file is made for a chain step, when the playing character is a different fighter kind from the one
+  recorded, or when Trim skips the first input.
+- A fighter is not put at a point inside solid ground or a wall, outside the camera's limits, or past the safe
+  blast-line bounds. If either fighter's point fails these checks, the editor reads
+  "Can't stand there on this stage."; a fighter already held goes back to where the hold began. Each fighter's
+  point is judged by itself, so the other one is still shown when its own point allows.
+- The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
+- Fixed before the card build (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
+  the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
+  both fighters stood beside their recorded points while the editor said they were held.
+- Seen in Eden on `eb39d6bc`, the build before that fix: a recorded take held both fighters at In with no preview,
+  In and Out followed the handles, and deselecting let them go; an old macro read "Play it once to see positions
+  while scrubbing." and got its positions from one Play; X in the editor showed them at once; a crop kept them.
+- Merge 17's own checks are in testing. Merge 16 did not establish scrub behavior in a waiting room, through a
+  fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions.
+  No host test runs the Switch code that holds the fighters.
+- On one Eden host (one boot per build), every tested macro on merge 16 started on install 5's frame count or
+  one frame earlier. That includes the first Play of the old 30-second and ten-minute macros. The unchanged
+  playback path carries this result forward; these are not timings from a merge-17 boot or the console.
   [Replay window](menu/recording.md#replay-window)
 
 ### In work
 
-Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
-
-- **In work: see the fighters while you scrub.** Moving In, Out or the free playhead shows the available fighter
-  positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
-  both use the same offset, so their recorded spacing is kept. Record saves the positions in a second file beside
-  the macro. The macro format stays the same, so older builds can still read new macros. Older macros still load
-  and play on the new build. A macro with no positions file gets one when it is played by itself from its first
-  frame, with Play or with X from the start of the take; you do not record it again. The two fighters are sampled
-  during that playback, so those positions are that playback's, not the original recording's. A playback stopped
-  early gives positions up to where it stopped, and a file made this way never replaces one saved by Record. If the
-  positions file is missing, unreadable or no longer matches the macro, the macro still plays. Combos and drills
-  are unchanged.
+Nothing planned for this build is still in work.
 
 ## Install 5
 
@@ -372,7 +409,8 @@ tool's, not TrainingRooms'.
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
-  took a second or more to start. Install 5 changes how Play starts; the start has not been timed in a game. They
+  took a second or more to start. Install 5 changes how Play starts; timed later in Eden, not on the console, it
+  started a 3-second macro 9 frames after the press and a ten-minute one 27 frames after. They
   also asked for placement changes and a Delete for replay captures; both are in install 5.
 
 ## Install 3

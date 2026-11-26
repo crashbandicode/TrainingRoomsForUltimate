@@ -17,9 +17,17 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
   previewed. A second boot opened the menu, and Guard the Edge's set-up, in a one-player waiting room. Neither
   drill was played through, no placement was saved, no second player joined a room, and most of the build's other
   new items were not touched.
-- **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
-  with "In is mid-action" after a snap to the move start; Known issues below has the way round. It is a report of what they
-  saw, not a test of the build; the reports on the earlier builds are in the evidence page.
+- **On the console:** three reports so far. On 2026-11-25 the operator reported that the clip editor kept refusing
+  with "In is mid-action" after a snap to the move start. On 2026-11-26 they reported that a fighter placed off stage
+  on a save stays on the ground once it has landed, and that Guard the Edge's starting spot varies between rounds.
+  Known issues below has each. They are reports of what they saw, not tests of the build; the reports on the earlier
+  builds are in the evidence page.
+- **The next build is not on the card.** It is merge 17 (`5df3d9dc`): three changes to the clip editor and one fix.
+  The operator ordered its install on 2026-11-26. In Eden, merge 16 passed its Play-start comparison with
+  install 5, its record, old-macro, snap and browse checks, and part of the diagnostic checks. The Play-start
+  result and rename result carry over: rename passed by typing in Eden's keyboard window, not by pad.
+  Merge 17's own Eden checks are in testing.
+  [Next build](RELEASE-NOTES-rc15.md#next-build-not-installed-yet)
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -99,12 +107,23 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
   mid-action, preview and save are refused. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y to snap to a
   move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
   saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
-  A fix is merged (`dbded2d1`) for the build after install 5; it is not on the card, and it has not run in a game.
-- **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
+  A fix is merged (`dbded2d1`) for the build after install 5; it is not on the card. In Eden on that build before
+  its last fix (`eb39d6bc`), Y moved In to the attack's start, and X then previewed.
+- **Placement on a save, reported on install 5:** a fighter switched to Off stage floats, but once it is moved into
+  the ground it lands and then stays on the ground as the crosshair moves. Switch On stage and Off stage again to put
+  it right. Neither install 5 nor merge 17 fixes it. A fix is planned for the following build; there is no
+  confirmed in-game fix yet.
+- **Guard the Edge, reported on install 5:** the fighter sometimes starts slightly off the chosen spot, lower on one
+  round and higher on the next. Not fixed in install 5 or in the next build (merge 17); a fix is planned for the
+  build after it. No cause is established.
+  [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console)
+- **Install 5 test coverage:** three reports from console play are on record, not a full hardware verdict. Eden covered
   parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
-  starts; the start has not been timed in a game.
+  starts. Timed in Eden, not on the console, install 5 started a 3-second macro 9 frames after the press, a
+  30-second one 10 or 11, and a ten-minute one 27.
+  [Install evidence](EVIDENCE-rc15-installs.md#the-next-build)
 - **Not covered by install 4's final Eden session, nor by install 5's smoke boot:** the editor in the waiting room; the Quick Play practice pick, new pick
   and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
   attacks; the Trim setting's migration; and the CPU's playback indicator.
