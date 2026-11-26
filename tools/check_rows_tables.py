@@ -8,16 +8,27 @@ import sys
 import tempfile
 
 
+REQUIRED = (
+    "cpu_level", "custom_stages", "game_speed", "lobby_items", "lobby_persist",
+    "lobby_speed", "module_pins", "res_unload", "speed_frame", "speed_label",
+)
+
+
 def main():
     root = pathlib.Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser()
     parser.add_argument("elf")
     parser.add_argument("--tables", type=pathlib.Path, default=root / "data" / "tables")
     args = parser.parse_args()
-    generators = sorted((root / "tools").glob("gen_rows_*.py"))
+    tools = root / "tools"
+    generators = sorted(set(tools.glob("gen_rows_*.py")) | {tools / f"gen_rows_{name}.py" for name in REQUIRED})
     problems = 0
     with tempfile.TemporaryDirectory() as directory:
         for generator in generators:
+            if not generator.is_file():
+                print(f"MISSING {generator.name}")
+                problems += 1
+                continue
             name = generator.stem.removeprefix("gen_") + ".ROWS.tsv"
             output = pathlib.Path(directory) / name
             table = args.tables / name
