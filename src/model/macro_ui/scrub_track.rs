@@ -218,9 +218,9 @@ impl Block {
         }
     }
 
-    /// The worker: nobody is asked to be held, and every role the last ask moved has run a fighter frame under that
-    /// "nobody", which is the frame that lets its body go. A role that never ran a frame here has no body to wait for.
-    pub fn released(&self) -> bool {
+    /// Acknowledgements for the latest ask only. The worker must use `Slot::released` to also check
+    /// for callbacks still running and bodies that remain held from an earlier ask.
+    pub(super) fn released(&self) -> bool {
         if self.ask() != Ask::None {
             return false;
         }
@@ -331,7 +331,10 @@ impl Slot {
 
     /// The worker's release check before it starts a wanted play.
     pub fn released(&self) -> bool {
-        self.with(|block| block.released()).unwrap_or(true)
+        // A callback may have read a point but not reported its first hold yet. Once we are the only
+        // reader of the cancelled ask, no later callback can start a hold and both last reports count.
+        self.with(|b| self.readers.load(Ordering::SeqCst) == NO_READER + 1 && b.released()
+            && (0..2).all(|slot| b.seen(slot) != SEEN_HELD)).unwrap_or(true)
     }
 
     /// The worker: cancel the request and keep the slot reachable until the fighters have released it.
@@ -1219,7 +1222,7 @@ mod tests {
         let notices = worker.split_once("pub fn worker_preview_notices() {").map_or("", |(_, rest)| rest);
         assert!(notices.trim_start().starts_with("scrub_service();\n    service_wanted_play();"), "the wanted play is looked at on every pass");
         let service = worker.split_once("fn service_wanted_play() {").map_or("", |(_, rest)| rest);
-        let released = service.find("block.released()").expect("the release is read");
+        let released = service.find("SLOT.released()").expect("the release is read");
         assert!(released < service.find("block.await_settle()").unwrap() && released < service.find("editor.take_wanted_play()").unwrap());
         assert!(worker.contains("[Scrub] play wanted") && worker.contains("[Scrub] released"), "both steps are in the trace");
         assert!(!worker.contains("static WANTED"), "the wanted play lives in the editor, not in a static (BSS)");

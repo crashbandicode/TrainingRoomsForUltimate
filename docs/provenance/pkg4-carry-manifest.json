@@ -5725,7 +5725,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "19d4b09ca3288849bbb98d415c61ca104231615a8cefa81488c8c3c9cce21411",
+   "dest_sha256": "60311445d9026603c79c17884049c07a46a13348b3609c2c98f6ff9624ae680a",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6746,6 +6746,16 @@
      "reason": "Scrub positions, next build (tr-primary-2 2026-11-26 12:54:05Z): the wanted play carries whether it is a playback, so the worker keeps no static for it (BSS must not grow).",
      "old": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\n/// The play the editor wants (`ClipEditor::want_play`) is a playback, not a preview.\nstatic WANTED_PLAYBACK: AtomicBool = AtomicBool::new(false);\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n",
      "new": "static ENABLED: AtomicBool = AtomicBool::new(false);\nstatic EDITOR: Mutex<Option<Editor>> = Mutex::new(None);\nstatic TAIL: Mutex<PreviewTail> = Mutex::new(PreviewTail::new());\nstatic BROWSER: Mutex<Option<Browser>> = Mutex::new(None);\nstatic REVISION: AtomicU64 = AtomicU64::new(1);\nstatic SELECTION_REVISION: AtomicU64 = AtomicU64::new(1);\n"
+    },
+    {
+     "reason": "Validate both actual scrub holds and in-flight fighter readers before starting a queued preview (review of dec899a6).",
+     "old": "    let wanted = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n        if editor.wanted_play().is_none() || !SLOT.with(|block| block.released()).unwrap_or(true) { return; }\n        SLOT.with(|block| block.await_settle());\n        editor.take_wanted_play()\n    };\n",
+     "new": "    let wanted = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n        if editor.wanted_play().is_none() || !SLOT.released() { return; }\n        SLOT.with(|block| block.await_settle());\n        editor.take_wanted_play()\n    };\n"
+    },
+    {
+     "reason": "Validate both actual scrub holds and in-flight fighter readers before starting a queued preview (review of dec899a6).",
+     "old": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n",
+     "new": "    {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return false };\n        if editor.view().playing || SLOT.released() { return false; }\n        editor.want_play(action, playback);\n    }\n    crate::runtime::diag_log::diagnostic(format_args!(\"[Scrub] play wanted: the hold lets the fighters go first\"));\n"
     }
    ]
   },
