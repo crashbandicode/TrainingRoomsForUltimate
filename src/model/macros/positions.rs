@@ -40,9 +40,10 @@ pub fn path(dir: &Path, id: &str) -> PathBuf {
 }
 
 /// Where a positions file came from: a take's own recording, or a playback of a macro that had none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Source {
+    #[default]
     Recorded = 1,
     Generated = 2,
 }
@@ -157,10 +158,14 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
 /// The positions of the macro `id`, whose inputs are `inputs`; none when the file is missing, is not one this build
 /// reads, or does not bind this macro. A file with no rows is an empty track, not a missing one.
 pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFrame; 2]>> {
+    read_with_source(dir, id, inputs).map(|(_, track)| track)
+}
+
+pub(super) fn read_with_source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<(Source, Vec<[ReplayFrame; 2]>)> {
     #[cfg(test)]
     READS.with(|reads| reads.set(reads.get() + 1));
     let mut file = fs::File::open(path(dir, id)).ok()?;
-    let (frames, _) = bound(&mut file, id, inputs)?;
+    let (frames, source) = bound(&mut file, id, inputs)?;
     let mut track = Vec::new();
     track.try_reserve_exact(frames).ok()?;
     let mut buffer = vec![0u8; CHUNK_FRAMES.min(frames) * FRAME];
@@ -171,7 +176,7 @@ pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFr
             track.push([get_row(&bytes[..ROW])?, get_row(&bytes[ROW..])?]);
         }
     }
-    Some(track)
+    Some((source, track))
 }
 
 /// Where the positions file of `id` came from, when it binds these inputs. Only its header is read.
