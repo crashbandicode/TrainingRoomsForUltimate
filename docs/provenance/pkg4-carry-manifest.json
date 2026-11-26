@@ -1280,7 +1280,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "39a5e69483a07bdcdefe55fa5804cda48511b66c2a5727d9cdb629aceb2333bb",
+   "dest_sha256": "f6ce869690a2224298e7721bfed5d320ecc56f2850719a76f30bf9281db9464a",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1311,6 +1311,11 @@
      "old": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn name(&self) -> &str {",
      "new": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn owns(bytes: &[u8]) -> bool {\n        !super::recording::is_chain_document(bytes)\n    }\n\n    fn name(&self) -> &str {",
      "reason": "Recording redesign rr-1: a chain file in macros/ is a different record, so the recording list omits it."
+    },
+    {
+     "old": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];",
+     "new": "const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];",
+     "reason": "Scrub positions (2026-11-26 00:21:37Z): the macro reader knows the tracked schema even when a track row fails to parse."
     }
    ]
   },
@@ -1319,7 +1324,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "4ee5dbb0371b62053ad2ae6afe3f3b19da840d9a2295255574bb4966067b1738",
+   "dest_sha256": "ffc28731899f440642130034d32eec1834168b1de2b86495c5584f501a33b93c",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -1398,6 +1403,11 @@
      "old": "            edited_json(|v| v[\"schema_version\"] = json!(3)),",
      "new": "            edited_json(|v| v[\"schema_version\"] = json!(4)),",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));",
+     "new": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));\n    let tracked = |short_row: bool| edited_json(|v| {\n        v[\"schema_version\"] = json!(3);\n        v[\"track\"] = json!([[[8, 2, -1, 3, 17, 1, 0, 40, 5], [18, 0, 1, 0, 0, 0, 0, -20, 7]]]);\n        if short_row { v[\"track\"][0][1].as_array_mut().unwrap().pop(); }\n    });\n    let path = tmp.path().join(\"tracked.json\");\n    fs::write(&path, tracked(false)).unwrap();\n    assert_eq!(lib.load(\"tracked\").unwrap().track.unwrap()[0][1].y, 7.0);\n    fs::write(&path, tracked(true)).unwrap();\n    let err = lib.load(\"tracked\").unwrap_err();\n    assert!(matches!(err, MacroError::Parse(_)), \"short v3 track row: {err}\");",
+     "reason": "Scrub positions (2026-11-26 00:21:37Z): distinguish a malformed row in the supported v3 format from an unsupported future format."
     }
    ]
   },
