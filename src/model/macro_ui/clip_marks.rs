@@ -457,12 +457,8 @@ mod tests {
          Span { start: 92, end: None, mv: None, ..Span::default() }]
     }
 
-    fn scratch(tag: &str) -> std::path::PathBuf {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path = std::env::temp_dir().join(format!("tr-replay-editor-{tag}-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        std::fs::create_dir_all(&path).unwrap();
-        path
+    fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+        crate::test_scratch::Scratch::new(&format!("tr-replay-editor-{tag}"))
     }
 
     fn saved_state(kind: i32) -> SavedState {

@@ -882,25 +882,11 @@ mod tests {
     use super::*;
     use std::io::{Seek, SeekFrom};
 
-    static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
-
-    struct TestDir(PathBuf);
+    struct TestDir(crate::test_scratch::Scratch);
 
     impl TestDir {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "training-mod-capture-{}-{}",
-                std::process::id(),
-                NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)
-            ));
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
-        }
-    }
-
-    impl Drop for TestDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            Self(crate::test_scratch::Scratch::new("training-mod-capture"))
         }
     }
 

@@ -528,18 +528,16 @@ mod tests {
     use smash_match_data_oracle::{validate_capture, CaptureExt};
     
 
-    struct Fixture(PathBuf);
+    struct Fixture(crate::test_scratch::Scratch);
+    struct RestorePermissions(Vec<PathBuf>, fs::Permissions);
+    impl Drop for RestorePermissions {
+        fn drop(&mut self) {
+            for path in &self.0 { let _ = fs::set_permissions(path, self.1.clone()); }
+        }
+    }
     impl Fixture {
         fn new() -> Self {
-            for _ in 0..64 {
-                let p = std::env::temp_dir().join(format!("training-shared-test-{}", NEXT_TEMP.fetch_add(1, Ordering::Relaxed)));
-                match fs::create_dir(&p) {
-                    Ok(()) => return Self(p),
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-                    Err(e) => panic!("fixture: {e}"),
-                }
-            }
-            panic!("fixture collision limit");
+            Self(crate::test_scratch::Scratch::new("training-shared-test"))
         }
         fn archive(&self) -> SharedCaptureArchive { SharedCaptureArchive::new(&self.0) }
         fn publish(&self, s: &LiveSession) -> PathBuf {
@@ -549,10 +547,6 @@ mod tests {
         }
         fn load(&self) -> io::Result<SavedCapture> { self.archive().load(&encode_file_id("native-id")) }
     }
-    impl Drop for Fixture {
-        fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
-    }
-
     fn frame(axes: [f32;4]) -> LiveFrame {
         LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: 0x80000201, axes },
             start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,
@@ -586,6 +580,7 @@ mod tests {
         fs::copy(dir.join(format!("{id}.tmrc")), &twin).unwrap();
         let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());
         assert!(before.len() >= 3, "the manifest, the timeline and the editor's file");
+        let _restore = RestorePermissions(vec![f.0.path().to_path_buf()], fs::metadata(&f.0).unwrap().permissions());
         fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();
         let locked = fs::write(f.0.join("probe"), b"").is_err();
         let result = archive.delete(&id);
@@ -617,10 +612,11 @@ mod tests {
         fs::create_dir(&foreign).unwrap();
         fs::write(foreign.join("keep"), b"kept").unwrap();
         let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());
+        let moved = f.0.join(format!(".{id}.smd-1.del"));
+        let _restore = RestorePermissions(vec![dir.clone(), moved.clone()], fs::metadata(&dir).unwrap().permissions());
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
         let locked = fs::write(dir.join("probe"), b"").is_err();
         let result = archive.delete(&id);
-        let moved = f.0.join(format!(".{id}.smd-1.del"));
         for path in [&dir, &moved] {
             let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));
         }

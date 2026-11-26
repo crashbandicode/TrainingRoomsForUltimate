@@ -37,8 +37,7 @@ fn developer_held_chord_counts_each_p1_poll_and_no_other_input() {
 }
 
 fn developer_reader_continues_large_files_and_reports_missing_files() {
-    let dir = std::env::temp_dir().join(format!("tr-developer-reader-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_scratch::Scratch::new("tr-developer-reader");
     let path = dir.join("dev.json");
     let text = path.to_str().unwrap();
     let mut bytes = vec![b' '; 100_000];

@@ -14,14 +14,11 @@ use crate::engine::preload::cycle_preload_config::{
     MAX_BYTES,
 };
 
-struct Dir(PathBuf);
+struct Dir(crate::test_scratch::Scratch);
 
 impl Dir {
     fn new(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("tr-preload-ini-{}-{name}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        Self(dir)
+        Self(crate::test_scratch::Scratch::new(&format!("tr-preload-ini-{name}")))
     }
     fn child(&self, name: &str) -> PathBuf {
         self.0.join(name)
@@ -34,12 +31,6 @@ impl Dir {
             std::fs::read_dir(&self.0).unwrap().map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned()).collect();
         names.sort();
         names
-    }
-}
-
-impl Drop for Dir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

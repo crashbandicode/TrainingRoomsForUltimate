@@ -23,10 +23,8 @@ fn record(name: &str) -> ComboRecord {
     ComboRecord::new(name.to_owned(), combo, None)
 }
 
-fn scratch(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("tr-combo-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir
+fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("tr-combo-{tag}"))
 }
 
 fn a_record_round_trips_through_its_json() {
@@ -100,7 +98,8 @@ fn a_links_spot_is_saved_and_an_older_file_reads_as_none() {
 }
 
 fn the_library_saves_lists_renames_deletes_and_selects() {
-    let dir = scratch("library");
+    let scratch = scratch("library");
+    let dir = scratch.join("library");
     let library = ComboLibrary::new(&dir);
     assert_eq!(library.selected(), None);
     let id = library.save_new(&record("Nair loop")).unwrap();

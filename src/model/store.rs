@@ -829,7 +829,6 @@ fn wake_catalog() {
 #[cfg(test)]
 mod tests {
     lib_unit_tests! {
-    use std::sync::atomic::{AtomicU32, Ordering};
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -883,21 +882,11 @@ mod tests {
         }
     }
 
-    struct TempDir(PathBuf);
+    struct TempDir(crate::test_scratch::Scratch);
 
     impl TempDir {
         fn new() -> Self {
-            static NEXT: AtomicU32 = AtomicU32::new(0);
-            let path = std::env::temp_dir()
-                .join(format!("training_rooms-store-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            Self(crate::test_scratch::Scratch::new("training_rooms-store"))
         }
     }
 

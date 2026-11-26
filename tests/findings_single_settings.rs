@@ -169,8 +169,8 @@ fn saved_defaults_continue_in_a_fresh_process() {
         }
         return;
     }
-    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let file = std::env::temp_dir().join(format!("tr-single-{}-{stamp}.json", std::process::id()));
+    let scratch = crate::test_scratch::Scratch::new("tr-single");
+    let file = scratch.join("settings.json");
     for stage in ["save", "restore"] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "findings_single_settings::saved_defaults_continue_in_a_fresh_process", "--nocapture"])

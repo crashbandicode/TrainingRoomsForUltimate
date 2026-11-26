@@ -61,7 +61,7 @@
    "dest": "src/model/macros/capture_archive.rs",
    "crate": "macros",
    "src_sha256": "dbfdf217e08fe1421c292b302ea58e60d541a817b7fc17b410b166e8c7458d5f",
-   "dest_sha256": "1e4370ed36d0de7aa27e1a713bbfbed05c4b725bab53db3acb47dbc390f0aaab",
+   "dest_sha256": "983fc037826a5f16eac6680ad03f9774cd31df683f199217e6c6ad6ff9024cbc",
    "edits": [
     {
      "old": "file_id.as_bytes().chunks_exact(2) {",
@@ -362,6 +362,11 @@
      "reason": "scrub-moves SM5 D: schema-sized records preserve poses and legacy captures",
      "old": "\nconst MAGIC: &[u8; 8] = b\"TMRCAP01\";\nconst FIXED_HEADER_BYTES: usize = 12;\nconst CAPTURE_SCHEMA_VERSION: u32 = 1;\nconst TEMP_CREATE_ATTEMPTS: usize = 64;\nstatic NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);\n\n",
      "new": "\nconst MAGIC: &[u8; 8] = b\"TMRCAP01\";\nconst FIXED_HEADER_BYTES: usize = 12;\nconst CAPTURE_SCHEMA_VERSION: u32 = 2;\nconst TEMP_CREATE_ATTEMPTS: usize = 64;\nstatic NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);\n\n"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders",
+     "old": "    use super::*;\n    use std::io::{Seek, SeekFrom};\n\n    static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);\n\n    struct TestDir(PathBuf);\n\n    impl TestDir {\n        fn new() -> Self {\n            let path = std::env::temp_dir().join(format!(\n                \"training-mod-capture-{}-{}\",\n                std::process::id(),\n                NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)\n            ));\n            fs::create_dir_all(&path).unwrap();\n            Self(path)\n        }\n    }\n\n    impl Drop for TestDir {\n        fn drop(&mut self) {\n            let _ = fs::remove_dir_all(&self.0);\n        }\n    }\n\n",
+     "new": "    use super::*;\n    use std::io::{Seek, SeekFrom};\n\n    struct TestDir(crate::test_scratch::Scratch);\n\n    impl TestDir {\n        fn new() -> Self {\n            Self(crate::test_scratch::Scratch::new(\"training-mod-capture\"))\n        }\n    }\n\n"
     }
    ]
   },
@@ -1117,7 +1122,7 @@
    "dest": "src/model/macros/shared_capture.rs",
    "crate": "macros",
    "src_sha256": "46093f8256ff444e9943ee4672cc6c348ddc46548a6108fc177a45fe65c208f0",
-   "dest_sha256": "a6f6068074618f94292e907335c1f82f77e2a0d50ccffde3b98cac8d81215c09",
+   "dest_sha256": "4c2f0d8c5a799b0cf7979b784a7695856ec8c9012b56d0db46e59821d358c6a4",
    "edits": [
     {
      "old": "            }\n        }\n    }\n}\n",
@@ -1334,6 +1339,26 @@
      "reason": "scrub-moves SM5 D: copy poses by fighter entry to the editor cache and canonical load",
      "old": "        let (mut projected, projected_miis) = projector.finish(session.truncated)?;\n        // The identity read with the capture goes into the editor cache's header; the timeline has no field for it.\n        for track in &mut projected.tracks {\n            track.fighter = session.tracks.iter().find(|live| live.entry == track.entry).and_then(|live| live.fighter);\n        }\n        CaptureArchive::new(&staging).save_with_miis(replay_id, replay_name, game_version, &projected, projected_miis.as_ref())?;\n        prescan(&staging.join(TIMELINE_FILE))?;\n",
      "new": "        let (mut projected, projected_miis) = projector.finish(session.truncated)?;\n        // The identity read with the capture goes into the editor cache's header; the timeline has no field for it.\n        for track in &mut projected.tracks {\n            let live = session.tracks.iter().find(|live| live.entry == track.entry).ok_or_else(|| bad(\"missing live track\"))?;\n            if track.frames.len() != live.frames.len() { return Err(bad(\"live track length disagrees with projection\")); }\n            track.fighter = live.fighter;\n            for (frame, live) in track.frames.iter_mut().zip(&live.frames) { frame.pose = live.pose; }\n        }\n        CaptureArchive::new(&staging).save_with_miis(replay_id, replay_name, game_version, &projected, projected_miis.as_ref())?;\n        prescan(&staging.join(TIMELINE_FILE))?;\n"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders and restore permissions",
+     "old": "        fs::create_dir(&foreign).unwrap();\n        fs::write(foreign.join(\"keep\"), b\"kept\").unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(dir.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        let moved = f.0.join(format!(\".{id}.smd-1.del\"));\n        for path in [&dir, &moved] {\n            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));\n        }\n",
+     "new": "        fs::create_dir(&foreign).unwrap();\n        fs::write(foreign.join(\"keep\"), b\"kept\").unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        let moved = f.0.join(format!(\".{id}.smd-1.del\"));\n        let _restore = RestorePermissions(vec![dir.clone(), moved.clone()], fs::metadata(&dir).unwrap().permissions());\n        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(dir.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n        for path in [&dir, &moved] {\n            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));\n        }\n"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders and restore permissions",
+     "old": "        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        assert!(before.len() >= 3, \"the manifest, the timeline and the editor's file\");\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(f.0.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n",
+     "new": "        fs::copy(dir.join(format!(\"{id}.tmrc\")), &twin).unwrap();\n        let (before, twin_before) = (bytes_in(&dir), fs::read(&twin).unwrap());\n        assert!(before.len() >= 3, \"the manifest, the timeline and the editor's file\");\n        let _restore = RestorePermissions(vec![f.0.path().to_path_buf()], fs::metadata(&f.0).unwrap().permissions());\n        fs::set_permissions(&f.0, fs::Permissions::from_mode(0o555)).unwrap();\n        let locked = fs::write(f.0.join(\"probe\"), b\"\").is_err();\n        let result = archive.delete(&id);\n"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders and restore permissions",
+     "old": "        }\n        fn load(&self) -> io::Result<SavedCapture> { self.archive().load(&encode_file_id(\"native-id\")) }\n    }\n    impl Drop for Fixture {\n        fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }\n    }\n\n    fn frame(axes: [f32;4]) -> LiveFrame {\n        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: 0x80000201, axes },\n            start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,\n",
+     "new": "        }\n        fn load(&self) -> io::Result<SavedCapture> { self.archive().load(&encode_file_id(\"native-id\")) }\n    }\n    fn frame(axes: [f32;4]) -> LiveFrame {\n        LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput { buttons: 0x80000201, axes },\n            start: StartState { speed_x: -0.0, speed_y: f32::from_bits(1), status: 14,\n"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders and restore permissions",
+     "old": "    use smash_match_data_oracle::{validate_capture, CaptureExt};\n    \n\n    struct Fixture(PathBuf);\n    impl Fixture {\n        fn new() -> Self {\n            for _ in 0..64 {\n                let p = std::env::temp_dir().join(format!(\"training-shared-test-{}\", NEXT_TEMP.fetch_add(1, Ordering::Relaxed)));\n                match fs::create_dir(&p) {\n                    Ok(()) => return Self(p),\n                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,\n                    Err(e) => panic!(\"fixture: {e}\"),\n                }\n            }\n            panic!(\"fixture collision limit\");\n        }\n        fn archive(&self) -> SharedCaptureArchive { SharedCaptureArchive::new(&self.0) }\n        fn publish(&self, s: &LiveSession) -> PathBuf {\n",
+     "new": "    use smash_match_data_oracle::{validate_capture, CaptureExt};\n    \n\n    struct Fixture(crate::test_scratch::Scratch);\n    struct RestorePermissions(Vec<PathBuf>, fs::Permissions);\n    impl Drop for RestorePermissions {\n        fn drop(&mut self) {\n            for path in &self.0 { let _ = fs::set_permissions(path, self.1.clone()); }\n        }\n    }\n    impl Fixture {\n        fn new() -> Self {\n            Self(crate::test_scratch::Scratch::new(\"training-shared-test\"))\n        }\n        fn archive(&self) -> SharedCaptureArchive { SharedCaptureArchive::new(&self.0) }\n        fn publish(&self, s: &LiveSession) -> PathBuf {\n"
     }
    ]
   },
@@ -1430,11 +1455,16 @@
    "dest": "src/model/macros/test_util.rs",
    "crate": "macros",
    "src_sha256": "84136e6677ec3bd094ff71f668289ce080bab17c23e8a9fb041167c3732e6ab7",
-   "dest_sha256": "5528f32d89b0ad2a803fe597f5b9b08b23930377d31c55287c222f0f7a76b56a",
+   "dest_sha256": "db4bf2801ffd555d3bb173db307b19b2f1e419576f725ade73e24229b55de96c",
    "edits": [
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "reason": "rc-next 93d29c28: isolated test scratch folders",
+     "old": "//! Shared fixtures for the unit tests.\n\nlib_unit_tests! {\nuse std::{\n    fs,\n    path::{Path, PathBuf},\n    sync::atomic::{AtomicU32, Ordering},\n};\n\nuse {crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};\n\n/// A unique directory under the system temp dir, removed on drop.\npub struct TempDir(PathBuf);\n\nimpl TempDir {\n    pub fn new() -> Self {\n        static NEXT: AtomicU32 = AtomicU32::new(0);\n        let path = std::env::temp_dir().join(format!(\n            \"training_mod_macros-{}-{}\",\n            std::process::id(),\n            NEXT.fetch_add(1, Ordering::Relaxed)\n        ));\n        fs::create_dir_all(&path).unwrap();\n        Self(path)\n    }\n\n    pub fn path(&self) -> &Path {\n        &self.0\n    }\n}\n\nimpl Drop for TempDir {\n    fn drop(&mut self) {\n        let _ = fs::remove_dir_all(&self.0);\n    }\n}\n\n",
+     "new": "//! Shared fixtures for the unit tests.\n\nlib_unit_tests! {\nuse std::path::Path;\n\nuse {crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};\n\n/// A unique directory under the system temp dir, removed on drop.\npub struct TempDir(crate::test_scratch::Scratch);\n\nimpl TempDir {\n    pub fn new() -> Self {\n        Self(crate::test_scratch::Scratch::new(\"training_mod_macros\"))\n    }\n\n    pub fn path(&self) -> &Path {\n        self.0.path()\n    }\n}\n\n"
     }
    ]
   },
