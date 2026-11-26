@@ -1362,8 +1362,10 @@ mod tests {
         block.ask_at(Some(139), group([0.0, 0.0], [1.0, 0.0]));
         assert_eq!(at(block.point(1, |_| Some(home), |_| None)), Some([-29.0, 0.5]));
         block.forget();
+        // The replacing body's callback asks for its point before release drops the old hold.
+        assert_eq!(block.point(0, |_| Some(home), |_| None), None);
         block.ask_at(Some(140), group([0.0, 0.0], [1.0, 0.0]));
-        assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]), "use the replacement's home");
     }
 
     /// P3 (tr-primary-2 2026-11-26 13:43:10Z, 13:47:51Z; rv-preview-vis 13:44:24Z, 16:20:59Z): a body the game pushes
