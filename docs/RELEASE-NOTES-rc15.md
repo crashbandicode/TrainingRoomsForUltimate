@@ -37,7 +37,7 @@ All three changes are in the clip editor of the [Replay window](menu/recording.m
 
 ### Y on In makes a capture previewable
 
-*Clip coming.*
+*Clip coming: it is held until the known issue with X after a snap is fixed.*
 
 On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
 found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
@@ -57,7 +57,9 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 
 ### A free playhead in the clip editor
 
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-playhead.mp4)
 
 With no handle selected, on a macro or a capture:
 
@@ -80,7 +82,9 @@ With no handle selected, on a macro or a capture:
 
 ### The fighters are shown while you scrub
 
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*Crop on Macro 3: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-scrub.mp4)
 
 With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
 frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
