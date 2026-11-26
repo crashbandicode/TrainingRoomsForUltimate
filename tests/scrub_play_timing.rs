@@ -18,7 +18,12 @@ fn play_start_timings() {
         // The host's playback state is process-wide: time it in a fresh process.
         let root = env::temp_dir().join(format!("tr-scrub-timing-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
-        let ran = Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"]).env(KEY, &root).status().unwrap().success();
+        // One core for the whole timed process, the same on every run (tr-primary-2 2026-11-26 04:35:21Z): the host
+        // otherwise gives a process one of two speeds for its life. Without taskset the run is not pinned and says so.
+        let exe = env::current_exe().unwrap();
+        let pinned = Path::new("/usr/bin/taskset").exists();
+        let mut child = if pinned { let mut c = Command::new("/usr/bin/taskset"); c.args(["-c", "3"]).arg(&exe); c } else { Command::new(&exe) };
+        let ran = child.args(["--exact", TEST, "--nocapture"]).env(KEY, &root).env("TR_SCRUB_TIMING_PINNED", if pinned { "cpu3" } else { "no" }).status().unwrap().success();
         fs::remove_dir_all(root).unwrap();
         assert!(ran, "the timed process failed");
         return;
@@ -72,6 +77,6 @@ fn report(name: &str, frames: usize, json: u64, mut what: impl FnMut()) {
         TIMED.with(|timed| timed.take()).unwrap_or(began).elapsed().as_micros()
     }).collect();
     times.sort_unstable();
-    eprintln!("PLAY_TIMING what={name} frames={frames} json_bytes={json} runs={RUNS} median_us={} min_us={} max_us={}",
+    eprintln!("PLAY_TIMING what={name} frames={frames} json_bytes={json} runs={RUNS} pinned={} median_us={} min_us={} max_us={}", env::var("TR_SCRUB_TIMING_PINNED").unwrap_or_default(),
         times[RUNS / 2], times[0], times[RUNS - 1]);
 }
