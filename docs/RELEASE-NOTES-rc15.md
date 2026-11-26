@@ -492,7 +492,7 @@ tool's, not TrainingRooms'.
 
 | Change | What it does | More |
 | --- | --- | --- |
-| Sliders | Up and Down choose Min or Max and change it; holding speeds up. Damage ranges move in 0.5% steps. | [Changing a row](guide/using-the-menu.md#changing-a-row) |
+| Sliders | Up or Down chooses Min or Max. Press A to edit it, then tap Up or Down to change the value, or hold to move faster. A or B finishes the edit. Damage ranges move in 0.5% steps. | [Changing a row](guide/using-the-menu.md#changing-a-row) |
 
 ### Waiting rooms
 
