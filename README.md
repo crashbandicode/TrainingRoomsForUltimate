@@ -4,7 +4,7 @@ TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode 
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
 **Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 5 (`b7a382e4`, 2026-11-25), is
-installed and tested in Eden in part; three reports from the console are on record. What's new, how to install it and what is known not to work
+installed and tested in Eden in part; three reports from the console are on record. The next build (merge 17) is not installed and is in testing. What's new, how to install it and what is known not to work
 are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 

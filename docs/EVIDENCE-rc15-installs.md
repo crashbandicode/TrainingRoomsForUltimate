@@ -147,7 +147,7 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-24 19:35 | install 3 | Quick Play: after a match the loser declined the rematch, picked a different fighter and came back to the room; the earlier fighter was put back as both the CPU and Player 1. | Install 4 (`6146f8e9`). Not run in Eden: the final session exercised no Quick Play feature of TrainingRooms. |
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
-| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed. A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
+| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([The next build](#the-next-build)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
 | 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not in install 5. Reproduced by a host test on `58c9ccb5`, whose code is install 5's: 4 of 24 editor cases fail, among them Y alone leaving In without a move start, while the case that snaps with ZL or ZR + Y passes (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; place-t1a, inbox 23:49:51Z). The Y snap's code is the same in install 4 (`a945b0c1`), compared line by line for this page. The fix merged after install 5 as `dbded2d1` (pin `3990f50e`; gate `artifacts/phase23/next-build/gate-dbded2d1/`, six steps exit 0): on a capture, Y on a mark that is mid-action now resolves the move as the held-modifier snap does. Host tests and builds only; the operator's own take is not reproduced, and nothing ran in a game. The smoke boot's editor check opened the editor and previewed a take without moving a handle. |
 | 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not changed. Assigned for a later build, cause first (inbox 2026-11-26 11:57:13Z, tr-primary-2, with the operator's words). No cause is established, and it has not been reproduced. |
 | 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | Not changed. Assigned for a later build, cause first (inbox 2026-11-26 11:57:13Z, tr-primary-2, with the operator's words). No cause is established, and it has not been reproduced. |
@@ -263,8 +263,9 @@ frame was looked at.
 
 ## The next build
 
-Merged after install 5 and **not on the card**. The Gate column names the receipt under
-`artifacts/phase23/next-build/`. These are host tests and builds, not gameplay tests.
+Merged after install 5 and **not on the card**. The operator ordered the card install of merge 17 (`5df3d9dc`) on
+2026-11-26 (inbox 12:03:32Z, tr-primary-2); no install receipt exists yet. The Gate column names the receipt under
+`artifacts/phase23/next-build/`; the gates are host tests and builds. The Eden runs follow the table.
 
 | Merge | Head | Gate |
 | --- | --- | --- |
@@ -279,16 +280,58 @@ Merged after install 5 and **not on the card**. The Gate column names the receip
   it is not shown that the stage reads in a room.
 - **Why the fix:** an Eden session on `eb39d6bc`, the build before it, found on a match capture that both fighters
   stood beside their recorded points while the line read held (row SP-10; dup-audit, inbox 2026-11-26 10:24:00Z).
-  tr-primary-2 ruled it a defect to fix in this build (10:27:48Z). The session's other rows are not written here yet.
+  tr-primary-2 ruled it a defect to fix in this build (10:27:48Z).
 - **In work:** nothing.
 - **Repeated Play, host only:** starts took 0.98 to 1.07 times as long as on the previous `main` (`6dbf9aa9`).
   This range does not describe the first Play of an old macro without positions.
 - **First Play that generates positions, host only:** the median of seven paired differences in cold-start
   overhead was 28 microseconds at 3 s (passes the 100-microsecond limit), 127 microseconds at 30 s (over the
-  limit), and 764 microseconds at 10 min (inconclusive, not a pass). The 30 s and 10 min verdicts await PB-1:
-  compare the first Play of the session on this build and install 5, on the same host with the same trackless
-  macro. The first input may be at most one frame later. Neither a second Play nor a macro with recorded positions
-  substitutes for this check. Source: `artifacts/phase23/scrub-positions/READY-ERRATUM-d8713ee4.md`.
-- **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
-  then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
-  about it is claimed here.
+  limit), and 764 microseconds at 10 min (inconclusive, not a pass). The 30 s and 10 min verdicts were left to the
+  in-game comparison with install 5, which is in the Eden part below. Source:
+  `artifacts/phase23/scrub-positions/READY-ERRATUM-d8713ee4.md`.
+
+### Eden, on the build before the fix (`eb39d6bc`)
+
+One session by dup-audit on 2026-11-26, on merge 16's release NRO (sha256 `d4557201…`) and diag NRO (`8abda32f…`).
+**Nothing in this part ran on merge 17.** Receipts: `artifacts/phase23/scrub-positions/eden-session/evidence/`.
+The first run is install 5's own build, as the baseline.
+
+| Run (folder) | Build | Passed | No verdict |
+| --- | --- | --- | --- |
+| `scrub-pb0-xps-01` (`pb0/`) | install 5, `b7a382e4` | The Play-start counts in the next table. | – |
+| `scrub-rel-xps-01` (`rel/`) | `eb39d6bc`, release | The Play-start comparison. Record, then In held with no preview, on a 214-frame take. An old macro read "Play it once to see positions while scrubbing." and X still previewed it. Snap: with In one frame into an attack X played nothing, Y moved In to the attack's start, X previewed and A saved. Browse: the playhead went to frames 188 and 158 with In 0 and Out 214 unchanged, and both fighters stood within 0.5 of the positions file. | The playhead's cuts and its snap, and the second and fast snap cases, did not fly. |
+| `scrub-xps-01` (`diag/`) | `eb39d6bc`, diag | Record with no preview, In follows, Out on the last frame, release on deselect (SP-1 to SP-4). The old macro (SP-7); positions from one Play, and at once after X (the two generation rows). A crop keeps its positions (SP-8). File sizes (SP-9). A stale positions file (SP-20). | The match capture (SP-10) is the defect row. Release on close (SP-6) was spoiled by its own row. Rename (SP-22) was done by typing into Eden's keyboard window: the id and the positions file's hash stayed and Crop still held; its row file does not read as a pass. Not flown: SP-5, SP-11 to SP-13, SP-17, SP-19, SP-21, the CPU take. The run ended on its own 90-minute limit. |
+| `scrub-room-a-yoga-01`, `scrub-room-b-yoga-01` | `eb39d6bc` | A second Eden joined the first one's waiting room (the join rows). | The room rows (SP-14 to SP-16) did not fly. |
+
+Frames from the Play press to the first played input (`evidence/compare_pb.txt`, which ends `PASS`; XPS, the same
+bridge and the same three staged old macros on both builds):
+
+| Macro | Install 5 `b7a382e4` | `eb39d6bc` |
+| --- | --- | --- |
+| Old ten-minute macro, the session's first Play | 27 | 26 |
+| Old 30-second macro, its first Play | 11 | 10 |
+| Old 3-second macro, first Play | 9 | 9 |
+| Old 3-second macro, three later Plays | 9, 9, 9 | 9, 9, 9 |
+| A 3-second take recorded in the boot | 9, 9, 9 | 9, 9, 9 |
+| A 30-second take recorded in the boot | 10, 10, 10 | 10, 10, 10 |
+
+- **What the first Plays are:** on `eb39d6bc` an old macro has no positions, so its first Play is the one that
+  makes them. After it the ten-minute macro had a generated positions file with the 297 frames that played before
+  the row stopped it, and the 30-second macro one with all 1,800 (dup-audit, inbox 08:10:00Z).
+- **Limits of the counts:** one boot per build on one host; one sample each for the two long macros; whole frames
+  only, so nothing under a frame is shown; the takes recorded in the two boots differ by a few frames in length.
+  This is Eden, not the console.
+- **Not repeated on merge 17:** the fix changes four files, none of them a playback file (merge record of `5df3d9dc`;
+  rv-preview-vis, inbox 11:07:22Z), so tr-primary-2 ruled that the comparison is not run again (10:27:48Z).
+- **Logs:** dup-audit counted 0 lines with panic, abort, Unmapped, crash, Fatal or a break call in each run's Eden
+  console log, the baseline included (inbox 11:15:03Z). The three runs that the runner stopped at its time limit
+  show "CRASH (core dumped, signal 11)" in the Down summary; each log ends on the limit second.
+- **Not established by this session:** anything in a waiting room beyond the join; a fighter swap or a scene change
+  while a fighter is held; a long take; the menu thread's stack depth (SP-19 could not be read in that boot).
+
+### Eden, on merge 17 (`5df3d9dc`)
+
+**In testing.** Merge 17's NROs are release sha256 `c1ced861…` and diag `853964b2…`
+(`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). dup-audit's two boots for them were accepted as started at
+11:25 on 2026-11-26 (inbox 11:40:39Z, tr-primary-2). No result is in, and none is claimed here. Planned: the diag
+rows again with the match capture row, a release smoke, and a fresh waiting-room pair.

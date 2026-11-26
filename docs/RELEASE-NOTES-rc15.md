@@ -27,9 +27,17 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Next build (not installed yet)
 
-The build after install 5. Three changes are merged, all in the clip editor, and nothing is still in work. They
-passed host tests and builds; nothing in this build has run in a game. The card build waits for an Eden session on
-them.
+The build after install 5, at merge 17 (`5df3d9dc`). Three changes are merged, all in the clip editor, with one fix
+to the third, and nothing is still in work. The operator ordered its card install on 2026-11-26; it is not installed
+yet.
+
+- **Host:** every merge passed host tests and builds.
+- **Eden, on the build before the fix (`eb39d6bc`):** Play started no later than on install 5; a take was recorded
+  and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable;
+  and the playhead browsed a take. The same session found the defect that merge 17 fixes.
+- **Eden, on merge 17 itself:** in testing. No result is in, and none is claimed here.
+
+The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#the-next-build).
 
 ### Merged
 
@@ -40,6 +48,8 @@ them.
 - Where no move can start at that frame, the strip says why. A second Y keeps the same move.
 - The check behind "In is mid-action" is unchanged. Host tests compared all 1,176 crop ranges of a 48-frame
   capture: every preview that worked on install 5 kept its starting state and inputs.
+- Seen in Eden on `eb39d6bc`: with In one frame into an attack, X played nothing and the refusal showed; Y moved In
+  to the attack's start; X then previewed and A saved a macro. A second Y and the faster cases have host tests only.
 - Found by the operator on install 5, where the way round is ZL or ZR + Y:
   [Known issues](CURRENT-RELEASE.md#known-issues).
   [Replay window](menu/recording.md#replay-window)
@@ -53,7 +63,9 @@ them.
   one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
 - An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
 - Combos and drills are unchanged.
-- Host tests and builds only. Holding a direction on a pad has no host test.
+- Seen in Eden on `eb39d6bc`: with nothing selected the playhead moved to two other frames while In and Out stayed
+  where they were, and the strip read "Playhead moved. L sets the start here, R the end.". The cuts with L and R
+  and the snap with Y have host tests only; holding a direction on a pad has no host test.
   [Replay window](menu/recording.md#replay-window)
 
 #### The fighters are shown while you scrub (merged 2026-11-26)
@@ -74,16 +86,22 @@ them.
 - No positions file is made for a chain step, when the playing character is a different fighter kind from the one
   recorded, or when Trim skips the first input.
 - A fighter is not put at a point where it cannot stand on this stage: inside the ground or a wall, outside the
-  camera's limits, past a blast line, or anywhere when the stage cannot be read. The editor reads "Can't stand
-  there on this stage."; a fighter already held goes back to where the hold began, and the other fighter is still
-  shown. The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
+  camera's limits, past a blast line, or anywhere when the stage cannot be read. The editor then reads
+  "Can't stand there on this stage."; a fighter already held goes back to where the hold began, and the other
+  fighter is still shown.
+- The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
 - Fixed before the card build (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
   the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
   both fighters stood beside their recorded points while the editor said they were held.
-- Host tests and builds only; the Switch code that holds the fighters has not run in a test.
-  On the host, repeated Plays took 0.98 to 1.07 times as long to start as on the previous build.
-  For an old macro played for the first time to generate positions, only the 3 s take passed on the host. The
-  30 s and 10 min takes need an in-game timing check against install 5. There is no in-game result yet.
+- Seen in Eden on `eb39d6bc`, the build before that fix: a recorded take held both fighters at In with no preview,
+  In and Out followed the handles, and deselecting let them go; an old macro read "Play it once to see positions
+  while scrubbing." and got its positions from one Play; X in the editor showed them at once; a crop kept them.
+- Not shown in a game yet: anything on merge 17 itself (in testing), the waiting room, a fighter swap or a scene
+  change while a fighter is held, a long take, and deleting a macro with its positions. No host test runs the
+  Switch code that holds the fighters.
+- Play starts no later than on install 5. In Eden on one host, each macro started on install 5's frame count or one
+  frame earlier, including the first Play of an old 30-second and an old ten-minute macro, which is the Play that
+  makes their positions. One boot per build.
   [Replay window](menu/recording.md#replay-window)
 
 ### In work
@@ -391,7 +409,8 @@ tool's, not TrainingRooms'.
   rematch, the airborne steered special, the deflection half of Match angle and deflection, ledge attacks, the Trim
   setting's migration and the CPU's playback indicator. The Quick Play match was a font check for Online Deluxe.
 - **The operator reported** (2026-11-25, on this build): the move names Jab 1 and Jab 2 are fine; and playback
-  took a second or more to start. Install 5 changes how Play starts; the start has not been timed in a game. They
+  took a second or more to start. Install 5 changes how Play starts; timed later in Eden, not on the console, it
+  started a 3-second macro 9 frames after the press and a ten-minute one 27 frames after. They
   also asked for placement changes and a Delete for replay captures; both are in install 5.
 
 ## Install 3

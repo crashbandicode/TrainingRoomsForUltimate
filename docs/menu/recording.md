@@ -332,7 +332,7 @@ install 5. With no handle selected on a macro or a capture the strip reads "Hold
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-Host tests only; not yet seen in a game.
+Browsing was seen in Eden on `eb39d6bc`, an earlier head of that build; the cuts and the snap have host tests only.
 
 2026-11-26. Positions while you scrub, merged for the build after install 5. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
@@ -353,7 +353,9 @@ is left alone, and the other fighter is still shown. The key line reads "Can't s
   here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
 - The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
 
-Host tests only; not yet seen in a game.
+Seen in Eden on `eb39d6bc`, the head before the rule for a point where a fighter cannot stand: the hold at In after
+Record, the old-macro line, positions from one Play and at once after X, and a crop that keeps them. That rule and
+its key line have host tests only; the Eden checks of the head with it are in testing.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
