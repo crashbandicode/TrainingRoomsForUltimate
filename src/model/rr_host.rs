@@ -5531,12 +5531,14 @@ mod tests {
         let (root, _, _) = generated_fixture("generated-notice", 3);
         tick(&root);
         generated_play(&root, Role::Cpu);
+        let at_first_play = recording_version();
         for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
         tick(&root);
         assert!(take_generated());
         assert!(!take_generated());
+        let after_settle = recording_version();
         generated_play(&root, Role::Cpu);
-        assert!(!play_sampling());
+        assert!(!play_sampling(), "a done macro armed again: library version at the first Play {at_first_play:?}, after the settle {after_settle:?}, at the second Play {:?}", recording_version());
         for i in 0..3 { assert!(generated_take(Role::Cpu, i).is_some()); }
         tick(&root);
         assert!(!take_generated());
