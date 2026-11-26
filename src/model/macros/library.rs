@@ -121,7 +121,6 @@ impl Record for MacroRecording {
         Ok(read_header(reader)?.map(|rec| rec.summary(id)))
     }
     fn summary_name(summary: &MacroEntry) -> &str { &summary.name }
-    fn stream_write(&self) -> bool { self.track.is_some() }
     fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {
         #[derive(serde::Deserialize)]
         struct Header { kind: Option<String> }

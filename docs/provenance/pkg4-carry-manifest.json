@@ -1280,7 +1280,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "f3b98480c838bf799cbc9047168d79c3a1982e89ab5517924e01c21d14365028",
+   "dest_sha256": "24f412b996713a4ee5fbb2190dab3e3f0fca415dd202ca456fe44aa3328406b2",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1356,6 +1356,11 @@
      "old": "        self.load(id)",
      "new": "        self.load_with(id, |reader| {\n            Ok(read_header(reader)?.map(|mut rec| {\n                // The file's version names its track; the played copy has none.\n                rec.set_track(None);\n                rec\n            }))\n        })",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "new": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "reason": "Input-only streaming (2026-11-26 03:10:37Z): the JSON writer must not need an in-memory position track to stream a long macro."
     }
    ]
   },

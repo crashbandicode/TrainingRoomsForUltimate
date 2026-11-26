@@ -120,7 +120,6 @@ pub trait Record: Serialize + DeserializeOwned {
     const MAX_FILE_BYTES: u64;
     /// Large records can opt out of retaining a second, JSON-sized buffer.
     const STREAM_READ: bool = false;
-    fn stream_write(&self) -> bool { false }
     fn owns_reader(_reader: impl Read) -> serde_json::Result<bool> { Ok(true) }
     fn read_summary(_id: &str, _reader: &mut dyn Read) -> serde_json::Result<Result<Self::Summary, Self::Error>> {
         unreachable!("only a streaming record supplies a header reader")
@@ -568,7 +567,7 @@ fn lift<R: Record>(err: StoreError) -> R::Error {
 
 fn encode<R: Record>(rec: &R) -> Result<Option<Vec<u8>>, R::Error> {
     rec.validate()?;
-    if rec.stream_write() { Ok(None) } else { serde_json::to_vec(rec).map(Some).map_err(|err| lift::<R>(err.into())) }
+    if R::STREAM_READ { Ok(None) } else { serde_json::to_vec(rec).map(Some).map_err(|err| lift::<R>(err.into())) }
 }
 
 #[cfg(test)]
