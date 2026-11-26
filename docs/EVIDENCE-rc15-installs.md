@@ -36,70 +36,53 @@ each gate's own; they were not compared test by test here.
 
 ## Install 1 (`152629cd`)
 
-- **Card:** `artifacts/phase23/card-install/20261123-2004Z-install1-152629cd/INSTALL.md`. Over DBI MTP. Before
-  `0a17c793` (the build of `17060a5e`), after `3d6836da`. The other 20 plugins and 185 settings files were unchanged by
-  name and size.
-- **Gate:** `artifacts/phase23/fix-round-20261123/integration/gate/batch4-152629cd/status.json`: release, diag, test,
-  clippy, no-default-features and size all exit 0.
-- **Review:** inbox 2026-11-23 17:50:30Z, rv-integration: source, build and release ELF pass.
-- **Eden** (2026-11-23, the full card line-up of 22 plugins on both hosts):
-  - Start-up: inbox 18:29:51Z, rv-integration: all 22 plugins loaded on the Yoga and the XPS.
-  - Verdict: inbox 19:43:11Z, rv-integration. Yoga, Training: 16 pass, 5 partial, 2 fail (the Guard the Edge start
-    point: Preview and the grounded rest differed), 1 setup failure, 2 not run, 1 hand check, of 27. XPS, waiting room:
-    Record and Play on the CPU gave the same turns as in Training; Crop saved the chosen range without changing its
-    source.
-  - Not run in the waiting room: the preview's delivery and timing rows (F7-3, F7-4, F7-10) and one Record row (f4-w2).
-  - Release: inbox 19:48:07Z, rv-integration: cleared for a limited release, with those rows carried to install 2.
-    The entry says no waiver is a row pass.
-- **The operator's reports:** none on record for this build.
+| Record | Install 1 |
+| --- | --- |
+| Card | `artifacts/phase23/card-install/20261123-2004Z-install1-152629cd/INSTALL.md`. Over DBI MTP. Before `0a17c793` (the build of `17060a5e`), after `3d6836da`. The other 20 plugins and 185 settings files were unchanged by name and size. |
+| Gate | `artifacts/phase23/fix-round-20261123/integration/gate/batch4-152629cd/status.json`: release, diag, test, clippy, no-default-features and size all exit 0. |
+| Review | Inbox 2026-11-23 17:50:30Z, rv-integration: source, build and release ELF pass. |
+| Eden | 2026-11-23, the full card line-up of 22 plugins on both hosts |
+| Eden: start-up | Inbox 18:29:51Z, rv-integration: all 22 plugins loaded on the Yoga and the XPS. |
+| Eden: verdict | Inbox 19:43:11Z, rv-integration. Yoga, Training: 16 pass, 5 partial, 2 fail (the Guard the Edge start point: Preview and the grounded rest differed), 1 setup failure, 2 not run, 1 hand check, of 27. XPS, waiting room: Record and Play on the CPU gave the same turns as in Training; Crop saved the chosen range without changing its source. |
+| Eden: not run in the waiting room | The preview's delivery and timing rows (F7-3, F7-4, F7-10) and one Record row (f4-w2). |
+| Eden: release | Inbox 19:48:07Z, rv-integration: cleared for a limited release, with those rows carried to install 2. The entry says no waiver is a row pass. |
+| The operator's reports | None on record for this build. |
 
 ## Install 2 (`71158421`)
 
-- **Card:** `artifacts/phase23/card-install/20261124-0043Z-install2-71158421/INSTALL.md`. Over hekate UMS, with the
-  playbook's `upgrade2-ums.py`. Before `3d6836da`, after `1b5608ed`. 20 of 20 other plugins and 3 of 3 protected
-  configs were byte-identical afterwards.
-- **Gate:** `artifacts/phase23/fix-round-20261123/install2/gate/final-71158421/status.json` (release) and
-  `final-71158421-rest/status.json` (test, clippy, no-default-features, size, diag): all exit 0.
-- **Eden** (2026-11-23 and 24; the runs were stopped when the install was ordered):
-  - Final verdict: inbox 2026-11-24 00:48:19Z, rv-integration: **partial, with one confirmed product failure**.
-  - Passed: list wrapping, the 1 Frame label, both recording indicators, Record and Play on the CPU, the Playback Slot
-    when idle and at both hit timings, the fighter pop-up's box, two of the frame strip's direction marks and the
-    Guard the Edge start-point rows; in a waiting room, a fresh Stop, an ordinary Guard the Edge Stop returning the
-    room's partner, and its Training Partner Behavior restored.
-  - **Product failure:** with Lobby Practice turned Off during a running Guard the Edge drill, the room's partner did
-    not return: the borrowed fighter stayed in all 169 reads after the menu closed. Fixed in install 3.
-  - Not run or not shown: the preview counts, the drill preview, the chain picker's rows, the special-direction rows,
-    the menu's hold on the CPU in a room, and no two-console result.
-  - The install record's line "no product fail observed" was written at the install; the verdict above came just
-    after it and is the final result.
-- **The operator's reports:** none on record for this build. It was on the card from 00:43 to 03:07.
+| Record | Install 2 |
+| --- | --- |
+| Card | `artifacts/phase23/card-install/20261124-0043Z-install2-71158421/INSTALL.md`. Over hekate UMS, with the playbook's `upgrade2-ums.py`. Before `3d6836da`, after `1b5608ed`. 20 of 20 other plugins and 3 of 3 protected configs were byte-identical afterwards. |
+| Gate | `artifacts/phase23/fix-round-20261123/install2/gate/final-71158421/status.json` (release) and `final-71158421-rest/status.json` (test, clippy, no-default-features, size, diag): all exit 0. |
+| Eden | 2026-11-23 and 24; the runs were stopped when the install was ordered |
+| Eden: final verdict | Inbox 2026-11-24 00:48:19Z, rv-integration: **partial, with one confirmed product failure**. |
+| Eden: passed | List wrapping, the 1 Frame label, both recording indicators, Record and Play on the CPU, the Playback Slot when idle and at both hit timings, the fighter pop-up's box, two of the frame strip's direction marks and the Guard the Edge start-point rows; in a waiting room, a fresh Stop, an ordinary Guard the Edge Stop returning the room's partner, and its Training Partner Behavior restored. |
+| Eden: **Product failure** | With Lobby Practice turned Off during a running Guard the Edge drill, the room's partner did not return: the borrowed fighter stayed in all 169 reads after the menu closed. Fixed in install 3. |
+| Eden: not run or not shown | The preview counts, the drill preview, the chain picker's rows, the special-direction rows, the menu's hold on the CPU in a room, and no two-console result. |
+| Eden: note | The install record's line "no product fail observed" was written at the install; the verdict above came just after it and is the final result. |
+| The operator's reports | None on record for this build. It was on the card from 00:43 to 03:07. |
 
 ## Install 3 (`e7667f26`)
 
-- **Card:** `artifacts/phase23/card-install/20261124-0304Z-install3-e7667f26/INSTALL.md`. Over hekate UMS. Before
-  `1b5608ed`, after `eff66d92`. 20 of 20 and 3 of 3 byte-identical.
-- **Gate:** `artifacts/phase23/fix-round-20261123/install3/gate/final-e7667f26/status.json`: all six steps exit 0.
-- **Review:** `artifacts/phase23/fix-round-20261123/install3/RV-FINAL-e7667f26.md`: source, build and release ELF pass.
-  It states that there was no Eden run before the install and that it is not a gameplay verdict.
-- **Eden, after the install** (2026-11-24, this build):
-  - Waiting room, run `rc15-i3-e7667f26-xps-f15-4-1`: inbox 14:34:27Z, rv-integration. The practice partner's Stop
-    passed (120 consecutive reads). The install 2 failure is fixed: after Lobby Practice Off during a running drill
-    the original fighter returned and stayed through 729 and then 900 reads.
-  - Training, run `mod-inputs-yoga-01`: `artifacts/phase23/mod-tests/inputs-yoga/RESULTS.md`. Passed: the frame
-    strip's marks for Pikachu's up special and Kirby's angled side tilt; drill files and grades for Pikachu, Pichu,
-    Greninja, Palutena, Zelda and Mewtwo; Kirby's angled tilt as a drill.
-  - **Product failures found there:** Sheik's, Fox's, Falco's and Wolf's special direction was saved as a second
-    step, and after a Training reset the next drill attempt was not graded. Install 4 addresses both.
-  - Not tested there: the waiting room, a hit combo with an up special, loading an older drill file.
-- **The operator's reports:** two, on 2026-11-24, [below](#the-operator-s-reports-from-the-console).
+| Record | Install 3 |
+| --- | --- |
+| Card | `artifacts/phase23/card-install/20261124-0304Z-install3-e7667f26/INSTALL.md`. Over hekate UMS. Before `1b5608ed`, after `eff66d92`. 20 of 20 and 3 of 3 byte-identical. |
+| Gate | `artifacts/phase23/fix-round-20261123/install3/gate/final-e7667f26/status.json`: all six steps exit 0. |
+| Review | `artifacts/phase23/fix-round-20261123/install3/RV-FINAL-e7667f26.md`: source, build and release ELF pass. It states that there was no Eden run before the install and that it is not a gameplay verdict. |
+| Eden, after the install | 2026-11-24, this build |
+| Eden, after the install: Waiting room, run `rc15-i3-e7667f26-xps-f15-4-1` | Inbox 14:34:27Z, rv-integration. The practice partner's Stop passed (120 consecutive reads). The install 2 failure is fixed: after Lobby Practice Off during a running drill the original fighter returned and stayed through 729 and then 900 reads. |
+| Eden, after the install: Training, run `mod-inputs-yoga-01` | `artifacts/phase23/mod-tests/inputs-yoga/RESULTS.md`. Passed: the frame strip's marks for Pikachu's up special and Kirby's angled side tilt; drill files and grades for Pikachu, Pichu, Greninja, Palutena, Zelda and Mewtwo; Kirby's angled tilt as a drill. |
+| Eden, after the install: **Product failures found there** | Sheik's, Fox's, Falco's and Wolf's special direction was saved as a second step, and after a Training reset the next drill attempt was not graded. Install 4 addresses both. |
+| Eden, after the install: not tested there | The waiting room, a hit combo with an up special, loading an older drill file. |
+| The operator's reports | Two, on 2026-11-24, [below](#the-operator-s-reports-from-the-console). |
 
 ## Install 4 (`a945b0c1`)
 
-- **Card:** `artifacts/phase23/card-install/20261125-0703Z-install4-a945b0c1/INSTALL.md`. Over hekate UMS. Before
-  `eff66d92`, after `99e00e92`. 20 of 20 and 3 of 3 byte-identical. Online Deluxe 0.10.9 went on in the same session.
-- **Gate:** `artifacts/phase23/install4/gate-a945b0c1/SUMMARY.md`: all six steps exit 0.
-- **Eden:** `artifacts/phase23/mod-tests/install4-final/RESULTS.md` (2026-11-25, Yoga, the full card line-up). The
-  session ran on three heads, so each row is listed with its build:
+| Record | Install 4 |
+| --- | --- |
+| Card | `artifacts/phase23/card-install/20261125-0703Z-install4-a945b0c1/INSTALL.md`. Over hekate UMS. Before `eff66d92`, after `99e00e92`. 20 of 20 and 3 of 3 byte-identical. Online Deluxe 0.10.9 went on in the same session. |
+| Gate | `artifacts/phase23/install4/gate-a945b0c1/SUMMARY.md`: all six steps exit 0. |
+| Eden | `artifacts/phase23/mod-tests/install4-final/RESULTS.md` (2026-11-25, Yoga, the full card line-up). The session ran on three heads, so each row is listed with its build: |
 
 | Part | Build | Verdict |
 | --- | --- | --- |
@@ -109,20 +92,18 @@ each gate's own; they were not compared test by test here.
 | 2, Quick Play (boot 4) | `0d28433d` | Online Deluxe's font check only, pass. The match and its sudden death ended with no desync on both windows. |
 | 3, Training (`i4-final-yoga-p3`) | `a945b0c1`, the installed build | Pass: the reset chord by itself, held 4 and 40 frames, on Mario's and Kirby's drills, adds no result; Load after starts no load after the chord; the two control drills grade as in part 1. |
 
-- **Not exercised in the final Eden session** (from the install record): the airborne entry of a steered special;
-  the deflection half of Match angle and deflection; in Quick Play the practice pick, a new pick and a rematch; ledge
-  attacks beyond the host tests; Recordings beyond one played capture; step titles beyond the list; the clip editor in
-  a waiting room; the Trim setting's migration; the CPU's playback indicator; the reset chord pressed one button at a
-  time.
-- **Repeated on the installed build:** the Mario and Kirby reset rows, Load after, and the Mario steering and Kirby
-  tilt controls. Two airborne rows were attempted again, but neither produced a jump. The other part 1 rows were
-  not repeated. The two fixes between `a9131331` and `a945b0c1` change a saved take's move name and the reset chord.
-- **The operator's reports:** two, on 2026-11-25, [below](#the-operator-s-reports-from-the-console).
+| Record | Install 4, continued |
+| --- | --- |
+| Not exercised in the final Eden session (from the install record) | The airborne entry of a steered special; the deflection half of Match angle and deflection; in Quick Play the practice pick, a new pick and a rematch; ledge attacks beyond the host tests; Recordings beyond one played capture; step titles beyond the list; the clip editor in a waiting room; the Trim setting's migration; the CPU's playback indicator; the reset chord pressed one button at a time. |
+| Repeated on the installed build | The Mario and Kirby reset rows, Load after, and the Mario steering and Kirby tilt controls. Two airborne rows were attempted again, but neither produced a jump. The other part 1 rows were not repeated. The two fixes between `a9131331` and `a945b0c1` change a saved take's move name and the reset chord. |
+| The operator's reports | Two, on 2026-11-25, [below](#the-operator-s-reports-from-the-console). |
 
 ## The build before install 1 (`17060a5e`)
 
-- **Card:** `artifacts/phase23/card-install/20261123-1140Z/INSTALL.md`: `0a17c793`, 2026-11-23 11:40.
-- **The operator's reports:** at seven times on 2026-11-23, [below](#the-operator-s-reports-from-the-console).
+| Record | The build before install 1 |
+| --- | --- |
+| Card | `artifacts/phase23/card-install/20261123-1140Z/INSTALL.md`: `0a17c793`, 2026-11-23 11:40. |
+| The operator's reports | At seven times on 2026-11-23, [below](#the-operator-s-reports-from-the-console). |
 
 ## The operator's reports from the console
 
