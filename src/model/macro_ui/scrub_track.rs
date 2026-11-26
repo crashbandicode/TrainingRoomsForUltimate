@@ -954,6 +954,29 @@ mod tests {
     }
 
     #[test]
+    fn the_sampler_reads_nothing_with_no_take() {
+        let root = env!("CARGO_MANIFEST_DIR");
+        // A fighter frame reads the nine values only while a take is being recorded: one atomic read otherwise.
+        let states = std::fs::read_to_string(format!("{root}/src/runtime/features/states.rs")).unwrap();
+        let gate = states.find("if !nana && crate::engine::rr_host::capture_role() != 0 {").expect("the take test comes first");
+        let sample = states.find("TAKE.live(role.index(), &crate::runtime::macros::replay_capture::state(").unwrap();
+        assert!(gate < sample && states[gate..sample].lines().count() <= 3, "the sample sits inside the take test");
+        assert_eq!(states.matches("replay_capture::state(").count(), 1);
+        // So a take's start reads both bodies once: its first frame has its state.
+        let host = std::fs::read_to_string(format!("{root}/src/runtime/features/recording_host.rs")).unwrap();
+        let chords = host.split_once("pub fn on_chords(").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(chords.contains("seed_take_track(Some(cpu));"), "the Record chord seeds the take");
+        let picker = std::fs::read_to_string(format!("{root}/src/runtime/features/record_place.rs")).unwrap();
+        assert!(picker.contains("super::recording_host::seed_take_track(recorder::cpu_body());"), "a placed start seeds the take");
+        // A fighter that never had a frame is marked absent, not a fighter of kind 0 at the origin.
+        let take = TakeTrack::new();
+        take.service(false, 0);
+        take.live(0, &state(0, 0));
+        take.push(0, 0);
+        assert_eq!(take.take(1).map(|track| track[0][1].start.fighter_kind), Some(-1));
+    }
+
+    #[test]
     fn a_retired_block_is_freed_only_with_no_reader() {
         let slot = Slot::new();
         assert!(slot.empty() && !slot.live());
