@@ -1355,7 +1355,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "8b893cc440177ce519743dd16c6f88ca5bf8167d1a5426bfde449e759c10da6d",
+   "dest_sha256": "2366abd59886b5fe4a029681c658828f58f8a6997baebee482e96ad4c19ea1ab",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1455,6 +1455,16 @@
     {
      "old": "use super::recording::{Placement, TRACK_SCHEMA_VERSION};",
      "new": "use super::recording::Placement;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
+     "new": "        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }\n\n    /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an\n    /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)\n    /// carries no positions in memory and keeps the file that binds its inputs.\n    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);\n        }\n    }\n\n    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.\n    fn after_write(&self, dir: &std::path::Path, id: &str) {\n        if let Some(track) = &self.track {\n            if super::positions::write(dir, id, &self.frames, track).is_err() {\n                super::positions::remove(dir, id);\n            }\n        }\n    }\n\n    fn after_delete(dir: &std::path::Path, id: &str) {\n        super::positions::remove(dir, id);\n    }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.load(id)",
+     "new": "        let mut recording = self.load(id)?;\n        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));\n        Ok(recording)",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -5525,7 +5535,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "ce07496b54711e1722dac7d8f259fdb0e16ff45609b7de82b30cec43925fab61",
+   "dest_sha256": "c1d6c8f70717b1c39e3e5a16a7c28306cffaedb9dc3981482a1414d2f9f8bf94",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6500,6 +6510,11 @@
     {
      "old": "    let ask = editor.scrub().0;",
      "new": "    let (shown, ask) = (editor.shown_frame(), editor.scrub().0);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load(id)",
+     "new": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load_edited(id)",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

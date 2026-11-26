@@ -98,7 +98,9 @@ impl Store<MacroRecording> {
     /// Loads a macro for the clip editor: the macro, and its positions when the file beside it binds it
     /// (`positions`). Playback, the list and every other load read the macro only (`load`).
     pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {
-        self.load(id)
+        let mut recording = self.load(id)?;
+        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));
+        Ok(recording)
     }
 }
 
@@ -120,6 +122,28 @@ impl Record for MacroRecording {
         #[derive(serde::Deserialize)]
         struct Header { kind: Option<String> }
         Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some("chain"))
+    }
+
+    /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an
+    /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)
+    /// carries no positions in memory and keeps the file that binds its inputs.
+    fn before_write(&self, dir: &std::path::Path, id: &str) {
+        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {
+            super::positions::remove(dir, id);
+        }
+    }
+
+    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
+    fn after_write(&self, dir: &std::path::Path, id: &str) {
+        if let Some(track) = &self.track {
+            if super::positions::write(dir, id, &self.frames, track).is_err() {
+                super::positions::remove(dir, id);
+            }
+        }
+    }
+
+    fn after_delete(dir: &std::path::Path, id: &str) {
+        super::positions::remove(dir, id);
     }
 
     fn validate(&self) -> Result<(), MacroError> {

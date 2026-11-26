@@ -391,6 +391,7 @@ impl<R: Record> Store<R> {
             Err(err) => return Err(lift::<R>(err.into())),
         }
         let _ = fs::remove_file(self.file(id, "json.bak"));
+        R::after_delete(&self.dir, id);
         note_catalog_write(&self.dir, id, None);
         Ok(())
     }
@@ -436,6 +437,7 @@ impl<R: Record> Store<R> {
     }
 
     fn write_atomic(&self, id: &str, rec: &R, bytes: Option<Vec<u8>>) -> Result<(), R::Error> {
+        rec.before_write(&self.dir, id);
         let path = self.file(id, "json");
         let size = if let Some(bytes) = bytes {
             write_replace(&path, &bytes).map_err(|e| lift::<R>(e.into()))?;
@@ -449,6 +451,7 @@ impl<R: Record> Store<R> {
                 Ok(writer.get_ref().metadata()?.len())
             }).map_err(|e| lift::<R>(e.into()))?
         } else { unreachable!("non-streaming records always have encoded bytes") };
+        rec.after_write(&self.dir, id);
         note_catalog_write(&self.dir, id, Some(size));
         Ok(())
     }

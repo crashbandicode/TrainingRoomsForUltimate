@@ -906,7 +906,7 @@ static DRILL_TAKE: Mutex<Option<String>> = Mutex::new(None);
 fn drill_clip(source: &str) -> Option<crate::engine::macro_ui::clip_panel::ClipEditor> {
     use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor};
     let library = crate::engine::macros::Library::new(std::path::Path::new(ROOT).join(crate::engine::library::MACROS_DIR));
-    let mut clip = ClipEditor::macro_file(library.load(source).ok()?, true).ok()?;
+    let mut clip = ClipEditor::macro_file(library.load_edited(source).ok()?, true).ok()?;
     clip.on_action(ClipAction::TogglePlay);
     Some(clip)
 }

@@ -321,7 +321,7 @@ pub fn open_file_editor(id: &str, combo: bool, player: bool) {
         crate::model::combo_record::ComboLibrary::new(root.join("combos")).load(id)
             .map_err(|error| error.to_string()).and_then(ClipEditor::combo_file)
     } else {
-        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load(id)
+        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load_edited(id)
             .map_err(|error| error.to_string()).and_then(|recording| ClipEditor::macro_file(recording, player))
     };
     let editor = match result { Ok(editor) => editor, Err(error) => { notify(error); return; } };
