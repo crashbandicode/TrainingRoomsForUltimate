@@ -14,9 +14,11 @@ import difflib
 import hashlib
 import json
 import os
+import sys
 
 
 DEFAULT_MANIFEST = "docs/provenance/pkg4-carry-manifest.json"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def derive(base: str, wanted: str, reason: str, test_reason=None, tests_marker=None) -> list[dict]:
@@ -51,10 +53,61 @@ def derive(base: str, wanted: str, reason: str, test_reason=None, tests_marker=N
     return edits
 
 
+def rebuild(args):
+    import carry_pkg4
+    import carry_pkg6
+
+    tool = carry_pkg6 if "pkg6" in os.path.basename(args.manifest) else carry_pkg4
+    path = os.path.join(args.root, args.manifest)
+    with open(path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    entry = next((entry for entry in manifest["files"] if entry["dest"] == args.dest), None)
+    if entry is None:
+        raise SystemExit(f"no manifest entry for {args.dest}")
+    if entry.get("removed"):
+        raise SystemExit(f"cannot rebuild removed entry {args.dest}")
+    stage_dir = os.path.join(tool.STAGES, args.stage, "stage")
+    source_path = tool.source_path(entry, stage_dir) if tool is carry_pkg4 else os.path.join(stage_dir, entry["src"])
+    with open(source_path, "rb") as f:
+        source = f.read()
+    if tool.sha(source) != entry.get("src_sha256"):
+        raise SystemExit(f"source hash does not match the manifest for {entry['src']}")
+    with open(os.path.join(args.root, args.dest), "rb") as f:
+        wanted = f.read()
+    if tool.sha(wanted) != entry.get("dest_sha256"):
+        raise SystemExit(f"destination hash does not match the manifest for {args.dest}")
+    dest_by_src = {item["src"]: item["dest"] for item in manifest["files"]}
+    base = tool.transform({**entry, "edits": []}, manifest["modules"], source, dest_by_src)
+    current, kept, dropped = base, [], []
+    for edit in entry.get("edits", []):
+        try:
+            updated = tool.apply_edits({"src": entry["src"], "edits": [edit]}, current)
+        except SystemExit:
+            dropped.append(edit)
+        else:
+            kept.append(edit)
+            current = updated
+    reasons = list(dict.fromkeys(edit["reason"] for edit in dropped))
+    reason = f"{args.reason}; replaces {len(dropped)} edit(s) that no longer applied in order: {' | '.join(reasons)}"
+    derived = derive(current.decode("utf-8"), wanted.decode("utf-8"), reason)
+    edits = kept + derived
+    if tool.apply_edits({"src": entry["src"], "edits": edits}, base) != wanted:
+        raise SystemExit(f"rebuilt edits do not reproduce {args.dest}")
+    print(f"{args.dest}: kept {len(kept)}, dropped {len(dropped)}, derived {len(derived)}")
+    if args.dry_run:
+        print("dry run: no files written")
+        return
+    entry["edits"] = edits
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        json.dump(manifest, f, indent=1)
+        f.write("\n")
+    print(f"rebuilt {args.dest}; now run: python3 -I tools/carry_{'pkg6' if tool is carry_pkg6 else 'pkg4'}.py carry, ledger, verify")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("dest")
-    ap.add_argument("base")
+    ap.add_argument("base", nargs="?")
     ap.add_argument("--reason", required=True)
     ap.add_argument("--test-reason")
     ap.add_argument("--tests-marker")
@@ -62,7 +115,20 @@ def main(argv=None):
     ap.add_argument("--root", default=".")
     ap.add_argument("--wanted")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--rebuild", action="store_true")
+    ap.add_argument("--stage")
     args = ap.parse_args(argv)
+    if args.rebuild:
+        if not args.stage:
+            ap.error("--rebuild requires --stage")
+        if args.base or args.wanted or args.test_reason or args.tests_marker:
+            ap.error("--rebuild uses the recorded destination, not a base or alternate wanted file")
+        rebuild(args)
+        return
+    if not args.base:
+        ap.error("base is required without --rebuild")
+    if args.stage:
+        ap.error("--stage requires --rebuild")
     with open(args.base, encoding="utf-8", newline="") as f:
         base = f.read()
     with open(args.wanted or os.path.join(args.root, args.dest), encoding="utf-8", newline="") as f:

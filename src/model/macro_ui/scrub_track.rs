@@ -109,6 +109,9 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
     if deltas == [None; 2] { Ask::None } else { Ask::Group { target: target & 1, deltas } }
 }
 
+/// `Block::home`'s role word on the callback that forgot a hold of another body: no role, no home.
+const FORGOT: u32 = u32::MAX;
+
 /// A world point as one word, compared exactly.
 fn key(at: [f32; 2]) -> u64 {
     u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits())
@@ -198,7 +201,9 @@ impl Block {
         for slot in 0..2 {
             self.set_pose(slot, POSE_NONE, PackedPose::NONE);
         }
-        self.home.0.store(0, Ordering::Release);
+        // The callback that forgets asks for its point next, with the hold of the body that is gone still in its
+        // slot: it lets go, whatever the worker has published since (`point`).
+        self.home.0.store(FORGOT, Ordering::Release);
     }
 
     fn forgotten(&self) -> bool {
@@ -237,7 +242,8 @@ impl Block {
     /// is let go while a group is still asked for: its published position is read before the hold's step, so on that
     /// frame it is still the point it was held at, and its partner would be placed from there.
     pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
-        let Some(target) = self.target_slot() else {
+        let (forgot, target) = (self.home.0.load(Ordering::Relaxed) == FORGOT, self.target_slot());
+        let Some(target) = target.filter(|_| !forgot) else {
             self.home.0.store(0, Ordering::Relaxed);
             return None;
         };
@@ -1473,6 +1479,36 @@ mod tests {
         assert_eq!(block.point(0, |_| Some(home), |_| None), None);
         block.ask_at(Some(140), group([0.0, 0.0], [1.0, 0.0]));
         assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]), "use the replacement's home");
+    }
+
+    /// P3: the worker publishes a new request between `forget()` and `point` inside one fighter callback. The callback
+    /// still has the hold of the body that is gone in its slot. It lets go on that callback, and the new request is
+    /// acted on from the next one, from where the new body stands; the old body's home is neither used nor kept.
+    #[test]
+    fn a_request_published_while_a_callback_forgets_never_uses_the_old_bodys_home() {
+        let block = Block::new();
+        let at = |point: Option<Spot>| point.map(|spot| spot.at);
+        let group = Ask::Group { target: 0, deltas: [Some(spot(2.0, 0.0, 1.0)), Some(spot(-40.0, 0.0, -1.0))] };
+        let (old, new) = ([-30.0, 0.5], [16.0, 0.5]);
+        block.ask_at(Some(139), group);
+        assert_eq!(at(block.point(0, |_| Some(old), |_| None)), Some([-28.0, 0.5]));
+        // The target's body is another: its callback forgets, and before it asks for its point a new frame is shown.
+        block.forget();
+        block.ask_at(Some(140), group);
+        assert_eq!(block.point(0, |_| Some(old), |_| Some(new)), None, "the callback that forgot lets go");
+        // From the next callback the request is acted on, from where the new body stands.
+        assert_eq!(at(block.point(0, |_| None, |_| Some(new))), Some([18.0, 0.5]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some(new))), Some([-24.0, 0.5]), "the old body's home is not kept");
+        // The same with the new body refused where it is asked: no hold of it, and still not the old home.
+        block.ask_at(Some(141), group);
+        assert_eq!(at(block.point(0, |_| Some(new), |_| None)), Some([18.0, 0.5]));
+        block.forget();
+        block.ask_at(Some(142), group);
+        assert_eq!(block.point(1, |_| Some(new), |_| Some(old)), None, "the partner's callback forgot");
+        for _ in 0..3 {
+            assert_eq!(at(block.point(0, |_| None, |_| Some(old))), Some([-28.0, 0.5]));
+            assert_eq!(at(block.point(1, |_| None, |_| Some(old))), Some([-70.0, 0.5]));
+        }
     }
 
     /// P3 (tr-primary-2 2026-11-26 13:43:10Z, 13:47:51Z; rv-preview-vis 13:44:24Z, 16:20:59Z): a body the game pushes
