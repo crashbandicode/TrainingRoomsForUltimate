@@ -5,11 +5,11 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 pub fn playing_index(player: bool) -> usize { usize::from(!player) }
 
-/// Read the worker's request and leave it pending while the game-side check says to wait.
+/// Consume only the checked request. A changed value must get its own check next frame.
 pub fn take_home_ask(ask: &AtomicU8, wait: impl FnOnce(u8) -> bool) -> u8 {
     let checked = ask.load(Ordering::Acquire);
-    if wait(checked) { return 0; }
-    ask.swap(0, Ordering::AcqRel)
+    if wait(checked) || checked == 0 { return 0; }
+    ask.compare_exchange(checked, 0, Ordering::AcqRel, Ordering::Acquire).unwrap_or(0)
 }
 
 /// What a preview's start does about a CPU the scrub hold has just let go (`scrub_track::Block::settling`).
