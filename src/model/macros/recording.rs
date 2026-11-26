@@ -171,7 +171,7 @@ pub struct MacroRecording {
 mod track_rows {
     use super::super::ReplayFrame;
     use super::{InputFrame, StartState};
-    use serde::{ser::SerializeSeq, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     type Row = (i32, u32, f32, i32, i32, f32, f32, f32, f32);
 
@@ -190,38 +190,13 @@ mod track_rows {
     }
 
     pub fn serialize<S: serde::Serializer>(track: &Option<Vec<[ReplayFrame; 2]>>, serializer: S) -> Result<S::Ok, S::Error> {
-        let Some(track) = track else { return serializer.serialize_none() };
-        let mut seq = serializer.serialize_seq(Some(track.len()))?;
-        for [first, second] in track {
-            seq.serialize_element(&[row(first), row(second)])?;
-        }
-        seq.end()
+        let rows: Option<Vec<[Row; 2]>> = track.as_ref().map(|track| track.iter().map(|pair| [row(&pair[0]), row(&pair[1])]).collect());
+        rows.serialize(serializer)
     }
 
     pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {
-        #[derive(Deserialize)]
-        struct Rows(#[serde(deserialize_with = "read_pairs")] Vec<[ReplayFrame; 2]>);
-        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))
-    }
-
-    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {
-        struct Pairs;
-        impl<'de> serde::de::Visitor<'de> for Pairs {
-            type Value = Vec<[ReplayFrame; 2]>;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("a sequence") }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-                let mut pairs = Vec::new();
-                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {
-                    let len = pairs.len();
-                    if len == pairs.capacity() && len < super::MAX_FRAMES {
-                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));
-                    }
-                    pairs.push([frame(a), frame(b)]);
-                }
-                Ok(pairs)
-            }
-        }
-        deserializer.deserialize_seq(Pairs)
+        let rows = Option::<Vec<[Row; 2]>>::deserialize(deserializer)?;
+        Ok(rows.map(|rows| rows.into_iter().map(|pair| [frame(pair[0]), frame(pair[1])]).collect()))
     }
 }
 
@@ -255,18 +230,6 @@ impl MacroRecording {
 
     /// Checks everything `Library` requires before it writes or accepts a file.
     pub fn validate(&self) -> Result<(), MacroError> {
-        self.validate_header()?;
-        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,
-        // for a crop past its end), every number finite.
-        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()
-            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
-        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
-            return Err(MacroError::InvalidTrack);
-        }
-        self.validate_frame_count()
-    }
-
-    pub(super) fn validate_header(&self) -> Result<(), MacroError> {
         if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) {
             return Err(MacroError::UnsupportedVersion {
                 found: self.schema_version,
@@ -289,10 +252,14 @@ impl MacroRecording {
             (TRACK_SCHEMA_VERSION, None) => {},
             _ => return Err(MacroError::InvalidMii("schema, fighter class and exact configuration disagree")),
         }
-        self.placement.validate()
-    }
-
-    pub(super) fn validate_frame_count(&self) -> Result<(), MacroError> {
+        self.placement.validate()?;
+        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,
+        // for a crop past its end), every number finite.
+        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()
+            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));
+        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {
+            return Err(MacroError::InvalidTrack);
+        }
         if self.frames.is_empty() {
             return Err(MacroError::EmptyFrames);
         }

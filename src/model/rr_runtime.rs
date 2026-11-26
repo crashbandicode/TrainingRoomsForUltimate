@@ -651,8 +651,8 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     steps: Vec::new(),
                     start_save: file.start_save,
                     start_save_on: file.start_save_on,
-                    recorded_on: fighter_name(file.fighter_kind),
-                    span: file.frame_count as u32,
+                    recorded_on: fighter_name(file.start.fighter_kind),
+                    span: file.frames.len() as u32,
                 }, file.trim, MacroPlace {
                     offset: [file.placement.delta_x.to_bits(), file.placement.delta_y.to_bits()],
                     rest: file.placement.momentum == crate::engine::macros::MomentumMode::AtRest,
