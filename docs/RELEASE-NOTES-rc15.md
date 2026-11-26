@@ -52,7 +52,7 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 | --- | --- |
 | Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
 | Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
-| Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast case passed |
+| Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast snap landed. The preview after a snap is not shown there: no preview in the Replay window fed a frame in that boot |
 | Known issue in install 6 | With In still selected after Y, X can be refused with "Let the CPU settle to idle and leave the ledge before previewing". Press L to deselect In, then X: [Known issues](CURRENT-RELEASE.md#known-issues) |
 
 ### A free playhead in the clip editor
@@ -78,6 +78,7 @@ With no handle selected, on a macro or a capture:
 | --- | --- |
 | Eden, on `eb39d6bc` | With nothing selected the playhead moved to two other frames while In and Out stayed where they were, and the strip read "Playhead moved. L sets the start here, R the end." |
 | Eden, install 6 diagnostic build | In the macro demonstration, Y snapped from 64 to a mark at 66. L set In to 66; R later kept frame 100 (Out 101). This is footage, not a verdict for a test row. |
+| Eden test rows, same build | The playhead's browse, cut, no-move and snap rows passed |
 | No host test | Holding a direction on a pad |
 
 ### The fighters are shown while you scrub
@@ -141,7 +142,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
-| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. Found: positions stop 20 seconds into a long take. No smoke boot of the installed release file, and no waiting-room pair, has flown |
+| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. No smoke boot of the installed release file, and no waiting-room pair, has flown |
 | On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).

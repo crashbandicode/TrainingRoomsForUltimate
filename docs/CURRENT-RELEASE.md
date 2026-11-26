@@ -13,7 +13,7 @@ Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed
 | Check | Install 6 |
 | --- | --- |
 | Installed | The file on the card was read back and matches the build |
-| Eden, on install 6's diagnostic build | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. One defect found: positions stop 20 seconds into a long take |
+| Eden, on install 6's diagnostic build | Passed so far: record and hold, release, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues in the second table under [Known issues](#known-issues) |
 | Eden, on the installed release file | No smoke boot yet, and no waiting-room pair |
 | Eden, on `eb39d6bc` (before the last fix) | Record, old macros, snap, browse and part of the diagnostic checks passed |
 | Results carried over | Play-start comparison with install 5; rename through Eden's keyboard window, not by pad |
