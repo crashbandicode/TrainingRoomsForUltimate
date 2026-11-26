@@ -335,17 +335,19 @@ cut at the playhead but does not deselect an In or Out handle. A refused preview
 Host tests only; not yet seen in a game.
 
 2026-11-26. Positions while you scrub, merged for the build after install 5. With In or Out selected, or once the
-playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. They move
-by one shared offset from where the target stood when the editor opened, so their recorded spacing is kept. A fighter
-whose point is outside this stage's camera limits stays where it is, and the key line reads "Off this stage.".
+playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
+the target's position when the hold begins, so their recorded spacing is kept. If a fighter's point is outside the
+stage's camera limits, it is not held there: a held fighter goes back to where its hold began, and a fighter not yet
+held is left alone. The key line reads "Off this stage.".
 
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
-  capture saved as a macro. The macro's own file is unchanged, and Play does not read the positions. Deleting the
-  macro deletes that file.
+  capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
+  positions at startup. Delete also removes `<id>.pos`; Rename changes the display name, not the ID or either
+  filename.
 - A macro without positions reads "Play it once to see positions while scrubbing.". Play it by itself from its first
   input, with Play or with X here from the start of the take, and they are saved; after X they show at once. They
-  are that playback's positions, not the original recording's. No file is made for a step of a chain, on another
-  fighter than the macro's own, or when Trim starts it after its first input.
+  are that playback's positions, not the original recording's. No positions file is made for a chain step, when the
+  playing character's fighter kind differs from the recorded one, or when Trim skips the first input.
 - A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
   here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
 - The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.

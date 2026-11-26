@@ -59,8 +59,8 @@ them.
 #### The fighters are shown while you scrub (merged 2026-11-26)
 
 - With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
-  frame, without playing a preview. They move by one shared offset from where the target stood when the editor
-  opened, so their recorded spacing is kept. This works on a macro and on a match capture.
+  frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
+  is kept. This works on a macro and on a match capture.
 - Record saves a macro's positions in a second file beside it. The macro's own file stays the same, so older
   builds can still read new macros, older macros still load and play on this build, and Play reads what it read
   before. A crop and a capture saved as a macro carry their positions.
@@ -69,15 +69,17 @@ them.
   After X in the editor they show at once.
 - Positions made by a playback are that playback's, not the original recording's. A playback stopped early gives
   positions up to where it stopped; past them the editor reads "Positions end here.".
-- A playback never replaces a valid positions file saved by Record. One that is damaged or no longer matches the
-  macro counts as missing, and such a playback replaces it. Whatever the state of that file, the macro still plays.
-- No file is made when the macro plays as a step of a chain, on another fighter than its own, or with Trim
-  starting it after its first input.
-- A fighter whose point is outside this stage's camera limits stays where it is, and the editor reads "Off this
-  stage.". The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show
-  nothing.
-- Host tests and builds only. The code that holds the fighters in the game is run by no test. Play's start measured
-  level with the build before on the host; it has not been timed in a game.
+- A playback never replaces a valid positions file saved by Record. A damaged or mismatched file counts as
+  missing, so an eligible playback can replace it. The macro does not need positions to play.
+- No positions file is made for a chain step, when the playing character is a different fighter kind from the one
+  recorded, or when Trim skips the first input.
+- If a fighter's point is outside the stage's camera limits, the editor reads "Off this stage." instead of moving
+  it there. A fighter already held goes back to where the hold began. The pose is frozen or neutral; projectiles,
+  items and damage are not shown. Combos and drills show nothing.
+- Host tests and builds only; the Switch code that holds the fighters has not run in a test.
+  On the host, repeated Plays took 0.98 to 1.07 times as long to start as on the previous build.
+  For an old macro played for the first time to generate positions, only the 3 s take passed on the host. The
+  30 s and 10 min takes need an in-game timing check against install 5. There is no in-game result yet.
   [Replay window](menu/recording.md#replay-window)
 
 ### In work

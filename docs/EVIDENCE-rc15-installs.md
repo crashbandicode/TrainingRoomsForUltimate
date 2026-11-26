@@ -274,10 +274,14 @@ Merged after install 5 and **not on the card**. The Gate column names the receip
   reproduced; the playhead's, that holding a direction on a pad has no host test; the scrub positions', that the
   Switch-only code is executed by no test and that its last review was still open at the merge.
 - **In work:** nothing.
-- **Play's start, on the host only:** the scrub positions lane measured it level with `main` (repeated rows between
-  0.98 and 1.07 of `main`'s time), and could not decide the first Play of a ten-minute macro (preview-vis-sol, inbox
-  2026-11-26 06:24:48Z; `artifacts/phase23/scrub-positions/timing-sym-summary-51536478.md` and
-  `timing-armed-summary-9466fa45.md`). These are host-model numbers; nothing was timed in a game.
+- **Repeated Play, host only:** starts took 0.98 to 1.07 times as long as on the previous `main` (`6dbf9aa9`).
+  This range does not describe the first Play of an old macro without positions.
+- **First Play that generates positions, host only:** the median of seven paired differences in cold-start
+  overhead was 28 microseconds at 3 s (passes the 100-microsecond limit), 127 microseconds at 30 s (over the
+  limit), and 764 microseconds at 10 min (inconclusive, not a pass). The 30 s and 10 min verdicts await PB-1:
+  compare the first Play of the session on this build and install 5, on the same host with the same trackless
+  macro. The first input may be at most one frame later. Neither a second Play nor a macro with recorded positions
+  substitutes for this check. Source: `artifacts/phase23/scrub-positions/READY-ERRATUM-d8713ee4.md`.
 - **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
   then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
   about it is claimed here.
