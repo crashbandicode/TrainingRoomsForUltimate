@@ -2250,6 +2250,11 @@ fn step_role(machine: &mut Playback, book: &Book, role: Role) {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static POLL_ON_PUBLISH: core::cell::Cell<Option<fn(Role)>> = const { core::cell::Cell::new(None) };
+}
+
 /// A cut clears the run flag. If it races this publish, the hook's cut flag still
 /// suppresses the old frame until the worker can clear the generation.
 fn publish(role: Role, frame: InputFrame) {
@@ -2257,6 +2262,8 @@ fn publish(role: Role, frame: InputFrame) {
         // The worker checked room before advancing playback. The hook can only free more room.
         let queued = role_frames(role).push(pack(frame));
         debug_assert!(queued, "replay advanced without room for its frame");
+        #[cfg(test)]
+        if let Some(poll) = POLL_ON_PUBLISH.take() { poll(role); }
     }
 }
 
@@ -5082,6 +5089,23 @@ mod tests {
         tick(&root);
         tick(&root);
         assert_eq!(generated_rows(&root, &id, &recording).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn an_immediate_poll_of_the_first_preview_input_gets_its_positions() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-first-poll", 5);
+        tick(&root);
+        request_preview(&id, Role::Cpu, 0, 1);
+        POLL_ON_PUBLISH.set(Some(|role| {
+            assert_eq!(generated_take(role, 0).map(|frame| frame.buttons), Some(1));
+        }));
+        tick(&root);
+        assert_eq!(fed_frames(Role::Cpu), 1);
+        tick(&root);
+        let positions = generated_rows(&root, &id, &recording).expect("the first input of X was consumed");
+        assert_eq!((positions.len(), positions[0][0].x, positions[0][1].x), (1, 0.0, 100.0));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn an_editor_preview_from_zero_binds_the_whole_macro() {
