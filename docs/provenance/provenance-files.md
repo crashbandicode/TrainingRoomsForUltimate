@@ -1,8 +1,8 @@
 | Path | Origin | Stage lines | Upstream lines | Retained upstream | Fork-only lines | Fork-only ranges (stage line numbers) |
 | --- | --- | ---: | ---: | ---: | ---: | --- |
 | `CODEOWNERS` | upstream-identical | 2 |  |  |  |  |
-| `Cargo.lock` | ours-new | 1051 |  |  |  |  |
-| `Cargo.toml` | mixed | 240 | 69 | 60 | 180 | 3, 14-16, 37, 42-53, 68-72, 82-122, 124-240 |
+| `Cargo.lock` | ours-new | 1044 |  |  |  |  |
+| `Cargo.toml` | mixed | 239 | 69 | 59 | 180 | 3, 14-16, 36, 41-52, 67-71, 81-121, 123-239 |
 | `README.md` | mixed | 584 | 476 | 474 | 110 | 1-108, 150, 278 |
 | `diagnostics/trace-control/src/lib.rs` | ours-new | 158 |  |  |  |  |
 | `docs/REVISION29_DRAW_DECOUPLING.md` | ours-new | 289 |  |  |  |  |
@@ -16,23 +16,20 @@
 | `docs/character-items/SCREENSHOTS.md` | ours-new | 15 |  |  |  |  |
 | `docs/character-items/page-1.png` | ours-new |  |  |  |  |  |
 | `docs/character-items/page-2.png` | ours-new |  |  |  |  |  |
+| `docs/cpu-rolls-apply.md` | ours-new | 61 |  |  |  |  |
 | `docs/cycle-preload.md` | ours-new | 106 |  |  |  |  |
 | `docs/elite-counterpick.md` | ours-new | 29 |  |  |  |  |
 | `docs/experimental-release.md` | ours-new | 104 |  |  |  |  |
-| `docs/feature-walkthroughs/character-items.gif` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/elite-counterpick.gif` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/elite-status.png` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/kirby-grid.png` | ours-new |  |  |  |  |  |
-| `docs/feature-walkthroughs/kirby-hats.gif` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/lobby-enable.png` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/mii-editor.png` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/mii-gunner-hud.gif` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/mii-gunner-hud.json` | ours-new | 25 |  |  |  |  |
 | `docs/feature-walkthroughs/mii-hud-portraits.png` | ours-new |  |  |  |  |  |
-| `docs/feature-walkthroughs/mii-selection.gif` | ours-new |  |  |  |  |  |
 | `docs/feature-walkthroughs/stage-rotation.png` | ours-new |  |  |  |  |  |
 | `docs/fighter-hotswap.md` | ours-new | 43 |  |  |  |  |
-| `docs/fighter-hotswap/character-cycles.gif` | ours-new |  |  |  |  |  |
 | `docs/fighter-hotswap/hotswap.gif` | ours-new |  |  |  |  |  |
 | `docs/fighter-hotswap/manual-hotswap.gif` | ours-new |  |  |  |  |  |
 | `docs/fighter-hotswap/solo-popo.gif` | ours-new |  |  |  |  |  |
@@ -48,15 +45,12 @@
 | `docs/lobby-practice/ldn-item-restore.gif` | ours-new |  |  |  |  |  |
 | `docs/lobby-practice/ldn-ledge-playback.gif` | ours-new |  |  |  |  |  |
 | `docs/lobby-practice/stage-menu.gif` | ours-new |  |  |  |  |  |
-| `docs/lobby-practice/waiting-room.gif` | ours-new |  |  |  |  |  |
 | `docs/lobby-practice/waiting-room.png` | ours-new |  |  |  |  |  |
 | `docs/media-provenance.json` | ours-new | 612 |  |  |  |  |
 | `docs/media/record-slot-bind.gif` | ours-new |  |  |  |  |  |
 | `docs/menu-shortcuts.md` | ours-new | 90 |  |  |  |  |
 | `docs/mii-fighters.md` | ours-new | 37 |  |  |  |  |
 | `docs/mii-replay-discovery/README.md` | ours-new | 33 |  |  |  |  |
-| `docs/mii-replay-discovery/mii-discovery-existing.gif` | ours-new |  |  |  |  |  |
-| `docs/mii-replay-discovery/mii-discovery-new.gif` | ours-new |  |  |  |  |  |
 | `docs/named-macros-build.md` | ours-new | 73 |  |  |  |  |
 | `docs/named-macros.md` | ours-new | 165 |  |  |  |  |
 | `docs/named-macros/README.md` | ours-new | 8 |  |  |  |  |
@@ -78,7 +72,6 @@
 | `docs/named-macros/images/15-native-stop-restored.png` | ours-new |  |  |  |  |  |
 | `docs/named-macros/images/16-persistent-capture.png` | ours-new |  |  |  |  |  |
 | `docs/named-macros/images/crop.gif` | ours-new |  |  |  |  |  |
-| `docs/named-macros/images/fighter.gif` | ours-new |  |  |  |  |  |
 | `docs/named-macros/images/match.gif` | ours-new |  |  |  |  |  |
 | `docs/named-macros/images/move-snap.gif` | ours-new |  |  |  |  |  |
 | `docs/named-macros/images/naming.gif` | ours-new |  |  |  |  |  |
@@ -102,20 +95,15 @@
 | `docs/setup-library.md` | ours-new | 77 |  |  |  |  |
 | `docs/setup-library/SCREENSHOTS.md` | ours-new | 50 |  |  |  |  |
 | `docs/setup-library/bind.gif` | ours-new |  |  |  |  |  |
-| `docs/setup-library/library.gif` | ours-new |  |  |  |  |  |
 | `docs/setup-library/list.png` | ours-new |  |  |  |  |  |
-| `docs/setup-library/restore.gif` | ours-new |  |  |  |  |  |
 | `docs/setup-library/restore.png` | ours-new |  |  |  |  |  |
 | `docs/setup-library/save.gif` | ours-new |  |  |  |  |  |
+| `docs/skyline-logger-race.md` | ours-new | 62 |  |  |  |  |
 | `docs/solo-popo.md` | ours-new | 33 |  |  |  |  |
 | `photos/2021081718384700-0E7DF678130F4F0FA2C88AE72B47AFDF.jpg` | upstream-identical | 733 |  |  |  |  |
-| `photos/FLy0xiw.gif` | upstream-identical | 427542 |  |  |  |  |
-| `photos/character_item.gif` | upstream-identical | 167731 |  |  |  |  |
 | `photos/damage_range.png` | upstream-identical | 10373 |  |  |  |  |
 | `photos/defensive_settings.png` | upstream-identical | 10083 |  |  |  |  |
-| `photos/ezgif-2-299a3e9b46.gif` | upstream-identical | 125320 |  |  |  |  |
 | `photos/mash_settings.png` | upstream-identical | 9008 |  |  |  |  |
-| `photos/mash_trigger_tumble.gif` | upstream-identical | 162927 |  |  |  |  |
 | `photos/mash_triggers.png` | upstream-identical | 9307 |  |  |  |  |
 | `photos/misc_settings.png` | upstream-identical | 9631 |  |  |  |  |
 | `photos/save_states.png` | upstream-identical | 10999 |  |  |  |  |
@@ -409,7 +397,7 @@
 | `src/character_items.rs` | ours-new | 361 |  |  |  |  |
 | `src/character_lifecycle.rs` | ours-new | 211 |  |  |  |  |
 | `src/character_memory.rs` | ours-new | 321 |  |  |  |  |
-| `src/character_roster.rs` | ours-new | 2777 |  |  |  |  |
+| `src/character_roster.rs` | ours-new | 2830 |  |  |  |  |
 | `src/character_sources.rs` | ours-new | 2586 |  |  |  |  |
 | `src/common/button_config.rs` | mixed | 484 | 333 | 236 | 248 | 3, 12-71, 226-227, 230, 234, 240-241, 253-254, 257-287, 292-296, 300-304, 307, 309-346, … (+7 more) |
 | `src/common/consts.rs` | upstream-identical | 9354 |  |  |  |  |
@@ -434,9 +422,9 @@
 | `src/cpu_pilot/pilot.rs` | ours-new | 277 |  |  |  |  |
 | `src/cpu_pilot/stage_session.rs` | ours-new | 117 |  |  |  |  |
 | `src/cpu_pilot/tests.rs` | ours-new | 321 |  |  |  |  |
-| `src/cycle_preload.rs` | ours-new | 499 |  |  |  |  |
+| `src/cycle_preload.rs` | ours-new | 540 |  |  |  |  |
 | `src/cycle_preload_config.rs` | ours-new | 219 |  |  |  |  |
-| `src/cycle_preload_policy.rs` | ours-new | 750 |  |  |  |  |
+| `src/cycle_preload_policy.rs` | ours-new | 1089 |  |  |  |  |
 | `src/diag_ring.rs` | ours-new | 260 |  |  |  |  |
 | `src/effect_hook_chain.rs` | ours-new | 118 |  |  |  |  |
 | `src/hang_trace.rs` | ours-new | 204 |  |  |  |  |
@@ -448,11 +436,12 @@
 | `src/kirby_hat_cycle.rs` | ours-new | 300 |  |  |  |  |
 | `src/kirby_hats.rs` | ours-new | 489 |  |  |  |  |
 | `src/kirby_resource_probe.rs` | ours-new | 208 |  |  |  |  |
-| `src/lib.rs` | mixed | 392 | 155 | 122 | 270 | 3-20, 24, 27, 37-40, 43-46, 48-113, 115-147, 150, 154-159, 162-174, 176-209, 214-269, … (+10 more) |
+| `src/lib.rs` | mixed | 415 | 155 | 122 | 293 | 3-37, 41, 44, 54-57, 60-63, 65-130, 132-167, 170, 174-179, 182-194, 196-229, 234-292, … (+10 more) |
 | `src/live_replay.rs` | ours-new | 684 |  |  |  |  |
 | `src/lobby_stage_cycle.rs` | ours-new | 356 |  |  |  |  |
 | `src/lobby_stage_probe.rs` | ours-new | 243 |  |  |  |  |
-| `src/logging.rs` | mixed | 347 | 50 | 50 | 297 | 1-16, 20-284, 329-344 |
+| `src/log_stress.rs` | ours-new | 107 |  |  |  |  |
+| `src/logging.rs` | mixed | 359 | 50 | 23 | 336 | 1-25, 28-318, 327-329, 332, 341-356 |
 | `src/mii_auto_init.rs` | ours-new | 154 |  |  |  |  |
 | `src/mii_backend.rs` | ours-new | 42 |  |  |  |  |
 | `src/mii_catalog_request.rs` | ours-new | 245 |  |  |  |  |
@@ -520,12 +509,12 @@
 | `src/mii_native_access.rs` | ours-new | 230 |  |  |  |  |
 | `src/mii_native_adapter.rs` | ours-new | 240 |  |  |  |  |
 | `src/mii_native_cpu_scope.rs` | ours-new | 243 |  |  |  |  |
-| `src/mii_ordinary_cpu.rs` | ours-new | 1499 |  |  |  |  |
-| `src/mii_ordinary_cpu_native.rs` | ours-new | 648 |  |  |  |  |
+| `src/mii_ordinary_cpu.rs` | ours-new | 1502 |  |  |  |  |
+| `src/mii_ordinary_cpu_native.rs` | ours-new | 673 |  |  |  |  |
 | `src/mii_ordinary_gate.S` | ours-new | 94 |  |  |  |  |
 | `src/mii_ordinary_gate.rs` | ours-new | 168 |  |  |  |  |
-| `src/mii_ordinary_native.rs` | ours-new | 1013 |  |  |  |  |
-| `src/mii_ordinary_player.rs` | ours-new | 1304 |  |  |  |  |
+| `src/mii_ordinary_native.rs` | ours-new | 1044 |  |  |  |  |
+| `src/mii_ordinary_player.rs` | ours-new | 1307 |  |  |  |  |
 | `src/mii_origin_observer.rs` | ours-new | 650 |  |  |  |  |
 | `src/mii_pool_observer.rs` | ours-new | 324 |  |  |  |  |
 | `src/mii_pool_observer_policy.rs` | ours-new | 135 |  |  |  |  |
@@ -537,9 +526,9 @@
 | `src/mii_saved_fingerprints.rs` | ours-new | 120 |  |  |  |  |
 | `src/mii_saved_native.rs` | ours-new | 287 |  |  |  |  |
 | `src/mii_selector_native.rs` | ours-new | 751 |  |  |  |  |
-| `src/mii_source_provenance.rs` | ours-new | 349 |  |  |  |  |
+| `src/mii_source_provenance.rs` | ours-new | 431 |  |  |  |  |
 | `src/model.rs` | ours-new | 147 |  |  |  |  |
-| `src/native_body_bank.rs` | ours-new | 3570 |  |  |  |  |
+| `src/native_body_bank.rs` | ours-new | 3946 |  |  |  |  |
 | `src/native_fields.rs` | ours-new | 201 |  |  |  |  |
 | `src/native_fighter_install.rs` | ours-new | 264 |  |  |  |  |
 | `src/native_gc_guard.rs` | ours-new | 55 |  |  |  |  |
@@ -567,7 +556,7 @@
 | `src/process_memory.rs` | ours-new | 33 |  |  |  |  |
 | `src/replay_capture.rs` | ours-new | 983 |  |  |  |  |
 | `src/replay_move_start.rs` | ours-new | 45 |  |  |  |  |
-| `src/replay_preview.rs` | ours-new | 229 |  |  | Retired by F7; Recording playback owns preview. |  |
+| `src/replay_preview.rs` | ours-new | 229 |  |  |  |  |
 | `src/replay_store.rs` | ours-new | 296 |  |  |  |  |
 | `src/source_capacity_probe.rs` | ours-new | 1784 |  |  |  |  |
 | `src/source_descriptor.rs` | ours-new | 120 |  |  |  |  |
@@ -646,43 +635,44 @@
 | `src/training/charge.rs` | mixed | 1114 | 1171 | 1087 | 27 | 2, 10, 19-23, 26-29, 432-439, 441-444, 454-456, 459 |
 | `src/training/clatter.rs` | upstream-identical | 89 |  |  |  |  |
 | `src/training/combo.rs` | mixed | 169 | 150 | 145 | 24 | 21-26, 88, 91-107 |
+| `src/training/cpu_rolls.rs` | ours-new | 125 |  |  |  |  |
 | `src/training/crouch.rs` | upstream-identical | 30 |  |  |  |  |
 | `src/training/debug.rs` | mixed | 197 | 188 | 177 | 20 | 4, 8-15, 105-115 |
-| `src/training/directional_influence.rs` | upstream-identical | 103 |  |  |  |  |
+| `src/training/directional_influence.rs` | mixed | 106 | 103 | 103 | 3 | 21-23 |
 | `src/training/fast_fall.rs` | upstream-identical | 140 |  |  |  |  |
 | `src/training/frame_counter.rs` | upstream-identical | 122 |  |  |  |  |
 | `src/training/full_hop.rs` | upstream-identical | 71 |  |  |  |  |
 | `src/training/input_delay.rs` | mixed | 27 | 23 | 23 | 4 | 10-13 |
 | `src/training/input_log.rs` | mixed | 384 | 377 | 374 | 10 | 177, 187, 211, 312-318 |
 | `src/training/input_record.rs` | mixed | 1040 | 606 | 532 | 508 | 12-14, 74-88, 110, 189-199, 223-255, 263-264, 267-301, 303-317, 320, 322-330, 337-338, 358, … (+35 more) |
-| `src/training/ledge.rs` | mixed | 221 | 211 | 210 | 11 | 49-50, 106-108, 187-192 |
-| `src/training/lobby.rs` | ours-new | 180 |  |  |  |  |
+| `src/training/ledge.rs` | mixed | 232 | 211 | 210 | 22 | 33-41, 58-61, 117-119, 198-203 |
+| `src/training/lobby.rs` | ours-new | 168 |  |  |  |  |
 | `src/training/mash.rs` | mixed | 656 | 641 | 639 | 17 | 66, 107, 197-211 |
-| `src/training/mod.rs` | mixed | 1378 | 964 | 823 | 555 | 7-8, 33, 47-54, 58, 60-112, 116, 167-179, 194-228, 230-235, 237-239, 244-246, 248-283, … (+54 more) |
+| `src/training/mod.rs` | mixed | 1380 | 964 | 823 | 557 | 7-8, 29, 34, 48-55, 59, 61-113, 117, 168-180, 195-229, 231-236, 238-240, 245-247, … (+55 more) |
 | `src/training/named_macros.rs` | ours-new | 1441 |  |  |  |  |
 | `src/training/practice.rs` | ours-new | 140 |  |  |  |  |
 | `src/training/practice_policy.rs` | ours-new | 88 |  |  |  |  |
-| `src/training/reset.rs` | mixed | 54 | 31 | 31 | 23 | 12-34 |
+| `src/training/reset.rs` | mixed | 52 | 31 | 27 | 25 | 6, 11-33, 47 |
 | `src/training/save_states.rs` | mixed | 1272 | 800 | 739 | 533 | 2, 25, 95-102, 116-118, 171-172, 175-179, 183-504, 508-510, 515-516, 525-529, 538-541, 547-550, … (+30 more) |
-| `src/training/sdi.rs` | upstream-identical | 55 |  |  |  |  |
+| `src/training/sdi.rs` | mixed | 59 | 55 | 52 | 7 | 14-18, 20-21 |
 | `src/training/seams.rs` | ours-new | 183 |  |  |  |  |
 | `src/training/setup_library.rs` | ours-new | 422 |  |  |  |  |
 | `src/training/shield.rs` | mixed | 457 | 439 | 439 | 18 | 34-43, 168-170, 173, 190-193 |
-| `src/training/shield_tilt.rs` | upstream-identical | 30 |  |  |  |  |
+| `src/training/shield_tilt.rs` | mixed | 31 | 30 | 25 | 6 | 9-14 |
 | `src/training/tech.rs` | mixed | 777 | 758 | 737 | 40 | 12, 19-25, 355-372, 384-389, 415, 437, 753, 771-775 |
-| `src/training/throw.rs` | upstream-identical | 139 |  |  |  |  |
+| `src/training/throw.rs` | mixed | 150 | 139 | 139 | 11 | 43-51, 76-77 |
 | `src/training/ui/anchors.rs` | ours-new | 174 |  |  |  |  |
 | `src/training/ui/archive_name.rs` | ours-new | 115 |  |  |  |  |
 | `src/training/ui/archive_retirement.rs` | ours-new | 118 |  |  |  |  |
 | `src/training/ui/clip_editor.rs` | ours-new | 567 |  |  |  |  |
 | `src/training/ui/damage.rs` | upstream-identical | 153 |  |  |  |  |
-| `src/training/ui/display.rs` | mixed | 71 | 72 | 70 | 1 | 28 |
+| `src/training/ui/display.rs` | mixed | 57 | 72 | 49 | 8 | 28, 36-38, 42, 44, 48, 53 |
 | `src/training/ui/input_log.rs` | mixed | 432 | 200 | 91 | 341 | 2, 17-82, 85-217, 265-285, 288-294, 302, 304-305, 309-363, 365-369, 375-385, 390-412, 415-429, … (+1 more) |
 | `src/training/ui/layout_registry.rs` | ours-new | 71 |  |  |  |  |
 | `src/training/ui/menu.rs` | mixed | 955 | 632 | 583 | 372 | 6, 66-142, 163-240, 270-278, 324-327, 329-347, 350, 356, 367, 384-398, 401-407, 414, … (+19 more) |
 | `src/training/ui/mod.rs` | mixed | 392 | 202 | 166 | 226 | 7-8, 11, 14-16, 18, 21-23, 25, 27-102, 138-152, 154-182, 185-186, 195, 199-201, … (+13 more) |
 | `src/training/ui/native_menu.rs` | ours-new | 65 |  |  |  |  |
-| `src/training/ui/notifications.rs` | upstream-identical | 84 |  |  |  |  |
+| `src/training/ui/notifications.rs` | mixed | 56 | 84 | 17 | 39 | 3, 6-8, 10-15, 18, 22-39, 43-51, 55 |
 | `src/training/ui/roster_grid.rs` | ours-new | 365 |  |  |  |  |
 | `src/training/ui/stage_grid.rs` | ours-new | 220 |  |  |  |  |
 | `src/training/ui/waiting_archive.rs` | ours-new | 122 |  |  |  |  |
@@ -698,21 +688,24 @@
 | `tools/tests/test_nro_session.py` | ours-new | 819 |  |  |  |  |
 | `training_mod_consts/Cargo.lock` | ours-new | 729 |  |  |  |  |
 | `training_mod_consts/Cargo.toml` | mixed | 46 | 25 | 23 | 23 | 7, 21-28, 31-40, 43-46 |
-| `training_mod_consts/src/body_bank.rs` | ours-new | 2803 |  |  |  |  |
+| `training_mod_consts/src/body_bank.rs` | ours-new | 3055 |  |  |  |  |
 | `training_mod_consts/src/body_bank/memory.rs` | ours-new | 357 |  |  |  |  |
 | `training_mod_consts/src/body_bank/memory_table.rs` | ours-new | 525 |  |  |  |  |
+| `training_mod_consts/src/body_bank/mii_publish.rs` | ours-new | 183 |  |  |  |  |
 | `training_mod_consts/src/body_bank/window_share.rs` | ours-new | 202 |  |  |  |  |
 | `training_mod_consts/src/capacity_creation.rs` | ours-new | 558 |  |  |  |  |
 | `training_mod_consts/src/character_forms.rs` | ours-new | 760 |  |  |  |  |
 | `training_mod_consts/src/character_items.rs` | ours-new | 254 |  |  |  |  |
-| `training_mod_consts/src/config.rs` | mixed | 171 | 160 | 142 | 29 | 6-7, 16-17, 20-25, 35, 37-39, 43-47, 63, 65, 79, 82, 88, 96, … (+3 more) |
+| `training_mod_consts/src/config.rs` | mixed | 171 | 160 | 140 | 31 | 6-7, 16-17, 20-25, 35, 37-39, 43-47, 63, 65, 79, 82-84, 88, 96, … (+3 more) |
+| `training_mod_consts/src/cpu_rolls.rs` | ours-new | 325 |  |  |  |  |
 | `training_mod_consts/src/cycle_admission_grace.rs` | ours-new | 197 |  |  |  |  |
 | `training_mod_consts/src/cycle_preload_capacity.rs` | ours-new | 88 |  |  |  |  |
 | `training_mod_consts/src/cycle_preload_config.rs` | ours-new | 2719 |  |  |  |  |
 | `training_mod_consts/src/files.rs` | mixed | 18 | 15 | 12 | 6 | 5-10 |
 | `training_mod_consts/src/identity_view.rs` | ours-new | 571 |  |  |  |  |
-| `training_mod_consts/src/lib.rs` | mixed | 1351 | 804 | 642 | 709 | 7-35, 40, 58-59, 120-122, 132-293, 299, 301, 303-307, 323, 384, 409-443, 445-457, … (+82 more) |
+| `training_mod_consts/src/lib.rs` | mixed | 1357 | 804 | 642 | 715 | 7-41, 46, 64-65, 126-128, 138-299, 305, 307, 309-313, 329, 390, 415-449, 451-463, … (+82 more) |
 | `training_mod_consts/src/lobby_stages.rs` | ours-new | 774 |  |  |  |  |
+| `training_mod_consts/src/log_stress.rs` | ours-new | 140 |  |  |  |  |
 | `training_mod_consts/src/menu_json.rs` | ours-new | 795 |  |  |  |  |
 | `training_mod_consts/src/menu_shortcuts.rs` | ours-new | 169 |  |  |  |  |
 | `training_mod_consts/src/mii_cycle.rs` | ours-new | 1114 |  |  |  |  |
@@ -721,20 +714,21 @@
 | `training_mod_consts/src/native_seams/images.rs` | ours-new | 502 |  |  |  |  |
 | `training_mod_consts/src/native_seams/mod.rs` | ours-new | 837 |  |  |  |  |
 | `training_mod_consts/src/native_seams/report.rs` | ours-new | 455 |  |  |  |  |
-| `training_mod_consts/src/native_seams/rows_a1.rs` | ours-new | 618 |  |  |  |  |
+| `training_mod_consts/src/native_seams/rows_a1.rs` | ours-new | 669 |  |  |  |  |
 | `training_mod_consts/src/native_seams/rows_a2.rs` | ours-new | 2292 |  |  |  |  |
 | `training_mod_consts/src/native_seams/rows_a3.rs` | ours-new | 716 |  |  |  |  |
 | `training_mod_consts/src/native_seams/rows_a4.rs` | ours-new | 306 |  |  |  |  |
 | `training_mod_consts/src/native_seams/rows_a5.rs` | ours-new | 941 |  |  |  |  |
 | `training_mod_consts/src/native_seams/rows_identity.rs` | ours-new | 103 |  |  |  |  |
 | `training_mod_consts/src/native_seams/tests.rs` | ours-new | 699 |  |  |  |  |
+| `training_mod_consts/src/notice_queue.rs` | ours-new | 323 |  |  |  |  |
 | `training_mod_consts/src/options.rs` | mixed | 1182 | 1145 | 1102 | 80 | 42-45, 62-65, 74-76, 84-87, 227-228, 230-234, 313-353, 429-430, 432-436, 446, 1044-1052 |
 | `training_mod_consts/src/ordered_roster.rs` | ours-new | 460 |  |  |  |  |
 | `training_mod_consts/src/p1_cpu_menu_tests.rs` | ours-new | 74 |  |  |  |  |
 | `training_mod_consts/src/practice_setup.rs` | ours-new | 947 |  |  |  |  |
 | `training_mod_consts/src/roster_menu_tests.rs` | ours-new | 1439 |  |  |  |  |
 | `training_mod_consts/src/source_load.rs` | ours-new | 658 |  |  |  |  |
-| `training_mod_consts/src/swap_model/capabilities.rs` | ours-new | 649 |  |  |  |  |
+| `training_mod_consts/src/swap_model/capabilities.rs` | ours-new | 667 |  |  |  |  |
 | `training_mod_consts/src/swap_model/copy_packages.rs` | ours-new | 332 |  |  |  |  |
 | `training_mod_consts/src/swap_model/copy_registry.rs` | ours-new | 758 |  |  |  |  |
 | `training_mod_consts/src/swap_model/fallback.rs` | ours-new | 190 |  |  |  |  |
@@ -751,7 +745,7 @@
 | `training_mod_consts/src/swap_model/scope.rs` | ours-new | 588 |  |  |  |  |
 | `training_mod_consts/src/swap_model/special_articles.rs` | ours-new | 195 |  |  |  |  |
 | `training_mod_consts/src/swap_model/target.rs` | ours-new | 83 |  |  |  |  |
-| `training_mod_consts/src/swap_model/tests.rs` | ours-new | 533 |  |  |  |  |
+| `training_mod_consts/src/swap_model/tests.rs` | ours-new | 562 |  |  |  |  |
 | `training_mod_consts/src/trio.rs` | ours-new | 364 |  |  |  |  |
 | `training_mod_consts/tests/cycle_preload_policy.rs` | ours-new | 2 |  |  |  |  |
 | `training_mod_consts/tests/diag_features.rs` | ours-new | 117 |  |  |  |  |
@@ -892,6 +886,10 @@
 
 Dropped by fork (present upstream, absent in stage):
 
+- `photos/FLy0xiw.gif`
+- `photos/character_item.gif`
+- `photos/ezgif-2-299a3e9b46.gif`
+- `photos/mash_trigger_tumble.gif`
 - `src/common/dialog.rs`
 - `src/common/events.rs`
 - `src/common/release.rs`
