@@ -1381,6 +1381,96 @@ mod tests {
         assert!(e.view().playing);
     }
 
+    /// A model of the two orders in which the game's fighter callback and the worker's passes can run after X with a
+    /// frame shown (tr-primary-2 2026-11-26 13:24:36Z, 13:43:10Z). It is not a replay of either test host. The CPU
+    /// is as the hold and the game treat it: lifted and in Fall while a frame is shown; on the ground, Fall still its
+    /// status, on the frame that lets it go; idle on the next. One game frame runs the checkpoint's gate first and
+    /// the hold's step second, as the callback does.
+    fn x_after_a_held_frame_previews_in_either_order_of_the_two_threads() {
+        use crate::engine::macro_ui::scrub_track::Block;
+        use crate::model::state::preview::{settle, Body, Settle};
+        struct Game { block: Box<Block>, cpu: Body, asked: bool }
+        impl Game {
+            fn publish(&self, e: &ClipEditor) {
+                self.block.ask_at(e.shown_frame(), e.scrub().0);
+            }
+            fn frame(&mut self) -> Option<Settle> {
+                let generation = self.block.generation();
+                let gate = match self.asked.then(|| settle(self.cpu)) {
+                    Some(Settle::Wait) if self.block.settling() => None,
+                    Some(verdict) => {
+                        self.asked = false;
+                        self.block.settled();
+                        Some(if verdict == Settle::Ready { Settle::Ready } else { Settle::Refuse })
+                    }
+                    None => None,
+                };
+                self.cpu = if self.block.held_at(1, [0.0, 0.0]).is_some() {
+                    Body { air: true, falling: true, floor: true, ..Body::default() }
+                } else if self.cpu.air {
+                    Body { ground: true, falling: true, ..Body::default() }
+                } else {
+                    Body { ground: true, idle: true, ..Body::default() }
+                };
+                for slot in 0..2 {
+                    self.block.ack(slot, generation);
+                }
+                gate
+            }
+            fn verdict(&mut self) -> Settle {
+                (0..8).find_map(|_| self.frame()).expect("the start is answered")
+            }
+        }
+        let held = || {
+            let mut e = editor();
+            e.on_action(ClipAction::SelectIn);
+            let mut game = Game { block: Block::new(), cpu: Body { ground: true, idle: true, ..Body::default() }, asked: false };
+            game.publish(&e);
+            assert!(game.frame().is_none() && game.frame().is_none());
+            assert!(game.cpu.air && game.cpu.falling, "the CPU is held at the shown frame");
+            (e, game)
+        };
+        // Merge 17 and the build before it: X starts the play at once, the worker lets the hold go on its next pass,
+        // and the start reaches the game after `frames` game frames of that. Which comes first is not fixed.
+        let at_once = |frames: usize| {
+            let (mut e, mut game) = held();
+            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+            if frames > 0 {
+                game.publish(&e);
+            }
+            for _ in 0..frames {
+                assert!(game.frame().is_none());
+            }
+            game.asked = true;
+            let verdict = game.verdict();
+            game.publish(&e);
+            verdict
+        };
+        assert_eq!(at_once(0), Settle::Refuse, "the refusing order: the gate runs before the hold has let go");
+        assert_eq!(at_once(1), Settle::Refuse, "let go on the frame before: on the ground, not idle yet");
+        assert_eq!(at_once(2), Settle::Ready, "the playing order: the hold let go two frames before the gate ran");
+        // Now: X is kept as a wanted play, the worker starts it on the pass that finds the bodies released, and the
+        // start waits on the CPU's state. `frames`: the game frames between two worker passes.
+        for frames in 0..4 {
+            let (mut e, mut game) = held();
+            e.want_play(ClipAction::TogglePlay, false);
+            game.publish(&e);
+            let mut passes = 0;
+            while !game.block.released() {
+                for _ in 0..frames.max(usize::from(passes > 0)) {
+                    assert!(game.frame().is_none(), "no start is asked before the release");
+                }
+                passes += 1;
+                assert!(passes < 4, "the hold never reported the bodies released");
+            }
+            let Some((action, false)) = e.take_wanted_play() else { panic!("a wanted preview") };
+            game.block.await_settle();
+            assert!(matches!(e.on_action(action), ClipEffect::Preview(_)));
+            game.asked = true;
+            assert_eq!(game.verdict(), Settle::Ready, "{frames} game frames to a worker pass");
+        }
+    }
+
     fn generated_positions_reach_the_open_editor_at_once() {
         let mut e = saved_macro(false);
         let recording = match &e.file {
@@ -1723,6 +1813,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
+            ("x_after_a_held_frame_previews_in_either_order_of_the_two_threads", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),
             ("the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),
             ("a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped", a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped as fn()),
             ("the_playhead_browses_the_whole_take_and_leaves_in_and_out", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),
