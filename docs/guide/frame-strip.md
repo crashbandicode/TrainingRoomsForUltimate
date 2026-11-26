@@ -113,8 +113,9 @@ Hold **R3** (right stick click) and press **D-pad Left or Right** to look back t
 direction to repeat. That's about ten seconds of continuous action. When the strip freezes during an idle stretch,
 no new columns are added, so the time on the marker can be much longer. Release R3 to return to live.
 
-<!-- CLIP: tut-input-scrollback.mp4 | R3 + D-pad Left scrolls the strip back, the label reads the time, Right returns to now -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/16db06e0ff5b07c584ded3173e52cfade51d4dfa" autoplay muted loop playsinline controls></video>
+
+*Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](../media/i4-scrollback-zoom.mp4)
 
 ## Freeze
 
