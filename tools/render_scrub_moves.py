@@ -129,8 +129,9 @@ def sm2():
         ("none, or one that does not load", "any rows", "version 2, generated", 90),
         ("version 1, generated", "a run at least as long", "replaced: version 2, generated", 90),
         ("version 1, generated", "a shorter run", "kept", 80),
-        ("version 1, recorded with the take", "a run at least as long", None, 250),
-        ("version 1, recorded with the take", "a shorter run, a stopped preview, a failed write", "unchanged", 110),
+        ("version 1, recorded, whole", "a run at least as long", None, 250),
+        ("version 1, recorded, whole", "a shorter run, a stopped preview, a failed write", "unchanged", 110),
+        ("recorded, shorter than its inputs", "a longer run", "replaced: version 2, generated (the 1,200-frame fix's rule)", 110),
         ("version 2 with moves", "any run", "recorded: never replaced · generated: only by a longer run", 110),
     ]
     y = 144
@@ -147,8 +148,8 @@ def sm2():
         else:
             boxed(c, edges[2], y, edges[3], y + height, right)
         y += height + 7
-    paragraph(c, 24, 940, "The file says where its moves came from: none, the take, or a playback. A playback's moves are never called recorded.", 1150)
-    c.save("scrub-moves-SM2-file-upgrade", 980)
+    paragraph(c, 24, 1058, "The file says where its moves came from: none, the take, or a playback. A playback's moves are never called recorded.", 1150)
+    c.save("scrub-moves-SM2-file-upgrade", 1098)
 
 
 def sm3():
@@ -230,23 +231,24 @@ def sm4():
 def sm5():
     c = Canvas(W, 860)
     title(c, "SM5 · A Replay window capture itself")
-    ay = d.panel(c, 16, 65, 594, 677, "A · Not in this change", rec=True, tag_below=True)
-    by = d.panel(c, 606, 65, 1184, 677, "B · Captures keep the animation too", tag_below=True)
+    ay = d.panel(c, 16, 65, 594, 735, "A · Not in this change", rec=True, tag_below=True)
+    by = d.panel(c, 606, 65, 1184, 735, "B · Captures keep the animation too", tag_below=True)
     aend = vertical_flow(c, 32, 578, ay + 8, [
-        "a capture's frame: inputs and state, no animation",
+        "a capture's frame: inputs and state, no animation (fresh or reopened)",
         "scrub the capture: positions, as today",
         "A saves a macro",
         "play it once",
         "scrub the macro: the moves",
     ], height=72, gap=25)
-    paragraph(c, 34, aend + 24, "No change to the capture format.", 530, "s")
+    y = paragraph(c, 34, aend + 24, "No change to the capture file (TMRCAP01, schema 1).", 530, "s") + 12
+    paragraph(c, 34, y, "A fighter the playback does not have keeps positions only.", 530, "s")
     bend = vertical_flow(c, 622, 1168, by + 8, [
         "every captured frame of every fighter gains animation and frame",
         "scrub the capture: the moves at once",
     ], height=82, gap=28)
     y = paragraph(c, 624, bend + 30, "The capture format changes.", 530, "s") + 12
     paragraph(c, 624, y, "More memory in every match with Replay capture On.", 530, "s")
-    c.save("scrub-moves-SM5-captures", 703)
+    c.save("scrub-moves-SM5-captures", 760)
 
 
 if __name__ == "__main__":
