@@ -1236,6 +1236,12 @@ pub fn take_player_frame() -> Option<InputFrame> {
 
 #[cfg(any(test, target_os = "switch"))]
 pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
+    take_cpu_frame_seeded(|| ())
+}
+
+#[cfg(any(test, target_os = "switch"))]
+pub(crate) fn take_cpu_frame_seeded(seed: impl FnOnce()) -> Option<InputFrame> {
+    if play_seed_due(Role::Cpu) { seed(); }
     let frame = take_frame(Role::Cpu);
     if let Some(frame) = frame.filter(|_| make_actor_cpu() && INPUT_MODE.load(Ordering::Acquire) & 1 != 0) {
         MAKE_CPU_FRAME.store(pack(frame), Ordering::Release);
@@ -2261,6 +2267,7 @@ fn step_role(machine: &mut Playback, book: &Book, role: Role) {
 #[cfg(test)]
 thread_local! {
     static POLL_ON_PUBLISH: core::cell::Cell<Option<fn(Role)>> = const { core::cell::Cell::new(None) };
+    static BEFORE_TAKE: core::cell::Cell<Option<Box<dyn FnOnce()>>> = const { core::cell::Cell::new(None) };
 }
 
 /// A cut clears the run flag. If it races this publish, the hook's cut flag still
@@ -2907,6 +2914,8 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
 fn take_frame(role: Role) -> Option<InputFrame> {
+    #[cfg(test)]
+    if let Some(publish) = BEFORE_TAKE.take() { publish(); }
     PLAY.poll(|| {
         let (frame, generation) = pop_frame(role)?;
         credit_frame(role, generation);
@@ -5005,6 +5014,24 @@ mod tests {
 
     fn generated_rows(root: &Path, id: &str, recording: &MacroRecording) -> Option<Vec<[ReplayFrame; 2]>> {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
+    }
+
+    #[test]
+    fn a_poll_that_straddles_generation_arm_seeds_the_first_input_once() {
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-seed-at-take", 3);
+        let publish_root = root.clone();
+        BEFORE_TAKE.set(Some(Box::new(move || generated_play(&publish_root, Role::Cpu))));
+        let seeds = std::cell::Cell::new(0);
+        let seed = || {
+            seeds.set(seeds.get() + 1);
+            generated_sample(Role::Cpu, 42);
+        };
+        for input in &recording.frames { assert_eq!(take_cpu_frame_seeded(seed), Some(*input)); }
+        tick(&root);
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        assert_eq!((seeds.get(), rows[0][0].x, rows[0][1].x), (1, 42.0, 142.0));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
