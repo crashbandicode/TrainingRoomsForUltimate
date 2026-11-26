@@ -153,9 +153,12 @@ class CarryEditsTests(unittest.TestCase):
             self.assertEqual(len(new), 1)
             self.replay(base, wanted, new)
             before = path.read_bytes()
-            with contextlib.redirect_stdout(io.StringIO()):
+            said = io.StringIO()
+            with contextlib.redirect_stdout(said):
                 carry_edits.main(args + ["--dry-run"])
             self.assertEqual(path.read_bytes(), before)
+            self.assertIn("no files written", said.getvalue())
+            self.assertNotIn("appended", said.getvalue())
 
     def test_identical_files_change_nothing(self):
         base = "".join(lines(10))
