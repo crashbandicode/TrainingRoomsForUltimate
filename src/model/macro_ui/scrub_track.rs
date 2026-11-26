@@ -368,6 +368,10 @@ impl TakeTrack {
                 len: AtomicUsize::new(0),
                 readers: AtomicUsize::new(0),
             });
+            // A role with no fighter frame yet is absent (kind -1), as a saved capture marks it.
+            for live in &table.live {
+                live[0].store(-1i32 as u32, Ordering::Release);
+            }
             self.table.store(Box::into_raw(table) as usize, Ordering::Release);
         }
         let Some(table) = self.table() else { return };

@@ -477,6 +477,7 @@ unsafe fn give_live(start: &Start) {
                 pose.start_state = plan.state;
             }
             rr_host::set_record_role(if *recorded == Who::Cpu { Role::Cpu } else { Role::Player });
+            super::recording_host::seed_take_track(recorder::cpu_body());
             rr_host::note_record_start(rr_host::RecordStart { poses, speeds: [(0.0, 0.0); 2] });
             rr_host::on_chords(true, false, false);
             rr_host::cpu_role_begin_placed();

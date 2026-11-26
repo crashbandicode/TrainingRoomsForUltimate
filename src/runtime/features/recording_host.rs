@@ -36,9 +36,25 @@ pub fn on_chords(cpu: super::recorder::Body, record: bool, play_player: bool, pl
     if record && rr_host::capture_role() == 0 {
         // SAFETY: the chord step runs on the game thread (the AI epilogue) with the CPU body it resolved this frame.
         let (start, fighter) = unsafe { record_start(cpu) };
+        // SAFETY: as above.
+        unsafe { seed_take_track(Some(cpu)); }
         rr_host::post_record_start(start, fighter);
     }
     rr_host::on_chords(record, play_player, play_cpu);
+}
+
+/// A take starts: both fighters' state now, read with the capture's sampler, so the take's first frame has it. The
+/// fighter frames sample only while a take records.
+///
+/// # Safety
+/// Game thread; `cpu` was resolved this frame.
+pub(super) unsafe fn seed_take_track(cpu: Option<super::recorder::Body>) {
+    for (slot, body) in [super::recorder::body_of(0), cpu].into_iter().enumerate() {
+        if let Some(body) = body {
+            let module = &mut *(body.accessor as *mut smash::app::BattleObjectModuleAccessor);
+            crate::engine::macro_ui::scrub_track::TAKE.live(slot, &crate::runtime::macros::replay_capture::state(module));
+        }
+    }
 }
 
 /// FS-027 / FS-031: a Recording-page take is open (`rr_host::taking`), for the busy guards.
