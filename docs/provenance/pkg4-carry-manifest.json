@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "cb13f5ac436650e97c363a96d49f6364f176c16d4a5fb462ddb07077505d0fcd",
+   "dest_sha256": "689dc86a0ba978797b6b760243e04d808f94da80223f65b0994df0f2367c1b8d",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2322,6 +2322,11 @@
      "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): browse, snap and cut at the playhead, expose its shown frame and clear the browse state.",
      "old": "        Handle::In => (\n            \"Start selected. Hold Left or Right to move it.\".to_owned(),\n            format!(\"Hold longer to speed up, or hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead => (\n            \"Press L for the start, or R for the end.\".to_owned(),\n",
      "new": "        Handle::In => (\n            \"Start selected. Hold Left or Right to move it.\".to_owned(),\n            format!(\"Hold longer to speed up, or hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead if view.context.preview() && view.shown.is_some() => (\n            \"Playhead moved. L sets the start here, R the end.\".to_owned(),\n            \"Left or Right browses on. Y goes to the nearest move.\".to_owned(),\n        ),\n        Handle::Playhead if view.context.preview() => (\n            \"Hold Left or Right to browse the take, or Y for the nearest move.\".to_owned(),\n            format!(\"Press L for the start, or R for the end. Hold {coarse} to start fast.\"),\n        ),\n        Handle::Playhead => (\n            \"Press L for the start, or R for the end.\".to_owned(),\n"
+    },
+    {
+     "old": "        window.seek(self.window.cursor().min(window.total() - 1));",
+     "new": "        window.seek(match self.handle {\n            Handle::In => window.start(),\n            Handle::Out => window.end() - 1,\n            Handle::Playhead => self.window.cursor().min(window.total() - 1),\n        });",
+     "reason": "Free playhead (2026-11-26 00:45:28Z): after a fighter switch the shown frame is the selected handle on the new track, including a longer full take."
     }
    ]
   },

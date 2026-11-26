@@ -629,7 +629,11 @@ impl ClipEditor {
             window.set_out(self.window.end());
             window.set_in(self.window.start());
         }
-        window.seek(self.window.cursor().min(window.total() - 1));
+        window.seek(match self.handle {
+            Handle::In => window.start(),
+            Handle::Out => window.end() - 1,
+            Handle::Playhead => self.window.cursor().min(window.total() - 1),
+        });
         self.track = index;
         self.window = window;
         self.marks = track_marks(&self.session.tracks[index]);
