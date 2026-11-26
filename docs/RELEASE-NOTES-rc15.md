@@ -101,7 +101,7 @@ is kept. This works on a macro and on a match capture.
 | --- | --- |
 | "Play it once to see positions while scrubbing." | The macro has no positions |
 | "Positions end here." | The selected frame is beyond the saved positions. This can follow an early stop during generation or the long-recording defect below. |
-| "Can't stand there on this stage." | The editor detected a point inside solid ground or a wall, outside the camera limits, or past the safe blast-line bounds. A held fighter returns to its hold origin; the other fighter is judged separately. Install 6 misses the wall case described below. |
+| "Can't stand there on this stage." | The editor detected a point inside solid ground or a wall, outside the camera limits, or past the safe blast-line bounds. A held fighter returns to its hold origin; the other fighter is judged separately. Install 6 judges the point only, not whether the fighter's body fits beside a wall: see below. |
 
 | Rule | What it means |
 | --- | --- |
@@ -129,7 +129,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Timing coverage | One Eden host, one boot per build. The playback path is unchanged; install 6 and the console were not timed here. |
 | Eden, on install 6's diagnostic build | Record with no preview, In and Out following the handles, release on deselect, the old-macro line, a crop keeping its positions, and the file sizes passed. Deleting a macro removed both its files. The menu thread used 49,904 B of stack, under its 57,648 B bound |
 | A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the floor was not moved. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
-| Known issue found there | A point inside the stage's wall, just beside the end of the floor and below it, was not refused: that fighter was shown about 5 units from its recorded point, pressed against the wall. [Known issues](CURRENT-RELEASE.md#known-issues) |
+| Known issue found there | A point just left of the end of the floor and below it was free, but the fighter's body did not fit beside the wall: the game pushed it about 5 units from its recorded point, and the editor still treated it as held. [Known issues](CURRENT-RELEASE.md#known-issues) |
 | Release, on that build | In Crop on a recorded macro, X played the preview and let the fighters go after it. B closed the editor with both fighters back at their homes. This is not the match-capture preview. |
 | Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. A fighter walked off stage gave no verdict yet |
 | The installed release file | No smoke boot yet; the rows above ran the diagnostic build of the same commit |
