@@ -234,6 +234,8 @@ mod pristine_load;
 mod release_warnings;
 #[path = "../roster_request_handoff.rs"]
 mod roster_request_handoff;
+#[path = "../rows_tables.rs"]
+mod rows_tables;
 #[path = "../sav002_load_stops_rr_playback.rs"]
 mod sav002_load_stops_rr_playback;
 #[path = "../size_budget.rs"]
