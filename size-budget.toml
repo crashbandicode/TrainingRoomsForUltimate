@@ -3248,3 +3248,11 @@ ceiling = 208689
 date = "2026-11-26"
 reason = "Scrub moves, P5b part B (SM1: the clip editor's scrub draws the recorded animation on a held fighter without its script lines, asks the game whether the fighter has that animation first, and lets a posed body go plain before the wake), on feat/scrub-moves-p5b de33380e (208555: part A with the capture crop fix; part A's own +226 entry is place-t1a's and is not in this tree): +134, measured by the size step of the gate on 7d92c201 (208684 against part A's 208550 on f74a277c). The ceiling is this branch's count; the join's entry is the sum of the three parts."
 approved_by = "tr-primary-2 2026-11-26 20:51:11Z (P5b pre-approved: each part raises its own entry by its own figure, up to +900 lines in all on rc-next cbd709f9's 208329; release NRO at most +8 KiB and release raw .bss +0 against cbd709f9)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209091
+date = "2026-11-26"
+reason = "Scrub moves, P5b of the next build, the join of its three parts on rc-next 4da7f807 (208329): the positions file version 2 with 44-byte rows and the rule by which a playback gives an older file its moves (part A, with the shared names and the capture crop fix), the recorded animation drawn on a held fighter without its script lines (part B), and the per-fighter toggle on ZL+L and ZL+R (part C). +762 in all, measured by the size step on the joined head: part A +233, part B +134, part C +395."
+approved_by = "tr-primary-2 2026-11-26 20:51:11Z and 21:24:01Z (P5b pre-approved up to +900 lines in all on rc-next's 208329; one joined entry by place-t1a) and 21:42:46Z (release NRO at most +16,384 B on merge 17 5df3d9dc, at most +12,288 B on 4da7f807; release raw .bss +0; the 8-byte reply word of part C accepted at 21:45:17Z wherever it lands)."
