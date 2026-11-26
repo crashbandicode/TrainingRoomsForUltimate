@@ -81,8 +81,9 @@ fn play_start_timings() {
     let first = times[1];
     let mut warm = times[1..].to_vec();
     warm.sort_unstable();
+    let median = (warm[warm.len() / 2 - 1] + warm[warm.len() / 2]) / 2;
     eprintln!("PLAY_TIMING what=play_armed frames={frames} json_bytes={armed_json} runs={} pinned={} median_us={} min_us={} max_us={} first_us={first}",
-        warm.len(), env::var("TR_SCRUB_TIMING_PINNED").unwrap_or_default(), warm[warm.len() / 2], warm[0], warm[warm.len() - 1]);
+        warm.len(), env::var("TR_SCRUB_TIMING_PINNED").unwrap_or_default(), median, warm[0], warm[warm.len() - 1]);
     assert!(armed.iter().all(|armed| *armed) && host::play_sampling(), "every sample armed generation"); // head-only
     host::on_chords(false, true, false);
     let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
