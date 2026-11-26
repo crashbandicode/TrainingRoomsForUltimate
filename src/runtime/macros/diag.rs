@@ -47,7 +47,6 @@ const NAME: u8 = 6;
 const REPLAY_WINDOW: u8 = 7;
 const CLIP: u8 = 8;
 const LIST_CAPTURES: u8 = 9;
-const OPEN_PLACEMENT: u8 = 11;
 const AUDIT_CAPTURES: u8 = 12;
 
 fn parse(line: &str) -> Option<Command> {
@@ -70,7 +69,6 @@ fn parse(line: &str) -> Option<Command> {
             set_text(words.next()?, &mut command);
             command.number = words.next().and_then(|n| n.parse().ok()).unwrap_or(0);
         }
-        "open_placement" => command.kind = OPEN_PLACEMENT,
         "view" => command.kind = VIEW,
         "status" => command.kind = STATUS,
         "name" => {
@@ -183,10 +181,6 @@ fn run(command: Command) {
         OPEN_LIBRARY => {
             named_macros::open_library(usize::try_from(command.number).ok());
             diagnostic(format_args!("[NamedMacroDiag] open_library slot={}", command.number));
-        }
-        OPEN_PLACEMENT => {
-            named_macros::open_editor();
-            diagnostic(format_args!("[NamedMacroDiag] open_placement"));
         }
         PAD => match pad_of(text) {
             Some(pad) => {

@@ -8,7 +8,7 @@ use hos_lock::Mutex;
 
 use crate::model::chords::{field, Sample};
 use crate::model::edge_juggle::perfect::{self, Outline, Point, Segment};
-use crate::model::egg_zone::{blast_rect, crop_window, CropRect, CropView, Outcome, Side, Stage, Step, Wizard, Zone, CROP_RECTS};
+use crate::model::egg_zone::{blast_rect, crop_window, CropRect, CropView, LayoutCrop, Outcome, Side, Stage, Step, Wizard, Zone, CROP_RECTS};
 use crate::model::eggs::View;
 use crate::model::input_delay::Owners;
 use crate::model::notify::DEFAULT_COLOR;
@@ -16,7 +16,7 @@ use crate::model::storage::FixedPath;
 use crate::model::wizard::Kind;
 use crate::runtime::{game::natives, published, scene, ui::worker};
 
-use super::{edge_juggle, mashout::FloorRay, notices, states, tech_surfaces};
+use super::{stage_geometry::{self, FloorRay}, notices, states, tech_surfaces};
 
 const NOTICE: u8 = 0x35;
 const INSET_BACKING: [u8; 4] = [10, 15, 27, 235];
@@ -39,7 +39,7 @@ static BACK: AtomicU32 = AtomicU32::new(0);
 
 /// The crop window `draw` computed in this pass and the layout it was drawn for, taken by that layout's menu tick
 /// (`ui::tick`) right after the draw. The tick reads no camera itself: the projection stays behind the hitbox unit's draw.
-static CROP: Mutex<Option<(usize, [Option<CropRect>; CROP_RECTS])>> = Mutex::new(None);
+static CROP: Mutex<Option<LayoutCrop>> = Mutex::new(None);
 
 pub fn request() {
     REQUEST.store(epoch(), Ordering::Release);
@@ -56,11 +56,7 @@ pub fn wizard_active() -> bool {
 /// This pass's crop window for `layout`, once; `None` when the editor's guide was not drawn for it in this pass.
 pub fn crop(layout: usize) -> Option<[Option<CropRect>; CROP_RECTS]> {
     let mut slot = CROP.try_lock()?;
-    let (owner, rects) = (*slot)?;
-    (owner == layout).then(|| {
-        *slot = None;
-        rects
-    })
+    LayoutCrop::take(&mut slot, layout)
 }
 
 pub fn take_menu_request() -> bool {
@@ -165,9 +161,9 @@ unsafe fn read_stage(p1: usize, id: i32) -> Option<Stage> {
     let range = [left, right, top, bottom];
     let (mid, limits) = perfect::outline_probe(camera, range)?;
     let ray = FloorRay::new(p1)?;
-    let (ledges, _) = edge_juggle::stage_floor(&ray, camera)?;
-    let (outline, _) = tech_surfaces::training_outline(&ray, mid, limits)?;
-    Stage::new(id, range, ledges, outline)
+    let (outline, _) = stage_geometry::training_outline(&ray, mid, limits)?;
+    let mut probe = stage_geometry::RayProbe::new(p1)?;
+    Stage::read(id, range, camera, outline, &mut probe).ok().flatten()
 }
 
 /// The editor's state for the optional test bridge (`zone.*`). Call it before `LIVE` changes.
@@ -378,7 +374,7 @@ pub fn draw(layout: usize, view: View, mut line: impl FnMut(Segment, f32, [u8; 4
         crop_view(&overview)
     });
     if let Some(mut crop) = CROP.try_lock() {
-        *crop = Some((layout, crop_window(crop_view(&map), inset, display.step)));
+        LayoutCrop::publish(&mut crop, layout, crop_window(crop_view(&map), inset, display.step));
     }
     display.samples
 }

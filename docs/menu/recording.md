@@ -106,10 +106,10 @@ don't turn the page while a file's screen is open.
 
 | File | Rows |
 | --- | --- |
-| Save state | Bind to Save / Load, Duplicate, Rename, Delete |
-| Macro | Start save (only if it has one), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
+| Save state | Bind to Save / Load, Change placement, Duplicate, Rename, Delete |
+| Macro | Start save, Change placement and Momentum (only if it has a start save), Offset (only if it also has an offset), Set active, Playback slot, Rename, Trim, Crop, Make combo, Delete |
 | Recording | Inputs from, Plays on, Play back, Make macro…, Make combo…, Make drill…, Delete |
-| Chain | Start save (only if its first macro has one), Set active, Edit chain, Rename, Make combo, Delete |
+| Chain | Start save and Change placement (only if its first macro has a start save), Set active, Edit chain, Rename, Make combo, Delete |
 | Combo | Drill, Made from (only if it was made from a macro), Rename, Crop, Delete |
 | Input drill | Drill, Made from (only if made from a macro or chain), Rename, Trim, Crop, Delete |
 | Sequence | Drill sequence, a row for each of its combos (A drills that combo alone), Edit combos, Rename, Delete |
@@ -117,8 +117,11 @@ don't turn the page while a file's screen is open.
 | Row | What it does |
 | --- | --- |
 | Bind to Save / Load | On makes this the save the Save and Load chords use. Load only warps there; it never starts a macro. |
+| Change placement | Closes the menu and opens the [placement picker](#change-placement) on this save: a macro's start save, or the start save of a chain's first macro. |
 | Duplicate | Makes a copy named Save N. |
 | Start save | On warps both fighters to the macro's start save once, before it plays. Off plays it from where the fighters are. |
+| Momentum | Keep recorded speed (the default) gives the side that plays the speed it had when Record started, on its first input after the warp to the start save. Start at rest starts it standing. Left, Right or A flips it; it is kept in the macro's file. |
+| Offset | Only on a macro that still has a start offset from Edit placement, the offset editor of earlier builds. It shows the offset, such as X -40, and Play adds it to the side that plays, on top of the start save's spot. A clears it and changes nothing else in the file; Left/Right do nothing. |
 | Set active | On makes this the active macro of the view you're in, replacing the one before. Off clears it. |
 | Playback slot | None or Slot 1 to 5 (Left/Right, or A to step on). The CPU plays this macro when it picks that Playback Slot in Mash, Followup, the overrides or Ledge Options. One macro per slot: choosing a slot another macro holds takes it. A slot holds up to 600 frames (10 s), so crop a longer macro first. Kept with the library; deleting the macro empties its slot. |
 | Rename | Opens the Switch keyboard (up to 48 characters). B, or an empty name, keeps the old name. |
@@ -238,35 +241,64 @@ stays, without asking, as if you had picked Keep.
 
 More: [Fighter Mismatch](../guide/recording.md#fighter-mismatch)
 
-### Edit placement
+### Change placement
 
-Moves where a macro starts. Play warps the fighters to the macro's start save, and this adds an offset for the side
-that plays it. It edits the active macro of the side the [pop-up](#player-and-cpu) is set to (not always the view ZR
-shows here), or a chain's first macro.
+Moves where a save state puts the fighters. The menu closes and a picker opens on the live game, with the camera on
+the whole stage. Both fighters stand at the save's spots, you move them with the Break the Targets crosshair, and A
+or + writes the new spots into the save file.
 
-![Play on Player 1: the jab hits; Edit placement, X- forty times, Write; the same Play starts 40 units left and misses](../media/rc11-edit-placement.gif)<br>
-*Play on Player 1, then Edit placement moves its start 40 units left (X- forty times) and Write; the same Play now
-starts at the new spot and the jab misses. Cut at the menu steps.*
+From this row it opens the start save of the active macro of the side the [pop-up](#player-and-cpu) is set to (not
+always the view ZR shows here); for a chain that is its first macro's start save. The same picker opens from
+**Change placement** on a save's, a macro's or a chain's [own screen](#a-file-s-own-screen), and with X on a save in
+the [pop-up](#the-lists-and-the-hot-five).
 
-![Replays > Edit placement: the key grid X- X+ Y- Y+, x- x+ y- y+, Momentum, Keep, Write, New, Back and the offset readout](../media/rc13-edit-placement-screen.png)<br>
-*The Edit placement screen for the active macro: the grid of keys, the offset readout ("Offset X 0.00 Y 0.00 Keep recorded speed") and the help line. Eden, rc.13 (untested on hardware).*
+<!-- CAPTURE-REQUEST rec-change-placement: Change placement on a save: Where, Off stage for the CPU, the crosshair with the game's magnifier, A saves, then Load puts both fighters on the new spots. See artifacts/docs4/CAPTURE-REQUESTS.md. -->
 
-- **Values:** an editor: the offset and the Momentum choice.
-- **How:** A opens it. The D-pad moves between keys, A presses one, B leaves. If it can't open, the help line says
-  why, such as "Make a macro active for this role first" or "Link a start save to the macro first" (the macro has no
-  start save, or its Start save switch is Off).
+- **Values:** a picker of five pages: Where, Spot, State, Percent, Preview.
+- **How:** A opens it. It opens with both practice fighters there and no recording, playback or load under way. Over
+  a running practice game the notice reads "Stop the practice game to place fighters". From this row, if it can't
+  open, the notice says why, such as "Make a macro active for this role first" or "Link a start save to the macro
+  first" (the macro has no start save, or its Start save switch is Off).
+- **Where:** Training and the waiting room.
 
-| Key | What it does |
-| --- | --- |
-| x- / x+, y- / y+ | Move the start a little. |
-| X- / X+, Y- / Y+ | Move it four times as far. |
-| Momentum | Keep recorded speed (the default) gives the side the speed it had when Record started. Start at rest starts it standing. |
-| Write | Saves the offset into the macro file. |
-| Keep | Uses it for that file until you close the game; the file stays as it is. |
-| New | Saves it into a copy. |
-| Back (or B) | Leaves without writing. |
+| Page | What you set | Keys |
+| --- | --- | --- |
+| Where | On stage or Off stage, for Player 1 and for the CPU | L / R or Up / Down pick the fighter. Left / Right switch it on or off stage. |
+| Spot | The spot | The stick or the D-pad moves it. L / R take the other fighter. Y switches on or off stage. |
+| State | How the fighter starts: Standard; on stage also Missed tech or Trip; off stage also Tumble, Helpless or Footstool | Left / Right change it. On a missed tech, X turns it face up or face down. |
+| Percent | The damage, 0 to 300% | Left / Right change it by 1, Up / Down by 10. |
+| Preview | Both fighters as they will be saved | A or + saves. |
 
-More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-placement-and-the-replay-window)
+On every page A goes to the next page and B goes back; B on Where cancels, puts both fighters back where they stood
+and writes nothing. X puts both fighters back to the saved values. + saves at once, from any page: a page you did not
+visit keeps the save's own values.
+
+- **On stage:** the fighter stands on a floor. Left / Right move it along that floor, and Up / Down step to the floor
+  above or below, a platform or the ground. For a moment after the picker opens, until the stage's floors are traced,
+  the crosshair moves freely and the fighter stands on the floor under it.
+- **Off stage:** the fighter is held in the air at the crosshair, which reaches to 1 unit inside the blast line.
+  Outside the picture the game shows its own magnifier of the fighter; with the game's HUD off, a dotted pointer at
+  the border shows the way.
+- **Switching to Off stage:** if the spot is in open air or under the stage, the fighter is held there. If it is over
+  the stage or inside it, the fighter goes to the open air beside the nearest ledge, halfway across that gap and
+  halfway down to the bottom blast line. On the Spot page the spot is the crosshair's, and the crosshair goes with
+  the fighter. After that the crosshair moves freely, also back over the stage.
+- **A start save that macros share:** when macros start from the save, the picker first asks whether to change it for
+  all of them (it says how many) or to copy it. Up / Down choose, A goes on, B cancels. Opened from a macro, the copy
+  becomes that macro's start save. From a chain, only its first macro gets the new start-save link. From the save's
+  own screen, the copy is a new save and no macro is relinked.
+  [Shared start save](#shared-start-save) answers the question ahead.
+- **What is saved:** only what you changed, for the fighter you changed: its spot, its start state, its damage. With
+  nothing changed the file is not written. The save then loads once, so both fighters end on the saved spots.
+  Copy changes at most a macro's start-save link, not its inputs, Momentum or offset. Play still
+  adds an existing offset on top of the save's spot until you clear it with the Offset row of the macro's
+  [own screen](#a-file-s-own-screen).
+
+In an Eden smoke boot on install 5 (2026-11-25), in the picker that Record opens, switching Player 1 to Off stage
+moved the spot beside the ledge, and one D-pad step moved it on. No placement was saved or loaded, and Change
+placement was not opened on a save; those rest on host tests. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
+
+More: [Change placement and the Replay window](../guide/recording.md#change-placement-and-the-replay-window)
 
 ### Replay window
 
@@ -289,7 +321,7 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | ZR | A tap (pressed and released with nothing else) swaps where the preview of a macro or a capture plays: the CPU or Player 1, as ZR does on the Recording page. The strip names it ("Plays on CPU", or after a capture's fighter "plays on Player 1"). A recording opened from its own screen starts on its Plays on choice, and Make uses the target the strip shows. During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
 | L / R | L picks the start and R the end. After a preview or save, pick a handle again before moving it. |
 | Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. |
-| Y | Snaps the selected handle to the nearest move: In to a move's start, Out to a move's end. A move whose end is not known offers the next move's start, or the end of the take. Pick a handle with L or R first. |
+| Y | Snaps the selected handle to the nearest move: In to a move's start, Out to a move's end. A move whose end is not known offers the next move's start, or the end of the take. Pick a handle with L or R first. On a Replay window capture, a start in the middle of an action also takes the move's short setup, as ZL + Y does, so X and A work from it; where no move can start there, the strip says why. |
 | ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
 | X | Previews the kept part: a capture on the CPU (or on Player 1 after a ZR tap, or when its Plays on says so), or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early and drops its remaining frames. Not offered for combos or drills. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
@@ -324,7 +356,7 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 - **How:** A opens it. It opens only while nothing else is going on: not during a recording, a playback, a load or a
   fighter change. With no capture, it says "Save a replay with match capture on, or play one in Vault first".
 
-More: [Edit placement and the Replay window](../guide/recording.md#replays-edit-placement-and-the-replay-window)
+More: [Change placement and the Replay window](../guide/recording.md#change-placement-and-the-replay-window)
 
 ### Replay capture
 
@@ -368,11 +400,26 @@ Off hides the playback indicator.
 - **Values:** On, Off
 - **Default:** On
 
+### Playback delay
+
+Waits after the fighters are placed and before the first input, once per Play, not on later loop passes. It applies to
+Play on Player 1, Play on CPU, Vault Play back and Make combo's pass, but not to editor previews or CPU Playback
+slots. The playing role is neutral while it waits, the indicator stays visible, and Stop cancels the run.
+
+- **Values:** None, 10, 20, 30, 45, 60, 90 or 120 frames
+- **Default:** None
+- **How:** Left/Right cycle through the values; A opens the list.
+- **Known limit:** if a Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can
+  pass what you hold instead of neutral. It is at most one frame, at the start of the wait; the chord's own buttons
+  never reach the game.
+
 ### Place fighters before Record
 
-On: Record first opens four pages to place Player 1 and the CPU, choose their starting states and set their
-damage. The recorded start is saved with the macro. Off: Record starts at once. The Recording pop-up's Y button
-also flips this setting. Placement works in Training and the waiting room.
+On: Record first opens five pages (Where, Spot, State, Percent, Preview) to place Player 1 and the CPU, choose their
+starting states and set their damage. It is the picker of [Change placement](#change-placement), with the same pages
+and keys: both fighters stand at their spots while you place them, and + starts the recording from any page. The
+recorded start is saved with the macro. Off: Record starts at once. The Recording pop-up's Y button also flips this
+setting. Placement works in Training and the waiting room.
 
 - **Values:** On, Off
 - **Default:** Off
@@ -439,6 +486,17 @@ it ends. On: those settings act during the macro too.
 - **How:** A, Left or Right flips it.
 
 More: [Recordings and the CPU settings](../guide/cpu-behaviour.md#recordings-and-the-cpu-settings)
+
+### Shared start save
+
+An advanced row. What [Change placement](#change-placement) does with a start save that macros share. Prompt: the
+picker asks each time whether to change the save for every macro that starts from it or to copy it. Always change:
+it changes the save, without asking. Always copy: it copies the save, without asking; opened from a macro, the copy
+becomes that macro's start save. A save no macro starts from is changed without a question, whatever this is set to.
+
+- **Values:** Prompt, Always change, Always copy
+- **Default:** Prompt
+- **How:** Left/Right cycle through the values; A opens the list.
 
 ### Combo helper
 
@@ -546,7 +604,8 @@ it points to the chords screen.
 
 The title reads Recording, with Player and CPU role tabs and a ZR cap beside them. ZR switches between Player 1 and
 the CPU, as it does on the Recording page; the lit tab is the side you're working on. That side is the one Record
-(ZR + D-pad Down) records and [Edit placement](#edit-placement) edits. It stays until you change it, and starts on Player.
+(ZR + D-pad Down) records, and the one whose active macro the Replays row [Change placement](#change-placement)
+opens. It stays until you change it, and starts on Player.
 
 Under the title are the pop-up's own tabs:
 
@@ -570,7 +629,7 @@ The footer says what A does in the list under the cursor:
 
 | List | Footer | A does |
 | --- | --- | --- |
-| SAVE STATES | A bind | Binds the save: the Save and Load chords use it. |
+| SAVE STATES | A bind   X place | Binds the save: the Save and Load chords use it. X closes the pop-up and opens [Change placement](#change-placement) on the save. |
 | MACROS | A set active   X loop | Sets the macro active for the side you're on. X steps its loop count. |
 | COMBOS, SEQUENCES | A drill | Makes the combo or sequence the drill. |
 

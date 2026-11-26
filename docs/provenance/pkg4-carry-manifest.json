@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "f9056b05d4bd60456a32321c4cb6d2896ef65534700a4cf56f14b01c16a5e741",
+   "dest_sha256": "89da7f14e9e7fceaa7ecbfa7a61c7274e8a3c7d21f7dc6dc40f25824f12be5e9",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2162,6 +2162,61 @@
      "reason": "Preview stop (tr-primary-2 2026-11-25 14:29:24Z): the unused tail accessor of the tests-first commit is removed",
      "old": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n",
      "new": "            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n            let view = e.view();\n            e.preview_cursor(view.end - view.start);\n            assert_eq!(e.view().cursor, view.end - 1);\n            assert!(e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::StopPreview));\n            assert!(!e.view().playing);\n            let back = e.action_for_pad(Pad::Back).unwrap();\n            assert!(matches!(e.on_action(back), ClipEffect::Close));\n            assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_) | ClipEffect::PreviewFile { .. }));\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z and 23:41:03Z): the red-first cases and the ZL/ZR + Y control row",
+     "old": "            (\"combo_clip_has_no_preview_action_or_help\", combo_clip_has_no_preview_action_or_help as fn()),\n            (\"file_clip_single_side_does_not_change_selection\", file_clip_single_side_does_not_change_selection as fn()),\n            (\"move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent\", move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent as fn()),\n            (\"normalized_pad_cannot_bypass_or_clear_opening_press_ownership\", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),\n            (\"invalid_start_requires_explicit_lead_in_and_keeps_selection\", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),\n            (\"saved_capture_name_survives_crop_without_exceeding_macro_name_limit\", saved_capture_name_survives_crop_without_exceeding_macro_name_limit as fn()),\n",
+     "new": "            (\"combo_clip_has_no_preview_action_or_help\", combo_clip_has_no_preview_action_or_help as fn()),\n            (\"file_clip_single_side_does_not_change_selection\", file_clip_single_side_does_not_change_selection as fn()),\n            (\"move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent\", move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent as fn()),\n            (\"y_snap_on_a_mid_action_in_previews_and_saves\", y_snap_on_a_mid_action_in_previews_and_saves as fn()),\n            (\"y_after_a_refused_preview_snaps_previews_and_saves\", y_after_a_refused_preview_snaps_previews_and_saves as fn()),\n            (\"a_second_y_keeps_the_same_move\", a_second_y_keeps_the_same_move as fn()),\n            (\"y_snap_to_an_idle_mark_stays_a_plain_start\", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),\n            (\"y_snap_where_no_move_can_start_says_why\", y_snap_where_no_move_can_start_says_why as fn()),\n            (\"the_lead_in_key_then_x_and_a_work_on_the_same_take\", the_lead_in_key_then_x_and_a_work_on_the_same_take as fn()),\n            (\"y_snap_on_a_saved_macro_is_unchanged\", y_snap_on_a_saved_macro_is_unchanged as fn()),\n            (\"normalized_pad_cannot_bypass_or_clear_opening_press_ownership\", normalized_pad_cannot_bypass_or_clear_opening_press_ownership as fn()),\n            (\"invalid_start_requires_explicit_lead_in_and_keeps_selection\", invalid_start_requires_explicit_lead_in_and_keeps_selection as fn()),\n            (\"saved_capture_name_survives_crop_without_exceeding_macro_name_limit\", saved_capture_name_survives_crop_without_exceeding_macro_name_limit as fn()),\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z and 23:41:03Z): the red-first cases and the ZL/ZR + Y control row",
+     "old": "mod tests {\n    lib_unit_tests! {\n    use super::*;\n    use {crate::engine::macros::InputFrame, crate::engine::macros::StartState};\n\n    fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {\n        use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};\n",
+     "new": "mod tests {\n    lib_unit_tests! {\n    use super::*;\n    use {crate::engine::macros::InputFrame, crate::engine::macros::MoveFamily, crate::engine::macros::StartState};\n\n    fn snap_rules() -> MoveStartRules {\n        MoveStartRules { families: vec![MoveFamily { fighter: None, statuses: vec![45, 46, 47], buttons: 0 }],\n            setup: vec![6, 7], ground: 0, air: 2, wait: 0, fall: 14, trigger_buttons: 0 }\n    }\n\n    fn snap_capture_with(setup: i32, action: i32, tail: i32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            input: InputFrame { buttons: if (23..=26).contains(&i) { 1 } else { 0 }, ..InputFrame::default() },\n            start: StartState { status: match i { 0..=19 => 0, 20..=24 => setup, 25..=39 => action, _ => tail },\n                ..StartState::neutral(74, 0, 1.0) },\n            x: 0.0, y: 0.0,\n        }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            entry: 1, fighter: None, quantized_analog: false, frames,\n        }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap().with_move_rules(snap_rules())\n    }\n\n    fn snap_capture() -> ClipEditor {\n        snap_capture_with(7, 45, 0)\n    }\n\n    /// Operator 2026-11-25 (install 5): \"I used snap but it still gives that message\". Y on In, then X, then A.\n    fn y_snap_on_a_mid_action_in_previews_and_saves() {\n        let mut e = snap_capture();\n        assert_eq!(e.marks.list().len(), 1);\n        assert_eq!(e.marks.list()[0].start, 23);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        assert_eq!(e.view().start, 30);\n        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));\n        assert!(e.view().error.is_none());\n        let want = snap_rules().snap(e.track(), 23).unwrap();\n        assert_eq!(want.action_frame, 25);\n        assert_eq!(e.view().move_start, Some(want));\n        assert_eq!(e.view().start, want.frame);\n        assert!(e.view().clean_start);\n        let inputs: Vec<_> = e.track().frames[want.frame as usize..60].iter().map(|frame| frame.input).collect();\n        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!(\"preview refused\") };\n        assert_eq!(preview.frames, inputs);\n        e.preview_progress(60 - want.frame);\n        let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!(\"save refused\") };\n        assert_eq!(saved.frames, preview.frames);\n        assert_eq!(saved.start, preview.start);\n    }\n\n    /// Operator 2026-11-25 (install 5): X refuses, then \"I used snap but it still gives that message\".\n    fn y_after_a_refused_preview_snaps_previews_and_saves() {\n        let mut e = snap_capture();\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        let ClipEffect::Error(text) = e.on_action(ClipAction::TogglePlay) else { panic!(\"preview did not refuse\") };\n        assert_eq!(text, \"In is mid-action. Snap to a move start before previewing or saving.\");\n        assert_eq!(e.view().handle, Handle::In);\n        let ClipEffect::Error(saved_error) = e.on_action(ClipAction::Confirm) else { panic!(\"save did not refuse\") };\n        assert_eq!(saved_error, text);\n        assert_eq!(e.view().handle, Handle::In);\n        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));\n        let want = snap_rules().snap(e.track(), 23).unwrap();\n        assert_eq!(e.view().move_start, Some(want));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));\n        e.preview_progress(60 - want.frame);\n        assert!(matches!(e.on_action(ClipAction::Confirm), ClipEffect::Export(_)));\n    }\n\n    fn a_second_y_keeps_the_same_move() {\n        let mut e = snap_capture();\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));\n        let want = snap_rules().snap(e.track(), 23).unwrap();\n        assert_eq!(e.view().move_start, Some(want));\n        let first = (e.view().start, e.view().move_start);\n        for _ in 0..2 {\n            assert!(!matches!(e.on_action(ClipAction::Snap), ClipEffect::Error(_)));\n            assert_eq!((e.view().start, e.view().move_start), first);\n        }\n    }\n\n    fn y_snap_to_an_idle_mark_stays_a_plain_start() {\n        let mut e = snap_capture_with(0, 45, 0);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        e.on_action(ClipAction::Snap);\n        assert_eq!(e.view().start, 23);\n        assert!(e.view().move_start.is_none());\n        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!(\"preview refused\") };\n        assert_eq!(preview.start.status, 0);\n    }\n\n    fn y_snap_where_no_move_can_start_says_why() {\n        let mut e = snap_capture_with(99, 99, 99);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        let ClipEffect::Error(text) = e.on_action(ClipAction::Snap) else { panic!(\"snap did not refuse\") };\n        assert_eq!(text, snap_rules().snap(e.track(), 23).unwrap_err());\n        assert!(!text.contains(\"mid-action\"));\n        assert_eq!(e.view().start, 23);\n        assert!(e.view().move_start.is_none());\n        assert_eq!(e.view().error, Some(text));\n    }\n\n    /// The workaround given for install 5: ZL/ZR + Y, then X, then A. It passes before the fix too.\n    fn the_lead_in_key_then_x_and_a_work_on_the_same_take() {\n        let mut e = snap_capture();\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(30));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));\n        assert!(!matches!(e.on_action(ClipAction::UseLeadIn), ClipEffect::Error(_)));\n        let want = snap_rules().snap(e.track(), 30).unwrap();\n        assert_eq!((want.frame, want.action_frame), (19, 25));\n        assert_eq!(e.view().move_start, Some(want));\n        let ClipEffect::Preview(preview) = e.on_action(ClipAction::TogglePlay) else { panic!(\"preview refused\") };\n        e.preview_progress(60 - want.frame);\n        let ClipEffect::Export(saved) = e.on_action(ClipAction::Confirm) else { panic!(\"save refused\") };\n        assert_eq!(saved.frames, preview.frames);\n    }\n\n    fn y_snap_on_a_saved_macro_is_unchanged() {\n        let mut e = saved_macro(false);\n        assert!(!e.marks.list().is_empty());\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(2));\n        let boundary = e.marks.snap_in(2).unwrap();\n        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));\n        assert_eq!(e.view().start, boundary);\n    }\n\n    fn move_snap_previews_and_exports_the_same_local_inputs_and_is_idempotent() {\n        use {crate::engine::macros::MoveFamily, crate::engine::macros::MoveStartRules};\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z): Y on the In handle of a capture takes the move at a mid-action mark through the lead-in rule (move_at), and a refused preview keeps the selected handle",
+     "old": "            }\n            ClipAction::UseLeadIn => {\n                self.pause();\n                if let Some(rules) = &self.move_rules {\n                    // Repeated presses keep the same move, rather than treating\n                    // its included setup as a request for the preceding move.\n                    let requested = self.move_start.map_or(self.window.start(), |s| s.action_frame);\n                    match rules.snap(self.track(), requested) {\n                        Ok(start) if start.action_frame < self.window.end() => {\n                            self.window.set_in(start.frame);\n                            self.window.seek(start.frame);\n                            self.handle = Handle::In;\n                            self.move_start = Some(start);\n                        }\n                        Ok(_) => return ClipEffect::Error(\"Move is outside the crop; move Out later\".into()),\n                        Err(error) => return ClipEffect::Error(error),\n                    }\n                } else if let Some(start) = self.track().previous_clean_start(self.window.start(), &self.clean_statuses) {\n                    self.window.set_in(start);\n                    self.window.seek(start);\n                    self.handle = Handle::In;\n                } else { return ClipEffect::Error(\"No earlier idle/fall start in this capture\".into()); }\n            }\n            ClipAction::Confirm => {\n                self.pause();\n",
+     "new": "            }\n            ClipAction::UseLeadIn => {\n                self.pause();\n                // Repeated presses keep the same move, rather than treating\n                // its included setup as a request for the preceding move.\n                let requested = self.move_start.map_or(self.window.start(), |s| s.action_frame);\n                match self.move_at(requested) {\n                    Some(Ok(())) => {}\n                    Some(Err(error)) => return ClipEffect::Error(error),\n                    None => if let Some(start) = self.track().previous_clean_start(self.window.start(), &self.clean_statuses) {\n                        self.window.set_in(start);\n                        self.window.seek(start);\n                        self.handle = Handle::In;\n                    } else { return ClipEffect::Error(\"No earlier idle/fall start in this capture\".into()); }\n                }\n            }\n            ClipAction::Confirm => {\n                self.pause();\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z): Y on the In handle of a capture takes the move at a mid-action mark through the lead-in rule (move_at), and a refused preview keeps the selected handle",
+     "old": "            ClipAction::Snap => {\n                let boundary = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In => self.marks.snap_in(self.window.start()),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),\n                };\n                let Some(boundary) = boundary else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                match self.handle {\n                    Handle::In => { self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start()); }\n                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }\n                    Handle::Playhead => {}\n                }\n",
+     "new": "            ClipAction::Snap => {\n                let boundary = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In => self.marks.snap_in(self.move_start.map_or(self.window.start(), |start| start.action_frame)),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),\n                };\n                let Some(boundary) = boundary else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                match self.handle {\n                    Handle::In => {\n                        self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start());\n                        // A mark is where a button was pressed, seldom an idle frame: take the move there, as the lead-in does.\n                        if self.file.is_none() && self.track().frames.get(boundary as usize)\n                            .is_some_and(|frame| !self.clean_statuses.contains(&frame.start.status)) {\n                            if let Some(Err(error)) = self.move_at(boundary) { return ClipEffect::Error(error); }\n                        }\n                    }\n                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }\n                    Handle::Playhead => {}\n                }\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z): Y on the In handle of a capture takes the move at a mid-action mark through the lead-in rule (move_at), and a refused preview keeps the selected handle",
+     "old": "                self.playing = true;\n                ClipEffect::Preview(Box::new(recording))\n            }\n            Err(error) => ClipEffect::Error(error),\n        }\n    }\n\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {\n",
+     "new": "                self.playing = true;\n                ClipEffect::Preview(Box::new(recording))\n            }\n            Err(error) => { self.handle = handle; ClipEffect::Error(error) }\n        }\n    }\n\n    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A\n    /// then restart that move from neutral (`export_move`). `None` without rules.\n    fn move_at(&mut self, at: u32) -> Option<Result<(), String>> {\n        let rules = self.move_rules.as_ref()?;\n        Some(match rules.snap(self.track(), at) {\n            Ok(start) if start.action_frame < self.window.end() => {\n                self.window.set_in(start.frame);\n                self.window.seek(start.frame);\n                self.handle = Handle::In;\n                self.move_start = Some(start);\n                Ok(())\n            }\n            Ok(_) => Err(\"Move is outside the crop; move Out later\".into()),\n            Err(error) => Err(error),\n        })\n    }\n\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {\n"
+    },
+    {
+     "reason": "Snap after a refusal (operator 2026-11-25 on install 5; tr-primary-2 23:33:51Z): Y on the In handle of a capture takes the move at a mid-action mark through the lead-in rule (move_at), and a refused preview keeps the selected handle",
+     "old": "    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        self.window.seek(self.window.start());\n        self.handle = Handle::Playhead;\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.window.start(), self.window.end());\n        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n",
+     "new": "    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        self.window.seek(self.window.start());\n        let handle = std::mem::replace(&mut self.handle, Handle::Playhead);\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.window.start(), self.window.end());\n        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n"
+    },
+    {
+     "reason": "Snap boundaries (reviewer rv-edge-juggle-sol 540a0983, 2026-11-25): the three red-first boundary cases",
+     "old": "            (\"y_snap_on_a_mid_action_in_previews_and_saves\", y_snap_on_a_mid_action_in_previews_and_saves as fn()),\n            (\"y_after_a_refused_preview_snaps_previews_and_saves\", y_after_a_refused_preview_snaps_previews_and_saves as fn()),\n            (\"a_second_y_keeps_the_same_move\", a_second_y_keeps_the_same_move as fn()),\n            (\"y_snap_to_an_idle_mark_stays_a_plain_start\", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),\n            (\"y_snap_where_no_move_can_start_says_why\", y_snap_where_no_move_can_start_says_why as fn()),\n            (\"the_lead_in_key_then_x_and_a_work_on_the_same_take\", the_lead_in_key_then_x_and_a_work_on_the_same_take as fn()),\n",
+     "new": "            (\"y_snap_on_a_mid_action_in_previews_and_saves\", y_snap_on_a_mid_action_in_previews_and_saves as fn()),\n            (\"y_after_a_refused_preview_snaps_previews_and_saves\", y_after_a_refused_preview_snaps_previews_and_saves as fn()),\n            (\"a_second_y_keeps_the_same_move\", a_second_y_keeps_the_same_move as fn()),\n            (\"second_y_does_not_reselect_a_different_mark_near_the_action_frame\", second_y_does_not_reselect_a_different_mark_near_the_action_frame as fn()),\n            (\"y_checks_the_in_applied_by_a_shortened_out\", y_checks_the_in_applied_by_a_shortened_out as fn()),\n            (\"a_refused_x_leaves_the_watched_mark_available_to_y\", a_refused_x_leaves_the_watched_mark_available_to_y as fn()),\n            (\"y_snap_to_an_idle_mark_stays_a_plain_start\", y_snap_to_an_idle_mark_stays_a_plain_start as fn()),\n            (\"y_snap_where_no_move_can_start_says_why\", y_snap_where_no_move_can_start_says_why as fn()),\n            (\"the_lead_in_key_then_x_and_a_work_on_the_same_take\", the_lead_in_key_then_x_and_a_work_on_the_same_take as fn()),\n"
+    },
+    {
+     "reason": "Snap boundaries (reviewer rv-edge-juggle-sol 540a0983, 2026-11-25): the three red-first boundary cases",
+     "old": "\n    fn snap_capture() -> ClipEditor {\n        snap_capture_with(7, 45, 0)\n    }\n\n    /// Operator 2026-11-25 (install 5): \"I used snap but it still gives that message\". Y on In, then X, then A.\n",
+     "new": "\n    fn snap_capture() -> ClipEditor {\n        snap_capture_with(7, 45, 0)\n    }\n\n    fn long_action_capture(last: u32) -> ClipEditor {\n        let frames = (0..60).map(|i| ReplayFrame {\n            input: InputFrame { buttons: u32::from(i == 5 || i == 36), ..InputFrame::default() },\n            start: StartState { status: if (8..=last).contains(&i) { 45 } else { 0 },\n                ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0,\n        }).collect();\n        ClipEditor::new(ReplaySession { tracks: vec![ReplayTrack {\n            entry: 0, fighter: None, quantized_analog: false, frames,\n        }], truncated: false, breaks: Vec::new() }, vec![0, 14]).unwrap().with_move_rules(snap_rules())\n    }\n\n    fn second_y_does_not_reselect_a_different_mark_near_the_action_frame() {\n        // A later press in the same long move is farther from its start than the preceding idle mark.\n        let mut e = long_action_capture(40);\n        assert_eq!(e.marks.list().iter().map(|m| m.start).collect::<Vec<_>>(), [5, 36]);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(36));\n        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));\n        let selected = e.view().move_start.unwrap();\n        assert_eq!((selected.frame, selected.action_frame), (7, 8));\n        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));\n        assert_eq!((e.view().start, e.view().move_start), (7, Some(selected)));\n    }\n\n    fn y_checks_the_in_applied_by_a_shortened_out() {\n        let mut e = long_action_capture(32);\n        e.on_action(ClipAction::SelectOut);\n        e.on_action(ClipAction::Nudge(-30));\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(29));\n        assert_eq!(e.marks.snap_in(29), Some(36)); // clean, but outside [In, Out)\n        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));\n        assert_eq!(e.view().end, 30);\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)), \"Y left the applied In mid-action\");\n        e.preview_progress(30);\n        assert!(matches!(e.on_action(ClipAction::Confirm), ClipEffect::Export(_)));\n    }\n\n    fn a_refused_x_leaves_the_watched_mark_available_to_y() {\n        let mut e = long_action_capture(32);\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));\n        e.watch(&[Span { start: 28, ..Span::default() }]);\n        e.preview_progress(60);\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(28));\n        assert_eq!(e.marks.snap_in(28), Some(28));\n        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(_)));\n        assert_eq!(e.marks.snap_in(28), Some(28), \"no preview started; its mark should still be available to Y\");\n        assert!(matches!(e.on_action(ClipAction::Snap), ClipEffect::StopPreview));\n        assert_eq!(e.view().move_start.unwrap().action_frame, 8);\n    }\n\n    /// Operator 2026-11-25 (install 5): \"I used snap but it still gives that message\". Y on In, then X, then A.\n"
+    },
+    {
+     "reason": "Snap boundaries (reviewer rv-edge-juggle-sol 33f54959, 2026-11-25): Y snaps the applied In and keeps a resolved move until its range changes; a refused preview keeps the cursor, the handle and the watched marks",
+     "old": "    fn apply_action(&mut self, action: ClipAction) -> ClipEffect {\n        match action {\n            ClipAction::Snap => {\n                let boundary = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In => self.marks.snap_in(self.move_start.map_or(self.window.start(), |start| start.action_frame)),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()),\n                };\n                let Some(boundary) = boundary else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                match self.handle {\n                    Handle::In => {\n                        self.move_start = None; self.window.set_in(boundary); self.window.seek(self.window.start());\n                        // A mark is where a button was pressed, seldom an idle frame: take the move there, as the lead-in does.\n                        if self.file.is_none() && self.track().frames.get(boundary as usize)\n                            .is_some_and(|frame| !self.clean_statuses.contains(&frame.start.status)) {\n                            if let Some(Err(error)) = self.move_at(boundary) { return ClipEffect::Error(error); }\n                        }\n                    }\n                    Handle::Out => { self.window.set_out(boundary); self.window.seek(self.window.end() - 1); }\n                    Handle::Playhead => {}\n                }\n            }\n            ClipAction::SwapTarget => {\n",
+     "new": "    fn apply_action(&mut self, action: ClipAction) -> ClipEffect {\n        match action {\n            ClipAction::Snap => {\n                let at = match self.handle {\n                    Handle::Playhead => return ClipEffect::Error(\"Press L for the start or R for the end, then Y to snap\".into()),\n                    Handle::In if self.move_start.is_some() => Some(self.window.start()),\n                    Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),\n                    Handle::Out => self.marks.snap_out(self.window.end(), self.window.total()).map(|mark| self.window.set_out(mark) - 1),\n                };\n                let Some(at) = at else { return ClipEffect::Error(\"No move marks yet: X previews and marks them\".into()) };\n                self.pause();\n                self.window.seek(at);\n                self.move_start = self.move_start.filter(|start| start.action_frame < self.window.end());\n                if self.handle == Handle::In && self.file.is_none() && self.move_start.is_none()\n                    && !self.clean_statuses.contains(&self.track().frames[at as usize].start.status) {\n                    if let Some(Err(error)) = self.move_at(at) { return ClipEffect::Error(error); }\n                }\n            }\n            ClipAction::SwapTarget => {\n"
+    },
+    {
+     "reason": "Snap boundaries (reviewer rv-edge-juggle-sol 33f54959, 2026-11-25): Y snaps the applied In and keeps a resolved move until its range changes; a refused preview keeps the cursor, the handle and the watched marks",
+     "old": "\n    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        self.window.seek(self.window.start());\n        let handle = std::mem::replace(&mut self.handle, Handle::Playhead);\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.window.start(), self.window.end());\n        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n            self.playing = true;\n            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player };\n        }\n        match self.export_selection(\"Preview\") {\n            Ok(recording) => {\n                // The selected window may be a different form from the track's first frame.\n                self.marks.set_namer(saved_namer(&recording));\n                self.playing = true;\n                ClipEffect::Preview(Box::new(recording))\n            }\n            Err(error) => { self.handle = handle; ClipEffect::Error(error) }\n        }\n    }\n\n    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A\n",
+     "new": "\n    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        let effect = if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n            ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player }\n        } else {\n            let recording = match self.export_selection(\"Preview\") {\n                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.watch_base, self.window.end());\n        self.window.seek(self.watch_base);\n        self.handle = Handle::Playhead;\n        self.playing = true;\n        effect\n    }\n\n    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A\n"
+    },
+    {
+     "reason": "Snap boundaries, lead fold (place-t1a 2026-11-26): the comment on the preview namer, dropped by the restructure of start_preview, is back",
+     "old": "                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n",
+     "new": "                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            // The selected window may be a different form from the track's first frame.\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n"
     }
    ]
   },
@@ -2220,7 +2275,7 @@
    "dest": "src/model/macro_ui/macro_panel.rs",
    "crate": "tui",
    "src_sha256": "1b6e698f679029bc6fa83ff9cd43756302bd939debaad2d3eeeacd10fb166da1",
-   "dest_sha256": "7dfe566aa22c575ab6149ed1471d67291acb709d4082820b305efdb472d1e98e",
+   "dest_sha256": "4cb0ec478da8064dbc6ec4b55206c7aa21740d8ffb1ec50b0bee395532a46474",
    "edits": [
     {
      "old": "    /// Facing, status, and frames for one playback. Empty when the fighter is not ready.\n    pub fn copy_playback(",
@@ -2978,6 +3033,388 @@
      "old": "    actions: Vec<crate::engine::macros::ActionMark>,\n}",
      "new": "    actions: Vec<crate::engine::macros::ActionMark>,\n    recorded_fighter: Option<crate::model::move_names::FighterId>,\n}",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "    /// Keep on Edit placement for a role's active macro: Play uses this offset until the game closes; the file is\n    /// unchanged.\n    KeepPlacement { id: String, placement: Placement },\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "/// The role's active macro on Edit placement, and where its start save puts that role.\nstruct Editing {\n    id: String,\n    recording: MacroRecording,\n}\n\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "    /// Edit placement's file while its page is open (primary 2026-11-08 #70 (a)); the named selection is not changed.\n    editing: Option<Editing>,\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "            editing: None,\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "                        if self.editing.is_some() { \"where the start save puts this role\" } else { \"the restored CPU position\" }\n",
+     "new": "                        \"the restored CPU position\"\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "delete_from": "    /// Edit placement on a role's active macro, the file Play plays (primary 2026-11-08 #70 (a)). `anchor` is where the\n",
+     "delete_to": "    pub fn on_pad(&mut self, pad: Pad) -> Effect {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        let anchor = if self.editing.is_some() { self.edit_anchor } else { self.anchor.or(self.edit_anchor) }?;\n",
+     "new": "        let anchor = self.anchor.or(self.edit_anchor)?;\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        self.screen = Screen::Closed;\n        self.editing = None;\n        self.picked = None;\n",
+     "new": "        self.screen = Screen::Closed;\n        self.picked = None;\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        if let Some(editing) = self.editing.take() {\n            self.screen = Screen::Closed;\n            return Effect::KeepPlacement { id: editing.id, placement };\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        if let Some(editing) = self.editing.as_mut() {\n            if editing.recording.set_placement(placement).is_err() {\n                return Effect::Notify(\"Placement is not usable\".to_owned());\n            }\n            let Some(Editing { id, recording }) = self.editing.take() else { return Effect::None };\n            self.screen = Screen::Closed;\n            return Effect::Overwrite { id, recording: Box::new(recording) };\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        let editing = self.editing.take();\n        let Some(source) = editing.as_ref().map(|editing| &editing.recording).or(self.loaded.as_ref().map(|loaded| &loaded.recording)) else {\n",
+     "new": "        let Some(source) = self.loaded.as_ref().map(|loaded| &loaded.recording) else {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        self.held_save = None;\n        self.editing = None;\n        self.screen = Screen::Closed;\n        Effect::None\n",
+     "new": "        self.held_save = None;\n        self.screen = Screen::Closed;\n        Effect::None\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "delete_from": "    /// Primary 2026-11-08 #70 (a): Edit placement edits the role's active macro, the file Play plays. Eden\n",
+     "delete_to": "    fn native_checkpoint_survives_repeated_interruption_without_commit() {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "            (\"edit_placement_opens_on_the_active_macro_and_writes_that_file\", edit_placement_opens_on_the_active_macro_and_writes_that_file as fn()),\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "line_patch": [
+      [
+       143,
+       146,
+       []
+      ],
+      [
+       221,
+       221,
+       []
+      ],
+      [
+       223,
+       227,
+       []
+      ],
+      [
+       311,
+       317,
+       []
+      ],
+      [
+       332,
+       332,
+       []
+      ],
+      [
+       337,
+       337,
+       [
+        "/// Menu, naming, and the restore/character sequence for one macro."
+       ]
+      ],
+      [
+       346,
+       350,
+       []
+      ],
+      [
+       368,
+       370,
+       []
+      ],
+      [
+       403,
+       409,
+       []
+      ],
+      [
+       432,
+       438,
+       []
+      ],
+      [
+       492,
+       492,
+       [
+        "                \"{} \u00b7 {}f \u00b7 {:.2}s\\nA: system keyboard   B: return\","
+       ]
+      ],
+      [
+       510,
+       511,
+       []
+      ],
+      [
+       536,
+       549,
+       []
+      ],
+      [
+       649,
+       649,
+       []
+      ],
+      [
+       701,
+       720,
+       []
+      ],
+      [
+       809,
+       815,
+       []
+      ],
+      [
+       872,
+       873,
+       [
+        "        self.stop_playback();"
+       ]
+      ],
+      [
+       877,
+       877,
+       [
+        "    /// invalidate playback and character acknowledgments."
+       ]
+      ],
+      [
+       880,
+       880,
+       [
+        "        self.stop_playback();"
+       ]
+      ],
+      [
+       887,
+       887,
+       [
+        "    fn stop_playback(&mut self) {"
+       ]
+      ],
+      [
+       891,
+       892,
+       []
+      ],
+      [
+       905,
+       905,
+       []
+      ],
+      [
+       952,
+       952,
+       []
+      ],
+      [
+       1041,
+       1041,
+       []
+      ],
+      [
+       1113,
+       1113,
+       []
+      ],
+      [
+       1128,
+       1131,
+       []
+      ],
+      [
+       1188,
+       1188,
+       []
+      ],
+      [
+       1193,
+       1193,
+       [
+        "            Key::Empty => Effect::None,"
+       ]
+      ],
+      [
+       1197,
+       1219,
+       []
+      ],
+      [
+       1271,
+       1296,
+       []
+      ],
+      [
+       1347,
+       1396,
+       []
+      ],
+      [
+       1398,
+       1405,
+       []
+      ],
+      [
+       1407,
+       1407,
+       [
+        "            Screen::Save(_) | Screen::Library(_) => self.discard(),"
+       ]
+      ],
+      [
+       1412,
+       1423,
+       []
+      ],
+      [
+       1425,
+       1425,
+       []
+      ],
+      [
+       1511,
+       1511,
+       []
+      ],
+      [
+       1517,
+       1535,
+       []
+      ],
+      [
+       1594,
+       1594,
+       []
+      ],
+      [
+       1596,
+       1608,
+       [
+        "        Key::Empty => \"\","
+       ]
+      ],
+      [
+       1612,
+       1618,
+       []
+      ],
+      [
+       1824,
+       1857,
+       []
+      ],
+      [
+       1886,
+       1886,
+       [
+        "    fn saving_a_named_draft_keeps_its_selected_momentum() {"
+       ]
+      ],
+      [
+       1888,
+       1888,
+       []
+      ],
+      [
+       1892,
+       1892,
+       [
+        "        goto(&mut ui, 19);"
+       ]
+      ],
+      [
+       1894,
+       1897,
+       []
+      ],
+      [
+       1902,
+       1902,
+       [
+        "        assert_eq!(recording.placement.delta_x, 0.0);"
+       ]
+      ],
+      [
+       1951,
+       1951,
+       [
+        "    fn exact_mii_naming_retry_and_same_class_ack_keep_identity() {"
+       ]
+      ],
+      [
+       1976,
+       1977,
+       [
+        "        ui.restore_draft(ui.loaded.as_ref().unwrap().recording.clone());"
+       ]
+      ],
+      [
+       2189,
+       2190,
+       []
+      ],
+      [
+       2261,
+       2262,
+       []
+      ],
+      [
+       2264,
+       2264,
+       [
+        "            (\"saving_a_named_draft_keeps_its_selected_momentum\", saving_a_named_draft_keeps_its_selected_momentum as fn()),"
+       ]
+      ],
+      [
+       2266,
+       2266,
+       [
+        "            (\"exact_mii_naming_retry_and_same_class_ack_keep_identity\", exact_mii_naming_retry_and_same_class_ack_keep_identity as fn()),"
+       ]
+      ]
+     ],
+     "reason": "PC2/PC6 A, 2026-11-25 20:50:36Z: naming is not a placement entry. Remove the unopenable offset grid, its state and its keys; keep the draft's recorded offset, momentum, inputs and Mii through naming."
+    },
+    {
+     "old": "struct Loaded {\n    id: Option<String>,\n",
+     "new": "struct Loaded {\n    /// The selection's library id. No shipped code reads it since the placement grid went (operator 2026-11-25,\n    /// PC6 A); the tests tell by it which selection is loaded.\n    #[cfg(test)]\n    id: Option<String>,\n",
+     "reason": "Operator 2026-11-25, PC6 A: with the placement grid gone no shipped code reads a loaded selection's library id (its last reader was Write over), so the field is kept in test builds only, where the tests tell by it which selection is loaded (clippy dead_code on precheck-2c4abe0d; zero warnings without an allow)"
+    },
+    {
+     "old": "        id: Option<String>,\n        recording: MacroRecording,\n        cpu_kind: Option<i32>,\n    ) -> Result<Effect, MacroError> {\n        let kind = recording.start.fighter_kind;\n        self.loaded = Some(Loaded { id, recording, plays: Plays::Recorded });\n",
+     "new": "        _id: Option<String>,\n        recording: MacroRecording,\n        cpu_kind: Option<i32>,\n    ) -> Result<Effect, MacroError> {\n        let kind = recording.start.fighter_kind;\n        self.loaded = Some(Loaded {\n            #[cfg(test)]\n            id: _id,\n            recording,\n            plays: Plays::Recorded,\n        });\n",
+     "reason": "Operator 2026-11-25, PC6 A: with the placement grid gone no shipped code reads a loaded selection's library id (its last reader was Write over), so the field is kept in test builds only, where the tests tell by it which selection is loaded (clippy dead_code on precheck-2c4abe0d; zero warnings without an allow)"
+    },
+    {
+     "old": "        id: Option<String>,\n        recording: MacroRecording,\n        cpu_kind: Option<i32>,\n    ) -> Effect {\n        self.loaded = Some(Loaded { id, recording, plays: Plays::Current });\n",
+     "new": "        _id: Option<String>,\n        recording: MacroRecording,\n        cpu_kind: Option<i32>,\n    ) -> Effect {\n        self.loaded = Some(Loaded {\n            #[cfg(test)]\n            id: _id,\n            recording,\n            plays: Plays::Current,\n        });\n",
+     "reason": "Operator 2026-11-25, PC6 A: with the placement grid gone no shipped code reads a loaded selection's library id (its last reader was Write over), so the field is kept in test builds only, where the tests tell by it which selection is loaded (clippy dead_code on precheck-2c4abe0d; zero warnings without an allow)"
     }
    ]
   },
@@ -3273,7 +3710,7 @@
    "dest": "src/runtime/macros/named_macros.rs",
    "crate": "root",
    "src_sha256": "737474479d5f05b064ab645d850ceb189cad3943097ae4fdb5fc74d2fcda0809",
-   "dest_sha256": "9c6ec46e0daded40d0a6fd725bda741f206cdbd530a71033bba5f26d5c8db457",
+   "dest_sha256": "adc84b82417af6543c8aaf5eb571d895292f43747f05624eb18b79a322e98dbb",
    "edits": [
     {
      "old": "use training_mod_sync::*;",
@@ -4269,6 +4706,68 @@
      "old": "    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.hides_page())",
      "new": "    let clip_previewing = crate::runtime::macros::replay_capture::clip_view().is_some_and(|v| v.playing)",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "delete_from": "/// Edit placement edits the Recording pop-up role's active macro, the file Play plays (primary 2026-11-08 #70 (a)); the anchor\n",
+     "delete_to": "fn practice_ready() -> bool {\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        Effect::KeepPlacement { id, placement } => {\n            crate::engine::rr_host::keep_placement(&id, placement);\n            notify(\"Placement kept for this session\");\n        }\n",
+     "new": "",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "old": "        Ok(()) => {\n            crate::engine::rr_host::placement_written(&id);\n            notify(\"Placement written\");\n        }\n",
+     "new": "        Ok(()) => notify(\"Placement written\"),\n",
+     "reason": "Operator 2026-11-25, PC6 A (docs/DECISIONS.md, Change placement): the Replays key grid goes. Change placement edits the start save through the placement picker; a macro's stored offset and Momentum are rows of its own screen. The grid's entry on a role's active macro (open_placement, Editing, KeepPlacement) is removed"
+    },
+    {
+     "line_patch": [
+      [
+       9,
+       9,
+       []
+      ],
+      [
+       411,
+       411,
+       []
+      ],
+      [
+       422,
+       422,
+       [
+        "        suspended: suspended(),"
+       ]
+      ],
+      [
+       588,
+       591,
+       []
+      ],
+      [
+       751,
+       757,
+       []
+      ],
+      [
+       787,
+       820,
+       []
+      ],
+      [
+       843,
+       843,
+       []
+      ],
+      [
+       884,
+       890,
+       []
+      ]
+     ],
+     "reason": "PC2/PC6 A, 2026-11-25 20:50:36Z: native macro naming handles the keyboard and Back, not placement. Drop the old grid's Y handler, overwrite action and no-longer-reachable spark marker."
     }
    ]
   },
@@ -4481,7 +4980,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "7178f6cca9c0150d17e5b4ee668bfc5e1105ff86626b0bb83c5b20edabb0ab6f",
+   "dest_sha256": "4dafde3542c76ae3953b8e3f15e3cb96abf02f09d1f752672b50bcead507141a",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5372,6 +5871,21 @@
      "reason": "Delete for replay captures (2026-11-25): a capture can be deleted from its screen and from the Replay window",
      "old": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n",
      "new": "        BrowserEffect::Close => { close_editor_revision(false, Some(revision)); }\n        BrowserEffect::Delete(id) => {\n            delete_recording(&id);\n            let (rows, skipped) = browser_rows();\n            let listed = BROWSER.lock().unwrap().as_mut().is_some_and(|b| b.revision == revision && b.ui.relist(rows, skipped));\n            if !listed {\n                close_editor_revision(false, Some(revision));\n            }\n        }\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "        if play { apply_action(ClipAction::TogglePlay); }\n",
+     "new": "        if play { apply_action_as(ClipAction::TogglePlay, true); }\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "fn apply_action(action: ClipAction) {\n",
+     "new": "fn apply_action(action: ClipAction) { apply_action_as(action, false); }\n\nfn apply_action_as(action: ClipAction, playback: bool) {\n"
+    },
+    {
+     "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
+     "old": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n",
+     "new": "                if playback {\n                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());\n                } else {\n                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n                }\n"
     }
    ]
   },

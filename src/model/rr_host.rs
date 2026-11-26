@@ -1,8 +1,9 @@
 //! Recording worker decisions the host can run. The Switch wrapper performs the notices,
 //! the save-restore request, and the keyboard offer this module names.
 
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,8 +18,8 @@ use super::playback::{Book, Playback, StartLink};
 use super::rr_runtime::{
     chord_notice, civil_date, delete_save,
     drive_mash, drive_play, drive_step, duplicate_save, finish_recording, migrate_at_boot,
-    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, Capture,
-    KeyboardOffer, Tape, EMPTY_COMBO, READ_WINDOW, RESIDENT_FRAMES,
+    push_frame, save_chord, save_made_combo, start_save_notice, toggle_record, unused_name, Capture,
+    KeyboardOffer, EMPTY_COMBO,
 };
 use crate::model::action::Late;
 use crate::model::combo::{CaptureOwner, Combo, InputCapture};
@@ -30,6 +31,7 @@ use crate::model::input_delay::MappedInputs;
 use crate::model::hud_row::Take;
 use crate::model::recording::{inject_values, ControlOut, CpuRoleDrive, Inject, Phase};
 use crate::model::recording::{ImportRefusal, PlayRefusal, PlayStart, SlotRun, SLOTS, SLOT_FRAMES};
+use crate::model::record_place::{Commit, Shared};
 use crate::model::recording_menu::{Effect, FileKind, LoopMark, Selection, ViewRole};
 use crate::model::state::record::{SavedState, StartState as PlacementStartState};
 use crate::model::store::{self, Record, Store};
@@ -405,7 +407,7 @@ fn parry_next_pass(start: impl FnOnce()) {
 static CUT_PLAYER: AtomicBool = AtomicBool::new(false);
 static CUT_CPU: AtomicBool = AtomicBool::new(false);
 static MACHINE: Mutex<Option<Playback>> = Mutex::new(None);
-static RESIDENT: Mutex<Option<Resident>> = Mutex::new(None);
+static BOOK: Mutex<Option<Box<HeldBook>>> = Mutex::new(None);
 type MenuEffect = (Option<(u64, u64)>, Effect);
 static MENU_EFFECT: Mutex<Option<MenuEffect>> = Mutex::new(None);
 static PREVIEW: AtomicU8 = AtomicU8::new(0);
@@ -459,8 +461,6 @@ static BOUND_APPLIED: Mutex<Option<BoundCopy>> = Mutex::new(None);
 static SAVED_PAIR: Mutex<Option<[SavedState; 2]>> = Mutex::new(None);
 /// A setup restore moved the fighters through the active slot: the slot is given the bound save again.
 static SLOT_RESYNC: AtomicBool = AtomicBool::new(false);
-/// Edit placement's Keep: a file id and the offset Play uses for it instead of the file's.
-static KEPT_PLACEMENT: Mutex<Option<(String, Placement)>> = Mutex::new(None);
 
 /// The bound save as the save-state machine's active slot must hold it (RECORDING.md, "Save states only warp").
 #[derive(Clone, Debug, PartialEq)]
@@ -486,18 +486,27 @@ pub fn request_make(ask: MakeAsk) { *lock(&MAKE_ASK) = Some(ask); }
 pub fn make_actor_cpu() -> bool { MAKE_ROLE.load(Ordering::Acquire) == ROLE_CPU }
 pub fn make_cpu_inputs() -> MappedInputs { to_mapped(unpack(MAKE_CPU_FRAME.load(Ordering::Acquire))) }
 
-struct Resident {
-    id: String,
-    frames: Vec<InputFrame>,
-    tape: Tape,
+/// What the worker keeps between passes: the index and each playing file with its start save. Read again at every
+/// start and after an in-mod write; ordinary playback passes do not read the held files.
+struct HeldBook {
+    root: PathBuf,
+    version: (u64, u64),
+    book: Book,
+    saves: Vec<(String, NamedSave)>,
+    sources: [Option<Source>; 2],
 }
+
+/// What a role's run plays: the file it started on, and whether the run follows the role's active file (a chord's run
+/// does; a preview or Make combo plays the one file it named).
+#[derive(Clone)]
+struct Source { id: String, active: bool }
 
 enum PreviewWindow {
     Exact(core::ops::Range<usize>),
     Drill { frames: u32, trim: Trim },
 }
 
-struct PreviewStart { source: String, role: Role, window: PreviewWindow }
+struct PreviewStart { source: String, role: Role, window: PreviewWindow, playback: bool }
 #[derive(Default)]
 struct PreviewRequests {
     stop: bool,
@@ -524,6 +533,7 @@ pub enum HomeWarp {
 #[derive(Clone, Debug, Default)]
 pub struct Tick {
     pub warp: Option<String>,
+    pub warp_pair: Option<Box<[SavedState; 2]>>,
     /// A Vault clip's preview: the game keeps both fighters as Save reads them when it first starts and loads that pair at the start and for the return.
     pub home: Option<HomeWarp>,
     /// The playing role and the placement of the file that warps (`warp_pair`).
@@ -540,6 +550,8 @@ pub struct Tick {
     /// A combo records a fighter name. The wrapper resolves it to a kind.
     pub switch_name: Option<String>,
     pub switch_player: bool,
+    /// The full save pair is needed only on a picker open, not on every recording tick's stack.
+    pub place: Option<Box<PlaceOpen>>,
 }
 
 /// The existing Fighter Mismatch screen, named for the wrapper that opens it.
@@ -569,7 +581,7 @@ pub fn migrated() -> bool {
 /// The clip editor's preview of a saved macro: frames `start..end` of `source` play once on `role` through the role's
 /// Play queue, warped to the macro's start save. Running from this call until the run ends or `stop_preview`.
 pub fn request_preview(source: &str, role: Role, start: u32, end: u32) {
-    queue_preview(PreviewStart { source: source.to_owned(), role, window: PreviewWindow::Exact(start as usize..end as usize) });
+    queue_preview(PreviewStart { source: source.to_owned(), role, window: PreviewWindow::Exact(start as usize..end as usize), playback: false });
 }
 
 fn queue_preview(start: PreviewStart) {
@@ -583,14 +595,20 @@ pub fn request_drill_preview(source: &str, frames: u32, trim: Trim) -> bool {
     if player_playback_blocks_preview() {
         return false;
     }
-    queue_preview(PreviewStart { source: source.to_owned(), role: Role::Player, window: PreviewWindow::Drill { frames, trim } });
+    queue_preview(PreviewStart { source: source.to_owned(), role: Role::Player, window: PreviewWindow::Drill { frames, trim }, playback: false });
     true
 }
 
 pub fn request_clip_preview(recording: MacroRecording, role: Role) {
     let len = recording.frames.len();
     *lock(&PREVIEW_CLIP) = Some(recording);
-    queue_preview(PreviewStart { source: CLIP_ID.to_owned(), role, window: PreviewWindow::Exact(0..len) });
+    queue_preview(PreviewStart { source: CLIP_ID.to_owned(), role, window: PreviewWindow::Exact(0..len), playback: false });
+}
+
+pub fn request_clip_playback(recording: MacroRecording, role: Role) {
+    let len = recording.frames.len();
+    *lock(&PREVIEW_CLIP) = Some(recording);
+    queue_preview(PreviewStart { source: CLIP_ID.to_owned(), role, window: PreviewWindow::Exact(0..len), playback: true });
 }
 
 /// A Vault clip's preview has the fighters away from where it found them until the return lands.
@@ -836,7 +854,7 @@ pub(crate) fn cpu_controller(take_frame: impl FnOnce() -> Option<InputFrame>) ->
         return None;
     }
     // Sample ownership before the pop: the worker can enqueue the tail and end the run concurrently.
-    let running = RUN_CPU.load(Ordering::Acquire);
+    let running = role_playing(Role::Cpu);
     take_frame().map(|frame| {
         slot_stop();
         playback_controller(frame)
@@ -863,6 +881,7 @@ pub fn post_effect_at(effect: Effect, expected: Option<(u64, u64)>) {
 
 /// The three chords, consumed by the AI hook. This only stores flags.
 pub fn on_chords(record: bool, play_player: bool, play_cpu: bool) {
+    // The game thread posts flags instead of reading the card or waiting on the worker.
     if record {
         let direct = DRILL_ARMED.swap(false, Ordering::AcqRel);
         let role = if direct { ROLE_PLAYER } else { RECORD_ROLE.load(Ordering::Acquire) };
@@ -1231,9 +1250,13 @@ pub unsafe fn on_player_poll(out: *mut MappedInputs) -> bool {
     if out.is_null() {
         return false;
     }
+    let delay_before = DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire);
+    // The fighter's poll takes the first input after the worker has published it.
     let injected = take_player_frame();
     if let Some(frame) = injected {
         *out = to_mapped(frame);
+    } else if DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire) < delay_before {
+        *out = to_mapped(InputFrame::default());
     }
     if CAP_ROLE.load(Ordering::Acquire) == ROLE_PLAYER {
         push_capture(ROLE_PLAYER, to_frame(*out));
@@ -1247,6 +1270,35 @@ pub fn today() -> String {
     match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => civil_date(duration.as_secs()),
         Err(_) => "1970-01-01".to_string(),
+    }
+}
+
+/// A macro stop and an input-drill stop are alternatives. The drill's deep
+/// save path must not reserve the macro capture, spans and two saved fighters.
+#[inline(never)]
+fn save_stopped_macro(root: &Path, player: SavedState, cpu: SavedState, tick: &mut Tick) {
+    let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { "cpu" } else { "player" };
+    tick.diags.push(format!("screen=recording role={role_now} recording=0"));
+    let (spans, count) = take_capture_spans();
+    let (role, frames) = taken_frames();
+    let mut capture = Capture::idle();
+    toggle_record(&mut capture, role);
+    for frame in frames {
+        push_frame(&mut capture, role, frame);
+    }
+    capture.set_spans(&spans[..count]);
+    // The Record chord owns the start pose and speed. Host callers without
+    // a posted start use the two live poses, at rest.
+    let posted = take_record_start();
+    capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
+    let (player, cpu, speeds) = match posted.map(|p| p.start) {
+        Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
+        None => (player, cpu, [(0.0, 0.0); 2]),
+    };
+    if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim()) {
+        if let Some(text) = stop.notice() {
+            tick.notices.push(text);
+        }
     }
 }
 
@@ -1312,36 +1364,7 @@ pub fn service_at(
         let (spans, count) = take_capture_spans();
         save_input(root, "", true, &spans[..count], &mut tick); let _ = taken_frames(); let _ = take_record_start();
     } else if edge == 2 {
-        let role_now = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU {
-            "cpu"
-        } else {
-            "player"
-        };
-        tick.diags
-            .push(format!("screen=recording role={role_now} recording=0"));
-        let (spans, count) = take_capture_spans();
-        let (role, frames) = taken_frames();
-        let mut capture = Capture::idle();
-        toggle_record(&mut capture, role);
-        for frame in frames {
-            push_frame(&mut capture, role, frame);
-        }
-        capture.set_spans(&spans[..count]);
-        // The start save is where Record started, and the macro keeps the recorded role's speed then (PLAY-MOMENTUM).
-        // Without a posted start (only a host test drives the chord without the game thread) the worker's live pose
-        // stands in, at rest, as before.
-        let posted = take_record_start();
-        capture.set_fighter(posted.and_then(|p| if role == Role::Cpu { p.cpu } else { p.owner }.fighter()));
-        let (player, cpu, speeds) = match posted.map(|p| p.start) {
-            Some(start) => (start.poses[0].saved(), start.poses[1].saved(), start.speeds),
-            None => (player.clone(), cpu.clone(), [(0.0, 0.0); 2]),
-        };
-        if let Ok(stop) = finish_recording(root, &capture, player, cpu, speeds[role_index(role)], unix_now(), record_trim())
-        {
-            if let Some(text) = stop.notice() {
-                tick.notices.push(text);
-            }
-        }
+        save_stopped_macro(root, player, cpu, &mut tick);
     }
     // A drill question and a finished Make combo are work even when no chord is waiting.
     let busy = play_player
@@ -1355,7 +1378,8 @@ pub fn service_at(
     if !busy {
         return tick;
     }
-    let Ok(mut book) = load_book(root) else {
+    let mut held = lock(&BOOK);
+    if !refresh_held(&mut held, root, [play_player, play_cpu]) {
         // Before the refusal is taken: taking one clears `PREVIEW`, which names the role to retire.
         retire_preview_run();
         take_preview_refusal(&mut tick);
@@ -1363,8 +1387,11 @@ pub fn service_at(
         *lock(&PREVIEW_ASK) = PreviewRequests::default();
         drop_preview_home();
         return tick;
-    };
-    if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { book.add_recording(CLIP_ID, clip.clone()); }
+    }
+    let held = held.as_mut().expect("held book").as_mut();
+    held.book.remove_recording(CLIP_ID);
+    if let Some(clip) = lock(&PREVIEW_CLIP).as_ref() { held.book.add_recording(CLIP_ID, clip.clone()); }
+    let book = &held.book;
     let mut machine = lock(&MACHINE);
     let machine = machine.get_or_insert_with(Playback::new);
     // restriction: parry-mash-ignored
@@ -1388,25 +1415,32 @@ pub fn service_at(
     }
     release_held(&mut play_player, &mut play_cpu);
     if play_player {
-        play_role(root, machine, &book, Role::Player, &mut tick);
+        play_role(root, machine, book, Role::Player, &mut tick);
     } else if RUN_PLAYER.load(Ordering::Acquire) {
-        step_role(root, machine, &book, Role::Player);
+        step_role(machine, book, Role::Player);
     }
     if play_cpu {
-        play_role(root, machine, &book, Role::Cpu, &mut tick);
+        play_role(root, machine, book, Role::Cpu, &mut tick);
     } else if RUN_CPU.load(Ordering::Acquire) {
-        step_role(root, machine, &book, Role::Cpu);
+        step_role(machine, book, Role::Cpu);
     }
-    parry_next_pass(|| play_role_with(root, machine, &book, Role::Cpu, &mut tick, true));
+    parry_next_pass(|| {
+        play_role_with(root, machine, book, Role::Cpu, &mut tick, true);
+        if machine.playing(Role::Cpu) {
+            held.sources[role_index(Role::Cpu)] = book.index.active(Role::Cpu)
+                .map(|id| Source { id: id.to_owned(), active: true });
+        }
+    });
     if menu_pending() {
-        apply_menu(root, machine, &book, &mut tick);
+        apply_menu(root, machine, book, &mut tick);
     }
     if let Some(ask) = lock(&MAKE_ASK).take() {
-        begin_make(root, machine, &book, ask, &mut tick);
+        begin_make(machine, book, ask, &mut tick);
     }
-    drive_preview(root, machine, &book, &mut tick);
+    drive_preview(machine, book, &mut tick);
     ask_drill(root, &mut tick);
     finish_make(root, &mut tick);
+    hold_warp_pair(held, &mut tick);
     tick
 }
 
@@ -1429,6 +1463,8 @@ pub fn set_role_fighter(role: Role, kind: i32) {
 /// Record-time trim last published by Recording › Options (factory End).
 static RECORD_TRIM: AtomicU8 = AtomicU8::new(crate::model::trim::Trim::End as u8);
 static PLAYBACK_INDICATOR: AtomicBool = AtomicBool::new(true);
+static PLAYBACK_DELAY: AtomicU16 = AtomicU16::new(0);
+static DELAY_OWED: [AtomicU16; 2] = [const { AtomicU16::new(0) }; 2];
 
 pub fn set_record_trim(trim: crate::model::trim::Trim) {
     RECORD_TRIM.store(trim as u8, Ordering::Release);
@@ -1440,6 +1476,22 @@ fn record_trim() -> crate::model::trim::Trim {
 
 pub fn set_playback_indicator(on: bool) {
     PLAYBACK_INDICATOR.store(on, Ordering::Release);
+}
+
+pub fn set_playback_delay(frames: u16) {
+    PLAYBACK_DELAY.store(frames, Ordering::Release);
+}
+
+fn owe_delay(role: Role) {
+    DELAY_OWED[role_index(role)].store(PLAYBACK_DELAY.load(Ordering::Acquire), Ordering::Release);
+}
+
+#[cfg(test)]
+pub fn drop_cached_book() -> Option<usize> {
+    let held = lock(&BOOK).take()?;
+    let inline = std::mem::size_of_val(&held);
+    drop(held);
+    Some(inline)
 }
 
 pub fn playback_indicator_enabled() -> bool {
@@ -1544,25 +1596,14 @@ pub fn setup_bound(restore: bool) {
     }
 }
 
-/// What Edit placement edits (primary 2026-11-08 #70 (a)): the active macro of the Recording pop-up's role (`RECORD_ROLE`,
-/// not the page's ZR view), the file Play plays, and the position its start save gives that role. Play warps there and
-/// adds the offset (`warp_pair`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct PlacementTarget {
-    pub role: Role,
-    pub id: String,
-    pub recording: MacroRecording,
-    pub anchor: (f32, f32),
-}
-
 /// The game's `SITUATION_KIND_AIR` (ground 0, cliff 1).
 const SITUATION_AIR: i32 = 2;
 
 pub const PLACE_NO_MACRO: &str = "Make a macro active for this role first";
 pub const PLACE_NO_START: &str = "Link a start save to the macro first";
 
-pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
-    let role = if RECORD_ROLE.load(Ordering::Acquire) == ROLE_CPU { Role::Cpu } else { Role::Player };
+/// The save to open and the macro to relink on Copy. Reading the save belongs to `place_open`.
+fn active_placement_ids(root: &Path, role: Role) -> Result<(String, String), &'static str> {
     let index = RecordingIndex::load(root).map_err(|_| PLACE_NO_MACRO)?;
     let active = index.active(role).ok_or(PLACE_NO_MACRO)?.to_owned();
     // A chain warps to macro 1's start save and plays with macro 1's placement (`play_placement`), so it edits macro 1.
@@ -1572,45 +1613,14 @@ pub fn placement_target(root: &Path) -> Result<PlacementTarget, &'static str> {
     };
     let recording = Library::new(root.join(MACROS_DIR)).load(&id).map_err(|_| PLACE_NO_MACRO)?;
     let start_on = chain_on.unwrap_or(recording.start_save_on);
-    let save = recording
-        .start_save
-        .as_deref()
-        .filter(|_| start_on)
-        .and_then(|save| Store::<NamedSave>::new(root.join(SAVES_DIR)).load(save).ok())
-        .ok_or(PLACE_NO_START)?;
-    let at = match role {
-        Role::Player => &save.player,
-        Role::Cpu => &save.cpu,
-    };
-    let anchor = (at.x, at.y);
-    let mut recording = recording;
-    if let Some(placement) = kept_placement(&id) {
-        recording.placement = placement;
-    }
-    Ok(PlacementTarget { role, id, recording, anchor })
+    let save = recording.start_save.filter(|_| start_on).ok_or(PLACE_NO_START)?;
+    Ok((save, id))
 }
 
-/// Keep on Edit placement: Play uses this offset for that file until the game closes. The file is unchanged.
-pub fn keep_placement(id: &str, placement: Placement) {
-    *lock(&KEPT_PLACEMENT) = Some((id.to_owned(), placement));
-}
-
-/// Write over put an offset into the file: a kept one for that file no longer applies.
-pub fn placement_written(id: &str) {
-    let mut kept = lock(&KEPT_PLACEMENT);
-    if kept.as_ref().is_some_and(|(kept, _)| kept == id) {
-        *kept = None;
-    }
-}
-
-fn kept_placement(id: &str) -> Option<Placement> {
-    lock(&KEPT_PLACEMENT).as_ref().filter(|(kept, _)| kept == id).map(|(_, placement)| *placement)
-}
-
-/// The placement a Play of `id` warps with: a kept one, else the file's (a chain: macro 1's, whose start save it is).
+/// The placement a Play of `id` warps with: the file's own (a chain: macro 1's, whose start save it is).
 fn play_placement(book: &Book, id: &str) -> Placement {
     let first = book.first_recording(id).unwrap_or(id);
-    kept_placement(first).unwrap_or_else(|| book.placement(first))
+    book.placement(first)
 }
 
 /// The pair a Play warps to: the start save, with the file's placement added to the playing role's saved position
@@ -1629,6 +1639,110 @@ pub fn warp_pair(save: NamedSave, place: Option<(Role, Placement)>) -> [SavedSta
         }
     }
     pair
+}
+
+/// Change placement: a save the placement picker is asked to open on, as the worker read it. `save` is its file,
+/// `relink` the macro a copy is linked to (the macro whose screen asked, a chain's macro 1); the picker hands both
+/// back with what it confirmed (`commit_placement`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlaceOpen {
+    pub save: String,
+    pub relink: Option<String>,
+    pub name: String,
+    pub pair: [SavedState; 2],
+    /// The fighter the picker edits first.
+    pub edit: Role,
+    pub shared: Shared,
+}
+
+/// What a confirmed placement did to its save, for the Switch wrapper.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Placed {
+    /// Nothing was written: the save, its copy or the macro's link could not be read or written. `name`: the
+    /// save's, when it could be read.
+    Refused { ticket: u32, name: String },
+    /// The save holds the placement (or nothing was edited): the pair to load once, and the notice.
+    Saved { ticket: u32, pair: Box<[SavedState; 2]>, notice: String },
+}
+
+/// The save `save` as the placement picker opens on it, with the macro files that start from it counted.
+#[inline(never)]
+fn place_open(root: &Path, save: String, relink: Option<String>, edit: Role) -> Option<Box<PlaceOpen>> {
+    let file = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(&save).ok()?;
+    let shared = Shared { macros: macros_starting_from(root, &save), from_macro: relink.is_some() };
+    Some(Box::new(PlaceOpen { save, relink, name: file.name, pair: [file.player, file.cpu], edit, shared }))
+}
+
+/// How many macro files start from the save `save`. The worker reads the macro folder once when Change placement
+/// is asked for: the book it holds for Play has only the files that play. A chain is not a macro file (it starts
+/// from its macro 1's save), so it is not counted; a file that does not read as a macro is passed over.
+/// Kept out of line, as the held book's reader is: a loaded macro must not sit in `service_at`'s frame.
+#[inline(never)]
+fn macros_starting_from(root: &Path, save: &str) -> u8 {
+    let library = Library::new(root.join(MACROS_DIR));
+    let Ok(folder) = std::fs::read_dir(root.join(MACROS_DIR)) else { return 0 };
+    let count = folder
+        .flatten()
+        .filter_map(|item| item.file_name().to_str().and_then(|name| name.strip_suffix(".json")).map(str::to_owned))
+        .filter(|id| library.load(id).is_ok_and(|file| file.start_save.as_deref() == Some(save)))
+        .count();
+    u8::try_from(count).unwrap_or(u8::MAX)
+}
+
+/// The picker confirmed a placement on the save its visit opened: the worker writes it. Only what was edited is
+/// written, field by field (`record_place::patch`); with nothing edited no file is written and none is copied. A
+/// copy is a new save, written before `relink` is linked to it; if that link cannot be written the copy is
+/// removed again, so the old link stands. No macro file is touched otherwise: a macro's offset stays its own.
+pub fn commit_placement(root: &Path, save: &str, relink: Option<&str>, commit: Commit) -> Placed {
+    let ticket = commit.ticket;
+    let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let Ok(mut file) = saves.load(save) else { return Placed::Refused { ticket, name: String::new() } };
+    let name = file.name.clone();
+    if !commit.edits.iter().any(|edit| edit.any()) {
+        return Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice: format!("Nothing changed · {name}") };
+    }
+    crate::model::record_place::patch([&mut file.player, &mut file.cpu], &commit.setup, commit.edits, commit.stage);
+    let notice = if commit.copy {
+        match copy_placed(root, &saves, &file, relink) {
+            Some(copy) => format!("Saved a copy · {copy}"),
+            None => return Placed::Refused { ticket, name },
+        }
+    } else {
+        if saves.overwrite(save, &file).is_err() {
+            return Placed::Refused { ticket, name };
+        }
+        invalidate_bound();
+        match commit.macros {
+            0 => format!("Saved · {name}"),
+            1 => format!("Saved · {name} · 1 macro starts here"),
+            macros => format!("Saved · {name} · {macros} macros start here"),
+        }
+    };
+    Placed::Saved { ticket, pair: Box::new([file.player, file.cpu]), notice }
+}
+
+/// The placed pair as a new save, and `relink` linked to it; the copy's name. `None`: nothing is left behind.
+fn copy_placed(root: &Path, saves: &Store<NamedSave>, placed: &NamedSave, relink: Option<&str>) -> Option<String> {
+    let names = saves.list().ok()?.entries.into_iter().map(|entry| entry.name).collect::<Vec<_>>();
+    let copy = NamedSave::new(unused_name("Save", &names), placed.player.clone(), placed.cpu.clone()).ok()?;
+    let id = saves.save_new(&copy).ok()?;
+    if let Some(recording) = relink {
+        let macros = Library::new(root.join(MACROS_DIR));
+        let linked = macros.load(recording).ok().and_then(|mut file| {
+            // Relink the store-issued id without enabling a standalone start the chain's first macro had disabled.
+            file.start_save = Some(id.clone());
+            macros.overwrite(recording, &file).ok()
+        });
+        if linked.is_none() {
+            let _ = saves.delete(&id);
+            return None;
+        }
+    }
+    let _ = RecordingIndex::update(root, |index| {
+        index.note_use(Kind::Save, &id, Use::Recorded, unix_now())?;
+        Ok(true)
+    });
+    Some(copy.name)
 }
 
 /// Save writes the one bound save, or a new bound Save N when none is bound (`rr_runtime::save_chord`). Worker side.
@@ -1959,7 +2073,7 @@ fn play_role(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick:
 }
 
 fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, tick: &mut Tick, next: bool) {
-    show_chord_notice(root, tick);
+    if !book.index.chord_notice_seen() { show_chord_notice(root, tick); }
     if let Some(ask) = mismatch_for(book, role) {
         // Ask before switching fighter Off (operator 2026-11-13, TR6): the current fighter stays, as Keep, unasked.
         let asking = ASK_FIGHTER.load(Ordering::Acquire);
@@ -2045,13 +2159,14 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
     }
     // A parry refusal and the deleted-save notice share Recording's standing notice: the refusal stays up.
     if !tick.notices.contains(&PARRY_START_SAVE_MISSING) {
-        note_missing_start(root, book, role, tick);
+        note_missing_start(book, role, tick);
     }
     if effect.stopped || effect.started {
         drop_frames(role);
     }
     if effect.started {
         mark_run(role);
+        if !next { owe_delay(role); }
     }
     // PLAY-MOMENTUM: the warp's start speed waits for the run's first input (after `drop_frames`, which clears it).
     if let Some((speed, _)) = owed {
@@ -2064,13 +2179,13 @@ fn play_role_with(root: &Path, machine: &mut Playback, book: &Book, role: Role, 
         run_flag(role).store(true, Ordering::Release);
     }
     if run_flag(role).load(Ordering::Acquire) {
-        step_role(root, machine, book, role);
+        step_role(machine, book, role);
     }
 }
 
 /// Fill the role's queue ahead of its hook, in file order. The hook takes one frame per game frame, so a
 /// late or doubled worker tick neither drops nor repeats one.
-fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
+fn step_role(machine: &mut Playback, book: &Book, role: Role) {
     if WARP_HOLD.load(Ordering::Acquire) {
         return;
     }
@@ -2078,50 +2193,13 @@ fn step_role(root: &Path, machine: &mut Playback, book: &Book, role: Role) {
     // fill the queue (Astra 09:48Z).
     while run_flag(role).load(Ordering::Acquire) && role_frames(role).room() > 0 {
         match drive_step(machine, role, book) {
-            Some(played) => publish(role, resident_frame(root, &played)),
+            Some(played) => publish(role, played.frame),
             None => {
                 run_flag(role).store(false, Ordering::Release);
                 return;
             }
         }
     }
-}
-
-fn resident_frame(root: &Path, played: &super::playback::Played) -> InputFrame {
-    if played.frame_index < RESIDENT_FRAMES {
-        return played.frame;
-    }
-    let mut slot = lock(&RESIDENT);
-    let same = slot
-        .as_ref()
-        .is_some_and(|item| item.id == played.recording_id);
-    if !same {
-        let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(played.recording_id) else {
-            return played.frame;
-        };
-        let tape = Tape::load(&recording.frames);
-        *slot = Some(Resident {
-            id: played.recording_id.to_owned(),
-            frames: recording.frames,
-            tape,
-        });
-    }
-    let index = played.frame_index;
-    let missing = slot
-        .as_ref()
-        .is_some_and(|item| item.tape.hook_frame(index).is_none());
-    if missing {
-        let item = slot.as_mut().expect("resident");
-        let start = RESIDENT_FRAMES + ((index - RESIDENT_FRAMES) / READ_WINDOW) * READ_WINDOW;
-        if start < item.frames.len() {
-            let count = READ_WINDOW.min(item.frames.len() - start);
-            let window = item.frames[start..start + count].to_vec();
-            item.tape.fill_window(index, |_, _| window.clone());
-        }
-    }
-    slot.as_ref()
-        .and_then(|item| item.tape.hook_frame(index))
-        .unwrap_or(played.frame)
 }
 
 /// A cut clears the run flag. If it races this publish, the hook's cut flag still
@@ -2139,22 +2217,14 @@ fn publish(role: Role, frame: InputFrame) {
 fn drop_frames(role: Role) {
     role_frames(role).clear();
     owe_start_speed(role, None);
+    DELAY_OWED[role_index(role)].store(0, Ordering::Release);
 }
 
-fn note_missing_start(root: &Path, book: &Book, role: Role, tick: &mut Tick) {
+fn note_missing_start(book: &Book, role: Role, tick: &mut Tick) {
     let Some(id) = book.index.active(role) else {
         return;
     };
-    let Ok(recording) = Library::new(root.join(MACROS_DIR)).load(id) else {
-        return;
-    };
-    let Some(save) = recording.start_save.as_deref() else {
-        return;
-    };
-    if Store::<NamedSave>::new(root.join(SAVES_DIR))
-        .load(save)
-        .is_ok()
-    {
+    if !book.missing_recording_save(id) {
         return;
     }
     if let Some(text) = start_save_notice(StartSaveState::Deleted) {
@@ -2229,6 +2299,18 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
     }
     match effect {
         Effect::None | Effect::RecordDrill | Effect::ListRecordings | Effect::CancelRecording | Effect::OpenRecording { .. } => {}
+        Effect::ChangePlacement { save, relink } => tick.place = place_open(root, save, relink, record_role()),
+        // The Replays row: the start save of the pop-up role's active macro (a chain: its macro 1's).
+        Effect::ChangeActivePlacement => {
+            let role = record_role();
+            match active_placement_ids(root, role) {
+                Ok((save, id)) => {
+                    tick.place = place_open(root, save, Some(id), role);
+                    if tick.place.is_none() { tick.notices.push(PLACE_NO_START); }
+                }
+                Err(refusal) => tick.notices.push(refusal),
+            }
+        },
         Effect::Keyboard { header, draft } => {
             tick.diags.push(format!("screen=rename header={header}"));
             tick.keyboard = Some(KeyboardOffer { header, draft });
@@ -2237,7 +2319,7 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
         Effect::PreviewDrill { .. } => {} // The menu worker starts the preview (F10).
         Effect::MakeCombo { source, chain } => {
             let _ = chain;
-            begin_make(root, machine, book, MakeAsk { source, role: Role::Player, drill: None }, tick)
+            begin_make(machine, book, MakeAsk { source, role: Role::Player, drill: None }, tick)
         }
         Effect::DuplicateSave { source } => {
             let _ = duplicate_save(root, &source, unix_now());
@@ -2286,6 +2368,14 @@ fn apply_menu(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick)
             }
         }
         Effect::SetTrim { .. } => {}
+        // The macro's own screen (operator 2026-11-25, PC6 A): each row writes its one field into the macro's file.
+        Effect::SetMomentum { id, rest } => {
+            let momentum = if rest { MomentumMode::AtRest } else { MomentumMode::PreserveRecorded };
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| file.placement.momentum = momentum);
+        }
+        Effect::ClearOffset { id } => {
+            rename::<MacroRecording>(root, MACROS_DIR, &id, |file| (file.placement.delta_x, file.placement.delta_y) = (0.0, 0.0));
+        }
     }
 }
 
@@ -2363,7 +2453,6 @@ fn rename<R: Record>(root: &Path, dir: &str, id: &str, set: impl FnOnce(&mut R))
 }
 
 fn begin_make(
-    root: &Path,
     machine: &mut Playback,
     book: &Book,
     ask: MakeAsk,
@@ -2373,7 +2462,7 @@ fn begin_make(
     MAKE_CPU_FRAME.store(0, Ordering::Release);
     MAKE_ROLE.store(if ask.role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
     begin_input(1);
-    let started = start_run(root, machine, book, ask.role, &ask.source, None, None);
+    let started = start_run(machine, book, ask.role, &ask.source, None, None, true);
     let since = lock(&STRIP).0;
     tick.diags.push(format!("screen=make-combo source={} role={} playing={}", ask.source,
         if ask.role == Role::Player { "player" } else { "cpu" }, i32::from(started)));
@@ -2404,13 +2493,13 @@ fn warp_to_start(book: &Book, role: Role, source: &str, tick: &mut Tick) -> Opti
 }
 
 fn start_run(
-    root: &Path,
     machine: &mut Playback,
     book: &Book,
     role: Role,
     source: &str,
     frames: Option<core::ops::Range<usize>>,
     owed: Option<StartSpeed>,
+    delayed: bool,
 ) -> bool {
     let effect = match frames {
         Some(frames) => machine.play_range(role, book, source, frames),
@@ -2418,10 +2507,11 @@ fn start_run(
     };
     if effect.started {
         drop_frames(role);
+        if delayed { owe_delay(role); }
         mark_run(role);
         owe_start_speed(role, owed);
         run_flag(role).store(true, Ordering::Release);
-        step_role(root, machine, book, role);
+        step_role(machine, book, role);
     }
     effect.started
 }
@@ -2453,7 +2543,7 @@ fn retire_preview_run() {
     clear_cut(role);
 }
 
-fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Tick) {
+fn drive_preview(machine: &mut Playback, book: &Book, tick: &mut Tick) {
     take_preview_refusal(tick);
     let role = preview_role();
     let (stop, queued) = {
@@ -2480,7 +2570,7 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
     }
     let start = lock(&PREVIEW_ASK).start.take();
     match start {
-        Some(PreviewStart { source, role, window }) => {
+        Some(PreviewStart { source, role, window, playback }) => {
             PREVIEW.store(if role == Role::Player { ROLE_PLAYER } else { ROLE_CPU }, Ordering::Release);
             let frames = match window {
                 PreviewWindow::Exact(frames) => frames,
@@ -2497,7 +2587,7 @@ fn drive_preview(root: &Path, machine: &mut Playback, book: &Book, tick: &mut Ti
             } else {
                 warp_to_start(book, role, &source, tick)
             };
-            if !start_run(root, machine, book, role, &source, Some(frames), owed) {
+            if !start_run(machine, book, role, &source, Some(frames), owed, playback) {
                 PREVIEW.store(0, Ordering::Release);
             }
         }
@@ -2596,6 +2686,111 @@ pub fn parry_use(root: &Path, id: &str, count: LoopCount) -> Result<(), String> 
     }).map(|_| ()).map_err(|e| e.to_string())
 }
 
+fn read_held(root: &Path, mut sources: [Option<Source>; 2], roles: [bool; 2], starts: [bool; 2]) -> Result<HeldBook, ()> {
+    let version = recording_version();
+    let index = RecordingIndex::load(root).map_err(|_| ())?;
+    let library = Library::new(root.join(MACROS_DIR));
+    let chain_store = Store::<Chain>::new(root.join(MACROS_DIR));
+    let save_store = Store::<NamedSave>::new(root.join(SAVES_DIR));
+    let mut recordings = BTreeMap::<String, MacroRecording>::new();
+    let mut chains = BTreeMap::<String, Chain>::new();
+    let mut firsts = Vec::<String>::new();
+    let mut seen_files = BTreeSet::new();
+    for role in [Role::Player, Role::Cpu] {
+        let slot = role_index(role);
+        if !roles[slot] { continue; }
+        if starts[slot] && sources[slot].is_none() {
+            sources[slot] = index.active(role).map(|id| Source { id: id.to_owned(), active: true });
+        }
+        let source = sources[slot].as_ref();
+        let current = source.is_none_or(|source| source.active).then_some(index.active(role)).flatten();
+        for id in [source.map(|source| source.id.as_str()), current].into_iter().flatten() {
+            if id == CLIP_ID || !seen_files.insert(id.to_owned()) { continue; }
+            if !recordings.contains_key(id) && !chains.contains_key(id) {
+                if let Ok(recording) = library.load(id) {
+                    recordings.insert(id.to_owned(), recording);
+                } else if let Ok(chain) = chain_store.load(id) {
+                    for step in &chain.recordings {
+                        if let std::collections::btree_map::Entry::Vacant(entry) = recordings.entry(step.clone()) {
+                            if let Ok(recording) = library.load(step) {
+                                entry.insert(recording);
+                            }
+                        }
+                    }
+                    chains.insert(id.to_owned(), chain);
+                }
+            }
+            if let Some(chain) = chains.get(id) {
+                if let Some(first) = chain.recordings.first() { firsts.push(first.clone()); }
+            } else {
+                firsts.push(id.to_owned());
+            }
+        }
+    }
+    let mut book = Book::new(index);
+    let mut saves = Vec::new();
+    let mut seen = BTreeSet::new();
+    for first in firsts {
+        let Some(save) = recordings.get(&first).and_then(|recording| recording.start_save.as_deref()) else { continue };
+        if !seen.insert(save.to_owned()) { continue; }
+        if let Ok(named) = save_store.load(save) {
+            book.add_save(save);
+            saves.push((save.to_owned(), named));
+        }
+    }
+    for (id, recording) in recordings { book.add_recording(id, recording); }
+    for (id, chain) in chains { book.add_chain(id, chain); }
+    Ok(HeldBook { root: root.to_path_buf(), version, book, saves, sources })
+}
+
+/// Reload on a start, a root or mod-write generation change, or when no value is held.
+fn held_needs_read(held: Option<&HeldBook>, root: &Path, starts: [bool; 2]) -> bool {
+    held.is_none_or(|held| held.root != root || held.version != recording_version() || starts[0] || starts[1])
+}
+
+/// Reads the held files again when a role starts, the root changes, the mod wrote the library, or nothing is held.
+/// Kept out of line: the reader's locals (the book being built, a loaded macro, chain and save) must not sit in
+/// `service_at`'s frame, which is on the menu worker's deepest path (`thread_stacks`).
+#[inline(never)]
+fn refresh_held(held: &mut Option<Box<HeldBook>>, root: &Path, chords: [bool; 2]) -> bool {
+    let mut starts = chords;
+    if lock(&ANSWER).is_some() {
+        if let Some(role) = *lock(&HELD) { starts[role_index(role)] = true; }
+    }
+    let preview = lock(&PREVIEW_ASK).start.as_ref().map(|start| (start.role, start.source.clone()));
+    let make = lock(&MAKE_ASK).as_ref().map(|ask| (ask.role, ask.source.clone()));
+    let menu_make = lock(&MENU_EFFECT).as_ref().and_then(|(_, effect)| match effect {
+        Effect::MakeCombo { source, .. } => Some((Role::Player, source.clone())),
+        _ => None,
+    });
+    for (role, _) in [&menu_make, &make, &preview].into_iter().flatten() {
+        starts[role_index(*role)] = true;
+    }
+    if !held_needs_read(held.as_deref(), root, starts) { return true; }
+    let in_use = [
+        starts[0] || role_playing(Role::Player),
+        starts[1] || role_playing(Role::Cpu) || PARRY_PASSES.load(Ordering::Acquire) > 0,
+    ];
+    let mut sources = held.as_ref().map_or_else(|| [None, None], |held| held.sources.clone());
+    for role in [Role::Player, Role::Cpu] {
+        let slot = role_index(role);
+        if starts[slot] || !in_use[slot] { sources[slot] = None; }
+    }
+    for (role, source) in [menu_make, make, preview].into_iter().flatten() {
+        sources[role_index(role)] = Some(Source { id: source, active: false });
+    }
+    match read_held(root, sources, in_use, starts) {
+        Ok(next) => { *held = Some(Box::new(next)); true }
+        Err(()) => false,
+    }
+}
+
+#[inline(never)]
+fn hold_warp_pair(held: &HeldBook, tick: &mut Tick) {
+    tick.warp_pair = tick.warp.as_deref().and_then(|id| held.saves.iter().find(|(save, _)| save == id))
+        .map(|(_, save)| Box::new(warp_pair(save.clone(), tick.warp_place)));
+}
+
 fn load_book(root: &Path) -> Result<Book, ()> {
     let index = RecordingIndex::load(root).map_err(|_| ())?;
     let mut book = Book::new(index);
@@ -2646,9 +2841,14 @@ fn take_frame(role: Role) -> Option<InputFrame> {
 }
 
 fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
+    // A pending restore must land before an input or it would undo that input.
     if WARP_HOLD.load(Ordering::Acquire) || start_gated() || cut_flag(role).load(Ordering::Acquire)
         || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
     {
+        return None;
+    }
+    // Count the role's polls on the game thread so the delay is exact in game frames.
+    if DELAY_OWED[role_index(role)].fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1)).is_ok() {
         return None;
     }
     role_frames(role).pop_tagged().map(|(frame, generation)| {
@@ -2710,7 +2910,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 #[cfg(test)]
-fn reset_host() {
+pub(crate) fn reset_host() {
     slot_stop();
     for tape in &SLOT_TAPES {
         // SAFETY: host tests serialize the single publisher.
@@ -2721,6 +2921,8 @@ fn reset_host() {
     SLOTS_DIRTY.store(1, Ordering::Release);
     RECORD_TRIM.store(crate::model::trim::Trim::End as u8, Ordering::Release);
     PLAYBACK_INDICATOR.store(true, Ordering::Release);
+    PLAYBACK_DELAY.store(0, Ordering::Release);
+    for delay in &DELAY_OWED { delay.store(0, Ordering::Release); }
     RECORD_ROLE.store(ROLE_PLAYER, Ordering::Release);
     ASK_FIGHTER.store(true, Ordering::Release);
     LAST_ROLE.store(ROLE_PLAYER, Ordering::Release);
@@ -2748,7 +2950,7 @@ fn reset_host() {
     RUN_PLAYER.store(false, Ordering::Release);
     RUN_CPU.store(false, Ordering::Release);
     *lock(&MACHINE) = None;
-    *lock(&RESIDENT) = None;
+    *lock(&BOOK) = None;
     *lock(&MENU_EFFECT) = None;
     PREVIEW.store(0, Ordering::Release);
     *lock(&PREVIEW_ASK) = PreviewRequests::default();
@@ -2779,7 +2981,6 @@ fn reset_host() {
     *lock(&BOUND_APPLIED) = None;
     *lock(&SAVED_PAIR) = None;
     SLOT_RESYNC.store(false, Ordering::Release);
-    *lock(&KEPT_PLACEMENT) = None;
     for slot in ROLE_KIND.iter().chain(&LIVE_KIND) {
         slot.store(-1, Ordering::Release);
     }
@@ -3337,30 +3538,45 @@ mod tests {
         }
     }
 
-    fn a_crop_preview_ends_when_the_library_cannot_be_read() {
+    fn an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return() {
         let _hold = hold();
         reset_host();
         let root = scratch("preview-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        let id = one_macro(&root, "Real take", 7, 7, None);
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
-        request_preview("macro-1", Role::Cpu, 0, 3);
+        let reads = store::index_reads();
+        request_preview(&id, Role::Cpu, 0, 1);
         assert!(preview_running());
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(store::index_reads(), reads + 1);
         assert!(!preview_running() && lock(&PREVIEW_ASK).start.is_none());
+        assert!(take_cpu_frame().is_none());
 
         reset_host();
         let root = scratch("vault-preview-bad-index");
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
         let clip = MacroRecording::new("Clip", "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default(); 5]).unwrap();
+        // Exclude mod writes from parallel library tests: the only change here is external.
+        let _no_mod_write = store::recording_write_guard(&root).unwrap();
         request_clip_preview(clip, Role::Cpu);
         let tick = service_at(&root, &none(), "2026-11-23", state(8), state(7));
         assert!(preview_away());
         assert_eq!(tick.home, Some(HomeWarp::Start { air: false, player: false }));
         assert!(land_pair([state(8), state(7)], false));
         std::fs::write(root.join(super::super::library::INDEX_FILE), "{").unwrap();
-        stop_preview();
+        let reads = store::index_reads();
         service_at(&root, &none(), "2026-11-23", state(8), state(7));
-        assert!(!previewing());
+        assert!(take_cpu_frame().is_some() && !CPU_FRAMES.is_empty());
+        stop_preview();
+        let returning = service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert_eq!(returning.home, Some(HomeWarp::Return));
+        assert!(!preview_running() && preview_away() && CPU_FRAMES.is_empty());
+        assert!(take_cpu_frame().is_none());
+        assert!(land_pair([state(8), state(7)], false));
+        service_at(&root, &none(), "2026-11-23", state(8), state(7));
+        assert!(!previewing() && !preview_away());
+        assert_eq!(store::index_reads(), reads);
     }
 
     fn a_session_end_drops_the_preview_home() {
@@ -3769,47 +3985,6 @@ mod tests {
         assert!(take_cpu_frame().is_none());
     }
 
-    fn a_frame_past_the_resident_minute_comes_from_the_window() {
-        let _hold = hold();
-        reset_host();
-        let root = scratch("window");
-        let frames: Vec<InputFrame> = (0..4_300)
-            .map(|index| InputFrame {
-                buttons: index as u32,
-                ..InputFrame::default()
-            })
-            .collect();
-        let recording = super::super::macros::MacroRecording::new(
-            "Long",
-            "13.0.5",
-            StartState::neutral(1, 0, 1.0),
-            frames,
-        )
-        .unwrap();
-        let id = Library::new(root.join(MACROS_DIR))
-            .save_new(&recording)
-            .unwrap();
-        let played = crate::engine::playback::Played {
-            recording_id: id.as_str(),
-            frame_index: RESIDENT_FRAMES,
-            frame: InputFrame::default(),
-        };
-        assert_eq!(
-            resident_frame(&root, &played).buttons,
-            RESIDENT_FRAMES as u32
-        );
-        let later = crate::engine::playback::Played {
-            recording_id: id.as_str(),
-            frame_index: RESIDENT_FRAMES + 50,
-            frame: InputFrame::default(),
-        };
-        assert_eq!(
-            resident_frame(&root, &later).buttons,
-            (RESIDENT_FRAMES as u32) + 50
-        );
-        assert_eq!(lock(&RESIDENT).as_ref().unwrap().tape.reads().len(), 1);
-    }
-
     fn one_macro(root: &std::path::Path, name: &str, buttons: u32, kind: i32, save: Option<&str>) -> String {
         let mut recording = super::super::macros::MacroRecording::new(
             name,
@@ -4184,6 +4359,38 @@ mod tests {
         on_chords(false, false, true);
         tick(&root);
         assert_eq!(cpu_controller(take_cpu_frame).unwrap().buttons, 1, "a new Play starts normally");
+    }
+
+    #[test]
+    fn parry_practice_delays_its_first_pass_only() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("parry-delay");
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        let save = NamedSave::new("Parry start", state(8), state(7)).unwrap();
+        let save_id = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&save).unwrap();
+        let frames = vec![InputFrame { buttons: 2, ..InputFrame::default() }; 2];
+        let mut recording = super::super::macros::MacroRecording::new("Fireball", "13.0.5", StartState::neutral(7, 0, 1.0), frames).unwrap();
+        recording.set_start_save(Some(&save_id)).unwrap();
+        let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
+        let mut index = RecordingIndex::load(&root).unwrap();
+        index.set_active(Role::Cpu, Some(&id), 1).unwrap();
+        index.set_loop(Role::Cpu, LoopCount::Finite(2));
+        index.save(&root).unwrap();
+        set_parry(true);
+        set_playback_delay(10);
+        on_chords(false, false, true);
+        assert_eq!(service_at(&root, &none(), "2026-11-18", state(8), state(7)).warp.as_deref(), Some(save_id.as_str()));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        for _ in 0..10 { assert_eq!(take_cpu_frame(), None); }
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        assert_eq!(service_at(&root, &none(), "2026-11-18", state(8), state(7)).warp.as_deref(), Some(save_id.as_str()));
+        warp_landed();
+        let _ = service_at(&root, &none(), "2026-11-18", state(8), state(7));
+        assert_eq!(take_cpu_frame().map(|frame| frame.buttons), Some(2));
+        reset_host();
     }
 
     /// Parry practice (DESIGN rev 2 §2.3): each Loop pass is one play-once run warped to the macro's start save, and
@@ -4659,7 +4866,7 @@ mod tests {
         let mut machine = lock(&MACHINE).take().expect("the machine holds the CPU run");
         let (tx, rx) = std::sync::mpsc::channel();
         let worker = std::thread::spawn(move || {
-            step_role(Path::new("/nonexistent"), &mut machine, &book, Role::Cpu);
+            step_role(&mut machine, &book, Role::Cpu);
             let _ = tx.send(());
         });
         let returned = rx.recv_timeout(std::time::Duration::from_secs(5)).is_ok();
@@ -5112,6 +5319,7 @@ mod tests {
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             let frames = (1..=80).map(|buttons| InputFrame { buttons, ..InputFrame::default() }).collect();
             let take = super::super::rr_runtime::save_drill_take(&root, frames, StartState::neutral(8, 0, 1.0), crate::model::trim::Trim::Off, 1, &[]).unwrap().unwrap();
+            let no_mod_write = store::recording_write_guard(&root).unwrap();
             assert!(request_drill_preview(&take, 80, Trim::Off));
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
             assert_eq!(take_player_frame().unwrap().buttons, 1);
@@ -5124,9 +5332,26 @@ mod tests {
             let had_index = index.is_file();
             if had_index { std::fs::rename(&index, &held).unwrap(); }
             std::fs::create_dir(&index).unwrap();
-            if stop { stop_preview(); }
+            let reads = store::index_reads();
+            // Cross the prefilled queue boundary while the index remains unreadable.
+            for expected in 2..=65 {
+                service_at(&root, &none(), "2026-11-23", state(8), state(7));
+                assert_eq!(take_player_frame().map(|frame| frame.buttons), Some(expected));
+            }
+            assert!(preview_running() && !PLAYER_FRAMES.is_empty());
+            assert_eq!(store::index_reads(), reads);
+            if stop {
+                stop_preview();
+            } else {
+                drop(no_mod_write);
+                let generation = catalog_generation();
+                one_macro(&root, "Changed library", 7, 8, None);
+                assert_ne!(catalog_generation(), generation);
+            }
             service_at(&root, &none(), "2026-11-23", state(8), state(7));
+            assert_eq!(store::index_reads(), reads + usize::from(!stop));
             assert!(!preview_running());
+            assert!(PLAYER_FRAMES.is_empty());
             assert!(take_player_frame().is_none());
             assert!(!RUN_PLAYER.load(Ordering::Acquire));
 
@@ -5811,7 +6036,7 @@ mod tests {
         let root = scratch("placement");
         migrate_at_boot(&root, &none(), "2026-11-08").unwrap();
         set_record_role(Role::Cpu);
-        assert_eq!(placement_target(&root), Err(PLACE_NO_MACRO));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_MACRO));
         let saves = Store::<NamedSave>::new(root.join(SAVES_DIR));
         let mut cpu = at_x(30.0);
         cpu.fighter_kind = 7;
@@ -5824,16 +6049,14 @@ mod tests {
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&loose), 1).unwrap();
         index.save(&root).unwrap();
-        assert_eq!(placement_target(&root), Err(PLACE_NO_START), "no warp, no anchor");
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Err(PLACE_NO_START));
         recording.set_start_save(Some(&start)).unwrap();
         recording.set_placement(Placement { delta_x: 1.5, delta_y: 0.0, ..Placement::default() }).unwrap();
         let id = macros.save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&id), 2).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("the CPU's active macro");
-        assert_eq!((target.role, target.id.as_str(), target.anchor), (Role::Cpu, id.as_str(), (30.0, 2.0)));
-        assert_eq!(target.recording.placement.delta_x, 1.5);
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start.clone(), id.clone())));
 
         on_chords(false, false, true);
         let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
@@ -5847,23 +6070,313 @@ mod tests {
         );
         assert_eq!((lifted[1].y, lifted[1].situation_kind), (5.0, SITUATION_AIR), "a raised start is in the air");
 
-        keep_placement(&id, Placement { delta_x: -2.0, delta_y: 0.0, ..Placement::default() });
-        warp_landed();
-        on_chords(false, false, true);
-        let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        on_chords(false, false, true);
-        let tick = service_at(&root, &none(), "2026-11-08", state(8), state(7));
-        assert_eq!(tick.warp_place.map(|(_, place)| place.delta_x), Some(-2.0), "Keep wins until the game closes");
-        assert_eq!(macros.load(&id).unwrap().placement.delta_x, 1.5, "Keep leaves the file alone");
-
         // A chain warps to macro 1's start save and plays with macro 1's placement, so Edit placement edits macro 1.
         let chain = Chain::new("Pressure", vec![id.clone(), loose.clone()]).unwrap();
         let chain_id = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&chain).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Cpu, Some(&chain_id), 3).unwrap();
         index.save(&root).unwrap();
-        let target = placement_target(&root).expect("a chain edits its macro 1");
-        assert_eq!((target.id.as_str(), target.anchor), (id.as_str(), (30.0, 2.0)));
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((start, id)));
+    }
+
+    /// A save named Jab start (Player 1 at x 10, the CPU at x 50 with 6.3 %), and two macros that start from it;
+    /// the first has an offset of +5.
+    fn placement_library(root: &Path) -> (String, [String; 2]) {
+        let mut cpu = at_x(50.0);
+        (cpu.percent, cpu.fighter_kind) = (6.3, 7);
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).save_new(&NamedSave::new("Jab start", at_x(10.0), cpu).unwrap()).unwrap();
+        let macros = Library::new(root.join(MACROS_DIR));
+        let ids = ["Nair", "Fair"].map(|name| {
+            let mut recording = MacroRecording::new(name, "13.0.5", StartState::neutral(7, 0, 1.0), vec![InputFrame::default()]).unwrap();
+            recording.set_start_save(Some(&save)).unwrap();
+            if name == "Nair" {
+                recording.set_placement(Placement { delta_x: 5.0, delta_y: 0.0, ..Placement::default() }).unwrap();
+            }
+            macros.save_new(&recording).unwrap()
+        });
+        (save, ids)
+    }
+
+    #[test]
+    fn replays_opens_a_start_save_without_reading_it_twice() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("replays-open-reads");
+        let (save, macros) = placement_library(&root);
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR))
+            .save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        let book = Book::new(RecordingIndex::load(&root).unwrap());
+        let open = |effect| {
+            let mut tick = Tick::default();
+            let before = store::file_reads();
+            post_effect(effect);
+            apply_menu(&root, &mut Playback::new(), &book, &mut tick);
+            (tick, store::file_reads() - before)
+        };
+        let (direct, direct_reads) = open(Effect::ChangePlacement { save, relink: Some(macros[0].clone()) });
+        let (active, active_reads) = open(Effect::ChangeActivePlacement);
+        assert!(direct.place.is_some());
+        assert_eq!(active.place, direct.place, "same pair, editing role, shared count and relink target");
+        // Both paths read the save and count its links. Resolving an active chain
+        // additionally needs the chain and its first macro, not a second save read.
+        assert!(active_reads <= direct_reads + 2, "direct={direct_reads}; active chain={active_reads}");
+
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save(Some("missing")).unwrap();
+        library.overwrite(&macros[0], &first).unwrap();
+        let (missing, _) = open(Effect::ChangeActivePlacement);
+        assert!(missing.place.is_none());
+        assert_eq!(missing.notices, [PLACE_NO_START]);
+    }
+
+    /// What the picker confirms on `pair` after `edit`: the fields that differ, as the wizard reports them.
+    fn placed(pair: &[SavedState; 2], copy: bool, macros: u8, edit: impl FnOnce(&mut crate::model::record_place::Setup)) -> Commit {
+        use crate::model::record_place::{saved_fighter, Edits};
+        let was = [saved_fighter(&pair[0]).0, saved_fighter(&pair[1]).0];
+        let mut setup = was;
+        edit(&mut setup);
+        let edits = [0, 1].map(|i| Edits {
+            spot: setup[i].place != was[i].place || setup[i].at != was[i].at,
+            state: setup[i].state != was[i].state,
+            percent: setup[i].percent != was[i].percent,
+        });
+        Commit { ticket: 7, copy, setup, edits, stage: 31, macros }
+    }
+
+    fn saved_pair(root: &Path, id: &str) -> [SavedState; 2] {
+        let save = Store::<NamedSave>::new(root.join(SAVES_DIR)).load(id).unwrap();
+        [save.player, save.cpu]
+    }
+
+    fn file_bytes(root: &Path, dir: &str, id: &str) -> Vec<u8> {
+        std::fs::read(root.join(dir).join(format!("{id}.json"))).unwrap()
+    }
+
+    /// Operator 2026-11-25: Change placement "should also edit on the save state itself". Only the edited half is
+    /// written, field by field; no macro file is touched, so Play still adds a macro's offset to the new spot.
+    fn a_placement_save_rewrites_only_the_edited_half_of_the_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-change");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id));
+        let pair = saved_pair(&root, &save);
+        let commit = placed(&pair, false, 2, |setup| setup[1].at = [40.0, 0.0]);
+        let done = commit_placement(&root, &save, Some(&macros[0]), commit);
+        let Placed::Saved { ticket, pair: loads, notice } = done else { panic!("{done:?}") };
+        assert_eq!((ticket, notice.as_str()), (7, "Saved · Jab start · 2 macros start here"));
+        let written = saved_pair(&root, &save);
+        assert_eq!(written[0], pair[0], "the half that was not edited is as saved");
+        assert_eq!((written[1].x, written[1].saved_stage), (40.0, Some(31)));
+        // rv-edge-juggle-sol 15:54:53Z: a spot edit keeps the file's own damage, 6.3 and not 6.
+        assert_eq!(written[1].percent.to_bits(), pair[1].percent.to_bits());
+        assert_eq!(*loads, written, "the pair to load once is the file's");
+        assert_eq!(macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)), before, "no macro file is touched");
+        let nair = Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap();
+        let named = NamedSave::new("Jab start", written[0].clone(), written[1].clone()).unwrap();
+        assert_eq!(warp_pair(named, Some((Role::Player, nair.placement)))[0].x, 15.0, "Play still adds the offset");
+        // One macro reads in the singular; a save no macro starts from says nothing of macros.
+        let one = commit_placement(&root, &save, None, placed(&written, false, 1, |setup| setup[0].percent = 20));
+        assert!(matches!(&one, Placed::Saved { notice, .. } if notice == "Saved · Jab start · 1 macro starts here"), "{one:?}");
+        let none = commit_placement(&root, &save, None, placed(&written, false, 0, |setup| setup[0].percent = 30));
+        assert!(matches!(&none, Placed::Saved { notice, .. } if notice == "Saved · Jab start"), "{none:?}");
+        assert_eq!(saved_pair(&root, &save)[0].percent, 30.0);
+        // A save that is gone refuses, by its ticket.
+        assert_eq!(commit_placement(&root, "no-such-save", None, placed(&pair, false, 0, |setup| setup[0].percent = 1)),
+            Placed::Refused { ticket: 7, name: String::new() });
+    }
+
+    fn a_save_with_nothing_edited_writes_no_file() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-none");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = file_bytes(&root, SAVES_DIR, &save);
+        let pair = saved_pair(&root, &save);
+        // Also when the answer was "copy": with nothing to write there is nothing to copy.
+        for copy in [false, true] {
+            let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, copy, 2, |_| {}));
+            let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+            assert_eq!((notice.as_str(), *loads == pair), ("Nothing changed · Jab start", true));
+        }
+        assert_eq!(file_bytes(&root, SAVES_DIR, &save), before);
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1);
+        assert_eq!(Library::new(root.join(MACROS_DIR)).load(&macros[0]).unwrap().start_save.as_deref(), Some(save.as_str()));
+    }
+
+    fn the_bound_copy_follows_a_changed_placement() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-bound");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, _) = placement_library(&root);
+        RecordingIndex::update(&root, |index| { index.bind_save(Some(&save), 1)?; Ok(true) }).unwrap();
+        invalidate_bound();
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 50.0);
+        assert!(bound_sync(&root).is_none());
+        let pair = saved_pair(&root, &save);
+        assert!(matches!(commit_placement(&root, &save, None, placed(&pair, false, 0, |setup| setup[1].at = [40.0, 0.0])), Placed::Saved { .. }));
+        assert_eq!(bound_sync(&root).unwrap().unwrap()[1].x, 40.0, "Load goes to the new spot");
+    }
+
+    /// Operator 2026-11-25, PC5: "copy it for this macro". The copy is a new save; it is written before the macro is
+    /// linked to it, and the save and the other macro are not touched.
+    fn a_copy_is_written_before_the_macro_is_relinked() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-copy");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1]));
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        let Placed::Saved { pair: loads, notice, .. } = done else { panic!("{done:?}") };
+        assert_eq!(notice, "Saved a copy · Save 1");
+        let library = Library::new(root.join(MACROS_DIR));
+        let copy = library.load(&macros[0]).unwrap().start_save.expect("linked");
+        assert_ne!(copy, save);
+        assert_eq!((saved_pair(&root, &copy)[1].x, loads[1].x), (40.0, 40.0));
+        assert_eq!(library.load(&macros[0]).unwrap().placement.delta_x, 5.0, "the macro keeps its offset");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), file_bytes(&root, MACROS_DIR, &macros[1])), before);
+        // From the save's own screen a copy is a new save that no macro uses.
+        let own = commit_placement(&root, &save, None, placed(&pair, true, 2, |setup| setup[0].at = [0.0, 0.0]));
+        assert!(matches!(&own, Placed::Saved { notice, .. } if notice == "Saved a copy · Save 2"), "{own:?}");
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 3);
+        assert_eq!(library.load(&macros[1]).unwrap().start_save.as_deref(), Some(save.as_str()));
+        assert_eq!(library.load(&macros[0]).unwrap().start_save.as_deref(), Some(copy.as_str()));
+    }
+
+    fn a_chain_copy_keeps_the_first_macros_own_start_save_switch() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-chain-copy-switch");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let mut first = library.load(&macros[0]).unwrap();
+        first.set_start_save_on(false);
+        library.overwrite(&macros[0], &first).unwrap();
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let open = service_at(&root, &none(), "2026-11-25", state(8), state(7)).place.unwrap();
+        assert_eq!(open.relink.as_ref(), Some(&macros[0]), "the chain uses macro 1 even with its own switch Off");
+        assert_eq!(open.save, save);
+        let commit = placed(&open.pair, true, 2, |setup| setup[1].at = [40.0, 0.0]);
+        assert!(matches!(commit_placement(&root, &open.save, open.relink.as_deref(), commit), Placed::Saved { .. }));
+        let written = library.load(&macros[0]).unwrap();
+        let copy = written.start_save.clone().unwrap();
+        assert_ne!(copy, save);
+        assert_eq!(saved_pair(&root, &copy)[1].x, 40.0);
+        assert_eq!(active_placement_ids(&root, Role::Cpu), Ok((copy.clone(), macros[0].clone())));
+        first.start_save = Some(copy);
+        assert_eq!(written.start_save_on, first.start_save_on, "copy must not turn standalone warps On");
+        assert_eq!(written, first, "the new start-save id is the only macro edit");
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 2)?; Ok(true) }).unwrap();
+        assert_eq!(active_placement_ids(&root, Role::Cpu).unwrap_err(), PLACE_NO_START);
+    }
+
+    /// rv-edge-juggle-sol 16:38:12Z: the second write fails (a directory stands where the macro's temporary file
+    /// goes). The old link stays, the copy does not, and the picker is told the save was not written.
+    fn a_failed_relink_leaves_the_old_link_and_no_copy() {
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-relink");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let before = (file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id)));
+        std::fs::create_dir(root.join(MACROS_DIR).join(format!("{}.json.tmp", macros[0]))).unwrap();
+        let pair = saved_pair(&root, &save);
+        let done = commit_placement(&root, &save, Some(&macros[0]), placed(&pair, true, 2, |setup| setup[1].at = [40.0, 0.0]));
+        assert_eq!(done, Placed::Refused { ticket: 7, name: "Jab start".into() });
+        assert_eq!(Store::<NamedSave>::new(root.join(SAVES_DIR)).list().unwrap().entries.len(), 1, "no copy is left");
+        assert_eq!((file_bytes(&root, SAVES_DIR, &save), macros.clone().map(|id| file_bytes(&root, MACROS_DIR, &id))), before);
+        let library = Library::new(root.join(MACROS_DIR));
+        for id in &macros {
+            assert_eq!(library.load(id).unwrap().start_save.as_deref(), Some(save.as_str()));
+        }
+    }
+
+    /// Operator 2026-11-25, PC2: the Replays row "opens the SAME picker", on the start save of the pop-up role's
+    /// active macro (a chain: its macro 1's). The save's own screen and the pop-up open it with no macro to relink.
+    fn the_replays_row_opens_the_active_macros_start_save() {
+        use crate::model::record_place::Shared;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-open");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        set_record_role(Role::Cpu);
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!((tick.place, tick.notices), (None, vec![PLACE_NO_MACRO]));
+        let (save, macros) = placement_library(&root);
+        // The count is of macro files: a chain that uses one of them is not a third.
+        let chain = Store::<Chain>::new(root.join(MACROS_DIR)).save_new(&Chain::new("Pressure", macros.to_vec()).unwrap()).unwrap();
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&chain), 1)?; Ok(true) }).unwrap();
+        post_effect(Effect::ChangeActivePlacement);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let open = PlaceOpen {
+            save: save.clone(),
+            relink: Some(macros[0].clone()),
+            name: "Jab start".into(),
+            pair: saved_pair(&root, &save),
+            edit: Role::Cpu,
+            shared: Shared { macros: 2, from_macro: true },
+        };
+        assert_eq!(tick.place.as_deref(), Some(&open));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: None });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: None, shared: Shared { macros: 2, from_macro: false }, ..open.clone() }));
+        post_effect(Effect::ChangePlacement { save: save.clone(), relink: Some(macros[1].clone()) });
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.place.as_deref(), Some(&PlaceOpen { relink: Some(macros[1].clone()), ..open }));
+        post_effect(Effect::ChangePlacement { save: "no-such-save".into(), relink: None });
+        assert_eq!(service_at(&root, &none(), "2026-11-25", state(8), state(7)).place, None);
+    }
+
+    /// Operator 2026-11-25, PC6 A: "Momentum row; an Offset row shows an old offset, and A clears it". Each row
+    /// writes its one field into the macro's file; the menu's catalog carries both for the rows.
+    fn the_momentum_and_offset_rows_write_only_their_field() {
+        use crate::model::recording_menu::MacroPlace;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("place-rows");
+        migrate_at_boot(&root, &none(), "2026-11-25").unwrap();
+        let (save, macros) = placement_library(&root);
+        let library = Library::new(root.join(MACROS_DIR));
+        let before = library.load(&macros[0]).unwrap();
+        let other = file_bytes(&root, MACROS_DIR, &macros[1]);
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [5.0f32.to_bits(), 0.0f32.to_bits()], rest: false }));
+        assert_eq!(places.get(&macros[1]), Some(&MacroPlace::default()));
+        post_effect(Effect::SetMomentum { id: macros[0].clone(), rest: true });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut rest = library.load(&macros[0]).unwrap();
+        assert_eq!(rest.placement, Placement { momentum: MomentumMode::AtRest, ..before.placement });
+        rest.placement = before.placement;
+        assert_eq!(rest, before, "nothing else of the file changes");
+        post_effect(Effect::ClearOffset { id: macros[0].clone() });
+        let _ = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        let mut cleared = library.load(&macros[0]).unwrap();
+        assert_eq!(cleared.placement, Placement { momentum: MomentumMode::AtRest, ..Placement::default() }, "Momentum stays");
+        cleared.placement = before.placement;
+        assert_eq!(cleared, before, "inputs, start save and name are as they were");
+        assert_eq!(file_bytes(&root, MACROS_DIR, &macros[1]), other, "the other macro's file is untouched");
+        let places = super::super::rr_runtime::load_catalog(&root).unwrap().macro_places;
+        assert_eq!(places.get(&macros[0]), Some(&MacroPlace { offset: [0, 0], rest: true }));
+        // Play after the clear warps to the save's own spot, at rest.
+        RecordingIndex::update(&root, |index| { index.set_active(Role::Cpu, Some(&macros[0]), 1)?; Ok(true) }).unwrap();
+        set_record_role(Role::Cpu);
+        on_chords(false, false, true);
+        let tick = service_at(&root, &none(), "2026-11-25", state(8), state(7));
+        assert_eq!(tick.warp.as_deref(), Some(save.as_str()));
+        assert_eq!(tick.warp_place.map(|(role, place)| (role, place.delta_x, place.momentum)), Some((Role::Cpu, 0.0, MomentumMode::AtRest)));
     }
 
     fn exact_brawler() -> crate::engine::mii::lifetime::Configuration {
@@ -6413,13 +6926,13 @@ mod tests {
         if start_save {
             recording.set_start_save(Some(&save)).unwrap();
         }
+        if let Some(placement) = placement {
+            recording.set_placement(placement).unwrap();
+        }
         let id = Library::new(root.join(MACROS_DIR)).save_new(&recording).unwrap();
         let mut index = RecordingIndex::load(&root).unwrap();
         index.set_active(Role::Player, Some(&id), 1).unwrap();
         index.save(&root).unwrap();
-        if let Some(placement) = placement {
-            keep_placement(&id, placement);
-        }
         on_chords(false, true, false);
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
         assert!(take_start_speed(Role::Player).is_none(), "{tag}: nothing before the run's first input");
@@ -6842,7 +7355,7 @@ mod tests {
             ("a_cpu_crop_preview_holds_right_whatever_the_facing", a_cpu_crop_preview_holds_right_whatever_the_facing as fn()),
             ("a_named_load_is_taken_with_save_states_off", a_named_load_is_taken_with_save_states_off as fn()),
             ("a_linked_crop_preview_starts_with_save_states_off", a_linked_crop_preview_starts_with_save_states_off as fn()),
-            ("a_crop_preview_ends_when_the_library_cannot_be_read", a_crop_preview_ends_when_the_library_cannot_be_read as fn()),
+            ("an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return", an_unreadable_index_refuses_a_new_preview_but_does_not_prevent_a_vault_return as fn()),
             ("a_session_end_drops_the_preview_home", a_session_end_drops_the_preview_home as fn()),
             ("a_refused_vault_preview_says_why_and_ends", a_refused_vault_preview_says_why_and_ends as fn()),
             ("a_crop_preview_plays_its_window_on_the_role_through_the_play_queue", a_crop_preview_plays_its_window_on_the_role_through_the_play_queue as fn()),
@@ -6857,7 +7370,6 @@ mod tests {
             ("a_posted_menu_effect_reaches_the_worker", a_posted_menu_effect_reaches_the_worker as fn()),
             ("an_empty_posted_record_keeps_the_empty_notice", an_empty_posted_record_keeps_the_empty_notice as fn()),
             ("the_cpu_inject_slot_starts_empty", the_cpu_inject_slot_starts_empty as fn()),
-            ("a_frame_past_the_resident_minute_comes_from_the_window", a_frame_past_the_resident_minute_comes_from_the_window as fn()),
             ("record_follows_the_published_cpu_role", record_follows_the_published_cpu_role as fn()),
             ("a_cold_start_records_on_the_saved_popup_role", a_cold_start_records_on_the_saved_popup_role as fn()),
             ("the_open_take_is_the_capture_role", the_open_take_is_the_capture_role as fn()),
@@ -6919,6 +7431,14 @@ mod tests {
             ("delete_and_edit_reach_the_card", delete_and_edit_reach_the_card as fn()),
             ("the_active_slot_follows_the_bound_save_and_save_writes_it", the_active_slot_follows_the_bound_save_and_save_writes_it as fn()),
             ("edit_placement_targets_the_active_macro_and_play_warps_with_its_offset", edit_placement_targets_the_active_macro_and_play_warps_with_its_offset as fn()),
+            ("a_placement_save_rewrites_only_the_edited_half_of_the_file", a_placement_save_rewrites_only_the_edited_half_of_the_file as fn()),
+            ("a_save_with_nothing_edited_writes_no_file", a_save_with_nothing_edited_writes_no_file as fn()),
+            ("the_bound_copy_follows_a_changed_placement", the_bound_copy_follows_a_changed_placement as fn()),
+            ("a_copy_is_written_before_the_macro_is_relinked", a_copy_is_written_before_the_macro_is_relinked as fn()),
+            ("a_chain_copy_keeps_the_first_macros_own_start_save_switch", a_chain_copy_keeps_the_first_macros_own_start_save_switch as fn()),
+            ("a_failed_relink_leaves_the_old_link_and_no_copy", a_failed_relink_leaves_the_old_link_and_no_copy as fn()),
+            ("the_replays_row_opens_the_active_macros_start_save", the_replays_row_opens_the_active_macros_start_save as fn()),
+            ("the_momentum_and_offset_rows_write_only_their_field", the_momentum_and_offset_rows_write_only_their_field as fn()),
             ("switch_on_an_exact_mii_macro_asks_for_that_mii", switch_on_an_exact_mii_macro_asks_for_that_mii as fn()),
             ("a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it", a_setup_restore_leaves_the_bound_save_and_the_slot_returns_to_it as fn()),
             ("a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes", a_setup_bound_with_y_stays_loads_target_until_the_bound_save_changes as fn()),

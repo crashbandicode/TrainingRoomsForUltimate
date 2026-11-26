@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, RecordingScreens, SaveFile, SequenceFile};
+use crate::model::recording_menu::{CatalogBundle, ComboFile, LoopMark, MacroFile, MacroPlace, RecordingScreens, SaveFile, SequenceFile};
 use crate::model::store::{catalog_changes, try_recording_read, CatalogListing, CatalogSignatures, Record, Store, CATALOG_DIRS};
 
 use super::library::{
@@ -15,97 +15,17 @@ use super::library::{
 use super::macro_ui::macro_panel::{fighter_gate, FighterGate, FighterOrigin};
 use super::macro_ui::clip_marks::{Marks, Span};
 use super::macros::{ActionMark, InputFrame, Library, MacroRecording, StartState};
-#[cfg(test)]
-use super::macros::MAX_FRAMES;
 use super::playback::{Book, Playback};
 use crate::model::combo::Combo;
 use crate::model::combo_record::{clean_name, default_name, drill_take_name, is_drill_take_name, ComboLibrary, ComboRecord};
 use crate::model::state::record::SavedState;
 
-/// One minute at 60 fps. Five hot macros stay resident.
-pub const RESIDENT_FRAMES: usize = 3_600;
-/// The worker reads this many frames past the resident minute.
-pub const READ_WINDOW: usize = 600;
 pub const MISSING_START_SAVE: &str = "No start save. This macro plays from where the fighters are.";
 pub const CHORD_NOTICE: &str =
     "Record, Play on Player 1, Play on CPU, and the recording pop-up replace Input Record and Input Playback.";
 pub const EMPTY_RECORDING: &str = "Recording was empty";
 /// The sentence Save last combo already uses when the strip has no link.
 pub const EMPTY_COMBO: &str = "No combo yet: land a hit and a follow-up first.";
-
-/// Frames the hook may index. The rest of a long file stays out of this struct until the worker reads a window.
-#[derive(Clone, Debug)]
-pub struct Tape {
-    resident: Vec<InputFrame>,
-    window: Vec<InputFrame>,
-    window_start: usize,
-    len: usize,
-    reads: Vec<(usize, usize)>,
-}
-
-impl Tape {
-    pub fn load(frames: &[InputFrame]) -> Self {
-        let n = frames.len().min(RESIDENT_FRAMES);
-        Self {
-            resident: frames[..n].to_vec(),
-            window: Vec::new(),
-            window_start: 0,
-            len: frames.len(),
-            reads: Vec::new(),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn resident_len(&self) -> usize {
-        self.resident.len()
-    }
-
-    #[cfg(test)]
-    pub fn window_len(&self) -> usize {
-        self.window.len()
-    }
-
-    #[cfg(test)]
-    pub fn reads(&self) -> &[(usize, usize)] {
-        &self.reads
-    }
-
-    /// Hook path. It does not read the card and it does not allocate.
-    pub fn hook_frame(&self, index: usize) -> Option<InputFrame> {
-        if index < self.resident.len() {
-            return Some(self.resident[index]);
-        }
-        if index >= self.window_start && index < self.window_start + self.window.len() {
-            return Some(self.window[index - self.window_start]);
-        }
-        None
-    }
-
-    /// Worker path. The closure is the only reader.
-    pub fn fill_window(
-        &mut self,
-        index: usize,
-        mut read: impl FnMut(usize, usize) -> Vec<InputFrame>,
-    ) {
-        if index < self.resident.len() || index >= self.len {
-            return;
-        }
-        let start = RESIDENT_FRAMES + ((index - RESIDENT_FRAMES) / READ_WINDOW) * READ_WINDOW;
-        let count = READ_WINDOW.min(self.len - start);
-        if self.window_start == start && self.window.len() == count {
-            return;
-        }
-        self.reads.push((start, count));
-        self.window = read(start, count);
-        self.window_start = start;
-    }
-}
-
-/// The file cap stays 36,000. A length inside it is kept.
-#[cfg(test)]
-pub fn length_is_kept(frames: usize) -> bool {
-    frames > 0 && frames <= MAX_FRAMES
-}
 
 #[derive(Clone, Debug)]
 pub struct Capture {
@@ -694,7 +614,8 @@ pub fn load_catalog(root: &Path) -> Result<CatalogBundle, Error> {
 }
 
 enum CatalogEntry {
-    Macro(MacroFile, crate::model::trim::Trim),
+    /// A macro or a chain, its trim, and what Play does at its start save's warp (a chain has none of its own).
+    Macro(MacroFile, crate::model::trim::Trim, MacroPlace),
     Save(SaveFile),
     Combo(ComboFile, crate::model::trim::Trim),
     Sequence(SequenceFile),
@@ -705,7 +626,7 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
     let entry = match folder {
         0 => {
             let Some(file) = Library::new(dir).load_with_sibling::<Chain>(&id)? else { return Ok(None) };
-            let (file, trim) = match file {
+            let (file, trim, place) = match file {
                 Ok(file) => (MacroFile {
                     id,
                     name: file.name,
@@ -715,7 +636,10 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: fighter_name(file.start.fighter_kind),
                     span: file.frames.len() as u32,
-                }, file.trim),
+                }, file.trim, MacroPlace {
+                    offset: [file.placement.delta_x.to_bits(), file.placement.delta_y.to_bits()],
+                    rest: file.placement.momentum == crate::engine::macros::MomentumMode::AtRest,
+                }),
                 Err(file) => (MacroFile {
                     id,
                     name: file.name,
@@ -725,9 +649,9 @@ fn catalog_entry(root: &Path, folder: usize, id: String) -> std::io::Result<Opti
                     start_save_on: file.start_save_on,
                     recorded_on: String::new(),
                     span: 0,
-                }, crate::model::trim::Trim::Off),
+                }, crate::model::trim::Trim::Off, MacroPlace::default()),
             };
-            CatalogEntry::Macro(file, trim)
+            CatalogEntry::Macro(file, trim, place)
         }
         1 => {
             let Some(save) = Store::<NamedSave>::new(dir).load_for_catalog(&id)? else { return Ok(None) };
@@ -892,8 +816,11 @@ impl CatalogCache {
         let mut catalog = CatalogBundle::default();
         for file in self.files.values().filter_map(|file| file.entry.as_ref()) {
             match file {
-                CatalogEntry::Macro(file, trim) => {
+                CatalogEntry::Macro(file, trim, place) => {
                     catalog.macro_trims.insert(file.id.clone(), *trim);
+                    if !file.chain {
+                        catalog.macro_places.insert(file.id.clone(), *place);
+                    }
                     catalog.macros.push(file.clone());
                 }
                 CatalogEntry::Save(file) => catalog.saves.push(file.clone()),
@@ -1230,28 +1157,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![9]
         );
-    }
-
-    fn a_long_macro_plays_from_a_600_frame_window() {
-        assert!(length_is_kept(MAX_FRAMES));
-        assert!(!length_is_kept(MAX_FRAMES + 1));
-        let frames: Vec<InputFrame> = (0..4_300).map(|index| frame(index as u32)).collect();
-        let mut tape = Tape::load(&frames);
-        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
-        assert_eq!(tape.hook_frame(3_599).unwrap().buttons, 3_599);
-        assert!(tape.reads().is_empty());
-        assert!(tape.hook_frame(3_600).is_none());
-        tape.fill_window(3_600, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads(), &[(3_600, 600)]);
-        assert_eq!(tape.window_len(), 600);
-        assert_eq!(tape.hook_frame(3_600).unwrap().buttons, 3_600);
-        assert_eq!(tape.hook_frame(4_199).unwrap().buttons, 4_199);
-        tape.fill_window(4_100, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads().len(), 1);
-        tape.fill_window(4_200, |start, count| frames[start..start + count].to_vec());
-        assert_eq!(tape.reads(), &[(3_600, 600), (4_200, 100)]);
-        assert_eq!(tape.hook_frame(4_200).unwrap().buttons, 4_200);
-        assert_eq!(tape.resident_len(), RESIDENT_FRAMES);
     }
 
     fn the_play_chords_drive_the_role_machines() {
@@ -2087,7 +1992,6 @@ mod tests {
             ("a_stepped_catalog_build_is_load_catalog_a_file_at_a_time", a_stepped_catalog_build_is_load_catalog_a_file_at_a_time as fn()),
             ("the_catalog_cache_serves_only_a_fresh_catalog", the_catalog_cache_serves_only_a_fresh_catalog as fn()),
             ("record_follows_the_popup_role", record_follows_the_popup_role as fn()),
-            ("a_long_macro_plays_from_a_600_frame_window", a_long_macro_plays_from_a_600_frame_window as fn()),
             ("the_play_chords_drive_the_role_machines", the_play_chords_drive_the_role_machines as fn()),
             ("a_chain_asks_fighter_mismatch_for_macro_1_only", a_chain_asks_fighter_mismatch_for_macro_1_only as fn()),
             ("rename_uses_the_switch_keyboard_headers", rename_uses_the_switch_keyboard_headers as fn()),

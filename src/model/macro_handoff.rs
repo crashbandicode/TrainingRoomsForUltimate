@@ -32,8 +32,6 @@ pub struct MacroQueries {
     pub naming_pending: bool,
     /// The layer is suspended (a waiting-room scene left with a draft).
     pub suspended: bool,
-    /// The placement editor's cross marker, if it shows one (x, y).
-    pub marker: Option<(f32, f32)>,
 }
 
 /// What one physical P1 mapping may do with the published editor snapshot.
@@ -68,7 +66,6 @@ impl MacroQueries {
         browser_release: false,
         naming_pending: false,
         suspended: false,
-        marker: None,
     };
 }
 

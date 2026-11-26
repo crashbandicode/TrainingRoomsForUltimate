@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 179;
+pub const COUNT: usize = 183;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -151,6 +151,8 @@ pub static DEFS: [Def; COUNT] = [
     // Draft 9 (SPEC-core-04 §3.1): Off by default.
     row!("respawn_invincibility", Single, 2, [1]),
     row!("settings_override_playback", Single, 2, [1]),
+    // Change placement on a start save that macros share (operator 2026-11-25, PC5): Prompt by default.
+    row!("shared_start_save", Single, 3, [0]),
     row!("dev_reload_config", Single, 2, [1]),
     row!("dev_debug_hooks", Single, 2, [1]),
     // Preload Samples: the fork's id (SPEC-core-02 §2.8 proposed `preload_samples`; see CARRY-OVER.md).
@@ -276,6 +278,8 @@ pub static DEFS: [Def; COUNT] = [
     row!("juggle_reaction", Single, 3, [1]),
     row!("juggle_reaction_frames", Single, 30, [11]),
     row!("edge_cpu_percent", Single, 301, [100]),
+    row!("edge_under", Single, 2, [1]),
+    row!("edge_jumps", Single, 2, [0]),
     row!("edge_attempts", Single, 3, [0]),
     row!("juggle_attempts", Single, 3, [0]),
 
@@ -288,4 +292,5 @@ pub static DEFS: [Def; COUNT] = [
     row!("link_history", Single, 2, [0]),
     row!("move_names", Single, 2, [1]),
     row!("playback_indicator", Single, 2, [0]),
+    row!("playback_delay", Single, 8, [0]),
 ];

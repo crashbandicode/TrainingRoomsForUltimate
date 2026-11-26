@@ -19,6 +19,45 @@ player never sees. It is cropped out: the picture is the 1842×1036 region at (3
 | `tut-controls-change-chord.mp4` | Button chords: Save State Save is changed to ZL + D-pad Left, which then saves | `t04-controls-change-chord`, 0.2–7.8 s | 1,867,343 | `4b49a4cb454bea75` | [Controls](guide/controls.md) |
 | `tut-save-load.mp4` | ZL + D-pad Down saves, two jabs hit the CPU, ZL + D-pad Up puts both fighters back at 0% | `t06-save-load` of run `tut-c51f4d81-yoga-2` (the diagnostic build of `c51f4d81`), 0.5–7.5 s, whole frame: the capture tool was switched off during the take, so nothing is cropped | 3,748,140 | `435f35b4f8e24e1c` | [Save states](guide/save-states.md) |
 
+## rc.15 install 4 clips (2026-11-25)
+
+19 MP4 clips of install 4's features, embedded in the [rc.15 release notes](RELEASE-NOTES-rc15.md#clips).
+
+- **Run/build:** Eden runs `i4-media-qp-yoga-01` (the Quick Play capture) and `i4-media-yoga-01` (Training), the
+  installed build `a945b0c1` with the card's 21 plugins; Eden only, not checked on the console.
+- **Format:** H.264, 60 fps, no audio. The full-screen clips are 1280×720 from a 1920×1080 capture. A close-up is a
+  crop of that capture around the drill panel, the input display or the playback mark, where the effect cannot be
+  read at 1280×720.
+- **In the picture:** the stage is Final Destination's flat form. The yellow BRIDGE LIVE banner is the test bridge's
+  overlay.
+- **Frame pacing:** the game ran at 61.0 to 62.6 fps, so the 60 fps capture could not include every game frame.
+  Some captured frames also repeat: `i4-cpu-damage-range.mp4` has three repeats.
+- **Not here:** the ledge attack was not filmed. The 1080p evidence clips, GIFs and trip-attack clips are retained
+  with the ledger under `artifacts/phase23/install4-media/20261125-1352Z/`. The raw films were removed after encoding.
+- **Total:** 27,393,733 bytes.
+
+| File | Shows | Picture | Bytes | sha256 |
+| --- | --- | --- | ---: | --- |
+| `media/i4-replay-editor-timeline.mp4` | The clip editor over the game | 1280×720 | 1,177,939 | `48a92a57` |
+| `media/i4-replay-editor-preview.mp4` | Preview on Player 1, then on the CPU | 1280×720 | 2,934,762 | `272ee935` |
+| `media/i4-vault-recordings-menu.mp4` | Recordings | 1280×720 | 297,714 | `f64f6358` |
+| `media/i4-vault-playback.mp4` | Playing a capture back | 1280×720 | 4,121,266 | `0bf55623` |
+| `media/i4-trim-modes.mp4` | Trim: Off, Start, End and Both | 1280×720 | 3,240,017 | `a338f21d` |
+| `media/i4-playback-indicator-zoom.mp4` | The playback indicator | close-up | 864,615 | `67674e67` |
+| `media/i4-drill-step-names.mp4` | Drill steps are listed by move | 1280×720 | 435,263 | `21999d69` |
+| `media/i4-move-names-toggle.mp4` | Move names Off and On | 1280×720 | 1,436,743 | `80b44cca` |
+| `media/i4-action-off-147-zoom.mp4` | Match angle and deflection, Off | close-up | 790,213 | `2656134a` |
+| `media/i4-action-on-147-zoom.mp4` | Match angle and deflection, On, another angle | close-up | 810,794 | `c5ca99d5` |
+| `media/i4-action-on-135-zoom.mp4` | Match angle and deflection, On, the recorded angle | close-up | 751,403 | `2e095875` |
+| `media/i4-steer-steered-zoom.mp4` | A steered special, steered | close-up | 731,983 | `1db9271b` |
+| `media/i4-steer-straight-zoom.mp4` | A steered special, not steered | close-up | 695,066 | `6614162c` |
+| `media/i4-edge-getup-record.mp4` | A get-up attack, recorded | 1280×720 | 2,706,716 | `f851b8c7` |
+| `media/i4-edge-getup-play.mp4` | A get-up attack, played back | 1280×720 | 1,715,756 | `64ec18c4` |
+| `media/i4-reset-chord-alone-zoom.mp4` | L + R + A by itself | close-up | 1,386,307 | `c010352d` |
+| `media/i4-reset-after-fail-zoom.mp4` | L + R + A after a failed attempt | close-up | 1,134,887 | `8fb0b3cc` |
+| `media/i4-scrollback-zoom.mp4` | Scrolling the input display back | close-up | 1,750,067 | `ccd31142` |
+| `media/i4-cpu-damage-range.mp4` | Damage range sliders | 1280×720 | 412,222 | `053af66e` |
+
 ## rc.15 Stage tech practice (2026-11-17)
 
 `media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,

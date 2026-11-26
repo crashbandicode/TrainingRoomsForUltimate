@@ -89,6 +89,8 @@ Controls › Button chords ([Controls](controls.md)).
 
 - **Play** gives the side one recorded frame per game frame, in order, and warps to the start save once when its switch
   is On. A macro recorded on one side plays on either. With no active macro, the chord does nothing.
+- [Playback delay](../menu/recording.md#playback-delay) can hold the first input after placement, once per Play;
+  it defaults to None.
 - **Both Play chords can run at once:** Player 1 and the CPU play together. A chain's own macros play one after
   another.
 - **Your chord buttons don't reach the game** while you hold them, so pressing Record or Play never makes Player 1
@@ -312,7 +314,8 @@ on the [Recording page's pop-up section](../menu/recording.md#the-recording-pop-
 - While it is open it takes your buttons. B closes it and leaves the bound save, the active macros and the cursor as
   they were. That B never reaches your fighter, tapped or held; your buttons stay with the pop-up until you let go.
 - ZR switches between Player 1 and CPU, as on the Recording page. The ZR cap sits beside the role tabs; the lit side
-  is the one Record records and Edit placement edits. ZL, L and R switch the pop-up's tabs; on CPU there is only one.
+  is the one Record records and whose active macro the Replays row Change placement opens. ZL, L and R switch the
+  pop-up's tabs; on CPU there is only one.
 - The first help line shows the configured Record, Play on Player 1 and Play on CPU chords. It follows changes, reads
   an unbound chord as `disabled`, and uses P1 / CPU or points to the chords screen if the full line will not fit.
 - A acts at once: no file screens. Renaming, cropping and deleting are on the page.
@@ -358,6 +361,8 @@ On the Recording page, A on a file opens its own screen. The rows each kind of f
 
 - **Set active** is one row, for the side in view: Right sets On and Left sets Off. Left on a row that is already Off
   doesn't clear the other side.
+- **Change placement** is on a save's screen, and on a macro's or a chain's when it has a start save. It closes the
+  menu and opens the picker on that save ([Change placement](#change-placement-and-the-replay-window)).
 - **Names:** a name may be at most 48 characters, and it may not be empty or hold a control character.
   - Rename opens the Switch keyboard. B, or an empty confirm, keeps the old name.
   - A new chain or sequence with an empty name is Chain N or Sequence N. A recording stopped with no typed name is
@@ -383,21 +388,43 @@ On the Recording page, A on a file opens its own screen. The rows each kind of f
 ![A save state's own screen: Bind to Save / Load, Duplicate, Rename, Delete](../media/rc13-file-screen-save.png)<br>
 *A save state (Jab start, bound: Bind to Save / Load reads On). Eden, rc.13 (untested on hardware).*
 
-## Replays: Edit placement and the Replay window
+## Change placement and the Replay window
 
-**Edit placement** moves where a macro starts. Play warps the fighters to the macro's start save, and the offset moves
-the side that plays it.
+**Change placement** moves where a save state puts the fighters. A save state holds where Player 1 and the CPU
+stand, how each starts and its damage. Load warps there, and Play warps to a macro's start save before it plays.
+Change placement opens that save on the live game: both fighters stand at its spots, you place them with the
+Break the Targets crosshair, and A or + writes the save. The pages and keys are in the
+[menu reference](../menu/recording.md#change-placement).
 
-![Play warps both fighters to the start save; with an offset only the side that plays moves, and x- x+ and X- X+ set it](../diagrams/recording-placement.png)
+- **Where it opens:** *Change placement* on a save's own screen; on a macro's or a chain's own screen, for its start
+  save; X on a save in the pop-up; and Recording › Replays › Change placement, for the start save of the active macro
+  of the side the pop-up is set to (its lit tab, not the page's ZR view). For a chain it is macro 1's start save,
+  which the chain uses.
+- **On stage or Off stage:** each fighter is one or the other. On stage it stands on a floor, and you step it along
+  the floor and between the ground and the platforms. Off stage it is held in the air at the crosshair, up to the
+  blast line; outside the picture the game shows its magnifier.
+- **Switched to Off stage,** a fighter that is over the stage goes to the open air beside the nearest ledge, so it
+  starts off stage and not above a floor. From there the crosshair is free. The stage's shape is read from its own
+  lines, so the Training stage's two gaps beside the island count, and the long floor that runs out through the
+  blast line has no ledge on that side.
+- **Change or copy:** if at least one macro starts from the save, the picker normally asks whether to change it
+  for all its users or copy it. From a macro, Copy points that macro to the new save; from a chain, it points the
+  first macro there. From the save itself, Copy leaves all macro links alone. Recording › Options ›
+  [Shared start save](../menu/recording.md#shared-start-save) can answer ahead.
+- **Only what you changed is written.** The other fighter, and everything else in the file, stays as saved. Old save
+  files open as they are and load as before.
+- **A macro's own offset:** earlier builds had Edit placement, which stored an offset in the macro file. Such a macro
+  keeps its offset: Play adds it to the playing side on top of the save's spot. Copy leaves the offset and Momentum
+  alone. The macro's own screen shows the offset in an Offset row, and A there clears it; a cleared offset
+  cannot be set again, so move the save instead.
+- **Momentum** is a row of the macro's own screen, kept in the macro file as before. Keep recorded speed, the
+  default, gives the side the speed it had when Record started, on its first input after the warp; Start at rest
+  starts it from standstill. Both rows are there only for a macro with a start save, because they apply with the
+  warp to it.
 
-- **Which macro:** the active macro of the side the pop-up is set to (its lit tab, not the page's ZR view), the file
-  that side's Play chord plays. For a chain it is macro 1, whose start save the chain uses.
-- **The anchor** is where that macro's start save puts the side. The offset is added on the next Play, to the playing
-  side only. The keys, Write, Keep, New and Back are in the
-  [menu reference](../menu/recording.md#edit-placement).
-- **Momentum:** "Keep recorded speed", the default, gives the side the speed it had when Record started, on its first
-  input after the warp. "Start at rest" starts it from standstill. Like the offset, it applies with the warp to the
-  start save.
+In an Eden smoke boot on install 5 (2026-11-25), in the picker that Record opens, switching Player 1 to Off stage
+moved the spot beside the ledge, and one D-pad step moved it on. No placement was saved or loaded, and Change
+placement was not opened on a save; those rest on host tests. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
 **The Replay window** lists your saved match captures. A opens the clip editor on one: the fighter, the crop window,
 the playhead and the timeline. On a capture's Mii track it reads the recorded Mii, asks Fighter Mismatch, and Switch

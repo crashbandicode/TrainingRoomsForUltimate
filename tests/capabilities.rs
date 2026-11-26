@@ -37,6 +37,8 @@ const BOUNDARIES: &[Boundary] = &[
     // Optional Stage tech owns all adapter native calls. These are real first-condition
     // checks of the flag boot sets only after its complete closure passed.
     Boundary { function: "tech::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
+    // The placement picker reads Tech practice's traced floors, and walks that outline, only through this.
+    Boundary { function: "tech::floors", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::frame", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::di_before", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },
     Boundary { function: "tech_adapter::pending_decision", owner: Some(Feature::TechPractice), gate: Gate::Flag("tech_ready") },

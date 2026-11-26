@@ -125,4 +125,17 @@ fn picker_settings_round_trip_and_migrate() {
     assert_eq!(back.get("juggle_reaction"), &[1, 0, 0]);
     assert_eq!(crate::model::tech_settings::selected(&back.settings().menu, "edge_zoom_window"), 29);
 }
+
+#[test]
+fn the_two_start_options_default_to_todays_behaviour() {
+    use crate::model::edge_juggle::StartOptions;
+    assert_eq!(StartOptions::read(&Settings::factory().menu), StartOptions::default());
+    // A file saved before the two rows existed.
+    let old = parse(r#"{"menu":{"edge_difficulty":[0,1],"edge_reaction":[0,0,1]}}"#);
+    assert_eq!(StartOptions::read(&old.settings.menu), StartOptions::default());
+    let set = parse(r#"{"menu":{"edge_under":[1,0],"edge_jumps":[0,1]}}"#);
+    assert_eq!(StartOptions::read(&set.settings.menu), StartOptions { under: true, jumps_used: true });
+    let one = parse(r#"{"menu":{"edge_under":[0,1],"edge_jumps":[0,1]}}"#);
+    assert_eq!(StartOptions::read(&one.settings.menu), StartOptions { under: false, jumps_used: true });
+}
 }

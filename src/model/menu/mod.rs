@@ -1591,6 +1591,13 @@ impl Menu {
                 self.start(Game::Tech);
                 return;
             }
+            // Change placement is an action: the menu closes and the host opens the placement picker on the live
+            // game, on the start save of the pop-up role's active macro. A close alone starts no game.
+            Editor::EditPlacement => {
+                self.recording.ask_active_placement();
+                self.closed = true;
+                return;
+            }
             Editor::EggZone => {
                 self.outbox.egg_zone = true;
                 self.outbox.start = None;

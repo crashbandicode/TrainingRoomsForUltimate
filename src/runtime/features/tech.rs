@@ -3,24 +3,24 @@
 use super::{
     notices,
     tech_adapter::{Adapter, HitlagResolver},
-    tech_surfaces::{self, NativeSource, PlatformScan, ScanState},
+    tech_surfaces::{self, Discovery, Found, NativeSource},
 };
 use crate::model::btt::{self as model, Pad, LOOKS};
 use crate::model::chords::{field, Sample};
 use crate::model::cpu::hash::hash40;
 use crate::model::cpu::rng::Rng;
+use crate::model::floor_hop::Floor;
 use crate::model::panes::EggLook;
 use crate::model::settings::Snapshot;
 use crate::model::storage::FixedPath;
 use crate::model::tech::{
     controller::{Controller, Event, Outcome, Setup},
-    discovery::Bootstrap,
     picker::{self, Pick, Picker},
     planner,
     practice_state::{self as state, View as StateView},
     session::{Bests, Length, Phase, Session},
     solver,
-    surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, Walk},
+    surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, MAX_LINES},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
     Vec2,
 };
@@ -32,7 +32,7 @@ use crate::runtime::game::natives;
 use crate::runtime::{published, scene};
 use hos_lock::{Mailbox, Mutex, Published};
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::OnceLock;
 
 const NOTICE: u8 = 0x32;
@@ -40,7 +40,11 @@ static CONFIG: Published<Option<Config>> = Published::new(None);
 static OPEN: AtomicBool = AtomicBool::new(false);
 static START: AtomicBool = AtomicBool::new(false);
 static EDIT: AtomicBool = AtomicBool::new(false);
-static RESET: AtomicBool = AtomicBool::new(false);
+/// Training resets not answered yet, as two bits of one byte: `RESET_RUN` for the running Tech session, and
+/// `RESET_OUTLINE` since the outline in `VIEW` was traced (the game may have rebuilt its collision).
+static RESET: AtomicU8 = AtomicU8::new(0);
+const RESET_RUN: u8 = 1;
+const RESET_OUTLINE: u8 = 2;
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static GUARD_PRESS: AtomicBool = AtomicBool::new(false);
 static WIZARD_REQUEST: AtomicBool = AtomicBool::new(false);
@@ -54,6 +58,8 @@ static OUTCOMES: Mailbox<Outcome, 4> = Mailbox::new();
 struct ViewState {
     picker: Picker,
     surfaces: Surfaces,
+    /// The walk that fills `surfaces`: with it the lines say whether they are all there.
+    discovery: Discovery,
     range: Option<[f32; 4]>,
     start: bool,
     wizard: Option<Wizard>,
@@ -65,6 +71,7 @@ struct ViewState {
 static VIEW: Mutex<ViewState> = Mutex::new(ViewState {
     picker: Picker::EMPTY,
     surfaces: Surfaces::EMPTY,
+    discovery: Discovery::NEW,
     range: None,
     start: false,
     wizard: None,
@@ -86,9 +93,6 @@ struct Practice {
     reroll: bool,
     sampled: Option<(Setup, picker::Spot, [f32; 2])>,
     approximate: bool,
-    scan: Option<PlatformScan>,
-    scan_done: bool,
-    bootstrap: Option<Bootstrap>,
     discovery_failed: bool,
     epoch: Option<StageEpoch>,
     fighter_kind: i32,
@@ -159,7 +163,7 @@ pub fn starting() -> bool {
     START.load(Ordering::Acquire)
 }
 pub fn reset() {
-    RESET.store(true, Ordering::Release);
+    RESET.store(RESET_RUN | RESET_OUTLINE, Ordering::Release);
 }
 pub fn running() -> bool {
     RUNNING.load(Ordering::Acquire)
@@ -410,6 +414,56 @@ pub fn look(active: bool) -> [Option<([f32; 2], EggLook)>; LOOKS] {
         view.preview_blocked == Some(false),
     )
 }
+/// The stage's traced floors for the placement picker's step between floors, from the one outline Tech practice
+/// traces: no second copy is kept. The picker is open only while no practice game runs, so Tech is not walking
+/// the outline then. When it is not done for this stage, form and Training session, or a Training reset has passed
+/// since it was traced, the picker walks it here, one step a frame; Tech traces again at its next Start, as it
+/// always does. `found`: the picker's own note of how its walk went. Returns the floors written, 0 until the walk
+/// is done; `None` when the outline or the receipt is in use this frame, which is never waited for. The walk's
+/// native calls are Tech practice's: where its guards did not pass, no floor is given.
+pub(super) unsafe fn floors(
+    p1: usize,
+    (stage, form): (i32, u32),
+    range: [f32; 4],
+    found: &mut Found,
+    out: &mut [Floor; MAX_LINES],
+) -> Option<usize> {
+    if !super::tech_adapter::tech_ready() {
+        return Some(0);
+    }
+    let mut view = VIEW.try_lock()?;
+    let view = &mut *view;
+    let Some(training) = super::cpu::tech_player_receipt().ok()? else {
+        return Some(0);
+    };
+    let epoch = StageEpoch { stage, form, training };
+    let stale = RESET.fetch_and(!RESET_OUTLINE, Ordering::AcqRel) & RESET_OUTLINE != 0;
+    if stale || view.surfaces.epoch() != Some(epoch) {
+        view.surfaces = Surfaces::EMPTY;
+        Surfaces::bind(&mut view.surfaces, epoch);
+        view.discovery = Discovery::NEW;
+        *found = Found::More;
+    }
+    *found = if view.discovery.walked(&view.surfaces) {
+        Found::Done
+    } else if *found == Found::Failed {
+        Found::Failed
+    } else {
+        match NativeSource::new(p1) {
+            Some(mut source) => view.discovery.walk_step(&mut source, range, &mut view.surfaces),
+            None => Found::Failed,
+        }
+    };
+    if *found != Found::Done {
+        return Some(0);
+    }
+    let mut count = 0;
+    for line in view.surfaces.lines().filter(|line| line.kind() == Some(SurfaceKind::Floor)) {
+        out[count] = line.ends.map(|end| [end.x, end.y]);
+        count += 1;
+    }
+    Some(count)
+}
 /// Initialize from the CPU resolver's complete status array, in `tech_init::STATUS_IDS` order.
 /// # Safety
 /// Only the non-hook heartbeat may call this, after guarded game-table resolution.
@@ -495,9 +549,7 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
         *draws = MaterialDraws::default();
     }
     run.recovering = true;
-    run.scan = None;
-    run.scan_done = false;
-    run.bootstrap = None;
+    view.discovery = Discovery::NEW;
     view.surfaces.discard();
     view.picker.selected = None;
     view.picker.hovered = None;
@@ -526,7 +578,7 @@ fn with_practice_frame(
                         StateView::Paused
                     } else if run.recovery_error.is_some() || run.discovery_failed || run.planning_failed {
                         StateView::Failed
-                    } else if view.surfaces.state != Walk::Closed || !run.scan_done {
+                    } else if !view.discovery.walked(&view.surfaces) {
                         StateView::Discovering
                     } else if let Some(wizard) = view.wizard.as_ref().filter(|_| wizard_active()) {
                         StateView::Wizard(wizard, view.preview_blocked)
@@ -564,6 +616,7 @@ pub unsafe fn frame(fighter: usize) {
         {
             view.picker.enter(-1, Vec2::default());
             view.surfaces = Surfaces::EMPTY;
+            view.discovery = Discovery::NEW;
             view.range = None;
             view.start = false;
             view.wizard = None;
@@ -608,7 +661,7 @@ pub unsafe fn frame(fighter: usize) {
     let mut camera = config.camera;
     with_practice_frame(&mut view, open, |slot, view| {
         if stop {
-            RESET.store(false, Ordering::Release);
+            RESET.fetch_and(!RESET_RUN, Ordering::Release);
             view.start = false;
             if let Some(run) = slot.as_mut() {
                 run.controller.stop(&mut run.adapter);
@@ -636,9 +689,6 @@ pub unsafe fn frame(fighter: usize) {
                 reroll: true,
                 sampled: None,
                 approximate: false,
-                scan: None,
-                scan_done: false,
-                bootstrap: None,
                 discovery_failed: false,
                 epoch: None,
                 fighter_kind,
@@ -687,7 +737,7 @@ pub unsafe fn frame(fighter: usize) {
             form,
             training: identity,
         };
-        let reset = RESET.swap(false, Ordering::AcqRel);
+        let reset = RESET.fetch_and(!RESET_RUN, Ordering::AcqRel) & RESET_RUN != 0;
         let requested = START.swap(false, Ordering::AcqRel);
         if requested {
             view.cancelled = false;
@@ -739,9 +789,8 @@ pub unsafe fn frame(fighter: usize) {
             run.pending = false;
             run.planning_failed = false;
             published::WIZARDS.set_up(Kind::TechPlacing, false);
-            run.scan = None;
-            run.scan_done = false;
-            run.bootstrap = None;
+            view.discovery = Discovery::NEW;
+            RESET.fetch_and(!RESET_OUTLINE, Ordering::Release);
             run.discovery_failed = false;
             view.preview_params = None;
             view.picker.enter(
@@ -776,66 +825,21 @@ pub unsafe fn frame(fighter: usize) {
             notice(run, Some("Surface discovery incomplete"));
             return;
         };
-        if run.scan.is_none() {
-            run.scan = PlatformScan::new(range);
-        }
         let Some(mut source) = NativeSource::new(at) else {
             run.discovery_failed = true;
             notice(run, Some("Surface discovery incomplete"));
             return;
         };
-        if run.bootstrap.is_none() {
-            run.bootstrap = Bootstrap::new(range, source.touched());
-        }
-        {
-            view.range = Some(range);
-            if (view.surfaces.state != Walk::Closed || !run.scan_done)
-                && !run.bootstrap.as_mut().is_some_and(Bootstrap::tick)
-            {
-                run.discovery_failed = true;
-                notice(run, Some("Surface discovery incomplete"));
-                return;
-            }
-            if view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_none() {
-                match run
-                    .bootstrap
-                    .as_mut()
-                    .ok_or(())
-                    .and_then(|search| source.find_seed(search))
-                {
-                    Ok(Some((seed, end))) => view.surfaces.begin(seed, end),
-                    Ok(None) => {}
-                    Err(()) => {
-                        run.discovery_failed = true;
-                        notice(run, Some("Surface discovery incomplete"));
-                        return;
-                    }
-                }
-            }
-            if view.surfaces.state == Walk::More {
-                view.surfaces.step(&mut source);
-            } else if view.surfaces.state == Walk::Closed && !run.scan_done {
-                if let Some(scan) = run.scan.as_mut() {
-                    match scan.step(&mut source, &mut view.surfaces) {
-                        ScanState::More => {}
-                        ScanState::Done => run.scan_done = true,
-                        ScanState::Broken | ScanState::Full => {
-                            run.discovery_failed = true;
-                            notice(run, Some("Surface discovery incomplete"));
-                            return;
-                        }
-                    }
-                }
-            }
-            if matches!(view.surfaces.state, Walk::Full)
-                || (view.surfaces.state == Walk::Broken && view.surfaces.lines().next().is_some())
-            {
-                run.discovery_failed = true;
-                notice(run, Some("Surface discovery incomplete"));
-                return;
-            }
-            if view.surfaces.state != Walk::Closed || !run.scan_done {
+        view.range = Some(range);
+        match view.discovery.walk_step(&mut source, range, &mut view.surfaces) {
+            Found::Done => {}
+            Found::More => {
                 notice(run, Some("Finding stage surfaces…"));
+                return;
+            }
+            Found::Failed => {
+                run.discovery_failed = true;
+                notice(run, Some("Surface discovery incomplete"));
                 return;
             }
         }

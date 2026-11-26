@@ -8,7 +8,8 @@ below, with every option on it; the guides explain a topic across pages.
 | Page | Covers |
 | --- | --- |
 | [Getting started](guide/getting-started.md) | What you need, installing, the first start, opening the menu, a first look around, and how to read the build tag. |
-| [Current release](CURRENT-RELEASE.md) | Which release is current, what's new in it, how to install it and its known issues. |
+| [Current release](CURRENT-RELEASE.md) | Which release is current, which build is the newest, what is tested, what's new, how to install it and its known issues. |
+| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 5. |
 | [Troubleshooting](guide/troubleshooting.md) | What you may see, why, and what to do: the plugin or the menu not loading, greyed rows, the notices that say no, slow fighter loading, waiting rooms, settings, and where the logs are. |
 
 ## The menu, page by page
@@ -64,8 +65,10 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 - [Media](MEDIA.md): where each GIF was recorded.
 - [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
 - [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).
+- [Install evidence](EVIDENCE-rc15-installs.md): for each rc.15 install, the card readback, the gate, the Eden runs
+  with their verdicts, and what was not run.
 - Release notes: [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md),
-  [rc.9](RELEASE-NOTES-rc9.md) in this folder; rc.12's, rc.13's and rc.14's are on their
+  [rc.9](RELEASE-NOTES-rc9.md) and [rc.15](RELEASE-NOTES-rc15.md) in this folder; rc.12's, rc.13's and rc.14's are on their
   [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases). rc.7, rc.10 and rc.11 have
   none; see [Status](TECHNICAL.md#status).
 

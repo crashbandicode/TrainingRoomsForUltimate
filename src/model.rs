@@ -163,12 +163,16 @@ pub mod spacing;
 pub mod btt;
 #[path = "model/crosshair.rs"]
 pub mod crosshair;
+#[path = "model/floor_hop.rs"]
+pub mod floor_hop;
 #[path = "model/lockon.rs"]
 pub mod lockon;
 #[path = "model/sites_lockon.rs"]
 pub mod sites_lockon;
 #[path = "model/tech/mod.rs"]
 pub mod tech;
+#[path = "model/stage_geometry.rs"]
+pub mod stage_geometry;
 /// rc.15 Parry practice: the attempt detector (artifacts/rc15-parry/DESIGN.md).
 #[path = "model/parry.rs"]
 pub mod parry;

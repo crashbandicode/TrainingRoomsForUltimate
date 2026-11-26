@@ -285,7 +285,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 171] = [
+pub static ROWS: [Row; 175] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -384,8 +384,8 @@ pub static ROWS: [Row; 171] = [
     // Recording > Replays. The library groups above have no rows (revision 8.2).
     r(REPLAYS, "Ask before switching fighter", "fighter_prompt", TOGGLE,
       "On: a replay, macro, chain or combo drill on another fighter\nasks first. Off: the fighter you have stays, without asking."),
-    r(REPLAYS, "Edit placement", "", Control::Editor(Editor::EditPlacement),
-      "Moves where the active macro starts after its warp,\nfor the side the Recording pop-up is set to."),
+    r(REPLAYS, "Change placement", "", Control::Editor(Editor::EditPlacement),
+      "Places both fighters of the active macro's start save\non the live game, for the side of the Recording pop-up."),
     r(REPLAYS, "Replay window", "", Control::Editor(Editor::ReplayWindow),
       "Saved match captures: pick a fighter and an input window\nto turn into a recording."),
     r(REPLAYS, "Replay capture", "", Control::ReplayCapture,
@@ -403,6 +403,8 @@ pub static ROWS: [Row; 171] = [
       "How many times the active macro plays.\nX cycles this while the cursor is in MACROS."),
     Row { advanced: true, ..r(OPTIONS, "Settings override playback", "settings_override_playback", TOGGLE,
       "Off: a playing recording wins over the DI, SDI, air-dodge,\ntech and throw settings. On: the settings override it.") },
+    Row { advanced: true, ..r(OPTIONS, "Shared start save", "shared_start_save", Control::Dropdown(&o::SHARED_START),
+      "Change placement on a start save that macros share: ask,\nalways change it for all, or always copy it for one.") },
     r(OPTIONS, "Combo helper", "combo_helper", TOGGLE,
       "On: each attempt at the target is graded under the\nframe strip, link by link."),
     r(OPTIONS, "Match sweet/sour spot", "spots_combo", TOGGLE,
@@ -636,8 +638,12 @@ pub static ROWS: [Row; 171] = [
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
       "Choose the start area, the CPU's point and your point.\nPreview both positions before starting."),
+    r(EDGE, "Under the stage", "edge_under", TOGGLE,
+      "Off (default): the CPU start must be beside the stage.\nOn: A also takes a point under the stage."),
     r(EDGE, "CPU percent", "edge_cpu_percent", Control::Number { first: 0, step: 1 },
       "CPU damage at the start of each attempt.\nThe CPU starts in free fall."),
+    r(EDGE, "CPU midair jumps", "edge_jumps", Control::Dropdown(&["Kept", "Used"]),
+      "Kept (default): the CPU starts with its midair jumps.\nUsed: it starts with every midair jump already spent."),
     r(EDGE, "Attempts", "edge_attempts", Control::Dropdown(&["10", "20", "Free"]),
       "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
     r(EDGE, "Zoom landing window", "edge_zoom_window", Control::Number { first: 1, step: 1 },
@@ -657,6 +663,8 @@ pub static ROWS: [Row; 171] = [
       "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
     r(OPTIONS, "Show playback indicator", "playback_indicator", TOGGLE,
       "On: show which role is playing a recording.\nOff: hide the playback indicator."),
+    r(OPTIONS, "Playback delay", "playback_delay", Control::Dropdown(&o::PLAYBACK_DELAY),
+      "Frames to wait after the fighters are placed, before\na played recording's first input. 60 frames is one second."),
 ];
 
 /// Number of `ROWS` of a page that are visible with the pilot absent (and with it present, minus

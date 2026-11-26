@@ -2,6 +2,7 @@
 
 use super::cpu::ids::{Table, C};
 use super::input_delay::MappedInputs;
+use super::record_place::SharedStart;
 use super::settings::Snapshot;
 
 pub const SLOTS: usize = 5;
@@ -46,9 +47,12 @@ pub enum HitstunTiming {
 pub struct RecorderSettings {
     pub trim: super::trim::Trim,
     pub indicator: bool,
+    pub delay: u16,
     pub place: bool,
     pub hitstun: HitstunTiming,
     pub mash_interrupt: bool,
+    /// Change placement on a start save that macros share (`shared_start_save`): ask, or always one answer.
+    pub shared: SharedStart,
 }
 
 impl RecorderSettings {
@@ -56,9 +60,11 @@ impl RecorderSettings {
         Self {
             trim: super::trim::Trim::End,
             indicator: true,
+            delay: 0,
             place: false,
             hitstun: HitstunTiming::HitstunEnds,
             mash_interrupt: true,
+            shared: SharedStart::Prompt,
         }
     }
 
@@ -70,6 +76,7 @@ impl RecorderSettings {
         Self {
             trim,
             indicator: on("playback_indicator"),
+            delay: first("playback_delay").and_then(|index| PLAYBACK_DELAY_FRAMES.get(index)).copied().unwrap_or(0),
             place: on("recording_place"),
             hitstun: match first("hitstun_playback") {
                 Some(1) => HitstunTiming::HitstopEnds,
@@ -77,9 +84,16 @@ impl RecorderSettings {
                 _ => HitstunTiming::HitstunEnds,
             },
             mash_interrupt: on("playback_mash"),
+            shared: match first("shared_start_save") {
+                Some(1) => SharedStart::Change,
+                Some(2) => SharedStart::Copy,
+                _ => SharedStart::Prompt,
+            },
         }
     }
 }
+
+const PLAYBACK_DELAY_FRAMES: [u16; 8] = [0, 10, 20, 30, 45, 60, 90, 120];
 
 impl Default for RecorderSettings {
     fn default() -> Self {
