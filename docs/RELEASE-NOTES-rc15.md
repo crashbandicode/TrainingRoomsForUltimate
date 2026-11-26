@@ -65,11 +65,13 @@ Planned for this build and not merged yet. Each moves up to Merged when it lands
   both use the same offset, so their recorded spacing is kept. Record saves the positions in a second file beside
   the macro. The macro format stays the same, so older builds can still read new macros. Older macros still load
   and play on the new build. A macro with no positions file gets one when it is played by itself from its first
-  frame, with Play or with X from the start of the take; you do not record it again. The two fighters are sampled
-  during that playback, so those positions are that playback's, not the original recording's. A playback stopped
-  early gives positions up to where it stopped, and a file made this way never replaces one saved by Record. If the
-  positions file is missing, unreadable or no longer matches the macro, the macro still plays. Combos and drills
-  are unchanged.
+  frame, with Play or with X from the start of the take; you do not record it again. After X in the editor the
+  positions show at once. The two fighters are sampled during that playback, so those positions are that
+  playback's, not the original recording's. A playback stopped early gives positions up to where it stopped. A file
+  made this way never replaces a valid one saved by Record; a positions file that is damaged or no longer matches
+  the macro counts as missing, and such a playback replaces it. A macro played as a step of a chain makes no file:
+  play it by itself. Whatever the state of the positions file, the macro still plays. Combos and drills are
+  unchanged.
 
 ## Install 5
 
