@@ -208,11 +208,14 @@ impl Slot {
         result
     }
 
-    /// The worker: no new reader finds the block. It is freed by `reap`.
+    /// The worker: cancel the request and keep the slot reachable until the fighters have released it.
     pub fn close(&self) {
         let idle = self.with(|block| {
             block.set_ask(Ask::None);
-            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)
+            // An earlier reader may have its point but not yet have published SEEN_HELD.
+            // Once this is the only reader, any new fighter can see only the cancelled request.
+            self.readers.load(Ordering::SeqCst) == NO_READER + 1
+                && (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)
         });
         if idle == Some(true) { self.withdraw(); }
         self.reap();
