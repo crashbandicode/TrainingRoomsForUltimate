@@ -212,6 +212,12 @@ inside are listed in [MEDIA.md](MEDIA.md).*
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.
 
+![The DI and SDI direction grids: a mock-up of the chosen look, then Eden captures with nothing picked, with Down x1 picked, the SDI grid, and Down enlarged five times](decisions/rc13-DI-lines-eden.png)
+
+*From the rc.13 decision on the chips' look (2026-11-13): the first panel is a mock-up, the others are Eden captures
+(their titles name the run, `rc13-di-4`). The game draws the lines thinner and dimmer than the mock-up, and the look
+was kept as captured (2026-11-14). [Decisions](DECISIONS.md)*
+
 *CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
 notice says so once.
 
@@ -243,41 +249,25 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 ### Recording and playback
 
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
-that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
-X cycles the loop only while the cursor is in Macros.
+that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing; X steps
+the loop count while the cursor is in MACROS, and on a drill row it previews the drill's recorded inputs on Player 1.
 The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
 Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
 
-- The playback machine, the files, the grades, the chords and the migration: `src/model/playback.rs`,
-  `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and
-  `src/model/library/migrate.rs`. The pop-up, the Recording page and the file screens: `src/model/recording_menu.rs`
-  and `src/model/ui/frame.rs`. Record, Play and the pop-up chord are applied in `src/model/rr_host.rs`.
-- The start save keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`). Momentum is
-  `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`).
-- Mash interrupts playback stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs`.
-- Change placement (2026-11-25; it replaced Edit placement's offset editor): the picker is `Wizard` in
-  `src/model/record_place.rs`, the same wizard as Place fighters before Record, run from the fighter frame in
-  `src/runtime/features/record_place.rs`. On stage it steps between the floors of Tech practice's one traced outline
-  (`tech::floors`, `src/model/floor_hop.rs`). A fighter switched to Off stage is placed by `off_stage_spot`, on the
-  off-stage rule of `src/model/stage_geometry.rs`, read on that frame only. The worker writes the save in
-  `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's save and macro are
-  `active_placement_ids`, and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`).
-- Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
-  `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
-  `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is
-  installed through `installable` in `src/model/mii_install.rs` (cov-rest `cbe961a` and `f2298ee`; `cov-named-mii` and
-  `int-named-mii-twice` PASS). A chain's mismatch line is `screen=mismatch ask=macro1`.
-- The Saves page's Setup library: a setup restored with A only moves the fighters (`setup_restored` in `rr_host.rs`),
-  and binding one without restoring is `setup_bound` (same file). The checks A makes (Save States On, the stage, the
-  fighters) are in `src/model/state/setup_transaction.rs`; the file format is `src/model/state/setup.rs`; the two menu
-  rows are `src/runtime/ui/setups.rs` and `src/editors/setups.rs`, with the copy from the bound save in
-  `src/runtime/features/states/setups.rs`. Setup files are named from the setup's name (`corner-trap.json`) and never
-  overwritten.
-- The pop-up layout is the agreed r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
-  `review/menu-proposal`). Its status line reads `hairline=5` even when the fifth row is scrolled out of the four-row
-  window.
+| Part | Where |
+| --- | --- |
+| The playback machine, the files, the grades, the chords and the migration | `src/model/playback.rs`, `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and `src/model/library/migrate.rs` |
+| The pop-up, the Recording page and the file screens | `src/model/recording_menu.rs` and `src/model/ui/frame.rs` |
+| Record, Play and the pop-up chord | Are applied in `src/model/rr_host.rs` |
+| The start save | Keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`) |
+| Momentum | Is `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`) |
+| Mash interrupts playback | Stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs` |
+| Change placement (2026-11-25; it replaced Edit placement's offset editor) | The picker is `Wizard` in `src/model/record_place.rs`, the same wizard as Place fighters before Record, run from the fighter frame in `src/runtime/features/record_place.rs`. On stage it steps between the floors of Tech practice's one traced outline (`tech::floors`, `src/model/floor_hop.rs`). A fighter switched to Off stage is placed by `off_stage_spot`, on the off-stage rule of `src/model/stage_geometry.rs`, read on that frame only. The worker writes the save in `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's save and macro are `active_placement_ids`, and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`). |
+| Replay window | A capture's load no longer waits on the window (`Owners::REPLAY_LOADING`, `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`, `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is installed through `installable` in `src/model/mii_install.rs` (cov-rest `cbe961a` and `f2298ee`; `cov-named-mii` and `int-named-mii-twice` PASS). A chain's mismatch line is `screen=mismatch ask=macro1`. |
+| The Saves page's Setup library | A setup restored with A only moves the fighters (`setup_restored` in `rr_host.rs`), and binding one without restoring is `setup_bound` (same file). The checks A makes (Save States On, the stage, the fighters) are in `src/model/state/setup_transaction.rs`; the file format is `src/model/state/setup.rs`; the two menu rows are `src/runtime/ui/setups.rs` and `src/editors/setups.rs`, with the copy from the bound save in `src/runtime/features/states/setups.rs`. Setup files are named from the setup's name (`corner-trap.json`) and never overwritten. |
+| The pop-up layout | Is the agreed r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on `review/menu-proposal`). Its status line reads `hairline=5` even when the fifth row is scrolled out of the four-row window. |
 
 **Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
 
