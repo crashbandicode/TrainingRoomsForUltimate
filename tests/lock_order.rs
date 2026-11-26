@@ -1029,6 +1029,7 @@ const NOT_GAME_ENTRIES: &[(&str, &str)] = &[
     ("edge_juggle::planner_chose", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("edge_juggle::planner_unavailable", "a release trace-point anchor reached from edge_juggle::ai_correction"),
     ("edge_juggle::perfect_rule_fired", "a release trace-point anchor reached from edge_juggle::ai_correction"),
+    ("placement::placement_hold_seam", "a release trace-point anchor called by placement::hold_at; the fighter-frame paths of its callers still walk it"),
     ("combo::tr_seq_step_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("combo::tr_seq_plan_v1", "a trace-point anchor our own code calls (its callers are walked)"),
     ("combo::tr_seq_saved_v1", "a trace-point anchor our own code calls (its callers are walked)"),
