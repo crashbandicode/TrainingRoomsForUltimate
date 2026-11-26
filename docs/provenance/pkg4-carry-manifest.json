@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "a3386a79082edc5531cd8816f7540e38acc69013c0c4c0fb4bb7e00a309edbc3",
+   "dest_sha256": "89da7f14e9e7fceaa7ecbfa7a61c7274e8a3c7d21f7dc6dc40f25824f12be5e9",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2212,6 +2212,11 @@
      "reason": "Snap boundaries (reviewer rv-edge-juggle-sol 33f54959, 2026-11-25): Y snaps the applied In and keeps a resolved move until its range changes; a refused preview keeps the cursor, the handle and the watched marks",
      "old": "\n    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        self.window.seek(self.window.start());\n        let handle = std::mem::replace(&mut self.handle, Handle::Playhead);\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.window.start(), self.window.end());\n        if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n            self.playing = true;\n            return ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player };\n        }\n        match self.export_selection(\"Preview\") {\n            Ok(recording) => {\n                // The selected window may be a different form from the track's first frame.\n                self.marks.set_namer(saved_namer(&recording));\n                self.playing = true;\n                ClipEffect::Preview(Box::new(recording))\n            }\n            Err(error) => { self.handle = handle; ClipEffect::Error(error) }\n        }\n    }\n\n    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A\n",
      "new": "\n    fn start_preview(&mut self) -> ClipEffect {\n        self.pause();\n        let effect = if let Some(FileSource::Macro { player, .. }) = self.file.as_ref() {\n            ClipEffect::PreviewFile { start: self.window.start(), end: self.window.end(), player: *player }\n        } else {\n            let recording = match self.export_selection(\"Preview\") {\n                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n        self.watch_base = self.window.start();\n        self.marks.forget_watched(self.watch_base, self.window.end());\n        self.window.seek(self.watch_base);\n        self.handle = Handle::Playhead;\n        self.playing = true;\n        effect\n    }\n\n    /// In at the start of the move the status rules find at `at`, with its short setup, kept as `move_start`: X and A\n"
+    },
+    {
+     "reason": "Snap boundaries, lead fold (place-t1a 2026-11-26): the comment on the preview namer, dropped by the restructure of start_preview, is back",
+     "old": "                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n",
+     "new": "                Ok(recording) => recording,\n                Err(error) => return ClipEffect::Error(error),\n            };\n            // The selected window may be a different form from the track's first frame.\n            self.marks.set_namer(saved_namer(&recording));\n            ClipEffect::Preview(Box::new(recording))\n        };\n"
     }
    ]
   },

@@ -553,6 +553,7 @@ impl ClipEditor {
                 Ok(recording) => recording,
                 Err(error) => return ClipEffect::Error(error),
             };
+            // The selected window may be a different form from the track's first frame.
             self.marks.set_namer(saved_namer(&recording));
             ClipEffect::Preview(Box::new(recording))
         };
