@@ -1463,12 +1463,10 @@ mod tests {
         // The game side hands the hold's report over, and asks for the refusal before it takes the body.
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
         let hold = runtime.split_once("unsafe fn hold(").map_or("", |(_, rest)| rest);
-        let refused = hold.find("block.refused(index, generation, body, spot.at)").expect("the refusal is asked");
-        let step = hold.find("placement::hold_at(slot, accessor, body, spot.at, false)").expect("the hold's step");
-        let pushed = hold.find("if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {")
-            .expect("the hold's report is judged");
-        assert!(refused < step && step < pushed && pushed < hold.find("state::set_lr(accessor, spot.facing);").unwrap());
-        assert!(hold[pushed..].trim_start_matches(|c| c != '\n').trim_start().starts_with("release(slot, accessor);\n        return SEEN_OFF;"));
+        let judged = "if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {";
+        let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
+        assert!(order(&["block.refused(index, generation, body, spot.at)", "placement::hold_at(slot, accessor, body, spot.at, false)", judged, "state::set_lr(accessor, spot.facing);"]));
+        assert!(hold.contains(&format!("{judged}\n        release(slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
         assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
         assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
     }
