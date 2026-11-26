@@ -922,7 +922,7 @@ fn scrub_service() {
     }
     let (shown, ask) = (editor.shown_frame(), editor.scrub().0);
     let pos = SLOT.with(|block| {
-        block.show(shown, ask);
+        block.ask_at(shown, ask);
         block.pos()
     });
     if pos.is_some_and(|pos| editor.note_scrub(pos)) {

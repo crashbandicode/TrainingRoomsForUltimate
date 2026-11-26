@@ -5535,7 +5535,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "c1d6c8f70717b1c39e3e5a16a7c28306cffaedb9dc3981482a1414d2f9f8bf94",
+   "dest_sha256": "416f977487abf0dd2827d9bda975e9d74b8c82177b8a39d6265e8bdb8cf888db",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6515,6 +6515,11 @@
     {
      "old": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load(id)",
      "new": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load_edited(id)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        block.show(shown, ask);",
+     "new": "        block.ask_at(shown, ask);",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

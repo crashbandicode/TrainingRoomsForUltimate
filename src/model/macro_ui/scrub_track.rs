@@ -127,7 +127,7 @@ impl Block {
 
     /// The worker: what the fighters show from the next frame on, and the frame it is for. Another frame is another
     /// request also when its points are the same (an idle take), so a dropped hold wakes on any move of the handle.
-    pub fn show(&self, frame: Option<u32>, ask: Ask) {
+    pub fn ask_at(&self, frame: Option<u32>, ask: Ask) {
         let frame = frame.map_or(0, |frame| frame.wrapping_add(1));
         if self.shown.swap(frame, Ordering::AcqRel) != frame || self.ask.read() != ask {
             self.ask.publish(ask);
@@ -933,23 +933,23 @@ mod tests {
         // An idle take: every frame has the same points.
         let ask = Ask::Group { target: 1, deltas: [Some(spot(0.0, 0.0, 1.0)), Some(spot(2.0, 0.0, 1.0))] };
         let block = Block::new();
-        block.show(Some(5), ask);
+        block.ask_at(Some(5), ask);
         assert_eq!(block.pos(), Pos::Held);
         block.forget();
-        block.show(Some(5), ask);
+        block.ask_at(Some(5), ask);
         assert_eq!((block.held_at(1, [10.0, 0.0]), block.pos()), (None, Pos::None), "the same frame again holds nobody");
         // One nudge: the next frame, the same points.
-        block.show(Some(6), ask);
+        block.ask_at(Some(6), ask);
         assert_eq!((block.held_at(1, [10.0, 0.0]), block.pos()), (Some(spot(12.0, 0.0, 1.0)), Pos::Held));
         // Showing a frame again does not publish again.
         let generation = block.ask.generation();
-        block.show(Some(6), ask);
+        block.ask_at(Some(6), ask);
         assert_eq!(block.ask.generation(), generation);
         // No frame shown: nothing asked.
-        block.show(None, Ask::None);
+        block.ask_at(None, Ask::None);
         assert_eq!(block.pos(), Pos::None);
         let worker = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/macros/replay_capture.rs")).unwrap();
-        assert!(worker.contains("block.show(shown, ask);"), "the worker names the shown frame");
+        assert!(worker.contains("block.ask_at(shown, ask);"), "the worker names the shown frame");
     }
 
     #[test]
