@@ -33,7 +33,7 @@ fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
     editor.on_action(ClipAction::Nudge(2));
     assert_eq!((editor.view().fighter_kind, editor.crop_kind()), (8, 0x48));
     let check = |r: &mut MacroRecording| r.playback_target().map(|_| ()).map_err(|e| e.to_string());
-    assert!(matches!(editor.confirm_capture(check), ClipEffect::Error(_)));
+    assert!(matches!(editor.confirm_macro(check), ClipEffect::Error(_)));
     assert_eq!(editor.shown_frame(), Some(7));
     editor.on_action(ClipAction::SelectOut);
     assert_eq!(editor.view().end, 8);
@@ -43,7 +43,7 @@ fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
     editor.on_action(ClipAction::SelectIn);
     editor.on_action(ClipAction::Nudge(-3));
     assert_eq!((editor.view().fighter_kind, editor.crop_kind()), (0x48, 8));
-    let ClipEffect::Export(ordinary) = editor.confirm_capture(check) else { panic!("valid ordinary crop refused") };
+    let ClipEffect::Export(ordinary) = editor.confirm_macro(check) else { panic!("valid ordinary crop refused") };
     assert_eq!((ordinary.start.fighter_kind, ordinary.frames.len(), editor.shown_frame()), (8, 2, None));
 }
 
