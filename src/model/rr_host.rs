@@ -1536,12 +1536,6 @@ pub fn recording_version() -> (u64, u64) {
     (catalog_generation(), store::index_generation())
 }
 
-/// The library version a generating run is bound to. Under test it counts this thread's own library writes: the store's counters are process-wide there, and another test's write is not this host's.
-#[cfg(not(test))]
-fn track_version() -> (u64, u64) { recording_version() }
-#[cfg(test)]
-fn track_version() -> (u64, u64) { (store::thread_generation(), 0) }
-
 pub fn play_sampling() -> bool { PLAY.sampling() }
 pub fn play_allocated() -> bool { PLAY.allocated() }
 pub fn play_live(slot: usize, frame: &ReplayFrame) { PLAY.live(slot, frame); }
@@ -1561,7 +1555,7 @@ pub fn play_track_service(root: &Path) {
     let over = !role_playing(role) || RUN_GEN[slot].load(Ordering::SeqCst) != generation;
     if !over || PLAY.busy() != 0 { return; }
     let Some((open, mut rows)) = PLAY.end() else { return };
-    if open.version != track_version() { return; }
+    if open.version != recording_version() { return; }
     let dir = root.join(MACROS_DIR);
     let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
     let same = |played: &[InputFrame]| positions::same_inputs(open.id.as_str(), played, &recording.frames);
@@ -2104,7 +2098,7 @@ fn open_play_track(book: &Book, role: Role, id: &str, limit: usize, pass: bool) 
     if id == CLIP_ID || book.is_chain(id) || kind < 0 || book.recorded_fighter(id) != Some(kind) { return; }
     let Some(frames) = book.frame_count(id) else { return };
     let slot = role_index(role);
-    PLAY.begin(id, slot, RUN_GEN[slot].load(Ordering::SeqCst), track_version(), limit.min(frames) as u32, pass);
+    PLAY.begin(id, slot, RUN_GEN[slot].load(Ordering::SeqCst), recording_version(), limit.min(frames) as u32, pass);
 }
 
 fn apply_waiting_answer(tick: &mut Tick) {

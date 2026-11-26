@@ -236,7 +236,6 @@ mod tests {
         assert!(host.contains("store(slot, frame);"));
         assert!(host.contains("play_track_service("));
         assert!(editor.contains("take_generated()") && editor.contains("adopt_positions("));
-        assert!(include_str!("../rr_host.rs").contains("#[cfg(not(test))]\nfn track_version() -> (u64, u64) { recording_version() }"));
         let worker = include_str!("../rr_host.rs").split_once("pub fn play_track_service(").unwrap().1
             .split_once("\n}").unwrap().0;
         assert!(worker.find("PLAY_PLAYER.load").unwrap() < worker.find("PLAY.ready();").unwrap());
