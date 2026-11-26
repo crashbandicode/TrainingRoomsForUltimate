@@ -666,7 +666,7 @@ impl ClipEditor {
             ClipAction::Snap => {
                 let at = match self.handle {
                     Handle::Playhead if self.context().preview() =>
-                        self.marks.snap_in(self.window.cursor()).map(|at| at.min(self.window.total() - 1)),
+                        self.marks.nearest(self.window.cursor()).map(|(start, _)| start).filter(|&at| at < self.window.total()),
                     Handle::Playhead => return ClipEffect::Error("Press L for the start or R for the end, then Y to snap".into()),
                     Handle::In if self.move_start.is_some() => Some(self.window.start()),
                     Handle::In => self.marks.snap_in(self.window.start()).map(|mark| self.window.set_in(mark)),

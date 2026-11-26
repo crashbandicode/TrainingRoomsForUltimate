@@ -35,6 +35,20 @@ fn free_y_snaps_to_a_real_move_even_near_the_unmarked_start() {
     assert_eq!((view.cursor, view.shown, view.start, view.end), (23, Some(23), 0, 60));
     editor.on_action(ClipAction::SelectIn);
     assert_eq!(editor.view().start, 23);
+    editor.on_action(ClipAction::Nudge(-21));
+    editor.on_action(ClipAction::Snap);
+    assert_eq!(editor.view().start, 0, "selected In still offers the take boundary");
+
+    let quiet = MacroRecording::new("no marks", "13.0.5", StartState::neutral(0, 0, 1.0),
+        vec![InputFrame::default(); 8]).unwrap();
+    let mut editor = ClipEditor::macro_file(quiet, false).unwrap();
+    editor.on_action(ClipAction::Nudge(2));
+    let ClipEffect::Error(message) = editor.on_action(ClipAction::Snap) else { panic!("unmarked snap succeeded") };
+    assert_eq!(message, "No move marks yet: X previews and marks them");
+    let view = editor.view();
+    assert_eq!((view.cursor, view.shown, view.start, view.end), (2, Some(2), 0, 8));
+    editor.on_action(ClipAction::SelectOut);
+    assert_eq!(editor.view().end, 3, "refused snap keeps cut-here armed");
 }
 
 #[test]
