@@ -1190,8 +1190,7 @@ mod tests {
         let release = service.find("SLOT.released()").expect("release report");
         let take = service.find("take_wanted_fighter()").expect("take wanted fighter");
         assert!(release < take);
-        assert!(service.contains("roster_requests::request_player_kind(kind as u32)"));
-        assert!(service.contains("roster_requests::request_cpu_kind(kind as u32)"));
+        assert!(service.contains("roster_requests::request_clip_kind(player, kind as u32)"));
         assert!(service.contains("tick_fighter_load()"));
         let worker = source.split("fn worker_preview_notices(").nth(1).unwrap();
         let play = worker.find("service_wanted_play();").expect("wanted play");
