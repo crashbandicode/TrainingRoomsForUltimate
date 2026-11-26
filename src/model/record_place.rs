@@ -6,6 +6,7 @@ use super::floor_hop;
 use super::panes::{EggLook, EGG_WHOLE};
 use super::stage_geometry::{classify, default_spot, nearest_ledge, Probe};
 use super::state::record::{SavedState, StartState};
+use super::storage::FixedPath;
 
 pub const READY_FRAMES: u16 = 60;
 pub const CHECK_FRAMES: u16 = 60;
@@ -810,11 +811,21 @@ impl Wizard {
 
     /// The notice. `name`: the save's name when the wizard is opened on one.
     pub fn write_text(&self, recorded: Who, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
-        self.write_text_at(recorded, name, [None; 2], out)
+        self.write_page(recorded, name, [None; 2], out)
     }
 
     /// `write_text`, with where the game has a fighter's body when it moved it off its spot (`bodies`, by role).
     pub fn write_text_at(
+        &self, recorded: Who, name: &str, bodies: [Option<[f32; 2]>; 2], out: &mut FixedPath<224>,
+    ) -> core::fmt::Result {
+        self.write_page(recorded, "", bodies, out)?;
+        if self.mode == Mode::Save {
+            out.prepend_fitting(name);
+        }
+        Ok(())
+    }
+
+    fn write_page(
         &self, recorded: Who, name: &str, bodies: [Option<[f32; 2]>; 2], out: &mut impl core::fmt::Write,
     ) -> core::fmt::Result {
         let (number, title) = match self.page {
@@ -2508,9 +2519,9 @@ mod tests {
         let plain = text(&w, "Jab start");
         assert!(plain.contains("2/5 Spot"), "{plain}");
         let shown = |bodies| {
-            let mut out = String::new();
+            let mut out = FixedPath::new();
             w.write_text_at(Who::P1, "Jab start", bodies, &mut out).unwrap();
-            out
+            out.as_str().to_owned()
         };
         assert_eq!(shown([None; 2]), plain);
         // SP-10's CPU: asked x -81.72 beside the long floor's wall, left by the game at x -86.85.
@@ -2519,6 +2530,27 @@ mod tests {
         // The spot's own numbers stay the crosshair's.
         let p1 = plain.lines().nth(1).unwrap();
         assert_eq!(shown([Some([-40.1, 0.01]), None]), plain.replace(p1, &format!("{p1} · body at (-40, 0)")));
+    }
+
+    #[test]
+    fn a_long_save_name_leaves_room_for_displaced_bodies_and_spot_controls() {
+        use crate::model::{chords::logical::A, storage::FixedPath};
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        for (name, bodies) in [
+            ("n".repeat(48), [None, Some([-87.0, -15.0])]),
+            ("界".repeat(48), [Some([-40.0, 0.0]), Some([-87.0, -15.0])]),
+        ] {
+            assert!(crate::engine::library::check_label(&name).is_ok());
+            let mut card = FixedPath::<224>::new();
+            let mut expected = String::new();
+            w.write_page(Who::P1, "", bodies, &mut expected).unwrap();
+            let result = w.write_text_at(Who::P1, &name, bodies, &mut card);
+            assert!(result.is_ok(), "the actual placement notice buffer must fit the complete card");
+            assert!(card.as_str().ends_with(&expected), "only the displayed name may be shortened: {card:?}");
+            let shown_name = card.as_str().strip_suffix(&expected).unwrap();
+            assert_eq!(shown_name, &name[..name.floor_char_boundary(224 - expected.len())]);
+        }
     }
 
     #[test]

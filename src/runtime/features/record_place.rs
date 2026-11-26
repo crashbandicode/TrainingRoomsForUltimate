@@ -878,7 +878,7 @@ pub unsafe fn frame(fighter: usize) {
                                 Some(visit) => ("Change placement", save_name(&engine, visit.ticket)),
                                 None => ("Recording", ""),
                             };
-                            // Where the game has a body it moved off its spot; left out when the card has no room.
+                            // The card reserves space for the readbacks and controls before fitting the save name.
                             let bodies = holds.map(|hold| hold.and_then(|hold| hold.displaced).map(|moved| moved.at));
                             if wizard.write_text_at(recorded, name, bodies, &mut text).is_err() {
                                 text = FixedPath::new();
