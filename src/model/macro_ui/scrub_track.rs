@@ -7,7 +7,7 @@
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicPtr, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use crate::engine::macros::{InputFrame, ReplayFrame, StartState, MAX_FRAMES};
+use crate::engine::macros::{InputFrame, PackedPose, ReplayFrame, StartState, MAX_FRAMES};
 use crate::model::crosshair::CpuPreview;
 use crate::model::stage_geometry::{Place, Unread};
 
@@ -16,6 +16,9 @@ use crate::model::stage_geometry::{Place, Unread};
 pub struct Spot {
     pub at: [f32; 2],
     pub facing: f32,
+    /// The recorded fighter's kind on this frame, and its animation (none when the frame kept no pose).
+    pub kind: i32,
+    pub pose: PackedPose,
 }
 
 /// What the editor asks the fighters to show.
@@ -37,6 +40,8 @@ pub enum Pos {
     None,
     /// A macro recorded before positions were kept.
     NoTrack,
+    /// The fighters are shown at the frame's places; the macro kept no animations (recorded before they were kept).
+    NoMoves,
     /// The fighters are shown at the handle's frame.
     Held,
     /// A fighter's point is not a place to stand on this stage (outside the camera's limits or the blast lines, or
@@ -51,6 +56,7 @@ impl Pos {
     pub const fn text(self) -> &'static str {
         match self {
             Pos::NoTrack => "Play it once to see positions while scrubbing.",
+            Pos::NoMoves => "Play it once to see the moves while scrubbing.",
             Pos::Off => "Can't stand there on this stage.", // restriction: scrub-point-not-standable
             Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
@@ -62,7 +68,7 @@ impl Pos {
         match self {
             Pos::None => "none",
             Pos::NoTrack => "no_track",
-            Pos::Held => "held",
+            Pos::Held | Pos::NoMoves => "held",
             Pos::Off => "off",
             Pos::End => "end",
         }
@@ -73,6 +79,11 @@ impl Pos {
 pub const SEEN_IDLE: u32 = 0;
 pub const SEEN_HELD: u32 = 1;
 pub const SEEN_OFF: u32 = 2;
+
+/// What the game side drew for a role: nothing, the recorded animation, or nothing because the body is another fighter.
+pub const POSE_NONE: u32 = 0;
+pub const POSE_SHOWN: u32 = 1;
+pub const POSE_OTHER: u32 = 2;
 
 /// Whether a point may hold a body: inside the camera's limits `[left, right, top, bottom]`. A body held past them
 /// is on its way to a blast line.
@@ -93,7 +104,8 @@ pub fn can_stand(place: Result<Place, Unread>) -> bool {
 /// selected fighter plays on.
 pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32) -> Option<ReplayFrame>, anchor: u32, at: u32, target: u8) -> Ask {
     let Some(origin) = selected(anchor) else { return Ask::None };
-    let delta = |frame: ReplayFrame| Spot { at: [frame.x - origin.x, frame.y - origin.y], facing: frame.start.facing };
+    let delta = |frame: ReplayFrame| Spot { at: [frame.x - origin.x, frame.y - origin.y], facing: frame.start.facing,
+        kind: frame.start.fighter_kind, pose: frame.pose };
     let mut deltas = [None; 2];
     deltas[usize::from(target & 1)] = selected(at).map(delta);
     deltas[usize::from(target & 1 ^ 1)] = other(at).map(delta);
@@ -112,6 +124,7 @@ fn key(at: [f32; 2]) -> u64 {
 pub struct Block {
     ask: hos_lock::Published<Ask>,
     seen: [AtomicU32; 2],
+    posed: [(AtomicU32, AtomicU64); 2],
     /// The ask's generation, plus one, at which the game side found a hold made on another body; zero before any.
     dropped: AtomicU32,
     /// The frame the ask is for, plus one; zero for none.
@@ -140,6 +153,7 @@ impl Block {
         Box::new(Self {
             ask: hos_lock::Published::new(Ask::None),
             seen: [const { AtomicU32::new(SEEN_IDLE) }; 2],
+            posed: [const { (AtomicU32::new(POSE_NONE), AtomicU64::new(0)) }; 2],
             dropped: AtomicU32::new(0),
             shown: AtomicU32::new(0),
             classed: [const { AtomicU64::new(0) }; 2],
@@ -174,6 +188,11 @@ impl Block {
         }
     }
 
+    /// The clip frame the ask is for; none when no frame is shown.
+    pub fn shown(&self) -> Option<u32> {
+        self.shown.load(Ordering::Acquire).checked_sub(1)
+    }
+
     /// The game thread: the body a hold was made on is gone (a swapped fighter, a new scene). Nobody is held until
     /// the editor asks for another frame.
     pub fn forget(&self) {
@@ -181,6 +200,9 @@ impl Block {
         // Another body, maybe another stage: what the stage said is asked again.
         for verdict in &self.stands {
             verdict.store(0, Ordering::Release);
+        }
+        for slot in 0..2 {
+            self.set_pose(slot, POSE_NONE, PackedPose::NONE);
         }
         // The callback that forgets asks for its point next, with the hold of the body that is gone still in its
         // slot: it lets go, whatever the worker has published since (`point`).
@@ -198,7 +220,8 @@ impl Block {
         }
         let Ask::Group { deltas, .. } = self.ask() else { return None };
         let delta = (*deltas.get(slot)?)?;
-        Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing })
+        Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing,
+            kind: delta.kind, pose: delta.pose })
     }
 
     /// Recheck on a new ask even at identical coordinates, or if a moving anchor changes this ask's world point.
@@ -343,6 +366,22 @@ impl Block {
         }
     }
 
+    /// The game thread, on the role's fighter frame: what it drew, and the animation it read back.
+    pub fn set_pose(&self, slot: usize, state: u32, shown: PackedPose) {
+        if let Some((status, pose)) = self.posed.get(slot) {
+            pose.store(u64::from(shown.0[0]) | u64::from(shown.0[1]) << 32, Ordering::Relaxed);
+            status.store(state, Ordering::Relaxed);
+        }
+    }
+
+    /// What the game side last drew for the role in `slot`.
+    pub fn pose(&self, slot: usize) -> (u32, PackedPose) {
+        self.posed.get(slot).map_or((POSE_NONE, PackedPose::NONE), |(status, pose)| {
+            let word = pose.load(Ordering::Relaxed);
+            (status.load(Ordering::Relaxed), PackedPose([word as u32, (word >> 32) as u32]))
+        })
+    }
+
     /// The key line's state for what was asked and what the game side did with it.
     pub fn pos(&self) -> Pos {
         match self.ask() {
@@ -455,18 +494,18 @@ pub static SLOT: Slot = Slot::new();
 /// Frames in one block of a take's position track: 10 s.
 pub const TAKE_CHUNK: usize = 600;
 const TAKE_CHUNKS: usize = MAX_FRAMES / TAKE_CHUNK;
-const STATE_CELLS: usize = 9;
+const STATE_CELLS: usize = 11;
 const FRAME_CELLS: usize = 2 * STATE_CELLS;
 
 fn cells(frame: &ReplayFrame) -> [u32; STATE_CELLS] {
     let start = frame.start;
     [start.fighter_kind as u32, start.costume, start.facing.to_bits(), start.situation as u32, start.status as u32,
-        start.speed_x.to_bits(), start.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits()]
+        start.speed_x.to_bits(), start.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits(), frame.pose.0[0], frame.pose.0[1]]
 }
 
 fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     ReplayFrame {
-        pose: crate::engine::macros::PackedPose::NONE,
+        pose: PackedPose([cells[9], cells[10]]),
         input: InputFrame::default(),
         start: StartState { fighter_kind: cells[0] as i32, costume: cells[1], facing: f32::from_bits(cells[2]), situation: cells[3] as i32,
             status: cells[4] as i32, speed_x: f32::from_bits(cells[5]), speed_y: f32::from_bits(cells[6]) },
@@ -652,7 +691,7 @@ mod tests {
     use crate::engine::macro_ui::clip_panel::{clip_help, ClipAction, ClipEditor, ClipEffect};
 
     fn spot(x: f32, y: f32, facing: f32) -> Spot {
-        Spot { at: [x, y], facing }
+        Spot { at: [x, y], facing, kind: -1, pose: PackedPose::NONE }
     }
 
     /// The recorded (or selected) fighter walks right and up from (20, 0) and turns left on frame 6; the other one
@@ -661,6 +700,11 @@ mod tests {
         let i = i as f32;
         let (x, y, facing) = if fighter == 0 { (20.0 + 3.0 * i, i, if i >= 6.0 { -1.0 } else { 1.0 }) } else { (-20.0 - i, 50.0 - 2.0 * i, 1.0) };
         ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState { status: 14, facing, ..StartState::neutral(18, 0, 1.0) }, x, y }
+    }
+
+    fn recorded_spot(fighter: usize, frame: u32, x: f32, y: f32, facing: f32) -> Spot {
+        let recorded = state(fighter, frame);
+        Spot { kind: recorded.start.fighter_kind, pose: recorded.pose, ..spot(x, y, facing) }
     }
 
     fn capture(tracks: usize) -> ClipEditor {
@@ -684,6 +728,50 @@ mod tests {
     }
 
     #[test]
+    fn the_request_carries_each_fighters_kind_and_animation() {
+        let poses = [PackedPose([11, 0x102]), PackedPose([12, 0x203]),
+            PackedPose([13, 0x304]), PackedPose([14, 0x405])];
+        let mut selected = [state(0, 0), state(0, 1)];
+        let mut other = [state(1, 0), state(1, 1)];
+        selected[0].start.fighter_kind = 6;
+        selected[1].start.fighter_kind = 7;
+        other[0].start.fighter_kind = 74;
+        other[1].start.fighter_kind = 75;
+        selected[0].pose = poses[0];
+        selected[1].pose = poses[1];
+        other[0].pose = poses[2];
+        other[1].pose = poses[3];
+        let ask = |at| deltas(|i| selected.get(i as usize).copied(), |i| other.get(i as usize).copied(), 0, at, 0);
+        let block = Block::new();
+        assert_eq!(block.shown(), None);
+        for (frame, kinds, expected) in [(0, [6, 74], [poses[0], poses[2]]), (1, [7, 75], [poses[1], poses[3]])] {
+            block.ask_at(Some(frame), ask(frame));
+            assert_eq!(block.shown(), Some(frame));
+            let Ask::Group { deltas, .. } = block.ask() else { panic!("no group") };
+            for slot in 0..2 {
+                let delta = deltas[slot].unwrap();
+                assert_eq!((delta.kind, delta.pose), (kinds[slot], expected[slot]));
+                let held = block.held_at(slot, [5.0, 8.0]).unwrap();
+                assert_eq!((held.kind, held.pose), (kinds[slot], expected[slot]));
+                assert_eq!(held.at, [5.0 + delta.at[0], 8.0 + delta.at[1]]);
+            }
+        }
+        assert_eq!(block.pose(0), (POSE_NONE, PackedPose::NONE));
+        assert_eq!(block.pose(1), (POSE_NONE, PackedPose::NONE));
+        block.set_pose(0, POSE_SHOWN, poses[1]);
+        block.set_pose(1, POSE_OTHER, poses[3]);
+        block.set_pose(2, POSE_SHOWN, poses[0]);
+        assert_eq!(block.pose(0), (POSE_SHOWN, poses[1]));
+        assert_eq!(block.pose(1), (POSE_OTHER, poses[3]));
+        assert_eq!(block.pose(2), (POSE_NONE, PackedPose::NONE));
+        block.forget();
+        assert_eq!(block.pose(0), (POSE_NONE, PackedPose::NONE));
+        assert_eq!(block.pose(1), (POSE_NONE, PackedPose::NONE));
+        block.ask_at(None, Ask::None);
+        assert_eq!(block.shown(), None);
+    }
+
+    #[test]
     fn macros_and_captures_share_one_point_rule() {
         // One table through both: (the handle and its nudges, the frame it lands on).
         for (out, nudge, frame) in [(false, 0, 0u32), (false, 5, 5), (false, 8, 8), (true, 0, 9), (true, -3, 6), (true, -9, 0)] {
@@ -694,8 +782,8 @@ mod tests {
                 asks.push(editor.scrub());
             }
             let wanted = Ask::Group { target: 1, deltas: [
-                Some(spot(state(1, frame).x - 20.0, state(1, frame).y, 1.0)),
-                Some(spot(3.0 * frame as f32, frame as f32, state(0, frame).start.facing)),
+                Some(recorded_spot(1, frame, state(1, frame).x - 20.0, state(1, frame).y, 1.0)),
+                Some(recorded_spot(0, frame, 3.0 * frame as f32, frame as f32, state(0, frame).start.facing)),
             ] };
             assert_eq!(asks, [(wanted, Pos::Held); 2], "out={out} nudge={nudge}: Out shows frame end - 1");
         }
@@ -733,10 +821,10 @@ mod tests {
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
-        for pos in [Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End] {
+        for pos in [Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End] {
             assert!(pos.text().chars().count() <= 67, "{pos:?}");
         }
-        assert_eq!([Pos::None, Pos::NoTrack, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "off", "end"]);
+        assert_eq!([Pos::None, Pos::NoTrack, Pos::NoMoves, Pos::Held, Pos::Off, Pos::End].map(Pos::word), ["none", "no_track", "held", "held", "off", "end"]);
     }
 
     #[test]
@@ -754,10 +842,10 @@ mod tests {
         editor.pause();
         editor.on_action(ClipAction::SelectIn);
         block.set_ask(editor.scrub().0);
-        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(spot(28.0, 6.0, -1.0)));
+        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(recorded_spot(0, 6, 28.0, 6.0, -1.0)));
         editor.on_action(ClipAction::SelectOut);
         block.set_ask(editor.scrub().0);
-        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(spot(37.0, 9.0, -1.0)));
+        assert_eq!(block.held_at(1, [10.0, 0.0]), Some(recorded_spot(0, 9, 37.0, 9.0, -1.0)));
     }
 
     #[test]
@@ -771,8 +859,8 @@ mod tests {
         // fighter keeps the recorded spacing to it.
         let home = [100.0, 7.0];
         assert_eq!(block.target_slot(), Some(1));
-        assert_eq!(block.held_at(1, home), Some(spot(112.0, 11.0, 1.0)));
-        assert_eq!(block.held_at(0, home), Some(spot(100.0 + (-24.0 - 20.0), 7.0 + 42.0, 1.0)));
+        assert_eq!(block.held_at(1, home), Some(recorded_spot(0, 4, 112.0, 11.0, 1.0)));
+        assert_eq!(block.held_at(0, home), Some(recorded_spot(1, 4, 100.0 + (-24.0 - 20.0), 7.0 + 42.0, 1.0)));
         // A capture with one track moves one body.
         let mut single = capture(1);
         single.on_action(ClipAction::SelectIn);
@@ -826,7 +914,7 @@ mod tests {
             assert_eq!(editor.scrub(), (Ask::None, Pos::None), "a playing preview holds nothing");
         }
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("None => release(&mut holds[slot], accessor),"), "a role with no point is released");
+        assert!(runtime.contains("None => release(block, slot, &mut holds[slot], accessor),"), "a role with no point is released");
         assert!(runtime.contains("placement::restore(accessor, hold.origin());"));
     }
 
@@ -913,9 +1001,30 @@ mod tests {
         fill(0, TAKE_CHUNK + 1);
         assert_eq!(take.take(TAKE_CHUNK + 1).map(|track| track.len()), Some(TAKE_CHUNK));
         assert_eq!(TakeTrack::new().take(5), None, "a take with no state kept has no track");
-        assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 43_200);
+        assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 52_800);
         assert_eq!(TAKE_CHUNKS * TAKE_CHUNK, MAX_FRAMES);
         assert!(include_str!("scrub_track.rs").contains("Self { table: AtomicUsize::new(NO_BLOCK) }"), "initialised data, not BSS");
+    }
+
+    #[test]
+    fn a_take_keeps_each_frames_animation() {
+        let take = TakeTrack::new();
+        take.service(true, 0);
+        for i in 0..=TAKE_CHUNK {
+            for slot in 0..2 {
+                let mut frame = state(slot, i as u32);
+                frame.pose = PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]);
+                take.live(slot, &frame);
+            }
+            take.push(i, 0);
+        }
+        let rows = take.take(TAKE_CHUNK + 1).unwrap();
+        assert_eq!(rows.len(), TAKE_CHUNK + 1);
+        for i in [0, TAKE_CHUNK - 1, TAKE_CHUNK] {
+            for (slot, frame) in rows[i].iter().enumerate() {
+                assert_eq!(frame.pose, PackedPose([i as u32 + 1 + slot as u32 * 1_000, ((i as u32 + 1) << 8) | slot as u32]));
+            }
+        }
     }
 
     #[test]
@@ -1042,8 +1151,8 @@ mod tests {
         let block = Block::new();
         block.set_ask(reopened.scrub().0);
         // The file's last frame is the capture's frame 8; its anchor is the capture's frame 2, at (26, 2).
-        assert_eq!(block.held_at(1, [0.0, 0.0]), Some(spot(44.0 - 26.0, 8.0 - 2.0, -1.0)));
-        assert_eq!(block.held_at(0, [0.0, 0.0]), Some(spot(-28.0 - 26.0, 34.0 - 2.0, 1.0)));
+        assert_eq!(block.held_at(1, [0.0, 0.0]), Some(recorded_spot(0, 8, 44.0 - 26.0, 8.0 - 2.0, -1.0)));
+        assert_eq!(block.held_at(0, [0.0, 0.0]), Some(recorded_spot(1, 8, -28.0 - 26.0, 34.0 - 2.0, 1.0)));
         // A capture with one fighter saves that fighter's track; the other one is marked absent and is never held.
         let mut single = capture(1);
         single.on_action(ClipAction::SelectIn);
@@ -1051,7 +1160,7 @@ mod tests {
         assert_eq!(saved.track.as_ref().map(|track| (track.len(), track[0][0], track[0][1].start.fighter_kind)), Some((10, state(0, 0), -1)));
         let mut reopened = ClipEditor::macro_file(*saved, false).unwrap();
         reopened.on_action(ClipAction::SelectIn);
-        assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::Held)));
+        assert!(matches!(reopened.scrub(), (Ask::Group { target: 1, deltas: [None, Some(_)] }, Pos::NoMoves)));
         // The X preview's clip is not given a track: it is played, not saved.
         let mut previewed = capture(2);
         let ClipEffect::Preview(clip) = previewed.on_action(ClipAction::TogglePlay) else { panic!("expected a preview") };
@@ -1505,7 +1614,7 @@ mod tests {
         let judged = "if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {";
         let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
         assert!(order(&["block.refused(index, generation, body, spot.at)", "placement::hold_at(slot, accessor, body, spot.at, false)", judged, "state::set_lr(accessor, spot.facing);"]));
-        assert!(hold.contains(&format!("{judged}\n        release(slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
+        assert!(hold.contains(&format!("{judged}\n        release(block, index, slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
         assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
         assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
     }

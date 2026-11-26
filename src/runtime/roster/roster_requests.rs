@@ -7,7 +7,7 @@
 //!
 //! The queues are [`DropRing`]s: one producer each (the worker for requests, the game frame for replies), bounded and
 //! preallocated; a full ring drops the oldest and counts it, never waits.
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use crate::model::drop_ring::DropRing;
 
@@ -20,6 +20,10 @@ const NONE: u32 = u32::MAX;
 static REQUESTS: DropRing<2, 8> = DropRing::new();
 /// The game frame's answers to `PLAYER_REPLIED`: `[fighter kind, queued]`.
 static REPLIES: DropRing<2, 8> = DropRing::new();
+// One clip switch at a time. Tags 0..=2 belong to the older request paths.
+// Upper bits identify the switch; the low two bits of its answer are 0=pending/consumed, 1=yes, 2=no.
+const FIRST_CLIP: u64 = 4;
+static CLIP_REPLY: AtomicU64 = AtomicU64::new(FIRST_CLIP);
 /// Player 1's fighter kind as the roster last observed it (`NONE` before a practice entry), as of the last game frame.
 static PLAYER_KIND: AtomicU32 = AtomicU32::new(NONE);
 
@@ -43,6 +47,20 @@ pub(crate) fn take_reply() -> Option<(u32, bool)> {
     REPLIES.pop().map(|[kind, queued]| (kind as u32, queued != 0))
 }
 
+/// Worker only. A late answer for a cancelled switch cannot answer its successor, even for the same kind.
+pub(crate) fn request_clip_kind(player: bool, kind: u32) {
+    let ticket = (CLIP_REPLY.load(Ordering::Relaxed) & !3).wrapping_add(4).max(FIRST_CLIP);
+    CLIP_REPLY.store(ticket, Ordering::Release);
+    REQUESTS.push([ticket | u64::from(!player), u64::from(kind)]);
+}
+
+pub(crate) fn take_clip_reply() -> Option<bool> {
+    let word = CLIP_REPLY.load(Ordering::Acquire);
+    if word & 3 == 0 { return None; }
+    CLIP_REPLY.store(word & !3, Ordering::Relaxed);
+    Some(word & 3 == 1)
+}
+
 /// Player 1's fighter kind as the roster last observed it, as of the last game frame (the worker's read; never a lock).
 pub(crate) fn player_kind() -> Option<u32> {
     Some(PLAYER_KIND.load(Ordering::Acquire)).filter(|kind| *kind != NONE)
@@ -57,10 +75,17 @@ pub(crate) fn service() {
         match what {
             CPU => _ = super::character_roster::request_cpu_kind(kind),
             PLAYER => _ = super::character_roster::request_player_kind(kind),
-            _ => {
+            PLAYER_REPLIED => {
                 let queued = super::character_roster::request_player_kind(kind);
                 REPLIES.push([u64::from(kind), u64::from(queued)]);
                 replied = true;
+            }
+            _ => {
+                let queued = if what & 1 == 0 { super::character_roster::request_player_kind(kind) }
+                    else { super::character_roster::request_cpu_kind(kind) };
+                let ticket = what & !3;
+                replied |= CLIP_REPLY.compare_exchange(ticket, ticket | if queued { 1 } else { 2 },
+                    Ordering::Release, Ordering::Relaxed).is_ok();
             }
         }
     }

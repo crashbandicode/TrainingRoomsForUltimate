@@ -46,6 +46,8 @@ pub struct Clip {
     pub text: MoveText,
     /// The scrub's position state (`scrub_track::Pos::word`); written only when it is not `none`.
     pub pos: &'static str,
+    pub pose: [&'static str; 2],
+    pub fighter: [&'static str; 2],
 }
 
 /// The strip's move text on a `clip` line: at most 48 bytes, cut at a character; a quote, a backslash or a control
@@ -77,6 +79,10 @@ impl Clip {
             self.ctx, self.total, self.start, self.end, self.cursor, u8::from(self.playing), self.handle, u8::from(self.running));
         if !matches!(self.pos, "" | "none") {
             let _ = write!(line, " pos={}", self.pos);
+        }
+        if !self.fighter[0].is_empty() {
+            let _ = write!(line, " pose.p1={} pose.cpu={} fighter.p1={} fighter.cpu={}",
+                self.pose[0], self.pose[1], self.fighter[0], self.fighter[1]);
         }
         let _ = write!(line, " target={} marks={} mark=", self.target, self.marks);
         let _ = match self.mark {

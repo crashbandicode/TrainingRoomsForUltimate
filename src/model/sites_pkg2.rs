@@ -37,6 +37,8 @@ pub const WORK_SET_FLOAT_OFFSET: usize = 0x208_db60;
 pub const WORK_GET_PARAM_FLOAT_OFFSET: usize = 0x208_de50;
 pub const MOTION_CHANGE_HOOK_OFFSET: usize = 0x205_cb30;
 pub const MOTION_KIND_OFFSET: usize = 0x205_cc20;
+/// `MotionModule::is_anim_resource`: the clip editor's scrub asks it before it starts a recorded animation.
+pub const MOTION_IS_ANIM_RESOURCE_OFFSET: usize = 0x205_ce10;
 pub const COMMAND_FLAG_HOOK_OFFSET: usize = 0x200_1630;
 pub const ATTACK_AIR_KIND_HOOK_OFFSET: usize = 0x200_1710;
 pub const STICK_DIR_HOOK_OFFSET: usize = 0x200_1030;
@@ -85,7 +87,7 @@ pub const CHANGE_ACTIVE_CAMERA_OFFSET: usize = 0x4e_e480;
 pub const CAMERA_FUNCTOR_VTABLE: usize = 0x4f7_4ca0;
 pub const CAMERA_MODE_FIELD: usize = 0x4;
 
-pub static SITES_PKG2: [Site; 52] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
+pub static SITES_PKG2: [Site; 53] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
 
 /// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
 /// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from

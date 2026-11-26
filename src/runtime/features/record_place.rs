@@ -590,7 +590,7 @@ impl record_place::DownBody for DownAccess {
     fn set_face(&mut self, up: bool, motion: u64) {
         unsafe {
             natives::set_flag(self.0, up, konst(C::FlagDownUp));
-            natives::change_motion(self.0, motion, 0.0, 1.0);
+            natives::change_motion(self.0, motion, 0.0, 1.0, true);
         }
     }
 }
