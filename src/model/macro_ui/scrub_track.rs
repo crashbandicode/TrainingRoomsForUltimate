@@ -7,7 +7,7 @@
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicPtr, AtomicU32, AtomicUsize, Ordering};
 
-use crate::engine::macros::{InputFrame, ReplayFrame, StartState};
+use crate::engine::macros::{InputFrame, ReplayFrame, StartState, MAX_FRAMES};
 use crate::model::crosshair::CpuPreview;
 
 /// A fighter's place and facing on one frame; as a delta, how far from the target fighter's home.
@@ -234,9 +234,7 @@ pub static SLOT: Slot = Slot::new();
 
 /// Frames in one block of a take's position track: 10 s.
 pub const TAKE_CHUNK: usize = 600;
-/// Positions are retained for the first two minutes of a newly made macro; its inputs can run longer.
-pub const POSITION_FRAMES: usize = 7_200;
-const TAKE_CHUNKS: usize = POSITION_FRAMES / TAKE_CHUNK;
+const TAKE_CHUNKS: usize = MAX_FRAMES / TAKE_CHUNK;
 const STATE_CELLS: usize = 9;
 const FRAME_CELLS: usize = 2 * STATE_CELLS;
 
@@ -675,7 +673,7 @@ mod tests {
         assert_eq!(take.take(TAKE_CHUNK + 1).map(|track| track.len()), Some(TAKE_CHUNK));
         assert_eq!(TakeTrack::new().take(5), None, "a take with no state kept has no track");
         assert_eq!(TAKE_CHUNK * FRAME_CELLS * 4, 43_200);
-        assert_eq!(TAKE_CHUNKS * TAKE_CHUNK, POSITION_FRAMES);
+        assert_eq!(TAKE_CHUNKS * TAKE_CHUNK, MAX_FRAMES);
         assert!(include_str!("scrub_track.rs").contains("Self { table: AtomicUsize::new(NO_BLOCK) }"), "initialised data, not BSS");
     }
 
