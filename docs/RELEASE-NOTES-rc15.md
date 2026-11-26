@@ -27,85 +27,105 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Install 6
 
-Installed 2026-11-26 (12:22). Build `5df3d9dc`. It is still an rc.15 build: its footer reads
-`0.2.0-rc.15 · rc15 5df3d9dc`. It holds install 5 and the three changes to the clip editor below, with one fix to
-the third, all merged on 2026-11-26.
+| | |
+| --- | --- |
+| Installed | 2026-11-26 (12:22), and read back |
+| Build | `5df3d9dc`. Still an rc.15 build: the footer reads `0.2.0-rc.15 · rc15 5df3d9dc` |
+| Holds | install 5, plus three changes to the clip editor and one fix to the third, all merged on 2026-11-26 |
+
+All three changes are in the clip editor of the [Replay window](menu/recording.md#replay-window).
 
 ### Y on In makes a capture previewable
 
-- In the Replay window on a match capture, Y with In selected snaps In to a mark. When that frame is in the middle
-  of an action, Y now also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it.
-- Where no move can start at that frame, the strip says why. A second Y keeps the same move.
-- The check behind "In is mid-action" is unchanged. Host tests compared all 1,176 crop ranges of a 48-frame
-  capture: every preview that worked on install 5 kept its starting state and inputs.
-- Seen in Eden on `eb39d6bc`: with In one frame into an attack, X played nothing and the refusal showed; Y moved In
-  to the attack's start; X then previewed and A saved a macro. A second Y and the faster cases have host tests only.
-- Found by the operator on install 5, where the way round is ZL or ZR + Y:
-  [Known issues](CURRENT-RELEASE.md#known-issues).
-  [Replay window](menu/recording.md#replay-window)
+*Clip coming.*
+
+On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
+found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
+
+| With In selected | What Y does in install 6 |
+| --- | --- |
+| The mark is in the middle of an action | Snaps In to the mark and also takes the move's short setup, as ZL or ZR + Y does, so X and A work from it |
+| No move can start at that frame | The strip says why |
+| Y a second time | Keeps the same move |
+
+| Checked | Result |
+| --- | --- |
+| Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
+| Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
+| Host tests only | A second Y, and the faster cases |
 
 ### A free playhead in the clip editor
 
-- With no handle selected, Left and Right move the playhead over the whole take of a macro or a capture, inside or
-  outside the kept part. In and Out do not change.
-- Y then moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target.
-- Once the playhead has moved, L makes its frame the first kept frame and R makes it the last kept frame (Out is
-  one frame later). Neither cut can cross the other handle: the editor says which to set first and changes nothing.
+*Clip coming.*
+
+With no handle selected, on a macro or a capture:
+
+| Key | What it does |
+| --- | --- |
+| Left, Right | Move the playhead over the whole take, inside or outside the kept part. In and Out do not change |
+| Y | Moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target |
+| L, once the playhead has moved | Makes its frame the first kept frame |
+| R, once the playhead has moved | Makes its frame the last kept frame (Out is one frame later) |
+
+- Neither cut can cross the other handle: the editor says which to set first and changes nothing.
 - An In set this way is like one you nudged: if it is mid-action on a capture, Y resolves the move as above.
 - Combos and drills are unchanged.
-- Seen in Eden on `eb39d6bc`: with nothing selected the playhead moved to two other frames while In and Out stayed
-  where they were, and the strip read "Playhead moved. L sets the start here, R the end.". The cuts with L and R
-  and the snap with Y have host tests only; holding a direction on a pad has no host test.
-  [Replay window](menu/recording.md#replay-window)
+
+| Checked | Result |
+| --- | --- |
+| Eden, on `eb39d6bc` | With nothing selected the playhead moved to two other frames while In and Out stayed where they were, and the strip read "Playhead moved. L sets the start here, R the end." |
+| Host tests only | The cuts with L and R, and the snap with Y |
+| No host test | Holding a direction on a pad |
 
 ### The fighters are shown while you scrub
 
-- With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
-  frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
-  is kept. This works on a macro and on a match capture.
-- Record saves a macro's positions in a second file beside it. The macro's own file stays the same, so older
-  builds can still read new macros, older macros still load and play on this build, and Play reads what it read
-  before. A crop and a capture saved as a macro carry their positions.
-- A macro with no positions reads "Play it once to see positions while scrubbing.". Play it by itself from its
-  first input, with Play or with X from the start of the take, and they are saved; you do not record it again.
-  After X in the editor they show at once.
-- Positions made by a playback are that playback's, not the original recording's. A playback stopped early gives
-  positions up to where it stopped; past them the editor reads "Positions end here.".
-- A playback never replaces a valid positions file saved by Record. A damaged or mismatched file counts as
-  missing, so an eligible playback can replace it. The macro does not need positions to play.
-- No positions file is made for a chain step, when the playing character is a different fighter kind from the one
-  recorded, or when Trim skips the first input.
-- A fighter is not put at a point inside solid ground or a wall, outside the camera's limits, or past the safe
-  blast-line bounds. If either fighter's point fails these checks, the editor reads
-  "Can't stand there on this stage."; a fighter already held goes back to where the hold began. Each fighter's
-  point is judged by itself, so the other one is still shown when its own point allows.
-- The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
-- Fixed before the card build (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
-  the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
-  both fighters stood beside their recorded points while the editor said they were held.
-- Seen in Eden on `eb39d6bc`, the build before that fix: a recorded take held both fighters at In with no preview,
-  In and Out followed the handles, and deselecting let them go; an old macro read "Play it once to see positions
-  while scrubbing." and got its positions from one Play; X in the editor showed them at once; a crop kept them.
-- Install 6's own checks are in testing. The build before the fix did not establish scrub behavior in a waiting
-  room, through a fighter swap or scene change, on the final frame of a long recording, or after deleting a macro
-  with positions. No host test runs the Switch code that holds the fighters.
-- On one Eden host (one boot per build), every tested macro on `eb39d6bc` started on install 5's frame count or
-  one frame earlier. That includes the first Play of the old 30-second and ten-minute macros. The unchanged
-  playback path carries this result forward; these are not timings from a boot of install 6 or from the console.
-  [Replay window](menu/recording.md#replay-window)
+*Clip coming.*
+
+With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
+frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
+is kept. This works on a macro and on a match capture.
+
+| The macro | Where its positions come from |
+| --- | --- |
+| Recorded on this build | Record saves them in a second file beside the macro |
+| A crop, or a capture saved as a macro | It carries its positions |
+| Without positions | Play it by itself from its first input, with Play or with X from the start of the take, and they are saved; you do not record it again. After X in the editor they show at once |
+
+| The editor reads | When |
+| --- | --- |
+| "Play it once to see positions while scrubbing." | The macro has no positions |
+| "Positions end here." | Past the positions of a playback that was stopped early; it gives positions up to where it stopped |
+| "Can't stand there on this stage." | Either fighter's point is inside solid ground or a wall, outside the camera's limits, or past the safe blast-line bounds. A fighter already held goes back to where the hold began. Each fighter's point is judged by itself, so the other one is still shown when its own point allows |
+
+| Rule | |
+| --- | --- |
+| The macro's own file | Stays the same: older builds can still read new macros, older macros still load and play on this build, and Play reads what it read before. The macro does not need positions to play |
+| Positions made by a playback | Are that playback's, not the original recording's |
+| A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
+| No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
+| Not shown | The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing |
+
+**Fixed before the card build** (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
+the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
+both fighters stood beside their recorded points while the editor said they were held.
+
+| Checked | Result |
+| --- | --- |
+| Eden, on `eb39d6bc`, the build before that fix | A recorded take held both fighters at In with no preview, In and Out followed the handles, and deselecting let them go. An old macro read "Play it once to see positions while scrubbing." and got its positions from one Play. X in the editor showed them at once. A crop kept them |
+| Play's start, in Eden (one host, one boot per build) | Every tested macro on `eb39d6bc` started on install 5's frame count or one frame earlier, including the first Play of the old 30-second and ten-minute macros. The unchanged playback path carries this result forward; these are not timings from a boot of install 6 or from the console |
+| Not established by the build before the fix | Scrub behavior in a waiting room, through a fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions |
+| Install 6 itself | Its own checks are in testing |
+| Host | No host test runs the Switch code that holds the fighters |
 
 ### Tested
 
-- **Installed:** yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback
-  copy of install 5 was also saved on the card.
-- **Host:** every merge passed host tests and builds.
-- **Tested in Eden, on the build before the fix (`eb39d6bc`), not on this exact build:** Play started no later than
-  on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play;
-  Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the
-  fix addresses.
-- **Merge 17 in Eden:** at installation, two Training boots were testing its diagnostic build. No result from a
-  smoke test of the installed release file is claimed here.
-- **The operator reported:** nothing on this build yet.
+| | Install 6 |
+| --- | --- |
+| Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
+| Host | Every merge passed host tests and builds |
+| Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
+| Eden, on merge 17 | At installation, two Training boots were testing its diagnostic build. No result from a smoke test of the installed release file is claimed here |
+| The operator reported | Nothing about TrainingRooms on this build yet |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).
 

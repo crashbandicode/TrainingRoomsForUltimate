@@ -23,7 +23,7 @@ author. Times are UTC.
 | Card readback | match | match | match | match | match | match |
 | Host tests (passed / failed / ignored) | 2,879 / 0 / 4 | 2,444 / 0 / 4 | 2,444 / 0 / 4 | 2,776 / 0 / 4 | 3,048 / 0 / 4 | 3,108 / 0 / 4 |
 | Eden before the install | Training and a waiting room; limited release | partial; one product failure | none | Training in part; no TrainingRooms row in Quick Play | a smoke boot on the same file: nine of ten checks. After the install, a second boot opened the menu in a one-player waiting room | No smoke result on the installed release file. Two Training runs used the diagnostic file from the same commit. Earlier results on `eb39d6bc` are listed below. |
-| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | three (2026-11-25 and 2026-11-26) | none yet |
+| The operator's reports on record | none | none | two (2026-11-24) | two (2026-11-25) | three (2026-11-25 and 2026-11-26) | none about TrainingRooms; one crash in ARCropolis (2026-11-26) |
 
 The menu footer of each build ends with its commit. The install 4 file holds the text `rc15 a945b0c1`
 (`strings` on `artifacts/phase23/install4/gate-a945b0c1/nro/libtraining_rooms-a945b0c1-release.nro`). The install 5
@@ -152,6 +152,7 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. The fix is on the card since install 6 (2026-11-26). |
 | 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not fixed in install 6 (merge 17). Assigned for the following build (inbox 11:57:13Z, with the operator's words). A code review identified why the hold may not lift a landed fighter; this still needs confirmation in Eden (12:09:32Z). |
 | 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | Not changed. Assigned for a later build, cause first (inbox 2026-11-26 11:57:13Z, tr-primary-2, with the operator's words). No cause is established, and it has not been reproduced. |
+| 2026-11-26 12:29 | install 6 | The game crashed right after A on the title screen; the operator guessed it is intermittent. | Not TrainingRooms: ARCropolis. The crash report's thread is the game's resource inflate thread, a copy called from ARCropolis ran past its buffer, and no TrainingRooms frame is in it. A report of 2026-05-25 has the same signature (`artifacts/phase23/hw-crash-20261126-1229Z/SUMMARY.md`; inbox 2026-11-26 12:33:03Z, tr-primary-2). |
 
 ## Install 5 (`b7a382e4`)
 
@@ -278,7 +279,8 @@ frame was looked at.
 - **Eden at installation:** the two running Training boots used merge 17's diagnostic NRO (`853964b2…`), not the
   release file read back from the card. The release smoke and waiting-room checks were still pending.
   [Merge 17 test status](#eden-on-install-6-itself-5df3d9dc-merge-17)
-- **The operator's reports:** none on this build yet.
+- **The operator's reports:** none about TrainingRooms on this build yet. One crash on the title screen is on
+  record; it is in ARCropolis (the reports table above).
 
 The changes in this build were merged one by one after install 5 (`b7a382e4`). The Gate column names the receipt
 under `artifacts/phase23/next-build/`; the gates are host tests and builds. The Eden runs follow the table.
