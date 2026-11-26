@@ -392,29 +392,44 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    fn replacement_fault(fault: &'static str) {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        let id = library.save_new(&recording("Old", 3, true)).unwrap();
+        let mut next = recording("Replacement", 3, false);
+        next.set_track(Some(vec![pair(99); 3]));
+        FAULT.with(|cell| cell.set(Some(fault)));
+        fail_writes(true);
+        let result = library.overwrite(&id, &next);
+        let retry = library.overwrite(&id, &next);
+        fail_writes(false);
+        FAULT.with(|cell| cell.set(None));
+        let reopened = library.load_edited(&id).unwrap();
+        assert!(result.is_err(), "{fault} failed but overwrite reported success; macro={}", reopened.name);
+        assert!(retry.is_err(), "a retry must not bypass an outstanding {fault} failure");
+        assert_eq!(reopened.name, "Old");
+        assert_eq!(reopened.track, (fault == "unlink").then(|| track(3)));
+        library.overwrite(&id, &next).unwrap();
+        assert_eq!(library.load_edited(&id).unwrap(), next);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
-    fn a_failed_sidecar_invalidation_cannot_commit_the_replacement_macro() {
-        for fault in ["unlink", "sync"] {
-            let dir = scratch();
-            let library = Library::new(&dir);
-            let id = library.save_new(&recording("Old", 3, true)).unwrap();
-            let mut next = recording("Replacement", 3, false);
-            next.set_track(Some(vec![pair(99); 3]));
-            FAULT.with(|cell| cell.set(Some(fault)));
-            fail_writes(true);
-            let result = library.overwrite(&id, &next);
-            let retry = library.overwrite(&id, &next);
-            fail_writes(false);
-            FAULT.with(|cell| cell.set(None));
-            let reopened = library.load_edited(&id).unwrap();
-            assert!(result.is_err(), "{fault} failed but overwrite reported success; macro={}", reopened.name);
-            assert!(retry.is_err(), "a retry must not bypass an outstanding {fault} failure");
-            assert_eq!(reopened.name, "Old");
-            assert_eq!(reopened.track, (fault == "unlink").then(|| track(3)));
-            library.overwrite(&id, &next).unwrap();
-            assert_eq!(library.load_edited(&id).unwrap(), next);
-            fs::remove_dir_all(dir).unwrap();
-        }
+    fn a_failed_sidecar_invalidation_unlink() { replacement_fault("unlink"); }
+
+    #[test]
+    fn a_failed_sidecar_invalidation_sync() { replacement_fault("sync"); }
+
+    #[test]
+    fn a_failed_sidecar_invalidation_from_an_interrupted_delete_is_not_adopted() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        let id = library.save_new(&recording("Walk", 3, true)).unwrap();
+        fs::remove_file(dir.join(format!("{id}.json"))).unwrap();
+        let plain = recording("Walk", 3, false);
+        assert_eq!(library.save_new(&plain).unwrap(), id);
+        assert!(library.load_edited(&id).unwrap().track.is_none(), "a fresh take adopted the deleted take's positions");
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
