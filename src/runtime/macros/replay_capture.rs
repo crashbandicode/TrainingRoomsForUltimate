@@ -938,7 +938,7 @@ fn hold_play(action: ClipAction, playback: bool) -> bool {
     {
         let mut editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_mut() else { return false };
-        if editor.view().playing || SLOT.with(|block| block.released()).unwrap_or(true) { return false; }
+        if editor.view().playing || SLOT.released() { return false; }
         editor.want_play(action, playback);
     }
     crate::runtime::diag_log::diagnostic(format_args!("[Scrub] play wanted: the hold lets the fighters go first"));
@@ -954,7 +954,7 @@ fn service_wanted_play() {
     let wanted = {
         let mut editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_mut() else { return };
-        if editor.wanted_play().is_none() || !SLOT.with(|block| block.released()).unwrap_or(true) { return; }
+        if editor.wanted_play().is_none() || !SLOT.released() { return; }
         SLOT.with(|block| block.await_settle());
         editor.take_wanted_play()
     };

@@ -218,9 +218,9 @@ impl Block {
         }
     }
 
-    /// The worker: nobody is asked to be held, and every role the last ask moved has run a fighter frame under that
-    /// "nobody", which is the frame that lets its body go. A role that never ran a frame here has no body to wait for.
-    pub fn released(&self) -> bool {
+    /// Acknowledgements for the latest ask only. The worker must use `Slot::released` to also check
+    /// for callbacks still running and bodies that remain held from an earlier ask.
+    pub(super) fn released(&self) -> bool {
         if self.ask() != Ask::None {
             return false;
         }
@@ -327,6 +327,14 @@ impl Slot {
         let result = (ptr & 1 == 0).then(|| f(unsafe { &*(ptr as *const Block) }));
         self.readers.fetch_sub(1, Ordering::SeqCst);
         result
+    }
+
+    /// The worker's release check before it starts a wanted play.
+    pub fn released(&self) -> bool {
+        // A callback may have read a point but not reported its first hold yet. Once we are the only
+        // reader of the cancelled ask, no later callback can start a hold and both last reports count.
+        self.with(|b| self.readers.load(Ordering::SeqCst) == NO_READER + 1 && b.released()
+            && (0..2).all(|slot| b.seen(slot) != SEEN_HELD)).unwrap_or(true)
     }
 
     /// The worker: cancel the request and keep the slot reachable until the fighters have released it.
@@ -1110,6 +1118,50 @@ mod tests {
     }
 
     #[test]
+    fn preview_release_proof_keeps_a_partner_held_from_an_earlier_row() {
+        let slot = Slot::new();
+        assert!(slot.publish(Block::new()).is_ok());
+        let place = Some(spot(3.0, 4.0, 1.0));
+        slot.with(|b| {
+            b.ask_at(Some(4), Ask::Group { target: 0, deltas: [place; 2] });
+            for role in 0..2 {
+                b.set_seen(role, SEEN_HELD);
+                b.ack(role, b.generation());
+            }
+            // The CPU has not run since row 4. The next row has no partner.
+            b.ask_at(Some(5), Ask::Group { target: 0, deltas: [place, None] });
+            b.ask_at(None, Ask::None);
+            b.set_seen(0, SEEN_IDLE);
+            b.ack(0, b.generation());
+        });
+        assert!(!slot.released(), "the CPU is still holding its row-4 point");
+        slot.with(|b| { b.set_seen(1, SEEN_IDLE); b.ack(1, b.generation()); });
+        assert!(slot.released(), "both bodies reported their releases");
+        slot.close();
+    }
+
+    #[test]
+    fn preview_release_proof_sees_a_first_callback_that_has_not_reported_yet() {
+        let slot = Slot::new();
+        assert!(slot.publish(Block::new()).is_ok());
+        let place = Some(spot(3.0, 4.0, 1.0));
+        slot.with(|b| b.ask_at(Some(4), Ask::Group { target: 0, deltas: [None, place] }));
+        slot.with(|b| {
+            let generation = b.generation();
+            assert!(b.held_at(1, [0.0; 2]).is_some());
+            // The worker handles X after the CPU has its point, but before its first result.
+            b.ask_at(None, Ask::None);
+            assert!(!slot.released(), "the first fighter callback can still acquire the body");
+            b.set_seen(1, SEEN_HELD);
+            b.ack(1, generation);
+        });
+        assert!(!slot.released(), "the late hold is now observable");
+        slot.with(|b| { b.set_seen(1, SEEN_IDLE); b.ack(1, b.generation()); });
+        assert!(slot.released(), "the held CPU came home; absent P1 needs no callback");
+        slot.close();
+    }
+
+    #[test]
     fn a_play_waits_until_every_moved_role_has_let_go() {
         let block = Block::new();
         assert!(block.released(), "nothing was asked");
@@ -1170,7 +1222,7 @@ mod tests {
         let notices = worker.split_once("pub fn worker_preview_notices() {").map_or("", |(_, rest)| rest);
         assert!(notices.trim_start().starts_with("scrub_service();\n    service_wanted_play();"), "the wanted play is looked at on every pass");
         let service = worker.split_once("fn service_wanted_play() {").map_or("", |(_, rest)| rest);
-        let released = service.find("block.released()").expect("the release is read");
+        let released = service.find("SLOT.released()").expect("the release is read");
         assert!(released < service.find("block.await_settle()").unwrap() && released < service.find("editor.take_wanted_play()").unwrap());
         assert!(worker.contains("[Scrub] play wanted") && worker.contains("[Scrub] released"), "both steps are in the trace");
         assert!(!worker.contains("static WANTED"), "the wanted play lives in the editor, not in a static (BSS)");
