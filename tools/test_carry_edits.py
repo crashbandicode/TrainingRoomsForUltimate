@@ -138,7 +138,7 @@ class CarryEditsTests(unittest.TestCase):
             (root / "base").write_text(base, encoding="utf-8")
             (root / "wanted").write_text(wanted, encoding="utf-8")
             old = {"reason": "existing", "old": "old", "new": "new"}
-            manifest = {"files": [{"dest": "wanted", "edits": [old]}]}
+            manifest = {"files": [{"dest": "wanted", "dest_sha256": hashlib.sha256(base.encode()).hexdigest(), "edits": [old]}]}
             path = root / "pkg4-carry-manifest.json"
             path.write_text(json.dumps(manifest), encoding="utf-8")
             args = ["wanted", str(root / "base"), "--reason", "new reason", "--root", directory,

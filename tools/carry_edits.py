@@ -6,10 +6,12 @@ of context give one edit per group, processed last to first. When an old block
 is not unique in the current text, grow its context upward in both old and new
 until it is unique or reaches the top. Replay each replacement in order and
 require the result to equal the wanted text before writing the manifest.
-This tool never writes a carried file or computes a hash; carry does that.
+Check the supplied base against the manifest's destination hash. Only carry
+writes a carried file or updates its recorded hash.
 """
 import argparse
 import difflib
+import hashlib
 import json
 import os
 
@@ -75,6 +77,8 @@ def main(argv=None):
     entry = next((entry for entry in manifest["files"] if entry["dest"] == args.dest), None)
     if entry is None:
         raise SystemExit(f"no manifest entry for {args.dest}")
+    if hashlib.sha256(base.encode("utf-8")).hexdigest() != entry.get("dest_sha256"):
+        raise SystemExit(f"base does not match the derived destination hash for {args.dest}; run carry and use its output as the base")
     if not args.dry_run:
         entry.setdefault("edits", []).extend(edits)
         with open(path, "w", encoding="utf-8", newline="") as f:
