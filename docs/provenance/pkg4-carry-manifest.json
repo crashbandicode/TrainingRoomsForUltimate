@@ -6085,7 +6085,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "5237bf2c0f94d510f8b30f31054501a53388d516391fe6789b0790121b39ca23",
+   "dest_sha256": "124f3d120a50b18bf37850737e7b395430ceff88b77455f9ccf46fbc3435d5ca",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -7191,6 +7191,11 @@
      "reason": "Read the clip switch admission result on the worker, for either role.",
      "old": "\nfn service_wanted_fighter() {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    let (wanted, timed_out) = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n",
      "new": "\nfn service_wanted_fighter() {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    if roster_requests::take_clip_reply() == Some(false) {\n        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());\n        if refused {\n            notify(\"The roster refused the fighter switch\".into());\n            return;\n        }\n    }\n    let (wanted, timed_out) = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n"
+    },
+    {
+     "reason": "Link the clip admission notice to its approved restriction.",
+     "old": "    if roster_requests::take_clip_reply() == Some(false) {\n        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());\n        if refused {\n            notify(\"The roster refused the fighter switch\".into());\n            return;\n        }\n",
+     "new": "    if roster_requests::take_clip_reply() == Some(false) {\n        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());\n        if refused {\n            // restriction: clip-fighter-refused\n            notify(\"The roster refused the fighter switch\".into());\n            return;\n        }\n"
     }
    ]
   },
