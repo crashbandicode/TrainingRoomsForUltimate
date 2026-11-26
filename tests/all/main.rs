@@ -24,6 +24,7 @@ mod model;
 pub mod engine;
 mod allocation;
 mod input_json;
+mod slice_load;
 #[path = "../scrub_chain_heap.rs"]
 mod scrub_chain_heap;
 #[path = "../scrub_play_timing.rs"]
