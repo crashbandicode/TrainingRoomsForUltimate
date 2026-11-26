@@ -95,7 +95,8 @@ pub(super) unsafe fn ran(fighter: usize) {
 /// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read, 35 the hold reports it moved,
 /// 36 and 37 this frame's act: 0 lift, 1 hold, 2 stand) and the game frame's low 24 bits from bit 40, then three
 /// pairs of f32 words: the point asked for on this frame, where the game left the body, and its speed; then its
-/// animation, and its status with the animation's frame (f32 bits) above it.
+/// animation, and its status. Both are natives every unit that calls the hold already needs; the animation's frame
+/// is not read here, because the drills' unit has no other use of that native.
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64, motion: u64, status: u64) {
@@ -134,7 +135,7 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         pack(read.at),
         pack([speed_x, speed_y]),
         natives::motion_kind(body),
-        u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),
+        u64::from(natives::status_kind(body) as u32),
     );
     if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
         state::set_sleep(body, false);

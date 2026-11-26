@@ -2468,7 +2468,8 @@ mod tests {
 
     /// The hold's seam is where a game run reads the float: this frame's act, and the body's status and animation
     /// as the game left it, beside its point and speed. The animation after a body floats again is compared with
-    /// its first float's there (tr-primary-2 2026-11-26 15:25:49Z: the same animation, not merely Fall).
+    /// its first float's there (tr-primary-2 2026-11-26 15:25:49Z: the same animation, not merely Fall). The
+    /// first green (6046f2de) also read the animation's frame, which two capability tests refused.
     #[test]
     fn the_holds_seam_carries_the_act_and_the_bodys_status_and_animation() {
         let placement = include_str!("../runtime/features/placement.rs");
@@ -2479,7 +2480,10 @@ mod tests {
         let call = call.split("\n    );").next().unwrap();
         assert!(call.contains("| ((act as u64) << 36)"));
         assert!(call.contains("natives::motion_kind(body),"));
-        assert!(call.contains("u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),"));
+        assert!(call.contains("u64::from(natives::status_kind(body) as u32),"));
+        // The animation's frame is not read: `motion_frame` is a native the drills' unit does not otherwise
+        // need (`capabilities::CROSS_NEEDS`), and a trace word must not add a row a drill's install depends on.
+        assert!(!placement.contains("motion_frame"));
         // Read before this frame's write, like the point and the speed.
         assert!(!before.contains("lift(body, at") && !before.contains("hold(body, at)") && !before.contains("stand(body, at"));
     }
