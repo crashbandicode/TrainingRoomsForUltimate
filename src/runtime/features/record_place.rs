@@ -878,7 +878,12 @@ pub unsafe fn frame(fighter: usize) {
                                 Some(visit) => ("Change placement", save_name(&engine, visit.ticket)),
                                 None => ("Recording", ""),
                             };
-                            let _ = wizard.write_text(recorded, name, &mut text);
+                            // Where the game has a body it moved off its spot; left out when the card has no room.
+                            let bodies = holds.map(|hold| hold.and_then(|hold| hold.displaced).map(|moved| moved.at));
+                            if wizard.write_text_at(recorded, name, bodies, &mut text).is_err() {
+                                text = FixedPath::new();
+                                let _ = wizard.write_text(recorded, name, &mut text);
+                            }
                             post_text(&mut notice, header, text);
                         }
                     }
@@ -891,7 +896,8 @@ pub unsafe fn frame(fighter: usize) {
             // The crosshair carried the body into the ground and the game landed it: it leaves the ground again
             // as soon as its spot is free air.
             if let Some(hold) = holds[who.index()].as_mut().filter(|hold| hold.displaced.is_some_and(|moved| moved.landed)) {
-                if placement::free_at(accessor, fighter.at) {
+                let floor = placement::floor_under(accessor, fighter.at, true).map(|floor| floor[1]);
+                if record_place::leaves_ground(placement::free_at(accessor, fighter.at), fighter.at[1], floor) {
                     hold.lift_again();
                 }
             }

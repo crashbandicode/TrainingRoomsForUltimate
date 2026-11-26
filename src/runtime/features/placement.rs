@@ -1,7 +1,7 @@
 use super::{cpu::konst, stage_geometry::{FloorRay, RayProbe}};
 use crate::engine::macro_ui::scrub_track::can_stand;
 use crate::model::cpu::ids::{C, UNRESOLVED};
-use crate::model::crosshair::{self, CpuPreview, Origin, PreviewAct};
+use crate::model::crosshair::{self, BodyRead, CpuPreview, Origin, PreviewAct};
 use crate::model::stage_geometry::{classify, Unread};
 use crate::runtime::{game::{self, natives}, state_natives as state};
 
@@ -82,9 +82,10 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
     hold_at(slot, body, id, at, false)
 }
 
-/// Read by the release tracer at the hold's seam, before this frame's write: the body's id with three flags (bit 32
-/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read), then three pairs of f32 words:
-/// the point asked for on this frame, where the game left the body, and its speed.
+/// Read by the release tracer at the hold's seam, before this frame's write: the body's id with its flags (bit 32
+/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read, 35 the hold reports it moved)
+/// and the game frame's low 24 bits from bit 40, then three pairs of f32 words: the point asked for on this frame,
+/// where the game left the body, and its speed.
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64) {
@@ -98,21 +99,30 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         *slot = None;
         return None;
     }
-    // The body as the game left it, before this frame's write.
-    let seen = [natives::pos_x(body), natives::pos_y(body)];
-    let landed = natives::situation_kind(body) == konst(C::SituationGround);
-    let speed = super::recording_host::fighter_speed(body);
+    // The body as the game left it, before this frame's write. A hold that cannot read the body's speed cannot
+    // tell a moved body from a falling one: it does not run.
+    let Some((speed_x, speed_y)) = super::recording_host::fighter_speed(body) else {
+        *slot = None;
+        return None;
+    };
+    let read = BodyRead {
+        at: [natives::pos_x(body), natives::pos_y(body)],
+        landed: natives::situation_kind(body) == konst(C::SituationGround),
+        speed: Some([speed_x, speed_y]),
+        frame: crate::runtime::ui::facts::fact_frame_number() as u32,
+    };
+    let act = crosshair::hold_step(slot, id, grounded, || Origin { at: read.at, grounded: read.landed, facing: natives::lr(body) });
+    if let Some(preview) = slot {
+        preview.observe(at, read, grounded);
+    }
     let pack = |[low, high]: [f32; 2]| u64::from(low.to_bits()) | (u64::from(high.to_bits()) << 32);
     placement_hold_seam(
-        u64::from(id) | (u64::from(landed) << 32) | (u64::from(grounded) << 33) | (u64::from(speed.is_some()) << 34),
+        u64::from(id) | (u64::from(read.landed) << 32) | (u64::from(grounded) << 33) | (1 << 34)
+            | (u64::from(slot.is_some_and(|preview| preview.displaced.is_some())) << 35) | (u64::from(read.frame & 0xff_ffff) << 40),
         pack(at),
-        pack(seen),
-        pack(speed.map_or([0.0; 2], |(x, y)| [x, y])),
+        pack(read.at),
+        pack([speed_x, speed_y]),
     );
-    let act = crosshair::hold_step(slot, id, grounded, || Origin { at: seen, grounded: landed, facing: natives::lr(body) });
-    if let Some(preview) = slot {
-        preview.observe(at, seen, landed, grounded);
-    }
     if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
         state::set_sleep(body, false);
     }

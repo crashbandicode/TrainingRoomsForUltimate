@@ -81,6 +81,18 @@ pub struct Displaced {
     pub landed: bool,
 }
 
+/// A body as the game left it, read at the top of a hold's frame, before that frame's write.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BodyRead {
+    pub at: [f32; 2],
+    /// The game has it on the ground.
+    pub landed: bool,
+    /// Its own speed, read with the position; `None` when that read is not there.
+    pub speed: Option<[f32; 2]>,
+    /// The game frame of the read (it wraps).
+    pub frame: u32,
+}
+
 /// A picker's hold on the CPU: the body itself waits at its start point. In view the game draws it under the
 /// crosshair; out of view the game draws its own magnifier of it, with the direction pointer, at the screen edge.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -88,13 +100,15 @@ pub struct CpuPreview {
     body: u32,
     origin: Origin,
     frames: u8,
-    /// The air point the hold wrote on the frame before.
-    wrote: Option<[f32; 2]>,
+    /// The air point the hold last wrote, and the game frame it wrote it on.
+    wrote: Option<([f32; 2], u32)>,
     /// The caller has asked for the lift again at this point.
     relifted: bool,
-    /// The game moved the body off the point written on the frame before, as read at the top of this frame. The
-    /// game's physics runs under the hold, so a held body is one fall step under its point on every frame: that
-    /// is the hold's own. Moved is the ground, another x, or a y above the point. The callers decide what it means.
+    /// The game moved the body off the air point written on the frame before, as read at the top of this frame.
+    /// The game's physics runs under the hold, so a held body reads one fall step under its point on every frame:
+    /// that step is its own speed, read with it. Not moved is: in the air, at the x written, at the y written plus
+    /// that speed, compared exactly. Anything else is moved. Only a write of the frame before is judged, and only
+    /// with the speed read: without either, nothing is reported. The callers decide what a moved body means.
     pub displaced: Option<Displaced>,
     /// The hold put the body to sleep, as of this frame's write: whoever lets it go wakes it.
     pub asleep: bool,
@@ -112,21 +126,20 @@ impl CpuPreview {
         self.origin
     }
 
-    /// One frame's read of the body, taken before this frame's write. `at`: the point asked for on this frame;
-    /// `seen` and `landed`: where the game has the body and whether it stands on the ground; `grounded`: the hold
-    /// is a floor stand.
-    pub fn observe(&mut self, at: [f32; 2], seen: [f32; 2], landed: bool, grounded: bool) {
+    /// One frame of the hold. `at`: the point asked for on this frame; `read`: the body before this frame's write;
+    /// `grounded`: the hold is a floor stand, which rests where the game puts it and is not judged.
+    pub fn observe(&mut self, at: [f32; 2], read: BodyRead, grounded: bool) {
         if grounded {
             (self.displaced, self.wrote, self.relifted) = (None, None, false);
             return;
         }
         self.displaced = self.wrote
-            .filter(|wrote| landed || seen[0] != wrote[0] || seen[1] > wrote[1])
-            .map(|_| Displaced { at: seen, landed });
-        if self.wrote != Some(at) {
+            .filter(|(wrote, _)| read.landed || read.at[0] != wrote[0] || read.at[1] > wrote[1])
+            .map(|_| Displaced { at: read.at, landed: read.landed });
+        if self.wrote.map(|(wrote, _)| wrote) != Some(at) {
             self.relifted = false;
         }
-        self.wrote = Some(at);
+        self.wrote = Some((at, read.frame));
     }
 
     /// The caller asks for the placing frames again at the point now asked for. Once at a point; `false` when it
@@ -298,28 +311,52 @@ mod tests {
         assert_eq!(slot.unwrap().origin(), origin(3.0));
     }
 
-    /// A body held in the air at `at` for the settle and one frame more, read one fall step under it each frame.
+    /// Kirby's fall step under the hold, as the hold's seam read it (Eden, run place-float-xps-05): -0.064.
+    const FALL: [f32; 2] = [0.0, f32::from_bits(0xbd83_126f)];
+
+    fn air(at: [f32; 2], frame: u32) -> BodyRead {
+        BodyRead { at, landed: false, speed: Some(FALL), frame }
+    }
+
+    /// A body held in the air at `at` through the settle: the hold with its last write on frame `PREVIEW_SETTLE`.
     fn held_in_air(at: [f32; 2]) -> Option<CpuPreview> {
         let mut slot = None;
-        for _ in 0..PREVIEW_SETTLE + 1 {
+        for frame in 0..=u32::from(PREVIEW_SETTLE) {
             hold_step(&mut slot, 7, false, || origin(3.0));
-            slot.as_mut().unwrap().observe(at, [at[0], at[1] - 0.087], false, false);
+            slot.as_mut().unwrap().observe(at, air([at[0], at[1] + FALL[1]], frame), false);
         }
         slot
     }
+    const NEXT: u32 = PREVIEW_SETTLE as u32 + 1;
 
-    /// Eden, run place-float-xps-03 (merge 17): carried down through the long floor at x -40, the body landed at
-    /// (-40, 0.01) and stayed there while the crosshair went up to y 29.57.
+    /// The seam's words in open air: asked (-125, -68.42603), read (-125, -68.490036), speed (0, -0.064). The
+    /// read is the point asked on the frame before plus the speed, bit for bit, on a moving point too.
+    #[test]
+    fn a_held_body_reads_its_point_plus_its_own_fall_step_exactly() {
+        let y = |bits: u32| f32::from_bits(bits);
+        let mut slot = held_in_air([-125.0, y(0xc288_da21)]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-125.0, y(0xc284_da21)], air([-125.0, y(0xc288_fae6)], NEXT), false);
+        assert_eq!(hold.displaced, None);
+        // The crosshair went up two units: the body reads the point of the frame before, not this frame's.
+        hold.observe([-125.0, y(0xc280_da21)], air([-125.0, y(0xc284_fae6)], NEXT + 1), false);
+        assert_eq!(hold.displaced, None);
+        hold.observe([-123.0, y(0xc280_da21)], air([-125.0, y(0xc280_da21) + FALL[1]], NEXT + 2), false);
+        assert_eq!(hold.displaced, None);
+        hold.observe([-123.0, y(0xc280_da21)], air([-123.0, y(0xc280_da21) + FALL[1]], NEXT + 3), false);
+        assert_eq!(hold.displaced, None);
+    }
+
+    /// The same run: carried down through the long floor at x -40, the body landed at (-40.1, 0.01).
     #[test]
     fn a_body_the_game_landed_is_reported_and_is_lifted_again_once_at_a_spot() {
-        let mut slot = held_in_air([-40.0, 0.573967]);
+        let mut slot = held_in_air([-40.100_18, 0.573_967]);
         let hold = slot.as_mut().unwrap();
-        hold.observe([-40.0, -0.426033], [-40.0, 0.486967], false, false);
-        assert_eq!(hold.displaced, None, "one fall step under its point is the hold's own");
-        hold.observe([-40.0, -1.426033], [-40.0, 0.01], true, false);
-        assert_eq!(hold.displaced, Some(Displaced { at: [-40.0, 0.01], landed: true }));
+        let landed = |frame| BodyRead { at: [-40.100_18, 0.01], landed: true, speed: Some([0.0; 2]), frame };
+        hold.observe([-40.100_18, -0.426_033], landed(NEXT), false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-40.100_18, 0.01], landed: true }));
         // The crosshair leaves the ground: the caller asks for the lift, once at this spot.
-        hold.observe([-40.0, 3.573967], [-40.0, 0.01], true, false);
+        hold.observe([-40.100_18, 3.573_967], landed(NEXT + 1), false);
         assert!(hold.lift_again());
         assert!(!hold.lift_again(), "a spot is tried once");
         let settle = usize::from(PREVIEW_SETTLE);
@@ -328,58 +365,80 @@ mod tests {
         assert_eq!(acts[settle], PreviewAct::Hold);
         // In the air again nothing is reported, and another spot may be lifted to again.
         let hold = slot.as_mut().unwrap();
-        hold.observe([-40.0, 3.573967], [-40.0, 3.486967], false, false);
+        hold.observe([-40.100_18, 4.573_967], air([-40.100_18, 3.573_967 + FALL[1]], NEXT + 2), false);
         assert_eq!(hold.displaced, None);
-        hold.observe([-40.0, 4.573967], [-40.0, 3.486967], false, false);
         assert!(hold.lift_again());
     }
 
-    /// The same run, against the long floor's left wall (x -80) at y -2.43: the body followed to x -82, and read
-    /// x -81.08 for an asked -81, still in Fall. SP-10's CPU is the same with a wider body: asked x -81.72, left at
-    /// x -86.85; exact at x -86.96.
+    /// The same run, at the long floor's left wall (x -80) and its edge, asked y -3.5262246: the words read.
     #[test]
-    fn a_body_a_wall_pushed_is_reported_while_still_in_the_air() {
-        let mut slot = held_in_air([-82.0, -2.426033]);
-        let hold = slot.as_mut().unwrap();
-        hold.observe([-81.0, -2.426033], [-82.0, -2.513033], false, false);
-        assert_eq!(hold.displaced, None);
-        hold.observe([-80.0, -2.426033], [-81.083, -2.416], false, false);
-        assert_eq!(hold.displaced, Some(Displaced { at: [-81.083, -2.416], landed: false }));
-        let mut slot = held_in_air([-81.72, -15.10]);
-        let hold = slot.as_mut().unwrap();
-        hold.observe([-81.72, -15.10], [-86.85, -15.187], false, false);
-        assert_eq!(hold.displaced, Some(Displaced { at: [-86.85, -15.187], landed: false }));
-        let mut slot = held_in_air([-86.96, -15.10]);
-        let hold = slot.as_mut().unwrap();
-        hold.observe([-86.96, -15.10], [-86.96, -15.187], false, false);
-        assert_eq!(hold.displaced, None);
+    fn a_body_a_wall_or_a_floor_edge_pushed_is_reported() {
+        let y = f32::from_bits(0xc061_adaa);
+        let pushed = |asked: [f32; 2], read: BodyRead| {
+            let mut slot = held_in_air(asked);
+            let hold = slot.as_mut().unwrap();
+            hold.observe(asked, read, false);
+            hold.displaced
+        };
+        // Asked x -81: left at x -81.55, still in the air.
+        let wall = [f32::from_bits(0xc2a3_1bfc), f32::from_bits(0xc065_2266)];
+        assert_eq!(pushed([-81.0, y], air(wall, NEXT)), Some(Displaced { at: wall, landed: false }));
+        // Asked x -79: pushed up at the floor's edge on one frame, then put on the floor.
+        let up = [-79.0, f32::from_bits(0xbd5d_2f1c)];
+        assert_eq!(pushed([-79.0, y], air(up, NEXT)), Some(Displaced { at: up, landed: false }));
+        let floor = BodyRead { at: [-79.0, 0.01], landed: true, speed: Some([0.0; 2]), frame: NEXT };
+        assert_eq!(pushed([-79.0, y], floor), Some(Displaced { at: [-79.0, 0.01], landed: true }));
+        // Asked x -82: free of the wall.
+        assert_eq!(pushed([-82.0, y], air([-82.0, y + FALL[1]], NEXT)), None);
+        // A body the game threw out of a solid: its speed carries the push, so the sum is exact; its x is not.
+        let thrown = BodyRead { at: [-85.852_455, -9.132_209], landed: false, speed: Some([-45.752_274, -0.706_175_8]), frame: NEXT };
+        assert_eq!(pushed([-40.100_18, -8.426_033], thrown), Some(Displaced { at: thrown.at, landed: false }));
     }
 
-    /// The 36 Guard the Edge holds of runs place-float-xps-03 and -04: -68.51303 for a picked -68.42603.
+    /// Not read in a game yet: a body kept down by a ceiling is under the point by more than its own fall step.
     #[test]
-    fn a_held_body_one_fall_step_under_its_point_is_not_displaced() {
-        let mut slot = held_in_air([-125.0, -68.42603]);
+    fn a_body_pushed_down_is_reported_though_it_is_under_its_point() {
+        let mut slot = held_in_air([-250.0, -45.0]);
         let hold = slot.as_mut().unwrap();
-        hold.observe([-125.0, -68.42603], [-125.0, -68.51303], false, false);
-        assert_eq!(hold.displaced, None);
+        hold.observe([-250.0, -45.0], air([-250.0, -46.2], NEXT), false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-250.0, -46.2], landed: false }));
     }
 
+    /// A hold call the picker skipped: the write is two game frames old and the body fell twice. A frame without
+    /// the speed read. Neither is judged, whatever the body reads; the next frame is.
+    #[test]
+    fn a_stale_write_or_a_missing_speed_read_is_not_judged() {
+        let at = [-125.0, -68.426_03];
+        let mut slot = held_in_air(at);
+        let hold = slot.as_mut().unwrap();
+        let landed = |speed, frame| BodyRead { at: [-125.0, 0.01], landed: true, speed, frame };
+        hold.observe(at, landed(Some([0.0; 2]), NEXT + 1), false);
+        assert_eq!(hold.displaced, None, "the write was two frames old");
+        hold.observe(at, landed(None, NEXT + 2), false);
+        assert_eq!(hold.displaced, None, "no speed was read");
+        hold.observe(at, landed(Some([0.0; 2]), NEXT + 3), false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-125.0, 0.01], landed: true }));
+    }
+
+    /// The seam's words on a floor: asked (x, 0), read (x, 0.01), every frame. A floor stand is not an air place.
     #[test]
     fn a_first_frame_and_a_floor_stand_report_nothing() {
         let mut slot = None;
         hold_step(&mut slot, 7, false, || origin(3.0));
         let hold = slot.as_mut().unwrap();
-        hold.observe([5.0, 9.0], [3.0, 0.0], true, false);
+        let stood = |frame| BodyRead { at: [-30.0, 0.01], landed: true, speed: Some([0.0; 2]), frame };
+        hold.observe([5.0, 9.0], stood(0), false);
         assert_eq!(hold.displaced, None, "nothing was written before the first frame");
-        hold.observe([5.0, 9.0], [5.0, 0.01], true, false);
+        hold.observe([5.0, 9.0], stood(1), false);
         assert!(hold.displaced.is_some());
-        hold.observe([5.0, 0.0], [5.0, 0.01], true, true);
+        hold.observe([-30.0, 0.0], stood(2), true);
         assert_eq!(hold.displaced, None, "a floor stand rests where the game puts it");
+        hold.observe([-30.0, 0.0], stood(3), true);
+        assert_eq!(hold.displaced, None);
         // Taken into the air after a stand, the first frame has no written air point to compare with.
-        hold.observe([5.0, 9.0], [5.0, 0.01], true, false);
+        hold.observe([5.0, 9.0], stood(4), false);
         assert_eq!(hold.displaced, None);
     }
-
     /// The operator's picture: the CPU start of Guard the Edge at (-199, -8), left of the Fixed camera's view.
     fn picker_marks() -> Marks {
         let mut looks = [None; btt::LOOKS];

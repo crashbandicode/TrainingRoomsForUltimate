@@ -452,6 +452,13 @@ fn who_key(who: Who) -> &'static str {
     match who { Who::P1 => "p1", Who::Cpu => "cpu" }
 }
 
+/// A body the game landed leaves the ground again at a spot of free air. `free`: the shared stage rule lets a body
+/// be at the spot; `floor`: the height of the floor the picker finds for the spot, which is above the spot when the
+/// spot is within the picker's slack under that floor's surface. Lifted there, the body would hang inside the floor.
+pub fn leaves_ground(free: bool, _spot: f32, _floor: Option<f32>) -> bool {
+    free
+}
+
 pub fn write_shown(shown: &Shown, first: bool, popup: bool, role: Who, out: &mut String) {
     use core::fmt::Write as _;
     use crate::model::bridge_state::push_str;
@@ -803,6 +810,13 @@ impl Wizard {
 
     /// The notice. `name`: the save's name when the wizard is opened on one.
     pub fn write_text(&self, recorded: Who, name: &str, out: &mut impl core::fmt::Write) -> core::fmt::Result {
+        self.write_text_at(recorded, name, [None; 2], out)
+    }
+
+    /// `write_text`, with where the game has a fighter's body when it moved it off its spot (`bodies`, by role).
+    pub fn write_text_at(
+        &self, recorded: Who, name: &str, _bodies: [Option<[f32; 2]>; 2], out: &mut impl core::fmt::Write,
+    ) -> core::fmt::Result {
         let (number, title) = match self.page {
             Page::Ask => return self.write_ask(name, out),
             Page::Where => (1, "Where"), Page::Spot => (2, "Spot"), Page::State => (3, "State"),
@@ -2347,9 +2361,13 @@ mod tests {
     fn the_shared_hold_reports_a_moved_body_and_the_picker_lifts_a_landed_one() {
         let placement = include_str!("../runtime/features/placement.rs");
         let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
-        // The body is read before this frame's write, against the point written on the frame before.
+        // The body is read before this frame's write, against the point written on the frame before; with no
+        // speed read the hold does not run.
         assert!(hold_at.find("natives::pos_x(body)").unwrap() < hold_at.find("crosshair::hold_step(").unwrap());
-        assert!(hold_at.contains(".observe(at, seen, landed, grounded)"));
+        assert!(hold_at.contains(".observe(at, read, grounded)"));
+        let unread = hold_at.split("recording_host::fighter_speed(body) else {").nth(1).expect("the speed read");
+        assert!(unread.split('}').next().unwrap().contains("return None;"));
+        assert!(hold_at.contains("facts::fact_frame_number()"));
         // The hold itself stays the three writes it was: the report changes nothing it does.
         let hold = placement.split("pub(super) unsafe fn hold(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(!hold.contains("displaced") && !hold.contains("init_pos"));
@@ -2360,11 +2378,48 @@ mod tests {
         let landed = held.find("moved.landed").expect("the picker reads the report");
         let free = held.find("placement::free_at(accessor, fighter.at)").expect("the shared stage rule");
         assert!(landed < free && free < held.find(".lift_again()").expect("the lift is asked for"));
+        assert!(held.contains("record_place::leaves_ground(") && held.contains("placement::floor_under(accessor, fighter.at, true)"));
+        // The card shows where the game has a moved body, and keeps its help when that does not fit.
+        let (shown, plain) = frame.split_once("wizard.write_text_at(recorded, name, bodies, &mut text).is_err()").expect("the card");
+        assert!(shown.contains("hold.displaced") && plain.contains("wizard.write_text(recorded, name, &mut text)"));
         let free_at = placement.split("pub(super) unsafe fn free_at(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(free_at.contains("classify(") && free_at.contains("can_stand("));
         // The drill's picker and its rounds do not act on the report; the scrub reads it through the same hold.
         assert!(!include_str!("../runtime/features/edge_juggle.rs").contains("displaced"));
         assert!(include_str!("../runtime/features/scrub_hold.rs").contains("placement::hold_at("));
+    }
+
+    /// Eden, run place-float-xps-05: lifted at a spot 0.43 under the long floor's surface, which the stage rule
+    /// counts as on that floor, the body hung in the air inside the floor, followed the crosshair down inside the
+    /// solid, and was thrown 45 units out of it at a depth of 8.43.
+    #[test]
+    fn a_landed_body_is_not_lifted_into_the_floor_it_stands_on() {
+        assert!(!leaves_ground(true, -0.426_033, Some(0.0)), "within the slack under the floor's surface");
+        assert!(!leaves_ground(false, -8.426_033, None), "inside the solid");
+        assert!(leaves_ground(true, 3.573_967, Some(0.0)), "above the floor");
+        assert!(leaves_ground(true, 20.0, Some(0.014)), "under a platform, over the floor below");
+        assert!(leaves_ground(true, -20.0, None), "open air");
+    }
+
+    #[test]
+    fn a_body_the_game_moved_is_shown_beside_its_spot() {
+        use crate::model::chords::logical::A;
+        let mut w = save_wizard();
+        wizard_press(&mut w, A);
+        let plain = text(&w, "Jab start");
+        assert!(plain.contains("2/5 Spot"), "{plain}");
+        let shown = |bodies| {
+            let mut out = String::new();
+            w.write_text_at(Who::P1, "Jab start", bodies, &mut out).unwrap();
+            out
+        };
+        assert_eq!(shown([None; 2]), plain);
+        // SP-10's CPU: asked x -81.72 beside the long floor's wall, left by the game at x -86.85.
+        let cpu = plain.lines().nth(2).unwrap();
+        assert_eq!(shown([None, Some([-86.85, -15.187])]), plain.replace(cpu, &format!("{cpu} · body at (-87, -15)")));
+        // The spot's own numbers stay the crosshair's.
+        let p1 = plain.lines().nth(1).unwrap();
+        assert_eq!(shown([Some([-40.1, 0.01]), None]), plain.replace(p1, &format!("{p1} · body at (-40, 0)")));
     }
 
     #[test]
