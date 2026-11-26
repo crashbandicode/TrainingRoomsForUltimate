@@ -336,9 +336,10 @@ Host tests only; not yet seen in a game.
 
 2026-11-26. Positions while you scrub, merged for the build after install 5. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
-the target's position when the hold begins, so their recorded spacing is kept. If a fighter's point is outside the
-stage's camera limits, it is not held there: a held fighter goes back to where its hold began, and a fighter not yet
-held is left alone. The key line reads "Off this stage.".
+the target's position when the hold begins, so their recorded spacing is kept. A fighter is not put at a point where
+it cannot stand on this stage: inside the ground or a wall, outside the camera's limits, past a blast line, or
+anywhere when the stage cannot be read. A held fighter then goes back to where its hold began, a fighter not yet held
+is left alone, and the other fighter is still shown. The key line reads "Can't stand there on this stage.".
 
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
   capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading

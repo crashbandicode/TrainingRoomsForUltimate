@@ -73,9 +73,13 @@ them.
   missing, so an eligible playback can replace it. The macro does not need positions to play.
 - No positions file is made for a chain step, when the playing character is a different fighter kind from the one
   recorded, or when Trim skips the first input.
-- If a fighter's point is outside the stage's camera limits, the editor reads "Off this stage." instead of moving
-  it there. A fighter already held goes back to where the hold began. The pose is frozen or neutral; projectiles,
-  items and damage are not shown. Combos and drills show nothing.
+- A fighter is not put at a point where it cannot stand on this stage: inside the ground or a wall, outside the
+  camera's limits, past a blast line, or anywhere when the stage cannot be read. The editor reads "Can't stand
+  there on this stage."; a fighter already held goes back to where the hold began, and the other fighter is still
+  shown. The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
+- Fixed before the card build (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
+  the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
+  both fighters stood beside their recorded points while the editor said they were held.
 - Host tests and builds only; the Switch code that holds the fighters has not run in a test.
   On the host, repeated Plays took 0.98 to 1.07 times as long to start as on the previous build.
   For an old macro played for the first time to generate positions, only the 3 s take passed on the host. The

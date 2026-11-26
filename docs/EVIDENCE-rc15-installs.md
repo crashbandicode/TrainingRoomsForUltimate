@@ -269,10 +269,15 @@ Merged after install 5 and **not on the card**. The Gate column names the receip
 | The clip editor: Y on In resolves the move on a capture | `dbded2d1` | `gate-dbded2d1`: six steps exit 0; 3,049 tests passed, 0 failed, 4 ignored |
 | The clip editor: a free playhead | `ce2dba91` | `gate-6dbf9aa9` (one gate for this merge and a docs merge): six steps exit 0; 3,052 tests passed, 0 failed, 4 ignored |
 | The clip editor: the fighters shown while scrubbing, with their positions in a file beside the macro | `cdeb4d69` | `gate-eb39d6bc` (one gate for this merge, a tools merge and a docs merge): six steps exit 0; 3,106 tests passed, 0 failed, 4 ignored |
+| The clip editor: a fighter is not put where it cannot stand on the stage (a fix to the row above) | `5df3d9dc` | `gate-5df3d9dc`: six steps exit 0; 3,108 tests passed, 0 failed, 4 ignored |
 
-- **Not run in a game.** All three merge records say so. The snap fix's adds that the operator's own take was not
-  reproduced; the playhead's, that holding a direction on a pad has no host test; the scrub positions', that the
-  Switch-only code is executed by no test and that its last review was still open at the merge.
+- **Not run in a game, by their merge records.** All four say so. The snap fix's adds that the operator's own take
+  was not reproduced; the playhead's, that holding a direction on a pad has no host test; the scrub positions', that
+  the Switch-only code is executed by no test and that its last review was still open at the merge; the fix's, that
+  it is not shown that the stage reads in a room.
+- **Why the fix:** an Eden session on `eb39d6bc`, the build before it, found on a match capture that both fighters
+  stood beside their recorded points while the line read held (row SP-10; dup-audit, inbox 2026-11-26 10:24:00Z).
+  tr-primary-2 ruled it a defect to fix in this build (10:27:48Z). The session's other rows are not written here yet.
 - **In work:** nothing.
 - **Repeated Play, host only:** starts took 0.98 to 1.07 times as long as on the previous `main` (`6dbf9aa9`).
   This range does not describe the first Play of an old macro without positions.
