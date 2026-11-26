@@ -3,6 +3,7 @@ use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, 
 use crate::engine::macro_ui::macro_panel::Pad;
 use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};
 use crate::engine::macro_ui::scrub_track::{self, Ask, Pos};
+use crate::engine::macros::positions::{Moves, Source};
 use crate::model::combo_record::UnitKind;
 
 pub const CLIP_BAR_UNITS: u16 = 1600;
@@ -820,13 +821,15 @@ impl ClipEditor {
         if self.file.is_none() {
             let start = self.window.start() as usize;
             let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);
-            let state = |frame: &ReplayFrame| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), ..*frame };
+            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
             let absent = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
-            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
-                frames.iter().enumerate()
+            if let Some(frames) = self.track().frames.get(start..self.window.end() as usize) {
+                let rows: Vec<_> = frames.iter().enumerate()
                     .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
-                    .collect()
-            }));
+                    .collect();
+                let moves = if rows.iter().flatten().any(|frame| frame.pose.get().is_some()) { Moves::Take } else { Moves::None };
+                recording.set_sourced_track(Source::Recorded, moves, rows);
+            }
         }
         recording
     }
@@ -2126,6 +2129,47 @@ mod tests {
         for sample in &mut short.frames { sample.start.fighter_kind = 8; }
         session.tracks.push(short);
         ClipEditor::new(session, vec![14]).unwrap()
+    }
+
+    fn reopened_capture_crop(with_moves: bool) -> MacroRecording {
+        use crate::engine::macros::{Library, PackedPose};
+        let dir = crate::test_scratch::Scratch::new("tr-capture-crop-poses");
+        let lib = Library::new(&dir);
+        let mut editor = unequal_tracks();
+        if with_moves {
+            for track in &mut editor.session.tracks {
+                for (i, frame) in track.frames.iter_mut().enumerate() {
+                    frame.pose = PackedPose([frame.start.fighter_kind as u32, (i as u32) << 8]);
+                }
+            }
+        }
+        editor.select_kind(18);
+        editor.window.set_in(1);
+        editor.window.set_out(4);
+        let ClipEffect::Export(exported) = editor.on_action(ClipAction::Confirm) else { panic!("crop refused") };
+        let id = lib.save_new(&exported).unwrap();
+        lib.load_edited(&id).unwrap()
+    }
+
+    #[test]
+    fn capture_crop_reopens_with_its_own_two_fighters_moves() {
+        use crate::engine::macros::{positions::{Moves, Source}, PackedPose};
+        let (source, moves, rows) = reopened_capture_crop(true).take_sourced_track().unwrap();
+        assert_eq!(rows.len(), 3);
+        for (i, row) in rows.iter().enumerate() {
+            let frame = (1 + i as u32) << 8;
+            assert_eq!(row[0].pose, PackedPose([18, frame]));
+            assert_eq!(row[1].pose, if i < 2 { PackedPose([8, frame]) } else { PackedPose::NONE });
+        }
+        assert_eq!((source, moves), (Source::Recorded, Moves::Take));
+    }
+
+    #[test]
+    fn capture_crop_without_poses_reopens_eligible_for_a_playback_upgrade() {
+        use crate::engine::macros::positions::{Moves, Source};
+        let (source, moves, rows) = reopened_capture_crop(false).take_sourced_track().unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!((source, moves), (Source::Recorded, Moves::None));
     }
 
     fn automatic_cpu_selection_and_full_range_fighter_switch_keep_all_inputs() {
