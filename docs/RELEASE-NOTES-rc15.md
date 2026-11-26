@@ -9,7 +9,7 @@ Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, and a free playhead (both merged); the fighters shown while you scrub (in work) |
+| [Next build](#next-build-not-installed-yet) | not yet | | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub (all merged) |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
 | [Install 3](#install-3) | 2026-11-24 | `e7667f26` | Two fixes to install 2 |
@@ -27,9 +27,9 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Next build (not installed yet)
 
-The build after install 5. Two changes are merged and one is in work, all three in the clip editor. The merged
-changes passed host tests and builds; nothing in this build has run in a game. The card build waits for all three,
-and for an Eden session on them.
+The build after install 5. Three changes are merged, all in the clip editor, and nothing is still in work. They
+passed host tests and builds; nothing in this build has run in a game. The card build waits for an Eden session on
+them.
 
 ### Merged
 
@@ -56,22 +56,33 @@ and for an Eden session on them.
 - Host tests and builds only. Holding a direction on a pad has no host test.
   [Replay window](menu/recording.md#replay-window)
 
+#### The fighters are shown while you scrub (merged 2026-11-26)
+
+- With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
+  frame, without playing a preview. They move by one shared offset from where the target stood when the editor
+  opened, so their recorded spacing is kept. This works on a macro and on a match capture.
+- Record saves a macro's positions in a second file beside it. The macro's own file stays the same, so older
+  builds can still read new macros, older macros still load and play on this build, and Play reads what it read
+  before. A crop and a capture saved as a macro carry their positions.
+- A macro with no positions reads "Play it once to see positions while scrubbing.". Play it by itself from its
+  first input, with Play or with X from the start of the take, and they are saved; you do not record it again.
+  After X in the editor they show at once.
+- Positions made by a playback are that playback's, not the original recording's. A playback stopped early gives
+  positions up to where it stopped; past them the editor reads "Positions end here.".
+- A playback never replaces a valid positions file saved by Record. One that is damaged or no longer matches the
+  macro counts as missing, and such a playback replaces it. Whatever the state of that file, the macro still plays.
+- No file is made when the macro plays as a step of a chain, on another fighter than its own, or with Trim
+  starting it after its first input.
+- A fighter whose point is outside this stage's camera limits stays where it is, and the editor reads "Off this
+  stage.". The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show
+  nothing.
+- Host tests and builds only. The code that holds the fighters in the game is run by no test. Play's start measured
+  level with the build before on the host; it has not been timed in a game.
+  [Replay window](menu/recording.md#replay-window)
+
 ### In work
 
-Planned for this build and not merged yet. Each moves up to Merged when it lands, and what it does may still change.
-
-- **In work: see the fighters while you scrub.** Moving In, Out or the free playhead shows the available fighter
-  positions without playing a preview. Their movement is relative to the target's starting spot in the editor:
-  both use the same offset, so their recorded spacing is kept. Record saves the positions in a second file beside
-  the macro. The macro format stays the same, so older builds can still read new macros. Older macros still load
-  and play on the new build. A macro with no positions file gets one when it is played by itself from its first
-  frame, with Play or with X from the start of the take; you do not record it again. After X in the editor the
-  positions show at once. The two fighters are sampled during that playback, so those positions are that
-  playback's, not the original recording's. A playback stopped early gives positions up to where it stopped. A file
-  made this way never replaces a valid one saved by Record; a positions file that is damaged or no longer matches
-  the macro counts as missing, and such a playback replaces it. A macro played as a step of a chain makes no file:
-  play it by itself. Whatever the state of the positions file, the macro still plays. Combos and drills are
-  unchanged.
+Nothing planned for this build is still in work.
 
 ## Install 5
 

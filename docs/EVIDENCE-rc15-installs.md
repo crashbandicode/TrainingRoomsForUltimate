@@ -268,13 +268,16 @@ Merged after install 5 and **not on the card**. The Gate column names the receip
 | --- | --- | --- |
 | The clip editor: Y on In resolves the move on a capture | `dbded2d1` | `gate-dbded2d1`: six steps exit 0; 3,049 tests passed, 0 failed, 4 ignored |
 | The clip editor: a free playhead | `ce2dba91` | `gate-6dbf9aa9` (one gate for this merge and a docs merge): six steps exit 0; 3,052 tests passed, 0 failed, 4 ignored |
+| The clip editor: the fighters shown while scrubbing, with their positions in a file beside the macro | `cdeb4d69` | `gate-eb39d6bc` (one gate for this merge, a tools merge and a docs merge): six steps exit 0; 3,106 tests passed, 0 failed, 4 ignored |
 
-- **Not run in a game.** Both merge records say so. The snap fix's adds that the operator's own take was not
-  reproduced; the playhead's, that holding a direction on a pad has no host test.
-- **In work, not merged:** the fighters shown at the handle's frame while scrubbing, with the positions kept in a
-  file beside the macro and the macro file's format unchanged; a macro without such a file gets one from a
-  playback from its first frame (inbox 2026-11-26 00:21:37Z; the separate file, 03:06:35Z; the playback,
-  03:24:51Z; tr-primary-2, relaying the operator). None of it is implemented in `main`.
+- **Not run in a game.** All three merge records say so. The snap fix's adds that the operator's own take was not
+  reproduced; the playhead's, that holding a direction on a pad has no host test; the scrub positions', that the
+  Switch-only code is executed by no test and that its last review was still open at the merge.
+- **In work:** nothing.
+- **Play's start, on the host only:** the scrub positions lane measured it level with `main` (repeated rows between
+  0.98 and 1.07 of `main`'s time), and could not decide the first Play of a ten-minute macro (preview-vis-sol, inbox
+  2026-11-26 06:24:48Z; `artifacts/phase23/scrub-positions/timing-sym-summary-51536478.md` and
+  `timing-armed-summary-9466fa45.md`). These are host-model numbers; nothing was timed in a game.
 - **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
   then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
   about it is claimed here.

@@ -334,6 +334,24 @@ Starting a preview with X selects the playhead. An accepted A opens the naming p
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
 Host tests only; not yet seen in a game.
 
+2026-11-26. Positions while you scrub, merged for the build after install 5. With In or Out selected, or once the
+playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. They move
+by one shared offset from where the target stood when the editor opened, so their recorded spacing is kept. A fighter
+whose point is outside this stage's camera limits stays where it is, and the key line reads "Off this stage.".
+
+- A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
+  capture saved as a macro. The macro's own file is unchanged, and Play does not read the positions. Deleting the
+  macro deletes that file.
+- A macro without positions reads "Play it once to see positions while scrubbing.". Play it by itself from its first
+  input, with Play or with X here from the start of the take, and they are saved; after X they show at once. They
+  are that playback's positions, not the original recording's. No file is made for a step of a chain, on another
+  fighter than the macro's own, or when Trim starts it after its first input.
+- A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
+  here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
+- The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
+
+Host tests only; not yet seen in a game.
+
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
 
