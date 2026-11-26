@@ -111,15 +111,23 @@ impl HoldClock {
     }
 
     /// The game ran a frame of the fighter whose body is `body`.
-    pub fn ran(&self, _body: usize) {
-        self.frames[0].fetch_add(1, Ordering::Relaxed);
+    pub fn ran(&self, body: usize) {
+        for (held, frames) in self.held.iter().zip(&self.frames) {
+            if held.load(Ordering::Relaxed) == body {
+                frames.fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
 
     /// The count of `body`'s game frames, kept in `seat`. A body the seat was not counting starts two past every
     /// count given so far, in either seat: no write made before it reads as one frame old.
     pub fn frame(&self, seat: usize, body: usize) -> u32 {
-        self.held[seat & 1].store(body, Ordering::Relaxed);
-        self.frames[0].load(Ordering::Relaxed)
+        let frames = &self.frames[seat & 1];
+        if self.held[seat & 1].swap(body, Ordering::Relaxed) != body {
+            let given = self.frames[0].load(Ordering::Relaxed).max(self.frames[1].load(Ordering::Relaxed));
+            frames.store(given.wrapping_add(2), Ordering::Relaxed);
+        }
+        frames.load(Ordering::Relaxed)
     }
 }
 

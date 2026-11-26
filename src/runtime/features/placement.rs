@@ -1,7 +1,7 @@
 use super::{cpu::konst, stage_geometry::{FloorRay, RayProbe}};
 use crate::engine::macro_ui::scrub_track::can_stand;
 use crate::model::cpu::ids::{C, UNRESOLVED};
-use crate::model::crosshair::{self, BodyRead, CpuPreview, Origin, PreviewAct};
+use crate::model::crosshair::{self, BodyRead, CpuPreview, HoldClock, Origin, PreviewAct};
 use crate::model::stage_geometry::{classify, Unread};
 use crate::runtime::{game::{self, natives}, state_natives as state};
 
@@ -82,14 +82,24 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
     hold_at(slot, body, id, at, false)
 }
 
+/// The hold's clock (`HoldClock`): the game's own frames of the bodies the holds hold.
+static CLOCK: HoldClock = HoldClock::new();
+
+/// The game ran a frame of this fighter: the fighter-frame wrapper, for every fighter, first thing after the
+/// game's frame function returns.
+pub(super) unsafe fn ran(fighter: usize) {
+    CLOCK.ran(natives::fighter_accessor(fighter));
+}
+
 /// Read by the release tracer at the hold's seam, before this frame's write: the body's id with its flags (bit 32
-/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read, 35 the hold reports it moved)
-/// and the game frame's low 24 bits from bit 40, then three pairs of f32 words: the point asked for on this frame,
-/// where the game left the body, and its speed.
+/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read, 35 the hold reports it moved,
+/// 36 and 37 this frame's act: 0 lift, 1 hold, 2 stand) and the game frame's low 24 bits from bit 40, then three
+/// pairs of f32 words: the point asked for on this frame, where the game left the body, and its speed; then its
+/// animation, and its status with the animation's frame (f32 bits) above it.
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64) {
-    std::hint::black_box((meta, asked, seen, speed));
+pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64, motion: u64, status: u64) {
+    std::hint::black_box((meta, asked, seen, speed, motion, status));
 }
 
 /// `preview` for either fighter and either place (the placement picker). `grounded`: the body stands on its floor
@@ -109,7 +119,7 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         at: [natives::pos_x(body), natives::pos_y(body)],
         landed: natives::situation_kind(body) == konst(C::SituationGround),
         speed: Some([speed_x, speed_y]),
-        frame: crate::runtime::ui::facts::fact_frame_number() as u32,
+        frame: CLOCK.frame(usize::from(natives::module_accessor(0) != Some(body)), body),
     };
     let act = crosshair::hold_step(slot, id, grounded, || Origin { at: read.at, grounded: read.landed, facing: natives::lr(body) });
     if let Some(preview) = slot {
@@ -118,10 +128,13 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
     let pack = |[low, high]: [f32; 2]| u64::from(low.to_bits()) | (u64::from(high.to_bits()) << 32);
     placement_hold_seam(
         u64::from(id) | (u64::from(read.landed) << 32) | (u64::from(grounded) << 33) | (1 << 34)
-            | (u64::from(slot.is_some_and(|preview| preview.displaced.is_some())) << 35) | (u64::from(read.frame & 0xff_ffff) << 40),
+            | (u64::from(slot.is_some_and(|preview| preview.displaced.is_some())) << 35) | ((act as u64) << 36)
+            | (u64::from(read.frame & 0xff_ffff) << 40),
         pack(at),
         pack(read.at),
         pack([speed_x, speed_y]),
+        natives::motion_kind(body),
+        u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),
     );
     if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
         state::set_sleep(body, false);
