@@ -52,7 +52,8 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 | --- | --- |
 | Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
 | Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
-| Host tests only | A second Y, and the faster cases |
+| Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast case passed |
+| Seen once, cause not established | On a match capture in a filming boot of that build, Y on a mid-action In and then X was refused with "Let the CPU settle to idle and leave the ledge before previewing", and nothing played. Under investigation |
 
 ### A free playhead in the clip editor
 
@@ -94,7 +95,7 @@ is kept. This works on a macro and on a match capture.
 | The editor reads | When |
 | --- | --- |
 | "Play it once to see positions while scrubbing." | The macro has no positions |
-| "Positions end here." | Past the positions of a playback that was stopped early; it gives positions up to where it stopped |
+| "Positions end here." | Past the positions of a playback that was stopped early; it gives positions up to where it stopped. Also 20 seconds into a longer take recorded on install 6, which is a defect: see below |
 | "Can't stand there on this stage." | Either fighter's point is inside solid ground or a wall, outside the camera's limits, or past the safe blast-line bounds. A fighter already held goes back to where the hold began. Each fighter's point is judged by itself, so the other one is still shown when its own point allows |
 
 | Rule | What it means |
@@ -103,8 +104,13 @@ is kept. This works on a macro and on a match capture.
 | Positions made by a playback | Are that playback's, not the original recording's |
 | A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
 | No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
+| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does |
 | Fighter pose | Frozen or neutral; this is not a replay of the animation |
 | Not shown | Projectiles, items and damage. Combos and drills have no position display |
+
+**Defect found in testing install 6:** a take longer than 20 seconds (1,200 frames) keeps positions for its first
+20 seconds only. Past them the editor reads "Positions end here." and the fighters are not shown. The take's inputs
+are whole. A fix is planned for the following build: [Known issues](CURRENT-RELEASE.md#known-issues).
 
 **Fixed before the card build** (merged 2026-11-26): at first only the camera's limits were tested, so a point inside
 the ground counted as a place to stand. An Eden session on the build before this fix found it on a match capture:
@@ -116,8 +122,10 @@ both fighters stood beside their recorded points while the editor said they were
 | Old macro and crop on `eb39d6bc` | The no-positions line appeared. One Play generated positions; X showed them immediately in the editor. A crop kept them. |
 | Play start on `eb39d6bc` | Each tested macro started on install 5's frame or one earlier, including the first Plays of the old 30-second and ten-minute macros |
 | Timing coverage | One Eden host, one boot per build. The playback path is unchanged; install 6 and the console were not timed here. |
-| Not established by the build before the fix | Scrub behavior in a waiting room, through a fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions |
-| Install 6 itself | Its own checks are in testing |
+| Eden, on install 6's diagnostic build | Record with no preview, In and Out following the handles, release on deselect, the old-macro line, a crop keeping its positions, and the file sizes passed. Deleting a macro removed both its files. The menu thread used 49,904 B of stack, under its 57,648 B bound |
+| A point where a fighter cannot stand, on that build | On a match capture the fighter whose point was inside the ground was not moved, and the other was held at its own point. The strip showed the hint to snap, not "Can't stand there on this stage.", because In was mid-action there |
+| Not established yet | Scrub behavior in a waiting room, or through a fighter swap or scene change. Release on X and on close, and a fighter walked off stage, gave no verdict yet |
+| The installed release file | No smoke boot yet; the rows above ran the diagnostic build of the same commit |
 | Host | No host test runs the Switch code that holds the fighters |
 
 ### Tested
@@ -127,7 +135,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
-| Eden, on merge 17 | At installation, two Training boots were testing its diagnostic build. No result from a smoke test of the installed release file is claimed here |
+| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. Found: positions stop 20 seconds into a long take. No smoke boot of the installed release file, and no waiting-room pair, has flown |
 | On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).

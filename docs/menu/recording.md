@@ -343,6 +343,10 @@ if either point is refused. That fighter returns to where its hold began, or sta
 other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
 without that warning.
 
+The position lines share one place on the strip with the snap hint. On a capture with In in the middle of an action
+the strip reads "Press ZL+Y to snap to the move start, then X to preview." there instead, and after a snap it reads
+the line about the move's setup. The fighters are still held or left as described above.
+
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
   capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
   positions at startup. Delete also removes `<id>.pos`; Rename changes the display name, not the ID or either
@@ -353,11 +357,15 @@ without that warning.
   playing character's fighter kind differs from the recorded one, or when Trim skips the first input.
 - A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
   here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
+- Known defect in install 6: a take longer than 20 seconds (1,200 frames) keeps positions for its first 20 seconds
+  only, and reads "Positions end here." past them. [Known issues](../CURRENT-RELEASE.md#known-issues)
 - The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
 
-Seen in Eden on `eb39d6bc`, the head before the rule for a point where a fighter cannot stand: the hold at In after
-Record, the old-macro line, positions from one Play and at once after X, and a crop that keeps them. That rule and
-its key line have host tests only; the Eden checks of install 6 itself are in testing.
+Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the
+old-macro line, a crop that keeps its positions, and Delete removing both files. On a match capture a fighter whose
+point was inside the ground was left where it stood. Positions from one Play, and at once after X, were seen on
+`eb39d6bc`, the build before install 6's last fix. Not seen yet: the waiting room, a fighter swap or a scene change
+while a fighter is held, and the installed release file itself.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.

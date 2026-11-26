@@ -13,7 +13,8 @@ Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed
 | Check | Install 6 |
 | --- | --- |
 | Installed | The file on the card was read back and matches the build |
-| Eden, on install 6 | In testing. At installation, two Training boots were running on its diagnostic build; the installed release file had no smoke verdict |
+| Eden, on install 6's diagnostic build | Passed so far: record and hold, the old macro, a crop, delete, the second and fast snap, and the menu's stack check. One defect found: positions stop 20 seconds into a long take |
+| Eden, on the installed release file | No smoke boot yet, and no waiting-room pair |
 | Eden, on `eb39d6bc` (before the last fix) | Record, old macros, snap, browse and part of the diagnostic checks passed |
 | Results carried over | Play-start comparison with install 5; rename through Eden's keyboard window, not by pad |
 | The rest of the build | Is install 5, which had a short smoke boot and a one-player waiting-room boot |
@@ -110,6 +111,13 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 | Guard the Edge | At one chosen spot the fighter starts lower in some rounds and higher in others. | No workaround established. | Open; cause not confirmed. Fix planned for the following build. |
 
 The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
+
+| Found in testing install 6 | What happens | Workaround | Status |
+| --- | --- | --- | --- |
+| Positions stop 20 seconds into a long take | A take longer than 1,200 frames recorded on install 6 keeps positions for its first 1,200 frames. Past them the editor reads "Positions end here." and the fighters are not shown. The take's inputs are whole. | None established. | Open; accepted as a defect. Fix planned for the following build. |
+| Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
+
+The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).
 
 Other limits:
 

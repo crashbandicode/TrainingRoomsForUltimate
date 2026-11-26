@@ -278,7 +278,8 @@ frame was looked at.
 - **Docs-only merge:** `main` already contained `7edddeaa` when the card was written. That merge did not rebuild
   the NRO; the installed file is from `5df3d9dc` (f9-fix, inbox 12:17:41Z; deployment finished 12:22:55Z).
 - **Eden at installation:** the two running Training boots used merge 17's diagnostic NRO (`853964b2…`), not the
-  release file read back from the card. The release smoke and waiting-room checks were still pending.
+  release file read back from the card. The release smoke and waiting-room checks were still pending. Their first
+  results came 23 minutes after the install, with one defect (long takes).
   [Merge 17 test status](#eden-on-install-6-itself-5df3d9dc-merge-17)
 - **The operator's reports:** scrub positions moved without the move poses. The earlier title-screen crash was in
   ARCropolis, not TrainingRooms. The [reports table](#the-operator-s-reports-from-the-console) records both.
@@ -355,8 +356,23 @@ bridge and the same three staged old macros on both builds):
 
 ### Eden, on install 6 itself (`5df3d9dc`, merge 17)
 
-**In testing.** Merge 17's NROs are release sha256 `c1ced861…` and diag `853964b2…`
-(`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Two Eden boots on the diag NRO were up on 2026-11-26, with
-their rows started at 12:02 and 12:03 (dup-audit, inbox 12:04:29Z): `scrub-m17-xps-01` with SP-1 to SP-11, SP-17
-and SP-19, and `scrub-m17b-yoga-01` with the rows that never flew on `eb39d6bc`. No result is in, and none is
-claimed here. Not staged yet: a smoke boot of the release NRO, and a fresh waiting-room pair.
+**In testing; the results so far are on the diagnostic NRO.** Merge 17's NROs are release sha256 `c1ced861…`
+(the file on the card) and diag `853964b2…` (`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Receipts:
+`artifacts/phase23/scrub-positions/eden-session/evidence/`. Source: dup-audit, inbox 2026-11-26 12:45:51Z; the row
+files named below were read for this page.
+
+| Run (folder) | Host | Passed | Defect | No verdict |
+| --- | --- | --- | --- | --- |
+| `scrub-m17-xps-01` (`m17-xps/`) | XPS | SP-1 to SP-4 (record with no preview, In follows, Out on the last frame, release on deselect), SP-7 (old macro), SP-8 (a crop keeps positions), SP-9 (file sizes), SP-19 (menu thread stack) | SP-17 (long take) | SP-5, SP-6 and SP-11 stopped in the test's own hooks. SP-10: see below |
+| `scrub-m17b-yoga-01` (`m17b-yoga/`) | Yoga | SP-1 and SP-8 again as fixtures, SP-21 (delete removes both files), S2 (a second snap), S3 (the fast snap) | none | The CPU take, SP-12, SP-13, S1 and P1 to P3 stopped in the test's set-up and were started again |
+
+| Row | What the reads show |
+| --- | --- |
+| SP-17, the long take | **Defect, accepted** (inbox 12:48:20Z, tr-primary-2). A take of 1,553 input frames (25.88 s) has a positions file of 1,200 frames (86,440 B); Out reads `pos=end` and the frame reads "Positions end here.". A take of 3,253 input frames in the same boot also has 1,200. Takes of 182 to 222 frames have full files. Not known whether `eb39d6bc` does the same: the row never flew there. Both long takes were recorded by the runner's input macros with the menu closed. A fix is assigned for the following build; no cause is named yet |
+| SP-19, the menu thread's stack | `used=49904 size=90112`, under the 57,648 bound. Read after SP-1 to SP-10 and before the long take ended |
+| SP-10, the match capture, on the fixed build | Frame 30 reads `held` and both bodies are exact. At frame 137 the line is `pos=off`, Player 1 is not moved, and the CPU is held at its own point. The key line showed the hint to snap, not "Can't stand there on this stage.", because In is mid-action at that frame (`src/model/macro_ui/clip_panel.rs` lines 149 to 155 put the setup line or the snap hint before the position line). Whether the hint should win is with preview-vis-sol (12:48:20Z). The row's receipt reads failed: its hook stopped on a later step of its own |
+| A possible defect, seen once | In a filming boot of the same diag NRO, on a match capture, Y on a mid-action In and then X was refused with "Let the CPU settle to idle and leave the ledge before previewing"; no input frame was fed (docs-tutorials, inbox 12:46:48Z). The cause is not established; it is with preview-vis-sol |
+
+- **Not flown yet:** a smoke boot of the release NRO, which is the file on the card, and a fresh waiting-room pair.
+- **Not shown on this build:** a fighter swap or a scene change while a fighter is held (SP-12, SP-13), release on
+  X and on close (SP-5, SP-6), a fighter walked off stage (SP-11), a take on the CPU, and the playhead rows.
