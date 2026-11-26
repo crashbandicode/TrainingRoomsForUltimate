@@ -57,7 +57,7 @@ fn play_start_timings() {
     let armed_json = fs::metadata(root.join(MACROS_DIR).join(format!("{armed_id}.json"))).unwrap().len();
     let json = fs::metadata(root.join(MACROS_DIR).join(format!("{}.json", ids[0]))).unwrap().len();
     let pos = fs::metadata(root.join(MACROS_DIR).join(format!("{}.pos", ids[0]))).unwrap().len();
-    assert_eq!(pos, 40 + 72 * frames as u64, "both sides have the same positions file beside each macro");
+    assert_eq!(pos, 40 + 88 * frames as u64, "both sides have the same positions file beside each macro");
     // Everything written so far is flushed, and the host settles, before anything is timed.
     assert!(Command::new("sync").status().unwrap().success());
     std::thread::sleep(Duration::from_millis(500));
@@ -97,12 +97,12 @@ fn play_start_timings() {
     host_state("end", frames);
 }
 
-// main-only: /// What the head's library writes beside a macro with positions: 40 + 72 B a frame, through a temporary name, synced.
+// main-only: /// What the head's library writes beside a macro with positions: 40 + 88 B a frame, through a temporary name, synced.
 // main-only: fn positions_file(dir: &Path, id: &str, frames: usize) {
 // main-only:     use std::io::Write;
 // main-only:     let (tmp, path) = (dir.join(format!("{id}.pos.tmp")), dir.join(format!("{id}.pos")));
 // main-only:     let mut file = fs::File::create(&tmp).unwrap();
-// main-only:     file.write_all(&vec![0u8; 40 + 72 * frames]).unwrap();
+// main-only:     file.write_all(&vec![0u8; 40 + 88 * frames]).unwrap();
 // main-only:     file.sync_all().unwrap();
 // main-only:     fs::rename(tmp, path).unwrap();
 // main-only: }

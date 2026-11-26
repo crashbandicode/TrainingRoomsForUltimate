@@ -779,7 +779,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "8b2a51f6a349526b33cde72d1690e2d3a5f3796b0b3dbbb5be68a6ac0a1242fe",
+   "dest_sha256": "01733b27c7273faaf08fa1e790c108d17c214c523fe652b91b977ba16dd3752d",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -1039,6 +1039,21 @@
      "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): take a position track with its source for editor adoption.",
      "old": "        self.track_source = source;\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n",
      "new": "        self.track_source = source;\n    }\n\n    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {\n        self.track.take().map(|track| (self.track_source, track))\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n"
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {\n        self.track = track;\n        self.track_source = super::positions::Source::Recorded;\n    }\n\n    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {\n        self.track = Some(track);\n        self.track_source = source;\n    }\n\n    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {\n        self.track.take().map(|track| (self.track_source, track))\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n",
+     "new": "    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {\n        self.track = track;\n        self.track_source = super::positions::Source::Recorded;\n        self.track_moves = super::positions::Moves::Take;\n    }\n\n    pub fn set_sourced_track(&mut self, source: super::positions::Source, moves: super::positions::Moves, track: Vec<[super::ReplayFrame; 2]>) {\n        self.track = Some(track);\n        self.track_source = source;\n        self.track_moves = moves;\n    }\n\n    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, super::positions::Moves, Vec<[super::ReplayFrame; 2]>)> {\n        self.track.take().map(|track| (self.track_source, self.track_moves, track))\n    }\n\n    pub fn has_moves(&self) -> bool { self.track_moves != super::positions::Moves::None }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n"
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "            start_save_on: true,\n            track: None,\n            track_source: super::positions::Source::Recorded,\n        };\n        recording.validate()?;\n        Ok(recording)\n",
+     "new": "            start_save_on: true,\n            track: None,\n            track_source: super::positions::Source::Recorded,\n            track_moves: super::positions::Moves::None,\n        };\n        recording.validate()?;\n        Ok(recording)\n"
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n}\n\nimpl MacroRecording {\n",
+     "new": "    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n    #[serde(skip)]\n    pub(super) track_moves: super::positions::Moves,\n}\n\nimpl MacroRecording {\n"
     }
    ]
   },
@@ -1550,7 +1565,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "860b6f02eddc1da99b235b89c193cf23206d60a91e7b472b4d68bdfd54f54fa1",
+   "dest_sha256": "38af7351aa1cbf22cc60b0cef1378198ab20187cb43ed89f1e9fa145791a386f",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1716,6 +1731,16 @@
      "old": "        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));",
      "new": "        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, track);\n        }",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.\n    fn after_write(&self, dir: &std::path::Path, id: &str) {\n        if let Some(track) = &self.track {\n            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {\n                super::positions::remove(dir, id);\n            }\n        }\n",
+     "new": "    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.\n    fn after_write(&self, dir: &std::path::Path, id: &str) {\n        if let Some(track) = &self.track {\n            if super::positions::write(dir, id, &self.frames, track, self.track_source, self.track_moves).is_err() {\n                super::positions::remove(dir, id);\n            }\n        }\n"
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "    /// (`positions`). Playback, the list and every other load read the macro only (`load`).\n    pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        let mut recording = self.load(id)?;\n        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, track);\n        }\n        Ok(recording)\n    }\n",
+     "new": "    /// (`positions`). Playback, the list and every other load read the macro only (`load`).\n    pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        let mut recording = self.load(id)?;\n        if let Some((source, moves, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, moves, track);\n        }\n        Ok(recording)\n    }\n"
     }
    ]
   },
@@ -2185,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "c28bb7524d52b747d439aa20b06a4461e159617a8b86362b679c012f321d145c",
+   "dest_sha256": "0ae450c9a8291327560cabc8f5e05a545cdb9b9443a484cfe34635e172c2331a",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3172,6 +3197,26 @@
      "reason": "scrub-moves SM5 B: packed capture pose and explicit absent pose in existing samples",
      "old": "        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };\n            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n",
      "new": "        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), ..*frame };\n            let absent = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n"
+    },
+    {
+     "reason": "Test adoption of same-length recorded moves",
+     "old": "    fn case_table() {\n        crate::test_table::run(&[\n            (\"generated_positions_reach_the_open_editor_at_once\", generated_positions_reach_the_open_editor_at_once as fn()),\n            (\"x_after_a_held_frame_previews_in_either_order_of_the_two_threads\", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),\n            (\"the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint\", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),\n            (\"a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped\", a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped as fn()),\n",
+     "new": "    fn case_table() {\n        crate::test_table::run(&[\n            (\"generated_positions_reach_the_open_editor_at_once\", generated_positions_reach_the_open_editor_at_once as fn()),\n            (\"the_open_editor_takes_moves_for_the_frames_it_already_had\", the_open_editor_takes_moves_for_the_frames_it_already_had as fn()),\n            (\"x_after_a_held_frame_previews_in_either_order_of_the_two_threads\", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),\n            (\"the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint\", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),\n            (\"a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped\", a_wanted_play_shows_no_frame_until_it_is_taken_or_dropped as fn()),\n"
+    },
+    {
+     "reason": "Test adoption of same-length recorded moves",
+     "old": "        e.on_action(ClipAction::Nudge(-1));\n        assert_eq!(e.scrub().1, Pos::Held);\n        assert!(!combo_editor().adopt_positions(loaded));\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n",
+     "new": "        e.on_action(ClipAction::Nudge(-1));\n        assert_eq!(e.scrub().1, Pos::Held);\n        assert!(!combo_editor().adopt_positions(loaded));\n    }\n\n    fn the_open_editor_takes_moves_for_the_frames_it_already_had() {\n        use crate::engine::macros::positions::{Moves, Source};\n        let mut editor = saved_macro(false);\n        let recording = match &editor.file {\n            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),\n            _ => panic!(\"macro\"),\n        };\n        let mut frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE,\n            input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut held = recording.clone();\n        held.set_sourced_track(Source::Recorded, Moves::None, vec![[frame, frame]; 2]);\n        assert!(editor.adopt_positions(held.clone()));\n        frame.pose = crate::engine::macros::PackedPose([42, 0x100]);\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(Source::Recorded, Moves::Playback, vec![[frame, frame]; 2]);\n        assert!(editor.adopt_positions(loaded.clone()));\n        assert!(!editor.adopt_positions(loaded));\n        assert!(!editor.adopt_positions(held));\n        let mut shorter = recording;\n        shorter.set_sourced_track(Source::Recorded, Moves::Playback, vec![[frame, frame]]);\n        assert!(!editor.adopt_positions(shorter));\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n"
+    },
+    {
+     "reason": "Test adoption of same-length recorded moves",
+     "old": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n",
+     "new": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated,\n            crate::engine::macros::positions::Moves::Playback, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n"
+    },
+    {
+     "reason": "Keep recorded moves with positions",
+     "old": "\n    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some((source, track)) = loaded.take_sourced_track() else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_sourced_track(source, track);\n        true\n    }\n\n",
+     "new": "\n    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some((source, moves, track)) = loaded.take_sourced_track() else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held|\n            held.len() > track.len() || held.len() == track.len() && (recording.has_moves() || moves == crate::engine::macros::positions::Moves::None)) {\n            return false;\n        }\n        recording.set_sourced_track(source, moves, track);\n        true\n    }\n\n"
     }
    ]
   },

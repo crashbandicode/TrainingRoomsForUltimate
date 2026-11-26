@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -178,6 +179,60 @@ class CarryEditsTests(unittest.TestCase):
                                   "--manifest", "manifest.json"])
             self.assertEqual(output.getvalue().strip(), "no change")
             self.assertEqual(manifest.read_bytes(), before)
+
+
+class RebuildTests(unittest.TestCase):
+    def fixture(self, directory):
+        root = Path(directory)
+        stages = root / "stages"
+        stage = stages / "s1" / "stage"
+        stage.mkdir(parents=True)
+        source = b"start\nseed\nend\n"
+        wanted = b"start\nfinal\nend\n"
+        (stage / "source.txt").write_bytes(source)
+        (root / "dest.txt").write_bytes(wanted)
+        edits = [
+            {"old": "seed\n", "new": "kept-one\n", "reason": "first kept"},
+            {"old": "absent\n", "new": "obsolete\n", "reason": "dropped reason"},
+            {"old": "kept-one\n", "new": "kept-two\n", "reason": "second kept"},
+        ]
+        entry = {"src": "source.txt", "dest": "dest.txt", "crate": "root",
+                 "src_sha256": hashlib.sha256(source).hexdigest(),
+                 "dest_sha256": hashlib.sha256(wanted).hexdigest(), "edits": edits}
+        manifest = root / "pkg4-carry-manifest.json"
+        manifest.write_text(json.dumps({"stage": "s1", "modules": {}, "files": [entry]}), encoding="utf-8")
+        return root, stages, source, wanted, edits, manifest
+
+    def run_rebuild(self, root, stages, manifest):
+        tool = Path(__file__).resolve().with_name("carry_edits.py")
+        return subprocess.run([sys.executable, "-I", str(tool), "dest.txt", "--rebuild", "--stage", "s1",
+                               "--reason", "fresh reason", "--root", str(root), "--manifest", str(manifest)],
+                              env={**os.environ, "TR_CARRY_STAGES": str(stages)}, capture_output=True, text=True)
+
+    def test_rebuild_keeps_the_edits_that_apply_and_derives_the_rest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, stages, source, wanted, edits, manifest = self.fixture(directory)
+            out = self.run_rebuild(root, stages, manifest)
+            self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+            entry = json.loads(manifest.read_text(encoding="utf-8"))["files"][0]
+            self.assertEqual(entry["edits"][:2], [edits[0], edits[2]])
+            derived = entry["edits"][2:]
+            self.assertTrue(derived)
+            reason = "fresh reason; replaces 1 edit(s) that no longer applied in order: dropped reason"
+            self.assertTrue(all(edit["reason"] == reason for edit in derived))
+            self.assertEqual(carry_pkg4.apply_edits(entry, source), wanted)
+            self.assertEqual((root / "dest.txt").read_bytes(), wanted)
+
+    def test_rebuild_refuses_when_the_tree_is_not_the_recorded_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, stages, _, _, _, manifest = self.fixture(directory)
+            (root / "dest.txt").write_bytes(b"unrecorded\n")
+            before = manifest.read_bytes()
+            out = self.run_rebuild(root, stages, manifest)
+            self.assertNotEqual(out.returncode, 0)
+            self.assertIn("hash", (out.stdout + out.stderr).lower())
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertEqual((root / "dest.txt").read_bytes(), b"unrecorded\n")
 
 
 if __name__ == "__main__":
