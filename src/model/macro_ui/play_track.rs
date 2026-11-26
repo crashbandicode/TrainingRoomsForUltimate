@@ -1,7 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 
-use crate::engine::macros::{positions::Source, ReplayFrame};
+use crate::engine::macros::{positions::Source, InputFrame, ReplayFrame};
+use crate::engine::playback::Book;
 use super::scrub_track::TakeTrack;
 
 const IDLE: u64 = u64::MAX;
@@ -30,6 +31,7 @@ pub struct Open {
     pub generation: u32,
     pub version: (u64, u64),
     pub pass: bool,
+    pub retired_inputs: Option<Vec<InputFrame>>,
 }
 
 pub struct PlayTrack {
@@ -104,7 +106,7 @@ impl PlayTrack {
         }
         self.limit.store(limit, Ordering::Release);
         self.count.store(0, Ordering::Release);
-        state.open = Some(Open { id: name, slot, generation, version, pass });
+        state.open = Some(Open { id: name, slot, generation, version, pass, retired_inputs: None });
         self.key.store(u64::from(generation) << 32 | slot as u64, Ordering::SeqCst);
         true
     }
@@ -118,6 +120,15 @@ impl PlayTrack {
 
     pub fn open_run(&self) -> Option<(usize, u32)> {
         self.state.lock().unwrap_or_else(|error| error.into_inner()).open.as_ref().map(|open| (open.slot, open.generation))
+    }
+
+    /// Keep the exact source of an outstanding run when the worker replaces its playback book.
+    pub fn retire_book(&self, book: &mut Book) {
+        if !self.sampling() { return; }
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if let Some(open) = state.open.as_mut().filter(|open| open.retired_inputs.is_none()) {
+            open.retired_inputs = book.take_inputs(open.id.as_str());
+        }
     }
 
     pub fn note_done(&self, id: &str, version: (u64, u64)) {

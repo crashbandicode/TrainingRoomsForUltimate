@@ -64,6 +64,10 @@ impl Binding {
     }
 }
 
+pub(crate) fn same_inputs(id: &str, played: &[InputFrame], current: &[InputFrame]) -> bool {
+    played.len() == current.len() && Binding::of(id, played) == Binding::of(id, current)
+}
+
 fn header(binding: Binding, frames: u32, source: Source) -> [u8; HEADER] {
     let mut out = [0u8; HEADER];
     out[..4].copy_from_slice(&MAGIC);

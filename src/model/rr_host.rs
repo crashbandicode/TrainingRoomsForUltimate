@@ -1547,6 +1547,12 @@ pub fn play_track_service(root: &Path) {
     if open.version != recording_version() { return; }
     let dir = root.join(MACROS_DIR);
     let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
+    let same = |played: &[InputFrame]| positions::same_inputs(open.id.as_str(), played, &recording.frames);
+    let matches = match open.retired_inputs.as_deref() {
+        Some(played) => same(played),
+        None => lock(&BOOK).as_ref().and_then(|held| held.book.inputs(open.id.as_str())).is_some_and(same),
+    };
+    if !matches { return; }
     if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
     let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
     let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
@@ -2841,7 +2847,11 @@ fn refresh_held(held: &mut Option<Box<HeldBook>>, root: &Path, chords: [bool; 2]
         sources[role_index(role)] = Some(Source { id: source, active: false });
     }
     match read_held(root, sources, in_use, starts) {
-        Ok(next) => { *held = Some(Box::new(next)); true }
+        Ok(next) => {
+            if let Some(old) = held { PLAY.retire_book(&mut old.book); }
+            *held = Some(Box::new(next));
+            true
+        }
         Err(()) => false,
     }
 }
@@ -5277,12 +5287,16 @@ mod tests {
 
     #[test]
     fn a_same_size_external_edit_before_settle_cannot_adopt_the_previous_runs_positions() {
-        use crate::engine::macros::positions;
         let _hold = hold();
+        for stop in [false, true] { external_edit_before_settle(stop); }
+    }
+
+    fn external_edit_before_settle(stop: bool) {
+        use crate::engine::macros::positions;
         let (root, id, recording) = generated_fixture("generated-external-edit", 3);
         let dir = root.join(MACROS_DIR);
         generated_play(&root, Role::Cpu);
-        for (i, input) in recording.frames.iter().enumerate() {
+        for (i, input) in recording.frames.iter().take(if stop { 2 } else { 3 }).enumerate() {
             assert_eq!(generated_take(Role::Cpu, i as u32), Some(*input));
         }
         // Same external-edit contract as playback_immediate: no store event and no file-size change.
@@ -5294,6 +5308,7 @@ mod tests {
         std::fs::write(&path, bytes).unwrap();
         let changed = Library::new(&dir).load(&id).unwrap();
         assert_eq!(changed.frames[0].buttons, 9);
+        if stop { generated_play(&root, Role::Cpu); } // The stop chord refreshes the held book before settle.
         tick(&root);
         assert!(!positions::path(&dir, &id).exists(), "the worker must not sign the old poses with the new inputs");
         generated_play(&root, Role::Cpu);
