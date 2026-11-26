@@ -348,7 +348,7 @@ snapping In on a match capture, or a match-capture preview or export.
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
 the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
 separately. The editor refuses points it detects inside solid ground or a wall, outside the camera bounds, or beyond
-the safe blast-line bounds. Install 6 misses a wall beside the floor's end (see the test below). If the point is refused
+the safe blast-line bounds. Install 6 judges the point only, not whether the fighter's body fits beside a wall (see the test below). If the point is refused
 or the stage geometry cannot be read, that fighter returns to where its hold began,
 or stays put if it was not held; the
 other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
@@ -377,8 +377,8 @@ A mid-action In shows the snap hint instead. The fighters' placement does not de
 
 Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the
 old-macro line, a crop that keeps its positions, and Delete removing both files. On a match capture a fighter whose
-point was inside the ground was left where it stood; one whose point was inside the stage's wall beside the floor was
-not refused and stood beside its point, which is a [known issue](../CURRENT-RELEASE.md#known-issues). Positions from one Play, and at once after X, were seen on
+point was inside the ground was left where it stood; one whose point was free but too close beside the stage's wall
+was pushed about 5 units off it by the game, which is a [known issue](../CURRENT-RELEASE.md#known-issues). Positions from one Play, and at once after X, were seen on
 `eb39d6bc`, the build before install 6's last fix. Not seen yet: the waiting room, a fighter swap or a scene change
 while a fighter is held, and the installed release file itself.
 
