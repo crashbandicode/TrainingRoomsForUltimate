@@ -153,8 +153,8 @@ Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its 
 - **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
   showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
   in a match capture, plain Y can leave In on a mid-action frame. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y
-  for the move start. Release the modifier before pressing X to preview, or press A to save. The fix is not in
-  install 5. No other report on this build is on record.
+  for the move start. Release the modifier before pressing X to preview, or press A to save. A fix is merged
+  (`dbded2d1`) for the build after install 5; it is not in install 5. No other report on this build is on record.
 
 ## Install 4
 
