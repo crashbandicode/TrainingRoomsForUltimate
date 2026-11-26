@@ -98,6 +98,22 @@ class CarryToolsTests(unittest.TestCase):
                 for entry in entries[:2]:
                     self.assertIn(f"EDIT FAILS {entry['src']}:", out.stdout)
 
+    def test_missing_last_delete_marker_does_not_hide_later_failures(self):
+        for package in ("pkg4", "pkg6"):
+            with self.subTest(package=package), tempfile.TemporaryDirectory() as directory:
+                root, stages, manifest, _ = self.fixture(directory, package)
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+                first, second = data["files"][:2]
+                first["edits"] = [{"delete_from": "source", "delete_to_last": "missing end", "reason": "fixture"}]
+                second["edits"] = [{"old": "missing block", "new": "replacement", "reason": "fixture"}]
+                manifest.write_text(json.dumps(data), encoding="utf-8")
+
+                out = self.run_tool(package, root, stages, "verify")
+                self.assertEqual(out.returncode, 1, out.stdout + out.stderr)
+                self.assertIn("EDIT FAILS one.txt:", out.stdout, out.stderr)
+                self.assertIn("EDIT FAILS two.txt:", out.stdout)
+                self.assertIn("2 problem(s)", out.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
