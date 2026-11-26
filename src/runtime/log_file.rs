@@ -91,9 +91,8 @@ pub(crate) fn append_event_at(
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn paths(name: &str) -> (std::path::PathBuf, String, String) {
-        let root = std::env::temp_dir().join(format!("tr-events-{}-{name}", std::process::id()));
-        fs::create_dir(&root).unwrap();
+    fn paths(name: &str) -> (crate::test_scratch::Scratch, String, String) {
+        let root = crate::test_scratch::Scratch::new(&format!("tr-events-{name}"));
         let current = root.join("events.log").to_str().unwrap().to_owned();
         let previous = root
             .join("events.previous.log")

@@ -10,7 +10,6 @@ use model::menu::table::{COMBOS_SEQ, ROWS, SAVES_MACROS};
 use model::menu::{Entry, Env, Menu, Screen, LOOP_ROW};
 use model::recording_menu::{LoopMark, ViewRole};
 use model::settings::Settings;
-use std::path::PathBuf;
 
 const COUNTS: [(LoopMark, Option<usize>); 6] = [
     (LoopMark::Infinite, None),
@@ -71,19 +70,12 @@ fn pick(menu: &mut Menu, index: usize) {
     assert!(menu.screen().is_none());
 }
 
-struct Scratch(PathBuf);
+struct Scratch(crate::test_scratch::Scratch);
 impl Scratch {
     fn new() -> Self {
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("tr-loop-picker-{}-{stamp}", std::process::id()));
-        std::fs::create_dir(&path).unwrap();
-        Self(path)
+        Self(crate::test_scratch::Scratch::new("tr-loop-picker"))
     }
 }
-impl Drop for Scratch {
-    fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
-}
-
 /// Use the worker's real publication seam, reload its index, then execute the real playback machine.
 fn assert_playback(root: &Scratch, role: ViewRole, expected: Option<usize>) {
     let index = RecordingIndex::load(&root.0).unwrap();

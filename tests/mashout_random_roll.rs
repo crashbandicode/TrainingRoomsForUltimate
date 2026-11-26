@@ -184,8 +184,7 @@ fn actual_mashout_random_roll_survives_its_own_reload_restart() {
         .replace("// STEP", block(SOURCE, "fn step(&mut self, next: Step, text: &'static str) {"))
         .replace("// RESTART", block(SOURCE, "if restart {"))
         .replace("// CHOOSE", block(SOURCE, "Step::Choose => {"));
-    let dir = std::env::temp_dir().join(format!("mashout-random-roll-{}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_scratch::Scratch::new("mashout-random-roll");
     let input = dir.join("actual.rs");
     let binary = dir.join("actual");
     fs::write(&input, fixture).unwrap();

@@ -263,14 +263,8 @@ mod tests {
     use super::*;
     use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
     use crate::engine::macros::{Library, MacroRecording};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    static NEXT: AtomicUsize = AtomicUsize::new(0);
-
-    fn scratch() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("tr-positions-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        fs::create_dir(&dir).unwrap();
-        dir
+    fn scratch() -> crate::test_scratch::Scratch {
+        crate::test_scratch::Scratch::new("tr-positions")
     }
 
     fn inputs(count: u32) -> Vec<InputFrame> {

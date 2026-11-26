@@ -348,12 +348,11 @@ fn n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text() {
         }
         return;
     }
-    let root = std::env::temp_dir().join(format!("tr-ui-n7-continuation-{}", std::process::id()));
-    fs::create_dir(&root).unwrap();
+    let root = crate::test_scratch::Scratch::new("tr-ui-n7-continuation");
     fs::write(root.join("button_config.ini"), "# private note\n[menu]\nshortcut_1=Minus\nshortcut_2=disabled\nother_key=untouched\n[foreign]\ncolour=blue\n").unwrap();
     let exe = std::env::current_exe().unwrap();
     let run = |mode| Command::new(&exe).args(["--exact", "ui_chord_capture::n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text", "--nocapture"])
-        .env(MODE, mode).env(ROOT, &root).output().unwrap();
+        .env(MODE, mode).env(ROOT, root.path()).output().unwrap();
     let saved = run("save");
     assert!(saved.status.success(), "saver failed: {}", String::from_utf8_lossy(&saved.stderr));
     let saver_exit = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
@@ -370,8 +369,7 @@ fn n7_confirmed_ini_survives_a_fresh_process_and_preserves_unrelated_text() {
 #[test]
 fn n7_failed_ini_write_keeps_confirmed_session_value_and_old_file() {
     use std::fs;
-    let root = std::env::temp_dir().join(format!("tr-ui-n7-write-failure-{}", std::process::id()));
-    fs::create_dir(&root).unwrap();
+    let root = crate::test_scratch::Scratch::new("tr-ui-n7-write-failure");
     let path = root.join("button_config.ini");
     let before = "# keep me\n[menu]\nshortcut_1=Minus\nshortcut_2=disabled\nforeign=42\n";
     fs::write(&path, before).unwrap();

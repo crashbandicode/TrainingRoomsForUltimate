@@ -1,37 +1,20 @@
 //! Shared fixtures for the unit tests.
 
 lib_unit_tests! {
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::atomic::{AtomicU32, Ordering},
-};
+use std::path::Path;
 
 use {crate::engine::macros::InputFrame, crate::engine::macros::MacroRecording, crate::engine::macros::StartState};
 
 /// A unique directory under the system temp dir, removed on drop.
-pub struct TempDir(PathBuf);
+pub struct TempDir(crate::test_scratch::Scratch);
 
 impl TempDir {
     pub fn new() -> Self {
-        static NEXT: AtomicU32 = AtomicU32::new(0);
-        let path = std::env::temp_dir().join(format!(
-            "training_mod_macros-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        fs::create_dir_all(&path).unwrap();
-        Self(path)
+        Self(crate::test_scratch::Scratch::new("training_mod_macros"))
     }
 
     pub fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        self.0.path()
     }
 }
 

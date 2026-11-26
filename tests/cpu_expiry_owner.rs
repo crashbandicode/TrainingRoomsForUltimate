@@ -75,8 +75,7 @@ fn actual_cpu_expiry_notice_follows_the_request_owner() {
         String::new()
     };
     let fixture = FIXTURE.replace("// EXPIRY", expiry).replace("// MODEL_FNS", &model);
-    let dir = std::env::temp_dir().join(format!("cpu-expiry-owner-{}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_scratch::Scratch::new("cpu-expiry-owner");
     let input = dir.join("actual.rs");
     let binary = dir.join("actual");
     fs::write(&input, fixture).unwrap();

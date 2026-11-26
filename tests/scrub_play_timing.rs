@@ -26,10 +26,9 @@ fn play_start_timings() {
         let exe = env::current_exe().unwrap();
         let pinned = Path::new("/usr/bin/taskset").exists();
         for frames in SIZES {
-            let root = env::temp_dir().join(format!("tr-scrub-timing-{}-{frames}", std::process::id()));
-            fs::create_dir(&root).unwrap();
+            let root = crate::test_scratch::Scratch::new(&format!("tr-scrub-timing-{frames}"));
             let mut child = if pinned { let mut c = Command::new("/usr/bin/taskset"); c.args(["-c", CPU]).arg(&exe); c } else { Command::new(&exe) };
-            let ran = child.args(["--exact", TEST, "--nocapture"]).env(KEY, &root).env("TR_SCRUB_TIMING_FRAMES", frames.to_string())
+            let ran = child.args(["--exact", TEST, "--nocapture"]).env(KEY, root.path()).env("TR_SCRUB_TIMING_FRAMES", frames.to_string())
                 .env("TR_SCRUB_TIMING_PINNED", if pinned { "cpu3" } else { "no" }).status().unwrap().success();
             fs::remove_dir_all(root).unwrap();
             assert!(ran, "the timed process for {frames} frames failed");

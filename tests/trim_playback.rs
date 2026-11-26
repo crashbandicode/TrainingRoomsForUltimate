@@ -15,8 +15,7 @@ use library::{Chain, LoopCount, NamedSave, RecordingIndex, Role, Sequence, MACRO
 use macros::{InputFrame, Library, MacroRecording, StartState};
 use playback::{Book, Playback};
 use crate::model::store::Store;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::engine::rr_host as host;
@@ -163,26 +162,13 @@ fn install5_previewable_capture_windows_remain_previewable() {
     assert!(accepted.iter().all(|&count| count > 0), "{accepted:?}");
 }
 
-static NEXT: AtomicUsize = AtomicUsize::new(0);
 static HOST: Mutex<()> = Mutex::new(());
 
-struct Scratch(PathBuf);
+struct Scratch(crate::test_scratch::Scratch);
 
 impl Scratch {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "tr-trim-test-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::create_dir(&path).unwrap();
-        Self(path)
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        Self(crate::test_scratch::Scratch::new("tr-trim-test"))
     }
 }
 
