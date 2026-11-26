@@ -184,15 +184,28 @@ pub fn source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Source> {
 pub fn remove(dir: &Path, id: &str) {
     let file = path(dir, id);
     let _ = fs::remove_file(crate::model::store::with_suffix(&file, ".tmp"));
-    if fs::remove_file(file).is_ok() {
-        let _ = fs::File::open(dir).and_then(|dir| dir.sync_all());
+    if unlink(&file).is_ok() {
+        let _ = sync_folder(dir);
     }
+}
+
+fn unlink(path: &Path) -> io::Result<()> {
+    #[cfg(test)]
+    if FAULT.with(|fault| fault.get() == Some("unlink")) { return Err(io::ErrorKind::PermissionDenied.into()); }
+    fs::remove_file(path)
+}
+
+fn sync_folder(dir: &Path) -> io::Result<()> {
+    #[cfg(test)]
+    if FAULT.with(|fault| fault.get() == Some("sync")) { return Err(io::Error::other("injected directory sync failure")); }
+    fs::File::open(dir)?.sync_all()
 }
 
 #[cfg(test)]
 thread_local! {
     static READS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
     static FAIL_WRITE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    static FAULT: core::cell::Cell<Option<&'static str>> = const { core::cell::Cell::new(None) };
 }
 
 /// Positions files opened for reading by this thread (tests: playback and the list open none).
@@ -377,6 +390,31 @@ mod tests {
         library.delete(&id).unwrap();
         assert!(!path(&dir, &id).exists() && !dir.join(format!("{id}.json")).exists());
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_sidecar_invalidation_cannot_commit_the_replacement_macro() {
+        for fault in ["unlink", "sync"] {
+            let dir = scratch();
+            let library = Library::new(&dir);
+            let id = library.save_new(&recording("Old", 3, true)).unwrap();
+            let mut next = recording("Replacement", 3, false);
+            next.set_track(Some(vec![pair(99); 3]));
+            FAULT.with(|cell| cell.set(Some(fault)));
+            fail_writes(true);
+            let result = library.overwrite(&id, &next);
+            let retry = library.overwrite(&id, &next);
+            fail_writes(false);
+            FAULT.with(|cell| cell.set(None));
+            let reopened = library.load_edited(&id).unwrap();
+            assert!(result.is_err(), "{fault} failed but overwrite reported success; macro={}", reopened.name);
+            assert!(retry.is_err(), "a retry must not bypass an outstanding {fault} failure");
+            assert_eq!(reopened.name, "Old");
+            assert_eq!(reopened.track, (fault == "unlink").then(|| track(3)));
+            library.overwrite(&id, &next).unwrap();
+            assert_eq!(library.load_edited(&id).unwrap(), next);
+            fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]
