@@ -906,5 +906,5 @@ fn the_start_speed_waits_for_the_first_input_after_the_delay() {
     assert_eq!(host::take_start_speed(Role::Player).map(|speed| speed.speed), Some((1.25, -0.5)));
     let source = include_str!("../src/runtime/features/recording_host.rs");
     let player = source.split("pub unsafe fn on_player_poll(").nth(1).unwrap().split("\n}").next().unwrap();
-    assert!(player.contains("if rr_host::on_player_poll(out)") && player.contains("apply_start_speed("));
+    assert!(player.contains("if rr_host::on_player_poll_seeded(out,") && player.contains("apply_start_speed("));
 }

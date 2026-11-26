@@ -245,10 +245,7 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) {
-    if rr_host::play_seed_due(crate::engine::library::Role::Player) {
-        seed_both(super::recorder::cpu_body(), rr_host::play_seed);
-    }
-    if rr_host::on_player_poll(out) {
+    if rr_host::on_player_poll_seeded(out, || seed_both(super::recorder::cpu_body(), rr_host::play_seed)) {
         observe_start(crate::engine::library::Role::Player);
         apply_start_speed(crate::engine::library::Role::Player);
     }
