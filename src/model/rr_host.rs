@@ -1547,7 +1547,7 @@ pub fn play_track_service(root: &Path) {
     let dir = root.join(MACROS_DIR);
     let Ok(recording) = Library::new(&dir).load(open.id.as_str()) else { return };
     if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
-    let existing = positions::kept(&dir, open.id.as_str(), &recording.frames);
+    let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
     let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
     if write {
         if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
@@ -4988,6 +4988,58 @@ mod tests {
 
     fn generated_rows(root: &Path, id: &str, recording: &MacroRecording) -> Option<Vec<[ReplayFrame; 2]>> {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
+    }
+
+    fn playback_over_existing_sidecar(source: crate::engine::macros::positions::Source, damaged: bool) -> bool {
+        use crate::engine::macros::positions;
+        let (root, id, recording) = generated_fixture("generated-body", 605);
+        let dir = root.join(MACROS_DIR);
+        let path = positions::path(&dir, &id);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
+        let old = vec![[frame, frame]; 601];
+        positions::write(&dir, &id, &recording.frames, &old, source).unwrap();
+        if damaged {
+            let mut bytes = std::fs::read(&path).unwrap();
+            let partner_x = 40 + 600 * 72 + 36 + 28;
+            bytes[partner_x..partner_x + 4].copy_from_slice(&f32::NAN.to_le_bytes());
+            std::fs::write(&path, bytes).unwrap();
+        }
+        assert_eq!(positions::kept(&dir, &id, &recording.frames), Some((source, 601)));
+        assert_eq!(generated_rows(&root, &id, &recording).is_none(), damaged);
+        let bytes = std::fs::read(&path).unwrap();
+        tick(&root);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..2 { assert_eq!(generated_take(Role::Cpu, i), Some(recording.frames[i as usize])); }
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        let correct = if damaged {
+            positions::source(&dir, &id, &recording.frames) == Some(positions::Source::Generated)
+                && generated_rows(&root, &id, &recording).is_some_and(|rows| {
+                    rows.len() == 2 && (rows[1][0].x, rows[1][1].x) == (1.0, 101.0)
+                })
+        } else {
+            std::fs::read(&path).unwrap() == bytes && generated_rows(&root, &id, &recording) == Some(old)
+        };
+        std::fs::remove_dir_all(root).unwrap();
+        correct
+    }
+
+    #[test]
+    fn bad_sidecar_bodies_are_replaced_after_playback() {
+        use crate::engine::macros::positions::Source;
+        let _hold = hold();
+        let repaired = [Source::Generated, Source::Recorded].map(|source| playback_over_existing_sidecar(source, true));
+        assert_eq!(repaired, [true, true], "a nonfinite partner row in chunk two must not protect either source");
+    }
+
+    #[test]
+    fn valid_sidecars_win_over_a_shorter_playback() {
+        use crate::engine::macros::positions::Source;
+        let _hold = hold();
+        for source in [Source::Generated, Source::Recorded] {
+            assert!(playback_over_existing_sidecar(source, false), "a valid {source:?} file changed");
+        }
     }
 
     fn an_old_macro_played_once_from_zero_gets_generated_positions() {
