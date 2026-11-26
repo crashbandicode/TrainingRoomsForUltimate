@@ -89,6 +89,17 @@ fn every_lint_suppression_is_known_and_every_known_one_still_exists() {
     assert!(problems.is_empty(), "lint suppressions:\n{}", problems.join("\n"));
 }
 
+/// The host gates deny warnings through clippy. The code only the Switch builds compile gets the same rule from one
+/// crate attribute; without it a warning there passes every gate.
+#[test]
+fn switch_builds_deny_every_warning() {
+    let lib = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs")).unwrap();
+    assert!(
+        lib.lines().any(|line| line == "#![cfg_attr(target_os = \"switch\", deny(warnings))]"),
+        "src/lib.rs no longer denies warnings on Switch builds"
+    );
+}
+
 #[test]
 fn cargo_toml_sets_no_lint_to_allow() {
     let manifest = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();

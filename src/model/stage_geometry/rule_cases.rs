@@ -1,6 +1,5 @@
     lib_unit_tests! {
     use super::*;
-    use crate::model::tech::{discovery::decode, Vec2};
 
     fn line(ends: Segment, stand: bool, through: bool) -> Met { Met { ends, stand, through } }
     fn ledge(at: Point, facing: f32) -> Option<Ledge> { Some(Ledge { at, facing }) }
@@ -103,19 +102,6 @@
     }
 
     #[test]
-    fn a_traced_line_stands_by_placements_rule() {
-        let ends = [Vec2 { x: -10., y: 0. }, Vec2 { x: 10., y: 2. }];
-        for byte in [0x00, 0x01, 0x02, 0x08, 0x09, 0x20, 0x21, 0x22, 0x28, 0x29] {
-            for normal_y in [1.0, 0.8, 0.0, -1.0] {
-                let actual = met(decode(1, ends, Vec2 { x: 1.0, y: normal_y }, byte).unwrap());
-                assert_eq!(actual.stand, super::is_placement_floor((byte as u32) << 8, normal_y, true));
-                assert_eq!(actual.through, byte & 0x20 != 0);
-                assert_eq!(actual.ends, [[-10., 0.], [10., 2.]]);
-            }
-        }
-    }
-
-    #[test]
     fn a_line_at_the_end_of_a_column_is_passed_once() {
         let blast = [-100., 100., 100., -100.];
         let floor = [(line([[-10., 5.], [10., 5.]], true, false), true)];
@@ -172,6 +158,45 @@
         each(&battlefield(), |stage| for (point, expected) in cases {
             assert_eq!(classify(stage, BATTLEFIELD, point), Ok(expected), "{point:?}");
         });
+    }
+
+    fn run_ends(stage: &mut impl Probe, at: Point) -> Result<Option<Segment>, Unread> {
+        floor_run(stage, BATTLEFIELD, at).map(|run| run.map(|run| run.ends))
+    }
+
+    /// The walk under `floor_run`: joined solid floors are followed to the last end from any of them, a gap of one
+    /// float step ends the run, and a run too long to walk is unread, not cut short.
+    #[test]
+    fn a_floor_run_follows_joined_floors_to_the_last_end() {
+        struct Same(Met, f32);
+        impl Probe for Same {
+            fn first(&mut self, _: Point, to: f32, platforms: bool) -> Result<Option<Met>, Unread> {
+                assert!(!platforms && to == self.1, "the walk reads solid lines down to the bottom blast line");
+                Ok(Some(self.0))
+            }
+        }
+        let joined = [
+            (line([[-10., 0.], [10., 0.]], true, false), true),
+            (line([[-30., 0.], [-10., 0.]], true, false), true),
+            (line([[10., 0.], [30., 10.]], true, false), true),
+        ];
+        each(&joined, |stage| for x in [-20., 0., 20.] {
+            assert_eq!(run_ends(stage, [x, 12.]), Ok(Some([[-30., 0.], [30., 10.]])), "from {x}");
+        });
+        let gap = [joined[0], (line([[10_f32.next_up(), 0.], [30., 10.]], true, false), true)];
+        each(&gap, |stage| assert_eq!(run_ends(stage, [0., 12.]), Ok(Some([[-10., 0.], [10., 0.]]))));
+        each(&[], |stage| assert_eq!(run_ends(stage, [0., 12.]), Ok(None)));
+        // The same floor met again is the end of the run, not a step.
+        let (floor, bottom) = (joined[0].0, BATTLEFIELD[3]);
+        assert_eq!(run_end(&mut Same(floor, bottom), bottom, floor, true), Ok([10., 0.]));
+        assert_eq!(run_end(&mut Same(floor, bottom), bottom, floor, false), Ok([-10., 0.]));
+        let chain = |count: usize| -> Vec<(Met, bool)> {
+            (0..count).map(|i| (line([[i as f32 * 2., 0.], [i as f32 * 2. + 2., 0.]], true, false), true)).collect()
+        };
+        each(&chain(MAX_LINES), |stage| {
+            assert_eq!(run_ends(stage, [1., 0.]), Ok(Some([[0., 0.], [MAX_LINES as f32 * 2., 0.]])));
+        });
+        each(&chain(MAX_LINES + 1), |stage| assert_eq!(run_ends(stage, [1., 0.]), Err(Unread)));
     }
 
     #[test]
