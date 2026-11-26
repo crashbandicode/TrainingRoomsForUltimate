@@ -3200,3 +3200,11 @@ ceiling = 206279
 date = "2026-11-26"
 reason = "The free playhead with the free-Y fix folded (reviewer rv-edge-juggle-sol 3cc33ff7: Y on the playhead goes to the nearest marked move, never the take boundary), on main dbded2d1 (206183): +96, measured by the size step of the gate on 767eab3b (206279 against 206278). The changed line counts as two."
 approved_by = "tr-primary-2 2026-11-26 00:58:36Z (approved at the measured count after the reviewer folds) and 01:19:45Z (the cap is approved up to 206,290 with no further ask)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 207083
+date = "2026-11-26"
+reason = "Scrub positions (operator 2026-11-25 23:58:25Z and 2026-11-26 00:21:37Z: scrubbing shows the moment with no preview first, and Record stores what a match capture stores), on main 6dbf9aa9 (206279): +804, measured by the size step of the gate on 902079f6. Record keeps both fighters' per-frame state in a new macro file version, the clip editor holds the bodies at the shown frame, a capture saved as a macro carries its tracks, the track is capped at two minutes and the macro list skips it (reviewer rv-preview-vis 945ef9ae and b5af60bb folded)."
+approved_by = "tr-primary-2 2026-11-26 01:08:43Z (lines approved at the measured count after joining main and the free playhead; the number is posted with READY)."
