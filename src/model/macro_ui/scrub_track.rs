@@ -100,6 +100,9 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
     if deltas == [None; 2] { Ask::None } else { Ask::Group { target: target & 1, deltas } }
 }
 
+/// `Block::home`'s role word on the callback that forgot a hold of another body: no role, no home.
+const FORGOT: u32 = u32::MAX;
+
 /// A world point as one word, compared exactly.
 fn key(at: [f32; 2]) -> u64 {
     u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits())
@@ -179,7 +182,9 @@ impl Block {
         for verdict in &self.stands {
             verdict.store(0, Ordering::Release);
         }
-        self.home.0.store(0, Ordering::Release);
+        // The callback that forgets asks for its point next, with the hold of the body that is gone still in its
+        // slot: it lets go, whatever the worker has published since (`point`).
+        self.home.0.store(FORGOT, Ordering::Release);
     }
 
     fn forgotten(&self) -> bool {
@@ -217,7 +222,8 @@ impl Block {
     /// is let go while a group is still asked for: its published position is read before the hold's step, so on that
     /// frame it is still the point it was held at, and its partner would be placed from there.
     pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
-        let Some(target) = self.target_slot() else {
+        let (forgot, target) = (self.home.0.load(Ordering::Relaxed) == FORGOT, self.target_slot());
+        let Some(target) = target.filter(|_| !forgot) else {
             self.home.0.store(0, Ordering::Relaxed);
             return None;
         };
