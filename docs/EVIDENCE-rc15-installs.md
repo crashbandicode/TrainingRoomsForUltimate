@@ -272,8 +272,9 @@ Merged after install 5 and **not on the card**. The Gate column names the receip
 - **Not run in a game.** Both merge records say so. The snap fix's adds that the operator's own take was not
   reproduced; the playhead's, that holding a direction on a pad has no host test.
 - **In work, not merged:** the fighters shown at the handle's frame while scrubbing, with the positions kept in a
-  file beside the macro and the macro file's format unchanged (inbox 2026-11-26 00:21:37Z and, for the separate
-  file, 03:06:35Z, tr-primary-2, relaying the operator). Neither is implemented in `main`.
+  file beside the macro and the macro file's format unchanged; a macro without such a file gets one from a
+  playback from its first frame (inbox 2026-11-26 00:21:37Z; the separate file, 03:06:35Z; the playback,
+  03:24:51Z; tr-primary-2, relaying the operator). None of it is implemented in `main`.
 - **Planned before the card build:** an Eden session in Training and in a waiting room, which records a macro and
   then scrubs In and Out with no preview, and browses, cuts and snaps with the playhead. Not run yet, and nothing
   about it is claimed here.
