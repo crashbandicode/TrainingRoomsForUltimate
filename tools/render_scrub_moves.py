@@ -231,9 +231,12 @@ def sm4():
 def sm5():
     c = Canvas(W, 860)
     title(c, "SM5 · A Replay window capture itself")
-    ay = d.panel(c, 16, 65, 594, 735, "A · Not in this change", rec=True, tag_below=True)
-    by = d.panel(c, 606, 65, 1184, 735, "B · Captures keep the animation too", tag_below=True)
-    aend = vertical_flow(c, 32, 578, ay + 8, [
+    ay = d.panel(c, 16, 65, 594, 755, "A · Not in this change", tag_below=True)
+    by = d.panel(c, 606, 65, 1184, 755, "B · Captures keep the animation too", tag_below=True)
+    c.rect(606, 65, 1184, 755, outline=d.OURS, width=3, radius=8)
+    d.tag(c, 620, 103, "decided", d.OURS)
+    paragraph(c, 34, ay + 3, "The lane's recommendation; not chosen.", 530)
+    aend = vertical_flow(c, 32, 578, ay + 38, [
         "a capture's frame: inputs and state, no animation (fresh or reopened)",
         "scrub the capture: positions, as today",
         "A saves a macro",
@@ -242,13 +245,20 @@ def sm5():
     ], height=72, gap=25)
     y = paragraph(c, 34, aend + 24, "No change to the capture file (TMRCAP01, schema 1).", 530, "s") + 12
     paragraph(c, 34, y, "A fighter the playback does not have keeps positions only.", 530, "s")
-    bend = vertical_flow(c, 622, 1168, by + 8, [
+    bend = vertical_flow(c, 622, 1168, by + 36, [
         "every captured frame of every fighter gains animation and frame",
         "scrub the capture: the moves at once",
     ], height=82, gap=28)
-    y = paragraph(c, 624, bend + 30, "The capture format changes.", 530, "s") + 12
-    paragraph(c, 624, y, "More memory in every match with Replay capture On.", 530, "s")
-    c.save("scrub-moves-SM5-captures", 760)
+    y = bend + 30
+    for text in [
+        "Capture file schema 2: 52 bytes a fighter a frame (was 44).",
+        "A schema 1 capture still loads: positions only.",
+        "+288,000 B of memory per captured fighter, ten minutes.",
+        "+576,000 B for a ten-minute 1v1 file.",
+        "About +16 KiB of BSS.",
+    ]:
+        y = paragraph(c, 624, y, text, 530, "s") + 12
+    c.save("scrub-moves-SM5-captures", 780)
 
 
 if __name__ == "__main__":

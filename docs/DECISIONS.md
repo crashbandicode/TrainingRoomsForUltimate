@@ -2181,7 +2181,7 @@ alike (2026-11-22, above); no per-stage and no per-fighter table.
 
 Host tests only; not yet seen in a game.
 
-## Clip editor: scrubbing shows the moves, and a fighter toggle (2026-11-26): proposed, not decided
+## Clip editor: scrubbing shows the moves, and a fighter toggle (2026-11-26): decided (operator)
 
 The operator, 2026-11-26 about 12:41Z, on install 6 (relayed by tr-primary-2, inbox 12:41:51Z), verbatim:
 
@@ -2205,15 +2205,24 @@ The operator, 2026-11-26 about 12:41Z, on install 6 (relayed by tr-primary-2, in
   Ask before switching fighter is On, Fighter Mismatch asks "Keep current fighter | Switch to recorded fighter".
   It is never asked for a saved macro, never for Player 1, and it cannot be undone from the editor.
 
-**Proposed** (lane place-t1a; a green outline in a picture marks the recommendation). Five choices:
+**The design** (lane place-t1a) put five choices. tr-primary-2 ruled SM1 and SM2 (inbox 13:15:07Z); the operator saw
+them and did not change them.
 
-| | Choice | Recommended |
+**The operator's answers**, 2026-11-26 about 14:07Z (relayed by tr-primary-2, inbox 14:06:58Z), verbatim: "SM3 A,
+SM4 A, SM5 B, approve the message"
+
+**Decided:**
+
+| | Choice | Decided |
 | --- | --- | --- |
-| SM1 | What a shown frame draws | **A, the animation and its frame, and nothing else.** A row also keeps the fighter's animation (the game's 40-bit name) and its frame. On a shown frame the held fighter is given that animation at that frame, at speed 0, while its scripts sleep. The status is not forced: a status change runs the game's own code for that status, which is where articles, effects and movement come from. B forces the status too. |
-| SM2 | How a positions file gets its moves | **A, version 2 of the file, filled by use.** Record, a crop and a playback write version 2 (48 bytes a row, was 36). A version 1 file still loads and shows positions only, with the line "Play it once to see the moves while scrubbing.". One eligible playback upgrades it: a generated file is replaced by a run at least as long; a whole file recorded with the take keeps its own rows and gets the run's animations, on the frames where the run's fighter and status equal the recorded ones. A shorter run, a stopped preview or a failed write changes nothing. A recorded file that is shorter than its inputs follows the rule of the 1,200-frame fix (2026-11-26): a longer run replaces it, as generated. B replaces a whole recorded file by the playback's. C leaves whole recorded files as they are. |
-| SM3 | Recorded fighter or the one you are on | **A, a toggle for each fighter, default the one you are on.** Player 1 and the CPU each switch between the fighter the take recorded for them and the fighter they were when the editor opened, on a saved macro and on a capture alike, through the roster's existing loader. Moves are drawn only on the recorded fighter; on another one the scrub shows positions, as today, and the strip says which key switches. The fighters stay as toggled when the editor closes. B puts both back on close. |
-| SM4 | The keys | **A, ZL + L for Player 1 and ZL + R for the CPU** (ZR works as ZL does; Z on a GameCube controller). Left is Player 1 and right is the CPU, as on the damage display. The strip names both fighters and the keys. B opens a two-row pop-up, like Fighter Mismatch, and changes them there. |
-| SM5 | A Replay window capture itself | **A, not in this change.** A capture's own frames keep no animation, and its file (`TMRCAP01`, schema 1, 44 bytes a fighter a frame) is not changed. So scrubbing a capture, fresh or reopened from its file, shows positions as today. A macro saved from it keeps the capture's own rows, and one playback adds the animations under SM2's rule: only on frames whose fighter and status equal the captured ones. A fighter the playback does not have, such as the match's other fighter, keeps positions only. B adds the animation to every captured frame of every fighter, which changes the capture format and costs memory in every match with Replay capture On. |
+| SM1 | What a shown frame draws | **A, the animation and its frame, and nothing else.** A row also keeps the fighter's animation (the game's 40-bit name) and its frame. On a shown frame the held fighter is given that animation at that frame, at speed 0, while its scripts sleep. The status is not forced: a status change runs the game's own code for that status, which is where articles, effects and movement come from. |
+| SM2 | How a positions file gets its moves | **A, version 2 of the file, filled by use.** Record, a crop and a playback write version 2 (48 bytes a row, was 36). A version 1 file still loads and shows positions only, with the line "Play it once to see the moves while scrubbing.". One eligible playback upgrades it: a generated file is replaced by a run at least as long; a whole file recorded with the take keeps its own rows and gets the run's animations, on the frames where the run's fighter and status equal the recorded ones. A shorter run, a stopped preview or a failed write changes nothing. A recorded file that is shorter than its inputs follows the rule of the 1,200-frame fix (2026-11-26): a longer run replaces it, as generated. |
+| SM3 | Recorded fighter or the one you are on | **A, a toggle for each fighter, default the one you are on.** Player 1 and the CPU each switch between the fighter the take recorded for them and the fighter they were when the editor opened, on a saved macro and on a capture alike, through the roster's existing loader. Moves are drawn only on the recorded fighter; on another one the scrub shows positions, as today, and the strip says which key switches. The fighters stay as toggled when the editor closes. Player 1's way back is by fighter kind, so a Mii Fighter may come back as another Mii of that kind. |
+| SM4 | The keys | **A, ZL + L for Player 1 and ZL + R for the CPU** (ZR works as ZL does; Z on a GameCube controller). Left is Player 1 and right is the CPU, as on the damage display. With the modifier held, L and R no longer pick In and Out. The strip names both fighters and the keys. |
+| SM5 | A Replay window capture itself | **B, captures keep the animation too.** Every captured frame of every fighter also keeps its animation and frame, so scrubbing a capture shows the moves at once. The capture file goes to schema 2 (52 bytes a fighter a frame, was 44). A schema 1 capture still loads and shows positions only: the moves of its fighters cannot be recovered from it. The lane had recommended A, leaving captures out of this change. |
+
+A "recommended" mark in a picture is the lane's recommendation at the time. For SM5 the picture marks what was
+decided.
 
 ![SM1: what a shown frame draws](decisions/scrub-moves/scrub-moves-SM1-shown-frame.png)
 
@@ -2225,38 +2234,59 @@ The operator, 2026-11-26 about 12:41Z, on install 6 (relayed by tr-primary-2, in
 
 ![SM5: a capture itself](decisions/scrub-moves/scrub-moves-SM5-captures.png)
 
+**A new line, approved by the operator in the same answer:** "This take has no second fighter.", for a toggle on a
+role the take does not record. Its row in `docs/RESTRICTIONS.md` comes with the code.
+
+**The captured row** (SM5 B): 8 more bytes, as two 32-bit words. The first is the low 32 bits of the animation's
+name. The second is the name's top 8 bits and the frame in 24 bits, 8 of them for the fraction: frames 0 to 65,535
+in steps of 1/256. The positions file keeps SM2's plainer row.
+
 **The game calls** (all but one are already wrapped and guarded in `src/runtime/game.rs` and `state_natives.rs`):
 
-- read when a frame is sampled: `MotionModule::motion_kind`, `MotionModule::frame`;
+- read when a frame is sampled, by Record, by a playback and by a capture: `MotionModule::motion_kind`,
+  `MotionModule::frame`;
 - set on a shown frame: `MotionModule::change_motion(animation, frame, rate 0)`, only when the fighter's own kind is
   the row's kind, the animation is one that fighter has (`MotionModule::is_anim_resource`, the one new guarded call),
   and the hold reports the fighter held with its scripts asleep;
 - kept each frame by reading `motion_kind` and `frame` back and setting again only when they differ;
+- on a frame with no animation for that fighter, or when the hold refuses the point: the plain animation goes back
+  while the fighter stays held, so the last move is never left showing;
 - on release, in this order: a plain animation back (`wait` on the ground, `fall` in the air, speed 1), then the
   hold's own restore, then the scripts wake. A fighter is never woken with an attack's animation on it. This happens
   in the fighter frame that lets the body go, before that frame reports the release (the report the next build's
   preview fix adds). A fighter switch asks for its load only after that report.
 
 **Not established, and what settles it.** Two game facts decide the calls above, and neither can be read from the
-code. A diagnostic-only probe on a running Eden settles both before the feature is built on them:
+code. A diagnostic-only probe on a running Eden settles both before the feature is built on them (approved by
+tr-primary-2, inbox 13:15:07Z and 13:25:42Z):
 
-- whether an animation set on a fighter that is stopped whole is drawn at once. If it is not, the fighter is let
-  run for the one frame of the change, with its scripts asleep and at speed 0, and stopped again;
-- that nothing hits, sounds or spawns when the fighter is released: the other fighter stands inside the move's
-  hitbox while its active frames are scrubbed over and then let go, and its damage and status are read.
+- whether an animation set on a fighter that is stopped whole is drawn at once;
+- that nothing hits, sounds or spawns while a pose is set, moved, held and let go. An awake forward smash is the
+  control: a read counts only if it shows that attack.
 
-**Cost** (computed, not measured): a row grows from 9 to 12 words. A positions file goes from 72 to 96 bytes a
-frame, 2.59 MB to 3.46 MB for a ten-minute macro. A block of the take's memory goes from 43,200 to 57,600 bytes, so
-an armed playback holds 115,200 bytes (was 86,400) and keeps 57,600. Sampling reads two more values per fighter per
-frame. The Play-start rows and the stack tables are measured again at READY.
+**Cost** (computed, not measured; the capture figures are the ones the operator approved):
 
-**Not shown, under A:** projectiles and other articles, items, damage, effects, a weapon or body part that a script
-shows or hides, faces, and a fighter the take does not record (Nana, a second Pokémon after a switch).
+- **Positions file and take memory:** a row grows from 9 to 12 words. A positions file goes from 72 to 96 bytes a
+  frame, 2.59 MB to 3.46 MB for a ten-minute macro. A block of the take's memory goes from 43,200 to 57,600 bytes,
+  so an armed playback holds 115,200 bytes (was 86,400) and keeps 57,600.
+- **Captures:** +288,000 bytes of memory for each captured fighter over a ten-minute match; +576,000 bytes for a
+  ten-minute 1v1 capture file; about +16 KiB of BSS, because the two queues that carry samples to the worker keep
+  their 1,024 slots.
+- Sampling reads two more values per fighter per frame. BSS, Play start and the stack tables are measured at READY
+  against these figures.
 
-**Order of work:** behind tile-fix-g4's fix of the shared hold (a held body that lands). This change does not edit
-`placement.rs`; the pose is set and cleared by the scrub's own caller, around that hold.
+**Not shown:** projectiles and other articles, items, damage, effects, a weapon or body part that a script shows or
+hides, faces, and a fighter the take does not record (Nana, a second Pokémon after a switch).
+
+**Order of work:** behind tile-fix-g4's fix of the shared hold (a held body that lands) and preview-vis-sol's fixes
+of the 1,200-frame positions and the refused preview. The probe comes first, then the code. This change does not
+edit `placement.rs`; the pose is set and cleared by the scrub's own caller, around that hold.
+
+**Reverses:** "no animation/pose samples are retained in the per-frame capture buffer" (the note on `ReplayFrame`,
+`src/model/macros/replay.rs`); the capture file's single schema; "The pose is frozen or neutral" in the Replay
+window's page.
 
 **Followed:** macros keep their format and playback reads no positions (2026-11-26, scrub positions); old files
 upgrade by use, never by re-recording (operator, 2026-11-26); one roster loader, no second swap mechanism.
 
-Design only: nothing here is built or seen in a game.
+Decided, not built: nothing here is in a build or seen in a game.
