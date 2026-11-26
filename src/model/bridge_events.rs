@@ -46,6 +46,8 @@ pub struct Clip {
     pub text: MoveText,
     /// The scrub's position state (`scrub_track::Pos::word`); written only when it is not `none`.
     pub pos: &'static str,
+    pub pose: [&'static str; 2],
+    pub fighter: [&'static str; 2],
 }
 
 /// The strip's move text on a `clip` line: at most 48 bytes, cut at a character; a quote, a backslash or a control

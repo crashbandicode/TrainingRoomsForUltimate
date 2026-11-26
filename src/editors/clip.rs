@@ -113,6 +113,10 @@ mod tests {
             near: None,
             target: Some(false),
             pos: Default::default(),
+            fighters: ["current"; 2],
+            poses: ["none"; 2],
+            fighter_line: String::new(),
+            fighter_keys: false,
         }
     }
 

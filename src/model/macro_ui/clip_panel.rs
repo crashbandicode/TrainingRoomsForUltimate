@@ -12,7 +12,7 @@ pub enum Handle { Playhead, In, Out }
 #[derive(Clone, Copy, Debug)]
 pub enum ClipAction {
     SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,
-    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,
+    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel, ToggleFighter { player: bool },
 }
 pub enum ClipEffect {
     None, StopPreview, Preview(Box<MacroRecording>), Close,
@@ -41,6 +41,14 @@ impl PreviewTail {
 
 /// P-TIMER: a selection across a capture break (play resumed after a stretch with no live play: sudden death).
 pub const BREAK_CROSSED: &str = "The selection crosses the sudden-death restart. Keep it on one side.";
+pub const NO_SECOND_FIGHTER: &str = "This take has no second fighter.";
+pub const FIGHTER_SWAP_WAIT: &str = "Wait for the character swap to finish.";
+
+pub fn shoulder_action(l: bool, r: bool, _modifier: bool) -> Option<ClipAction> {
+    if l { Some(ClipAction::SelectIn) } else if r { Some(ClipAction::SelectOut) } else { None }
+}
+
+pub fn pose_word(_state: u32) -> &'static str { "none" }
 
 /// Frames of the same direction before held Left/Right starts repeating.
 const SCRUB_REPEAT_DELAY: u32 = 10;
@@ -314,6 +322,10 @@ pub struct ClipView {
     pub target: Option<bool>,
     /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).
     pub pos: Pos,
+    pub fighters: [&'static str; 2],
+    pub poses: [&'static str; 2],
+    pub fighter_line: String,
+    pub fighter_keys: bool,
 }
 
 pub struct ClipEditor {
@@ -364,6 +376,14 @@ fn track_marks(track: &ReplayTrack) -> Marks {
 }
 
 impl ClipEditor {
+    pub fn recorded_kind(&self, _slot: usize) -> Option<i32> { None }
+    pub fn note_fighters(&mut self, _kinds: [Option<i32>; 2], _settled: bool) -> bool { false }
+    pub fn note_poses(&mut self, _states: [u32; 2]) -> bool { false }
+    pub fn fighter_word(&self, _slot: usize) -> &'static str { "current" }
+    pub fn wanted_fighter(&self) -> Option<(usize, i32)> { None }
+    pub fn take_wanted_fighter(&mut self) -> Option<(bool, i32)> { None }
+    pub fn fighter_loading(&self) -> Option<(usize, i32)> { None }
+    pub fn cancel_fighter(&mut self) -> bool { false }
     /// The same take or capture with its marks named by `namer` instead of the published toggle and fighter.
     pub fn with_namer(mut self, namer: crate::model::move_names::Namer<'static>) -> Self {
         if let Some(FileSource::Macro { recording, .. }) = &self.file {
@@ -578,7 +598,8 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }
+            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos },
+            fighters: ["current"; 2], poses: ["none"; 2], fighter_line: String::new(), fighter_keys: false }
     }
 
     /// What the fighters show at `shown_frame` (the selected handle's frame, or the moved playhead's), and what the
@@ -760,6 +781,7 @@ impl ClipEditor {
 
     fn apply_action(&mut self, action: ClipAction) -> ClipEffect {
         match action {
+            ClipAction::ToggleFighter { .. } => return ClipEffect::None,
             ClipAction::Snap => {
                 let at = match self.handle {
                     Handle::Playhead if self.context().preview() =>
@@ -919,6 +941,189 @@ mod tests {
     lib_unit_tests! {
     use super::*;
     use {crate::engine::macros::InputFrame, crate::engine::macros::MoveFamily, crate::engine::macros::StartState};
+
+    fn duo_capture() -> ClipEditor {
+        let tracks = [(0, 6), (1, 74)].into_iter().map(|(entry, kind)| ReplayTrack {
+            entry, fighter: None, quantized_analog: false,
+            frames: (0..10).map(|_| ReplayFrame {
+                pose: crate::engine::macros::PackedPose::NONE,
+                input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,
+            }).collect(),
+        }).collect();
+        let mut editor = ClipEditor::new(ReplaySession { tracks, truncated: false, breaks: Vec::new() }, vec![0]).unwrap();
+        editor.set_play_target(true);
+        editor
+    }
+
+    fn the_fighter_toggle_starts_on_the_current_fighter_for_each_role() {
+        let mut e = duo_capture();
+        assert_eq!((e.recorded_kind(0), e.recorded_kind(1)), (Some(6), Some(74)));
+        assert_eq!((e.fighter_word(0), e.fighter_word(1)), ("current", "current"));
+        assert!(e.note_fighters([Some(8), Some(18)], true));
+        assert_eq!(e.view().fighters, ["current", "current"]);
+        assert_eq!(e.wanted_fighter(), None);
+        assert_eq!(e.fighter_loading(), None);
+    }
+
+    fn a_fighter_toggle_goes_to_the_takes_fighter_and_back() {
+        let mut e = duo_capture();
+        e.note_fighters([Some(8), Some(18)], true);
+        for (slot, recorded, original) in [(0, 6, 8), (1, 74, 18)] {
+            let player = slot == 0;
+            assert!(matches!(e.on_action(ClipAction::ToggleFighter { player }), ClipEffect::None));
+            assert_eq!(e.wanted_fighter(), Some((slot, recorded)));
+            assert_eq!(e.fighter_word(slot), "loading");
+            assert_eq!(e.take_wanted_fighter(), Some((player, recorded)));
+            assert_eq!(e.fighter_loading(), Some((slot, recorded)));
+            e.note_fighters([Some(8), Some(18)], true);
+            assert_eq!(e.fighter_loading(), Some((slot, recorded)));
+            let mut kinds = [Some(8), Some(18)];
+            kinds[slot] = Some(recorded);
+            e.note_fighters(kinds, false);
+            assert_eq!(e.fighter_loading(), Some((slot, recorded)));
+            e.note_fighters(kinds, true);
+            assert_eq!(e.fighter_loading(), None);
+            assert_eq!(e.fighter_word(slot), "recorded");
+            assert!(matches!(e.on_action(ClipAction::ToggleFighter { player }), ClipEffect::None));
+            assert_eq!(e.take_wanted_fighter(), Some((player, original)));
+            e.note_fighters([Some(8), Some(18)], true);
+            assert_eq!(e.fighter_loading(), None);
+            assert_eq!(e.fighter_word(slot), "current");
+        }
+        let mut already = duo_capture();
+        already.note_fighters([Some(6), Some(74)], true);
+        assert!(matches!(already.on_action(ClipAction::ToggleFighter { player: true }), ClipEffect::None));
+        assert_eq!(already.wanted_fighter(), None);
+        let mut playing = duo_capture();
+        playing.note_fighters([Some(8), Some(18)], true);
+        assert!(matches!(playing.on_action(ClipAction::TogglePlay), ClipEffect::Preview(_)));
+        assert!(matches!(playing.on_action(ClipAction::ToggleFighter { player: true }), ClipEffect::StopPreview));
+        assert_eq!(playing.wanted_fighter(), Some((0, 6)));
+        let mut wanted = duo_capture();
+        wanted.note_fighters([Some(8), Some(18)], true);
+        wanted.want_play(ClipAction::TogglePlay, false);
+        wanted.on_action(ClipAction::ToggleFighter { player: true });
+        assert!(wanted.wanted_play().is_none());
+        assert_eq!(wanted.wanted_fighter(), Some((0, 6)));
+        let mut at_cursor = duo_capture();
+        at_cursor.session.tracks[0].frames[4].start.fighter_kind = 2;
+        at_cursor.on_action(ClipAction::Nudge(4));
+        assert_eq!(at_cursor.recorded_kind(0), Some(2));
+    }
+
+    fn closing_the_editor_asks_for_no_fighter() {
+        let mut e = duo_capture();
+        e.note_fighters([Some(8), Some(18)], true);
+        e.on_action(ClipAction::ToggleFighter { player: true });
+        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
+        e.note_fighters([Some(6), Some(18)], true);
+        assert!(matches!(e.on_action(ClipAction::Cancel), ClipEffect::Close));
+        assert_eq!(e.wanted_fighter(), None);
+        assert_eq!(e.fighter_loading(), None);
+        assert_eq!(e.fighter_word(0), "recorded");
+    }
+
+    fn a_wanted_fighter_shows_no_frame_until_it_is_taken() {
+        let mut e = duo_capture();
+        e.note_fighters([Some(8), Some(18)], true);
+        e.on_action(ClipAction::SelectIn);
+        assert_eq!(e.shown_frame(), Some(0));
+        e.on_action(ClipAction::ToggleFighter { player: true });
+        assert_eq!(e.wanted_fighter(), Some((0, 6)));
+        assert_eq!(e.shown_frame(), None);
+        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
+        assert_eq!(e.shown_frame(), None);
+        e.note_fighters([Some(6), Some(18)], true);
+        assert_eq!(e.shown_frame(), Some(0));
+    }
+
+    fn the_fighter_load_waits_for_the_release_report() {
+        let source = include_str!("../../runtime/macros/replay_capture.rs");
+        assert!(source.contains("fn service_wanted_fighter("));
+        let service = source.split("fn service_wanted_fighter(").nth(1).unwrap();
+        let release = service.find("SLOT.released()").expect("release report");
+        let take = service.find("take_wanted_fighter()").expect("take wanted fighter");
+        assert!(release < take);
+        let worker = source.split("fn worker_preview_notices(").nth(1).unwrap();
+        let play = worker.find("service_wanted_play();").expect("wanted play");
+        let fighter = worker.find("service_wanted_fighter();").expect("wanted fighter");
+        assert!(play < fighter);
+    }
+
+    fn a_take_without_a_second_fighter_refuses_the_toggle() {
+        let mut single = editor();
+        single.set_play_target(true);
+        assert_eq!(single.recorded_kind(1), None);
+        assert!(matches!(single.on_action(ClipAction::ToggleFighter { player: false }),
+            ClipEffect::Error(message) if message == NO_SECOND_FIGHTER));
+        for player in [true, false] {
+            let mut saved = saved_macro(player);
+            assert_eq!(saved.recorded_kind(usize::from(player)), None);
+            assert!(matches!(saved.on_action(ClipAction::ToggleFighter { player: !player }),
+                ClipEffect::Error(message) if message == NO_SECOND_FIGHTER));
+        }
+        let mut combo = combo_editor();
+        combo.note_fighters([Some(8), Some(18)], true);
+        assert!(!combo.view().fighter_keys);
+        assert!(matches!(combo.on_action(ClipAction::ToggleFighter { player: true }), ClipEffect::None));
+    }
+
+    fn a_second_toggle_waits_for_the_swap() {
+        let mut e = duo_capture();
+        e.note_fighters([Some(8), Some(18)], true);
+        e.on_action(ClipAction::ToggleFighter { player: true });
+        for action in [ClipAction::ToggleFighter { player: false }, ClipAction::TogglePlay, ClipAction::Restart] {
+            assert!(matches!(e.on_action(action), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));
+            assert_eq!(e.wanted_fighter(), Some((0, 6)));
+        }
+        e.on_action(ClipAction::Nudge(1));
+        assert_eq!(e.wanted_fighter(), Some((0, 6)));
+        assert!(e.cancel_fighter());
+        assert_eq!(e.wanted_fighter(), None);
+        e.on_action(ClipAction::ToggleFighter { player: true });
+        assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
+        assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));
+        assert!(e.cancel_fighter());
+        assert_eq!(e.fighter_loading(), None);
+    }
+
+    fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {
+        assert!(shoulder_action(false, false, false).is_none());
+        assert!(matches!(shoulder_action(true, false, false), Some(ClipAction::SelectIn)));
+        assert!(matches!(shoulder_action(false, true, false), Some(ClipAction::SelectOut)));
+        assert!(matches!(shoulder_action(true, true, false), Some(ClipAction::SelectIn)));
+        assert!(matches!(shoulder_action(true, false, true), Some(ClipAction::ToggleFighter { player: true })));
+        assert!(matches!(shoulder_action(false, true, true), Some(ClipAction::ToggleFighter { player: false })));
+        assert!(matches!(shoulder_action(true, true, true), Some(ClipAction::ToggleFighter { player: true })));
+        let source = include_str!("../../runtime/macros/replay_capture.rs");
+        let input = source.split("pub fn on_input(").nth(1).unwrap().split("\npub fn ").next().unwrap();
+        assert!(input.contains("shoulder_action("));
+        assert!(!input.contains("Some(ClipAction::SelectIn)"));
+        assert!(!input.contains("Some(ClipAction::SelectOut)"));
+    }
+
+    fn the_strip_names_the_fighter_and_its_key() {
+        let mut e = duo_capture();
+        let plain = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
+        assert_eq!(plain.controls, "D-pad Up/Down: fighter. ZR Player/CPU. X preview. Y snap. A save. B close.");
+        assert!(e.note_fighters([Some(8), Some(18)], true));
+        let help = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
+        assert!(help.controls.starts_with("ZL+L / ZL+R: fighters. "));
+        assert_eq!(help.notice, "Moves show on Kirby. ZL + L switches Player 1.");
+        let mut off = e.view();
+        off.pos = Pos::Off;
+        assert_eq!(clip_help(&off, "ZL/ZR", "ZL", 1).notice, "Can't stand there on this stage.");
+        e.on_action(ClipAction::ToggleFighter { player: true });
+        let help = clip_help(&e.view(), "ZL/ZR", "ZL", 1);
+        assert_eq!(help.primary, "Loading Kirby… B cancels");
+        assert_eq!(pose_word(scrub_track::POSE_SHOWN), "shown");
+        assert_eq!(pose_word(scrub_track::POSE_OTHER), "other_fighter");
+        assert_eq!(pose_word(scrub_track::POSE_NONE), "none");
+        assert_eq!(pose_word(u32::MAX), "none");
+        assert!(e.note_poses([scrub_track::POSE_SHOWN, scrub_track::POSE_OTHER]));
+        assert_eq!(e.view().poses, ["shown", "other_fighter"]);
+        assert!(!e.note_poses([scrub_track::POSE_SHOWN, scrub_track::POSE_OTHER]));
+    }
 
     fn snap_rules() -> MoveStartRules {
         MoveStartRules { families: vec![MoveFamily { fighter: None, statuses: vec![45, 46, 47], buttons: 0 }],
@@ -1815,6 +2020,15 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_fighter_toggle_starts_on_the_current_fighter_for_each_role", the_fighter_toggle_starts_on_the_current_fighter_for_each_role as fn()),
+            ("a_fighter_toggle_goes_to_the_takes_fighter_and_back", a_fighter_toggle_goes_to_the_takes_fighter_and_back as fn()),
+            ("closing_the_editor_asks_for_no_fighter", closing_the_editor_asks_for_no_fighter as fn()),
+            ("a_wanted_fighter_shows_no_frame_until_it_is_taken", a_wanted_fighter_shows_no_frame_until_it_is_taken as fn()),
+            ("the_fighter_load_waits_for_the_release_report", the_fighter_load_waits_for_the_release_report as fn()),
+            ("a_take_without_a_second_fighter_refuses_the_toggle", a_take_without_a_second_fighter_refuses_the_toggle as fn()),
+            ("a_second_toggle_waits_for_the_swap", a_second_toggle_waits_for_the_swap as fn()),
+            ("the_modifier_turns_l_and_r_into_the_fighter_toggles", the_modifier_turns_l_and_r_into_the_fighter_toggles as fn()),
+            ("the_strip_names_the_fighter_and_its_key", the_strip_names_the_fighter_and_its_key as fn()),
             ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
             ("x_after_a_held_frame_previews_in_either_order_of_the_two_threads", x_after_a_held_frame_previews_in_either_order_of_the_two_threads as fn()),
             ("the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint", the_line_that_says_why_a_body_is_not_moved_comes_before_the_snap_hint as fn()),
