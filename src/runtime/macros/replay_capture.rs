@@ -1055,11 +1055,11 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
         let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());
-        let effect = editor.as_mut().map(|e| {
-            if file || !matches!(action, ClipAction::Confirm) { return e.on_action(action); }
-            let view = e.view();
-            let configuration = e.target_for(view.entry, e.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);
-            e.confirm_macro(|recording| {
+        let effect = editor.as_mut().map(|editor| {
+            if file || !matches!(action, ClipAction::Confirm) { return editor.on_action(action); }
+            let view = editor.view();
+            let configuration = editor.target_for(view.entry, editor.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);
+            editor.confirm_macro(|recording| {
                 if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }
                 else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {
                     // restriction: replay-mii-metadata
