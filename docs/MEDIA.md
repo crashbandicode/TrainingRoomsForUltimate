@@ -20,6 +20,20 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-clip-playhead.mp4` | Right browses to 64, Y takes it to the start of the nearest move, at 66, L sets In there; R later keeps frame 100 (Out 101) | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 | `tut-juggler-setup-and-result.mp4` | Juggler: Set up… (CPU spot, percent, Player 1's start, Preview), Start; the CPU lands unhit and the result notice shows | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
 | `tut-guard-edge-setup-and-score.mp4` | Guard the Edge: Set up… (CPU start off stage, Player 1's start, Preview), Start, three attempts, “Secured 1/3” | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
+| `tut-menu-list-scroll.mp4` | Held Down and Up on the CPU page, then ZL + Down between the Recording page's lists | `t03-menu-list-scroll` of run `tut-5df3d9dc-yoga-3`, 0.5–20.0 s | 566,038 | `c0352b105b434bbc` | [Using the menu](guide/using-the-menu.md) |
+| `tut-notice-save-states-off.mp4` | The save chord refused with Save States Off; Save States On; the chord saves | `t05-notice-save-states-off` of the same run, 0.3–9.0 s | 2,463,368 | `911d7fd9435aff39` | [Troubleshooting](guide/troubleshooting.md) |
+| `tut-record-macro.mp4` | Record on Player 1: the red tint, two jabs and a forward smash, the stop | `t08-record-macro` of the same run, 0.3–7.5 s | 3,349,706 | `9e94692216f4955e` | [Recording](guide/recording.md) |
+| `tut-mash-out.mp4` | Mash out from Start: repeated grabs, unmashed, with the result line | `t14-mash-out` of the same run, 2.5–21.0 s | 8,011,379 | `a61ddcd58ab732dc` | [Mash out](guide/mash-out.md) |
+| `tut-break-the-targets.mp4` | Break the Targets: Place targets, one target placed; no target broken | `t15-break-the-targets` of the same run, 11.5–24.0 s | 4,045,828 | `8ea4ea2be13ecd99` | [Break the Targets](guide/break-the-targets.md) |
+| `tut-tech-practice.mp4` | Tech practice from Start: launches at 72% and untech'd landings | `t16-tech-practice` of the same run, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
+| `tut-hitbox-visualization.mp4` | Hurtbox pills on both fighters; a jab and a grab with their boxes drawn | `t18-hitbox-visualization` of the same run, 0.3–6.0 s | 2,508,502 | `3506e99fdcd8da32` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
+| `tut-hitbox-colour-legend.mp4` | The Hitbox Visualization checklist and its Colour legend | `t20-hitbox-colour-legend` of the same run, 0.3–5.0 s | 130,141 | `1d90ab63bde904b0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
+| `tut-cpu-mash.mp4` | CPU Mash: Link answers a jab out of hitstun | `t26-cpu-mash` of the same run, 0.3–8.5 s | 4,249,903 | `00e5cd16878ebc16` | [CPU behaviour](guide/cpu-behaviour.md#mash-and-followup) |
+| `tut-cpu-shield.mp4` | CPU Shield held through three jabs | `t27-cpu-shield` of the same run, 0.3–6.0 s | 2,369,048 | `4d834abd0cc27050` | [CPU behaviour](guide/cpu-behaviour.md) |
+| `tut-cpu-di.mp4` | DI Direction Left, then Right: the same smash at 80% sends Link along two lines | `t28-cpu-di` of the same run, 0.5–16.0 s | 9,503,476 | `ea876d6c9fcb0271` | [CPU behaviour](guide/cpu-behaviour.md#direction-chips) |
+| `tut-cpu-hide.mp4` | Hide CPU On, the CPU gone; Off, the CPU back | `t30-cpu-hide` of the same run, 0.5–11.0 s | 2,693,222 | `29c7aa26b49d119f` | [CPU](menu/cpu.md#hide-cpu) |
+| `tut-fighter-cycle.mp4` | Cycle Player: Mario becomes Donkey Kong in place | `t31-fighter-cycle` of the same run, 0.3–6.0 s | 2,499,823 | `a629bd963f6b3bd0` | [Fighter cycles](guide/fighter-cycles.md) |
+| `tut-game-speed.mp4` | The speed label stepping 2/3, 1/4, 1 Frame (Press ZL) | `t35-game-speed` of the same run, 0.5–12.0 s | 1,530,032 | `23059a650a842c3a` | [Game speed](guide/game-speed.md) |
 
 ### Earlier waiting-room example
 

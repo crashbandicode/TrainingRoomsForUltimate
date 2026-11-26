@@ -37,8 +37,9 @@ on its page's own doc: [CPU](../menu/cpu.md), [Saves](../menu/saves.md), [Record
 Two help lines describe the row you are on, and the footer lists the keys. A greyed row can't be changed until the
 row it depends on changes. The Loading section on Fighters & Stages is collapsed; A on its header opens it.
 
-<!-- CLIP: tut-menu-list-scroll.mp4 | held Down and Up move through the CPU page, quickening → ZL + Down jumps a screenful on a long Recording list -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/941ad671c142b24ff631b02815e01f8006700c56" autoplay muted loop playsinline controls></video>
+
+*Holding Down runs through the CPU page, faster the longer it is held, and Up runs back. On the Recording page, ZL + Down jumps from one list to the next. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-menu-list-scroll.mp4)
 
 ## Changing a row
 

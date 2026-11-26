@@ -2,8 +2,9 @@
 
 Slow down or speed up practice without opening a menu. The same controls work in Training and waiting rooms.
 
-<!-- CLIP: tut-game-speed.mp4 | A smash at x1 → hold R + D-pad Up, Left steps to 1/4, the stopwatch shows it → the same smash, slow -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
+
+*Hold R + D-pad Up and tap Left: the label at the top right steps down through 2/3 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-game-speed.mp4)
 
 ## Changing the speed
 
