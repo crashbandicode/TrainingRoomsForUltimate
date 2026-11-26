@@ -125,7 +125,7 @@ impl Block {
     /// The game thread: the body a hold was made on is gone (a swapped fighter, a new scene). Nobody is held until
     /// the editor asks for another frame.
     pub fn forget(&self) {
-        let _ = &self.dropped;
+        self.dropped.store(self.ask.generation().wrapping_add(1), Ordering::Release);
     }
 
     fn forgotten(&self) -> bool {

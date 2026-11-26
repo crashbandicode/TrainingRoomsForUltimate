@@ -1280,7 +1280,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "e53817d39e6d0be22e6385c57ac195d4719cd5eb7601e9cd9e897610de33452a",
+   "dest_sha256": "f3b98480c838bf799cbc9047168d79c3a1982e89ab5517924e01c21d14365028",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1350,6 +1350,11 @@
     {
      "old": "\n/// The named-macro library: the original API, now on the generic store.",
      "new": "\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {\n    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not\n    /// built. Crop and the clip editor load the whole file (`load`).\n    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        self.load(id)\n    }\n}\n\n/// The named-macro library: the original API, now on the generic store.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.load(id)",
+     "new": "        self.load_with(id, |reader| {\n            Ok(read_header(reader)?.map(|mut rec| {\n                // The file's version names its track; the played copy has none.\n                rec.set_track(None);\n                rec\n            }))\n        })",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]

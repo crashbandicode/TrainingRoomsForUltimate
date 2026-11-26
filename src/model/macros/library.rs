@@ -98,7 +98,13 @@ impl Store<MacroRecording> {
     /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not
     /// built. Crop and the clip editor load the whole file (`load`).
     pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {
-        self.load(id)
+        self.load_with(id, |reader| {
+            Ok(read_header(reader)?.map(|mut rec| {
+                // The file's version names its track; the played copy has none.
+                rec.set_track(None);
+                rec
+            }))
+        })
     }
 }
 

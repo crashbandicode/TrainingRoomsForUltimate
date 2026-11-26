@@ -21,6 +21,11 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
     }
     SLOT.with(|block| {
         let Some(mut holds) = block.holds.try_lock() else { return };
+        // A hold made on another body (a swapped fighter, a new scene): the hold is dropped, for both roles, until the
+        // editor asks for another frame.
+        if holds[slot].is_some_and(|hold| hold.body() != natives::battle_object_id(accessor)) {
+            block.forget();
+        }
         let seen = match point(block, &holds, slot, accessor) {
             Some(spot) => hold(&mut holds[slot], accessor, spot),
             None => release(&mut holds[slot], accessor),

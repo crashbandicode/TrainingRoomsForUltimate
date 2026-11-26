@@ -346,7 +346,7 @@ fn sync_slots(root: &Path) {
     let library = crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR));
     let mut held = HELD.lock().unwrap();
     for (slot, wanted) in rr_host::slot_changes(index.slots(), &held) {
-        let recording = wanted.as_deref().and_then(|id| library.load(id).ok());
+        let recording = wanted.as_deref().and_then(|id| library.load_played(id).ok());
         let result = rr_host::set_slot(slot, recording.as_ref());
         slot_copied(recording.as_ref().map_or("", |r| r.name.as_str()), slot, announce, result);
         held[slot] = wanted;
