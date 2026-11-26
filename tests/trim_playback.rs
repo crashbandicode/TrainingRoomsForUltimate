@@ -22,6 +22,22 @@ use std::sync::{Mutex, MutexGuard};
 use crate::engine::rr_host as host;
 
 #[test]
+fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
+    let track = macros::ReplayTrack { entry: 0, quantized_analog: false, fighter: None,
+        frames: vec![macros::ReplayFrame { start: StartState::neutral(0x48, 0, 1.0),
+            input: InputFrame::default(), x: 0.0, y: 0.0 }; 12] };
+    let mut editor = ClipEditor::new(macros::ReplaySession { tracks: vec![track], ..Default::default() }, vec![0]).unwrap();
+    editor.on_action(ClipAction::Nudge(7));
+    // The captured inputs alone are exportable, but no exact Mii configuration was resolved.
+    let ClipEffect::Export(recording) = editor.on_action(ClipAction::Confirm) else { panic!("expected capture inputs") };
+    let refusal = recording.playback_target().unwrap_err();
+    editor.report_error(refusal.to_string());
+    assert_eq!(editor.shown_frame(), Some(7));
+    editor.on_action(ClipAction::SelectIn);
+    assert_eq!(editor.view().start, 7);
+}
+
+#[test]
 fn switching_tracks_shows_the_selected_handle_on_the_new_track() {
     let track = |entry, len| macros::ReplayTrack { entry, quantized_analog: false, fighter: None,
         frames: vec![macros::ReplayFrame { start: StartState::neutral(entry, 0, 1.0),
