@@ -62,6 +62,10 @@ saved defaults.
 | Hold B, click the right stick | The CPU's Kirby takes the next hat. |
 | Hold R3, D-pad Left / Right | Scrolls the input display back and forward. Let go of R3 to return to now. |
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ff5c2315ca6efcb51bbb8fea5d3205962e7c7295" autoplay muted loop playsinline controls></video>
+
+*Close-up of the drill panel. After one green attempt, L + R + A alone, short and long, adds no square: the streak stays at 1. Eden, 2026-11-25, install 4, build `a945b0c1`.* [Open the clip](../media/i4-reset-chord-alone-zoom.mp4)
+
 ## GameCube controller
 
 GameCube L is ZL, GameCube R is ZR, and GameCube Z is R. There is no Switch L and no Minus, so open the menu with

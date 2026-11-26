@@ -549,6 +549,10 @@ Pyra and Mythra currently use common special names.
 - **Default:** Off
 - **How:** A, Left or Right flips it.
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video>
+
+*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, install 4, build `a945b0c1`.* [Open the clip](../media/i4-move-names-toggle.mp4)
+
 ### On-time tolerance
 
 How many frames an input may be away from the recorded one and still count as on time. An input outside it drops the
