@@ -302,6 +302,14 @@ More: [Change placement and the Replay window](../guide/recording.md#change-plac
 
 ### Replay window
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*The same editor opened from Macro 3's Crop row: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+
 Turns part of a saved match into a macro. It lists the captures you have: "Latest Vault capture" and "Previous Vault
 capture" (replays you played in the Vault), then each capture saved with [Replay capture](#replay-capture) On, with
 its name and its length in frames ("(partial)" if it ended early).
@@ -332,8 +340,9 @@ With no handle selected on a macro or a capture the strip reads "Hold Left or Ri
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-Browsing was seen in Eden on `eb39d6bc`. On install 6's diagnostic build, a filmed macro showed Y snapping the
-playhead to frame 66 and L and R setting the two cuts. It did not demonstrate snapping In on a match capture.
+Browsing was seen in Eden on `eb39d6bc`. The playhead clip above shows browsing, Y snapping the playhead to frame 66
+and L and R setting the two cuts on one macro, in Eden on install 6's diagnostic build (`5df3d9dc`). It does not show
+snapping In on a match capture, or a match-capture preview or export.
 
 2026-11-26. Positions while you scrub, in install 6. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
@@ -592,6 +601,10 @@ Pyra and Mythra currently use common special names.
 - **Values:** On, Off
 - **Default:** Off
 - **How:** A, Left or Right flips it.
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video>
+
+*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, install 4, build `a945b0c1`.* [Open the clip](../media/i4-move-names-toggle.mp4)
 
 ### On-time tolerance
 

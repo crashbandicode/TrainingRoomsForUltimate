@@ -38,6 +38,15 @@ gives the game's revival.*
 Press Record (ZR + D-pad Down) to start and again to stop. The inputs are kept as a named macro (Macro 1, Macro 2, …;
 rename it on its own screen). The Record presses themselves are not in the recording.
 
+<!-- CLIP: tut-record-macro.mp4 | ZR + D-pad Down starts Record: the REC mark, Mario tinted → jab, jab, smash → the chord stops it and the notice names the macro -->
+*Clip coming.*
+
+1. Choose who records in the pop-up (ZR + D-pad Right): Player 1 at first, or the CPU.
+2. Press ZR + D-pad Down. While the take records, the HUD shows **REC P1** in red or **REC CPU** in blue, and the
+   recorded fighter is tinted the same way: Player 1 red, the CPU blue. Before a CPU take starts, the CPU is tinted
+   yellow, then magenta, while it waits.
+3. Do your moves, then press ZR + D-pad Down again. The take is listed under MACROS.
+
 ![Record writes the inputs as a macro and the spot as its start save; the macro becomes the active macro of the side that recorded](../diagrams/recording-record-flow.png)
 
 - **Who records:** the side the pop-up is set to (Player 1 until you pick CPU there). A recording made for the CPU
@@ -138,6 +147,9 @@ because the picker lists recordings only.
 
 ### Getting a combo
 
+<!-- CLIP: tut-combo-save-drill.mp4 | Kirby lands jab into side tilt → Recording › Combos & Sequences › + Save last combo… → the next try is graded on the link cells -->
+*Clip coming.*
+
 - **+ Save last combo…** is the first row of COMBOS, on the Recording page and in the pop-up's Combos & Sequences tab.
   It keeps the last combo the frame strip saw and makes it the drill. A opens the keyboard for a name. An empty name,
   or a room where no keyboard can open, gives it the next Combo N. With no link on the strip yet it says so and saves
@@ -194,6 +206,9 @@ recorded one.
 
 ### Input drills
 
+<!-- CLIP: tut-input-drill-record.mp4 | DRILLS › + Record drill… → Record chord, the moves, stop → the drill's steps listed → one graded try -->
+*Clip coming.*
+
 **DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Trim, Crop and Delete, plus Made from when a macro or chain made it. Macro and drill Trim skips neutral frames during playback without removing them; hit combos have no Trim row because they have no idle input frames.
 
 Each step shows its first and last inputs' moves, or the inputs when no move was recorded. Presses on one frame count
@@ -239,14 +254,22 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 
 ### Crop
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*Scrubbing Macro 3 without playing it: L selects In, Right moves it to 64. R selects Out, Left moves it to 116, and R again releases the fighters. Their positions change, not their move animations. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*The playhead reaches 64 without changing In or Out. Y takes it to the start of the nearest move, at 66; L sets In there. After L again, Right reaches 100 and R keeps that frame: Out reads 101. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-clip-playhead.mp4)
+
 Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
 
 - L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves when the editor is idle.
-- In install 6, with neither handle selected on a macro, Left/Right browse the take and Y snaps to the nearest move mark. After moving, L sets the first kept frame and R the last. All three actions were shown on a macro in Eden on the diagnostic build.
+- In install 6, with neither handle selected on a macro, Left/Right move the playhead over the whole take. Y takes it to the start of the move it is in, or of the nearest one. Once it has moved, L makes that frame the first kept and R makes it the last. The second clip above shows all three on one macro, in Eden on install 6's diagnostic build.
 - The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
 - A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
 - A macro crop keeps that range of input frames and the original's one start context. Move marks recorded with the take stay with the frames they belong to.
-- 2026-11-26, in install 6: while you move In, Out or the playhead, both fighters are shown where the take had them. A macro's positions are kept in a file beside it; a crop keeps the ones for its range, and a macro without any gets them when you play it once by itself from its start. Seen in Eden on the build before install 6's last fix; install 6 itself is in testing. More: [Replay window](../menu/recording.md#replay-window).
+- 2026-11-26, in install 6: while you move In, Out or the playhead, both fighters are shown where the take had them. Only where they stand and which way they face changes; the move itself is not shown. A macro's positions are kept in a file beside it; a crop keeps the ones for its range, and a macro without any gets them when you play it once by itself from its start. The first clip above was filmed on install 6's diagnostic build; install 6's own checks are in testing. More: [Replay window](../menu/recording.md#replay-window).
 - X previews a macro's kept inputs through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On. A ZR tap swaps the target and stops a running preview. While it plays, the strip's key line reads `B stop preview`; B or X stops it and drops the remaining frames. After the last frame the result stays for about a second and the key line reads `B back`; B or X ends the tail without closing the editor, then the usual keys return and B closes it.
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
