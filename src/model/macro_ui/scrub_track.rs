@@ -235,14 +235,16 @@ impl Block {
         self.held_at(slot, home)
     }
 
-    /// The game thread, after the hold's step for the role in `slot`. `displaced`: the hold reports that the game
-    /// moved the body off the point written on the frame before. That is about this request only when that write was
-    /// this role's, for this request (`generation`, read before the ask), at this point: then the body is refused
-    /// here, and `true` says to let it go. Otherwise this frame's write is noted and the next frame is judged.
-    pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], displaced: bool) -> bool {
+    /// The game thread, after the hold's step for the role in `slot`. `moved`: where the game has the body, when the
+    /// hold reports that the game moved it off the point written on the frame before. That is about this request only
+    /// when that write was this role's, for this request (`generation`, read before the ask), at this point: then the
+    /// body is refused here, and `true` says to let it go. Otherwise this frame's write is noted and the next frame
+    /// is judged.
+    pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], moved: Option<[f32; 2]>) -> bool {
         let (Some(wrote), Some(pushed)) = (self.wrote.get(slot), self.pushed.get(slot)) else { return false };
         let (key, request) = (key(at), u64::from(generation) + 1);
-        if displaced && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
+        let sideways = moved.is_some();
+        if sideways && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
             pushed.0.store(key, Ordering::Relaxed);
             pushed.1.store(request, Ordering::Relaxed);
             pushed.2.store(body, Ordering::Relaxed);
@@ -1371,14 +1373,14 @@ mod tests {
         block.ask_at(Some(137), ask);
         let request = block.generation();
         // The first frame of a hold writes. Nothing of this request has been judged yet, whatever the hold reports.
-        assert!(!block.pushed(1, request, cpu, wall, true), "the write judged was not this request's");
+        assert!(!block.pushed(1, request, cpu, wall, Some([-81.5, -3.5])), "the write judged was not this request's");
         assert!(!block.refused(1, request, cpu, wall));
         // The next frame reads the body off the point this request wrote.
-        assert!(block.pushed(1, request, cpu, wall, true), "pushed off its own write");
+        assert!(block.pushed(1, request, cpu, wall, Some([-81.5, -3.5])), "pushed off its own write");
         // Ten unchanged callbacks: refused. The other role is held at its point throughout.
         for _ in 0..10 {
             assert!(block.refused(1, request, cpu, wall));
-            assert!(!block.refused(0, request, player, open) && !block.pushed(0, request, player, open, false));
+            assert!(!block.refused(0, request, player, open) && !block.pushed(0, request, player, open, None));
         }
         // Another body at the same point under the same request gets its own try.
         assert!(!block.refused(1, request, other, wall));
@@ -1389,17 +1391,77 @@ mod tests {
         assert!(!block.refused(1, next, cpu, wall));
         // The body is written at the wall again; before the next frame the shown frame moves it to open air. The
         // hold's report on that frame is about the wall's write and says nothing of the open point.
-        assert!(!block.pushed(1, next, cpu, wall, false));
+        assert!(!block.pushed(1, next, cpu, wall, None));
         block.ask_at(Some(139), ask);
         let moved = block.generation();
-        assert!(!block.pushed(1, moved, cpu, open, true), "the write judged was the wall's");
-        assert!(!block.pushed(1, moved, cpu, open, false) && !block.refused(1, moved, cpu, open), "exact in open air: held");
+        assert!(!block.pushed(1, moved, cpu, open, Some([-81.5, -3.5])), "the write judged was the wall's");
+        assert!(!block.pushed(1, moved, cpu, open, None) && !block.refused(1, moved, cpu, open), "exact in open air: held");
         // A request published during the callback: the callback had read the older generation before the ask. The
         // refusal is the older request's; the new one asks afresh.
-        assert!(!block.pushed(1, moved, cpu, wall, false));
+        assert!(!block.pushed(1, moved, cpu, wall, None));
         block.ask_at(Some(140), ask);
-        assert!(block.pushed(1, moved, cpu, wall, true));
+        assert!(block.pushed(1, moved, cpu, wall, Some([-81.5, -3.5])));
         assert!(block.refused(1, moved, cpu, wall) && !block.refused(1, block.generation(), cpu, wall));
+    }
+
+    /// P3, the ruled test (tr-primary-2 2026-11-26 17:47:24Z): the scrub refuses a body the game moved sideways, its
+    /// x not bit for bit the x asked; a body the floor takes straight up or down stays held. The reports are the
+    /// shared hold's (`CpuPreview::observe`), on the words its seam read in a game where there are any.
+    #[test]
+    fn a_sideways_push_refuses_and_a_vertical_take_holds() {
+        use crate::model::crosshair::{hold_step, BodyRead, Origin};
+        // The hold's fall step and the asked height of the wall rows (Eden, run place-float-xps-05).
+        let fall = [0.0, f32::from_bits(0xbd83_126f)];
+        let y = f32::from_bits(0xc061_adaa);
+        let air = |at: [f32; 2]| BodyRead { at, landed: false, speed: Some(fall), frame: 0 };
+        let landed = |at: [f32; 2]| BodyRead { at, landed: true, speed: Some([0.0; 2]), frame: 0 };
+        // What the hold reports on the frame after it wrote `asked`, the game having left the body as `read`.
+        let report = |asked: [f32; 2], read: BodyRead| {
+            let mut slot = None;
+            hold_step(&mut slot, 7, false, || Origin { at: [0.0, 0.01], grounded: true, facing: 1.0 });
+            let hold = slot.as_mut().unwrap();
+            hold.observe(asked, BodyRead { frame: 1, ..air(asked) }, false);
+            hold.observe(asked, BodyRead { frame: 2, ..read }, false);
+            hold.displaced.map(|moved| moved.at)
+        };
+        // The scrub's verdict on the second frame of a hold at `asked`: let go, or held.
+        let let_go = |asked: [f32; 2], read: BodyRead| {
+            let block = Block::new();
+            block.ask_at(Some(137), Ask::Group { target: 0, deltas: [None, Some(spot(0.0, 0.0, 1.0))] });
+            let request = block.generation();
+            assert!(!block.pushed(1, request, 0x200, asked, None));
+            let moved = report(asked, read);
+            (moved.is_some(), block.pushed(1, request, 0x200, asked, moved), block.refused(1, request, 0x200, asked))
+        };
+        // Sideways. The seam's words at the long floor's left wall: asked x -81, left at x -81.55, still in the air.
+        let wall = [f32::from_bits(0xc2a3_1bfc), f32::from_bits(0xc065_2266)];
+        assert_eq!(let_go([-81.0, y], air(wall)), (true, true, true), "a wall pushed it");
+        // A body the game threw out of a solid: its speed carries the push; its x is not the x asked.
+        let thrown = BodyRead { at: [-85.852_455, -9.132_209], landed: false, speed: Some([-45.752_274, -0.706_175_8]), frame: 0 };
+        assert_eq!(let_go([-40.100_18, -8.426_033], thrown), (true, true, true));
+        // Free of the wall, one unit further out: the read is the point plus the fall step, and nothing is reported.
+        assert_eq!(let_go([-82.0, y], air([-82.0, y + fall[1]])), (false, false, false), "exact in open air");
+        // Vertical. A fighter standing where it was recorded is held as an air hold at the floor's height. Which of
+        // these the game reads there is not read in a game yet; none of them lets the body go.
+        let stand = [-30.0, 0.01];
+        assert_eq!(let_go(stand, landed(stand)), (true, false, false), "landed on the floor at its point");
+        assert_eq!(let_go(stand, air(stand)), (true, false, false), "kept in the air at the floor's height");
+        assert_eq!(let_go(stand, BodyRead { speed: Some([0.0; 2]), ..air(stand) }), (false, false, false), "at rest");
+        // A point within one fall step over the floor: the floor takes the body, a few hundredths under its point.
+        assert_eq!(let_go([-30.0, 0.05], landed(stand)), (true, false, false), "taken by the floor: held, shown on it");
+        // The same x in other bits is another x: minus zero is not zero.
+        assert_eq!(let_go([0.0, y], air([-0.0, y + fall[1]])), (true, true, true));
+        // The game side hands the hold's report over, and asks for the refusal before it takes the body.
+        let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
+        let hold = runtime.split_once("unsafe fn hold(").map_or("", |(_, rest)| rest);
+        let refused = hold.find("block.refused(index, generation, body, spot.at)").expect("the refusal is asked");
+        let step = hold.find("placement::hold_at(slot, accessor, body, spot.at, false)").expect("the hold's step");
+        let pushed = hold.find("if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {")
+            .expect("the hold's report is judged");
+        assert!(refused < step && step < pushed && pushed < hold.find("state::set_lr(accessor, spot.facing);").unwrap());
+        assert!(hold[pushed..].trim_start_matches(|c| c != '\n').trim_start().starts_with("release(slot, accessor);\n        return SEEN_OFF;"));
+        assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
+        assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
     }
 
     #[test]
@@ -1449,7 +1511,7 @@ mod tests {
         // The line is true for a point in the ground and for one past a blast line; the bridge's word is unchanged.
         assert_eq!((Pos::Off.text(), Pos::Off.word()), ("Can't stand there on this stage.", "off"));
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("if !in_bounds(spot.at, limits) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
+        assert!(runtime.contains("if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
         assert!(runtime.contains("RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at))"));
         assert!(!runtime.contains(".lock()"), "the fighter frame takes no blocking lock");
     }
