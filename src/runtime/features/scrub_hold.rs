@@ -92,27 +92,27 @@ unsafe fn stands(accessor: usize, at: [f32; 2]) -> bool {
     can_stand(RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
-/// The frame's animation on a held body (SM1). It is set only when the game shows another one, at rate 0 and
+/// The frame's animation on a held body (SM1). It is set on first claim or when the game shows another frame, at rate 0 and
 /// without its script lines: the scripts sleep under the hold, and the game would otherwise run them up to the
 /// frame the animation starts at, hitbox lines included. The role's frame then reports what the game shows.
 /// `asleep`: the hold's own report for this frame. The body's kind is the role's, as its fighter frame published it.
 unsafe fn pose(block: &Block, index: usize, accessor: usize, spot: Spot, asleep: bool) {
-    let posed = block.pose(index).0 == POSE_SHOWN;
+    let mut owned = block.pose(index).0 == POSE_SHOWN;
     let kind = crate::engine::rr_host::live_pose(index).fighter_kind;
     let read = || (natives::motion_kind(accessor), natives::motion_frame(accessor));
-    match decide(spot.kind, spot.pose, kind, asleep, posed, read()) {
+    match decide(spot.kind, spot.pose, kind, asleep, owned, read()) {
         Act::Set(pose) => {
-            natives::change_motion(accessor, pose.motion, pose.frame, 0.0, false);
+            owned |= natives::change_motion(accessor, pose.motion, pose.frame, 0.0, false);
             // A fighter with no animation of that name keeps nothing of the scrub's: the report below says none.
             if natives::motion_kind(accessor) != pose.motion {
                 natives::change_motion(accessor, FALL, 0.0, 1.0, true);
             }
         }
-        Act::Plain => natives::change_motion(accessor, FALL, 0.0, 1.0, true),
+        Act::Plain => { natives::change_motion(accessor, FALL, 0.0, 1.0, true); }
         Act::Keep => {}
     }
     let shown = read();
-    let state = drawn(spot.kind, spot.pose, kind, asleep, posed, shown);
+    let state = drawn(spot.kind, spot.pose, kind, asleep, owned, shown);
     block.set_pose(index, state, PackedPose::pack(Pose { motion: shown.0, frame: shown.1 }));
     #[cfg(feature = "diag")]
     super::scrub_pose_probe::note(index, block.shown(), state, spot.pose, shown);

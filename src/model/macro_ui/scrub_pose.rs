@@ -34,7 +34,7 @@ pub fn decide(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, 
         return Act::Keep;
     }
     match asked.get().filter(|_| body_kind >= 0 && body_kind == asked_kind) {
-        Some(pose) if PackedPose::pack(Pose { motion: shown.0, frame: shown.1 }) != asked => Act::Set(pose),
+        Some(pose) if !posed || shown != (pose.motion, pose.frame) => Act::Set(pose),
         Some(_) => Act::Keep,
         None if posed => Act::Plain,
         None => Act::Keep,
@@ -42,16 +42,15 @@ pub fn decide(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, 
 }
 
 /// What the role's frame reports (`Block::set_pose`), from what the game shows after `decide`'s act. `POSE_SHOWN`
-/// only while the game shows the recorded animation on a sleeping body of the recorded fighter: that is also what
-/// makes the body the scrub's to put back when it lets it go.
-pub fn drawn(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, posed: bool, shown: (u64, f32)) -> u32 {
+/// means the scrub issued the setter and the body has that motion. The actual frame is reported separately.
+pub fn drawn(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, owned: bool, shown: (u64, f32)) -> u32 {
     if !asleep {
-        return if posed { POSE_SHOWN } else { POSE_NONE };
+        return if owned { POSE_SHOWN } else { POSE_NONE };
     }
     if body_kind < 0 || body_kind != asked_kind {
         return POSE_OTHER;
     }
-    if asked.get().is_some_and(|pose| pose.motion == shown.0) { POSE_SHOWN } else { POSE_NONE }
+    if owned && asked.get().is_some_and(|pose| pose.motion == shown.0) { POSE_SHOWN } else { POSE_NONE }
 }
 
 /// The diag build's line for one role, written on its fighter frame when what is shown changes:
@@ -164,9 +163,10 @@ mod tests {
     #[test]
     fn the_report_is_what_the_game_shows() {
         let asked = pose(12.5);
-        assert_eq!(drawn(KIRBY, asked, KIRBY, true, false, (SMASH, 12.5)), POSE_SHOWN);
+        assert_eq!(drawn(KIRBY, asked, KIRBY, true, false, (SMASH, 12.5)), POSE_NONE, "a matching motion without a setter call is not ours");
+        assert_eq!(drawn(KIRBY, asked, KIRBY, true, true, (SMASH, 12.5)), POSE_SHOWN);
         // The game kept the animation and clamped the frame: the move is the scrub's, and the line carries the frame.
-        assert_eq!(drawn(KIRBY, asked, KIRBY, true, false, (SMASH, 11.0)), POSE_SHOWN);
+        assert_eq!(drawn(KIRBY, asked, KIRBY, true, true, (SMASH, 11.0)), POSE_SHOWN);
         // The fighter has no such animation: nothing of the scrub's is on it.
         assert_eq!(drawn(KIRBY, asked, KIRBY, true, false, (FALL, 0.0)), POSE_NONE);
         assert_eq!(drawn(KIRBY, PackedPose::NONE, KIRBY, true, true, (FALL, 0.0)), POSE_NONE);
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn only_the_scrubs_pose_starts_an_animation_without_its_script_lines() {
         let game = include_str!("../../runtime/game.rs");
-        assert!(game.contains("pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) {"));
+        assert!(game.contains("pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {"));
         assert!(game.contains("f(accessor, motion, frame, rate, false, 0.0, false, !run_lines);"), "the native's last argument skips the lines");
         let picker = include_str!("../../runtime/features/record_place.rs");
         assert_eq!(picker.matches("natives::change_motion(").count(), 1);
