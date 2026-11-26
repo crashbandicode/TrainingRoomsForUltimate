@@ -25,6 +25,14 @@ pub enum Act {
     Plain,
 }
 
+/// The pose asked of a body: the recorded one when it unpacks and the body has an animation of that name (`has`,
+/// which is asked of the game only then), else none. The game starts an animation it is given without a test
+/// that the fighter has one of that name.
+pub fn asked_of(recorded: PackedPose, has: impl FnOnce(u64) -> bool) -> PackedPose {
+    let _ = has;
+    recorded
+}
+
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown
 /// frame (`Spot`). `body_kind`: the fighter the body is now (below 0: not known). `asleep`: the hold reports the
 /// body held with its scripts asleep. `posed`: the scrub's own animation is on this body. `shown`: the animation
@@ -250,6 +258,39 @@ mod tests {
         assert!(!hold.contains("status_request") && !hold.contains("change_status"));
         assert!(hold.contains("crate::engine::rr_host::live_pose(index).fighter_kind"), "the body's kind, as the recorder publishes it");
         assert!(!hold.contains("fighter_kind(accessor)"), "no native outside the placement unit's set");
+    }
+
+    #[test]
+    fn a_pose_is_asked_only_of_a_body_that_has_the_animation() {
+        let recorded = pose(12.5);
+        assert_eq!(asked_of(recorded, |motion| motion == SMASH), recorded);
+        assert_eq!(asked_of(recorded, |_| false), PackedPose::NONE, "the fighter has no animation of that name");
+        // A row without a pose asks the game nothing.
+        assert_eq!(asked_of(PackedPose::NONE, |_| panic!("no name to ask about")), PackedPose::NONE);
+        assert_eq!(asked_of(PackedPose([0, 0x500]), |_| panic!("no name to ask about")), PackedPose::NONE);
+        // So such a body is never given the setter, and one the scrub owns goes plain and reports none.
+        let asked = asked_of(recorded, |_| false);
+        assert_eq!(decide(KIRBY, asked, KIRBY, true, false, (FALL, 3.0)), Act::Keep);
+        assert_eq!(drawn(KIRBY, asked, KIRBY, true, false, (FALL, 3.0)), POSE_NONE);
+        assert_eq!(decide(KIRBY, asked, KIRBY, true, true, (SMASH, 9.0)), Act::Plain);
+        assert_eq!(drawn(KIRBY, asked, KIRBY, true, true, (FALL, 0.0)), POSE_NONE);
+    }
+
+    #[test]
+    fn the_scrub_asks_the_game_for_the_animation_before_it_claims_the_body() {
+        let game = include_str!("../../runtime/game.rs");
+        assert!(game.contains("pub unsafe fn is_anim_resource(accessor: usize, motion: u64) -> bool {"));
+        assert!(game.contains("at::<extern \"C\" fn(usize, u64) -> bool>(sites_pkg2::MOTION_IS_ANIM_RESOURCE_OFFSET).is_some_and(|f| f(accessor, motion))"),
+            "a refused row answers no: no pose");
+        let hold = include_str!("../../runtime/features/scrub_hold.rs");
+        let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
+        assert!(order(&["let asked = asked_of(spot.pose, |motion| natives::is_anim_resource(accessor, motion));",
+            "match decide(spot.kind, asked, kind, asleep, owned, read()) {", "let state = drawn(spot.kind, asked, kind, asleep, owned, shown);"]));
+        assert_eq!(hold.matches("spot.pose").count(), 2, "the pose as recorded goes to the question and to the diag line only");
+        // The row is the placement unit's own: a refused one turns that unit off and no other.
+        let row = crate::model::capabilities::find("motion_is_anim_resource").expect("the guarded row");
+        assert_eq!((row.offset, row.feature), (0x205_ce10, crate::model::sites::Feature::RecordPlace));
+        assert!(matches!(row.kind, crate::model::guard::SeamKind::Called));
     }
 
     #[test]
