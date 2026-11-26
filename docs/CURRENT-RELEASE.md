@@ -14,10 +14,12 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
 - **Tested in Eden, in part:** a short smoke boot on this exact build ran with no crash. Guard the Edge and Juggler
   opened their set-up on the Training stage, and Guard the Edge also from the island and on Battlefield. Eggs-ercise
   had its off-stage zone, the recording picker's Off stage switch moved a fighter, a take played and the clip editor
-  previewed. Neither drill was played through, no placement was saved, the waiting room was not run, and most of
-  the build's other new items were not touched.
-- **On the console:** not played yet. Install 5 went on the card at 23:06 and no report is on record. The operator's
-  reports on the earlier builds are in the evidence page.
+  previewed. A second boot opened the menu, and Guard the Edge's set-up, in a one-player waiting room. Neither
+  drill was played through, no placement was saved, no second player joined a room, and most of the build's other
+  new items were not touched.
+- **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
+  with "In is mid-action" after a snap to the move start; Known issues below has the way round. It is a report of what they
+  saw, not a test of the build; the reports on the earlier builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -93,7 +95,13 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **Install 5 has not been played on the console.** Its Eden check was one short smoke boot:
+- **"In is mid-action" after a snap in a match capture.** Plain Y snaps In to a mark. If that frame is still
+  mid-action, preview and save are refused. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y to snap to a
+  move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
+  saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
+  A fix is written but is not in install 5.
+- **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
+  parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
   starts; the start has not been timed in a game.

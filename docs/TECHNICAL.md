@@ -460,7 +460,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 ## Status
 
 The current release is **rc.15**. Its newest build is install 5 (`b7a382e4`, on the test console's card since
-2026-11-25): **installed and read back, tested in Eden in part, not yet played on the console**.
+2026-11-25): **installed and read back, tested in Eden in part, with one report from the console on record**.
 [Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
 [the rc.15 release notes](RELEASE-NOTES-rc15.md) list installs 1 to 5, and [Install evidence](EVIDENCE-rc15-installs.md)
 names the runs behind each claim. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was built from, so
@@ -493,7 +493,7 @@ pilot and imgui_smash.
 
 rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
 the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (installed and tested in Eden in part, not yet played on the console; see the [install evidence](EVIDENCE-rc15-installs.md)).
+[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (installed and tested in Eden in part, with one report from the console; see the [install evidence](EVIDENCE-rc15-installs.md)).
 
 ## Build
 
