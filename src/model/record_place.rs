@@ -2412,6 +2412,78 @@ mod tests {
         assert!(leaves_ground(true, -20.0, None), "open air");
     }
 
+    /// The operator's route (2026-11-26, about 15:25Z): Off stage is selected and the body floats; the crosshair
+    /// goes sideways onto the stage and the body lands; it goes sideways back past the floor's end, where there
+    /// is no floor under it. The body gets the placing frames of its first float again, then the same hold. The
+    /// words are run place-float-xps-06's at the long floor's left end (x -80), asked y -3.5262246.
+    #[test]
+    fn a_body_landed_on_the_stage_floats_again_when_the_crosshair_leaves_the_floor_sideways() {
+        use crate::model::crosshair::{hold_step, BodyRead, CpuPreview, Displaced, Origin, PreviewAct, PREVIEW_SETTLE};
+        let y = f32::from_bits(0xc061_adaa);
+        let fall = f32::from_bits(0xbd83_126f);
+        let settle = usize::from(PREVIEW_SETTLE);
+        let mut frame = 0;
+        // One frame of the picker: the hold's act, the body as read before the write, then the picker's rule.
+        let mut step = |slot: &mut Option<CpuPreview>, spot: [f32; 2], body: [f32; 2], landed: bool, free: bool, floor: Option<f32>| {
+            let act = hold_step(slot, 7, false, || Origin { at: [0.0, 0.01], grounded: true, facing: 1.0 });
+            let hold = slot.as_mut().unwrap();
+            let speed = Some([0.0, if landed { 0.0 } else { fall }]);
+            hold.observe(spot, BodyRead { at: body, landed, speed, frame }, false);
+            frame += 1;
+            if hold.displaced.is_some_and(|moved| moved.landed) && leaves_ground(free, spot[1], floor) {
+                hold.lift_again();
+            }
+            act
+        };
+        let under = |spot: [f32; 2]| [spot[0], spot[1] + fall];
+        let mut slot = None;
+        // 1. The float left of the floor: the placing frames, then the hold.
+        let start = [-100.0, y];
+        let first: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, start, under(start), false, true, None)).collect();
+        assert!(first[..settle].iter().all(|act| *act == PreviewAct::Lift) && first[settle..].iter().all(|act| *act == PreviewAct::Hold));
+        // 2. Sideways onto the stage, inside the long floor: the game puts the body on the floor; it stays held.
+        let inside = [-79.0, y];
+        assert_eq!(step(&mut slot, inside, under(start), false, false, None), PreviewAct::Hold);
+        for _ in 0..3 {
+            assert_eq!(step(&mut slot, inside, [-79.0, 0.01], true, false, None), PreviewAct::Hold);
+        }
+        assert_eq!(slot.unwrap().displaced, Some(Displaced { at: [-79.0, 0.01], landed: true }));
+        // 3. Sideways back past the floor's end, beside its wall: free air with no floor under it.
+        let beside = [-81.0, y];
+        assert_eq!(step(&mut slot, beside, [-79.0, 0.01], true, true, None), PreviewAct::Hold);
+        let again: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, beside, under(beside), false, true, None)).collect();
+        assert_eq!(again, first, "the placing frames of the first float, then the hold");
+        assert_eq!(slot.unwrap().displaced, None);
+        // The game pulls the body back onto the floor's end at this spot: a spot is tried once. At the next spot
+        // out it is lifted again.
+        for _ in 0..3 {
+            assert_eq!(step(&mut slot, beside, [-80.0, 0.01], true, true, None), PreviewAct::Hold);
+        }
+        let out = [-82.0, y];
+        assert_eq!(step(&mut slot, out, [-80.0, 0.01], true, true, None), PreviewAct::Hold);
+        let third: Vec<_> = (0..settle + 2).map(|_| step(&mut slot, out, under(out), false, true, None)).collect();
+        assert_eq!(third, first);
+        assert_eq!(slot.unwrap().displaced, None);
+    }
+
+    /// The hold's seam is where a game run reads the float: this frame's act, and the body's status and animation
+    /// as the game left it, beside its point and speed. The animation after a body floats again is compared with
+    /// its first float's there (tr-primary-2 2026-11-26 15:25:49Z: the same animation, not merely Fall).
+    #[test]
+    fn the_holds_seam_carries_the_act_and_the_bodys_status_and_animation() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let seam = placement.split("pub extern \"C\" fn placement_hold_seam(").nth(1).unwrap();
+        assert!(seam.starts_with("meta: u64, asked: u64, seen: u64, speed: u64, motion: u64, status: u64) {"));
+        let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        let (before, call) = hold_at.split_once("placement_hold_seam(").unwrap();
+        let call = call.split("\n    );").next().unwrap();
+        assert!(call.contains("| ((act as u64) << 36)"));
+        assert!(call.contains("natives::motion_kind(body),"));
+        assert!(call.contains("u64::from(natives::status_kind(body) as u32) | (u64::from(natives::motion_frame(body).to_bits()) << 32),"));
+        // Read before this frame's write, like the point and the speed.
+        assert!(!before.contains("lift(body, at") && !before.contains("hold(body, at)") && !before.contains("stand(body, at"));
+    }
+
     #[test]
     fn a_body_the_game_moved_is_shown_beside_its_spot() {
         use crate::model::chords::logical::A;
