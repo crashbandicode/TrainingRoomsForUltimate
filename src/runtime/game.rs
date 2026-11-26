@@ -244,9 +244,11 @@ pub mod natives {
         at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
-    pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32) {
+    /// `run_lines`: the game runs the animation's script lines up to `frame`, as it does for its own calls. False
+    /// starts the animation at `frame` and runs none of them (the native's last argument, true).
+    pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) {
         if let Some(f) = at::<extern "C" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) {
-            f(accessor, motion, frame, rate, false, 0.0, false, false);
+            f(accessor, motion, frame, rate, false, 0.0, false, !run_lines);
         }
     }
 

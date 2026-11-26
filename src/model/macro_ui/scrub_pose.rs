@@ -3,6 +3,7 @@
 //! `runtime::features::scrub_hold`'s; nothing here reads the game.
 //!
 //! NOT YET SWITCH-RUN.
+#[cfg(any(feature = "diag", test))]
 use core::fmt;
 
 use super::scrub_track::{POSE_NONE, POSE_OTHER, POSE_SHOWN};
@@ -29,21 +30,34 @@ pub enum Act {
 /// body held with its scripts asleep. `posed`: the scrub's own animation is on this body. `shown`: the animation
 /// and frame the game shows now.
 pub fn decide(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, posed: bool, shown: (u64, f32)) -> Act {
-    let _ = (asked_kind, asked, body_kind, asleep, posed, shown);
-    Act::Keep
+    if !asleep {
+        return Act::Keep;
+    }
+    match asked.get().filter(|_| body_kind >= 0 && body_kind == asked_kind) {
+        Some(pose) if PackedPose::pack(Pose { motion: shown.0, frame: shown.1 }) != asked => Act::Set(pose),
+        Some(_) => Act::Keep,
+        None if posed => Act::Plain,
+        None => Act::Keep,
+    }
 }
 
 /// What the role's frame reports (`Block::set_pose`), from what the game shows after `decide`'s act. `POSE_SHOWN`
 /// only while the game shows the recorded animation on a sleeping body of the recorded fighter: that is also what
 /// makes the body the scrub's to put back when it lets it go.
 pub fn drawn(asked_kind: i32, asked: PackedPose, body_kind: i32, asleep: bool, posed: bool, shown: (u64, f32)) -> u32 {
-    let _ = (asked_kind, asked, body_kind, asleep, posed, shown, POSE_OTHER, POSE_SHOWN);
-    POSE_NONE
+    if !asleep {
+        return if posed { POSE_SHOWN } else { POSE_NONE };
+    }
+    if body_kind < 0 || body_kind != asked_kind {
+        return POSE_OTHER;
+    }
+    if asked.get().is_some_and(|pose| pose.motion == shown.0) { POSE_SHOWN } else { POSE_NONE }
 }
 
 /// The diag build's line for one role, written on its fighter frame when what is shown changes:
 /// `[Scrub] pose role=<p1|cpu> frame=<clip frame|none> state=<shown|none|other_fighter> asked=<0xNAME,FRAME|none> shown=<0xNAME,FRAME>`.
 /// `shown` is read back from the game after the set; frames print in the float's shortest form.
+#[cfg(any(feature = "diag", test))]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PoseLine {
     pub role: usize,
@@ -53,16 +67,38 @@ pub struct PoseLine {
     pub shown: (u64, f32),
 }
 
+#[cfg(any(feature = "diag", test))]
 impl PoseLine {
-    /// Equal for two frames that would print the same line.
-    pub fn key(&self) -> [u64; 3] {
-        [0; 3]
+    /// What makes a line new for its role: the clip frame, the state, the animation asked for and the one shown.
+    /// The shown animation's frame counts only on a posed body: on any other it runs on with the game.
+    pub fn key(&self) -> [u64; 4] {
+        [
+            u64::from(self.frame.map_or(0, |frame| frame.wrapping_add(1))) | u64::from(self.state) << 32,
+            u64::from(self.asked.0[0]) | u64::from(self.asked.0[1]) << 32,
+            self.shown.0,
+            if self.state == POSE_SHOWN { u64::from(self.shown.1.to_bits()) } else { 0 },
+        ]
     }
 }
 
+#[cfg(any(feature = "diag", test))]
 impl fmt::Display for PoseLine {
-    fn fmt(&self, _out: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(out, "[Scrub] pose role={} frame=", if self.role == 0 { "p1" } else { "cpu" })?;
+        match self.frame {
+            Some(frame) => write!(out, "{frame}")?,
+            None => out.write_str("none")?,
+        }
+        out.write_str(match self.state {
+            POSE_SHOWN => " state=shown asked=",
+            POSE_OTHER => " state=other_fighter asked=",
+            _ => " state=none asked=",
+        })?;
+        match self.asked.get() {
+            Some(pose) => write!(out, "{:#x},{}", pose.motion, pose.frame)?,
+            None => out.write_str("none")?,
+        }
+        write!(out, " shown={:#x},{}", self.shown.0, self.shown.1)
     }
 }
 
@@ -143,6 +179,10 @@ mod tests {
         ] {
             assert_ne!(first.key(), other.key(), "{other:?}");
         }
+        // A body that is not posed runs its own animation on: its frame alone is not a new line.
+        let free = PoseLine { state: POSE_NONE, asked: PackedPose::NONE, shown: (FALL, 3.0), ..first };
+        assert_eq!(free.key(), PoseLine { shown: (FALL, 4.0), ..free }.key());
+        assert_ne!(free.key(), PoseLine { shown: (WAIT, 3.0), ..free }.key());
     }
 
     #[test]
@@ -179,6 +219,9 @@ mod tests {
         let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
         // `forget` clears both roles' cells; the other role's body is still the one the scrub posed.
         assert!(order(&["let partner = block.pose(slot ^ 1);", "block.forget();", "block.set_pose(slot ^ 1, partner.0, partner.1);"]));
+        // A set the fighter did not take (it has no animation of that name) leaves nothing of the scrub's on it.
+        assert!(order(&["natives::change_motion(accessor, pose.motion, pose.frame, 0.0, false);",
+            "if natives::motion_kind(accessor) != pose.motion {", "natives::change_motion(accessor, FALL, 0.0, 1.0, true);", "let shown = read();"]));
         assert!(hold.contains("crate::engine::rr_host::live_pose(index).fighter_kind"), "the body's kind, as the recorder publishes it");
         assert!(!hold.contains("fighter_kind(accessor)"), "no native outside the placement unit's set");
     }
