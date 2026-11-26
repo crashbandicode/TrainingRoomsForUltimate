@@ -16,9 +16,9 @@ W = 1200
 
 
 class Canvas(d.DCanvas):
-    def save(self, name):
+    def save(self, name, height):
         OUT.mkdir(parents=True, exist_ok=True)
-        self.img.convert("RGB").save(OUT / f"{name}.png", optimize=True)
+        self.img.crop((0, 0, self.img.width, height)).convert("RGB").save(OUT / f"{name}.png", optimize=True)
 
 
 def wrap(c, text, width, font="xs"):
@@ -69,8 +69,8 @@ def sm1():
     title(c, "SM1 · What a shown frame draws")
     c.rect(16, 58, 1184, 128, fill=d.PANEL, outline=d.LINE, radius=6)
     paragraph(c, 30, 72, "Install 6: the editor stops both fighters whole, so each keeps the pose it had when the editor took it. The scrub only moves that frozen body.", 1135)
-    ay = d.panel(c, 16, 145, 594, 885, "A · The animation and its frame", rec=True, tag_below=True)
-    by = d.panel(c, 606, 145, 1184, 885, "B · Force the status too", tag_below=True)
+    ay = d.panel(c, 16, 145, 594, 735, "A · The animation and its frame", rec=True, tag_below=True)
+    by = d.panel(c, 606, 145, 1184, 735, "B · Force the status too", tag_below=True)
     aend = vertical_flow(c, 32, 578, ay + 8, [
         "the row for this frame: point · facing · animation · frame",
         "the fighter is held, its move scripts asleep",
@@ -92,8 +92,8 @@ def sm1():
     y = bend + 24
     for text in ["Shows more (a thrown item, a drawn weapon).", "Each side effect has to be found and stopped."]:
         y = paragraph(c, 624, y, text, 540) + 12
-    paragraph(c, 24, 910, "On release: a plain animation back first (wait or fall), then the hold's own restore, then the scripts wake.", 1150)
-    c.save("scrub-moves-SM1-shown-frame")
+    paragraph(c, 24, 765, "On release: a plain animation back first (wait or fall), then the hold's own restore, then the scripts wake.", 1150)
+    c.save("scrub-moves-SM1-shown-frame", 805)
 
 
 def row_cells(c, y, fields):
@@ -112,7 +112,7 @@ def row_cells(c, y, fields):
 def sm2():
     c = Canvas(W, 1190)
     title(c, "SM2 · How a positions file gets its moves")
-    d.panel(c, 16, 65, 432, 1070, "A file's row")
+    d.panel(c, 16, 65, 432, 605, "A file's row")
     c.text(30, 138, "version 1 · 36 bytes a row", "s", d.FG)
     fields = ["fighter", "costume", "facing", "situation", "status", "speed", "point"]
     row_cells(c, 174, fields)
@@ -147,24 +147,26 @@ def sm2():
         else:
             boxed(c, edges[2], y, edges[3], y + height, right)
         y += height + 7
-    paragraph(c, 24, 1105, "The file says where its moves came from: none, the take, or a playback. A playback's moves are never called recorded.", 1150)
-    c.save("scrub-moves-SM2-file-upgrade")
+    paragraph(c, 24, 940, "The file says where its moves came from: none, the take, or a playback. A playback's moves are never called recorded.", 1150)
+    c.save("scrub-moves-SM2-file-upgrade", 980)
 
 
 def sm3():
     c = Canvas(W, 845)
     title(c, "SM3 · Recorded fighter or the one you are on")
     paragraph(c, 24, 54, "Default: the fighter you are on. On a saved macro and on a capture alike.", 1145)
-    for x0, x1, role, yours, take in [
-        (16, 594, "Player 1", "Mario (yours)", "Link (the take's)"),
-        (606, 1184, "CPU", "Fox (yours)", "Marth (the take's)"),
+    for x0, x1, role, yours, take, notice in [
+        (16, 594, "Player 1", "Mario (yours)", "Link (the take's)",
+         "on another fighter: positions only, and the strip reads: Moves show on Link. ZL + L switches Player 1."),
+        (606, 1184, "CPU", "Fox (yours)", "Marth (the take's)",
+         "on another fighter: positions only, and the strip reads: Moves show on Marth. ZL + R switches the CPU."),
     ]:
-        d.panel(c, x0, 92, x1, 347, role)
+        d.panel(c, x0, 92, x1, 320, role)
         boxed(c, x0 + 16, 150, x0 + 234, 210, yours, font="s")
         boxed(c, x1 - 234, 150, x1 - 16, 210, take, font="s")
         d.arrow(c, (x0 + 246, 180), (x1 - 246, 180), d.OURS, both=True)
         y = paragraph(c, x0 + 18, 232, "on the take's fighter: the moves are drawn", 540)
-        paragraph(c, x0 + 18, y + 8, "on another fighter: positions only, and the strip reads: Moves show on Link. ZL + L switches Player 1.", 540)
+        paragraph(c, x0 + 18, y + 8, notice, 540)
     texts = [
         "the key",
         "the roster's own loader (Kirby, Ice Climbers and preload rules unchanged)",
@@ -173,23 +175,23 @@ def sm3():
     ]
     for i, text in enumerate(texts):
         x0 = 20 + i * 295
-        boxed(c, x0, 376, x0 + 265, 472, text)
+        boxed(c, x0, 349, x0 + 265, 445, text)
         if i < 3:
-            d.arrow(c, (x0 + 269, 424), (x0 + 291, 424))
-    paragraph(c, 24, 496, "One load at a time. A second press reads: Wait for the character swap to finish.", 1150)
-    d.panel(c, 16, 559, 594, 793, "A · They stay as toggled", rec=True)
-    c.text(30, 599, "when the editor closes", "h", d.FG)
-    paragraph(c, 32, 657, "As Switch does today. No extra load.", 530, "s")
-    d.panel(c, 606, 559, 1184, 793, "B · Both go back on close")
-    paragraph(c, 622, 623, "One more load for each fighter that was switched.", 530, "s")
-    c.save("scrub-moves-SM3-toggle")
+            d.arrow(c, (x0 + 269, 397), (x0 + 291, 397))
+    paragraph(c, 24, 469, "One load at a time. A second press reads: Wait for the character swap to finish.", 1150)
+    d.panel(c, 16, 532, 594, 670, "A · They stay as toggled", rec=True)
+    c.text(30, 572, "when the editor closes", "h", d.FG)
+    paragraph(c, 32, 630, "As Switch does today. No extra load.", 530, "s")
+    d.panel(c, 606, 532, 1184, 670, "B · Both go back on close")
+    paragraph(c, 622, 596, "One more load for each fighter that was switched.", 530, "s")
+    c.save("scrub-moves-SM3-toggle", 695)
 
 
 def sm4():
     c = Canvas(W, 850)
     title(c, "SM4 · The keys")
-    ay = d.panel(c, 16, 65, 594, 820, "A · Two keys", rec=True)
-    by = d.panel(c, 606, 65, 1184, 820, "B · A pop-up")
+    ay = d.panel(c, 16, 65, 594, 705, "A · Two keys", rec=True)
+    by = d.panel(c, 606, 65, 1184, 705, "B · A pop-up")
     for i, (key, text) in enumerate([
         ("ZL + L", "Player 1: the take's fighter ⇄ yours"),
         ("ZL + R", "CPU: the take's fighter ⇄ yours"),
@@ -222,14 +224,14 @@ def sm4():
     y = by + 270
     y = paragraph(c, 624, y, "Opened with ZL + L or ZL + R.", 540, "s") + 14
     paragraph(c, 624, y, "Names both fighters before anything loads; one more step each time.", 540, "s")
-    c.save("scrub-moves-SM4-keys")
+    c.save("scrub-moves-SM4-keys", 730)
 
 
 def sm5():
     c = Canvas(W, 860)
     title(c, "SM5 · A Replay window capture itself")
-    ay = d.panel(c, 16, 65, 594, 825, "A · Not in this change", rec=True, tag_below=True)
-    by = d.panel(c, 606, 65, 1184, 825, "B · Captures keep the animation too", tag_below=True)
+    ay = d.panel(c, 16, 65, 594, 677, "A · Not in this change", rec=True, tag_below=True)
+    by = d.panel(c, 606, 65, 1184, 677, "B · Captures keep the animation too", tag_below=True)
     aend = vertical_flow(c, 32, 578, ay + 8, [
         "a capture's frame: inputs and state, no animation",
         "scrub the capture: positions, as today",
@@ -244,7 +246,7 @@ def sm5():
     ], height=82, gap=28)
     y = paragraph(c, 624, bend + 30, "The capture format changes.", 530, "s") + 12
     paragraph(c, 624, y, "More memory in every match with Replay capture On.", 530, "s")
-    c.save("scrub-moves-SM5-captures")
+    c.save("scrub-moves-SM5-captures", 703)
 
 
 if __name__ == "__main__":
