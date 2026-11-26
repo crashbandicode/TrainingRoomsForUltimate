@@ -347,7 +347,7 @@ impl TakeTrack {
 
     /// The game thread, as frame `index` of the take is stored for the role in `slot`: both fighters' states go
     /// with it. Frame 0 starts the track again. A frame whose block is not there, or that does not follow the last
-    /// one kept, is left out, and the take then has no track.
+    /// one kept, is left out: the track ends before it, and the take's inputs go on.
     pub fn push(&self, index: usize, slot: usize) {
         let Some(table) = self.table() else { return };
         if slot > 1 || index != 0 && table.len.load(Ordering::Acquire) != index {
@@ -356,7 +356,8 @@ impl TakeTrack {
         table.readers.fetch_add(1, Ordering::SeqCst);
         let chunk = table.chunks.get(index / TAKE_CHUNK).map_or(null_mut(), |chunk| chunk.load(Ordering::SeqCst));
         if chunk.is_null() {
-            table.len.store(0, Ordering::Release);
+            // The track ends here and keeps what it has. With no first block there is nothing to keep.
+            table.len.fetch_min(index, Ordering::AcqRel);
         } else {
             // SAFETY: a block holds TAKE_CHUNK frames of FRAME_CELLS cells, and is freed only with no push counted.
             let cells = unsafe { std::slice::from_raw_parts(chunk.add(index % TAKE_CHUNK * FRAME_CELLS), FRAME_CELLS) };
@@ -368,13 +369,14 @@ impl TakeTrack {
         table.readers.fetch_sub(1, Ordering::SeqCst);
     }
 
-    /// The worker, with the finished take's `frames`: its track, when every frame has its state.
+    /// The worker, with the finished take's `frames`: its track, as far as the frames have their state.
     pub fn take(&self, frames: usize) -> Option<Vec<[ReplayFrame; 2]>> {
         let table = self.table()?;
-        if frames == 0 || table.len.load(Ordering::Acquire) != frames {
+        let kept = table.len.load(Ordering::Acquire).min(frames);
+        if kept == 0 {
             return None;
         }
-        (0..frames).map(|index| {
+        (0..kept).map(|index| {
             let chunk = table.chunks.get(index / TAKE_CHUNK)?.load(Ordering::SeqCst);
             if chunk.is_null() {
                 return None;
@@ -525,7 +527,9 @@ mod tests {
         assert!(matches!(single.scrub().0, Ask::Group { target: 1, deltas: [None, Some(_)] }));
         // ZR: the selected fighter plays on Player 1, and the group follows.
         editor.on_action(ClipAction::SwapTarget);
-        editor.on_action(ClipAction::SelectIn);
+        if editor.scrub().0 == Ask::None {
+            editor.on_action(ClipAction::SelectIn);
+        }
         assert!(matches!(editor.scrub().0, Ask::Group { target: 0, deltas: [Some(_), Some(_)] }));
     }
 

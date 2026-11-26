@@ -132,8 +132,9 @@ pub fn finish_recording(
     trim: crate::model::trim::Trim,
 ) -> Result<RecordStop, Error> {
     let kept = trim.window(&capture.frames);
-    let track = capture.track.as_ref().filter(|track| track.len() == capture.frames.len())
-        .map(|track| track[kept.start..kept.end].to_vec());
+    let track = capture.track.as_ref()
+        .map(|track| track[kept.start.min(track.len())..kept.end.min(track.len())].to_vec())
+        .filter(|track| !track.is_empty());
     let (frames, marks) = finish_take(capture.frames.clone(), &capture.spans, trim);
     if frames.is_empty() {
         return Ok(RecordStop::Empty);

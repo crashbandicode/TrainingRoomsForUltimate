@@ -570,7 +570,11 @@ impl ClipEditor {
         };
         let target = u8::from(self.plays_on_player() != Some(true));
         let ask = scrub_track::deltas(|index| frame(0, index), |index| frame(1, index), self.anchor, at, target);
-        (ask, if ask == Ask::None { Pos::None } else { Pos::Held })
+        match (ask, &self.file) {
+            (Ask::None, Some(FileSource::Macro { .. })) => (ask, Pos::End),
+            (Ask::None, _) => (ask, Pos::None),
+            _ => (ask, Pos::Held),
+        }
     }
 
     /// The worker: what the game side did with the last ask, for the key line.
