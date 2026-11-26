@@ -2514,7 +2514,7 @@ mod tests {
             ("n".repeat(48), [None, Some([-87.0, -15.0])]),
             ("界".repeat(48), [Some([-40.0, 0.0]), Some([-87.0, -15.0])]),
         ] {
-            assert!(crate::model::library::check_label(&name).is_ok());
+            assert!(crate::engine::library::check_label(&name).is_ok());
             let mut card = FixedPath::<224>::new();
             let mut expected = String::new();
             w.write_text_at(Who::P1, "", bodies, &mut expected).unwrap();
