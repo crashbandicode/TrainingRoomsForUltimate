@@ -996,6 +996,7 @@ fn service_wanted_fighter() {
         return;
     }
     if let Some((player, kind)) = wanted {
+        // restriction: clip-fighter-by-kind
         if player { roster_requests::request_player_kind(kind as u32); }
         else { roster_requests::request_cpu_kind(kind as u32); }
         crate::runtime::diag_log::diagnostic(format_args!(
