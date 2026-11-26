@@ -25,3 +25,11 @@ fn the_ledger_is_generated_from_the_manifest() {
     let after = std::fs::read_to_string(format!("{root}/docs/provenance/pkg4-carry-ledger.md")).unwrap();
     assert_eq!(before, after, "run `python3 -I tools/carry_pkg4.py ledger` and commit the result");
 }
+
+/// `tools/carry_edits.py` writes manifest edits from a base and a wanted file; its host tests replay every edit
+/// through this tool's own `apply_edits`.
+#[test]
+fn the_edit_writer_passes_its_host_tests() {
+    let Some(out) = run(&["tools/test_carry_edits.py"]) else { return };
+    assert!(out.status.success(), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+}
