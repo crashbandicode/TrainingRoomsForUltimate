@@ -136,7 +136,7 @@ impl Record for MacroRecording {
     /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
     fn after_write(&self, dir: &std::path::Path, id: &str) {
         if let Some(track) = &self.track {
-            if super::positions::write(dir, id, &self.frames, track).is_err() {
+            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {
                 super::positions::remove(dir, id);
             }
         }

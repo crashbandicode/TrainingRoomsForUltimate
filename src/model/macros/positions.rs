@@ -38,6 +38,14 @@ pub fn path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.pos"))
 }
 
+/// Where a positions file came from: a take's own recording, or a playback of a macro that had none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Source {
+    Recorded = 1,
+    Generated = 2,
+}
+
 /// What ties a positions file to its macro: the id it is stored under and the inputs it was recorded with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Binding {
@@ -55,7 +63,8 @@ impl Binding {
     }
 }
 
-fn header(binding: Binding, frames: u32) -> [u8; HEADER] {
+fn header(binding: Binding, frames: u32, source: Source) -> [u8; HEADER] {
+    let _ = source;
     let mut out = [0u8; HEADER];
     out[..4].copy_from_slice(&MAGIC);
     out[4..6].copy_from_slice(&VERSION.to_le_bytes());
@@ -118,7 +127,7 @@ pub fn binds(dir: &Path, id: &str, inputs: &[InputFrame]) -> bool {
 
 /// Write the positions of the macro `id`, whose inputs are `inputs`: to `<id>.pos.tmp`, synced, then put in place.
 /// Entries past the inputs are left out.
-pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame; 2]]) -> io::Result<()> {
+pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame; 2]], source: Source) -> io::Result<()> {
     #[cfg(test)]
     if FAIL_WRITE.with(|fail| fail.get()) {
         return Err(io::Error::from(io::ErrorKind::Interrupted));
@@ -126,7 +135,7 @@ pub fn write(dir: &Path, id: &str, inputs: &[InputFrame], track: &[[ReplayFrame;
     let track = &track[..track.len().min(inputs.len())];
     crate::model::store::replace_with(&path(dir, id), |tmp| {
         let mut file = fs::File::create(tmp)?;
-        file.write_all(&header(Binding::of(id, inputs), track.len() as u32))?;
+        file.write_all(&header(Binding::of(id, inputs), track.len() as u32, source))?;
         let mut buffer = vec![0u8; CHUNK_FRAMES.min(track.len()) * FRAME];
         for chunk in track.chunks(CHUNK_FRAMES) {
             for (pair, out) in chunk.iter().zip(buffer.as_chunks_mut::<FRAME>().0) {
@@ -157,6 +166,12 @@ pub fn read(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Vec<[ReplayFr
         }
     }
     Some(track)
+}
+
+/// Where the positions file of `id` came from, when it binds these inputs. Only its header is read.
+pub fn source(dir: &Path, id: &str, inputs: &[InputFrame]) -> Option<Source> {
+    let _ = (dir, id, inputs);
+    None
 }
 
 /// Remove the positions file of `id`, and its unfinished write; a missing file is fine. The folder is synced where
@@ -229,10 +244,11 @@ mod tests {
     fn the_file_has_the_published_layout() {
         let dir = scratch();
         let inputs = inputs(700);
-        write(&dir, "walk", &inputs, &track(650)).unwrap();
+        write(&dir, "walk", &inputs, &track(650), Source::Recorded).unwrap();
         let bytes = fs::read(path(&dir, "walk")).unwrap();
         assert_eq!(path(&dir, "walk"), dir.join("walk.pos"));
-        assert_eq!(bytes.len(), 32 + 72 * 650);
+        assert_eq!(bytes.len(), 40 + 72 * 650);
+        assert_eq!((bytes[32], &bytes[33..40]), (1, &[0u8; 7][..]), "the source, then padding");
         assert_eq!(&bytes[..4], b"TRPS");
         assert_eq!((bytes[4], bytes[5], bytes[6], bytes[7]), (1, 0, 2, 36));
         assert_eq!((word(&bytes, 8), word(&bytes, 12)), (650, 700));
@@ -243,13 +259,18 @@ mod tests {
             .fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3));
         assert_eq!(bytes[24..32], hash.to_le_bytes());
         // Frame 2's rows: the recorded fighter's nine words, then the other fighter's.
-        let row = |at: usize| (0..9).map(|cell| word(&bytes, 32 + 72 * 2 + at + 4 * cell)).collect::<Vec<_>>();
+        let row = |at: usize| (0..9).map(|cell| word(&bytes, 40 + 72 * 2 + at + 4 * cell)).collect::<Vec<_>>();
         assert_eq!(row(0), [18, 3, (-1.0f32).to_bits(), 0, 14, 0.5f32.to_bits(), 0, 26.0f32.to_bits(), 2.0f32.to_bits()]);
         assert_eq!(row(36), [74, 0, 1.0f32.to_bits(), 2, 0, 0, (-1.25f32).to_bits(), (-40.0f32).to_bits(), 7.5f32.to_bits()]);
         assert!(!dir.join("walk.pos.tmp").exists(), "the unfinished name is gone");
         // More than one chunk reads back whole; entries past the inputs are left out.
         assert_eq!(read(&dir, "walk", &inputs), Some(track(650)));
-        write(&dir, "walk", &inputs[..10], &track(650)).unwrap();
+        assert_eq!(source(&dir, "walk", &inputs), Some(Source::Recorded));
+        // A file made by a playback says so, and reads the same way.
+        write(&dir, "walk", &inputs, &track(650), Source::Generated).unwrap();
+        assert_eq!((source(&dir, "walk", &inputs), read(&dir, "walk", &inputs)), (Some(Source::Generated), Some(track(650))));
+        assert_eq!(source(&dir, "walk", &inputs[..5]), None, "only for the macro it binds");
+        write(&dir, "walk", &inputs[..10], &track(650), Source::Recorded).unwrap();
         assert_eq!(read(&dir, "walk", &inputs[..10]), Some(track(10)));
         fs::remove_dir_all(dir).unwrap();
     }
@@ -261,14 +282,16 @@ mod tests {
         assert_eq!(read(&dir, "take", &inputs), None, "a missing file");
         assert!(!binds(&dir, "take", &inputs));
         // No rows is an empty track (positions that ran out at once), not a missing file.
-        write(&dir, "take", &inputs, &[]).unwrap();
+        write(&dir, "take", &inputs, &[], Source::Recorded).unwrap();
         assert_eq!(read(&dir, "take", &inputs), Some(Vec::new()));
         // A prefix shorter than the inputs is whole.
-        write(&dir, "take", &inputs, &track(8)).unwrap();
+        write(&dir, "take", &inputs, &track(8), Source::Recorded).unwrap();
         assert_eq!(read(&dir, "take", &inputs), Some(track(8)));
         assert!(binds(&dir, "take", &inputs));
         let good = fs::read(path(&dir, "take")).unwrap();
-        let broken: [(&str, fn(&mut Vec<u8>)); 9] = [
+        type Edit = fn(&mut Vec<u8>);
+        let broken: [(&str, Edit); 10] = [
+            ("a source this build does not know", |bytes| bytes[32] = 3),
             ("the magic", |bytes| bytes[0] = b'X'),
             ("a later format version", |bytes| bytes[4] = 2),
             ("one fighter", |bytes| bytes[6] = 1),
@@ -277,7 +300,7 @@ mod tests {
             ("bytes after the last row", |bytes| bytes.push(0)),
             ("more frames than the file holds", |bytes| bytes[8] = 9),
             ("more frames than the macro has inputs", |bytes| { bytes[8] = 13; bytes.extend([0; 72 * 5]); }),
-            ("a number that is not finite", |bytes| bytes[32 + 28..32 + 32].copy_from_slice(&f32::NAN.to_le_bytes())),
+            ("a number that is not finite", |bytes| bytes[40 + 28..40 + 32].copy_from_slice(&f32::NAN.to_le_bytes())),
         ];
         for (what, edit) in broken {
             let mut bytes = good.clone();
@@ -298,6 +321,24 @@ mod tests {
         remove(&dir, "take");
         remove(&dir, "take");
         assert!(!path(&dir, "take").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_earlier_takes_file_under_the_same_id_does_not_bind() {
+        // tr-primary-2 2026-11-26 03:10:37Z: the macro under an id is replaced by one with other inputs.
+        let dir = scratch();
+        let (first, second) = (inputs(20), (0..20).map(|i| InputFrame { buttons: 500 + i, ..InputFrame::default() }).collect::<Vec<_>>());
+        write(&dir, "take", &first, &track(20), Source::Recorded).unwrap();
+        assert!(!binds(&dir, "take", &second));
+        assert_eq!((read(&dir, "take", &second), source(&dir, "take", &second)), (None, None));
+        // Through the library: the earlier take's file is gone once the new macro is in place, and nothing shows.
+        let library = Library::new(&dir);
+        let id = library.save_new(&recording("Take", 20, true)).unwrap();
+        let mut other = recording("Take", 20, false);
+        other.frames = second;
+        library.overwrite(&id, &other).unwrap();
+        assert!(!path(&dir, &id).exists() && library.load_edited(&id).unwrap().track.is_none());
         fs::remove_dir_all(dir).unwrap();
     }
 

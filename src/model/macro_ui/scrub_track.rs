@@ -48,7 +48,7 @@ impl Pos {
     /// The key line's text; empty when there is nothing to say.
     pub const fn text(self) -> &'static str {
         match self {
-            Pos::NoTrack => "Re-record to see positions while scrubbing.",
+            Pos::NoTrack => "Play it once to see positions while scrubbing.",
             Pos::Off => "Off this stage.",
             Pos::End => "Positions end here.",
             Pos::None | Pos::Held => "",
@@ -530,7 +530,7 @@ mod tests {
         for action in [ClipAction::SelectIn, ClipAction::SelectOut] {
             editor.on_action(action);
             assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
-            assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Re-record to see positions while scrubbing.");
+            assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Play it once to see positions while scrubbing.");
             let line = crate::engine::macro_ui::clip_marks::bridge_clip(&editor.view(), Some("macro.p1"), false).text();
             assert!(line.contains(" running=0 pos=no_track target="), "{line}");
         }

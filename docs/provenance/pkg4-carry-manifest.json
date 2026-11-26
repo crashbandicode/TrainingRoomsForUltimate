@@ -1355,7 +1355,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "2366abd59886b5fe4a029681c658828f58f8a6997baebee482e96ad4c19ea1ab",
+   "dest_sha256": "0c2902986937ab55bec610dda30bc3a5facbf30ba914bf9f5a58309fd38b870f",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1465,6 +1465,11 @@
     {
      "old": "        self.load(id)",
      "new": "        let mut recording = self.load(id)?;\n        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));\n        Ok(recording)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            if super::positions::write(dir, id, &self.frames, track).is_err() {",
+     "new": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
