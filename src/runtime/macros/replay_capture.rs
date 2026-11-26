@@ -979,6 +979,13 @@ fn service_wanted_play() {
 
 fn service_wanted_fighter() {
     use crate::engine::macro_ui::scrub_track::SLOT;
+    if roster_requests::take_clip_reply() == Some(false) {
+        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());
+        if refused {
+            notify("The roster refused the fighter switch".into());
+            return;
+        }
+    }
     let (wanted, timed_out) = {
         let mut editor = EDITOR.lock().unwrap();
         let Some(editor) = editor.as_mut() else { return };
@@ -997,8 +1004,7 @@ fn service_wanted_fighter() {
     }
     if let Some((player, kind)) = wanted {
         // restriction: clip-fighter-by-kind
-        if player { roster_requests::request_player_kind(kind as u32); }
-        else { roster_requests::request_cpu_kind(kind as u32); }
+        roster_requests::request_clip_kind(player, kind as u32);
         crate::runtime::diag_log::diagnostic(format_args!(
             "[Scrub] fighter role={} kind={kind}: the roster is asked", if player { "p1" } else { "cpu" }));
     }

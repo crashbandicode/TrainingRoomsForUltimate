@@ -1,5 +1,5 @@
 //! Production worker service and both queue endpoints; the roster is an admission oracle, not a loader here.
-use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Mutex, atomic::Ordering};
 pub mod model { #[path = "PROJECT_ROOT/src/model/drop_ring.rs"] pub mod drop_ring; }
 pub mod engine {
     pub mod compat { pub mod logging { pub fn diagnostic(_: std::fmt::Arguments) {} } }
@@ -59,6 +59,11 @@ fn main() {
         }
         assert_eq!(roster_requests::take_reply(), Some((6, true)), "combo answer was consumed");
         assert_eq!(roster_requests::take_reply(), None, "clip answer leaked into combo replies");
+        ask(role, refused);
+        EDITOR.lock().unwrap().as_mut().unwrap().cancel_fighter();
+        roster_requests::service();
+        service_wanted_fighter();
+        assert!(EDITOR.lock().unwrap().as_ref().unwrap().notice.is_empty(), "B-cancel received a stale refusal");
         // An old refused request and a newer accepted one are serviced in the same game pass.
         ask(role, refused);
         ask(role, accepted);

@@ -2210,7 +2210,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "99c33345e1e009578054c6f6910f824ebebf1ea1976de2b3d5c118b64122022e",
+   "dest_sha256": "5e7a86f129570060151b47010ef6b0d0c70244545b6d12b9b5dbefee9511c02e",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -3312,6 +3312,11 @@
      "reason": "P5b C: the per-fighter toggle and its keys (SM3, SM4).",
      "old": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel,\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n",
      "new": "#[derive(Clone, Copy, Debug)]\npub enum ClipAction {\n    SelectIn, SelectOut, Nudge(i32), TogglePlay, Restart, Snap, SwapTarget,\n    PreviousFighter, NextFighter, ToggleCapture, UseLeadIn, Confirm, Cancel, ToggleFighter { player: bool },\n}\npub enum ClipEffect {\n    None, StopPreview, Preview(Box<MacroRecording>), Close,\n"
+    },
+    {
+     "reason": "Read the clip switch admission result on the worker, for either role.",
+     "old": "        let release = service.find(\"SLOT.released()\").expect(\"release report\");\n        let take = service.find(\"take_wanted_fighter()\").expect(\"take wanted fighter\");\n        assert!(release < take);\n        assert!(service.contains(\"roster_requests::request_player_kind(kind as u32)\"));\n        assert!(service.contains(\"roster_requests::request_cpu_kind(kind as u32)\"));\n        assert!(service.contains(\"tick_fighter_load()\"));\n        let worker = source.split(\"fn worker_preview_notices(\").nth(1).unwrap();\n        let play = worker.find(\"service_wanted_play();\").expect(\"wanted play\");\n",
+     "new": "        let release = service.find(\"SLOT.released()\").expect(\"release report\");\n        let take = service.find(\"take_wanted_fighter()\").expect(\"take wanted fighter\");\n        assert!(release < take);\n        assert!(service.contains(\"roster_requests::request_clip_kind(player, kind as u32)\"));\n        assert!(service.contains(\"tick_fighter_load()\"));\n        let worker = source.split(\"fn worker_preview_notices(\").nth(1).unwrap();\n        let play = worker.find(\"service_wanted_play();\").expect(\"wanted play\");\n"
     }
    ]
   },
@@ -6080,7 +6085,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "a68e5136041b028fc15fd32f1f7c27df6ff704e1a5106c75866bd4467540ec92",
+   "dest_sha256": "5237bf2c0f94d510f8b30f31054501a53388d516391fe6789b0790121b39ca23",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -7176,6 +7181,16 @@
      "reason": "P5b C: the per-fighter toggle and its keys (SM3, SM4).",
      "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\nuse crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};\nuse crate::engine::macros::{PackedPose, Pose};\n\n",
      "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\nuse crate::runtime::roster::{character_roster, roster_requests};\nuse crate::runtime::ui::facts;\nuse crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};\nuse crate::engine::macros::{PackedPose, Pose};\n\n"
+    },
+    {
+     "reason": "Read the clip switch admission result on the worker, for either role.",
+     "old": "    }\n    if let Some((player, kind)) = wanted {\n        // restriction: clip-fighter-by-kind\n        if player { roster_requests::request_player_kind(kind as u32); }\n        else { roster_requests::request_cpu_kind(kind as u32); }\n        crate::runtime::diag_log::diagnostic(format_args!(\n            \"[Scrub] fighter role={} kind={kind}: the roster is asked\", if player { \"p1\" } else { \"cpu\" }));\n    }\n",
+     "new": "    }\n    if let Some((player, kind)) = wanted {\n        // restriction: clip-fighter-by-kind\n        roster_requests::request_clip_kind(player, kind as u32);\n        crate::runtime::diag_log::diagnostic(format_args!(\n            \"[Scrub] fighter role={} kind={kind}: the roster is asked\", if player { \"p1\" } else { \"cpu\" }));\n    }\n"
+    },
+    {
+     "reason": "Read the clip switch admission result on the worker, for either role.",
+     "old": "\nfn service_wanted_fighter() {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    let (wanted, timed_out) = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n",
+     "new": "\nfn service_wanted_fighter() {\n    use crate::engine::macro_ui::scrub_track::SLOT;\n    if roster_requests::take_clip_reply() == Some(false) {\n        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());\n        if refused {\n            notify(\"The roster refused the fighter switch\".into());\n            return;\n        }\n    }\n    let (wanted, timed_out) = {\n        let mut editor = EDITOR.lock().unwrap();\n        let Some(editor) = editor.as_mut() else { return };\n"
     }
    ]
   },
