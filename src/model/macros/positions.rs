@@ -211,6 +211,7 @@ pub fn fail_writes(fail: bool) {
 mod tests {
     lib_unit_tests! {
     use super::*;
+    use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
     use crate::engine::macros::{Library, MacroRecording};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -243,6 +244,28 @@ mod tests {
             recording.set_track(Some(track(frames)));
         }
         recording
+    }
+
+    #[test]
+    fn a_saved_editor_crop_preserves_its_partial_positions_source() {
+        let dir = scratch();
+        let library = Library::new(&dir);
+        for origin in [Source::Recorded, Source::Generated] {
+            let rec = recording("Walk", 8, false);
+            let id = library.save_new(&rec).unwrap();
+            write(&dir, &id, &rec.frames, &track(3), origin).unwrap();
+            let mut editor = ClipEditor::macro_file(library.load_edited(&id).unwrap(), true).unwrap();
+            editor.on_action(ClipAction::SelectIn);
+            editor.on_action(ClipAction::Nudge(1));
+            editor.on_action(ClipAction::SelectOut);
+            editor.on_action(ClipAction::Nudge(-1));
+            let ClipEffect::Export(crop) = editor.on_action(ClipAction::Confirm) else { panic!("no macro crop") };
+            assert_eq!(&crop.frames, &rec.frames[1..7]);
+            let kept = library.save_new(&crop).unwrap();
+            assert_eq!(read(&dir, &kept, &crop.frames), Some(vec![pair(1), pair(2)]));
+            assert_eq!(source(&dir, &kept, &crop.frames), Some(origin), "cropping does not record new positions");
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
