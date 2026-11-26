@@ -2,7 +2,7 @@
 use super::{Raw, Role, ACTIVE, CONSTS_READY, LOADING};
 use crate::engine::rr_host::HomeWarp;
 use crate::engine::mii::lifetime::Configuration;
-use crate::model::state::{ids::C, preview::{settle, Body, Checkpoint, Error, Settle}};
+use crate::model::state::{ids::C, preview::{settle, take_home_ask, Body, Checkpoint, Error, Settle}};
 use crate::runtime::features::recorder;
 use crate::runtime::{game::natives, lobby::training::practice};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -42,11 +42,7 @@ pub(super) unsafe fn take_home() -> bool {
     }
     // A start that follows the scrub hold's release stays asked, as it does while a load runs, until the released CPU
     // has settled or will not (tr-primary-2 2026-11-26 12:54:05Z). The wait is on the CPU's state, never on a clock.
-    let waiting = ASK.load(Ordering::Acquire);
-    if waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait) {
-        return false;
-    }
-    let ask = ASK.swap(0, Ordering::AcqRel);
+    let ask = take_home_ask(&ASK, |waiting| waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait));
     if ask == 0 {
         return false;
     }

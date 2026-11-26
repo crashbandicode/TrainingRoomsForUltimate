@@ -1,8 +1,16 @@
 //! A clip editor's transient checkpoint. Numbered slots and persistence are not
 //! part of this owner; native adapters supply freshly qualified identities.
 use super::record::SavedState;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 pub fn playing_index(player: bool) -> usize { usize::from(!player) }
+
+/// Read the worker's request and leave it pending while the game-side check says to wait.
+pub fn take_home_ask(ask: &AtomicU8, wait: impl FnOnce(u8) -> bool) -> u8 {
+    let checked = ask.load(Ordering::Acquire);
+    if wait(checked) { return 0; }
+    ask.swap(0, Ordering::AcqRel)
+}
 
 /// What a preview's start does about a CPU the scrub hold has just let go (`scrub_track::Block::settling`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,9 +147,27 @@ mod tests {
         }
         // The game side keeps the start asked while it waits, and takes it only then.
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/states/preview.rs")).unwrap_or_default();
-        let wait = runtime.find("if waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait) {").expect("a start waits for the released CPU");
-        assert!(wait < runtime.find("let ask = ASK.swap(0, Ordering::AcqRel);").unwrap(), "the ask stays while it waits");
+        assert!(runtime.contains("take_home_ask(&ASK") && runtime.contains("waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait)"),
+            "only starts wait for the released CPU");
         assert!(!runtime.contains("Instant") && !runtime.contains("elapsed"), "no clock");
+    }
+
+    #[test]
+    fn a_preview_request_published_during_the_check_waits_for_its_own_frame() {
+        // Empty -> Start, Start -> different Start, Start -> Return, Return -> Start.
+        let results = [(0, 1), (1, 5), (5, 3), (3, 2)].map(|(first, next)| {
+            let ask = AtomicU8::new(first);
+            let taken = take_home_ask(&ask, |checked| {
+                assert_eq!(checked, first);
+                ask.store(next, Ordering::Release);
+                false
+            });
+            (taken, ask.load(Ordering::Acquire), take_home_ask(&ask, |_| false), ask.load(Ordering::Acquire))
+        });
+        assert_eq!(results, [(0, 1, 1, 0), (0, 5, 5, 0), (0, 3, 3, 0), (0, 2, 2, 0)]);
+        let ask = AtomicU8::new(4);
+        assert_eq!(take_home_ask(&ask, |_| true), 0);
+        assert_eq!(take_home_ask(&ask, |_| false), 4);
     }
 
     fn restarts_crop_edits_and_stop_keep_first_checkpoint_until_close() {
