@@ -1,6 +1,6 @@
 //! The carried files are generated: `tools/carry_pkg6.py verify --dest-only` compares every carried file's sha256
-//! with the manifest, so a hand edit fails here. With the fork stage present (`--stage`), `verify` also re-derives
-//! each file from the stage; that run is made by hand at each re-sync.
+//! with the manifest, so a hand edit fails here. The gate also runs full `verify` against the fork stage on this
+//! machine before each test step.
 
 use std::process::Command;
 
