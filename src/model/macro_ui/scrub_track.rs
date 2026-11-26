@@ -108,10 +108,9 @@ pub struct Block {
     dropped: AtomicU32,
     /// The frame the ask is for, plus one; zero for none.
     shown: AtomicU32,
-    /// Each role's last point asked of the stage (x and y bits), and what the stage said: 0 not asked, 1 a body
-    /// may stand there, 2 it may not. The game thread only.
+    /// Each role's last world point and tagged verdict. Only the game side touches these, under `holds`.
     classed: [AtomicU64; 2],
-    stands: [AtomicU32; 2],
+    stands: [AtomicU64; 2],
     /// Each role's hold, as the placement picker keeps one. The game thread only, with `try_lock`.
     pub holds: hos_lock::Mutex<[Option<CpuPreview>; 2]>,
 }
@@ -124,7 +123,7 @@ impl Block {
             dropped: AtomicU32::new(0),
             shown: AtomicU32::new(0),
             classed: [const { AtomicU64::new(0) }; 2],
-            stands: [const { AtomicU32::new(0) }; 2],
+            stands: [const { AtomicU64::new(0) }; 2],
             holds: hos_lock::Mutex::new([None; 2]),
         })
     }
@@ -173,15 +172,20 @@ impl Block {
         Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing })
     }
 
-    /// The game thread: whether the role's body may stand at `at`. The stage is asked (`class`) once per point, so a
-    /// held body casts rays only when its point changes.
+    /// Recheck on a new ask even at identical coordinates, or if a moving anchor changes this ask's world point.
     pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
         let (Some(point), Some(verdict)) = (self.classed.get(slot), self.stands.get(slot)) else { return false };
         let key = u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits());
-        if point.swap(key, Ordering::AcqRel) != key || verdict.load(Ordering::Acquire) == 0 {
-            verdict.store(if class() { 1 } else { 2 }, Ordering::Release);
+        // Zero means invalid; the low bit of a tagged answer is the verdict.
+        let tag = (u64::from(self.ask.generation()) + 1) << 1;
+        let cached = verdict.load(Ordering::Relaxed);
+        if cached & !1 == tag && point.load(Ordering::Relaxed) == key {
+            return cached & 1 != 0;
         }
-        verdict.load(Ordering::Acquire) == 1
+        let ok = class();
+        point.store(key, Ordering::Relaxed);
+        verdict.store(tag | u64::from(ok), Ordering::Relaxed);
+        ok
     }
 
     /// The role whose home anchors the group.
@@ -1044,6 +1048,30 @@ mod tests {
             let pair = take.take(1).unwrap()[0];
             assert_eq!(pair[0], state(recorded, 9));
             assert_eq!(pair[1].start.fighter_kind, -1, "frame zero inherited a partner from another take");
+        }
+    }
+
+    #[test]
+    fn a_new_shown_frame_rechecks_the_same_point_on_both_roles() {
+        use crate::model::stage_geometry::{classify, Copied, Met};
+        let block = Block::new();
+        let ask = Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)); 2] };
+        let permits = |floor_y| {
+            let floor = [Met { ends: [[-20.0, floor_y], [20.0, floor_y]], stand: true, through: false }];
+            can_stand(classify(&mut Copied(&floor), [-100.0, 100.0, 100.0, -100.0], [0.0, 0.0]))
+        };
+        block.ask_at(Some(10), ask);
+        for slot in 0..2 {
+            assert!(block.standable(slot, [0.0, 0.0], || permits(-4.0)));
+        }
+        block.ask_at(Some(10), ask);
+        for slot in 0..2 {
+            assert!(block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged hold")));
+        }
+        block.ask_at(Some(11), ask);
+        for slot in 0..2 {
+            assert!(!block.standable(slot, [0.0, 0.0], || permits(4.0)), "frame 11: role {slot} is inside the floor");
+            assert!(!block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged refusal")));
         }
     }
 

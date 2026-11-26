@@ -71,7 +71,7 @@ unsafe fn hold(block: &Block, index: usize, slot: &mut Option<CpuPreview>, acces
 }
 
 /// The shared stage rule for a point, read by the placement ray through this role's own body on its own frame. The
-/// block asks it once per point. A stage that cannot be read lets nobody stand.
+/// block asks it again for a new shown frame or a changed world point. A stage that cannot be read lets nobody stand.
 unsafe fn stands(accessor: usize, at: [f32; 2]) -> bool {
     let Some(blast) = super::tech_surfaces::blast_bounds() else { return false };
     can_stand(RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
