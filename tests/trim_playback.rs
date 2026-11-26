@@ -21,6 +21,69 @@ use std::sync::{Mutex, MutexGuard};
 
 use crate::engine::rr_host as host;
 
+#[test]
+fn install5_previewable_capture_windows_remain_previewable() {
+    use macros::{MoveFamily, MoveStartRules, ReplayFrame, ReplaySession, ReplayTrack};
+
+    const CLEAN: [i32; 3] = [0, 14, 15];
+    let rules = MoveStartRules {
+        families: vec![MoveFamily { fighter: None, statuses: vec![45, 46, 47], buttons: 1 }],
+        setup: vec![7], ground: 0, air: 2, wait: 0, fall: 14, trigger_buttons: 1,
+    };
+    let frames: Vec<_> = (0..48).map(|i| {
+        let status = match i {
+            0..=3 | 40..=47 => 0, 4..=7 => 14, 8..=11 => 7, 12..=15 | 32..=34 => 45,
+            16..=18 | 35..=36 => 46, 19 | 37 => 47, 20..=27 => 15, 28..=31 => 7, _ => 99,
+        };
+        ReplayFrame {
+            input: InputFrame { buttons: u32::from([5, 10, 31].contains(&i)), lstick_x: i as i8, ..Default::default() },
+            start: StartState { status, situation: if (4..=27).contains(&i) { 2 } else { 0 },
+                ..StartState::neutral(if i < 40 { 74 } else { 8 }, 0, 1.0) }, x: 0.0, y: 0.0,
+        }
+    }).collect();
+    let session = ReplaySession { tracks: vec![ReplayTrack {
+        entry: 1, frames, quantized_analog: false, fighter: None,
+    }], breaks: vec![24], truncated: false };
+    let track = &session.tracks[0];
+    let mut accepted = [0; 3];
+    for out in 1..=48 {
+        for at in 0..out {
+            for (mode, key) in [None, Some(ClipAction::Snap), Some(ClipAction::UseLeadIn)].into_iter().enumerate() {
+                // Install 5's ordinary In, plain-Y boundaries (the press at 10 is grouped
+                // with 5), and its unchanged chord rule. Out is exclusive.
+                let (start, context) = match key {
+                    Some(ClipAction::UseLeadIn) => match rules.snap(track, at) {
+                        Ok(mv) if mv.action_frame < out => (mv.frame, mv.context),
+                        _ => continue,
+                    },
+                    _ => {
+                        let n = if key.is_some() {
+                            [0_u32, 5, 31].into_iter().min_by_key(|&m| (m.abs_diff(at), m)).unwrap().min(out - 1)
+                        } else { at };
+                        let context = track.frames[n as usize].start;
+                        if !CLEAN.contains(&context.status) { continue; }
+                        (n, context)
+                    }
+                };
+                if (start < 24 && 24 < out) || (start < 40 && 40 < out) { continue; }
+                let mut editor = ClipEditor::new(session.clone(), CLEAN.to_vec()).unwrap().with_move_rules(rules.clone());
+                editor.on_action(ClipAction::SelectOut);
+                editor.on_action(ClipAction::Nudge(out as i32 - 48));
+                editor.on_action(ClipAction::SelectIn);
+                editor.on_action(ClipAction::Nudge(at as i32));
+                if let Some(key) = key { assert!(matches!(editor.on_action(key), ClipEffect::StopPreview), "{key:?} {at}..{out}"); }
+                let ClipEffect::Preview(take) = editor.on_action(ClipAction::TogglePlay) else {
+                    panic!("lost an install 5 preview: {key:?} {at}..{out} (In {start})")
+                };
+                assert_eq!(take.start, context);
+                assert!(take.frames.iter().copied().eq(track.frames[start as usize..out as usize].iter().map(|f| f.input)));
+                accepted[mode] += 1;
+            }
+        }
+    }
+    assert!(accepted.iter().all(|&count| count > 0), "{accepted:?}");
+}
+
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 static HOST: Mutex<()> = Mutex::new(());
 
