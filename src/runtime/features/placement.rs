@@ -82,6 +82,15 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
     hold_at(slot, body, id, at, false)
 }
 
+/// Read by the release tracer at the hold's seam, before this frame's write: the body's id with three flags (bit 32
+/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read), then three pairs of f32 words:
+/// the point asked for on this frame, where the game left the body, and its speed.
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64) {
+    std::hint::black_box((meta, asked, seen, speed));
+}
+
 /// `preview` for either fighter and either place (the placement picker). `grounded`: the body stands on its floor
 /// point, awake, every frame; a body the hold had put to sleep is woken first.
 pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32, at: [f32; 2], grounded: bool) -> Option<bool> {
@@ -92,6 +101,14 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
     // The body as the game left it, before this frame's write.
     let seen = [natives::pos_x(body), natives::pos_y(body)];
     let landed = natives::situation_kind(body) == konst(C::SituationGround);
+    let speed = super::recording_host::fighter_speed(body);
+    let pack = |[low, high]: [f32; 2]| u64::from(low.to_bits()) | (u64::from(high.to_bits()) << 32);
+    placement_hold_seam(
+        u64::from(id) | (u64::from(landed) << 32) | (u64::from(grounded) << 33) | (u64::from(speed.is_some()) << 34),
+        pack(at),
+        pack(seen),
+        pack(speed.map_or([0.0; 2], |(x, y)| [x, y])),
+    );
     let act = crosshair::hold_step(slot, id, grounded, || Origin { at: seen, grounded: landed, facing: natives::lr(body) });
     if let Some(preview) = slot {
         preview.observe(at, seen, landed, grounded);
