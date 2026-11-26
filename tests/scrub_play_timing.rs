@@ -57,10 +57,21 @@ fn start(root: &Path, id: &str) {
     let state = |kind| { let mut s = SavedState::never_saved(); s.fighter_kind = kind; s };
     let tick = || host::service_at(root, &[None, None, None, None, None], "2026-11-26", state(8), state(7));
     tick();
+    warm();
     TIMED.with(|timed| timed.set(Some(Instant::now())));
     host::on_chords(false, true, false);
     tick();
     assert_eq!(host::take_player_frame().map(|frame| frame.buttons), Some(1), "the first input after the chord");
+}
+
+/// Keep the core busy for 5 ms just before a timed span. The spans are a fraction of a millisecond and follow synced
+/// file writes (the fixture, the index save); a core that has just slept through one starts the span slower, and
+/// by a different amount on each run. A Play press in a game finds a busy core.
+fn warm() {
+    let began = Instant::now();
+    while began.elapsed().as_micros() < 5_000 {
+        std::hint::spin_loop();
+    }
 }
 
 thread_local! {
@@ -71,6 +82,7 @@ thread_local! {
 /// chord, so its setup (the index write, the reset, the warm tick) is not counted.
 fn report(name: &str, frames: usize, json: u64, mut what: impl FnMut()) {
     let mut times: Vec<u128> = (0..RUNS).map(|_| {
+        warm();
         let began = Instant::now();
         TIMED.with(|timed| timed.set(None));
         what();
