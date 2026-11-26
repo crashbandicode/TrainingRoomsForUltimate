@@ -351,6 +351,14 @@ Crop on a macro, combo or drill opens this same editor. A one-side file has no f
 - A combo has one mark per link and a drill one per step, with the name the list shows.
 - The timeline draws the 24 marks nearest the playhead. A take keeps ends for its first 32 moves.
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*L, then Left/Right: the start handle moves and the fighters stand where the recording had them on that frame; R does the same for the end. No preview is played. Eden, 2026-11-26, the build after install 5, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*With nothing selected, Left/Right moves the playhead, Y jumps to the nearest move's start, and L or R cuts there. Eden, 2026-11-26, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-playhead.mp4)
+
 ![Moving a macro's start handle from frame 0 to 180 keeps the final 134 frames](../media/rc15-crop-editor.gif)<br>
 *Macro Crop, Eden, 2026-11-15, rc.15 d520d325 (untested on hardware). L selects the start handle; Left/Right moves it. This clip shows range selection.*
 

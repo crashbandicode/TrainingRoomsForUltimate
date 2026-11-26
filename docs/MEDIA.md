@@ -18,6 +18,8 @@ player never sees. It is cropped out: the picture is the 1842×1036 region at (3
 | `tut-menu-change-option.mp4` | CPU › Crouch flips On with D-pad Right, the menu closes, the CPU crouches | `t02-menu-change-option`, 1.6–8.6 s | 1,514,380 | `9ef6bc2ccd65da7c` | [Using the menu](guide/using-the-menu.md) |
 | `tut-controls-change-chord.mp4` | Button chords: Save State Save is changed to ZL + D-pad Left, which then saves | `t04-controls-change-chord`, 0.2–7.8 s | 1,867,343 | `4b49a4cb454bea75` | [Controls](guide/controls.md) |
 | `tut-save-load.mp4` | ZL + D-pad Down saves, two jabs hit the CPU, ZL + D-pad Up puts both fighters back at 0% | `t06-save-load` of run `tut-c51f4d81-yoga-2` (the diagnostic build of `c51f4d81`), 0.5–7.5 s, whole frame: the capture tool was switched off during the take, so nothing is cropped | 3,748,140 | `435f35b4f8e24e1c` | [Save states](guide/save-states.md) |
+| `tut-clip-scrub.mp4` | Crop on a macro: L, Right moves the start and the fighters stand where the recording had them; R, Left moves the end; R releases them. No preview | `t41-clip-scrub` of run `tut-5df3d9dc-yoga-3` (the diagnostic build of `5df3d9dc`), 0.6–10.8 s | 2,866,172 | `0aafcffcbbcd865d` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
+| `tut-clip-playhead.mp4` | The playhead: Right browses the take with the fighters following, Y jumps to a moves start, L and R cut there | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 
 ## rc.15 install 4 clips (2026-11-25)
 

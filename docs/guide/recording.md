@@ -265,6 +265,14 @@ Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](..
 - A combo crop keeps the links from the first handle through the last; a drill crop keeps the selected steps. The handles step by whole links or steps, and X is not offered.
 - A chain has no Crop row, because it has no frames of its own. The Replay window is a separate row under Replays.
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
+
+*Crop on a macro, no preview played. L selects the start; holding Right moves it, and the fighters stand where the recording had them on that frame. R selects the end; holding Left moves it back. R again lets both fighters go. Eden, 2026-11-26, the build after install 5, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-scrub.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+
+*The playhead, with nothing selected. Holding Right moves it through the take (the range line reads `playhead 64`) and the fighters follow. Y jumps to the nearest move's start and L sets the start there. L again, Right, then R sets the end at the playhead. Eden, 2026-11-26, `5df3d9dc` (not checked on the console).* [Open the clip](../media/tut-clip-playhead.mp4)
+
 ![A macro start handle moves from frame 0 to 180](../media/rc15-crop-editor.gif)<br>
 *Macro Crop range selection: L, then Left/Right moves the start handle. Eden, 2026-11-15, rc.15 `d520d325`. Preview and save-as-new were checked separately; this clip shows the selection.*
 
