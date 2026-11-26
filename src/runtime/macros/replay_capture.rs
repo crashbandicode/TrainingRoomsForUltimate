@@ -1059,7 +1059,7 @@ fn apply_action_as(action: ClipAction, playback: bool) {
             if file || !matches!(action, ClipAction::Confirm) { return e.on_action(action); }
             let view = e.view();
             let configuration = e.target_for(view.entry, e.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);
-            e.confirm_capture(|recording| {
+            e.confirm_macro(|recording| {
                 if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }
                 else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {
                     // restriction: replay-mii-metadata

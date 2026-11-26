@@ -784,17 +784,11 @@ impl ClipEditor {
                 self.pause();
                 if let Some(FileSource::Combo(recording)) = &self.file {
                     return match recording.crop_units(self.window.start(), self.window.end()) {
-                        Ok(saved) => { self.browsed = false; ClipEffect::ExportCombo(Box::new(saved)) }
+                        Ok(saved) => ClipEffect::ExportCombo(Box::new(saved)),
                         Err(error) => ClipEffect::Error(error.to_string()),
                     };
                 }
-                if self.file.is_some() {
-                    return match self.export_selection(&self.source_name) {
-                        Ok(recording) => { self.browsed = false; ClipEffect::Export(Box::new(recording)) }
-                        Err(error) => ClipEffect::Error(error),
-                    };
-                }
-                return self.confirm_capture(|_| Ok(()));
+                return self.confirm_macro(|_| Ok(()));
             }
             ClipAction::Cancel => {
                 if self.playing {
@@ -809,11 +803,13 @@ impl ClipEditor {
     }
 
     /// The game validates the exact saved identity before accepting A; preview only needs the inputs.
-    pub fn confirm_capture(&mut self, attach: impl FnOnce(&mut MacroRecording) -> Result<(), String>) -> ClipEffect {
-        let suffix = format!(" P{}", self.track().entry + 1);
-        let prefix: String = self.source_name.chars()
-            .take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
-        match self.export_selection(&format!("{prefix}{suffix}")).and_then(|mut take| { attach(&mut take)?; Ok(take) }) {
+    pub fn confirm_macro(&mut self, attach: impl FnOnce(&mut MacroRecording) -> Result<(), String>) -> ClipEffect {
+        let crop = if self.file.is_some() { self.export_selection(&self.source_name) } else {
+            let suffix = format!(" P{}", self.track().entry + 1);
+            let prefix: String = self.source_name.chars().take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
+            self.export_selection(&format!("{prefix}{suffix}"))
+        };
+        match crop.and_then(|mut take| { attach(&mut take)?; Ok(take) }) {
             Ok(take) => { self.error = None; self.browsed = false; self.pause(); ClipEffect::Export(Box::new(take)) }
             Err(error) => { self.report_error(error.clone()); ClipEffect::Error(error) }
         }
