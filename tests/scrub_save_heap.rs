@@ -45,6 +45,8 @@ fn a_maximum_take_keeps_its_inputs_and_first_two_minutes_of_positions() {
         let peak = after.peak - before.live;
         writeln!(std::io::stderr(), "SCRUB_LIST path={phase} count={count} peak_above_idle={peak} largest={} time_us={}", after.largest, elapsed.as_micros()).unwrap();
         assert_eq!(count, MAX_FRAMES);
+        let file_bytes = fs::metadata(folder.join(format!("{id}.json"))).unwrap().len() as isize;
+        assert!(peak < file_bytes + 1024 * 1024, "the directory needs one file buffer and its metadata, not a parsed JSON tree or position track");
         return;
     }
     if env::var("TR_SCRUB_PHASE").as_deref() == Ok("load") {
