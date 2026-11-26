@@ -149,138 +149,205 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 
 ## Install 5
 
-Installed 2026-11-25 (23:06). Build `b7a382e4`. It is still an rc.15 build: its footer reads
-`0.2.0-rc.15 · rc15 b7a382e4`. It holds the ten changes below, all merged on 2026-11-25.
+| Install 5 | Details |
+| --- | --- |
+| Installed | 2026-11-25 (23:06), and read back |
+| Build | `b7a382e4`. Still an rc.15 build: the footer reads `0.2.0-rc.15 · rc15 b7a382e4` |
+| Holds | the ten changes below, all merged on 2026-11-25 |
+
+| Change | In short |
+| --- | --- |
+| [Record with an AI on Player 1](#record-works-while-an-ai-plays-player-1) | Record starts instead of being refused |
+| [Named grabs, throws and edge attacks](#grabs-throws-and-edge-attacks-are-named-in-combo-files) | Five more moves are written by name in combo files |
+| [B stops a preview](#b-stops-a-preview-and-the-pop-up-shows-its-chords) | And the Recording pop-up shows your chords |
+| [Delete for replay captures](#delete-for-replay-captures) | A Delete row, and Y in the Replay window |
+| [Named move marks](#the-clip-editor-s-marks-name-the-form-of-a-move) | Jab 1, Jab 2, Forward air on the editor's timeline |
+| [Playback start](#playback-starts-without-reading-the-library) | Play no longer reads the whole library; a Playback delay option |
+| [Guard the Edge and Juggler](#guard-the-edge-and-juggler-start-from-the-floor-you-stand-on) | They start from the floor you stand on |
+| [Two Guard the Edge options](#two-guard-the-edge-options) | Under the stage; CPU midair jumps |
+| [Eggs-ercise](#eggs-ercise-s-off-stage-zone-follows-the-stage) | The off-stage zone follows the stage |
+| [Change placement](#a-save-s-placement-is-changed-with-the-crosshair) | Move where a save puts the fighters, with the crosshair |
 
 ### Record works while an AI plays Player 1
 
-- With the CPU pilot plugin, or TrainingRooms' own Player 1 control, playing Player 1, Record now starts. The take
-  holds Player 1's inputs as the game receives them, the AI's included.
-- Before, Record was refused. Play on Player 1 and L + R + A are still refused while an AI plays Player 1.
-- More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1).
+*Clip coming.*
+
+An AI here is the CPU pilot plugin, or TrainingRooms' own Player 1 control.
+
+| While an AI plays Player 1 | Install 5 | Before |
+| --- | --- | --- |
+| Record | Starts. The take holds Player 1's inputs as the game receives them, the AI's included | Refused |
+| Play on Player 1 | Refused | Refused |
+| L + R + A | Refused | Refused |
+
+More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1).
 
 ### Grabs, throws and edge attacks are named in combo files
 
-- A combo file now writes `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack` by name in a link's
-  `from` and `to`.
-- **Not backward compatible:** install 4 and earlier skip a file that has one of these five there. Files without them
-  are not affected, and this build still reads older files.
-- More: [Combo files › The format](guide/combos.md#the-format).
+| Combo files | Install 5 |
+| --- | --- |
+| Written by name | `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack`, in a link's `from` and `to` |
+| **Not backward compatible** | Install 4 and earlier skip a file that has one of these five there |
+| Not affected | Files without them. This build still reads older files |
+
+More: [Combo files › The format](guide/combos.md#the-format).
 
 ### B stops a preview, and the pop-up shows its chords
 
-- While any preview plays, the key line reads `B stop preview`. B or X stops it and drops the rest of its frames.
-- After the last frame the result stays for about a second and the key line reads `B back`.
-- The Recording pop-up's first help line shows the Record, Play on Player 1 and Play on CPU chords as you have set
-  them.
-- More: [Recording › Replay window](menu/recording.md#replay-window) and
-  [The Recording pop-up](menu/recording.md#the-recording-pop-up).
+*Clip coming.*
+
+| When | The key line reads | What happens |
+| --- | --- | --- |
+| While any preview plays | `B stop preview` | B or X stops it and drops the rest of its frames |
+| After the last frame, for about a second | `B back` | The result stays on screen |
+
+The Recording pop-up's first help line shows the Record, Play on Player 1 and Play on CPU chords as you have set
+them.
+
+More: [Recording › Replay window](menu/recording.md#replay-window) and
+[The Recording pop-up](menu/recording.md#the-recording-pop-up).
 
 ### Delete for replay captures
 
-- A capture's screen under RECORDINGS has a **Delete** row, and Y deletes the capture under the cursor in the Replay
-  window. It is removed at once, without asking, as a macro is.
-- Macros, combos and drills already made from it stay. The game's own replay in the Vault is untouched.
-- More: [Recording › Recordings](menu/recording.md#recordings).
+*Clip coming.*
+
+| Where | How |
+| --- | --- |
+| A capture's screen under RECORDINGS | The **Delete** row |
+| The Replay window | Y deletes the capture under the cursor |
+
+| Delete | What it does |
+| --- | --- |
+| Asks first | No. The capture is removed at once, as a macro is |
+| Keeps | Macros, combos and drills already made from it. The game's own replay in the Vault is untouched |
+
+More: [Recording › Recordings](menu/recording.md#recordings).
 
 ### The clip editor's marks name the form of a move
 
-- A move mark on the editor's timeline keeps which form of the move it was: the first, second or third jab, the
-  rapid jab or its finisher, which aerial, grab or throw, and a side tilt or smash aimed up or down.
-- With Move names On, a mark reads as the combo and drill lists do, for example Jab 1, Jab 2 or Forward air. A take
-  saved before this has no forms: its jab reads Jab.
-- A take, and each fighter of a replay capture, stores the fighter it was recorded on, so its specials keep that
-  fighter's own names whoever Player 1 is.
-- More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
+| Move marks | Install 5 |
+| --- | --- |
+| A mark keeps the form of its move | The first, second or third jab, the rapid jab or its finisher, which aerial, grab or throw, and a side tilt or smash aimed up or down |
+| With Move names On | A mark reads as the combo and drill lists do, for example Jab 1, Jab 2 or Forward air |
+| A take saved before this | Has no forms: its jab reads Jab |
+| Specials | A take, and each fighter of a replay capture, stores the fighter it was recorded on, so its specials keep that fighter's own names whoever Player 1 is |
+
+More: [Recording › Replay window](menu/recording.md#replay-window) and [Move names](menu/recording.md#move-names).
 
 ### Playback starts without reading the library
 
-- Play no longer reads the whole recording library before it starts. It reads the index, the file each side plays
-  and its start save, and nothing while a macro plays. How long a start now takes has not been measured in a game.
-- **Playback delay** is a new option under Recording › Options, None by default (10 to 120 frames). It waits after
-  the fighters are placed and before the first input, once per Play. It applies to Play on Player 1, Play on CPU, a
-  capture's Play back and Make combo's pass; not to the editor's previews or the CPU's Playback Slots.
-- **Known limit:** if Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can pass
-  what you hold instead of nothing. It is one frame at most, at the start.
-- More: [Playback delay](menu/recording.md#playback-delay).
+| Play's start | Install 5 |
+| --- | --- |
+| What it reads | The index, the file each side plays and its start save. Not the whole recording library, and nothing while a macro plays |
+| How long it takes | Timed in Eden on 2026-11-26, not on the console: 9 frames after the press for a 3-second macro, 10 or 11 for a 30-second one, 27 for a ten-minute one. [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc) |
+| Known limit | If Play on Player 1 starts in the middle of one of Player 1's input polls, that one poll can pass what you hold instead of nothing. It is one frame at most, at the start |
+
+| Playback delay | A new option under Recording › Options |
+| --- | --- |
+| Values | None by default; 10 to 120 frames |
+| When it waits | After the fighters are placed and before the first input, once per Play |
+| Applies to | Play on Player 1, Play on CPU, a capture's Play back and Make combo's pass |
+| Does not apply to | The editor's previews, or the CPU's Playback Slots |
+
+More: [Playback delay](menu/recording.md#playback-delay).
 
 ### Guard the Edge and Juggler start from the floor you stand on
 
-- Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with more than
-  one piece of ground, such as the Training stage, stand on the piece you want and choose Start.
-- Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side.
-  Juggler needs no ledge: its CPU spot is over the stage or in open air beside it.
-- When Start cannot begin the drill, the row returns to Start and a message explains why: "The stage could not
-  be read", "Stand on the stage to start this drill" or "This floor has no ledge to guard". Before this change,
-  the Training stage check left the menu showing Running even though neither drill began
-  ([Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)).
-- In Juggler's setup, "Pick a point over the stage or beside it" means the CPU spot was refused. Stay on the
-  CPU page, move the crosshair and press **A** again.
-- A start you set up is used again only on the floor it was made on.
-- More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
+*Clip coming for the choice of floor. Each drill's set-up is filmed in its guide:
+[Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).*
+
+| Rule | What it means |
+| --- | --- |
+| Where a drill starts | From the floor you are standing on, not from the middle of the stage. On a stage with more than one piece of ground, such as the Training stage, stand on the piece you want and choose Start |
+| Guard the Edge's sides | Each end of that floor that has open air beside it. A floor with one such end has one side |
+| Juggler | Needs no ledge: its CPU spot is over the stage or in open air beside it |
+| A start you set up | Is used again only on the floor it was made on |
+
+| When | The message |
+| --- | --- |
+| Start cannot begin the drill; the row returns to Start | "The stage could not be read", "Stand on the stage to start this drill" or "This floor has no ledge to guard" |
+| Juggler's set-up refused the CPU spot | "Pick a point over the stage or beside it". Stay on the CPU page, move the crosshair and press **A** again |
+
+Before this change, the Training stage check left the menu showing Running even though neither drill began
+([Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)).
+
+More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
 
 ### Two Guard the Edge options
 
-- **Under the stage** (Off by default). On: the CPU's start can also be a point under the stage.
-- **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with its midair jumps already spent.
-- Known limits: a point just under the stage can put the fighter's upper body inside the stage; Perfect mode's route
-  from under the stage is not established; whether a fighter's own moves give the jumps back is not known.
-- More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
+*Clip coming.*
+
+| Option | Default | The other setting |
+| --- | --- | --- |
+| **Under the stage** | Off | On: the CPU's start can also be a point under the stage |
+| **CPU midair jumps** | Kept | Used: the CPU starts every attempt with its midair jumps already spent |
+
+| Known limit | |
+| --- | --- |
+| A point just under the stage | Can put the fighter's upper body inside the stage |
+| Perfect mode | Its route from under the stage is not established |
+| The fighter's own moves | Whether they give the jumps back is not known |
+
+More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stages.md#guard-the-edge-and-juggler).
 
 ### Eggs-ercise's off-stage zone follows the stage
 
-- Each zone lies beside a ledge of the stage's main floor that has open air next to it, so a stage can have two
-  zones, one or none. The zone's outer edge stops where that open air ends. On the Training stage the one zone is
-  the gap between the long floor and the island.
-- A target appears only in the air off stage: never inside another part of the stage, and never above a floor or a
-  platform.
-- Known limits: a platform that moves after the stage is read is not followed, and a piece of the stage narrower
-  than 10 units can be missed.
-- More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise).
+*Clip coming.*
+
+| The off-stage zone | Install 5 |
+| --- | --- |
+| Where a zone lies | Beside a ledge of the stage's main floor that has open air next to it, so a stage can have two zones, one or none |
+| Its outer edge | Stops where that open air ends |
+| On the Training stage | The one zone is the gap between the long floor and the island |
+| Where a target appears | Only in the air off stage: never inside another part of the stage, and never above a floor or a platform |
+| Known limits | A platform that moves after the stage is read is not followed, and a piece of the stage narrower than 10 units can be missed |
+
+More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercise).
 
 ### A save's placement is changed with the crosshair
 
-- **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
-  game: move the fighters with the crosshair. The five pages are Where, Spot, State, Percent and Preview.
-  Press A on Preview to save, or + to save from any page.
-- It opens from the Recording page, from a save's, a macro's or a chain's own screen, and with X on a save in the
-  pop-up. For a macro it changes the macro's start save.
-- If at least one macro starts from the save, the picker normally asks whether to change it or make a copy.
-  Copy from a macro changes its start-save link to the copy; for a chain, only its first macro gets that link.
-  Copy from the save itself leaves all macro links alone. **Shared start save** can answer ahead: Always change
-  or Always copy instead of Prompt.
-- A fighter switched to Off stage stays where it is when the spot is in open air or under the stage. When the spot
-  is over the stage or inside it, the fighter goes to the open air beside the nearest ledge, and the crosshair then
-  moves freely.
-- The picker preserves each macro's inputs, Momentum and offset. A macro with an offset from an earlier build
-  keeps it until you clear it with the Offset row on the macro's own screen.
-- More: [Recording › Change placement](menu/recording.md#change-placement) and
-  [the guide](guide/recording.md#change-placement-and-the-replay-window).
+*Clip coming.*
+
+**Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
+game: move the fighters with the crosshair.
+
+| The picker | |
+| --- | --- |
+| Pages | Where, Spot, State, Percent and Preview |
+| To save | A on Preview, or + from any page |
+| Opens from | The Recording page; a save's, a macro's or a chain's own screen; X on a save in the pop-up. For a macro it changes the macro's start save |
+
+If at least one macro starts from the save, the picker normally asks whether to change it or make a copy.
+**Shared start save** can answer ahead: Always change or Always copy instead of Prompt.
+
+| A copy made from | Which macro links change |
+| --- | --- |
+| A macro | That macro's start-save link goes to the copy |
+| A chain | Only its first macro gets that link |
+| The save itself | None |
+
+| A fighter switched to Off stage, with the spot | Does this |
+| --- | --- |
+| In open air or under the stage | Stays where it is |
+| Over the stage or inside it | Goes to the open air beside the nearest ledge, and the crosshair then moves freely |
+
+The picker preserves each macro's inputs, Momentum and offset. A macro with an offset from an earlier build
+keeps it until you clear it with the Offset row on the macro's own screen.
+
+More: [Recording › Change placement](menu/recording.md#change-placement) and
+[the guide](guide/recording.md#change-placement-and-the-replay-window).
 
 ### Tested
 
-- **Installed:** yes, and read back. Only TrainingRooms' file changed on the card; the other 20 plugins are
-  byte-identical.
-- **Tested in Eden** (2026-11-25, on this exact build): one short smoke boot, with no crash. Nine of its ten checks
-  passed. Guard the Edge and Juggler opened their set-up on the Training stage. Guard the Edge was also checked from
-  the island and on Battlefield. Eggs-ercise had one off-stage zone in the Training stage's gap; the recording
-  picker's Off stage switch moved Player 1 beside the ledge; a take played on Player 1; and the clip editor opened
-  and previewed.
-- **It was a short check, not a play test.** Neither drill was played through, no placement was saved or loaded,
-  and most of the other new items were not touched. What ran and what did not:
-  [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build).
-- **The waiting room** was not run in that boot, because the test's own route failed. A second boot the same
-  evening reached a Local Wireless waiting room with one player: TrainingRooms' menu opened there, and Guard the
-  Edge opened its set-up. No second player joined, and nothing was played.
-  [Install evidence](EVIDENCE-rc15-installs.md#the-waiting-room-boot)
-- **The operator reported** (2026-11-25, on this build): in the clip editor, the refusal that In is mid-action kept
-  showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it:
-  in a match capture, plain Y can leave In on a mid-action frame. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y
-  for the move start. Release the modifier before pressing X to preview, or press A to save. The fix (`dbded2d1`)
-  is in install 6, not in install 5.
-- **The operator reported** (2026-11-26, on this build): a fighter placed off stage on a save stays on the ground
-  once it has landed; and Guard the Edge's start varies between rounds (the CPU is let go at the same point, and the game's AI then moves differently). Neither is fixed in install 6:
-  [Known issues](CURRENT-RELEASE.md#known-issues).
+| Check | Install 5 |
+| --- | --- |
+| Installed | Yes, and read back. TrainingRooms was the only plugin replaced; the other 20 are byte-identical. A rollback copy of install 4 was also saved on the card |
+| Eden, on this exact build (2026-11-25) | One short smoke boot, with no crash. Nine of its ten checks passed |
+| Seen in that boot | Guard the Edge and Juggler opened their set-up on the Training stage. Guard the Edge was also checked from the island and on Battlefield. Eggs-ercise had one off-stage zone in the Training stage's gap. The recording picker's Off stage switch moved Player 1 beside the ledge. A take played on Player 1. The clip editor opened and previewed |
+| A short check, not a play test | Neither drill was played through, no placement was saved or loaded, and most of the other new items were not touched. [Install evidence](EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build) |
+| The waiting room | Not run in that boot, because the test's own route failed. A second boot the same evening reached a Local Wireless waiting room with one player: TrainingRooms' menu opened there, and Guard the Edge opened its set-up. No second player joined, and nothing was played. [Install evidence](EVIDENCE-rc15-installs.md#the-waiting-room-boot) |
+| The operator reported, 2026-11-25 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. A host test reproduces it: in a match capture, plain Y can leave In on a mid-action frame. The way round and the fix, which is in install 6 (`dbded2d1`) and not in install 5: [Known issues](CURRENT-RELEASE.md#known-issues) |
+| The operator reported, 2026-11-26 | A fighter placed off stage on a save stays on the ground once it has landed; and Guard the Edge's start varies between rounds (the CPU is let go at the same point, and the game's AI then moves differently). Neither is fixed in install 6: [Known issues](CURRENT-RELEASE.md#known-issues) |
 
 ## Install 4
 
