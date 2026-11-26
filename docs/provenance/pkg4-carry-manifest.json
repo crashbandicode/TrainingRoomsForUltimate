@@ -1925,7 +1925,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "e34aabed3cc6754dec9358cbf3ec542ad22e1f1fa6ee5c64fa249857f9c4247d",
+   "dest_sha256": "d0ae63942655f0b42e40c9c9bb740a806584034c4ffaa66e1ea8755b4cb49cb5",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2777,6 +2777,21 @@
      "old": "    /// The game side left a fighter where it was: its point is outside the stage (`note_scrub`).\n    off: bool,",
      "new": "    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): test adopting matching, longer tracks without changing selection.",
+     "old": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"the_playhead_browses_the_whole_take_and_leaves_in_and_out\", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),\n            (\"y_snaps_the_playhead_to_the_nearest_mark\", y_snaps_the_playhead_to_the_nearest_mark as fn()),\n            (\"l_and_r_cut_here_after_the_playhead_moved\", l_and_r_cut_here_after_the_playhead_moved as fn()),\n",
+     "new": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"generated_positions_reach_the_open_editor_at_once\", generated_positions_reach_the_open_editor_at_once as fn()),\n            (\"the_playhead_browses_the_whole_take_and_leaves_in_and_out\", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),\n            (\"y_snaps_the_playhead_to_the_nearest_mark\", y_snaps_the_playhead_to_the_nearest_mark as fn()),\n            (\"l_and_r_cut_here_after_the_playhead_moved\", l_and_r_cut_here_after_the_playhead_moved as fn()),\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): test adopting matching, longer tracks without changing selection.",
+     "old": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            e.on_action(ClipAction::SelectIn);\n",
+     "new": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n    fn generated_positions_reach_the_open_editor_at_once() {\n        let mut e = saved_macro(false);\n        let recording = match &e.file {\n            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),\n            _ => panic!(\"macro\"),\n        };\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::NoTrack);\n        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::End);\n        let mut other = loaded.clone();\n        other.frames[0].buttons ^= 1;\n        assert!(!e.adopt_positions(other));\n        let mut shorter = loaded.clone();\n        shorter.set_track(Some(vec![[frame, frame]]));\n        assert!(!e.adopt_positions(shorter));\n        assert_eq!(e.scrub().1, Pos::End);\n        e.on_action(ClipAction::Nudge(-1));\n        assert_eq!(e.scrub().1, Pos::Held);\n        assert!(!combo_editor().adopt_positions(loaded));\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            e.on_action(ClipAction::SelectIn);\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): add an inert position-adoption seam.",
+     "old": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
+     "new": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
     }
    ]
   },

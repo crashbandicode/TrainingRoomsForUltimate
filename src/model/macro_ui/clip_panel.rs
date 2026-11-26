@@ -517,6 +517,8 @@ impl ClipEditor {
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
+    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }
+
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
     pub fn shown_frame(&self) -> Option<u32> {
         (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())
@@ -1297,6 +1299,36 @@ mod tests {
         ClipEditor::macro_file(recording, player).unwrap()
     }
 
+    fn generated_positions_reach_the_open_editor_at_once() {
+        let mut e = saved_macro(false);
+        let recording = match &e.file {
+            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),
+            _ => panic!("macro"),
+        };
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(1));
+        assert_eq!(e.scrub().1, Pos::NoTrack);
+        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
+        let mut loaded = recording.clone();
+        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));
+        assert!(e.adopt_positions(loaded.clone()));
+        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);
+        assert_eq!(e.scrub().1, Pos::Held);
+        e.on_action(ClipAction::Nudge(1));
+        assert_eq!(e.scrub().1, Pos::End);
+        let mut other = loaded.clone();
+        other.frames[0].buttons ^= 1;
+        assert!(!e.adopt_positions(other));
+        let mut shorter = loaded.clone();
+        shorter.set_track(Some(vec![[frame, frame]]));
+        assert!(!e.adopt_positions(shorter));
+        assert_eq!(e.scrub().1, Pos::End);
+        e.on_action(ClipAction::Nudge(-1));
+        assert_eq!(e.scrub().1, Pos::Held);
+        assert!(!combo_editor().adopt_positions(loaded));
+    }
+
     fn b_stops_a_clip_preview_without_leaving() {
         for mut e in [editor(), saved_macro(false), saved_macro(true)] {
             e.on_action(ClipAction::SelectIn);
@@ -1608,6 +1640,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
             ("the_playhead_browses_the_whole_take_and_leaves_in_and_out", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),
             ("y_snaps_the_playhead_to_the_nearest_mark", y_snaps_the_playhead_to_the_nearest_mark as fn()),
             ("l_and_r_cut_here_after_the_playhead_moved", l_and_r_cut_here_after_the_playhead_moved as fn()),

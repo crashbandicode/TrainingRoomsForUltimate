@@ -6,6 +6,7 @@ pub mod clip_marks;
 pub mod clip_panel;
 pub mod drill_preview;
 pub mod macro_panel;
+pub mod play_track;
 pub mod recordings;
 #[cfg(test)]
 pub mod replay_panel;
