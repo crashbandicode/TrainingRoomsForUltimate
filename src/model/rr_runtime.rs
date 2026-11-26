@@ -36,8 +36,9 @@ pub struct Capture {
     spans: Vec<Span>,
     /// The recorded role's fighter, as its take start read it (`MacroRecording::recorded_fighter`).
     fighter: Option<crate::model::move_names::FighterId>,
-    /// Both fighters' state on each frame of the take (`scrub_track::TakeTrack`), when every frame has one.
-    track: Option<Vec<[super::macros::ReplayFrame; 2]>>,
+    /// Both fighters' state on each frame of the take, as far as it was kept (`scrub_track::TakeTrack`). The save
+    /// takes it out.
+    track: std::cell::RefCell<Option<Vec<[super::macros::ReplayFrame; 2]>>>,
 }
 
 impl Capture {
@@ -48,12 +49,12 @@ impl Capture {
             frames: Vec::new(),
             spans: Vec::new(),
             fighter: None,
-            track: None,
+            track: std::cell::RefCell::new(None),
         }
     }
 
     pub fn set_track(&mut self, track: Option<Vec<[super::macros::ReplayFrame; 2]>>) {
-        self.track = track;
+        *self.track.get_mut() = track;
     }
 
     pub fn set_spans(&mut self, spans: &[Span]) {
@@ -83,7 +84,7 @@ pub fn toggle_record(capture: &mut Capture, role: Role) -> bool {
         capture.on = true;
         capture.role = role;
         capture.frames.clear();
-        capture.track = None;
+        *capture.track.get_mut() = None;
         true
     }
 }
@@ -132,9 +133,12 @@ pub fn finish_recording(
     trim: crate::model::trim::Trim,
 ) -> Result<RecordStop, Error> {
     let kept = trim.window(&capture.frames);
-    let track = capture.track.as_ref()
-        .map(|track| track[kept.start.min(track.len())..kept.end.min(track.len())].to_vec())
-        .filter(|track| !track.is_empty());
+    // The track is taken out of the take and cut in place: a long one is never held twice.
+    let track = capture.track.borrow_mut().take().map(|mut track| {
+        track.truncate(kept.end);
+        track.drain(..kept.start.min(track.len()));
+        track
+    }).filter(|track| !track.is_empty());
     let (frames, marks) = finish_take(capture.frames.clone(), &capture.spans, trim);
     if frames.is_empty() {
         return Ok(RecordStop::Empty);

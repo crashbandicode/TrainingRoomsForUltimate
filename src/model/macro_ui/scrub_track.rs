@@ -262,6 +262,20 @@ fn new_block() -> Option<Box<[AtomicU32]>> {
     Some(cells.into_boxed_slice())
 }
 
+/// The worker: free a block. No new push finds it; with a push already inside one, it stays for a later pass.
+fn free_block(table: &TakeTable, chunk: &AtomicPtr<AtomicU32>) {
+    let ptr = chunk.swap(null_mut(), Ordering::SeqCst);
+    if ptr.is_null() {
+        return;
+    }
+    if table.readers.load(Ordering::SeqCst) == 0 {
+        // SAFETY: the block was made by `service_with` with this length, and no push is inside one.
+        drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, TAKE_CHUNK * FRAME_CELLS)) });
+    } else {
+        chunk.store(ptr, Ordering::SeqCst);
+    }
+}
+
 struct TakeTable {
     /// Each role's state as its last fighter frame read it (the capture's sampler).
     live: [[AtomicU32; STATE_CELLS]; 2],
@@ -323,15 +337,8 @@ impl TakeTrack {
                 if let Some(cells) = made {
                     chunk.store(Box::into_raw(cells) as *mut AtomicU32, Ordering::SeqCst);
                 }
-            } else if !open && frames == 0 && !ptr.is_null() {
-                // No new push finds the block; one already inside it keeps it for this pass.
-                chunk.store(null_mut(), Ordering::SeqCst);
-                if table.readers.load(Ordering::SeqCst) == 0 {
-                    // SAFETY: the block was made above with this length, and no push is inside one.
-                    drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, TAKE_CHUNK * FRAME_CELLS)) });
-                } else {
-                    chunk.store(ptr, Ordering::SeqCst);
-                }
+            } else if !open && frames == 0 {
+                free_block(table, chunk);
             }
         }
     }
@@ -373,19 +380,24 @@ impl TakeTrack {
     pub fn take(&self, frames: usize) -> Option<Vec<[ReplayFrame; 2]>> {
         let table = self.table()?;
         let kept = table.len.load(Ordering::Acquire).min(frames);
-        if kept == 0 {
-            return None;
-        }
-        (0..kept).map(|index| {
-            let chunk = table.chunks.get(index / TAKE_CHUNK)?.load(Ordering::SeqCst);
+        let mut track = Vec::new();
+        track.try_reserve_exact(kept).ok()?;
+        for index in 0..kept {
+            let Some(slot) = table.chunks.get(index / TAKE_CHUNK) else { break };
+            let chunk = slot.load(Ordering::SeqCst);
             if chunk.is_null() {
-                return None;
+                break;
             }
-            // SAFETY: as in `push`; only this thread (the worker, in `service`) frees a block.
+            // SAFETY: as in `push`; only this thread (the worker) frees a block.
             let cells = unsafe { std::slice::from_raw_parts(chunk.add(index % TAKE_CHUNK * FRAME_CELLS), FRAME_CELLS) };
             let read = |at: usize| frame_of(std::array::from_fn(|cell| cells[at + cell].load(Ordering::Acquire)));
-            Some([read(0), read(STATE_CELLS)])
-        }).collect()
+            track.push([read(0), read(STATE_CELLS)]);
+            // A block past the first is done with once its last frame is out: a long track is never held twice.
+            if index >= TAKE_CHUNK && (index + 1) % TAKE_CHUNK == 0 {
+                free_block(table, slot);
+            }
+        }
+        (!track.is_empty()).then_some(track)
     }
 }
 
@@ -647,6 +659,14 @@ mod tests {
         fill(TAKE_CHUNK - 1, TAKE_CHUNK + 5);
         let track = take.take(TAKE_CHUNK + 5).expect("a whole track");
         assert_eq!((track.len(), track[TAKE_CHUNK + 4][0].x), (TAKE_CHUNK + 5, state(0, (TAKE_CHUNK + 4) as u32).x));
+        // A block past the first is freed as soon as its frames are out: a second read finds only the first block.
+        fill(0, TAKE_CHUNK - 1);
+        take.service(true, TAKE_CHUNK - 1);
+        fill(TAKE_CHUNK - 1, 2 * TAKE_CHUNK - 1);
+        take.service(true, 2 * TAKE_CHUNK - 1);
+        fill(2 * TAKE_CHUNK - 1, 2 * TAKE_CHUNK + 1);
+        assert_eq!(take.take(2 * TAKE_CHUNK + 1).map(|track| track.len()), Some(2 * TAKE_CHUNK + 1));
+        assert_eq!(take.take(2 * TAKE_CHUNK + 1).map(|track| track.len()), Some(TAKE_CHUNK));
         // Saved and idle: the blocks past the first are freed; the first stays for the next take's first frames.
         take.service(false, 0);
         fill(0, TAKE_CHUNK + 1);
@@ -755,7 +775,9 @@ mod tests {
         let panel = std::fs::read_to_string(format!("{root}/src/model/macro_ui/clip_panel.rs")).unwrap();
         assert!(panel.contains("kept.keep(self.window.start() as usize..self.window.end() as usize);"));
         let runtime = std::fs::read_to_string(format!("{root}/src/model/rr_runtime.rs")).unwrap();
-        assert!(runtime.contains(".map(|track| track[kept.start.min(track.len())..kept.end.min(track.len())].to_vec())"));
+        let finish = runtime.split_once("pub fn finish_recording(").unwrap().1.split_once("\n}").unwrap().0;
+        assert!(finish.contains("capture.track.borrow_mut().take()") && finish.contains("track.drain(..kept.start.min(track.len()));"));
+        assert!(!finish.contains("to_vec()"), "the track is cut in place, not copied");
     }
 
     #[test]
