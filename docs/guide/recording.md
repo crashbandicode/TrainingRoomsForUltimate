@@ -265,7 +265,7 @@ Sequences in rc.15 offer hit combos only. Their continuation currently checks th
 Crop on a combo, drill or macro opens the Replay window's clip editor ([keys](../menu/recording.md#replay-window)). It is a strip over the bottom of the screen; the fighters stay visible above it.
 
 - L selects In and R selects Out; Left/Right move the selected handle. Hold to move faster. B leaves when the editor is idle.
-- 2026-11-26, in install 6: on a macro, with no handle selected, Left/Right move the playhead over the whole take. Y takes it to the start of the move it is in, or of the nearest one. Once it has moved, L makes that frame the first kept and R makes it the last. The second clip above shows all three on one macro, in Eden on install 6's diagnostic build.
+- In install 6, with neither handle selected on a macro, Left/Right move the playhead over the whole take. Y takes it to the start of the move it is in, or of the nearest one. Once it has moved, L makes that frame the first kept and R makes it the last. The second clip above shows all three on one macro, in Eden on install 6's diagnostic build.
 - The timeline marks where each move starts and, when known, where it ends. Y snaps the selected handle to the nearest one: In to a start, Out to an end.
 - A opens the name keyboard and saves the cut as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays; a crop of the role's active macro becomes its new active macro.
 - A macro crop keeps that range of input frames and the original's one start context. Move marks recorded with the take stay with the frames they belong to.
