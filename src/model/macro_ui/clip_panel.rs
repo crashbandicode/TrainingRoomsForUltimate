@@ -656,7 +656,7 @@ impl ClipEditor {
             let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
             let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
             recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
-                frames.iter().enumerate()
+                frames.iter().take(scrub_track::POSITION_FRAMES).enumerate()
                     .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
                     .collect()
             }));

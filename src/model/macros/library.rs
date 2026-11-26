@@ -61,6 +61,10 @@ impl Record for MacroRecording {
         !super::recording::is_chain_document(bytes)
     }
 
+    fn for_listing(_id: &str, bytes: &[u8]) -> Result<Self, MacroError> {
+        super::recording::listing_record(bytes)
+    }
+
     fn name(&self) -> &str {
         &self.name
     }

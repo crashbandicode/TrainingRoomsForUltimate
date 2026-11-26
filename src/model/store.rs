@@ -137,6 +137,10 @@ pub trait Record: Serialize + DeserializeOwned {
     fn owns(_bytes: &[u8]) -> bool {
         true
     }
+    /// Menu-only read. A record can omit payloads which neither listing consumes.
+    fn for_listing(id: &str, bytes: &[u8]) -> Result<Self, Self::Error> {
+        decode::<Self>(id, bytes)
+    }
 }
 
 /// A `.json` file that could not be used, and why.
@@ -190,7 +194,7 @@ impl<R: Record> ListCursor<R> {
         if !R::owns(&data) {
             return true;
         }
-        match decode::<R>(id, &data) {
+        match R::for_listing(id, &data) {
             Ok(rec) => self.entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
             Err(err) => self.skipped.push(SkippedFile { file: name, reason: err.to_string() }),
         }
@@ -294,7 +298,7 @@ impl<R: Record> Store<R> {
             return Ok(None);
         };
         Ok(if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
-            decode::<R>(id, &data).ok().map(Ok)
+            R::for_listing(id, &data).ok().map(Ok)
         } else if S::accepts_id(id) && data.len() as u64 <= S::MAX_FILE_BYTES {
             decode::<S>(id, &data).ok().map(Err)
         } else {
